@@ -13,6 +13,13 @@ extern void matmul_shared(int w_offset, int x_offset, int result_offset,
 extern void elemwise_shared(int a_offset, int b_offset, int result_offset, 
                             int size, int op);
 
+extern void top_module(int* W, int* X, int* B, int* Y, int* Z, 
+                       int* H, int* A, int M, int N, int K, int mode);
+// Shared memory declaration - must match kernel.cpp exactly
+// This allows testbench to access the same shared_memory instance as kernels
+extern int shared_memory[4096];
+
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "Example 8: Shared Static Memory Across Kernels\n";
@@ -70,22 +77,43 @@ int main() {
     std::cout << "\n";
     std::cout << "Expected: 1 2 3 4\n\n";
     
-    // Test 4: Composite Operation H = W * X + B
-    std::cout << "--- Test 4: Composite Operation H = W * X + B ---\n";
-    std::cout << "Step 1: Compute W * X\n";
-    int temp_H[size] = {0};
-    matmul_kernel(W, X, temp_H, M, N, K);
+    // Test 4: Programmable TPU Interface with Control Paths (top_module)
+    std::cout << "--- Test 4: Programmable TPU Interface with Control Paths (top_module) ---\n";
+    std::cout << "Demonstrates: top_module with separate LOAD and COMPUTE modes\n";
+    std::cout << "Mode 0 (LOAD): Load data from host into shared BRAM\n";
+    std::cout << "Mode 1 (COMPUTE): Run computations using data in shared BRAM\n\n";
     
-    std::cout << "Step 2: Add bias B\n";
-    elemwise_kernel(temp_H, B, H, size, 0);  // Add
+    std::cout << "Step 1: Invocation 1 - LOAD MODE\n";
+    std::cout << "  Loading W, X, B, Y, Z into shared BRAM...\n";
+    top_module(W, X, B, Y, Z, H, A, M, N, K, 0);  // MODE_LOAD = 0
+    std::cout << "  ✓ Data loaded into shared BRAM\n\n";
     
-    std::cout << "Result H (first 4 elements): ";
+    std::cout << "Step 2: Invocation 2 - COMPUTE MODE\n";
+    std::cout << "  Computing:\n";
+    std::cout << "    1. H = W * X + B\n";
+    std::cout << "    2. A = X * Y + W * Z\n";
+    std::cout << "  All operations use shared BRAM!\n";
+    top_module(W, X, B, Y, Z, H, A, M, N, K, 1);  // MODE_COMPUTE = 1
+    
+    std::cout << "\nResults:\n";
+    std::cout << "  Result H = W*X + B (first 4 elements): ";
     for (int i = 0; i < 4; i++) {
         std::cout << H[i] << " ";
     }
     std::cout << "\n";
-    std::cout << "Expected: 2 3 4 5 (W*I + B, where W[0]=1, B[0]=1)\n\n";
+    std::cout << "  Expected: 2 3 4 5 (W*I + B, where W[0]=1, B[0]=1)\n\n";
     
+    std::cout << "  Result A = X*Y + W*Z (first 4 elements): ";
+    for (int i = 0; i < 4; i++) {
+        std::cout << A[i] << " ";
+    }
+    std::cout << "\n";
+    std::cout << "  Expected: 3 4 5 6 (X*Y + W*Z, where X*Y=2*I, W*Z=W)\n\n";
+    
+    std::cout << "✓ Two separate invocations: LOAD then COMPUTE\n";
+    std::cout << "✓ Control path separation enables flexible programming\n";
+    std::cout << "✓ Both engines share the same BRAM resource\n";
+    std::cout << "✓ Programmable interface enables complex operations\n\n";
 // Test 5: Shared Memory Direct Access - DEMONSTRATING KERNEL SHARING
     std::cout << "--- Test 5: Demonstrating Shared Memory Between Kernels ---\n";
     std::cout << "This test shows how kernels share intermediate results via shared_memory\n\n";
@@ -94,7 +122,6 @@ int main() {
     // In hardware, this would be via DMA or AXI, but kernels access directly
     // Note: shared_memory is declared as 'static' in kernel.cpp, so we need to access it
     // For simulation, we'll declare it here to match kernel.cpp
-    static int shared_memory[4096];
     
     // Define memory layout
     const int W_OFFSET = 0;

@@ -134,29 +134,6 @@ void elemwise_kernel(int* A, int* B, int* result, int size, int op) {
 // Operations:
 //   1. H = W * X + B  (matrix multiply + bias)
 //   2. A = X * Y + W * Z  (two matrix multiplies + add)
-void top_module(int* W, int* X, int* B, int* Y, int* Z, 
-                int* H, int* A, 
-                int M, int N, int K) {
-    // H = W * X + B
-    // Step 1: Compute W * X using matmul kernel
-    int temp_H[256];  // Temporary storage for W*X
-    matmul_kernel(W, X, temp_H, M, N, K);
-    
-    // Step 2: Add bias B (element-wise)
-    elemwise_kernel(temp_H, B, H, M * N, 0);  // op=0 means add
-    
-    // A = X * Y + W * Z
-    // Step 1: Compute X * Y
-    int temp_XY[256];
-    matmul_kernel(X, Y, temp_XY, K, N, K);
-    
-    // Step 2: Compute W * Z
-    int temp_WZ[256];
-    matmul_kernel(W, Z, temp_WZ, M, N, K);
-    
-    // Step 3: Add results (element-wise)
-    elemwise_kernel(temp_XY, temp_WZ, A, M * N, 0);  // op=0 means add
-}
 
 //=============================================================================
 // Alternative: Direct Shared Memory Access (More Efficient)
