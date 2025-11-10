@@ -17,10 +17,6 @@ create_clock -period 10
 
 csim_design
 csynth_design
-csynth_design
-csynth_design
-csynth_design
-csynth_design
 
 exit
 
