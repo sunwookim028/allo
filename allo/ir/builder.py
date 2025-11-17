@@ -71,6 +71,7 @@ from .types import (
     Struct,
     float32,
     Stream,
+    Stateful,
 )
 from .visitor import ASTVisitor, ASTContext, get_symbolic_expr
 from .symbol_resolver import ASTResolver
@@ -148,6 +149,16 @@ class ASTTransformer(ASTBuilder):
             )
         ret = ctx.get_symbol(node.id, allow_missing=True)
         if ret is not None:
+            if (hasattr(ret, 'attributes') and 'stateful' in ret.attributes):
+                # Re-fetch global for load
+                global_name = ctx.custom_globals[node.id][0]
+                memref_type = ctx.custom_globals[node.id][1]
+                get_global_op = memref_d.GetGlobalOp(
+                    memref_type,
+                    FlatSymbolRefAttr.get(global_name),
+                    ip=ctx.get_ip(),
+                )
+                ret = get_global_op
             ret_result = get_mlir_op_result(ret)
             if (
                 isinstance(ret_result.type, (MemRefType, RankedTensorType))
@@ -430,6 +441,10 @@ class ASTTransformer(ASTBuilder):
         res_type: AlloType,
         shape: list[int] = None,
     ):
+        if isinstance(src_type, Stateful):
+            src_type = src_type.dtype
+        if isinstance(res_type, Stateful):
+            res_type = res_type.dtype
         # No need to cast
         if type(res_type) is type(src_type) and res_type == src_type:
             return op
@@ -775,9 +790,12 @@ class ASTTransformer(ASTBuilder):
                 UFixed: RuntimeError,
             },
         }.get(type(node.op))
-        ty_cls = Int if isinstance(node.dtype, Index) else type(node.dtype)
+        node_dtype = node.dtype
+        if isinstance(node_dtype, Stateful):
+            node_dtype = node_dtype.dtype
+        ty_cls = Int if isinstance(node_dtype, Index) else type(node_dtype)
         if isinstance(node.op, (ast.LShift, ast.RShift)) and isinstance(
-            node.dtype, (Fixed, UFixed)
+            node_dtype, (Fixed, UFixed)
         ):
             op = opcls[ty_cls](
                 node.dtype.build(),
@@ -789,7 +807,7 @@ class ASTTransformer(ASTBuilder):
             op = opcls[ty_cls](
                 get_mlir_op_result(lhs), get_mlir_op_result(rhs), ip=ctx.get_ip()
             )
-        if isinstance(node.dtype, UInt):
+        if isinstance(node_dtype, UInt):
             op.attributes["unsigned"] = UnitAttr.get()
         return op
 
@@ -1661,6 +1679,74 @@ class ASTTransformer(ASTBuilder):
     @staticmethod
     def build_AnnAssign(ctx: ASTContext, node: ast.AnnAssign):
         shape, dtype = node.target.shape, node.target.dtype
+        if isinstance(dtype, Stateful):
+
+            # Generate unique global name
+            func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
+            global_name = f"{node.target.id}_stateful_{abs(hash(func_name))}"
+            #global_name = f"{node.target.id}_stateful_{abs(hash(ctx.top_func_name))}"
+            
+            # Check if already in custom_globals (avoid redeclaration)
+            if global_name not in getattr(ctx, 'custom_globals', {}):
+                # Create memref.global declaration
+                if len(dtype.shape) == 0:
+                    # For scalars, use memref<dtype> not just dtype
+                    memref_type = MemRefType.get([], dtype.dtype.build())
+                else:
+                    memref_type = ASTTransformer.build_shaped_type(
+                        ctx, dtype.dtype, dtype.shape
+                    )
+                
+                # Initialize with the RHS value if provided, else zero
+                if node.value is not None:
+                    rhs = build_stmt(ctx, node.value)
+                    if isinstance(rhs, MockConstant):
+                        initial_value = rhs.val
+                    else:
+                        raise RuntimeError(
+                            "Stateful variables must be initialized with constants"
+                        )
+                else:
+                    initial_value = 0
+                
+                # Create the initial value attribute
+                #import numpy as np
+                if len(dtype.shape) == 0:
+                    np_values = np.array(initial_value, dtype=np.int32)  # Adjust dtype as needed
+                else:
+                    np_values = np.full(dtype.shape, initial_value, dtype=np.int32)
+                
+                value_attr = DenseElementsAttr.get(np_values, type=dtype.dtype.build())
+                
+                # Declare global at module level
+                memref_d.GlobalOp(
+                    sym_name=StringAttr.get(global_name),
+                    type_=TypeAttr.get(memref_type),
+                    sym_visibility=StringAttr.get("private"),
+                    initial_value=value_attr,
+                    constant=False,  # Stateful variables are mutable
+                    alignment=None,
+                    ip=InsertionPoint(ctx.top_func),
+                )
+                
+                # Track in custom_globals
+                if not hasattr(ctx, 'custom_globals'):
+                    ctx.custom_globals = {}
+                ctx.custom_globals[node.target.id] = (global_name, memref_type)
+            
+            # Get the global reference for use in the function
+            global_name, memref_type = ctx.custom_globals[node.target.id]
+            get_global_op = memref_d.GetGlobalOp(
+                memref_type,
+                FlatSymbolRefAttr.get(global_name),
+                ip=ctx.get_ip(),
+            )
+            
+            # Store in context
+            ctx.buffers[node.target.id] = get_global_op
+            ctx.put_symbol(name=node.target.id, val=get_global_op)
+            
+            return None
         # stream can only be declared with annotated assign stmt
         # TODO: guard, stream declaration has no rhs
         if isinstance(dtype, Stream):
