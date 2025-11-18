@@ -268,6 +268,41 @@ class Stream(AlloType):
         shape = ", ".join(str(s) for s in self.shape)
         return f"Stream({self.dtype}[{shape}])"
 
+class Stateful(AlloType):
+    """
+    A stateful variable that persists across kernel invocations.
+    Stateful variables are stored as global memrefs and accessed via memref.get_global.
+    They can only be declared locally within a kernel, not as function parameters.
+    """
+
+    def __init__(self, dtype, shape=tuple()):
+        """
+        Constructs a stateful variable.
+
+        Parameters
+        ----------
+        dtype: AlloType
+            The element type of the stateful variable.
+        shape: tuple
+            The shape of the stateful variable (default is scalar).
+        """
+        assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
+        self.dtype = dtype
+        self.shape = shape
+        super().__init__(dtype.bits, dtype.fracs, f"stateful<{dtype}>")
+
+    def build(self):
+        # Stateful variables are represented as the underlying dtype
+        # The global memref declaration happens during IR building
+        if len(self.shape) > 0:
+            return MemRefType.get(self.shape, self.dtype.build())
+        return self.dtype.build()
+
+    def __repr__(self):
+        if len(self.shape) > 0:
+            shape_str = ", ".join(str(s) for s in self.shape)
+            return f"Stateful({self.dtype}[{shape_str}])"
+        return f"Stateful({self.dtype})"
 
 # boolean type should not be used as i1!
 bool = UInt(1)
