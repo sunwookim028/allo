@@ -13,7 +13,7 @@
 #include <math.h>
 #include <stdint.h>
 using namespace std;
-int32_t acc_stateful_5700927378943735518 = {0};	// L2
+static int32_t acc_stateful_5700927378943735518 = {0};	// L2
 void test(
   int32_t v0,
   int32_t *v1
