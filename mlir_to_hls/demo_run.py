@@ -27,7 +27,8 @@ try:
     mod = HLSModule(
         mod=mlir_content,
         top_func_name="test",
-        platform="vivado_hls",
+        platform="vitis_hls",
+        func_args=[('arg0', 'i32')],
     )
     hls_code = mod.hls_code
     
