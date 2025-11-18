@@ -1260,6 +1260,9 @@ void ModuleEmitter::emitGlobal(memref::GlobalOp op) {
     indent();
     auto arrayType = op.getType().cast<ShapedType>();
     auto type = arrayType.getElementType();
+    if (op->hasAttr("hls.static")) {
+      os << "static ";
+    }
     if (op->hasAttr("constant")) {
       os << "const ";
     }
