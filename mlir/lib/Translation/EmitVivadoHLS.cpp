@@ -1260,7 +1260,16 @@ void ModuleEmitter::emitGlobal(memref::GlobalOp op) {
     indent();
     auto arrayType = op.getType().cast<ShapedType>();
     auto type = arrayType.getElementType();
-    if (op->hasAttr("hls.static")) {
+    // Check for hls.static attribute or stateful variable naming pattern
+    bool isStatic = op->hasAttr("hls.static");
+    if (!isStatic) {
+      // Check if symbol name contains "_stateful_" pattern (stateful variables)
+      std::string symName = op.getSymName().str();
+      if (symName.find("_stateful_") != std::string::npos) {
+        isStatic = true;
+      }
+    }
+    if (isStatic) {
       os << "static ";
     }
     if (op->hasAttr("constant")) {
