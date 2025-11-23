@@ -71,6 +71,7 @@ from .types import (
     Struct,
     float32,
     Stream,
+    Stateful,
 )
 from .visitor import ASTVisitor, ASTContext, get_symbolic_expr
 from .symbol_resolver import ASTResolver
@@ -148,6 +149,16 @@ class ASTTransformer(ASTBuilder):
             )
         ret = ctx.get_symbol(node.id, allow_missing=True)
         if ret is not None:
+            if (hasattr(ret, 'attributes') and 'stateful' in ret.attributes):
+                # Re-fetch global for load
+                global_name = ctx.custom_globals[node.id][0]
+                memref_type = ctx.custom_globals[node.id][1]
+                get_global_op = memref_d.GetGlobalOp(
+                    memref_type,
+                    FlatSymbolRefAttr.get(global_name),
+                    ip=ctx.get_ip(),
+                )
+                ret = get_global_op
             ret_result = get_mlir_op_result(ret)
             if (
                 isinstance(ret_result.type, (MemRefType, RankedTensorType))
@@ -1661,6 +1672,71 @@ class ASTTransformer(ASTBuilder):
     @staticmethod
     def build_AnnAssign(ctx: ASTContext, node: ast.AnnAssign):
         shape, dtype = node.target.shape, node.target.dtype
+        if hasattr(dtype, 'stateful') and dtype.stateful:
+            # Generate unique global name
+            func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
+            global_name = f"{node.target.id}_stateful_{abs(hash((func_name, node.target.id)))}"
+            
+            # Check if already in custom_globals (avoid redeclaration)
+            if global_name not in getattr(ctx, 'custom_globals', {}):
+                # Create memref.global declaration
+                if len(shape) == 0:
+                    # For scalars, use memref<dtype> not just dtype
+                    memref_type = MemRefType.get([], dtype.build())
+                else:
+                    memref_type = ASTTransformer.build_shaped_type(
+                        ctx, dtype, shape
+                    )
+                
+                # Initialize with the RHS value if provided, else zero
+                if node.value is not None:
+                    rhs = build_stmt(ctx, node.value)
+                    if isinstance(rhs, MockConstant):
+                        initial_value = rhs.val
+                    else:
+                        raise RuntimeError(
+                            "Stateful variables must be initialized with constants"
+                        )
+                else:
+                    initial_value = 0
+                
+                # Create the initial value attribute
+                if len(shape) == 0:
+                    np_values = np.array(initial_value, dtype=np.int32)  # Adjust dtype as needed
+                else:
+                    np_values = np.full(shape, initial_value, dtype=np.int32)
+                
+                value_attr = DenseElementsAttr.get(np_values, type=dtype.build())
+                
+                # Declare global at module level
+                memref_d.GlobalOp(
+                    sym_name=StringAttr.get(global_name),
+                    type_=TypeAttr.get(memref_type),
+                    sym_visibility=StringAttr.get("private"),
+                    initial_value=value_attr,
+                    constant=False,  # Stateful variables are mutable
+                    alignment=None,
+                    ip=InsertionPoint(ctx.top_func),
+                )
+                
+                # Track in custom_globals
+                if not hasattr(ctx, 'custom_globals'):
+                    ctx.custom_globals = {}
+                ctx.custom_globals[node.target.id] = (global_name, memref_type)
+            
+            # Get the global reference for use in the function
+            global_name, memref_type = ctx.custom_globals[node.target.id]
+            get_global_op = memref_d.GetGlobalOp(
+                memref_type,
+                FlatSymbolRefAttr.get(global_name),
+                ip=ctx.get_ip(),
+            )
+            
+            # Store in context
+            ctx.buffers[node.target.id] = get_global_op
+            ctx.put_symbol(name=node.target.id, val=get_global_op)
+            
+            return None
         # stream can only be declared with annotated assign stmt
         # TODO: guard, stream declaration has no rhs
         if isinstance(dtype, Stream):

@@ -73,6 +73,16 @@ class TypeInferer(ASTVisitor):
     @staticmethod
     def visit_type_hint(ctx: ASTContext, node: ast.AST):
         if isinstance(node, ast.Subscript):
+            if isinstance(node.value, ast.Name) and node.value.id == "Stateful":
+                # Process the inner type
+                inner_dtype, inner_shape, inner_layout = TypeInferer.visit_type_hint(
+                    ctx, node.slice
+                )
+                # Create a copy with stateful=True
+                import copy
+                stateful_dtype = copy.deepcopy(inner_dtype)
+                stateful_dtype.stateful = True
+                return stateful_dtype, inner_shape, inner_layout
             if isinstance(node.value, ast.Call):
                 # e.g., a: UInt(16)[4]
                 dtype = TypeInferer.visit_call_type(ctx, node.value)
@@ -776,6 +786,11 @@ class TypeInferer(ASTVisitor):
                 arg.dtype, arg.shape, arg.spec = TypeInferer.visit_type_hint(
                     ctx, arg.annotation
                 )
+                if hasattr(arg.dtype, 'stateful') and arg.dtype.stateful:
+                    raise RuntimeError(
+                        f"Function parameter '{arg.arg}' cannot be Stateful. "
+                        "Stateful variables can only be declared locally within a kernel."
+                    )
                 arg.dtensor = DTensor(
                     ctx.rank, ctx.mapping, arg.shape, arg.dtype, arg.spec, name=arg.arg
                 )
