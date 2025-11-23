@@ -33,6 +33,7 @@ class AlloType:
         self.bits = bits
         self.fracs = fracs
         self.name = name
+        self.stateful = False
 
     def build(self):
         # Required a MLIR context outside
@@ -47,15 +48,36 @@ class AlloType:
         pass
 
     def __repr__(self):
-        return self.name
+        prefix = "Stateful[" if self.stateful else ""
+        suffix = "]" if self.stateful else ""
+        return f"{prefix}{self.name}{suffix}"
 
     def __eq__(self, other):
         if other is None or not isinstance(other, AlloType):
             return False
-        return self.name == other.name
+        return self.name == other.name and self.stateful == other.stateful
 
     def __hash__(self):
-        return hash(self.name)
+        return hash((self.name, self.stateful))
+
+def Stateful(dtype_spec):
+    """
+    Marks a type as stateful, making it persistent across kernel invocations.
+
+    Usage:
+        state: Stateful[int32]           # Stateful scalar
+        counter: Stateful[int32[10]]     # Stateful array
+
+    Parameters
+    ----------
+    dtype_spec: AlloType or subscription expression
+        The underlying type to mark as stateful
+
+    Returns
+    -------
+    A marker tuple that will be processed during type inference
+    """
+    return ("Stateful", dtype_spec)
 
 
 class Index(AlloType):
@@ -228,7 +250,9 @@ class Struct(AlloType):
         super().__init__(self.bits, 0, "struct")
 
     def __repr__(self):
-        return "Struct(" + str(self.dtype_dict) + ")"
+        prefix = "Stateful[" if self.stateful else ""
+        suffix = "]" if self.stateful else ""
+        return f"{prefix}Struct({self.dtype_dict}){suffix}"
 
     def __getattr__(self, key):
         try:
@@ -266,7 +290,9 @@ class Stream(AlloType):
 
     def __repr__(self):
         shape = ", ".join(str(s) for s in self.shape)
-        return f"Stream({self.dtype}[{shape}])"
+        prefix = "Stateful[" if self.stateful else ""
+        suffix = "]" if self.stateful else ""
+        return f"{prefix}Stream({self.dtype}[{shape}]){suffix}"
 
 
 # boolean type should not be used as i1!
