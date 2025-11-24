@@ -10,48 +10,37 @@ Usage:
 
 import sys
 from pathlib import Path
+import allo
+from allo.ir.types import int32, float32, Stateful
 
 # Add parent directory to path to import allo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from allo.backend.hls import HLSModule
 
+# Scalar stateful
+def test_stateful_scalar(x: int32) -> int32:
+    acc: Stateful[int32] = 0
+    acc = acc + x
+    return acc
+
+
 def main():
-    print("=" * 80)
-    print("TEST: Stateful Variable Translation to Static Inside Function")
-    print("=" * 80)
-    
-    # MLIR with stateful variable (matches what Allo generates)
-    mlir_content = """module {
-  memref.global "private" @acc_stateful_5700927378943735518 : memref<i32> = dense<1>
-  func.func @test(%arg0: i32) -> i32 attributes {itypes = "s", otypes = "s"} {
-    %0 = memref.get_global @acc_stateful_5700927378943735518 : memref<i32>
-    %1 = memref.load %0[] : memref<i32>
-    %2 = arith.addi %1, %arg0 : i32
-    memref.store %2, %0[] : memref<i32>
-    return %2 : i32
-  }
-}"""
-    
     print("\n1. Input MLIR:")
     print("-" * 80)
-    print(mlir_content)
+    s2 = allo.customize(test_stateful_scalar)
+    print(s2.module)  # Should show memref.global
     
     print("\n2. Translating to Vitis HLS C++...")
     print("-" * 80)
     
     try:
-        hls_mod = HLSModule(
-            mod=mlir_content,
-            top_func_name="test",
-            platform="vitis_hls",
-            func_args=[('arg0', 'i32')],
-        )
-        hls_code = hls_mod.hls_code
-        
-        print("\n3. Generated HLS C++ Code:")
-        print("-" * 80)
+        hls_code = s2.build(target="vhls")
         print(hls_code)
+        print("%" * 80)
+
+
+
         
         # Verify static variable is inside function
         func_start = hls_code.find('void test(')
