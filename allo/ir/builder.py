@@ -1699,7 +1699,7 @@ class ASTTransformer(ASTBuilder):
                 ctx.stateful_counter = 0
             ctx.stateful_counter += 1
             func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
-            global_name = f"{node.target.id}_stateful_{ctx.stateful_counter}"
+            global_name = f"__stateful_{func_name}_{node.target.id}_{ctx.stateful_counter}"
             
             # Check if already in custom_globals (avoid redeclaration)
             if global_name not in getattr(ctx, 'custom_globals', {}):
