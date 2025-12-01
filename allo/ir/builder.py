@@ -71,7 +71,6 @@ from .types import (
     Struct,
     float32,
     Stream,
-    Stateful,
 )
 from .visitor import ASTVisitor, ASTContext, get_symbolic_expr
 from .symbol_resolver import ASTResolver
@@ -462,10 +461,6 @@ class ASTTransformer(ASTBuilder):
         res_type: AlloType,
         shape: list[int] = None,
     ):
-        if isinstance(src_type, Stateful):
-            src_type = src_type.dtype
-        if isinstance(res_type, Stateful):
-            res_type = res_type.dtype
         # No need to cast
         if type(res_type) is type(src_type) and res_type == src_type:
             return op
@@ -811,12 +806,9 @@ class ASTTransformer(ASTBuilder):
                 UFixed: RuntimeError,
             },
         }.get(type(node.op))
-        node_dtype = node.dtype
-        if isinstance(node_dtype, Stateful):
-            node_dtype = node_dtype.dtype
-        ty_cls = Int if isinstance(node_dtype, Index) else type(node_dtype)
+        ty_cls = Int if isinstance(node.dtype, Index) else type(node.dtype)
         if isinstance(node.op, (ast.LShift, ast.RShift)) and isinstance(
-            node_dtype, (Fixed, UFixed)
+            node.dtype, (Fixed, UFixed)
         ):
             op = opcls[ty_cls](
                 node.dtype.build(),
@@ -828,7 +820,7 @@ class ASTTransformer(ASTBuilder):
             op = opcls[ty_cls](
                 get_mlir_op_result(lhs), get_mlir_op_result(rhs), ip=ctx.get_ip()
             )
-        if isinstance(node_dtype, UInt):
+        if isinstance(node.dtype, UInt):
             op.attributes["unsigned"] = UnitAttr.get()
         return op
 
@@ -1706,7 +1698,7 @@ class ASTTransformer(ASTBuilder):
                 ctx.stateful_counter = 0
             ctx.stateful_counter += 1
             func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
-            global_name = f"{node.target.id}_stateful_{ctx.stateful_counter}"
+            global_name = f"__stateful_{func_name}_{node.target.id}_{ctx.stateful_counter}"
             
             # Check if already in custom_globals (avoid redeclaration)
             if global_name not in getattr(ctx, 'custom_globals', {}):
