@@ -29,7 +29,6 @@ from .types import (
     float64,
     Struct,
     Stream,
-    Stateful,
 )
 from .typing_rule import get_typing_rule
 from ..utils import (
@@ -74,16 +73,6 @@ class TypeInferer(ASTVisitor):
     @staticmethod
     def visit_type_hint(ctx: ASTContext, node: ast.AST):
         if isinstance(node, ast.Subscript):
-            if isinstance(node.value, ast.Name) and node.value.id == "Stateful":
-                # Process the inner type
-                inner_dtype, inner_shape, inner_layout = TypeInferer.visit_type_hint(
-                    ctx, node.slice
-                )
-                # Create a copy with stateful=True
-                import copy
-                stateful_dtype = copy.deepcopy(inner_dtype)
-                stateful_dtype.stateful = True
-                return stateful_dtype, inner_shape, inner_layout
             if isinstance(node.value, ast.Call):
                 # e.g., a: UInt(16)[4]
                 dtype = TypeInferer.visit_call_type(ctx, node.value)
@@ -103,13 +92,6 @@ class TypeInferer(ASTVisitor):
                 return base_type, shape, None
             else:
                 dtype = ASTResolver.resolve(node.value, ctx.global_vars)
-            if dtype is Stateful:
-                # e.g., state: Stateful[int32] or state: Stateful[int32[4]]
-                base_type, base_shape, _ = TypeInferer.visit_type_hint(
-                    ctx, node.slice
-                )
-                stateful_dtype = Stateful(dtype=base_type, shape=base_shape)
-                return stateful_dtype, tuple(), None  # Stateful itself is scalar-like
             if dtype is Stream:
                 # e.g., pipe: Stream[Ty, 4]
                 assert (
@@ -132,6 +114,17 @@ class TypeInferer(ASTVisitor):
             assert dtype is not None, f"Unsupported type `{node.id}`"
             return dtype, tuple(), None
         if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "stateful":
+                # Process the inner type
+                inner_dtype, inner_shape, inner_layout = TypeInferer.visit_type_hint(
+                    ctx, node.args[0]
+                )
+                # Create a copy with stateful=True
+                import copy
+                stateful_dtype = copy.deepcopy(inner_dtype)
+                stateful_dtype.stateful = True
+                return stateful_dtype, inner_shape, inner_layout
+
             dtype = TypeInferer.visit_call_type(ctx, node)
             return dtype, tuple(), None
         if isinstance(node, ast.Constant):
@@ -154,12 +147,8 @@ class TypeInferer(ASTVisitor):
     def visit_Name(ctx: ASTContext, node: ast.Name):
         var = ctx.get_symbol(node.id, allow_missing=True)
         if var is not None:
-            if isinstance(var.dtype, Stateful):
-                node.dtype = var.dtype.dtype  # Extract inner type T from Stateful[T]
-                node.shape = var.dtype.shape
-            else:
-                node.dtype = var.dtype
-                node.shape = var.shape
+            node.dtype = var.dtype
+            node.shape = var.shape
             return node
         if node.id in ctx.global_vars:
             var = ctx.global_vars[node.id]
@@ -172,11 +161,6 @@ class TypeInferer(ASTVisitor):
             elif isinstance(var, AlloType):
                 node.dtype = Index()
                 node.shape = tuple()
-            elif isinstance(var, type) and issubclass(var, AlloType):
-                # Type class reference (for annotations)
-                node.dtype = None
-                node.shape = None
-                return node
             else:
                 raise RuntimeError(f"Unsupported global variable `{node.id}`")
             return node
@@ -339,9 +323,7 @@ class TypeInferer(ASTVisitor):
         ctx: ASTContext, node: ast.AugAssign | ast.BinOp, lhs: ast.expr, rhs: ast.expr
     ):
         typing_rule = get_typing_rule(type(node.op))
-        lhs_dtype = lhs.dtype.dtype if isinstance(lhs.dtype, Stateful) else lhs.dtype
-        rhs_dtype = rhs.dtype.dtype if isinstance(rhs.dtype, Stateful) else rhs.dtype
-        res_type = typing_rule(lhs_dtype, rhs_dtype)
+        res_type = typing_rule(lhs.dtype, rhs.dtype)
         node.dtype = res_type
         final_shape, lhs_dims, rhs_dims = TypeInferer.visit_broadcast(
             ctx, lhs.shape, rhs_shape=None if rhs is None else rhs.shape
@@ -408,16 +390,8 @@ class TypeInferer(ASTVisitor):
                 if target_ is not None:
                     target_shape, target_dtype = target_.shape, target_.dtype
                 if not rhs_visited:
-                    # Adjust expected type for RHS if target is Stateful
-                    expected_dtype = target_dtype
-                    expected_shape = target_shape
-                    
-                    if isinstance(target_dtype, Stateful):
-                        expected_dtype = target_dtype.dtype
-                        expected_shape = target_dtype.shape
-                    
                     rhs = TypeInferer.visit_assignment_val(
-                        ctx, values[idx], expected_shape, expected_dtype
+                        ctx, values[idx], target_shape, target_dtype
                     )
                     rhs_shape, rhs_dtype = rhs.shape, rhs.dtype
                 else:
@@ -428,24 +402,11 @@ class TypeInferer(ASTVisitor):
                     target.dtype = rhs_dtype
                     target.shape = rhs_shape
                 else:
-                   #if isinstance(target_dtype, Stateful):
-                   #    # Stateful[T] = T is valid
-                   #    # Check that RHS type matches the inner type
-                   #    if rhs_dtype != target_dtype.dtype:
-                   #        raise RuntimeError(
-                   #            f"Cannot assign {rhs_dtype} to Stateful[{target_dtype.dtype}]"
-                   #        )
-                   #    if rhs_shape != target_dtype.shape:
-                   #        raise RuntimeError(
-                   #            f"Shape mismatch: cannot assign {rhs_shape} to Stateful with shape {target_dtype.shape}"
-                   #        )
                     # assign
                     target.dtype, target.shape = target_dtype, target_shape
                 final_shape, lhs_dims, rhs_dims = TypeInferer.visit_broadcast(
                     ctx, target.shape, rhs_shape=rhs_shape, match_lhs=True
                 )
-                if isinstance(target_dtype, Stateful):
-                    final_shape = tuple()
                 assert (
                     final_shape == target.shape
                 ), f"Shape mismatch, got {final_shape} and {target.shape}"
@@ -500,20 +461,13 @@ class TypeInferer(ASTVisitor):
         elif isinstance(node.target, ast.Name):  # scalar
             lhs = ctx.get_symbol(node.target.id)
             assert lhs is not None
-            if isinstance(lhs.dtype, Stateful):
-                node.target.dtype = lhs.dtype.dtype  # Use inner type
-                node.target.shape = lhs.dtype.shape
-            else:
-                node.target.dtype, node.target.shape = lhs.dtype, lhs.shape
+            node.target.dtype, node.target.shape = lhs.dtype, lhs.shape
         else:
             raise RuntimeError("Unsupported AugAssign")
         # augment LHS
         TypeInferer.visit_general_binop(ctx, node, lhs, rhs)
         # store LHS
-        if isinstance(lhs.dtype, Stateful):
-            node.dtype = lhs.dtype  # Keep as Stateful[T]
-        else:
-            node.dtype = lhs.dtype
+        node.dtype = lhs.dtype
         node.shape = lhs.shape
         return node
 
@@ -694,14 +648,6 @@ class TypeInferer(ASTVisitor):
         target_dtype, target_shape, _ = TypeInferer.visit_type_hint(
             ctx, node.annotation
         )
-        if isinstance(target_dtype, Stateful) and ctx.nested_loops == 0:
-            # This is a local declaration (valid)
-            pass
-        elif isinstance(target_dtype, Stateful):
-            raise RuntimeError(
-                "Stateful variables can only be declared locally within a kernel, "
-                "not as function parameters."
-            )
         assert isinstance(
             node.target, ast.Name
         ), "target of AnnAssign must be Name, other type not supported."
@@ -914,9 +860,7 @@ class TypeInferer(ASTVisitor):
         assert len(node.comparators) == 1, "Only support one comparator for now"
         rhs = visit_stmt(ctx, node.comparators[0])
         typing_rule = get_typing_rule(type(node.ops[0]))
-        lhs_dtype = lhs.dtype.dtype if isinstance(lhs.dtype, Stateful) else lhs.dtype
-        rhs_dtype = rhs.dtype.dtype if isinstance(rhs.dtype, Stateful) else rhs.dtype
-        res_type = typing_rule(lhs_dtype, rhs_dtype)[0]
+        res_type = typing_rule(lhs.dtype, rhs.dtype)[0]
         node.dtype = res_type
         node.shape = tuple()
         return node
