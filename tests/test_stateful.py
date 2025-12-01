@@ -1,5 +1,5 @@
 import allo
-from allo.ir.types import int32, float32, Stateful
+from allo.ir.types import int32, float32, stateful
 
 # Scalar stateless
 def test_stateless_scalar(x: int32) -> int32:
@@ -9,7 +9,7 @@ def test_stateless_scalar(x: int32) -> int32:
 
 # Scalar stateful
 def test_stateful_scalar(x: int32) -> int32:
-    acc: Stateful[int32] = 0
+    acc: stateful(int32) = 0
     acc = acc + x
     return acc
 
@@ -21,15 +21,15 @@ def test_stateless_array(x: float32) -> float32:
 
 # Array stateful
 def test_stateful_array(x: float32) -> float32:
-    buffer: Stateful[float32[10]] = 0.0
+    buffer: stateful(float32[10]) = 0.0
     buffer[0] = buffer[1] + buffer[2]
     return buffer[0]
 
 def test_moving_average(new_value: float32) -> float32:
-    window: Stateful[float32[4]] = 0.0
-    i: Stateful[int32] = 0
-    count: Stateful[int32] = 0
-    total: Stateful[float32] = 0.0
+    window: stateful(float32[4]) = 0.0
+    i: stateful(int32) = 0
+    count: stateful(int32) = 0
+    total: stateful(float32) = 0.0
 
     # Subtract the old value that's being replaced
     total = total - window[i]

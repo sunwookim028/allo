@@ -73,16 +73,6 @@ class TypeInferer(ASTVisitor):
     @staticmethod
     def visit_type_hint(ctx: ASTContext, node: ast.AST):
         if isinstance(node, ast.Subscript):
-            if isinstance(node.value, ast.Name) and node.value.id == "Stateful":
-                # Process the inner type
-                inner_dtype, inner_shape, inner_layout = TypeInferer.visit_type_hint(
-                    ctx, node.slice
-                )
-                # Create a copy with stateful=True
-                import copy
-                stateful_dtype = copy.deepcopy(inner_dtype)
-                stateful_dtype.stateful = True
-                return stateful_dtype, inner_shape, inner_layout
             if isinstance(node.value, ast.Call):
                 # e.g., a: UInt(16)[4]
                 dtype = TypeInferer.visit_call_type(ctx, node.value)
@@ -124,6 +114,17 @@ class TypeInferer(ASTVisitor):
             assert dtype is not None, f"Unsupported type `{node.id}`"
             return dtype, tuple(), None
         if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "stateful":
+                # Process the inner type
+                inner_dtype, inner_shape, inner_layout = TypeInferer.visit_type_hint(
+                    ctx, node.args[0]
+                )
+                # Create a copy with stateful=True
+                import copy
+                stateful_dtype = copy.deepcopy(inner_dtype)
+                stateful_dtype.stateful = True
+                return stateful_dtype, inner_shape, inner_layout
+
             dtype = TypeInferer.visit_call_type(ctx, node)
             return dtype, tuple(), None
         if isinstance(node, ast.Constant):

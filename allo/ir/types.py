@@ -48,8 +48,8 @@ class AlloType:
         pass
 
     def __repr__(self):
-        prefix = "Stateful[" if self.stateful else ""
-        suffix = "]" if self.stateful else ""
+        prefix = "stateful(" if self.stateful else ""
+        suffix = ")" if self.stateful else ""
         return f"{prefix}{self.name}{suffix}"
 
     def __eq__(self, other):
@@ -60,13 +60,13 @@ class AlloType:
     def __hash__(self):
         return hash((self.name, self.stateful))
 
-def Stateful(dtype_spec):
+def stateful(dtype_spec):
     """
     Marks a type as stateful, making it persistent across kernel invocations.
 
     Usage:
-        state: Stateful[int32]           # Stateful scalar
-        counter: Stateful[int32[10]]     # Stateful array
+        state: stateful(int32)           # Stateful scalar
+        counter: stateful(int32[10])     # Stateful array
 
     Parameters
     ----------
@@ -77,7 +77,7 @@ def Stateful(dtype_spec):
     -------
     A marker tuple that will be processed during type inference
     """
-    return ("Stateful", dtype_spec)
+    return ("stateful", dtype_spec)
 
 
 class Index(AlloType):

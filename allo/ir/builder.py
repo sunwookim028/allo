@@ -71,7 +71,6 @@ from .types import (
     Struct,
     float32,
     Stream,
-    Stateful,
 )
 from .visitor import ASTVisitor, ASTContext, get_symbolic_expr
 from .symbol_resolver import ASTResolver
