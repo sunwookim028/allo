@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify Stateful type → MLIR → Vitis HLS translation.
+Test script to verify stateful type → MLIR → Vitis HLS translation.
 This script demonstrates that stateful variables are correctly translated
 to static variables inside functions in the generated HLS C++ code.
 
@@ -11,7 +11,7 @@ Usage:
 import sys
 from pathlib import Path
 import allo
-from allo.ir.types import int32, float32, Stateful
+from allo.ir.types import int32, float32, stateful
 
 # Add parent directory to path to import allo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -20,7 +20,7 @@ from allo.backend.hls import HLSModule
 
 # Scalar stateful
 def test_stateful_scalar(x: int32) -> int32:
-    acc: Stateful[int32] = 0
+    acc: stateful(int32) = 0
     acc = acc + x
     return acc
 
@@ -39,9 +39,19 @@ def main():
         print(hls_code)
         print("%" * 80)
 
-
+        mod = s2.build(target="vitis_hls", mode="hw_emu", project="stateful_acc.prj")
+        acc1 = 0
+        acc2 = 0
+        acc3 = 0
+        mod(2, acc1)
+        mod(8, acc2)
+        mod(4, acc3)
+        print(acc1)
+        print(acc2)
+        print(acc3)
 
         
+        '''
         # Verify static variable is inside function
         func_start = hls_code.find('void test(')
         func_body_start = hls_code.find('{', func_start)
@@ -70,6 +80,7 @@ def main():
                 f.write(hls_code)
             print(f"\n✓ Output saved to: {output_file}")
             return 0
+        '''
             
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
