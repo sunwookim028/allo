@@ -17,6 +17,7 @@ soda_*
 out
 rapidjson
 project_*
+**/.ipynb_checkpoints
 
 # Downloaded files
 *.params
@@ -67,7 +68,6 @@ build
 
 # HLS
 *.log
-*.prj
 
 # Linear programming files
 *.lp
@@ -76,7 +76,6 @@ tmp
 *.pyc
 
 .vscode
-*.prj
 *.pdf
 *.dot
 *.egg-info
@@ -88,3 +87,5 @@ log
 _tmp
 *.txt
 sg_execution_times.rst
+
+sunwoo_playground/*

@@ -1314,6 +1314,7 @@ def customize(
         inst_list=instantiate,
         func_instances=func_instances,
     )
+    sch.custom_globals = getattr(ctx, 'custom_globals', {})
     # Attach buffers to schedule:
     # The reason why we do not attach buffers to function is that
     # we may have multiple schedules referring to the same function,
