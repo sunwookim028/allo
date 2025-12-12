@@ -693,7 +693,11 @@ class ASTTransformer(ASTBuilder):
             in_cst = ASTTransformer.build_array(ctx, dtype, tuple())
             with ctx.get_ip():
                 fill = linalg_d.fill(get_mlir_op_result(op), outs=[in_cst.result])
-            op = fill.owner if ctx.enable_tensor else in_cst
+            op = (
+                (fill.owner if hasattr(fill, "owner") else fill)
+                if ctx.enable_tensor
+                else in_cst
+            )
         # target
         alloc_op = ASTTransformer.build_array(ctx, dtype, dst_shape)
         with ctx.get_ip():
@@ -950,7 +954,11 @@ class ASTTransformer(ASTBuilder):
                     )
                     with ctx.get_ip():
                         linalg_op = linalg_d.fill(rhs_result, outs=[alloc_op.result])
-                    rhs = linalg_op.owner if ctx.enable_tensor else alloc_op
+                    rhs = (
+                        (linalg_op.owner if hasattr(linalg_op, "owner") else linalg_op)
+                        if ctx.enable_tensor
+                        else alloc_op
+                    )
                 else:
                     rhs = ASTTransformer.build_broadcast_op(
                         ctx,
@@ -1002,10 +1010,14 @@ class ASTTransformer(ASTBuilder):
                             ctx, target.dtype, target.shape
                         )
                         with ctx.get_ip():
-                            linalg_op = linalg_d.copy(
+                            copy_op = linalg_d.copy(
                                 get_mlir_op_result(rhs), outs=[alloc_op.result]
                             )
-                        rhs = linalg_op.owner if ctx.enable_tensor else alloc_op
+                        rhs = (
+                            (copy_op.owner if hasattr(copy_op, "owner") else copy_op)
+                            if ctx.enable_tensor
+                            else alloc_op
+                        )
                     assert idx is None, "Not Supported"
                     ctx.buffers[target.id] = rhs
                     # FIXME (Shihan): GetGlobalOp has a "name" attribute, which may have assignment conflict
@@ -1122,10 +1134,20 @@ class ASTTransformer(ASTBuilder):
         node.target.ctx = ast.Load()
         lhs = build_stmt(ctx, node.target)
         node.target.ctx = ast.Store()
-        # Cast rhs to the target type
-        rhs = ASTTransformer.build_cast_op(ctx, rhs, node.value.dtype, node.dtype)
-        # Aug LHS
+        # Cast lhs to the operation type
+        lhs = ASTTransformer.build_cast_op(
+            ctx, lhs, node.target.dtype, node.dtype, node.target.shape
+        )
+        # Cast rhs to the operation type
+        rhs = ASTTransformer.build_cast_op(
+            ctx, rhs, node.value.dtype, node.dtype, node.value.shape
+        )
+        # Compute LHS
         res = ASTTransformer.build_general_binop(ctx, node, lhs, rhs)
+        # Cast res to the target type
+        res = ASTTransformer.build_cast_op(
+            ctx, res, node.dtype, node.target.dtype, node.shape
+        )
         # Store LHS
         store_op = build_stmt(ctx, node.target, val=res)
         return store_op
@@ -1648,7 +1670,6 @@ class ASTTransformer(ASTBuilder):
                 store_op = build_stmt(ctx, node.value, val=set_slice_op)
                 return store_op
 
-    # pylint: disable=inconsistent-return-statements
     @staticmethod
     def build_Subscript(
         ctx: ASTContext, node: ast.Subscript, val: OpView = None, idx: int = 0
@@ -1693,159 +1714,6 @@ class ASTTransformer(ASTBuilder):
     @staticmethod
     def build_AnnAssign(ctx: ASTContext, node: ast.AnnAssign):
         shape, dtype = node.target.shape, node.target.dtype
-        if hasattr(dtype, "stateful") and dtype.stateful:
-            # Generate unique global name
-            if not hasattr(ctx, "stateful_counter"):
-                ctx.stateful_counter = 0
-            ctx.stateful_counter += 1
-            func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
-            global_name = (
-                f"__stateful_{func_name}_{node.target.id}_{ctx.stateful_counter}"
-            )
-
-            # Check if already in custom_globals (avoid redeclaration)
-            if global_name not in getattr(ctx, "custom_globals", {}):
-                # Create memref.global declaration
-                if len(shape) == 0:
-                    # For scalars, use memref<dtype> not just dtype
-                    memref_type = MemRefType.get([], dtype.build())
-                else:
-                    memref_type = ASTTransformer.build_shaped_type(ctx, dtype, shape)
-
-                # Initialize with the RHS value if provided, else zero
-                if node.value is not None:
-                    rhs = build_stmt(ctx, node.value)
-                    if isinstance(rhs, MockConstant):
-                        # Scalar constant
-                        initial_value = rhs.val
-                    elif hasattr(node.value, "np_values"):
-                        # Array/tensor constant (from list initialization)
-                        initial_value = node.value.np_values
-                    else:
-                        raise RuntimeError(
-                            f"Stateful variable '{node.target.id}' must be initialized "
-                            f"with a compile-time constant. Got: {type(rhs).__name__}"
-                        )
-                else:
-                    initial_value = 0
-
-                import numpy.typing as npt
-
-                def allo_to_numpy_dtype(allo_type: AlloType) -> npt.DTypeLike:
-                    """
-                    Convert AlloType to corresponding numpy dtype.
-
-                    Parameters
-                    ----------
-                    allo_type : AlloType
-                        The Allo type to convert
-
-                    Returns
-                    -------
-                    numpy dtype
-                        Corresponding numpy data type
-                    """
-
-                    if isinstance(allo_type, Int):
-                        if allo_type.bits <= 8:
-                            return np.int8
-                        if allo_type.bits <= 16:
-                            return np.int16
-                        if allo_type.bits <= 32:
-                            return np.int32
-                        if allo_type.bits <= 64:
-                            return np.int64
-                        return np.int64
-
-                    if isinstance(allo_type, UInt):
-                        if allo_type.bits <= 8:
-                            return np.uint8
-                        if allo_type.bits <= 16:
-                            return np.uint16
-                        if allo_type.bits <= 32:
-                            return np.uint32
-                        if allo_type.bits <= 64:
-                            return np.uint64
-                        return np.uint64
-
-                    if isinstance(allo_type, Float):
-                        if allo_type.bits == 16:
-                            return np.float16
-                        if allo_type.bits == 32:
-                            return np.float32
-                        if allo_type.bits == 64:
-                            return np.float64
-                        return np.float32
-
-                    if isinstance(allo_type, Index):
-                        return np.int32
-
-                    if isinstance(allo_type, (Fixed, UFixed)):
-                        # Fixed point: use integer type of same bitwidth
-                        if allo_type.bits <= 8:
-                            return np.int8 if isinstance(allo_type, Fixed) else np.uint8
-                        if allo_type.bits <= 16:
-                            return (
-                                np.int16 if isinstance(allo_type, Fixed) else np.uint16
-                            )
-                        if allo_type.bits <= 32:
-                            return (
-                                np.int32 if isinstance(allo_type, Fixed) else np.uint32
-                            )
-                        return np.int64 if isinstance(allo_type, Fixed) else np.uint64
-
-                    # Safe default
-                    return np.float32
-
-                # Create the initial value attribute
-                np_dtype = allo_to_numpy_dtype(dtype)
-
-                if isinstance(initial_value, np.ndarray):
-                    # Already an array, just convert dtype
-                    np_values = initial_value.astype(np_dtype)
-                    # Verify shape matches
-                    if np_values.shape != tuple(shape):
-                        raise RuntimeError(
-                            f"Stateful variable '{node.target.id}' shape mismatch: "
-                            f"expected {shape}, got {np_values.shape}"
-                        )
-                elif len(shape) == 0:
-                    np_values = np.array(initial_value, dtype=np_dtype)
-                else:
-                    np_values = np.full(shape, initial_value, dtype=np_dtype)
-
-                value_attr = DenseElementsAttr.get(np_values, type=dtype.build())
-
-                # Declare global at module level
-                memref_d.GlobalOp(
-                    sym_name=StringAttr.get(global_name),
-                    type_=TypeAttr.get(memref_type),
-                    sym_visibility=StringAttr.get("private"),
-                    initial_value=value_attr,
-                    constant=False,  # Stateful variables are mutable
-                    alignment=None,
-                    ip=InsertionPoint(ctx.top_func),
-                )
-
-                # Track in custom_globals
-                if not hasattr(ctx, "custom_globals"):
-                    ctx.custom_globals = {}
-                ctx.custom_globals[node.target.id] = (global_name, memref_type)
-
-            # Get the global reference for use in the function
-            global_name, memref_type = ctx.custom_globals[node.target.id]
-            get_global_op = memref_d.GetGlobalOp(
-                memref_type,
-                FlatSymbolRefAttr.get(global_name),
-                ip=ctx.get_ip(),
-            )
-
-            # Store in context
-            ctx.buffers[node.target.id] = get_global_op
-            ctx.func_globals[global_name] = get_global_op
-            ctx.put_symbol(name=node.target.id, val=get_global_op)
-
-            return None
         # stream can only be declared with annotated assign stmt
         # TODO: guard, stream declaration has no rhs
         if isinstance(dtype, Stream):
@@ -1880,8 +1748,6 @@ class ASTTransformer(ASTBuilder):
 
     @staticmethod
     def build_FunctionDef(ctx: ASTContext, node: ast.FunctionDef):
-        if not hasattr(ctx, "func_globals"):
-            ctx.func_globals = {}
         func_name = node.name if ctx.func_id is None else f"{node.name}_{ctx.func_id}"
         # pylint: disable=too-many-nested-blocks
         if ctx.top_func is not None:
@@ -2190,7 +2056,7 @@ class ASTTransformer(ASTBuilder):
                 cond,
                 [get_mlir_op_result(var)],
                 ip=ctx.get_ip(),
-                hasElse=len(node.orelse),
+                has_else=len(node.orelse),
             )
             # TODO: MLIR bug, need to create a then_block function
             then_block = if_op.thenRegion.blocks[0]
@@ -2199,8 +2065,7 @@ class ASTTransformer(ASTBuilder):
             if_op = scf_d.IfOp(
                 get_mlir_op_result(cond), ip=ctx.get_ip(), hasElse=len(node.orelse)
             )
-            then_block = if_op.then_block
-        ctx.set_ip(then_block)
+        ctx.set_ip(if_op.then_block)
         with ctx.block_scope_guard():
             build_stmts(ctx, node.body)
             if is_affine:
@@ -2774,7 +2639,11 @@ class ASTTransformer(ASTBuilder):
                     )
                     op = ASTTransformer.build_cast_op(ctx, res, Int(32), node.dtype)
                     op = linalg_d.fill(get_mlir_op_result(op), outs=[alloc_op.result])
-                    return op.owner if ctx.enable_tensor else alloc_op
+                    return (
+                        (op.owner if hasattr(op, "owner") else op)
+                        if ctx.enable_tensor
+                        else alloc_op
+                    )
             if fn_name == "get_pid":
                 res = []
                 for i in range(3):
@@ -3046,7 +2915,7 @@ class ASTTransformer(ASTBuilder):
                 ASTTransformer.attach_op_name(
                     ctx,
                     node,
-                    linalg_fill.owner,
+                    linalg_fill.owner if hasattr(linalg_fill, "owner") else linalg_fill,
                     f"{attr}_init_zero",
                     postfix="init_zero",
                 )
@@ -3117,7 +2986,7 @@ class ASTTransformer(ASTBuilder):
                         )
                     ],
                 )
-                op = op.owner
+                op = op.owner if hasattr(op, "owner") else op
             elif attr in {"exp", "log", "abs", "copy"}:
                 op = {
                     "exp": linalg_d.exp,
@@ -3134,7 +3003,7 @@ class ASTTransformer(ASTBuilder):
                         )
                     ],
                 )
-                op = op.owner
+                op = op.owner if hasattr(op, "owner") else op
             elif attr == "softmax":
                 # TODO: Failed to lower to LLVM, see https://reviews.llvm.org/D153422
                 # We temporarily replace SoftmaxOp with a predefined lowered function to enable LLVM execution
@@ -3161,7 +3030,7 @@ class ASTTransformer(ASTBuilder):
                         zero_op.result,
                         outs=[result_tensor],
                     )
-                    op = op.owner
+                    op = op.owner if hasattr(op, "owner") else op
                 else:
                     op = linalg_d.max(
                         get_mlir_op_result(new_args[0]),
@@ -3172,7 +3041,7 @@ class ASTTransformer(ASTBuilder):
                         ),
                         outs=[result_tensor],
                     )
-                    op = op.owner
+                    op = op.owner if hasattr(op, "owner") else op
             elif attr == "transpose":
                 with ctx.get_ip():
                     op = linalg_d.transpose(
