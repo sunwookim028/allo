@@ -120,7 +120,6 @@ class TypeInferer(ASTVisitor):
                     ctx, node.args[0]
                 )
                 # Create a copy with stateful=True
-                import copy
                 stateful_dtype = copy.deepcopy(inner_dtype)
                 stateful_dtype.stateful = True
                 return stateful_dtype, inner_shape, inner_layout
@@ -787,7 +786,7 @@ class TypeInferer(ASTVisitor):
                 arg.dtype, arg.shape, arg.spec = TypeInferer.visit_type_hint(
                     ctx, arg.annotation
                 )
-                if hasattr(arg.dtype, 'stateful') and arg.dtype.stateful:
+                if hasattr(arg.dtype, "stateful") and arg.dtype.stateful:
                     raise RuntimeError(
                         f"Function parameter '{arg.arg}' cannot be Stateful. "
                         "Stateful variables can only be declared locally within a kernel."

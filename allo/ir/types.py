@@ -60,6 +60,7 @@ class AlloType:
     def __hash__(self):
         return hash((self.name, self.stateful))
 
+
 def stateful(dtype_spec):
     """
     Marks a type as stateful, making it persistent across kernel invocations.
