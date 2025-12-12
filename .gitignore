@@ -68,7 +68,6 @@ build
 
 # HLS
 *.log
-*.prj
 
 # Linear programming files
 *.lp
@@ -77,7 +76,6 @@ tmp
 *.pyc
 
 .vscode
-*.prj
 *.pdf
 *.dot
 *.egg-info
