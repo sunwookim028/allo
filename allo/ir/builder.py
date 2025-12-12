@@ -1648,6 +1648,7 @@ class ASTTransformer(ASTBuilder):
                 store_op = build_stmt(ctx, node.value, val=set_slice_op)
                 return store_op
 
+    # pylint: disable=inconsistent-return-statements
     @staticmethod
     def build_Subscript(
         ctx: ASTContext, node: ast.Subscript, val: OpView = None, idx: int = 0
@@ -2218,6 +2219,7 @@ class ASTTransformer(ASTBuilder):
                 else:
                     scf_d.YieldOp([], ip=ctx.get_ip())
             ctx.pop_ip()
+        return while_op
 
     @staticmethod
     def build_While(ctx: ASTContext, node: ast.While):
