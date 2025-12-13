@@ -38,11 +38,11 @@ def top():
                     with allo.meta_elif(j == 0):
                         # i > 0
                         for kt in range(Kt):
-                            fifo_A[i, j + 1].put(A[m * Mt + i - 1, k*Kt + kt])
+                            fifo_A[i, j + 1].put(A[m * Mt + i - 1, k * Kt + kt])
                     with allo.meta_elif(i == 0):
                         # j > 0
                         for kt in range(Kt):
-                            fifo_B[i + 1, j].put(B[k*Kt + kt, n * Nt + j - 1])
+                            fifo_B[i + 1, j].put(B[k * Kt + kt, n * Nt + j - 1])
                     # drain
                     with allo.meta_elif(i == Mt + 1):
                         for kt in range(Kt):
