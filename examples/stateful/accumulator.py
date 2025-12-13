@@ -21,7 +21,6 @@ def acc_stateful(x: Int(4), rst: bool) -> Int(4):
     return _sum
 
 
-
 s_stateless = allo.customize(acc_stateless)
 s_stateful = allo.customize(acc_stateful)
 

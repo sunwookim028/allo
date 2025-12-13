@@ -8,6 +8,7 @@ from allo.ir.types import int1, int8, int32, float32, stateful
 
 SEED = 0
 
+
 def kernel_rng() -> int32:
     seed: stateful(int32) = SEED
     seed = (1103515245 * seed + 12345) & 0x7FFFFFFF

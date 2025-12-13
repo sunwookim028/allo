@@ -4,11 +4,13 @@
 import allo
 from allo.ir.types import int32, float32, stateful
 
+
 # Scalar stateless
 def test_stateless_scalar(x: int32) -> int32:
     acc: int32 = 0
     acc = acc + x
     return acc
+
 
 # Scalar stateful
 def test_stateful_scalar(x: int32) -> int32:
@@ -16,17 +18,20 @@ def test_stateful_scalar(x: int32) -> int32:
     acc = acc + x
     return acc
 
+
 # Array stateless
 def test_stateless_array(x: float32) -> float32:
     buffer: float32[10] = 0.0
     buffer[0] = buffer[1] + buffer[2]
     return buffer[0]
 
+
 # Array stateful
 def test_stateful_array(x: float32) -> float32:
     buffer: stateful(float32[10]) = 0.0
     buffer[0] = buffer[1] + buffer[2]
     return buffer[0]
+
 
 def test_moving_average(new_value: float32) -> float32:
     window: stateful(float32[4]) = 0.0
@@ -51,6 +56,7 @@ def test_moving_average(new_value: float32) -> float32:
     # Return average of values in window
     return total / count
 
+
 s1 = allo.customize(test_stateless_scalar)
 print(s1.module)  # Should show alloc
 
@@ -64,4 +70,4 @@ s4 = allo.customize(test_stateful_array)
 print(s4.module)  # Should show memref.global with shape
 
 s5 = allo.customize(test_moving_average)
-print(s5.module) 
+print(s5.module)

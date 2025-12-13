@@ -4,10 +4,12 @@
 import allo
 from allo.ir.types import Int, int32, float32, stateful
 
+
 def test_stateful_scalar(x: Int(4)) -> Int(4):
     acc: stateful(Int(4)) = 0
     acc = acc + x
     return acc
+
 
 def test_moving_average(new_value: float32) -> float32:
     window: stateful(float32[4]) = 0.0
@@ -32,8 +34,9 @@ def test_moving_average(new_value: float32) -> float32:
     # Return average of values in window
     return total / count
 
+
 s = allo.customize(test_stateful_scalar)
-print(s.module) 
+print(s.module)
 
 code = s.build(target="vhls")
 print(code)
