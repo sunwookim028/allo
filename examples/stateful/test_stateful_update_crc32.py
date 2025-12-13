@@ -1,3 +1,6 @@
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import time
 import allo
 from allo.ir.types import uint8, uint32, stateful
