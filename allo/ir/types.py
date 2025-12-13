@@ -61,7 +61,7 @@ class AlloType:
         return hash((self.name, self.stateful))
 
 
-def stateful(dtype_spec):
+def stateful(dtype: AlloType):
     """
     Marks a type as stateful, making it persistent across kernel invocations.
 
@@ -71,14 +71,15 @@ def stateful(dtype_spec):
 
     Parameters
     ----------
-    dtype_spec: AlloType or subscription expression
+    dtype : AlloType
         The underlying type to mark as stateful
 
     Returns
     -------
-    A marker tuple that will be processed during type inference
+    tuple
+        A marker tuple that will be processed during type inference
     """
-    return ("stateful", dtype_spec)
+    return ("stateful", dtype)
 
 
 class Index(AlloType):
