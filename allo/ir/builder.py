@@ -1770,61 +1770,54 @@ class ASTTransformer(ASTBuilder):
                     if isinstance(allo_type, Int):
                         if allo_type.bits <= 8:
                             return np.int8
-                        elif allo_type.bits <= 16:
+                        if allo_type.bits <= 16:
                             return np.int16
-                        elif allo_type.bits <= 32:
+                        if allo_type.bits <= 32:
                             return np.int32
-                        elif allo_type.bits <= 64:
+                        if allo_type.bits <= 64:
                             return np.int64
-                        else:
-                            # For arbitrary precision, use int64 as fallback
-                            return np.int64
+                        # For arbitrary precision, use int64 as fallback
+                        return np.int64
 
-                    elif isinstance(allo_type, UInt):
+                    if isinstance(allo_type, UInt):
                         if allo_type.bits <= 8:
                             return np.uint8
-                        elif allo_type.bits <= 16:
+                        if allo_type.bits <= 16:
                             return np.uint16
-                        elif allo_type.bits <= 32:
+                        if allo_type.bits <= 32:
                             return np.uint32
-                        elif allo_type.bits <= 64:
+                        if allo_type.bits <= 64:
                             return np.uint64
-                        else:
-                            return np.uint64
+                        return np.uint64
 
-                    elif isinstance(allo_type, Float):
+                    if isinstance(allo_type, Float):
                         if allo_type.bits == 16:
                             return np.float16
-                        elif allo_type.bits == 32:
+                        if allo_type.bits == 32:
                             return np.float32
-                        elif allo_type.bits == 64:
+                        if allo_type.bits == 64:
                             return np.float64
-                        else:
-                            return np.float32
+                        return np.float32
 
-                    elif isinstance(allo_type, Index):
+                    if isinstance(allo_type, Index):
                         return np.int32
 
-                    elif isinstance(allo_type, (Fixed, UFixed)):
+                    if isinstance(allo_type, (Fixed, UFixed)):
                         # Fixed point: use integer type of same bitwidth
                         if allo_type.bits <= 8:
                             return np.int8 if isinstance(allo_type, Fixed) else np.uint8
-                        elif allo_type.bits <= 16:
+                        if allo_type.bits <= 16:
                             return (
                                 np.int16 if isinstance(allo_type, Fixed) else np.uint16
                             )
-                        elif allo_type.bits <= 32:
+                        if allo_type.bits <= 32:
                             return (
                                 np.int32 if isinstance(allo_type, Fixed) else np.uint32
                             )
-                        else:
-                            return (
-                                np.int64 if isinstance(allo_type, Fixed) else np.uint64
-                            )
+                        return np.int64 if isinstance(allo_type, Fixed) else np.uint64
 
-                    else:
-                        # Safe default
-                        return np.float32
+                    # Safe default
+                    return np.float32
 
                 # Create the initial value attribute
                 np_dtype = allo_to_numpy_dtype(dtype)
