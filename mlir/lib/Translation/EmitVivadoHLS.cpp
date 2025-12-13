@@ -141,6 +141,7 @@ public:
   void emitGlobal(memref::GlobalOp op);
   void emitSubView(memref::SubViewOp op);
   void emitReshape(memref::ReshapeOp op);
+  void emitCopy(memref::CopyOp op);
 
   /// Tensor-related statement emitters.
   void emitTensorExtract(tensor::ExtractOp op);
@@ -331,6 +332,7 @@ public:
   bool visitOp(memref::DeallocOp op) { return true; }
   bool visitOp(memref::SubViewOp op) { return emitter.emitSubView(op), true; }
   bool visitOp(memref::ReshapeOp op) { return emitter.emitReshape(op), true; }
+  bool visitOp(memref::CopyOp op) { return emitter.emitCopy(op), true; }
 
   /// Tensor-related statements.
   bool visitOp(tensor::ExtractOp op) {
@@ -1715,6 +1717,56 @@ void ModuleEmitter::emitReshape(memref::ReshapeOp op) {
   emitValue(op->getOperand(0));
   os << ";";
   emitInfoAndNewLine(op);
+}
+
+void ModuleEmitter::emitCopy(memref::CopyOp op) {
+  // Get source and target memrefs
+  auto source = op.getSource();
+  auto target = op.getTarget();
+
+  // Get the optional "to" attribute for the target name
+  std::string copy_to_name = "";
+  if (op->hasAttr("to")) {
+    copy_to_name = op->getAttr("to").cast<StringAttr>().getValue().str();
+  }
+
+  auto sourceType = source.getType().cast<MemRefType>();
+
+  if (!sourceType.hasStaticShape()) {
+    emitError(op, "memref.copy with dynamic shape is not supported.");
+    return;
+  }
+
+  // Generate nested loops for copying
+  unsigned dimIdx = 0;
+  for (auto &shape : sourceType.getShape()) {
+    indent();
+    os << "for (int _copy_iv" << dimIdx << " = 0; ";
+    os << "_copy_iv" << dimIdx << " < " << shape << "; ";
+    os << "++_copy_iv" << dimIdx++ << ") {\n";
+    addIndent();
+  }
+
+  // Emit the copy assignment: target[indices] = source[indices]
+  indent();
+  emitValue(target, 0, false, copy_to_name);
+  for (unsigned i = 0; i < sourceType.getRank(); ++i) {
+    os << "[_copy_iv" << i << "]";
+  }
+  os << " = ";
+  emitValue(source);
+  for (unsigned i = 0; i < sourceType.getRank(); ++i) {
+    os << "[_copy_iv" << i << "]";
+  }
+  os << ";";
+  emitInfoAndNewLine(op);
+
+  // Close the nested loops
+  for (unsigned i = 0; i < sourceType.getRank(); ++i) {
+    reduceIndent();
+    indent();
+    os << "}\n";
+  }
 }
 
 void ModuleEmitter::emitSelect(arith::SelectOp op) {
