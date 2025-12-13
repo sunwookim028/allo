@@ -1714,6 +1714,160 @@ class ASTTransformer(ASTBuilder):
     @staticmethod
     def build_AnnAssign(ctx: ASTContext, node: ast.AnnAssign):
         shape, dtype = node.target.shape, node.target.dtype
+        if hasattr(dtype, 'stateful') and dtype.stateful:
+            # Generate unique global name
+            if not hasattr(ctx, 'stateful_counter'):
+                ctx.stateful_counter = 0
+            ctx.stateful_counter += 1
+            func_name = ctx.top_func_tree.name if ctx.top_func_tree else "kernel"
+            global_name = f"__stateful_{func_name}_{node.target.id}_{ctx.stateful_counter}"
+            
+            # Check if already in custom_globals (avoid redeclaration)
+            if global_name not in getattr(ctx, 'custom_globals', {}):
+                # Create memref.global declaration
+                if len(shape) == 0:
+                    # For scalars, use memref<dtype> not just dtype
+                    memref_type = MemRefType.get([], dtype.build())
+                else:
+                    memref_type = ASTTransformer.build_shaped_type(
+                        ctx, dtype, shape
+                    )
+                
+                # Initialize with the RHS value if provided, else zero
+                if node.value is not None:
+                    rhs = build_stmt(ctx, node.value)
+                    if isinstance(rhs, MockConstant):
+                        # Scalar constant
+                        initial_value = rhs.val
+                    elif hasattr(node.value, 'np_values'):
+                        # Array/tensor constant (from list initialization)
+                        initial_value = node.value.np_values
+                    else:
+                        raise RuntimeError(
+                            f"Stateful variable '{node.target.id}' must be initialized "
+                            f"with a compile-time constant. Got: {type(rhs).__name__}"
+                        )
+                else:
+                    initial_value = 0
+                
+                import numpy.typing as npt
+                def allo_to_numpy_dtype(allo_type: AlloType) -> npt.DTypeLike:
+                    """
+                    Convert AlloType to corresponding numpy dtype.
+                    
+                    Parameters
+                    ----------
+                    allo_type : AlloType
+                        The Allo type to convert
+                    
+                    Returns
+                    -------
+                    numpy dtype
+                        Corresponding numpy data type
+                    """
+                    
+                    if isinstance(allo_type, Int):
+                        if allo_type.bits <= 8:
+                            return np.int8
+                        elif allo_type.bits <= 16:
+                            return np.int16
+                        elif allo_type.bits <= 32:
+                            return np.int32
+                        elif allo_type.bits <= 64:
+                            return np.int64
+                        else:
+                            # For arbitrary precision, use int64 as fallback
+                            return np.int64
+                    
+                    elif isinstance(allo_type, UInt):
+                        if allo_type.bits <= 8:
+                            return np.uint8
+                        elif allo_type.bits <= 16:
+                            return np.uint16
+                        elif allo_type.bits <= 32:
+                            return np.uint32
+                        elif allo_type.bits <= 64:
+                            return np.uint64
+                        else:
+                            return np.uint64
+                    
+                    elif isinstance(allo_type, Float):
+                        if allo_type.bits == 16:
+                            return np.float16
+                        elif allo_type.bits == 32:
+                            return np.float32
+                        elif allo_type.bits == 64:
+                            return np.float64
+                        else:
+                            return np.float32
+                    
+                    elif isinstance(allo_type, Index):
+                        return np.int32
+                    
+                    elif isinstance(allo_type, (Fixed, UFixed)):
+                        # Fixed point: use integer type of same bitwidth
+                        if allo_type.bits <= 8:
+                            return np.int8 if isinstance(allo_type, Fixed) else np.uint8
+                        elif allo_type.bits <= 16:
+                            return np.int16 if isinstance(allo_type, Fixed) else np.uint16
+                        elif allo_type.bits <= 32:
+                            return np.int32 if isinstance(allo_type, Fixed) else np.uint32
+                        else:
+                            return np.int64 if isinstance(allo_type, Fixed) else np.uint64
+                    
+                    else:
+                        # Safe default
+                        return np.float32
+
+                # Create the initial value attribute
+                np_dtype = allo_to_numpy_dtype(dtype)
+                
+                if isinstance(initial_value, np.ndarray):
+                    # Already an array, just convert dtype
+                    np_values = initial_value.astype(np_dtype)
+                    # Verify shape matches
+                    if np_values.shape != tuple(shape):
+                        raise RuntimeError(
+                            f"Stateful variable '{node.target.id}' shape mismatch: "
+                            f"expected {shape}, got {np_values.shape}"
+                        )
+                elif len(shape) == 0:
+                    np_values = np.array(initial_value, dtype=np_dtype)
+                else:
+                    np_values = np.full(shape, initial_value, dtype=np_dtype)
+                
+                value_attr = DenseElementsAttr.get(np_values, type=dtype.build())
+                
+                # Declare global at module level
+                memref_d.GlobalOp(
+                    sym_name=StringAttr.get(global_name),
+                    type_=TypeAttr.get(memref_type),
+                    sym_visibility=StringAttr.get("private"),
+                    initial_value=value_attr,
+                    constant=False,  # Stateful variables are mutable
+                    alignment=None,
+                    ip=InsertionPoint(ctx.top_func),
+                )
+                
+                # Track in custom_globals
+                if not hasattr(ctx, 'custom_globals'):
+                    ctx.custom_globals = {}
+                ctx.custom_globals[node.target.id] = (global_name, memref_type)
+            
+            # Get the global reference for use in the function
+            global_name, memref_type = ctx.custom_globals[node.target.id]
+            get_global_op = memref_d.GetGlobalOp(
+                memref_type,
+                FlatSymbolRefAttr.get(global_name),
+                ip=ctx.get_ip(),
+            )
+            
+            # Store in context
+            ctx.buffers[node.target.id] = get_global_op
+            ctx.func_globals[global_name] = get_global_op
+            ctx.put_symbol(name=node.target.id, val=get_global_op)
+            
+            return None
         # stream can only be declared with annotated assign stmt
         # TODO: guard, stream declaration has no rhs
         if isinstance(dtype, Stream):
