@@ -16,8 +16,8 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "allo/Dialect/AlloDialect.h"
 #include "allo/Dialect/AlloOps.h"
@@ -446,7 +446,7 @@ public:
       }
     }
     if (auto binaryRHS = llvm::dyn_cast<AffineBinaryOpExpr>(expr.getRHS())) {
-      if (auto constRHS = 
+      if (auto constRHS =
               llvm::dyn_cast<AffineConstantExpr>(binaryRHS.getRHS())) {
         if ((unsigned)*syntax == (unsigned)*"+" && constRHS.getValue() == -1 &&
             binaryRHS.getKind() == AffineExprKind::Mul) {
@@ -1002,7 +1002,7 @@ void ModuleEmitter::emitAffineFor(AffineForOp op) {
   auto iterVar = op.getInductionVar();
   std::string loop_name = "";
   if (op->hasAttr("loop_name")) { // loop label
-    loop_name = 
+    loop_name =
         llvm::dyn_cast<StringAttr>(op->getAttr("loop_name")).getValue().str();
     std::replace(loop_name.begin(), loop_name.end(), '.', '_');
     os << "l_";
@@ -1220,7 +1220,7 @@ void ModuleEmitter::emitAffineLoad(AffineLoadOp op) {
   indent();
   std::string load_from_name = "";
   if (op->hasAttr("from")) {
-    load_from_name = 
+    load_from_name =
         llvm::dyn_cast<StringAttr>(op->getAttr("from")).getValue().str();
   }
   Value result = op.getResult();
@@ -1280,7 +1280,7 @@ void ModuleEmitter::emitAffineStore(AffineStoreOp op) {
   indent();
   std::string store_to_name = "";
   if (op->hasAttr("to")) {
-    store_to_name = 
+    store_to_name =
         llvm::dyn_cast<StringAttr>(op->getAttr("to")).getValue().str();
   }
   auto memref = op.getMemRef();
@@ -1635,7 +1635,7 @@ void ModuleEmitter::emitGlobal(memref::GlobalOp op) {
     unsigned elementIdx = 0;
     for (auto element : denseAttr.getValues<Attribute>()) {
       if (type.isF32()) {
-        auto value = 
+        auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
         if (std::isfinite(value))
           os << value;
@@ -1645,7 +1645,7 @@ void ModuleEmitter::emitGlobal(memref::GlobalOp op) {
           os << "-INFINITY";
 
       } else if (type.isF64()) {
-        auto value = 
+        auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToDouble();
         if (std::isfinite(value))
           os << value;
@@ -2282,13 +2282,13 @@ void ModuleEmitter::emitConstant(arith::ConstantOp op) {
     fixUnsignedType(result, op->hasAttr("unsigned"));
     emitArrayDecl(result);
     os << " = {";
-    auto type = 
+    auto type =
         llvm::dyn_cast<ShapedType>(op.getResult().getType()).getElementType();
 
     unsigned elementIdx = 0;
     for (auto element : denseAttr.getValues<Attribute>()) {
       if (type.isF32()) {
-        auto value = 
+        auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
         if (std::isfinite(value))
           os << value;
@@ -2298,7 +2298,7 @@ void ModuleEmitter::emitConstant(arith::ConstantOp op) {
           os << "-INFINITY";
 
       } else if (type.isF64()) {
-        auto value = 
+        auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToDouble();
         if (std::isfinite(value))
           os << value;
@@ -2570,7 +2570,7 @@ void ModuleEmitter::emitLoopDirectives(Operation *op) {
   if (auto ii = getLoopDirective(op, "pipeline_ii")) {
     reduceIndent();
     indent();
-    os << "#pragma HLS pipeline II=" 
+    os << "#pragma HLS pipeline II="
        << llvm::dyn_cast<IntegerAttr>(ii).getValue();
     // https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Rewinding-Pipelined-Loops-for-Performance
     if (op->hasAttr("rewind"))
@@ -2861,8 +2861,9 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   // Collect stateful globals used in this function
   std::vector<memref::GlobalOp> statefulGlobals;
   func.walk([&](memref::GetGlobalOp getGlobalOp) {
-    auto globalOp = getGlobalOp->getParentOfType<ModuleOp>()
-                        .lookupSymbol<memref::GlobalOp>(getGlobalOp.getName());
+    auto globalOp =
+        getGlobalOp->getParentOfType<ModuleOp>().lookupSymbol<memref::GlobalOp>(
+            getGlobalOp.getName());
     if (globalOp) {
       std::string symName = globalOp.getSymName().str();
       if (symName.find("_stateful_") != std::string::npos) {
@@ -2898,14 +2899,14 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   }
   std::string output_names;
   if (func->hasAttr("outputs")) {
-    output_names = 
+    output_names =
         llvm::dyn_cast<StringAttr>(func->getAttr("outputs")).getValue().str();
     // suppose only one output
     input_args.push_back(output_names);
   }
   std::string itypes = "";
   if (func->hasAttr("itypes"))
-    itypes = 
+    itypes =
         llvm::dyn_cast<StringAttr>(func->getAttr("itypes")).getValue().str();
   else {
     for (unsigned i = 0; i < func.getNumArguments(); ++i)
@@ -2948,7 +2949,7 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   auto args = func.getArguments();
   std::string otypes = "";
   if (func->hasAttr("otypes"))
-    otypes = 
+    otypes =
         llvm::dyn_cast<StringAttr>(func->getAttr("otypes")).getValue().str();
   else {
     for (unsigned i = 0; i < func.getNumArguments(); ++i)
@@ -3018,7 +3019,8 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
       unsigned elementIdx = 0;
       for (auto element : denseAttr.getValues<Attribute>()) {
         if (type.isF32()) {
-          auto value = llvm::cast<FloatAttr>(element).getValue().convertToFloat();
+          auto value =
+              llvm::cast<FloatAttr>(element).getValue().convertToFloat();
           if (std::isfinite(value))
             os << value;
           else if (value > 0)
@@ -3026,7 +3028,8 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
           else
             os << "-INFINITY";
         } else if (type.isF64()) {
-          auto value = llvm::cast<FloatAttr>(element).getValue().convertToDouble();
+          auto value =
+              llvm::cast<FloatAttr>(element).getValue().convertToDouble();
           if (std::isfinite(value))
             os << value;
           else if (value > 0)
@@ -3048,7 +3051,8 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
               os << "LL";
           }
         else
-          emitError(globalOp.getOperation(), "array has unsupported element type.");
+          emitError(globalOp.getOperation(),
+                    "array has unsupported element type.");
 
         if (elementIdx++ != denseAttr.getNumElements() - 1)
           os << ", ";
