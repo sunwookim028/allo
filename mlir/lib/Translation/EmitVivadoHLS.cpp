@@ -640,6 +640,18 @@ public:
   }
   bool visitOp(allo::StreamGetOp op) { return emitter.emitStreamGet(op), true; }
   bool visitOp(allo::StreamPutOp op) { return emitter.emitStreamPut(op), true; }
+  bool visitOp(allo::StreamTryGetOp op) {
+    return emitter.emitStreamTryGet(op), true;
+  }
+  bool visitOp(allo::StreamTryPutOp op) {
+    return emitter.emitStreamTryPut(op), true;
+  }
+  bool visitOp(allo::StreamEmptyOp op) {
+    return emitter.emitStreamEmpty(op), true;
+  }
+  bool visitOp(allo::StreamFullOp op) {
+    return emitter.emitStreamFull(op), true;
+  }
 
 private:
   allo::hls::VhlsModuleEmitter &emitter;
@@ -1562,7 +1574,7 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
     if (op->hasAttr("constant")) {
       os << "const ";
     }
-    os << getTypeName(type);
+    emitStatefulGlobalElementType(type);
     os << " " << op.getSymName();
     for (auto &shape : arrayType.getShape())
       os << "[" << shape << "]";
@@ -1573,12 +1585,7 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
       if (type.isF32()) {
         auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
-        if (std::isfinite(value))
-          os << value;
-        else if (value > 0)
-          os << "INFINITY";
-        else
-          os << "-INFINITY";
+        emitFloatArrayElement(value);
 
       } else if (type.isF64()) {
         auto value =
@@ -1994,6 +2001,93 @@ void allo::hls::VhlsModuleEmitter::emitStreamPut(StreamPutOp op) {
       os << "}\n";
     }
   }
+  emitInfoAndNewLine(op);
+}
+
+void allo::hls::VhlsModuleEmitter::emitStreamTryGet(StreamTryGetOp op) {
+  Value result = op.getResult(0);
+  Value success = op.getResult(1);
+  fixUnsignedType(result, op->hasAttr("unsigned"));
+  auto stream = op->getOperand(0);
+
+  // Declare the result data variable (emitValue emits type + name on first use)
+  indent();
+  emitValue(result);
+  os << ";\n";
+
+  // Declare the success variable and call read_nb
+  indent();
+  emitValue(success);
+  os << " = ";
+  emitValue(stream, 0, false);
+  // Only apply array subscript for shaped (array) stream types; direct stream
+  // references (hls::stream<T>&) do not support the [] operator.
+  if (llvm::isa<ShapedType>(stream.getType())) {
+    auto denseArrayAttr = op->getAttrOfType<DenseI64ArrayAttr>("indices");
+    if (denseArrayAttr)
+      for (int64_t v : denseArrayAttr.asArrayRef())
+        os << "[" << v << "]";
+  }
+  os << ".read_nb(";
+  emitValue(result);
+  os << ");\n";
+  emitInfoAndNewLine(op);
+}
+
+void allo::hls::VhlsModuleEmitter::emitStreamTryPut(StreamTryPutOp op) {
+  Value success = op.getResult();
+  auto stream = op->getOperand(0);
+  auto value = op->getOperand(1);
+
+  indent();
+  emitValue(success);
+  os << " = ";
+  emitValue(stream, 0, false);
+  if (llvm::isa<ShapedType>(stream.getType())) {
+    auto denseArrayAttr = op->getAttrOfType<DenseI64ArrayAttr>("indices");
+    if (denseArrayAttr)
+      for (int64_t v : denseArrayAttr.asArrayRef())
+        os << "[" << v << "]";
+  }
+  os << ".write_nb(";
+  emitValue(value);
+  os << ");\n";
+  emitInfoAndNewLine(op);
+}
+
+void allo::hls::VhlsModuleEmitter::emitStreamEmpty(StreamEmptyOp op) {
+  Value result = op.getResult();
+  auto stream = op->getOperand(0);
+
+  indent();
+  emitValue(result);
+  os << " = ";
+  emitValue(stream, 0, false);
+  if (llvm::isa<ShapedType>(stream.getType())) {
+    auto denseArrayAttr = op->getAttrOfType<DenseI64ArrayAttr>("indices");
+    if (denseArrayAttr)
+      for (int64_t v : denseArrayAttr.asArrayRef())
+        os << "[" << v << "]";
+  }
+  os << ".empty();\n";
+  emitInfoAndNewLine(op);
+}
+
+void allo::hls::VhlsModuleEmitter::emitStreamFull(StreamFullOp op) {
+  Value result = op.getResult();
+  auto stream = op->getOperand(0);
+
+  indent();
+  emitValue(result);
+  os << " = ";
+  emitValue(stream, 0, false);
+  if (llvm::isa<ShapedType>(stream.getType())) {
+    auto denseArrayAttr = op->getAttrOfType<DenseI64ArrayAttr>("indices");
+    if (denseArrayAttr)
+      for (int64_t v : denseArrayAttr.asArrayRef())
+        os << "[" << v << "]";
+  }
+  os << ".full();\n";
   emitInfoAndNewLine(op);
 }
 
@@ -2724,11 +2818,9 @@ void allo::hls::VhlsModuleEmitter::emitFunctionDirectives(
 /// After this call, indentation is back to the original level.
 SmallVector<Value, 8>
 allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
+  SmallVector<Value, 8> portList;
   os << "void " << func.getName() << "(\n";
   addIndent();
-
-  // This vector is to record all ports of the function.
-  SmallVector<Value, 8> portList;
 
   // Emit input arguments.
   unsigned argIdx = 0;
@@ -2754,6 +2846,7 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
       itypes += "x";
   }
   for (auto &arg : func.getArguments()) {
+    portList.push_back(arg);
     indent();
     fixUnsignedType(arg, itypes[argIdx] == 'u');
     if (llvm::isa<ShapedType>(arg.getType())) {
@@ -2781,7 +2874,6 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
       }
     }
 
-    portList.push_back(arg);
     if (argIdx++ != func.getNumArguments() - 1)
       os << ",\n";
   }
@@ -2801,6 +2893,7 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
     unsigned idx = 0;
     for (auto result : funcReturn.getOperands()) {
       if (std::find(args.begin(), args.end(), result) == args.end()) {
+        portList.push_back(result);
         if (func.getArguments().size() > 0)
           os << ",\n";
         indent();
@@ -2820,8 +2913,6 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
           else
             emitValue(result, /*rank=*/0, /*isPtr=*/true, output_names);
         }
-
-        portList.push_back(result);
       }
       idx += 1;
     }
@@ -2844,6 +2935,19 @@ void allo::hls::VhlsModuleEmitter::emitFunctionDeclaration(func::FuncOp func) {
   state.nameTable = savedNames;
   state.nameConflictCnt = savedConflicts;
   os << "\n);\n\n";
+}
+
+void allo::hls::VhlsModuleEmitter::emitStatefulGlobalElementType(Type type) {
+  os << getTypeName(type);
+}
+
+void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {
+  if (std::isfinite(value))
+    os << value;
+  else if (value > 0)
+    os << "INFINITY";
+  else
+    os << "-INFINITY";
 }
 
 void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
@@ -2954,7 +3058,7 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
       if (globalOp->hasAttr("constant")) {
         os << "const ";
       }
-      os << getTypeName(type);
+      emitStatefulGlobalElementType(type);
       os << " " << globalOp.getSymName();
       for (auto &shape : arrayType.getShape())
         os << "[" << shape << "]";
@@ -2965,12 +3069,7 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
         if (type.isF32()) {
           auto value =
               llvm::cast<FloatAttr>(element).getValue().convertToFloat();
-          if (std::isfinite(value))
-            os << value;
-          else if (value > 0)
-            os << "INFINITY";
-          else
-            os << "-INFINITY";
+          emitFloatArrayElement(value);
         } else if (type.isF64()) {
           auto value =
               llvm::cast<FloatAttr>(element).getValue().convertToDouble();
@@ -3177,6 +3276,11 @@ using namespace std;
         }
       }
     }
+
+    // Clear nameTable and nameConflictCnt to ensure that the definition pass can re-emit
+    // function signatures with full types.
+    state.nameTable.clear();
+    state.nameConflictCnt.clear();
 
     // Third pass: emit function definitions and non-stateful globals
     for (auto &op : *module.getBody()) {

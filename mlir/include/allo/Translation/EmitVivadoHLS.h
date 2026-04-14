@@ -69,6 +69,10 @@ public:
   void emitStreamConstruct(allo::StreamConstructOp op) override;
   void emitStreamGet(allo::StreamGetOp op) override;
   void emitStreamPut(allo::StreamPutOp op) override;
+  void emitStreamTryGet(allo::StreamTryGetOp op) override;
+  void emitStreamTryPut(allo::StreamTryPutOp op) override;
+  void emitStreamEmpty(allo::StreamEmptyOp op) override;
+  void emitStreamFull(allo::StreamFullOp op) override;
 
   /// Top-level MLIR module emitter.
   void emitModule(ModuleOp module) override;
@@ -91,6 +95,14 @@ protected:
 
   /// Emit function signature and return the port list.
   SmallVector<Value, 8> emitFunctionSignature(func::FuncOp func);
+
+  /// Virtual hook: emit the element type name for a stateful global variable.
+  /// Override in backend-specific emitters (e.g. Catapult) to emit
+  /// synthesizable float types like ac_ieee_float<binary32> instead of float.
+  virtual void emitStatefulGlobalElementType(Type type);
+  /// Virtual hook: emit a float constant value for an array initializer element.
+  /// Override to append 'f' suffix for backends that require float literals.
+  virtual void emitFloatArrayElement(float value);
 };
 
 } // namespace hls
