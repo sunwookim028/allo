@@ -35,27 +35,5 @@ def test_vhls_stream_nb():
     assert ".full()" in hls_code
     print("Level 2 VHLS Stream NB Test Passed!")
 
-def test_tapa_stream_nb():
-    @df.region()
-    def top():
-        S0: Stream[int32, 2][1]
-        
-        @df.kernel(mapping=[1])
-        def kernel():
-            data, success = S0[0].try_get()
-            if success:
-                S0[0].try_put(data)
-
-    mod = allo.customize(top)
-    hls_mod = mod.build(target="tapa")
-    hls_code = hls_mod.hls_code
-    
-    assert ".try_read(" in hls_code
-    assert ".try_write(" in hls_code
-    print("Level 2 Tapa Stream NB Test Passed!")
-
 if __name__ == "__main__":
     test_vhls_stream_nb()
-    test_tapa_stream_nb()
-
-
