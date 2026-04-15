@@ -1588,7 +1588,7 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
     if (op->hasAttr("constant")) {
       os << "const ";
     }
-    os << getTypeName(type);
+    emitStatefulGlobalElementType(type);
     os << " " << op.getSymName();
     for (auto &shape : arrayType.getShape())
       os << "[" << shape << "]";
@@ -1599,12 +1599,7 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
       if (type.isF32()) {
         auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
-        if (std::isfinite(value))
-          os << value;
-        else if (value > 0)
-          os << "INFINITY";
-        else
-          os << "-INFINITY";
+        emitFloatArrayElement(value);
 
       } else if (type.isF64()) {
         auto value =
@@ -2857,6 +2852,19 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
   return portList;
 }
 
+void allo::hls::VhlsModuleEmitter::emitStatefulGlobalElementType(Type type) {
+  os << getTypeName(type);
+}
+
+void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {
+  if (std::isfinite(value))
+    os << value;
+  else if (value > 0)
+    os << "INFINITY";
+  else
+    os << "-INFINITY";
+}
+
 /// Emit a forward declaration for a function: "void funcName(args...);\n"
 void allo::hls::VhlsModuleEmitter::emitFunctionDeclaration(func::FuncOp func) {
   if (func.getBlocks().empty())
@@ -2979,7 +2987,7 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
       if (globalOp->hasAttr("constant")) {
         os << "const ";
       }
-      os << getTypeName(type);
+      emitStatefulGlobalElementType(type);
       os << " " << globalOp.getSymName();
       for (auto &shape : arrayType.getShape())
         os << "[" << shape << "]";
@@ -2990,12 +2998,7 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
         if (type.isF32()) {
           auto value =
               llvm::cast<FloatAttr>(element).getValue().convertToFloat();
-          if (std::isfinite(value))
-            os << value;
-          else if (value > 0)
-            os << "INFINITY";
-          else
-            os << "-INFINITY";
+          emitFloatArrayElement(value);
         } else if (type.isF64()) {
           auto value =
               llvm::cast<FloatAttr>(element).getValue().convertToDouble();
