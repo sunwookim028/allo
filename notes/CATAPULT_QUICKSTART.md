@@ -16,7 +16,14 @@ Two versions are installed under `/opt/siemens/catapult/`:
 | 2024.2 (recommended) | `/opt/siemens/catapult/2024.2/` |
 | 2024.1 | `/opt/siemens/catapult/2024.1_2-1117371/` |
 
-No `module` command is needed — set the path directly:
+**Option A — module (if available):**
+
+```bash
+module load mentor-Catapult_synthesis_10.5a
+# Sets MGC_HOME and updates PATH automatically
+```
+
+**Option B — manual path (fallback if module is not installed):**
 
 ```bash
 export MGC_HOME=/opt/siemens/catapult/2024.2
@@ -251,10 +258,12 @@ This section applies only when using the Allo HLS framework to generate Catapult
 
 ### 6.1 Additional Dependency: conda env + libstdc++
 
-The Allo MLIR backend (`.so` files) requires GCC 13's `libstdc++`. RHEL 8 ships GCC 8 only.
-The conda `allo` env includes the newer `libstdc++`, but it must be on `LD_LIBRARY_PATH`:
+The Allo MLIR backend (`.so` files) requires GCC 13's `libstdc++`. RHEL 8 (zhang-21) ships GCC 8
+only. The conda `allo` env includes the newer `libstdc++`, but it must be on `LD_LIBRARY_PATH`
+before activating the env so that subprocesses inherit it:
 
 ```bash
+# Set LD_LIBRARY_PATH before conda activate so subprocesses inherit it
 export LD_LIBRARY_PATH="/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/lib:$LD_LIBRARY_PATH"
 conda activate allo
 ```
