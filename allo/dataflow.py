@@ -558,6 +558,20 @@ def kernel(mapping=None, args=None):
 
 
 def region():
+    """Mark the decorated function as a dataflow region.
+
+    A region is a top-level dataflow function whose body declares
+    streams, optional region-scope ``Stateful`` buffers, and a set of
+    ``@kernel`` functions. All kernels inside the region run
+    concurrently on each invocation of the compiled module, and any
+    ``Stateful`` declared at region body scope is a single persistent
+    buffer shared by every kernel in the region (vs. ``Stateful``
+    declared at kernel body scope, which is private to that kernel).
+
+    Region-scope ``Stateful`` is the natural fit for accelerator
+    architectures with a decoder kernel and a compute kernel sharing
+    scratchpad/accumulator state (Gemmini-style).
+    """
 
     def actual_decorator(func):
         # TODO: ideally this context information should be recorded in the builder
