@@ -149,7 +149,32 @@ class ASTContext:
         if hasattr(self, "func_suffix"):
             ctx.func_suffix = self.func_suffix
         ctx.global_op_cache = self.global_op_cache
+        # Propagate the Stateful name -> (global_name, memref_type) map so a
+        # kernel nested in a region can resolve a region-scope Stateful by
+        # name. The map holds symbol references and types (not MLIR ops),
+        # so it is safe to share across function boundaries; per-function
+        # ``memref.get_global`` ops live in ``global_op_cache`` and are
+        # reset when a new function body opens.
+        if hasattr(self, "stateful_var_map"):
+            ctx.stateful_var_map = self.stateful_var_map
+        if hasattr(self, "stateful_counter"):
+            ctx.stateful_counter = self.stateful_counter
         return ctx
+
+    def open_function_scope_for_stateful(self):
+        """Snapshot Stateful metadata so a nested function (kernel) can
+        shadow names without leaking back to the enclosing function.
+
+        Region-scope Stateful entries declared *before* the call must
+        remain visible (so a kernel inside a region can read shared state
+        by name); kernel-local entries declared *inside* the nested
+        function must not pollute the parent's view. We achieve this by
+        making the nested function start with a *copy* of the current
+        stateful_var_map. Updates inside the nested function then go to
+        the copy.
+        """
+        if hasattr(self, "stateful_var_map"):
+            self.stateful_var_map = dict(self.stateful_var_map)
 
     def set_ip(self, ip):
         if not isinstance(ip, InsertionPoint):
