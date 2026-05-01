@@ -2839,11 +2839,9 @@ void allo::hls::VhlsModuleEmitter::emitFunctionDirectives(
 /// After this call, indentation is back to the original level.
 SmallVector<Value, 8>
 allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
+  SmallVector<Value, 8> portList;
   os << "void " << func.getName() << "(\n";
   addIndent();
-
-  // This vector records all ports of the function (args + return operands).
-  SmallVector<Value, 8> portList;
 
   // Emit input arguments.
   unsigned argIdx = 0;
@@ -2971,6 +2969,19 @@ void allo::hls::VhlsModuleEmitter::emitFunctionDeclaration(func::FuncOp func) {
   state.nameTable = savedNames;
   state.nameConflictCnt = savedConflicts;
   os << "\n);\n\n";
+}
+
+void allo::hls::VhlsModuleEmitter::emitStatefulGlobalElementType(Type type) {
+  os << getTypeName(type);
+}
+
+void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {
+  if (std::isfinite(value))
+    os << value;
+  else if (value > 0)
+    os << "INFINITY";
+  else
+    os << "-INFINITY";
 }
 
 void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
