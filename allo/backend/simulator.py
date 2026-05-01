@@ -97,7 +97,9 @@ def _process_function_streams(
     pe_call_define_ops: dict[func_d.CallOp, func_d.FuncOp] = {}
     stream_construct_ops: dict[str, allo_d.StreamConstructOp] = {}
 
-    # Collect PE calls and stream construct ops in this function
+    # Collect PE calls and stream construct ops in this function.
+    # The top-level scan handles direct calls and local stream constructs,
+    # which is sufficient for flat regions.
     for op in func_ops:
         if isinstance(op, memref_d.AllocOp):
             continue
@@ -114,6 +116,34 @@ def _process_function_streams(
         elif isinstance(op, allo_d.StreamConstructOp):
             stream_name = str(op.attributes["name"]).strip('"')
             stream_construct_ops[stream_name] = op
+
+    # Deep scan: also reach func.call ops nested inside affine.for / scf.if /
+    # other control-flow regions. Without this, a sub-region call like
+    # ``inner(buf)`` placed inside ``for _ in range(N): inner(buf)`` is not
+    # discovered by the top-level scan above, and the callee's own
+    # ``allo.stream_put`` / ``allo.stream_get`` ops survive into LLVM
+    # lowering -- ``convert-func-to-llvm`` then fails with
+    # "cannot be converted to LLVM IR: missing LLVMTranslationDialectInterface
+    # registration for dialect for op: func.func".
+    #
+    # We do not add nested calls to ``pe_call_define_ops`` here: nested
+    # calls do not pass parent-region streams as call args (those would
+    # have been visible at the top level), so there is no parent-side
+    # arg-mapping to perform. We only need to ensure the callee gets
+    # processed so its internal streams are lowered.
+    nested_calls: list = []
+    recursive_collect_ops(func, func_d.CallOp, nested_calls)
+    for call_op in nested_calls:
+        if call_op in pe_call_define_ops:
+            continue
+        callee_name = str(call_op.callee)[1:]
+        if callee_name.startswith(("load_buf", "store_res", "usleep")):
+            continue
+        for mod_op in module.body.operations:
+            if isinstance(mod_op, func_d.FuncOp):
+                if callee_name == str(mod_op.sym_name).strip('"'):
+                    _process_function_streams(module, mod_op, processed_funcs)
+                    break
 
     # If no streams, nothing to do for this function
     if not stream_construct_ops:
