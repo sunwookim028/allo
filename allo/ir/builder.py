@@ -163,22 +163,44 @@ class ASTTransformer(ASTBuilder):
         return store_op
 
     @staticmethod
+    def get_or_create_stateful_get_global(ctx: ASTContext, name: str):
+        """Look up (or lazily create) the ``memref.get_global`` op for a
+        Stateful variable in the current function.
+
+        The op must dominate every use, so we anchor the lazily-created
+        op at the current function's entry block (matching the
+        kernel-local pattern where the AnnAssign sits at the top of the
+        body). The ``stateful_var_map`` carries the global symbol name and
+        memref type; the ``global_op_cache`` is per-function (reset in
+        ``build_FunctionDef``) and holds the ``get_global`` op for reuse
+        within that function.
+        """
+        global_name, memref_type = ctx.stateful_var_map[name]
+        if global_name in ctx.global_op_cache:
+            return ctx.global_op_cache[global_name]
+        # Anchor at the current function's entry block so the op
+        # dominates references inside loops or nested control flow.
+        if ctx.top_func is not None:
+            entry_block = ctx.top_func.entry_block
+            if len(entry_block.operations) > 0:
+                ip = InsertionPoint(entry_block.operations[0])
+            else:
+                ip = InsertionPoint(entry_block)
+        else:
+            ip = ctx.get_ip()
+        get_global_op = memref_d.GetGlobalOp(
+            memref_type,
+            FlatSymbolRefAttr.get(global_name),
+            ip=ip,
+        )
+        ctx.global_op_cache[global_name] = get_global_op
+        return get_global_op
+
+    @staticmethod
     def build_Name(ctx: ASTContext, node: ast.Name, val=None):
         if val is not None and isinstance(node.ctx, ast.Store):
             if hasattr(ctx, "stateful_var_map") and node.id in ctx.stateful_var_map:
-                global_name = ctx.stateful_var_map[node.id][0]
-                if global_name in ctx.global_op_cache:
-                    buffer = ctx.global_op_cache[global_name]
-                else:
-                    # Create new op and cache it
-                    memref_type = ctx.stateful_var_map[node.id][1]
-                    get_global_op = memref_d.GetGlobalOp(
-                        memref_type,
-                        FlatSymbolRefAttr.get(global_name),
-                        ip=ctx.get_ip(),
-                    )
-                    ctx.global_op_cache[global_name] = get_global_op
-                    buffer = get_global_op
+                buffer = ASTTransformer.get_or_create_stateful_get_global(ctx, node.id)
             else:
                 buffer = ctx.get_symbol(node.id)
             # FIXME (Shihan): We may need to look for some workarounds to support such cases.
@@ -189,22 +211,13 @@ class ASTTransformer(ASTBuilder):
                 ctx, node, buffer, ASTTransformer.get_mlir_op_result(ctx, val)
             )
         ret = ctx.get_symbol(node.id, allow_missing=True)
+        # If this name is a Stateful variable, prefer the per-function
+        # ``get_global`` op (creating one if missing). The scope-stack
+        # lookup may have returned an op bound to an enclosing function
+        # (e.g. a region body), which is invalid to use inside a kernel.
+        if hasattr(ctx, "stateful_var_map") and node.id in ctx.stateful_var_map:
+            ret = ASTTransformer.get_or_create_stateful_get_global(ctx, node.id)
         if ret is not None:
-            # Check if this is a stateful variable via ctx.stateful_var_map
-            if hasattr(ctx, "stateful_var_map") and node.id in ctx.stateful_var_map:
-                global_name = ctx.stateful_var_map[node.id][0]
-                if global_name in ctx.global_op_cache:
-                    ret = ctx.global_op_cache[global_name]
-                else:
-                    # Create new op and cache it
-                    memref_type = ctx.stateful_var_map[node.id][1]
-                    get_global_op = memref_d.GetGlobalOp(
-                        memref_type,
-                        FlatSymbolRefAttr.get(global_name),
-                        ip=ctx.get_ip(),
-                    )
-                    ctx.global_op_cache[global_name] = get_global_op
-                    ret = get_global_op
             ret_result = ASTTransformer.get_mlir_op_result(ctx, ret)
             if (
                 isinstance(ret_result.type, (MemRefType, RankedTensorType))
@@ -2181,6 +2194,22 @@ class ASTTransformer(ASTBuilder):
             # set context
             ctx.top_func = func_op
             ctx.top_func_tree = node
+            # Each function body must own its own ``memref.get_global`` ops:
+            # the cache maps ``global_name -> get_global_op`` and the cached
+            # op is bound to whichever function created it, so reusing it
+            # from a different function (e.g. a kernel referencing a
+            # region-scope Stateful) yields invalid MLIR. Swap in a fresh
+            # cache dict for this function -- the parent's ctx still holds
+            # its own dict by reference.
+            ctx.global_op_cache = {}
+            # When this function is nested (e.g. a kernel inside a region),
+            # snapshot the Stateful name -> global metadata so kernel-local
+            # ``Stateful`` declarations that shadow a region-scope name do
+            # not leak back into the enclosing region's view. The
+            # outermost function build keeps writing into the module-level
+            # ctx so the schedule can see every Stateful global.
+            if old_ctx is not None:
+                ctx.open_function_scope_for_stateful()
             for i, (dtensor, arg) in enumerate(zip(dtensors, func_op.arguments)):
                 name = dtensor.name
                 mock_arg = MockArg(arg, idx=i)
@@ -2213,10 +2242,20 @@ class ASTTransformer(ASTBuilder):
                                 args_kw = get_kwarg_value(decorator.keywords, "args")
                                 if args_kw is not None:
                                     args = build_stmts(ctx, args_kw)
-                                    arg_values = [
-                                        ASTTransformer.get_mlir_op_result(ctx, arg)
-                                        for arg in args
-                                    ]
+                                    arg_values = []
+                                    for arg in args:
+                                        res = ASTTransformer.get_mlir_op_result(
+                                            ctx, arg
+                                        )
+                                        # If it's a 0D memref (scalar), load it to get the value
+                                        if (
+                                            isinstance(res.type, MemRefType)
+                                            and len(res.type.shape) == 0
+                                        ):
+                                            op_ = ASTTransformer.build_scalar(ctx, arg)
+                                            arg_values.append(op_.result)
+                                        else:
+                                            arg_values.append(res)
                                 else:
                                     arg_values = []
                                 # Insert calls
@@ -2731,13 +2770,22 @@ class ASTTransformer(ASTBuilder):
                     new_ctx.func_suffix = inst_suffix
 
             func_op = ASTTransformer.build_FunctionDef(new_ctx, func_def)
+            func_op.attributes["dataflow"] = UnitAttr.get()
+            if ctx.top_func is not None:
+                func_op.operation.move_before(ctx.top_func)
 
             # Now insert the call
             # Parse arguments
             new_args = build_stmts(ctx, node.args)
-            arg_values = [
-                ASTTransformer.get_mlir_op_result(ctx, arg) for arg in new_args
-            ]
+            arg_values = []
+            for arg in new_args:
+                res = ASTTransformer.get_mlir_op_result(ctx, arg)
+                if isinstance(res.type, MemRefType) and len(res.type.shape) == 0:
+                    op_ = ASTTransformer.build_scalar(ctx, arg)
+                    arg_values.append(op_.result)
+                else:
+                    arg_values.append(res)
+
             call_op = func_d.CallOp(
                 [],
                 FlatSymbolRefAttr.get(func_def.name),
