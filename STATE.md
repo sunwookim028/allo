@@ -35,6 +35,13 @@ consumes this fork as its editable Allo install.
   wrapper. Branch: `fix/vhls-mlir-percent-alloc-csim` (PR #554).
 - **Non-blocking stream primitives** — `try_put`/`try_get`/
   `empty`/`full` for VHLS and Tapa. Branch: `feature/nb-streams`.
+  **⚠ MLIR `.so` not yet rebuilt with new ops; `StreamTryGetOp` etc.
+  absent from compiled extension → `dataflow.py` refs crash at import.**
+- **Nested-subregion stream lowering** — conservative deep-scan in
+  `_process_function_streams` so callees nested inside `affine.for` /
+  `scf.if` have their streams lowered before LLVM conversion. Does NOT
+  add nested calls to `pe_call_define_ops` (avoids OMP over-wrap).
+  Branch: `fix/simulator-nested-call-streams` (merged into `next`).
 - **Mesh-accelerator tile tests** — tile-based hierarchical
   dataflow regression set. Branch: `feature/mesh-accelerator-v2`.
 - **Catapult HLS NB stream support** — Catapult backend additions
