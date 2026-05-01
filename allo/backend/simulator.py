@@ -98,40 +98,47 @@ def _process_function_streams(
     pe_call_define_ops: dict[func_d.CallOp, func_d.FuncOp] = {}
     stream_construct_ops: dict[str, allo_d.StreamConstructOp] = {}
 
-    # Collect PE calls and stream construct ops in this function
-    all_calls = []
-    recursive_collect_ops(func, func_d.CallOp, all_calls)
-    for op in all_calls:
-        callee_name = str(op.callee)[1:]
-        if not callee_name.startswith(("load_buf", "store_res")):
-            for mod_op in module.body.operations:
-                if isinstance(mod_op, func_d.FuncOp):
-                    if callee_name == str(mod_op.sym_name).strip('"'):
-                        pe_call_define_ops[op] = mod_op
-                        # Recursively process the callee function first
-                        _process_function_streams(
-                            module, mod_op, processed_funcs, all_pe_calls_by_func
-                        )
-                        break
-    
+    # Collect PE calls and stream construct ops in this function.
+    # The top-level scan handles direct (non-nested) calls and local stream
+    # constructs, which is sufficient to identify top-level parallel PE calls.
     for op in func_ops:
-        if isinstance(op, allo_d.StreamConstructOp):
+        if isinstance(op, memref_d.AllocOp):
+            continue
+        if isinstance(op, func_d.CallOp):
+            callee_name = str(op.callee)[1:]
+            if not callee_name.startswith(("load_buf", "store_res")):
+                for mod_op in module.body.operations:
+                    if isinstance(mod_op, func_d.FuncOp):
+                        if callee_name == str(mod_op.sym_name).strip('"'):
+                            pe_call_define_ops[op] = mod_op
+                            _process_function_streams(
+                                module, mod_op, processed_funcs, all_pe_calls_by_func
+                            )
+                            break
+        elif isinstance(op, allo_d.StreamConstructOp):
             stream_name = str(op.attributes["name"]).strip('"')
             stream_construct_ops[stream_name] = op
 
-    # Also discover and recursively process func.call ops that are nested
-    # inside control flow (scf.if / scf.for / etc.) and were missed by the
-    # top-level scan above.  These callee regions need their own stream and
-    # PE-call processing (and OMP injection), but they are NOT top-level
-    # parallel PE calls in the current function, so they must not be added
-    # to pe_call_define_ops.  The processed_funcs guard makes repeated calls
-    # for already-visited functions a cheap no-op.
-    all_calls_in_body: list = []
-    recursive_collect_ops(func.operation, (func_d.CallOp,), all_calls_in_body)
-    for nested_call_op in all_calls_in_body:
-        if nested_call_op in pe_call_define_ops:
-            continue  # Already handled as a top-level PE call
-        callee_name = str(nested_call_op.callee)[1:]
+    # Deep scan: also reach func.call ops nested inside affine.for / scf.if /
+    # other control-flow regions. Without this, a sub-region call like
+    # ``inner(buf)`` placed inside ``for _ in range(N): inner(buf)`` is not
+    # discovered by the top-level scan above, and the callee's own
+    # ``allo.stream_put`` / ``allo.stream_get`` ops survive into LLVM
+    # lowering -- ``convert-func-to-llvm`` then fails with
+    # "cannot be converted to LLVM IR: missing LLVMTranslationDialectInterface
+    # registration for dialect for op: func.func".
+    #
+    # We do not add nested calls to ``pe_call_define_ops`` here: nested
+    # calls do not pass parent-region streams as call args (those would
+    # have been visible at the top level), so there is no parent-side
+    # arg-mapping to perform. We only need to ensure the callee gets
+    # processed so its internal streams are lowered.
+    nested_calls: list = []
+    recursive_collect_ops(func, func_d.CallOp, nested_calls)
+    for call_op in nested_calls:
+        if call_op in pe_call_define_ops:
+            continue
+        callee_name = str(call_op.callee)[1:]
         if callee_name.startswith(("load_buf", "store_res", "usleep")):
             continue
         for mod_op in module.body.operations:
