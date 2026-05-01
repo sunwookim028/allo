@@ -35,8 +35,6 @@ consumes this fork as its editable Allo install.
   wrapper. Branch: `fix/vhls-mlir-percent-alloc-csim` (PR #554).
 - **Non-blocking stream primitives** — `try_put`/`try_get`/
   `empty`/`full` for VHLS and Tapa. Branch: `feature/nb-streams`.
-  **⚠ MLIR `.so` not yet rebuilt with new ops; `StreamTryGetOp` etc.
-  absent from compiled extension → `dataflow.py` refs crash at import.**
 - **Nested-subregion stream lowering** — conservative deep-scan in
   `_process_function_streams` so callees nested inside `affine.for` /
   `scf.if` have their streams lowered before LLVM conversion. Does NOT
@@ -60,13 +58,15 @@ PR state on 2026-05-08 09:00 ET.
 
 ## Known broken / parked
 
-- **`wip/simulator-deep-scan`** — extends
-  `_process_function_streams` with a recursive `func_d.CallOp`
-  scan (so PE callees nested inside `affine.for`/`affine.if` get
-  visited). Builds successfully against allo-tpu L2 but produces
-  NaN / 1e35-magnitude outputs — likely double-processing of stream
-  args. **Blocks allo-tpu L2 baseline.** See `HANDOFF.md` on
-  `fork-mgmt` for diagnosis notes. **Owner: next Allo session.**
+_(none currently — `wip/simulator-deep-scan` was fixed and landed as
+`fix/simulator-nested-call-streams`, merged into `next` on 2026-05-01.)_
+
+### Pending investigation
+
+- **L2 NaN** — allo-tpu L2 systolic case may still produce NaN/1e35
+  magnitude outputs. The aggressive deep-scan from `feature/nb-streams`
+  (commit `8f407bf`) was the suspected cause; replaced by the conservative
+  fix. Re-validate allo-tpu L2 baseline after pulling updated `next`.
 
 ## Planned (not started)
 
