@@ -2950,19 +2950,6 @@ void allo::hls::VhlsModuleEmitter::emitFunctionDeclaration(func::FuncOp func) {
   os << "\n);\n\n";
 }
 
-void allo::hls::VhlsModuleEmitter::emitStatefulGlobalElementType(Type type) {
-  os << getTypeName(type);
-}
-
-void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {
-  if (std::isfinite(value))
-    os << value;
-  else if (value > 0)
-    os << "INFINITY";
-  else
-    os << "-INFINITY";
-}
-
 void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
   if (func->hasAttr("bit"))
     BIT_FLAG = true;
