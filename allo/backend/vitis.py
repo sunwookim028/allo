@@ -382,6 +382,7 @@ def postprocess_hls_code(hls_code, top=None, pragma=True):
     has_endif = False
     extern_decl = False
     func_args = []
+    scalar_args = []
     for line in hls_code.split("\n"):
         if line == "using namespace std;" or line.startswith("#ifndef"):
             out_str += line + "\n"
@@ -401,6 +402,8 @@ def postprocess_hls_code(hls_code, top=None, pragma=True):
             if pragma:
                 for i, arg in enumerate(func_args):
                     out_str += f"  #pragma HLS interface m_axi port={arg} offset=slave bundle=gmem{i}\n"
+                for arg in scalar_args:
+                    out_str += f"  #pragma HLS interface s_axilite port={arg} bundle=control\n"
         elif func_decl:
             if pragma:
                 dtype, var = line.strip().rsplit(" ", 1)
@@ -413,6 +416,7 @@ def postprocess_hls_code(hls_code, top=None, pragma=True):
                 else:  # scalar
                     var = var.split(",")[0]
                     out_str += "  " + dtype + " " + var + f"{comma}\n"
+                    scalar_args.append(var)
             else:
                 out_str += line + "\n"
         elif line.startswith("#endif"):

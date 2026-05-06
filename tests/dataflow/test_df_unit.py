@@ -1,6 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import tempfile
 import allo
 from allo.ir.types import int32, UInt, float32, index, Stream
 import allo.dataflow as df
@@ -107,8 +108,40 @@ def test_const_arrays_arithmetic():
     print("Dataflow Simulator (Arithmetic) Passed!")
 
 
+def test_region_bare_scalar_arg():
+    M = 16
+
+    @df.region()
+    def top(buf: int32[M], n: int32):
+        @df.kernel(mapping=[1], args=[buf, n])
+        def core(local_buf: int32[M], local_n: int32):
+            for i in allo.grid(M):
+                local_buf[i] = local_buf[i] + local_n
+
+    # simulator: np.int32 scalar must be accepted (not just Python int)
+    arr = np.ones(M, dtype=np.int32) * 5
+    sim_mod = df.build(top, target="simulator")
+    sim_mod(arr, np.int32(3))
+    np.testing.assert_array_equal(arr, np.full(M, 8, dtype=np.int32))
+    print("Dataflow Simulator (bare scalar arg) Passed!")
+
+    # vhls: buf → m_axi pointer, n → s_axilite (pass-by-value, no '*')
+    with tempfile.TemporaryDirectory() as tmpdir:
+        hls_mod = df.build(top, target="vitis_hls", project=tmpdir)
+        code = hls_mod.hls_code
+    # Exactly one array arg → exactly one m_axi pragma
+    assert "#pragma HLS interface m_axi port=" in code
+    # Exactly one scalar arg → s_axilite with control bundle
+    assert "#pragma HLS interface s_axilite port=" in code
+    assert "bundle=control" in code
+    # The s_axilite pragma line must not carry a '*' (scalar is not a pointer)
+    assert not any("*" in line for line in code.split("\n") if "s_axilite" in line)
+    print("VHLS bare scalar arg → s_axilite Passed!")
+
+
 if __name__ == "__main__":
     test_uint()
     test_func_index()
     test_const_arrays()
     test_const_arrays_arithmetic()
+    test_region_bare_scalar_arg()

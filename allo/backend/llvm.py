@@ -136,6 +136,12 @@ class LLVMModule:
         # 1. Construct argument pointers
         for arg, (target_in_type, shape) in zip(args, input_types):
             if len(shape) == 0:  # scalar
+                # Normalize numpy scalars and 0-d arrays to a Python int/float so
+                # the existing type-dispatch branches below can handle them.
+                if isinstance(arg, (np.integer, np.floating)):
+                    arg = arg.item()
+                elif isinstance(arg, np.ndarray) and arg.ndim == 0:
+                    arg = arg.item()
                 if isinstance(arg, int):
                     if target_in_type != "i32":
                         DTypeWarning(
