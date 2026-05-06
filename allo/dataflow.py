@@ -483,20 +483,62 @@ def _build_top(s, stream_info, enable_layout=False):
     input_types = []
     input_signed = ""
     arg_mapping = {}
-    used_args = {}  # {arg_name: arg_idx in top_func}
+    used_args = {}  # {canonical_arg_name: arg_idx in top_func}
+
+    # Pre-populate used_args in canonical order from the region's own function
+    # signature (s.func_args[s.top_func_name]).  This ensures the new top-level
+    # MLIR function has arguments in declaration order, matching the order that
+    # Python callers use when invoking the compiled module.
+    # Without this, args are assigned first-seen order across kernels, which can
+    # reorder them when a scalar arg appears in an earlier kernel than a later
+    # array arg (e.g., loader has args=[arr_in, n] while compute has
+    # args=[arr_out] — without pre-seeding, the top func ends up with
+    # (arr_in, n, arr_out) instead of the declared (arr_in, arr_out, n)).
+    top_dtensors = s.func_args.get(s.top_func_name, [])
+    # top_dtensors entries may be strings (for streams) or DTensors; skip streams
+    for top_dt in top_dtensors:
+        if not hasattr(top_dt, "shape"):
+            continue
+        top_name = top_dt.name
+        if top_name not in used_args:
+            used_args[top_name] = len(input_types)
+            input_types.append((top_dt.shape, top_dt.dtype))
+            # Signedness will be filled in from kernel itypes below;
+            # use '_' (signed/scalar) as placeholder.
+            input_signed += "_"
+
+    # Parallel list to hold signedness strings per canonical arg position
+    # so we can overwrite the placeholders with actual kernel itypes.
+    signed_per_arg = list(input_signed)
+
     for func in funcs:
         func_name = func.attributes["sym_name"].value
         arg_mapping[func_name] = []
         for i, arg in enumerate(func.arguments):
             if "!allo.stream" not in str(arg.type):
-                arg_name = s.func_args[func_name][i].name
-                if arg_name not in used_args:
-                    used_args[arg_name] = len(input_types)
-                    dtensor = s.func_args[func_name][i]
+                dtensor = s.func_args[func_name][i]
+                # Use top_name (region canonical name) when available so that
+                # kernel-local argument names (e.g., 'local_in') map to the
+                # corresponding region-level name ('arr_in').
+                canonical_name = (
+                    dtensor.top_name
+                    if hasattr(dtensor, "top_name") and dtensor.top_name is not None
+                    else dtensor.name
+                )
+                if canonical_name not in used_args:
+                    # Arg not covered by canonical top-func dtensors (should be
+                    # rare); append it in kernel-appearance order as before.
+                    used_args[canonical_name] = len(input_types)
                     input_types.append((dtensor.shape, dtensor.dtype))
-                    if "itypes" in func.attributes:
-                        input_signed += func.attributes["itypes"].value[i]
-                arg_mapping[func_name].append(used_args[arg_name])
+                    signed_per_arg.append("_")
+                idx = used_args[canonical_name]
+                # Overwrite placeholder signedness with the kernel's itype for
+                # this arg position.
+                if "itypes" in func.attributes:
+                    signed_per_arg[idx] = func.attributes["itypes"].value[i]
+                arg_mapping[func_name].append(idx)
+
+    input_signed = "".join(signed_per_arg)
     # update top function
     top_func = None
     for func in s.module.body.operations:
@@ -509,8 +551,13 @@ def _build_top(s, stream_info, enable_layout=False):
     assert top_func is not None, "Top function not found"
     with s.module.context, Location.unknown():
         # create new func
+        def _to_top_mlir_type(shape, dtype):
+            if len(shape) == 0:
+                return dtype.build()
+            return MemRefType.get(shape, dtype.build())
+
         func_type = FunctionType.get(
-            [MemRefType.get(shape, dtype.build()) for shape, dtype in input_types], []
+            [_to_top_mlir_type(shape, dtype) for shape, dtype in input_types], []
         )
         new_top = func_d.FuncOp(
             name=s.top_func_name, type=func_type, ip=InsertionPoint(top_func)
