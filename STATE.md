@@ -13,7 +13,6 @@ consumes this fork as its editable Allo install.
 | `main` | mirror of upstream `cornell-zhang/allo:main`. Never commit. | `origin/main` |
 | `next` | integration HEAD. Pulled by allo-tpu. Re-merge as features advance. | `fork/next` |
 | `feature/*`, `fix/*` | one branch ↔ one upstream PR, each based on `origin/main` | `fork/<same>` |
-| `fork-mgmt` | fork-only files (HANDOFF, gitignore, this STATE.md). Rebase onto `origin/main`; never upstream. | `fork/fork-mgmt` |
 | `wip/*` | known-broken or incomplete work parked for later | `fork/<same>` |
 
 ## Implemented in `next` (delta vs `origin/main`)
@@ -94,7 +93,8 @@ Items #1, #3 are partially handled above.
 
 ## Conventions for agents working here
 
-- Read `fork-mgmt:HANDOFF.md` before resuming WIP simulator work.
+- See `BRANCHES.md` for open PR status, not-yet-PR branches, and dependency graph.
+- Read `handoff.md` before resuming AXI-Lite / control-plane work.
 - Allo and allo-tpu are separate sessions. Never edit the other
   repo. See `/work/shared/users/phd/sk3463/projects/ALLO_LESSONS.md`.
 - Before claiming a fix is validated: `rm -rf .cache/llvm_sim/`

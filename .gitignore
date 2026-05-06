@@ -1,3 +1,6 @@
+# Claude Code agent runtime state (fork-local, never upstream)
+.claude/
+
 **.pyc
 **/*.pyc
 **/build
