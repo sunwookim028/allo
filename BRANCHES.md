@@ -24,7 +24,7 @@ Companion: `STATE.md` — what is implemented and what is planned.
 | PR | Branch | Status | Blocking notes |
 |---|---|---|---|
 | [#554](https://github.com/cornell-zhang/allo/pull/554) | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; awaiting @chhzh123 re-review |
-| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | Fangtangtang responded 2026-05-06: drop `move_before` (forward ref valid in MLIR); use option (1) for 0D-memref handling — apply fixes then re-request review |
+| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | Fixes pushed 2026-05-06 (42df618): `move_before` removed; scalar-in-args error in infer.py; OMP regression test added — re-request review |
 | [#579](https://github.com/cornell-zhang/allo/pull/579) | `fix/fp16-hls-half-type` | OPEN | Switched to `hls::` for all FP math + fp16 test; awaiting @Fangtangtang ack |
 
 ---
