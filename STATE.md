@@ -18,6 +18,14 @@ consumes this fork as its editable Allo install.
 
 ## Implemented in `next` (delta vs `origin/main`)
 
+- **Bare-scalar `@df.region()` args → `s_axilite`** — `int32` (no brackets) as
+  a region argument emits a true AXI-Lite control register in generated HLS
+  (`s_axilite`, pass-by-value) instead of an AXI-MM pointer. `int32[N]` keeps
+  `m_axi` semantics. Changes: `_build_top()` emits bare scalar MLIR type for
+  shape-`()` args; `postprocess_hls_code()` in `vitis.py` collects and emits
+  `s_axilite` pragmas; `llvm.py` call site accepts `np.integer`/`np.floating`
+  scalars and 0-d arrays. Test: `test_df_unit.py::test_region_bare_scalar_arg`.
+  Branch: `feature/region-bare-scalar-axilite`.
 - **Region-scope `@ Stateful`** — propagates `stateful_var_map` /
   `stateful_counter` through `ASTContext.copy()`, anchors
   `memref.get_global` at each function's entry block. Lets a
