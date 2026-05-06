@@ -24,7 +24,7 @@ Companion: `STATE.md` — what is implemented and what is planned.
 | PR | Branch | Status | Blocking notes |
 |---|---|---|---|
 | [#554](https://github.com/cornell-zhang/allo/pull/554) | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; awaiting @chhzh123 re-review |
-| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | Review fixes pushed (7a3212c); 2 questions out to @Fangtangtang (`move_before` vs #557; scalar-in-args type-infer) |
+| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | Fangtangtang responded 2026-05-06: drop `move_before` (forward ref valid in MLIR); use option (1) for 0D-memref handling — apply fixes then re-request review |
 | [#579](https://github.com/cornell-zhang/allo/pull/579) | `fix/fp16-hls-half-type` | OPEN | Switched to `hls::` for all FP math + fp16 test; awaiting @Fangtangtang ack |
 
 ---
@@ -33,12 +33,12 @@ Companion: `STATE.md` — what is implemented and what is planned.
 
 | Branch | Description | PR status | Notes |
 |---|---|---|---|
-| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` | Not opened | Clean; ready for upstream PR |
-| `feature/region-scope-stateful` | Region-scope `@Stateful` shared across inner kernels | Not opened | Depends on clean base; verify no rebase needed before PR |
-| `feature/nb-streams` | Non-blocking stream primitives (`try_put`/`try_get`/`empty`/`full`) | Not opened | Merges in #554, #577, #579 — must rebase onto upstream after those PRs merge |
-| `feature/mesh-accelerator-v2` | Tile-based hierarchical dataflow regression tests | Not opened | Stacked on `feature/nb-streams`; rebase after nb-streams is clean |
-| `feature/catapult-review` | Catapult HLS NB stream support + quickstart docs | Not opened | Based on old upstream; rebase check needed before PR |
-| `fix/simulator-nested-call-streams` | Conservative deep-scan for sub-region calls nested in control flow | Not opened | Replaces wip/simulator-deep-scan; clean and merged into `next` |
+| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` | Not opened | Clean; local-only (not pushed to fork/) |
+| `feature/region-scope-stateful` | Region-scope `@Stateful` shared across inner kernels | Not opened | Pushed to fork/; verify no rebase needed before PR |
+| `feature/nb-streams` | Non-blocking stream primitives (`try_put`/`try_get`/`empty`/`full`) | Not opened | Local-only; merges in #554, #577, #579 — must rebase after those land |
+| `feature/mesh-accelerator-v2` | Tile-based hierarchical dataflow regression tests | Not opened | Local-only; stacked on `feature/nb-streams` — rebase after nb-streams is clean |
+| `feature/catapult-review` | Catapult HLS NB stream support + quickstart docs | Not opened | Pushed to fork/; rebase check needed before PR |
+| `fix/simulator-nested-call-streams` | Conservative deep-scan for sub-region calls nested in control flow | Not opened | Pushed to fork/; merged into `next` |
 
 ---
 
