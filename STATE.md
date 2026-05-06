@@ -1,10 +1,10 @@
 # Fork state — `sunwookim028/allo`
 
-This file lives on the `next` branch (fork default) and is the
-single source of truth for what is implemented, what is planned,
-and which branches and PRs are live. Update it with any merge into
-`next` or any PR open/close. Companion repo: `sunwookim028/allo-tpu`
-consumes this fork as its editable Allo install.
+This file lives on the `next` branch (fork default) and tracks what
+is implemented and what is planned. For open PRs, branch dependencies,
+and housekeeping steps see `BRANCHES.md`. Update this file with any
+merge into `next` or any change to planned work. Companion repo:
+`sunwookim028/allo-tpu` consumes this fork as its editable Allo install.
 
 ## Branches
 

@@ -18,6 +18,13 @@
 - Place MLIR dialects and passes code in `mlir/`
 - Add tests and documentation for new features in `tests/` and `docs/`
 
+# Branching policy
+- `next` is the fork's integration HEAD and the home for all fork-local docs. This is the working branch.
+- `main` mirrors `cornell-zhang/allo:main` exactly — never commit here.
+- New features/fixes go on `feature/*` or `fix/*` branches based on `origin/main`, one branch per upstream PR.
+- Fork-local files (docs, notes, CLAUDE.md, STATE.md, BRANCHES.md) live on `next` only — never on feature branches destined for upstream.
+- See `BRANCHES.md` for current open PRs and branch dependencies.
+
 # Don'ts
 - Do not modify repository structure without approval
 - Do not install system packages without explicit user confirmation

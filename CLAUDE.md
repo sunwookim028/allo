@@ -22,6 +22,11 @@ OMP_NUM_THREADS=8 conda run -n allo python tests/dataflow/test_df_unit.py
 OMP_NUM_THREADS=8 conda run -n allo python tests/dataflow/test_region_stateful.py
 ```
 
+## Project state
+
+- `STATE.md` — what is implemented, what is planned, live upstream PRs
+- `BRANCHES.md` — open PR status, not-yet-PR branches, dependency graph, housekeeping steps
+
 ## Notes from AGENTS.md
 
 See `AGENTS.md` for build instructions, testing, and code style guidelines.
