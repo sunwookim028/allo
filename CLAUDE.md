@@ -5,7 +5,7 @@
 - **Region arg-order reordering** when scalar in early kernel `args=[...]` → fix in `_build_top`; details: `notes/PITFALLS_DATAFLOW_REGION.md`
 - **OMP segfault at exit** when GC races with OMP threads — set `OMP_NUM_THREADS=N`, run regions in separate processes; details: `notes/PITFALLS_DATAFLOW_REGION.md`
 - **Wrong `LLVM_BUILD_DIR`** — conda `allo` env sets it already (`build-rhel8`); overriding with `build/` → GLIBC_2.33 crash; details: `notes/PITFALLS_DATAFLOW_REGION.md`
-- **Scalar `@df.region()` args** — use bare `int32` (no brackets) to get `s_axilite`; `int32[N]` (any N, including 1) always maps to `m_axi`; details: `notes/PITFALLS_DATAFLOW_REGION.md`
+- **Scalar `@df.region()` args** — bare `int32` in `args=[...]` is **rejected** (PR #577); use `int32[1]` → `m_axi`. Auto-capture → `s_axilite` redesign pending upstream; details: `notes/PITFALLS_DATAFLOW_REGION.md`
 
 ## Environment
 

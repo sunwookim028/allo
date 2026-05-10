@@ -33,7 +33,7 @@ Companion: `STATE.md` — what is implemented and what is planned.
 
 | Branch | Description | PR status | Notes |
 |---|---|---|---|
-| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` | Not opened | Clean; local-only (not pushed to fork/) |
+| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` (args=[] path) | Not opened — reference only | Reverted from `next` 2026-05-10; conflicts with #577 scalar rejection. Redesign targets auto-capture → s_axilite. Upstream issue TBD. |
 | `feature/region-scope-stateful` | Region-scope `@Stateful` shared across inner kernels | Not opened | Pushed to fork/; verify no rebase needed before PR |
 | `feature/nb-streams` | Non-blocking stream primitives (`try_put`/`try_get`/`empty`/`full`) | Not opened | Local-only; merges in #554, #577, #579 — must rebase after those land |
 | `feature/mesh-accelerator-v2` | Tile-based hierarchical dataflow regression tests | Not opened | Local-only; stacked on `feature/nb-streams` — rebase after nb-streams is clean |
