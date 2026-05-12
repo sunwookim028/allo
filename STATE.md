@@ -3,15 +3,15 @@
 This file lives on the `next` branch (fork default) and tracks what
 is implemented and what is planned. For open PRs, branch dependencies,
 and housekeeping steps see `BRANCHES.md`. Update this file with any
-merge into `next` or any change to planned work. Companion repo:
-`sunwookim028/allo-tpu` consumes this fork as its editable Allo install.
+merge into `next` or any change to planned work. Consumer repo:
+`sunwookim028/allo-npu` consumes this fork as its editable Allo install.
 
 ## Branches
 
 | Branch | Role | Tracks |
 |---|---|---|
 | `main` | mirror of upstream `cornell-zhang/allo:main`. Never commit. | `origin/main` |
-| `next` | integration HEAD. Pulled by allo-tpu. Re-merge as features advance. | `fork/next` |
+| `next` | integration HEAD. Pulled by allo-npu. Re-merge as features advance. | `fork/next` |
 | `feature/*`, `fix/*` | one branch ↔ one upstream PR, each based on `origin/main` | `fork/<same>` |
 | `wip/*` | known-broken or incomplete work parked for later | `fork/<same>` |
 
@@ -33,7 +33,8 @@ merge into `next` or any change to planned work. Companion repo:
   Branch: `fix/hierarchical-dataflow-codegen` (PR #577).
 - **fp16 (half) HLS support** — `f16 → half` ctype mapping, fp16
   scalar math dispatch, `hls::xxx` qualified math ops uniformly.
-  Branch: `fix/fp16-hls-half-type` (PR #579).
+  *Merged upstream as PR #579 (commit `ad8da09`, 2026-05-11).*
+  Branch `fix/fp16-hls-half-type` deleted from local + fork.
 - **VHLS csim emitter cleanup** — `%alloc` MLIR-name stripping in
   postprocess; `ap_int<N>`/`ap_uint<N>` resolution in nanobind
   wrapper. Branch: `fix/vhls-mlir-percent-alloc-csim` (PR #554).
@@ -53,12 +54,10 @@ merge into `next` or any change to planned work. Companion repo:
 
 | PR | Branch | State | Notes |
 |---|---|---|---|
-| #554 | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; awaiting @chhzh123 re-review |
-| #577 | `fix/hierarchical-dataflow-codegen` | OPEN | Review fixes pushed (7a3212c); 2 questions out to @Fangtangtang (`move_before` vs #557; scalar-in-args type-infer) |
-| #579 | `fix/fp16-hls-half-type` | OPEN | Switched to `hls::` for all FP math + fp16 test added; awaiting @Fangtangtang ack |
+| #554 | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; re-pinged @chhzh123 2026-05-12 |
+| #577 | `fix/hierarchical-dataflow-codegen` | OPEN | EmitVivadoHLS.cpp restored to main (b5ee250); pylint fix (eab77a8); CI green; @chhzh123 pre-approved merge; awaiting @Fangtangtang final pass |
 
-A scheduled remote agent (`trig_01GAZWpbV4Qq8BREhRWF62L2`) checks
-PR state on 2026-05-08 09:00 ET.
+#579 merged 2026-05-11 (commit `ad8da09`).
 
 ## Known broken / parked
 
@@ -91,8 +90,13 @@ Items #1, #3 are partially handled above.
 ## Conventions for agents working here
 
 - See `BRANCHES.md` for open PR status, not-yet-PR branches, and dependency graph.
-- Read `handoff.md` before resuming AXI-Lite / control-plane work.
-- Allo and allo-tpu are separate sessions. Never edit the other
+- `/work/shared/users/phd/sk3463/projects/ALLO_HIERARCHY_DESIGN.md` is the pending
+  consolidation lens for items 5–8 of the upstream plan (region-scope `@Stateful`,
+  vhls file-scope statefuls, nested-call streams, auto-capture s_axilite). Read it
+  before pitching maintainers; items are deferred to a fresh session.
+- Consumer-side handoff doc is at `/work/shared/users/phd/sk3463/projects/allo-npu/handoff.md`
+  (moved out of this repo 2026-05-12).
+- Allo and allo-npu are separate sessions. Never edit the other
   repo. See `/work/shared/users/phd/sk3463/projects/ALLO_LESSONS.md`.
 - Before claiming a fix is validated: `rm -rf .cache/llvm_sim/`
   in allo-tpu and rebuild. Cache is keyed only on level `tpu.py`

@@ -13,7 +13,7 @@ Companion: `STATE.md` — what is implemented and what is planned.
 | Branch | Role |
 |---|---|
 | `main` | Mirror of `cornell-zhang/allo:main`. Never commit here. |
-| `next` | Integration HEAD; fork default; editable install for allo-tpu. Re-merge feature branches as they advance; no rebase/force-push. |
+| `next` | Integration HEAD; fork default; editable install for allo-npu. Re-merge feature branches as they advance; no rebase/force-push. |
 | `feature/*`, `fix/*` | One branch ↔ one upstream PR, each based on `origin/main`. |
 | `wip/*` | Known-broken or incomplete work parked for later. |
 
@@ -23,42 +23,50 @@ Companion: `STATE.md` — what is implemented and what is planned.
 
 | PR | Branch | Status | Blocking notes |
 |---|---|---|---|
-| [#554](https://github.com/cornell-zhang/allo/pull/554) | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; awaiting @chhzh123 re-review |
-| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | Fixes pushed 2026-05-06 (42df618): `move_before` removed; scalar-in-args error in infer.py; OMP regression test added — re-request review |
-| [#579](https://github.com/cornell-zhang/allo/pull/579) | `fix/fp16-hls-half-type` | OPEN | Switched to `hls::` for all FP math + fp16 test; awaiting @Fangtangtang ack |
+| [#554](https://github.com/cornell-zhang/allo/pull/554) | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Re-pinged @chhzh123 2026-05-12; CI green |
+| [#577](https://github.com/cornell-zhang/allo/pull/577) | `fix/hierarchical-dataflow-codegen` | OPEN | `EmitVivadoHLS.cpp` restored to upstream (b5ee250); pylint fix (eab77a8); CI green; @chhzh123 pre-approved; awaiting @Fangtangtang final pass |
+
+**Recently merged:** [#579](https://github.com/cornell-zhang/allo/pull/579) (`fix/fp16-hls-half-type`) merged 2026-05-11 (commit `ad8da09`). Branch deleted from local + fork.
 
 ---
 
 ## Feature/fix branches not yet PR'd
 
+**Items 5–8 of the upstream queue are deferred** to a fresh session per
+the consolidation verdict in `/work/shared/users/phd/sk3463/projects/ALLO_HIERARCHY_DESIGN.md`.
+That file frames region-scope `@Stateful`, vhls file-scope statefuls, nested
+sub-region streams, and auto-capture `s_axilite` as one structural gap. No
+individual upstream issues/PRs should be filed until the fresh session decides
+the consolidation form.
+
 | Branch | Description | PR status | Notes |
 |---|---|---|---|
-| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` (args=[] path) | Not opened — reference only | Reverted from `next` 2026-05-10; conflicts with #577 scalar rejection. Redesign targets auto-capture → s_axilite. Upstream issue TBD. |
-| `feature/region-scope-stateful` | Region-scope `@Stateful` shared across inner kernels | Not opened | Pushed to fork/; verify no rebase needed before PR |
-| `feature/nb-streams` | Non-blocking stream primitives (`try_put`/`try_get`/`empty`/`full`) | Not opened | Local-only; merges in #554, #577, #579 — must rebase after those land |
-| `feature/mesh-accelerator-v2` | Tile-based hierarchical dataflow regression tests | Not opened | Local-only; stacked on `feature/nb-streams` — rebase after nb-streams is clean |
-| `feature/catapult-review` | Catapult HLS NB stream support + quickstart docs | Not opened | Pushed to fork/; rebase check needed before PR |
-| `fix/simulator-nested-call-streams` | Conservative deep-scan for sub-region calls nested in control flow | Not opened | Pushed to fork/; merged into `next` |
+| `feature/region-bare-scalar-axilite` | Bare `int32` in `@df.region()` args → `s_axilite` (args=[] path) | Not opened — reference only | Reverted from `next` 2026-05-10; conflicts with #577 scalar rejection. Redesign targets auto-capture → s_axilite. **Deferred to fresh-session consolidation.** |
+| `feature/region-scope-stateful` | Region-scope `@Stateful` shared across inner kernels | Not opened | Pushed to fork/. **Deferred to fresh-session consolidation** (paired with vhls file-scope @Stateful — same root). |
+| `feature/nb-streams` | Non-blocking stream primitives (`try_put`/`try_get`/`empty`/`full`) | Not opened | Local-only; vhls scope agreed for upstream, Tapa/Catapult fork-local. **Postponed** until hierarchical items land. |
+| `feature/mesh-accelerator-v2` | Tile-based hierarchical dataflow regression tests | Not opened | Local-only; stacked on `feature/nb-streams` — rebase after nb-streams is clean. |
+| `feature/catapult-review` | Catapult HLS NB stream support + quickstart docs | Not opened — fork-local indefinitely | Pushed to fork/. Not in upstream queue. |
+| `fix/simulator-nested-call-streams` | Conservative deep-scan for sub-region calls nested in control flow | Not opened | Pushed to fork/; merged into `next`. **Deferred to fresh-session consolidation** (one of the four hierarchical-dataflow items). |
 
 ---
 
 ## Dependency graph
 
 ```
-origin/main
+origin/main  (#579 merged 2026-05-11)
   ├── fix/vhls-mlir-percent-alloc-csim       (PR #554)  ─┐
   ├── fix/hierarchical-dataflow-codegen      (PR #577)  ─┤─→ feature/nb-streams
-  ├── fix/fp16-hls-half-type                 (PR #579)  ─┘        │
-  │                                                                └─→ feature/mesh-accelerator-v2
-  ├── feature/region-bare-scalar-axilite     (standalone)
-  ├── feature/region-scope-stateful          (standalone)
-  ├── feature/catapult-review                (standalone)
-  └── fix/simulator-nested-call-streams      (standalone)
+  │                                                       │
+  │                                                       └─→ feature/mesh-accelerator-v2
+  ├── feature/region-bare-scalar-axilite     (reference — deferred)
+  ├── feature/region-scope-stateful          (deferred to consolidation)
+  ├── feature/catapult-review                (fork-local indefinitely)
+  └── fix/simulator-nested-call-streams      (deferred to consolidation)
 ```
 
-`feature/nb-streams` and `feature/mesh-accelerator-v2` carry merge commits from
-the three open PRs. When #554, #577, #579 land upstream, these two branches must
-be rebased onto the updated `origin/main` (drop the merged-in commits).
+`feature/nb-streams` and `feature/mesh-accelerator-v2` still carry merge commits
+from PR #577 and the (now-merged) #579. When #554 / #577 land, rebase them onto
+the updated `origin/main` to drop the merged-in commits.
 
 ---
 
