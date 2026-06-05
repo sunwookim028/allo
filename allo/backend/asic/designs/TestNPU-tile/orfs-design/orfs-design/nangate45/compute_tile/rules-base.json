@@ -1,0 +1,14 @@
+{
+    "constraints__clocks__count": {
+        "value": 1,
+        "compare": "=="
+    },
+    "detailedplace__design__violations": {
+        "value": 0,
+        "compare": "=="
+    },
+    "detailedroute__route__drc_errors": {
+        "value": 0,
+        "compare": "<="
+    }
+}
