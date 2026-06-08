@@ -9,7 +9,11 @@ module vpu_op #(
     output logic [DATA_W-1:0] result_out
 );
 
-  import vpu_pkg::*;
+  localparam [OP_W-1:0] VPU_OP_ADD = 3'd0;
+  localparam [OP_W-1:0] VPU_OP_SUB = 3'd1;
+  localparam [OP_W-1:0] VPU_OP_RELU = 3'd2;
+  localparam [OP_W-1:0] VPU_OP_MUL = 3'd3;
+  localparam [OP_W-1:0] VPU_OP_D_RELU = 3'd4;
 
   // internal signalas for computation result storing
   logic [DATA_W-1:0] result;
@@ -82,4 +86,3 @@ module vpu_op #(
   assign result_out = result;
 
 endmodule
-

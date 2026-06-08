@@ -6,7 +6,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module compute_tile
-  import npu_config_pkg::*;
 // IRAM_ADDR_WIDTH and L1_DATA_WIDTH are module parameters (not just package
 // imports) so Vivado's IP packager XPath evaluator can resolve port-width
 // expressions (IP_Flow 19-627).  Literals must stay in sync with params.py /
@@ -16,6 +15,7 @@ module compute_tile
 /* verilator lint_off VARHIDDEN */
 #(
     parameter IRAM_ADDR_WIDTH = 10,   // npu_config_pkg::IRAM_ADDR_WIDTH
+    parameter L1_ADDR_WIDTH   = 10,   // npu_config_pkg::L1_ADDR_WIDTH
     parameter L1_DATA_WIDTH   = 256,  // npu_config_pkg::L1_DATA_WIDTH
     parameter DM_ADDR_WIDTH   = 16,   // npu_config_pkg::DM_ADDR_WIDTH
     parameter DM_DATA_WIDTH   = 256   // npu_config_pkg::DM_DATA_WIDTH

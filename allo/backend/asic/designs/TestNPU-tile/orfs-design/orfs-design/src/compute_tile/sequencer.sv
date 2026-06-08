@@ -88,9 +88,17 @@
 // so the default (DMA) branch fires for DMA instructions.
 //////////////////////////////////////////////////////////////////////////////////
 
-module sequencer
-  import npu_config_pkg::*;
-(
+module sequencer #(
+    parameter N               = 8,
+    parameter DATA_WIDTH      = 32,
+    parameter L1_ADDR_WIDTH   = 10,
+    parameter L1_DATA_WIDTH   = 256,
+    parameter DM_ADDR_WIDTH   = 16,
+    parameter DM_DATA_WIDTH   = 256,
+    parameter MEM_LATENCY     = 2,
+    parameter PE_LATENCY      = 0,
+    parameter IRAM_ADDR_WIDTH = 12
+) (
     input logic clk,
     input logic rst_n,
 
@@ -140,11 +148,60 @@ module sequencer
     input  logic        tma_done
     /* verilator lint_on UNUSEDSIGNAL */
 );
-  import npu_isa_pkg::*;
 
   //---------------------------------------------
   // Local constants
   //---------------------------------------------
+  localparam [7:0] OP_MATMUL_TILE = 8'd1;
+  localparam [7:0] OP_VEC_ROWMAX = 8'd16;
+  localparam [7:0] OP_VEC_ROWSUM = 8'd17;
+  localparam [7:0] OP_VEC_EXP2 = 8'd18;
+  localparam [7:0] OP_VEC_SCALE_BCAST = 8'd19;
+  localparam [7:0] OP_VEC_SCALE_IMM = 8'd20;
+  localparam [7:0] OP_VEC_SUB_BCAST = 8'd21;
+  localparam [7:0] OP_VEC_DIV_BCAST = 8'd22;
+  localparam [7:0] OP_VEC_ZERO_ACC = 8'd23;
+  localparam [7:0] OP_VEC_SILU = 8'd24;
+  localparam [7:0] OP_VEC_MUL_ACC = 8'd25;
+  localparam [7:0] OP_VEC_ADD_ACC = 8'd26;
+  localparam [7:0] OP_VEC_SUB_ACC = 8'd27;
+  localparam [7:0] OP_VEC_SCALE_COL_BCAST = 8'd28;
+  localparam [7:0] OP_VEC_MAXIMUM = 8'd32;
+  localparam [7:0] OP_VEC_FMA = 8'd33;
+  localparam [7:0] OP_VEC_EXP2_VREG = 8'd34;
+  localparam [7:0] OP_VEC_SUB_VREG = 8'd35;
+  localparam [7:0] OP_VEC_MOVI = 8'd36;
+  localparam [7:0] OP_VEC_COPY_VREG = 8'd37;
+  localparam [7:0] OP_VEC_RSQRT = 8'd38;
+  localparam [7:0] OP_VEC_FMA_IMM = 8'd39;
+  localparam [7:0] OP_VEC_ADD_VREG = 8'd40;
+  localparam [7:0] OP_VEC_MUL_VREG = 8'd41;
+  localparam [7:0] OP_VEC_LOAD_IMM = 8'd42;
+  localparam [7:0] OP_CAST_F32_F16 = 8'd48;
+  localparam [7:0] OP_CAST_F16_F32 = 8'd49;
+  localparam [7:0] OP_CAST_F16_F32_VREG = 8'd50;
+  localparam [7:0] OP_DMA_LOAD_SPM = 8'd64;
+  localparam [7:0] OP_DMA_LOAD_ACC = 8'd65;
+  localparam [7:0] OP_DMA_STORE_SPM = 8'd66;
+  localparam [7:0] OP_DMA_STORE_ACC = 8'd67;
+  localparam [7:0] OP_LOOP_BEGIN = 8'd80;
+  localparam [7:0] OP_LOOP_END = 8'd81;
+  localparam [7:0] OP_FLUSH = 8'd82;
+  localparam [7:0] OP_FLUSH_SLOT = 8'd83;
+  localparam [7:0] OP_MATMUL_TILE_I8 = 8'd2;
+  localparam [7:0] OP_MATMUL_TILE_DQ = 8'd3;
+  localparam [7:0] OP_DMA_LOAD_SPM_I4 = 8'd68;
+  localparam [7:0] OP_DMA_LOAD_SPM_MI = 8'd72;
+  localparam [7:0] OP_DMA_LOAD_ACC_MI = 8'd73;
+  localparam [7:0] OP_DMA_LOAD_SPM_I4_MI = 8'd74;
+  localparam [7:0] OP_DMA_LOAD_SPM_I8_MI = 8'd75;
+  localparam [7:0] OP_DMA_STORE_SPM_MI = 8'd76;
+  localparam [7:0] OP_DMA_STORE_ACC_MI = 8'd77;
+  localparam [7:0] OP_DMA_STORE_SPM_I8_MI = 8'd78;
+  localparam [7:0] OP_BARRIER = 8'd84;
+  localparam [7:0] OP_LOOP_BEGIN_CSR = 8'd85;
+  localparam [2:0] FLAG_ASYNC_BIT = 3'd5;
+
   // DM bus is DM_DATA_WIDTH bits = DM_DATA_WIDTH/8 bytes wide per word.
   localparam DM_BYTES_PER_WORD = DM_DATA_WIDTH / 8;
   // Right-shift applied to a byte address to obtain a DM word address.

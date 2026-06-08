@@ -23,7 +23,16 @@ module decoder (
     output logic [15:0] op2_decode
 );
 
-  import npu_isa_pkg::*;
+  localparam FIELDS_INSTR_OP_LSB = 56;
+  localparam FIELDS_INSTR_OP_WIDTH = 8;
+  localparam FIELDS_INSTR_FLAGS_LSB = 48;
+  localparam FIELDS_INSTR_FLAGS_WIDTH = 8;
+  localparam FIELDS_INSTR_OP0_LSB = 32;
+  localparam FIELDS_INSTR_OP0_WIDTH = 16;
+  localparam FIELDS_INSTR_OP1_LSB = 16;
+  localparam FIELDS_INSTR_OP1_WIDTH = 16;
+  localparam FIELDS_INSTR_OP2_LSB = 0;
+  localparam FIELDS_INSTR_OP2_WIDTH = 16;
 
   assign op_decode    = instr_decode[FIELDS_INSTR_OP_LSB+:FIELDS_INSTR_OP_WIDTH];
   assign flags_decode = instr_decode[FIELDS_INSTR_FLAGS_LSB+:FIELDS_INSTR_FLAGS_WIDTH];

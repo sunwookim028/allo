@@ -8,9 +8,11 @@
 //              - Scalar broadcast support for vector-scalar operations
 //////////////////////////////////////////////////////////////////////////////////
 
-module vpu
-  import npu_config_pkg::*, vpu_pkg::*;
-(
+module vpu #(
+    parameter L1_ADDR_WIDTH = 10,
+    parameter L1_DATA_WIDTH = 256,
+    parameter DATA_WIDTH    = 32
+) (
     input logic clk,
     input logic rst_n,
 
@@ -36,6 +38,11 @@ module vpu
     output logic done
 );
   localparam NUM_LANES = L1_DATA_WIDTH / DATA_WIDTH;
+  localparam VPU_OPCODE_WIDTH = 3;
+  localparam [2:0] VPU_TYPE_SCALAR = 3'd0;
+  localparam [2:0] VPU_TYPE_VLOAD = 3'd1;
+  localparam [2:0] VPU_TYPE_VSTORE = 3'd2;
+  localparam [2:0] VPU_TYPE_VCOMPUTE = 3'd3;
 
   // SIMD internal signals
   logic start_simd;

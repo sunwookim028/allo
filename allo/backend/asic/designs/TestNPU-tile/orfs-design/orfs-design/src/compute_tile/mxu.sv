@@ -16,9 +16,14 @@
 // -----------------------------------------------------------------------------
 
 /* verilator lint_off WIDTHEXPAND */
-module mxu
-  import npu_config_pkg::*;
-(
+module mxu #(
+    parameter N             = 8,
+    parameter DATA_WIDTH    = 32,
+    parameter L1_ADDR_WIDTH = 10,
+    parameter MEM_LATENCY   = 2,
+    parameter L1_DATA_WIDTH = 256,
+    parameter PE_LATENCY    = 0
+) (
     // --- Control Signals (Standard) ---
     input logic clk,   // Clock signal
     input logic rst_n, // Reset signal (active low)

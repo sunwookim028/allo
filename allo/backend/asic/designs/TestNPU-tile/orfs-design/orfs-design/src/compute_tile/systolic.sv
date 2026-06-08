@@ -15,11 +15,10 @@
 //   Valid:       follows activations west → east
 //   Accept_w:    per-column broadcast (sys_accept_w[c])
 // =============================================================================
-module systolic
-  import npu_config_pkg::*;
-#(
-    parameter          DIM     = N,
-    parameter LATENCY = PE_LATENCY
+module systolic #(
+    parameter DIM        = 8,
+    parameter LATENCY    = 0,
+    parameter DATA_WIDTH = 32
 ) (
     input logic clk,
     input logic rst_n,

@@ -8,9 +8,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 // rst_n / dma_rd_en kept in port list for interface compatibility.
-module l1
-  import npu_config_pkg::*;
-(
+module l1 #(
+    parameter L1_ADDR_WIDTH = 10,
+    parameter L1_DATA_WIDTH = 256
+) (
     input logic clk,
     /* verilator lint_off UNUSEDSIGNAL */
     input logic rst_n,
@@ -81,4 +82,3 @@ module l1
   endgenerate
 
 endmodule
-
