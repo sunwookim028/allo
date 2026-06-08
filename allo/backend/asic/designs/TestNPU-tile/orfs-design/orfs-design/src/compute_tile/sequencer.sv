@@ -352,6 +352,8 @@ module sequencer #(
   logic [31:0] dma_iv_stride_b_reg;  // bytes per iv_b increment, u32 bit-pattern (pool[op1+4])
   // Combinational IV offset: iv_reg[iv_a_id]*iv_stride_a + iv_reg[iv_b_id]*iv_stride_b
   logic [31:0] dma_iv_offset;
+  logic [ 1:0] dma_iv_a_id;
+  logic [ 1:0] dma_iv_b_id;
 
   // ISA v2 / Gap-2: async DMA slot tracking
   logic [ 0:0] dma_async_slot_id;  // latched slot ID from pool (0 or 1)
@@ -480,10 +482,9 @@ module sequencer #(
   // TODO: For timing closure on FPGA at > 200 MHz, pipeline the two
   //       multiply-adds into a 1-cycle registered stage inserted before DMA_ROW_REQ.
   always @* begin : iv_offset_comb
-    logic [1:0] iv_a_id, iv_b_id;
-    iv_a_id = dma_iv_id_pair_reg[1:0];  // bits[15:0] → low 2 bits (iv_id is 2-bit)
-    iv_b_id = dma_iv_id_pair_reg[17:16];  // bits[31:16] → low 2 bits
-    dma_iv_offset = iv_reg[iv_a_id] * dma_iv_stride_a_reg + iv_reg[iv_b_id] * dma_iv_stride_b_reg;
+    dma_iv_a_id = dma_iv_id_pair_reg[1:0];  // bits[15:0] → low 2 bits (iv_id is 2-bit)
+    dma_iv_b_id = dma_iv_id_pair_reg[17:16];  // bits[31:16] → low 2 bits
+    dma_iv_offset = iv_reg[dma_iv_a_id] * dma_iv_stride_a_reg + iv_reg[dma_iv_b_id] * dma_iv_stride_b_reg;
   end
   assign dma_byte_addr = dram_addr_reg
                         + ({24'h0, dma_row_r} * dram_stride_reg)
@@ -596,6 +597,8 @@ module sequencer #(
   logic [DATA_WIDTH-1:0] vec_reduce_result;
   logic [L1_DATA_WIDTH-1:0] vec_computed_row;
   logic [L1_DATA_WIDTH-1:0] vec_computed_row_2src;
+  logic [L1_DATA_WIDTH-1:0] vec_computed_row_mux;
+  logic [L1_DATA_WIDTH-1:0] vec_computed_row_2src_mux;
 
   // Per-lane wires — VREG-to-VREG operations
   logic [BANKING-1:0][31:0] lane_fma_prod;  // a * b (latched into vec_prod_reg)
@@ -1958,39 +1961,38 @@ module sequencer #(
   // The simulator re-evaluates multiple always @* blocks correctly.
   //---------------------------------------------
   always @* begin : u_vcr_mux
-    automatic logic [L1_DATA_WIDTH-1:0] row1, row2;
-    row1 = bram_dout_b;
+    vec_computed_row_mux = bram_dout_b;
     if (state == VEC_ACC_RD_WAIT) begin
       for (int j2 = 0; j2 < BANKING; j2++) begin
         case (vec_opcode_reg)
-          OP_VEC_EXP2:            row1[j2*32+:32] = acc_exp2_row[j2];
-          OP_VEC_SILU:            row1[j2*32+:32] = acc_silu_row[j2];
-          OP_VEC_SCALE_BCAST:     row1[j2*32+:32] = acc_scale_bcast_row[j2];
-          OP_VEC_SCALE_COL_BCAST: row1[j2*32+:32] = acc_scale_col_row[j2];
+          OP_VEC_EXP2:            vec_computed_row_mux[j2*32+:32] = acc_exp2_row[j2];
+          OP_VEC_SILU:            vec_computed_row_mux[j2*32+:32] = acc_silu_row[j2];
+          OP_VEC_SCALE_BCAST:     vec_computed_row_mux[j2*32+:32] = acc_scale_bcast_row[j2];
+          OP_VEC_SCALE_COL_BCAST: vec_computed_row_mux[j2*32+:32] = acc_scale_col_row[j2];
           // OP_VEC_SUB_BCAST: handled in VEC_ACC_RD_WAIT2 (u_sub_b LATENCY=1)
-          OP_VEC_DIV_BCAST:       row1[j2*32+:32] = acc_div_bcast_row[j2];
-          OP_VEC_SCALE_IMM:       row1[j2*32+:32] = acc_scale_imm_row[j2];
-          default:                row1[j2*32+:32] = bram_dout_b[j2*32+:32];
+          OP_VEC_DIV_BCAST:       vec_computed_row_mux[j2*32+:32] = acc_div_bcast_row[j2];
+          OP_VEC_SCALE_IMM:       vec_computed_row_mux[j2*32+:32] = acc_scale_imm_row[j2];
+          default:                vec_computed_row_mux[j2*32+:32] = bram_dout_b[j2*32+:32];
         endcase
       end
     end else if (state == VEC_ACC_RD_WAIT2) begin
       // Fix 13: u_sub_b LATENCY=1 result valid one cycle after VEC_ACC_RD_WAIT.
-      for (int j2 = 0; j2 < BANKING; j2++) row1[j2*32+:32] = acc_sub_bcast_row[j2];
+      for (int j2 = 0; j2 < BANKING; j2++) vec_computed_row_mux[j2*32+:32] = acc_sub_bcast_row[j2];
     end
-    vec_computed_row = row1;
+    vec_computed_row = vec_computed_row_mux;
 
-    row2 = bram_dout_b;
+    vec_computed_row_2src_mux = bram_dout_b;
     if (state == VEC_ACC2_COMPUTE) begin
       for (int j2 = 0; j2 < BANKING; j2++) begin
         case (vec_opcode_reg)
-          OP_VEC_MUL_ACC: row2[j2*32+:32] = acc2_mul_row[j2];
-          OP_VEC_ADD_ACC: row2[j2*32+:32] = acc2_add_row[j2];
-          OP_VEC_SUB_ACC: row2[j2*32+:32] = acc2_sub_row[j2];
-          default:        row2[j2*32+:32] = vec_acc_a_row_reg[j2*32+:32];
+          OP_VEC_MUL_ACC: vec_computed_row_2src_mux[j2*32+:32] = acc2_mul_row[j2];
+          OP_VEC_ADD_ACC: vec_computed_row_2src_mux[j2*32+:32] = acc2_add_row[j2];
+          OP_VEC_SUB_ACC: vec_computed_row_2src_mux[j2*32+:32] = acc2_sub_row[j2];
+          default:        vec_computed_row_2src_mux[j2*32+:32] = vec_acc_a_row_reg[j2*32+:32];
         endcase
       end
     end
-    vec_computed_row_2src = row2;
+    vec_computed_row_2src = vec_computed_row_2src_mux;
   end
 
   //---------------------------------------------

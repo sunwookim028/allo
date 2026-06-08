@@ -50,6 +50,11 @@ module systolic #(
   logic [          15:0] pe_weight_out_w[TOTAL];
   logic                  pe_valid_out_w [TOTAL];
   logic                  pe_switch_out_w[TOTAL];
+  logic [          15:0] pe_input_in_w  [TOTAL];
+  logic                  pe_valid_in_w  [TOTAL];
+  logic [DATA_WIDTH-1:0] pe_psum_in_w   [TOTAL];
+  logic [          15:0] pe_weight_in_w [TOTAL];
+  logic                  pe_switch_in_w [TOTAL];
   /* verilator lint_on UNUSEDSIGNAL */
 
   // ---------------------------------------------------------------------------
@@ -60,37 +65,30 @@ module systolic #(
     for (r = 0; r < DIM; r++) begin : gen_row
       for (c = 0; c < DIM; c++) begin : gen_col
 
-        // West edge inputs (activation + valid)
-        logic [15:0] w_input;
-        logic        w_valid;
         if (c == 0) begin : g_west_edge
-          assign w_input = sys_data_in[r];
-          assign w_valid = sys_start[r];
+          assign pe_input_in_w[r*DIM+c] = sys_data_in[r];
+          assign pe_valid_in_w[r*DIM+c] = sys_start[r];
         end else begin : g_west_internal
-          assign w_input = pe_input_out_w[r*DIM+c-1];
-          assign w_valid = pe_valid_out_w[r*DIM+c-1];
+          assign pe_input_in_w[r*DIM+c] = pe_input_out_w[r*DIM+c-1];
+          assign pe_valid_in_w[r*DIM+c] = pe_valid_out_w[r*DIM+c-1];
         end
 
-        // North edge inputs (partial sum + weight)
-        logic [DATA_WIDTH-1:0] w_psum;
-        logic [          15:0] w_weight;
         if (r == 0) begin : g_north_edge
-          assign w_psum   = '0;
-          assign w_weight = sys_weight_in[c];
+          assign pe_psum_in_w[r*DIM+c]   = '0;
+          assign pe_weight_in_w[r*DIM+c] = sys_weight_in[c];
         end else begin : g_north_internal
-          assign w_psum   = pe_psum_out_w[(r-1)*DIM+c];
-          assign w_weight = pe_weight_out_w[(r-1)*DIM+c];
+          assign pe_psum_in_w[r*DIM+c]   = pe_psum_out_w[(r-1)*DIM+c];
+          assign pe_weight_in_w[r*DIM+c] = pe_weight_out_w[(r-1)*DIM+c];
         end
 
         // Switch routing: origin at pe[0][0]; right along row 0; then south
         // down each column.
-        logic w_switch;
         if (r == 0 && c == 0) begin : g_switch_origin
-          assign w_switch = sys_switch_in;
+          assign pe_switch_in_w[r*DIM+c] = sys_switch_in;
         end else if (r == 0) begin : g_switch_row0
-          assign w_switch = pe_switch_out_w[c-1];
+          assign pe_switch_in_w[r*DIM+c] = pe_switch_out_w[c-1];
         end else begin : g_switch_col
-          assign w_switch = pe_switch_out_w[(r-1)*DIM+c];
+          assign pe_switch_in_w[r*DIM+c] = pe_switch_out_w[(r-1)*DIM+c];
         end
 
         pe #(
@@ -101,12 +99,12 @@ module systolic #(
             .rst_n     (rst_n),
             .pe_enabled(1'b1),
 
-            .pe_input_in (w_input),
-            .pe_valid_in (w_valid),
-            .pe_switch_in(w_switch),
+            .pe_input_in (pe_input_in_w[r*DIM+c]),
+            .pe_valid_in (pe_valid_in_w[r*DIM+c]),
+            .pe_switch_in(pe_switch_in_w[r*DIM+c]),
 
-            .pe_psum_in    (w_psum),
-            .pe_weight_in  (w_weight),
+            .pe_psum_in    (pe_psum_in_w[r*DIM+c]),
+            .pe_weight_in  (pe_weight_in_w[r*DIM+c]),
             .pe_accept_w_in(sys_accept_w[c]),
 
             .pe_input_out (pe_input_out_w[r*DIM+c]),

@@ -105,20 +105,19 @@ module vpu #(
 
   // 8 parallel ALU instances
   logic [NUM_LANES-1:0][DATA_WIDTH-1:0] alu_result;
+  logic [NUM_LANES-1:0][DATA_WIDTH-1:0] operand_b_lane;
 
   generate
     for (genvar i = 0; i < NUM_LANES; i++) begin : alu_lanes
-      logic [DATA_WIDTH-1:0] operand_b_lane;
-
       // Scalar broadcast: use element 0 for all lanes
-      assign operand_b_lane = scalar_b ? rf_rd_data_b[0] : rf_rd_data_b[i];
+      assign operand_b_lane[i] = scalar_b ? rf_rd_data_b[0] : rf_rd_data_b[i];
 
       vpu_op #(
           .DATA_W(DATA_WIDTH),
           .OP_W  (VPU_OPCODE_WIDTH)
       ) alu (
           .operand0(rf_rd_data_a[i]),
-          .operand1(operand_b_lane),
+          .operand1(operand_b_lane[i]),
           .opcode(vpu_opcode),
           .result_out(alu_result[i])
       );

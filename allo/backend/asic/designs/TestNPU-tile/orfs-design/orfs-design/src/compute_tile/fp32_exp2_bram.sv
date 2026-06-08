@@ -1198,16 +1198,16 @@ module fp32_exp2_bram (
   end
   logic [ 9:0] lut_addr;
   logic [23:0] f_val24;
+  logic [23:0] lut_shifted;
   assign f_val24 = {1'b1, f_fp32_r[22:0]};
   // Right-shift f_val24 by (13 + shift_amt), extract bits [9:0]
   // Correct derivation: k = floor(f × 1024) = floor(f_val24 × 2^{f_exp8-140})
   // = f_val24 >> (140 - f_exp8) = f_val24 >> (14 + shift_amt)
   // (shift_amt = 126 - f_exp8 ≥ 0).
   always @* begin
-    logic [23:0] shifted;
-    if (shift_amt >= 4'd10) shifted = '0;
-    else shifted = f_val24 >> (5'd14 + {1'b0, shift_amt});
-    lut_addr = shifted[9:0];
+    if (shift_amt >= 4'd10) lut_shifted = '0;
+    else lut_shifted = f_val24 >> (5'd14 + {1'b0, shift_amt});
+    lut_addr = lut_shifted[9:0];
   end
 
   // ── Register stage ────────────────────────────────────────────────────────
