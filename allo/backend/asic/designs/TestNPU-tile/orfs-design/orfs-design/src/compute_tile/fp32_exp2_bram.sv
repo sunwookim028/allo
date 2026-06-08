@@ -1076,7 +1076,7 @@ module fp32_exp2_bram (
 
   // ── Integer part n = floor(x) ─────────────────────────────────────────────
   logic [4:0] frac_shift;
-  always_comb begin
+  always @* begin
     if (xE < 9'sd0) frac_shift = 5'd0;
     else if (xE >= 9'sd23) frac_shift = 5'd23;
     else frac_shift = xE[4:0] + 5'd1;
@@ -1093,13 +1093,13 @@ module fp32_exp2_bram (
   assign has_frac = (|frac_mant) & !x_zero;
 
   logic [7:0] n_abs;
-  always_comb begin
+  always @* begin
     if (x_zero || xE < 9'sd0) n_abs = 8'd0;
     else if (xE >= 9'sd7) n_abs = 8'd127;
-    else n_abs = 8'(full_mant >> (5'd23 - xE[4:0]));
+    else n_abs = (full_mant >> (5'd23 - xE[4:0]));
   end
   logic signed [8:0] n_int;
-  always_comb begin
+  always @* begin
     if (x_zero) n_int = 9'sd0;
     else if (!xs) n_int = {1'b0, n_abs};
     else begin
@@ -1118,8 +1118,8 @@ module fp32_exp2_bram (
   logic [31:0] float_n;
 
   assign fn_sign  = n_int[8];
-  assign fn_abs_v = fn_sign ? 8'(-n_int) : 8'(n_int);
-  always_comb begin
+  assign fn_abs_v = fn_sign ? (-n_int) : (n_int);
+  always @* begin
     casez (fn_abs_v)
       8'b1???????: fn_msb = 3'd7;
       8'b01??????: fn_msb = 3'd6;
@@ -1133,7 +1133,7 @@ module fp32_exp2_bram (
   end
   logic [7:0] fn_mask_v;
   assign fn_mask_v = (8'h01 << fn_msb) - 8'h01;
-  assign fn_mant_v = 23'(fn_abs_v & fn_mask_v) << (5'd23 - {2'b0, fn_msb});
+  assign fn_mant_v = (fn_abs_v & fn_mask_v) << (5'd23 - {2'b0, fn_msb});
   assign fn_exp_v  = 8'd127 + {5'd0, fn_msb};
   assign float_n   = (n_int == 9'sd0) ? 32'h0 : {fn_sign, fn_exp_v, fn_mant_v};
 
@@ -1149,7 +1149,7 @@ module fp32_exp2_bram (
   logic [22:0] xm_r2;
   logic signed [8:0] n_int_r2;
   logic [31:0] float_n_r2;
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     xs_r2      <= xs;
     xe_r2      <= xe;
     xm_r2      <= xm;
@@ -1179,7 +1179,7 @@ module fp32_exp2_bram (
   logic [31:0] f_fp32_r;
   logic signed [8:0] n_int_r3;
   logic [3:0] specials_r3;
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     f_fp32_r    <= f_fp32;
     n_int_r3    <= n_int_r2;
     specials_r3 <= {x_nan_r2, x_pinf_r2, ovf_r2, unf_r2};
@@ -1191,9 +1191,9 @@ module fp32_exp2_bram (
   logic [7:0] f_exp8;
   logic [3:0] shift_amt;
   assign f_exp8 = f_fp32_r[30:23];
-  always_comb begin
+  always @* begin
     if (f_exp8 == 8'd0) shift_amt = 4'd10;  // f = 0 → addr = 0
-    else if (f_exp8 >= 8'd117) shift_amt = 4'(8'd126 - f_exp8);  // 0..9
+    else if (f_exp8 >= 8'd117) shift_amt = (8'd126 - f_exp8);  // 0..9
     else shift_amt = 4'd10;  // f < 2^-10 → addr ≈ 0
   end
   logic [ 9:0] lut_addr;
@@ -1203,7 +1203,7 @@ module fp32_exp2_bram (
   // Correct derivation: k = floor(f × 1024) = floor(f_val24 × 2^{f_exp8-140})
   // = f_val24 >> (140 - f_exp8) = f_val24 >> (14 + shift_amt)
   // (shift_amt = 126 - f_exp8 ≥ 0).
-  always_comb begin
+  always @* begin
     logic [23:0] shifted;
     if (shift_amt >= 4'd10) shifted = '0;
     else shifted = f_val24 >> (5'd14 + {1'b0, shift_amt});
@@ -1215,19 +1215,19 @@ module fp32_exp2_bram (
   logic signed [8:0] n_int_r;
   logic [3:0] specials_r;  // {x_nan, x_pinf, ovf, unf}
 
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     rom_out_r  <= rom[lut_addr];
     n_int_r    <= n_int_r3;
     specials_r <= specials_r3;
   end
 
   // ── Assembly ──────────────────────────────────────────────────────────────
-  always_comb begin
+  always @* begin
     if (specials_r[3]) result = {1'b0, 8'hFF, 1'b1, 22'h0};  // NaN
     else if (specials_r[2]) result = 32'h7F800000;  // +Inf
     else if (specials_r[1]) result = 32'h7F800000;  // overflow
     else if (specials_r[0]) result = 32'h00000000;  // underflow
-    else result = {1'b0, 8'(n_int_r + 9'sd127), rom_out_r};
+    else result = {1'b0, (n_int_r + 9'sd127), rom_out_r};
   end
 
 endmodule

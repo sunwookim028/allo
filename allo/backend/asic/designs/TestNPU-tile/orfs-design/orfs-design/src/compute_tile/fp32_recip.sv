@@ -16,8 +16,8 @@ module fp32_recip (
     input  logic [31:0] x,
     output logic [31:0] result
 );
-  localparam logic [31:0] TWO = 32'h40000000;
-  localparam logic [31:0] QNAN = 32'hFFC00000;
+  localparam [31:0] TWO = 32'h40000000;
+  localparam [31:0] QNAN = 32'hFFC00000;
 
   logic x_nan, x_inf, x_zero;
   assign x_nan  = (&x[30:23]) & (|x[22:0]);
@@ -104,7 +104,7 @@ module fp32_recip (
       .result(y3)
   );
 
-  always_comb begin
+  always @* begin
     if (x_nan) result = QNAN;
     else if (x_inf) result = {x[31], 31'h0};  // 1/±Inf = ±0
     else if (x_zero) result = {x[31], 8'hFF, 23'h0};  // 1/±0 = ±Inf

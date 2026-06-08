@@ -15,10 +15,10 @@ module compute_tile
 // (VARHIDDEN) — the values are identical and the shadowing is necessary.
 /* verilator lint_off VARHIDDEN */
 #(
-    parameter int IRAM_ADDR_WIDTH = 10,   // npu_config_pkg::IRAM_ADDR_WIDTH
-    parameter int L1_DATA_WIDTH   = 256,  // npu_config_pkg::L1_DATA_WIDTH
-    parameter int DM_ADDR_WIDTH   = 16,   // npu_config_pkg::DM_ADDR_WIDTH
-    parameter int DM_DATA_WIDTH   = 256   // npu_config_pkg::DM_DATA_WIDTH
+    parameter IRAM_ADDR_WIDTH = 10,   // npu_config_pkg::IRAM_ADDR_WIDTH
+    parameter L1_DATA_WIDTH   = 256,  // npu_config_pkg::L1_DATA_WIDTH
+    parameter DM_ADDR_WIDTH   = 16,   // npu_config_pkg::DM_ADDR_WIDTH
+    parameter DM_DATA_WIDTH   = 256   // npu_config_pkg::DM_DATA_WIDTH
     /* verilator lint_on VARHIDDEN */
 ) (
     input logic clk,

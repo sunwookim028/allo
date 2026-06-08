@@ -1,7 +1,7 @@
 // ALU-style VPU operations
 module vpu_op #(
-    parameter int DATA_W = 32,
-    parameter int OP_W   = 3
+    parameter DATA_W = 32,
+    parameter OP_W   = 3
 ) (
     input  logic [DATA_W-1:0] operand0,
     input  logic [DATA_W-1:0] operand1,

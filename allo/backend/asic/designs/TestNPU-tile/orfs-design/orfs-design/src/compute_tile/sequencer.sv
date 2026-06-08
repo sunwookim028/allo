@@ -146,15 +146,15 @@ module sequencer
   // Local constants
   //---------------------------------------------
   // DM bus is DM_DATA_WIDTH bits = DM_DATA_WIDTH/8 bytes wide per word.
-  localparam int DM_BYTES_PER_WORD = DM_DATA_WIDTH / 8;
+  localparam DM_BYTES_PER_WORD = DM_DATA_WIDTH / 8;
   // Right-shift applied to a byte address to obtain a DM word address.
-  localparam int DM_BYTE_SHIFT = $clog2(DM_BYTES_PER_WORD);
+  localparam DM_BYTE_SHIFT = $clog2(DM_BYTES_PER_WORD);
   // Number of fp16/fp32 lanes per 256-bit BRAM row.
-  localparam int BANKING = L1_DATA_WIDTH / DATA_WIDTH;  // = 8
+  localparam BANKING = L1_DATA_WIDTH / DATA_WIDTH;  // = 8
   // Gap 3: Program registry slot size.
   // Each program occupies PROGRAM_SLOT_SIZE IRAM words.
   // 16 programs × 256 words/program = 4096 = 2^IRAM_ADDR_WIDTH.
-  localparam int PROGRAM_SLOT_SIZE = 256;
+  localparam PROGRAM_SLOT_SIZE = 256;
 
   //---------------------------------------------
   // Internal Signals
@@ -409,7 +409,7 @@ module sequencer
   // pf_addr_base = dma_pool_idx for DMA/vec; loop_hi_pool_idx for loop.begin.
   // Step 0 → pf_addr_base+0 (= POOL0 / hi-entry), step 1 → +1 (= POOL1 / bias / stride), …
   assign pool_fetch_active = (state == POOL_FETCH_REQ || state == POOL_FETCH_WAIT);
-  assign pool_fetch_addr = pool_base + IRAM_ADDR_WIDTH'(pf_addr_base) + IRAM_ADDR_WIDTH'(pf_step);
+  assign pool_fetch_addr = pool_base + (pf_addr_base) + (pf_step);
   assign iram_b_addr = pool_fetch_active ? pool_fetch_addr : pc_val;
 
   //---------------------------------------------
@@ -422,7 +422,7 @@ module sequencer
   // IV address resolution is purely combinational (behavioural model, LATENCY=0).
   // TODO: For timing closure on FPGA at > 200 MHz, pipeline the two
   //       multiply-adds into a 1-cycle registered stage inserted before DMA_ROW_REQ.
-  always_comb begin : iv_offset_comb
+  always @* begin : iv_offset_comb
     logic [1:0] iv_a_id, iv_b_id;
     iv_a_id = dma_iv_id_pair_reg[1:0];  // bits[15:0] → low 2 bits (iv_id is 2-bit)
     iv_b_id = dma_iv_id_pair_reg[17:16];  // bits[31:16] → low 2 bits
@@ -444,7 +444,7 @@ module sequencer
   //---------------------------------------------
   // Selects one of four 32-bit kernel_arg slices based on loop_hi_pool_idx[1:0]
   // (which carries the csr_idx latched from op1 at EXEC_DISPATCH).
-  always_comb begin : csr_loop_hi_mux
+  always @* begin : csr_loop_hi_mux
     case (loop_hi_pool_idx[1:0])
       2'd0:    csr_loop_hi_val = kernel_arg_csr[31:0];
       2'd1:    csr_loop_hi_val = kernel_arg_csr[63:32];
@@ -456,7 +456,7 @@ module sequencer
   //---------------------------------------------
   // Stage 4: i4_subrow_nibbles — 32-bit slice of i4_dm_latch for current subrow
   //---------------------------------------------
-  always_comb begin : i4_nibble_mux
+  always @* begin : i4_nibble_mux
     case (i4_subrow_r)
       3'd0:    i4_subrow_nibbles = i4_dm_latch[ 31:  0];
       3'd1:    i4_subrow_nibbles = i4_dm_latch[ 63: 32];
@@ -492,14 +492,14 @@ module sequencer
     (state == VEC_ACC_VREG_WRITE)                                                              ||
       // VEC_ACC_RD_WR fires for non-NL ops (scale/sub/div/imm) after writing registered result.
       // EXP2/SILU complete one or two cycles later in the NL pipeline states below.
-      (state == VEC_ACC_RD_WR && (vec_row_r == 8'(BANKING - 1))) ||
+      (state == VEC_ACC_RD_WR && (vec_row_r == (BANKING - 1))) ||
       // EXP2 completes in VEC_ACC_EXP2_WR (registered exp2 output written to BRAM).
-      (state == VEC_ACC_EXP2_WR        && (vec_row_r == 8'(BANKING - 1))                       &&
+      (state == VEC_ACC_EXP2_WR        && (vec_row_r == (BANKING - 1))                       &&
                                         vec_opcode_reg == OP_VEC_EXP2)                        ||
       // SILU completes in NL_RECIP_LATCH (2 extra BRAM cycles: exp2 + recip).
-      (state == VEC_ACC_NL_RECIP_LATCH && (vec_row_r == 8'(BANKING - 1))                      &&
+      (state == VEC_ACC_NL_RECIP_LATCH && (vec_row_r == (BANKING - 1))                      &&
                                          vec_opcode_reg == OP_VEC_SILU)                       ||
-    (state == VEC_ACC2_WR          && (vec_row_r == 8'(BANKING - 1)))                        ||
+    (state == VEC_ACC2_WR          && (vec_row_r == (BANKING - 1)))                        ||
     (state == VEC_ZERO_ACC_WRITE   && (vec_row_r == vec_zero_rows - 8'd1))                   ||
       // VEC_VREG_EXEC fires for instant VREG ops; EXP2_VREG and RSQRT wait one more
       // cycle for the BRAM module to produce its result.
@@ -532,7 +532,7 @@ module sequencer
   // All vec.* operations are implemented as combinational FP32 module
   // instances.  Results are sampled by the always_ff FSM at the appropriate
   // state boundary.  vec_computed_row / vec_computed_row_2src are muxed
-  // inline inside the BRAM-routing always_comb below to avoid iverilog
+  // inline inside the BRAM-routing always @* below to avoid iverilog
   // NBA-ordering races (same block as the consumers of those signals).
   //---------------------------------------------
 
@@ -643,7 +643,7 @@ module sequencer
   logic [31:0] rsum_l0_reg[4], rmax_l0_reg[4];
   logic [31:0] rsum_l1_reg[2], rmax_l1_reg[2];
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       for (int i = 0; i < 4; i++) begin
         rsum_l0_reg[i] <= '0;
@@ -733,8 +733,8 @@ module sequencer
 
   assign vec_reduce_result = (vec_opcode_reg == OP_VEC_ROWSUM) ? rowsum_result : rowmax_result;
 
-  localparam logic [31:0] NEG_LOG2E = 32'hBFB8AA3B;  // −log2(e) ≈ −1.44269504
-  localparam logic [31:0] ONE_F32 = 32'h3F800000;
+  localparam [31:0] NEG_LOG2E = 32'hBFB8AA3B;  // −log2(e) ≈ −1.44269504
+  localparam [31:0] ONE_F32 = 32'h3F800000;
 
   generate
     for (genvar gi = 0; gi < BANKING; gi++) begin : g_vpu_lanes
@@ -923,7 +923,7 @@ module sequencer
   //---------------------------------------------
   // FSM sequential logic
   //---------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state                <= IDLE;
       done                 <= 1'b0;
@@ -1018,7 +1018,7 @@ module sequencer
             // Gap 3: PC starts at program_id * PROGRAM_SLOT_SIZE (= << 8).
             // program_id is slv_reg13[3:0]; bits [3:0] select 1 of 16 slots.
             pc_load     <= 1'b1;
-            pc_load_val <= IRAM_ADDR_WIDTH'(program_id_csr[3:0]) << 8;
+            pc_load_val <= (program_id_csr[3:0]) << 8;
             state       <= FETCH_1;
           end
         end
@@ -1191,7 +1191,7 @@ module sequencer
               vreg_data_reg     <= '0;
               pf_addr_base      <= op1;
               pf_step           <= 4'd0;
-              pf_max_step       <= 4'(BANKING - 1);  // BANKING steps (0..BANKING-1)
+              pf_max_step       <= (BANKING - 1);  // BANKING steps (0..BANKING-1)
               pf_next_state_tag <= PF_TO_VEC_ACC_VREG_WRITE;
               state             <= POOL_FETCH_REQ;
             end
@@ -1429,7 +1429,7 @@ module sequencer
             // pc_enable fires this cycle via the assign above (POOL_FETCH_WAIT + tag + last step).
             iv_hi[loop_iv_id]         <= current_instr[31:0];
             iv_reg[loop_iv_id]        <= {24'h0, loop_lo};
-            iv_body_start[loop_iv_id] <= pc_val + IRAM_ADDR_WIDTH'(1);
+            iv_body_start[loop_iv_id] <= pc_val + (1);
 
           end else if (pf_next_state_tag == PF_TO_VEC_ACC_VREG_WRITE) begin
             // VREG_LOAD (vec.load.imm): latch one fp32 per step.
@@ -1498,7 +1498,7 @@ module sequencer
         end
 
         // DMA_I4_WRITE: write one SPM_I8 row per cycle (8 subrows per DM word).
-        // BRAM write is driven in the always_comb routing block below.
+        // BRAM write is driven in the always @* routing block below.
         // When the last subrow of the last DM word is written, pc_enable fires and
         // we return to FETCH_1 (or continue to DMA_ROW_REQ for the next DM word).
         DMA_I4_WRITE: begin
@@ -1523,7 +1523,7 @@ module sequencer
             vreg_wr_addr <= cast_vreg_dst;
             for (int i = 0; i < BANKING; i++) vreg_wr_data[i] <= cast_fp32_from_fp16[i];
           end
-          // BRAM write for non-vreg cast is handled in always_comb below.
+          // BRAM write for non-vreg cast is handled in always @* below.
           state <= FETCH_1;
         end
 
@@ -1583,7 +1583,7 @@ module sequencer
               vreg_wr_en   <= 1'b1;
               vreg_wr_addr <= vec_vreg_dst;
               for (int i = 0; i < BANKING; i++) begin
-                if (i < int'(vec_zero_rows)) vreg_wr_data[i] <= vec_imm_reg;
+                if (i < (vec_zero_rows)) vreg_wr_data[i] <= vec_imm_reg;
                 else vreg_wr_data[i] <= '0;
               end
               state <= FETCH_1;
@@ -1686,7 +1686,7 @@ module sequencer
         VEC_ACC_VREG_WAIT: begin
           vreg_data_reg[vec_row_r] <= vec_reduce_result;
           vec_row_r                <= vec_row_r + 8'd1;
-          if (vec_row_r == 8'(BANKING - 1)) state <= VEC_ACC_VREG_WRITE;
+          if (vec_row_r == (BANKING - 1)) state <= VEC_ACC_VREG_WRITE;
           else state <= VEC_ACC_VREG_REQ;
         end
 
@@ -1740,7 +1740,7 @@ module sequencer
         VEC_ACC_RD_WR: begin
           // Write registered single-src result; advance row.
           vec_row_r <= vec_row_r + 8'd1;
-          if (vec_row_r == 8'(BANKING - 1)) state <= FETCH_1;
+          if (vec_row_r == (BANKING - 1)) state <= FETCH_1;
           else state <= VEC_ACC_RD_REQ;
         end
 
@@ -1778,7 +1778,7 @@ module sequencer
 
         VEC_ACC_EXP2_WR: begin
           vec_row_r <= vec_row_r + 8'd1;
-          if (vec_row_r == 8'(BANKING - 1)) state <= FETCH_1;
+          if (vec_row_r == (BANKING - 1)) state <= FETCH_1;
           else state <= VEC_ACC_RD_REQ;
         end
 
@@ -1786,7 +1786,7 @@ module sequencer
         // acc_silu_row = silu_x_latch * recip_bram_out is combinational; write to BRAM.
         VEC_ACC_NL_RECIP_LATCH: begin
           vec_row_r <= vec_row_r + 8'd1;
-          if (vec_row_r == 8'(BANKING - 1)) state <= FETCH_1;
+          if (vec_row_r == (BANKING - 1)) state <= FETCH_1;
           else state <= VEC_ACC_RD_REQ;
         end
 
@@ -1803,7 +1803,7 @@ module sequencer
 
         VEC_ACC2_RD_B_WAIT: begin
           bram_dout_b_a2_reg <= bram_dout_b;
-          acc2_dst_addr_reg  <= vec_acc_dst + L1_ADDR_WIDTH'(vec_row_r);
+          acc2_dst_addr_reg  <= vec_acc_dst + (vec_row_r);
           state              <= VEC_ACC2_COMPUTE;
         end
 
@@ -1814,7 +1814,7 @@ module sequencer
 
         VEC_ACC2_WR: begin
           vec_row_r <= vec_row_r + 8'd1;
-          if (vec_row_r == 8'(BANKING - 1)) state <= FETCH_1;
+          if (vec_row_r == (BANKING - 1)) state <= FETCH_1;
           else state <= VEC_ACC2_RD_A_REQ;
         end
 
@@ -1858,7 +1858,7 @@ module sequencer
         LOOP_CSR_LATCH: begin
           iv_hi[loop_iv_id]         <= csr_loop_hi_val;  // hi from kernel_arg_csr[csr_idx]
           iv_reg[loop_iv_id]        <= {24'h0, loop_lo};
-          iv_body_start[loop_iv_id] <= pc_val + IRAM_ADDR_WIDTH'(1);
+          iv_body_start[loop_iv_id] <= pc_val + (1);
           // pc_enable fires via LOOP_CSR_LATCH condition in assign above
           state                     <= FETCH_1;
         end
@@ -1894,13 +1894,13 @@ module sequencer
   //---------------------------------------------
   // vec_computed_row / vec_computed_row_2src
   //
-  // Separate always_comb so that Vivado does not place acc_sub_bcast_row and
+  // Separate always @* so that Vivado does not place acc_sub_bcast_row and
   // similar fp32 results in the same combinational cone as bram_din_b.
   // Keeping them inline in the bram_din_b block (the old iverilog workaround)
   // created a 14 ns VREG→fp32→bram_din_b path that violated timing.
-  // The simulator re-evaluates multiple always_comb blocks correctly.
+  // The simulator re-evaluates multiple always @* blocks correctly.
   //---------------------------------------------
-  always_comb begin : u_vcr_mux
+  always @* begin : u_vcr_mux
     automatic logic [L1_DATA_WIDTH-1:0] row1, row2;
     row1 = bram_dout_b;
     if (state == VEC_ACC_RD_WAIT) begin
@@ -1944,7 +1944,7 @@ module sequencer
   // MXU arm is gated on state==WAIT_MXU rather than on the combinational `op`
   // field, which prevents spurious BRAM enables during pool reads.
   //---------------------------------------------
-  always_comb begin
+  always @* begin
     bram_addr_b     = '0;
     bram_din_b      = '0;
     bram_en_b       = 1'b0;
@@ -1961,7 +1961,7 @@ module sequencer
                   dma_op_reg == OP_DMA_STORE_SPM_MI || dma_op_reg == OP_DMA_STORE_ACC_MI ||
                   dma_op_reg == OP_DMA_STORE_SPM_I8_MI)) begin
       // Store: read row from BRAM so it can be written to DM in DMA_ROW_WAIT
-      bram_addr_b = dma_spm_base + L1_ADDR_WIDTH'(dma_row_r);
+      bram_addr_b = dma_spm_base + (dma_row_r);
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b0;
     end else if (state == DMA_ROW_WAIT &&
@@ -1969,7 +1969,7 @@ module sequencer
                   dma_op_reg == OP_DMA_LOAD_SPM_MI || dma_op_reg == OP_DMA_LOAD_ACC_MI ||
                   dma_op_reg == OP_DMA_LOAD_SPM_I8_MI)) begin
       // Load: write DM data (now valid) into BRAM
-      bram_addr_b = dma_spm_base + L1_ADDR_WIDTH'(dma_row_r);
+      bram_addr_b = dma_spm_base + (dma_row_r);
       bram_din_b  = dm_dout;
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b1;
@@ -1993,11 +1993,11 @@ module sequencer
       end
       // ---- Stage 2 BRAM routing ----
     end else if (state == VEC_ACC_VREG_REQ) begin
-      bram_addr_b = vec_acc_src + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_src + (vec_row_r);
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b0;
     end else if (state == VEC_ACC_RD_REQ) begin
-      bram_addr_b = vec_acc_src + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_src + (vec_row_r);
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b0;
     end else if (state == VEC_ACC_RD_WAIT) begin
@@ -2005,7 +2005,7 @@ module sequencer
       // Non-NL ops: result latched into vec_computed_row_reg this cycle; written in VEC_ACC_RD_WR.
     end else if (state == VEC_ACC_RD_WR) begin
       // Write registered single-src result — breaks bram_dout_b→fp32→bram_din_b path.
-      bram_addr_b = vec_acc_dst + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_dst + (vec_row_r);
       bram_din_b  = vec_computed_row_reg;
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b1;
@@ -2014,7 +2014,7 @@ module sequencer
       // For SILU, silu_denom drives recip_bram — no write yet.
     end else if (state == VEC_ACC_EXP2_WR) begin
       // Write registered exp2 result — breaks BRAM→assembly→BRAM path.
-      bram_addr_b = vec_acc_dst + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_dst + (vec_row_r);
       for (int j2 = 0; j2 < BANKING; j2++) bram_din_b[j2*32+:32] = acc_exp2_row_reg[j2];
       bram_en_b = 1'b1;
       bram_we_b = 1'b1;
@@ -2022,18 +2022,18 @@ module sequencer
       // recip_bram output valid; acc_silu_row = silu_x_latch * recip computed
       // combinationally by u_silu_out; write SILU result.
       if (vec_opcode_reg == OP_VEC_SILU) begin
-        bram_addr_b = vec_acc_dst + L1_ADDR_WIDTH'(vec_row_r);
+        bram_addr_b = vec_acc_dst + (vec_row_r);
         for (int j2 = 0; j2 < BANKING; j2++) bram_din_b[j2*32+:32] = acc_silu_row[j2];
         bram_en_b = 1'b1;
         bram_we_b = 1'b1;
       end
     end else if (state == VEC_ACC2_RD_A_REQ) begin
-      bram_addr_b = vec_acc_src + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_src + (vec_row_r);
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b0;
     end else if (state == VEC_ACC2_RD_A_WAIT) begin
       // Immediately issue acc_b read (data from acc_a captured in FSM this cycle)
-      bram_addr_b = vec_acc_b + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_b + (vec_row_r);
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b0;
     end else if (state == VEC_ACC2_WR) begin
@@ -2042,14 +2042,14 @@ module sequencer
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b1;
     end else if (state == VEC_ZERO_ACC_WRITE) begin
-      bram_addr_b = vec_acc_dst + L1_ADDR_WIDTH'(vec_row_r);
+      bram_addr_b = vec_acc_dst + (vec_row_r);
       bram_din_b  = '0;
       bram_en_b   = 1'b1;
       bram_we_b   = 1'b1;
     end else if (state == DMA_I4_WRITE) begin
       // Unpack 8 nibbles from i4_subrow_nibbles → 8 uint8 in bits[63:0], upper zero.
       // BRAM row = spm_base + (dm_word_row × 8) + subrow
-      bram_addr_b = dma_spm_base + L1_ADDR_WIDTH'({dma_row_r, 3'b0}) + L1_ADDR_WIDTH'(i4_subrow_r);
+      bram_addr_b = dma_spm_base + ({dma_row_r, 3'b0}) + (i4_subrow_r);
       bram_din_b  = '0;
       for (int j = 0; j < N; j++) begin
         bram_din_b[j*8+:8] = {4'b0, i4_subrow_nibbles[j*4+:4]};
@@ -2062,7 +2062,7 @@ module sequencer
   //---------------------------------------------
   // Device-memory control (combinational)
   //---------------------------------------------
-  always_comb begin
+  always @* begin
     dm_addr = '0;
     dm_din  = '0;
     dm_en   = 1'b0;
@@ -2096,7 +2096,7 @@ module sequencer
   // an opcode not in the dispatch table.  npu.sv latches it into a sticky
   // error-status register (slv_reg9[0]) readable by the host via AXI-Lite.
   //---------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) illegal_op_o <= 1'b0;
     else
       illegal_op_o <= (state == EXEC_DISPATCH) &&

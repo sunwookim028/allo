@@ -33,7 +33,7 @@ module pc #(
     output logic [PC_WIDTH-1:0] PC
 );
 
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     if (!rst_n) begin
       PC <= '0;
     end else begin

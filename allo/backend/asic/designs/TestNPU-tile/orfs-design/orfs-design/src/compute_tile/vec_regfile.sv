@@ -8,9 +8,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module vec_regfile #(
-    parameter int NUM_REGS   = 8,
-    parameter int ELEM_WIDTH = 32,
-    parameter int NUM_ELEMS  = 8
+    parameter NUM_REGS   = 8,
+    parameter ELEM_WIDTH = 32,
+    parameter NUM_ELEMS  = 8
 ) (
     input logic clk,
     input logic rst_n,
@@ -37,7 +37,7 @@ module vec_regfile #(
   assign rd_data_b = regs[rd_addr_b];
 
   // Synchronous write
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       for (int i = 0; i < NUM_REGS; i++) begin
         regs[i] <= '0;

@@ -16,11 +16,11 @@
 `timescale 1ns / 1ps
 /* verilator lint_off UNUSEDPARAM */
 module fp32_add #(
-    parameter int unsigned LATENCY   = 0,
+    parameter LATENCY   = 0,
     parameter              FORMAT    = "FP32",
-    parameter int          INT_BITS  = 16,
-    parameter int          FRAC_BITS = 16,
-    parameter int          WIDTH     = 32
+    parameter          INT_BITS  = 16,
+    parameter          FRAC_BITS = 16,
+    parameter          WIDTH     = 32
 ) (
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic             clk,
@@ -111,12 +111,12 @@ module fp32_add #(
             b_mant_ext = (b_exp == 8'h00) ? {1'b0, b_mant} : {1'b1, b_mant};
 
             if (a_exp >= b_exp) begin
-              larger_exp_i = int'(a_exp);
-              exp_diff_i   = int'(a_exp) - int'(b_exp);
+              larger_exp_i = (a_exp);
+              exp_diff_i   = (a_exp) - (b_exp);
               b_mant_ext   = b_mant_ext >> exp_diff_i;
             end else begin
-              larger_exp_i = int'(b_exp);
-              exp_diff_i   = int'(b_exp) - int'(a_exp);
+              larger_exp_i = (b_exp);
+              exp_diff_i   = (b_exp) - (a_exp);
               a_mant_ext   = a_mant_ext >> exp_diff_i;
             end
 
@@ -252,11 +252,11 @@ module fp32_add #(
 
             if (a_exp >= b_exp) begin
               s1_larger_exp = a_exp;
-              s1_exp_diff   = int'(a_exp) - int'(b_exp);
+              s1_exp_diff   = (a_exp) - (b_exp);
               s1_b_mant_ext = s1_b_mant_ext >> s1_exp_diff;
             end else begin
               s1_larger_exp = b_exp;
-              s1_exp_diff   = int'(b_exp) - int'(a_exp);
+              s1_exp_diff   = (b_exp) - (a_exp);
               s1_a_mant_ext = s1_a_mant_ext >> s1_exp_diff;
             end
 
@@ -276,7 +276,7 @@ module fp32_add #(
         end
 
         // Pipeline FF
-        always_ff @(posedge clk) begin
+        always @(posedge clk) begin
           p1_is_special     <= s1_is_special;
           p1_special_result <= s1_special_result;
           p1_result_sign    <= s1_result_sign;
@@ -308,7 +308,7 @@ module fp32_add #(
                 result = {p1_result_sign, 8'h00, s2_sum_mant[22:0]};
               end
             end else begin
-              s2_result_exp     = int'(p1_larger_exp);
+              s2_result_exp     = (p1_larger_exp);
               s2_normalize_done = 1'b0;
 
               if (s2_sum_mant[24]) begin
@@ -357,7 +357,7 @@ module fp32_add #(
       logic overflow;
       assign sum      = a + b;
       assign overflow = (a[WIDTH-1] == b[WIDTH-1]) && (sum[WIDTH-1] != a[WIDTH-1]);
-      always_comb begin
+      always @* begin
         if (overflow) result = a[WIDTH-1] ? {1'b1, {WIDTH - 1{1'b0}}} : {1'b0, {WIDTH - 1{1'b1}}};
         else result = sum;
       end

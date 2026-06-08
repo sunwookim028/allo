@@ -39,7 +39,7 @@ module l1
     input  logic                     dma_comp_we_b
 );
 
-  localparam int BRAM_ADDRB_W = 13;  // physical BRAM port width; L1_ADDR_WIDTH bits are used
+  localparam BRAM_ADDRB_W = 13;  // physical BRAM port width; L1_ADDR_WIDTH bits are used
 
   // Internal signals
   // Offset is now directly in 256-bit words.

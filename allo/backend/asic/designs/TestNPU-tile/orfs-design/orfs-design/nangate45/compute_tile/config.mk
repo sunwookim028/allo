@@ -1,7 +1,7 @@
 export DESIGN_NAME = compute_tile
 export PLATFORM    = nangate45
 
-# add all required verilog files
+# Full compute_tile source closure.
 export VERILOG_FILES = \
   ./designs/src/$(DESIGN_NAME)/npu_config_pkg.sv \
   ./designs/src/$(DESIGN_NAME)/npu_isa_pkg.sv \
@@ -35,7 +35,7 @@ export VERILOG_FILES = \
 export SDC_FILE      = ./designs/$(PLATFORM)/$(DESIGN_NAME)/constraint.sdc
 export ABC_AREA      = 1
 
-# Adders degrade GCD
+# Keep default adder mapping for initial compute_tile bring-up.
 export ADDER_MAP_FILE :=
 
 export CORE_UTILIZATION ?= 55

@@ -7,7 +7,7 @@
 `timescale 1ns / 1ps
 /* verilator lint_off UNUSEDPARAM */
 module fp32_max #(
-    parameter int unsigned LATENCY = 0
+    parameter LATENCY = 0
 ) (
     input  logic [31:0] a,
     input  logic [31:0] b,

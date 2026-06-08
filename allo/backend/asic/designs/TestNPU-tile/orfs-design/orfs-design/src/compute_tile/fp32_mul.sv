@@ -11,11 +11,11 @@
 `timescale 1ns / 1ps
 /* verilator lint_off UNUSEDPARAM */
 module fp32_mul #(
-    parameter int unsigned LATENCY   = 0,
+    parameter LATENCY   = 0,
     parameter              FORMAT    = "FP32",  // legacy; unused
-    parameter int          INT_BITS  = 16,      // legacy; unused
-    parameter int          FRAC_BITS = 16,      // legacy; unused
-    parameter int          WIDTH     = 32       // legacy; unused
+    parameter          INT_BITS  = 16,      // legacy; unused
+    parameter          FRAC_BITS = 16,      // legacy; unused
+    parameter          WIDTH     = 32       // legacy; unused
 ) (
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic        clk,
@@ -36,7 +36,7 @@ module fp32_mul #(
 `ifdef VERILATOR
   always @(*) result = dpi_fp32_mul(a, b);
 `else
-  localparam int FP32_EXP_BIAS = 127;
+  localparam FP32_EXP_BIAS = 127;
 
   logic [23:0] a_m, b_m, z_m;
   logic [9:0] a_e, b_e, z_e;
@@ -124,12 +124,12 @@ module fp32_mul #(
       end
 
       result[22:0]  = z_m[22:0];
-      result[30:23] = 8'(z_e[7:0] + 8'(FP32_EXP_BIAS));
+      result[30:23] = (z_e[7:0] + (FP32_EXP_BIAS));
       result[31]    = z_s;
 
       if ($signed(z_e) == -126 && z_m[23] == 0) result[30:23] = 8'h0;
 
-      if ($signed(z_e) > $signed(10'(FP32_EXP_BIAS))) begin
+      if ($signed(z_e) > $signed((FP32_EXP_BIAS))) begin
         result[22:0]  = 23'h0;
         result[30:23] = 8'hFF;
         result[31]    = z_s;

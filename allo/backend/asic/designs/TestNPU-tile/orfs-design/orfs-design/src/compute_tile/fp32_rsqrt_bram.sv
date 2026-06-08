@@ -1080,14 +1080,14 @@ module fp32_rsqrt_bram (
   logic [8:0] res_exp_9;
   // Derivation for xe ODD (E even): biased_exp = 126 - E/2 = (379-xe)/2
   // Derivation for xe EVEN (E odd): biased_exp = (380-xe)/2 (unchanged)
-  assign res_exp_9 = xe[0] ? 9'((9'd379 - {1'b0, xe}) >> 1) : 9'((9'd380 - {1'b0, xe}) >> 1);
+  assign res_exp_9 = xe[0] ? ((9'd379 - {1'b0, xe}) >> 1) : ((9'd380 - {1'b0, xe}) >> 1);
 
   // ── Register stage ────────────────────────────────────────────────────────
   logic [22:0] rom_out_r;
   logic [ 7:0] res_exp_r;
   logic x_nan_r, x_inf_r, x_neg_zero_r;
 
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     rom_out_r    <= rom[lut_addr];
     res_exp_r    <= res_exp_9[7:0];
     x_nan_r      <= x_nan;
@@ -1096,8 +1096,8 @@ module fp32_rsqrt_bram (
   end
 
   // ── Assembly ──────────────────────────────────────────────────────────────
-  localparam logic [31:0] QNAN = 32'hFFC00000;
-  always_comb begin
+  localparam [31:0] QNAN = 32'hFFC00000;
+  always @* begin
     if (x_nan_r || x_neg_zero_r) result = QNAN;
     else if (x_inf_r) result = 32'h00000000;  // 1/sqrt(Inf)=0
     else result = {1'b0, res_exp_r, rom_out_r};

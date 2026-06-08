@@ -47,8 +47,8 @@ module mxu
     input logic [N-1:0][31:0] scale_vec,  // fp32 per-column scales (dq_mode only)
     input logic dq_mode  // 1 = apply per-column scale after dequant
 );
-  localparam int BANKING_FACTOR = L1_DATA_WIDTH / DATA_WIDTH;
-  localparam int FP16_BITS = 16;
+  localparam BANKING_FACTOR = L1_DATA_WIDTH / DATA_WIDTH;
+  localparam FP16_BITS = 16;
 
 `ifndef SYNTHESIS
   // Integer-to-FP16 case table for int4 dequant.  Both val and zp are in
@@ -125,17 +125,17 @@ module mxu
       end else begin
         // Normal: value = (-1)^sign * 2^(exp-127) * (1 + mant/2^23)
         // Build IEEE-754 double: sign | exp+896 (rebias 127→1023) | mant<<29
-        exp_unbiased = int'(s_exp8) - 127;
+        exp_unbiased = (s_exp8) - 127;
         /* verilator lint_off WIDTHTRUNC */
-        exp64 = 11'(exp_unbiased + 1023);
+        exp64 = (exp_unbiased + 1023);
         /* verilator lint_on WIDTHTRUNC */
-        double_bits = {s_sign, 11'(exp64), {s_mant23, 29'b0}};
+        double_bits = {s_sign, (exp64), {s_mant23, 29'b0}};
         scale_r = $bitstoreal(double_bits);
       end
 
       // --- Compute diff * scale as real ---
       diff_i = $signed({1'b0, val_u8}) - $signed({1'b0, zero_u8});
-      result_r = real'(diff_i) * scale_r;
+      result_r = (diff_i) * scale_r;
 
       // --- Encode result (real/double) back to fp32 bits via double→fp32 ---
       double_bits = $realtobits(result_r);
@@ -152,7 +152,7 @@ module mxu
         exp32  = 8'hFF;
         mant32 = 23'd0;
       end else begin
-        exp32  = 8'(dexp - 11'd896);  // rebias: 1023-127=896
+        exp32  = (dexp - 11'd896);  // rebias: 1023-127=896
         mant32 = double_bits[51:29];  // top 23 mantissa bits
       end
       res_bits = {sign_b, exp32, mant32};
@@ -171,7 +171,7 @@ module mxu
         exp16  = 5'h1F;
         mant16 = 10'd0;
       end else begin
-        exp16  = 5'(exp32 - 8'd112);  // rebias: exp32_unbiased + 15
+        exp16  = (exp32 - 8'd112);  // rebias: exp32_unbiased + 15
         mant16 = mant32[22:13];  // top 10 mantissa bits (truncate)
       end
       dequant_scale_to_fp16 = {sign_b, exp16, mant16};
@@ -180,7 +180,7 @@ module mxu
 `endif
   // Total extra cycles added by the PE arithmetic pipeline: each of fp32_mul
   // and fp32_add contributes PE_LATENCY stages, plus 1 for mult_out_reg (Fix 10).
-  localparam int unsigned PE_LAT = 2 * PE_LATENCY + 1;
+  localparam PE_LAT = 2 * PE_LATENCY + 1;
 
   // Output, accumulate, and weight/x buffers
   logic signed [DATA_WIDTH-1:0] out_matrix[N*N-1:0];
@@ -278,7 +278,7 @@ module mxu
   // 2-cycle latency from pe_valid_in; pe_valid_out has 1-cycle latency).
   // Delay sys_valid_out by 1 cycle so captures fire when data is valid.
   // -------------------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) sys_valid_out_d <= '0;
     else sys_valid_out_d <= sys_valid_out;
   end
@@ -286,7 +286,7 @@ module mxu
   // -------------------------------------------------------------------------
   // Output capture + acc_buf management
   // -------------------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       for (int i = 0; i < N; i++) row_ptr[i] <= 0;
       for (int r = 0; r < N; r++) for (int c = 0; c < N; c++) out_matrix[(r*N+c)] <= '0;
@@ -330,7 +330,7 @@ module mxu
   // -------------------------------------------------------------------------
   // FSM Logic
   // -------------------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state             <= S_IDLE;
       phase_counter     <= '0;
@@ -497,8 +497,8 @@ module mxu
           // Switch fires one cycle after the last column finishes loading,
           // at phase 2*N-1.
           for (int col = 0; col < N; col++) begin
-            if (int'(phase_counter) >= col && int'(phase_counter) < N + col) begin
-              sys_weight_in[col] <= weight_matrix[col*N+(N-1-(int'(phase_counter)-col))];
+            if ((phase_counter) >= col && (phase_counter) < N + col) begin
+              sys_weight_in[col] <= weight_matrix[col*N+(N-1-((phase_counter)-col))];
               sys_accept_w[col]  <= 1;
             end
           end
@@ -509,9 +509,9 @@ module mxu
           // Row r of the systolic array receives column r of X.
           // Row r starts at phase 2*N + r (one cycle after switch, staggered by row).
           for (int row = 0; row < N; row++) begin
-            if (int'(phase_counter) >= 2 * N + row && int'(phase_counter) < 3 * N + row) begin
+            if ((phase_counter) >= 2 * N + row && (phase_counter) < 3 * N + row) begin
               sys_start[row]   <= 1;
-              sys_data_in[row] <= x_matrix[(int'(phase_counter)-(2*N+row))*N+row];
+              sys_data_in[row] <= x_matrix[((phase_counter)-(2*N+row))*N+row];
             end
           end
 

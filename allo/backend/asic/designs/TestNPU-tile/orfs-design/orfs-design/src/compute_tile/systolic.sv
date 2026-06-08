@@ -18,8 +18,8 @@
 module systolic
   import npu_config_pkg::*;
 #(
-    parameter int          DIM     = N,
-    parameter int unsigned LATENCY = PE_LATENCY
+    parameter          DIM     = N,
+    parameter LATENCY = PE_LATENCY
 ) (
     input logic clk,
     input logic rst_n,
@@ -43,7 +43,7 @@ module systolic
   // ---------------------------------------------------------------------------
   // Internal PE wires — flat 1D arrays indexed by (r*DIM + c)
   // ---------------------------------------------------------------------------
-  localparam int TOTAL = DIM * DIM;
+  localparam TOTAL = DIM * DIM;
 
   /* verilator lint_off UNUSEDSIGNAL */
   logic [          15:0] pe_input_out_w [TOTAL];

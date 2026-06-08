@@ -19,18 +19,18 @@ module fp32_to_fp16 (
   logic [22:0] mant32;
 
   // Exponent conversion constants — all derived from IEEE 754 field widths.
-  localparam int unsigned FP32_EXP_BIAS = 127;
-  localparam int unsigned FP16_EXP_BIAS = 15;
-  localparam int unsigned FP16_MANT_BITS = 10;
+  localparam FP32_EXP_BIAS = 127;
+  localparam FP16_EXP_BIAS = 15;
+  localparam FP16_MANT_BITS = 10;
   // exp16 = exp32 - (FP32_EXP_BIAS - FP16_EXP_BIAS); difference = 112
-  localparam int unsigned EXP_BIAS_DIFF = FP32_EXP_BIAS - FP16_EXP_BIAS;
+  localparam EXP_BIAS_DIFF = FP32_EXP_BIAS - FP16_EXP_BIAS;
   // fp16 max normal biased exponent = 2^5 - 2 = 30 (0x1E); exp=31 is reserved for inf/NaN
-  localparam int unsigned FP16_MAX_EXP = (1 << 5) - 2;
+  localparam FP16_MAX_EXP = (1 << 5) - 2;
   // fp32_exp > FP16_MAX_EXP + EXP_BIAS_DIFF = 142 → fp16 overflow
-  localparam int unsigned FP32_OVF_EXP = FP16_MAX_EXP + EXP_BIAS_DIFF;
+  localparam FP32_OVF_EXP = FP16_MAX_EXP + EXP_BIAS_DIFF;
   // fp32_exp < FP32_EXP_BIAS - (FP16_EXP_BIAS-1) - FP16_MANT_BITS = 103 → flush to fp16 zero
   // (smallest fp16 subnormal = 2^{-(FP16_EXP_BIAS-1+FP16_MANT_BITS)} = 2^{-24})
-  localparam int unsigned FP32_UNF_EXP = FP32_EXP_BIAS - (FP16_EXP_BIAS - 1) - FP16_MANT_BITS;
+  localparam FP32_UNF_EXP = FP32_EXP_BIAS - (FP16_EXP_BIAS - 1) - FP16_MANT_BITS;
 
   assign sign   = fp32_in[31];
   assign exp32  = fp32_in[30:23];
@@ -45,7 +45,7 @@ module fp32_to_fp16 (
   logic        round_up;  // RNE round-up decision
   logic [10:0] mant16_rounded;  // 11-bit after rounding (may carry into exp)
 
-  assign exp16_base     = 5'(exp32 - 8'(EXP_BIAS_DIFF));
+  assign exp16_base     = (exp32 - (EXP_BIAS_DIFF));
   assign mant16_base    = mant32[22:13];
   assign round_bit      = mant32[12];
   assign sticky         = (mant32[11:0] != 12'h0);
@@ -53,7 +53,7 @@ module fp32_to_fp16 (
   assign round_up       = round_bit & (sticky | lsb);
   assign mant16_rounded = {1'b0, mant16_base} + (round_up ? 11'h1 : 11'h0);
 
-  always_comb begin
+  always @* begin
     if (exp32 == 8'hFF) begin
       // NaN or Infinity
       if (mant32 == 23'h0) fp16_out = {sign, 5'h1F, 10'h0};  // Infinity
@@ -61,17 +61,17 @@ module fp32_to_fp16 (
     end else if (exp32 == 8'h00) begin
       // fp32 zero or subnormal — flush to fp16 zero
       fp16_out = {sign, 15'h0};
-    end else if (exp32 > 8'(FP32_OVF_EXP)) begin
+    end else if (exp32 > (FP32_OVF_EXP)) begin
       // Overflow → fp16 infinity
       fp16_out = {sign, 5'h1F, 10'h0};
-    end else if (exp32 < 8'(FP32_UNF_EXP)) begin
+    end else if (exp32 < (FP32_UNF_EXP)) begin
       // Underflow → fp16 zero (flush-to-zero)
       fp16_out = {sign, 15'h0};
     end else begin
       // Normal range: exp32 in [FP32_UNF_EXP, FP32_OVF_EXP] → exp16 in [1, FP16_MAX_EXP]
       if (mant16_rounded[10]) begin
         // Rounding caused mantissa overflow — increment exponent
-        if (exp16_base == 5'(FP16_MAX_EXP))
+        if (exp16_base == (FP16_MAX_EXP))
           fp16_out = {sign, 5'h1F, 10'h0};  // rounds up to infinity
         else fp16_out = {sign, (exp16_base + 5'h1), 10'h0};
       end else begin

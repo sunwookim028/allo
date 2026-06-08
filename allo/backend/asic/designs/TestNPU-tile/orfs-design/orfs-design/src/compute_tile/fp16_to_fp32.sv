@@ -16,12 +16,12 @@ module fp16_to_fp32 (
   logic [9:0] mant16;
 
   // Exponent bias constants — both derived from IEEE 754 field widths.
-  localparam int unsigned FP32_EXP_BIAS = 127;
-  localparam int unsigned FP16_EXP_BIAS = 15;
+  localparam FP32_EXP_BIAS = 127;
+  localparam FP16_EXP_BIAS = 15;
   // exp16 + (FP32_EXP_BIAS - FP16_EXP_BIAS) = exp16 + 112 gives the fp32 biased exponent.
-  localparam int unsigned EXP_BIAS_DIFF = FP32_EXP_BIAS - FP16_EXP_BIAS;
+  localparam EXP_BIAS_DIFF = FP32_EXP_BIAS - FP16_EXP_BIAS;
   // fp32 mantissa pads 13 zero bits below the fp16 mantissa: fp32(23b) - fp16(10b) = 13.
-  localparam int unsigned FP32_MANT_PAD = 23 - 10;
+  localparam FP32_MANT_PAD = 23 - 10;
 
   assign sign   = fp16_in[15];
   assign exp16  = fp16_in[14:10];
@@ -33,7 +33,7 @@ module fp16_to_fp32 (
   logic [7:0] sub_exp;  // fp32 exponent for the normalised subnormal
 
   // Leading-zero count via priority encoder
-  always_comb begin
+  always @* begin
     if (mant16[9]) lz = 4'd0;
     else if (mant16[8]) lz = 4'd1;
     else if (mant16[7]) lz = 4'd2;
@@ -52,9 +52,9 @@ module fp16_to_fp32 (
   // Leading 1 is at bit (9-lz), so value = 2^(-14) × 2^(9-lz) / 1024 × (1+frac)
   //                                       = 2^(-15-lz) × (1+frac).
   // fp32 biased exp = (-15 - lz) + 127 = EXP_BIAS_DIFF - lz.
-  assign sub_exp   = 8'(EXP_BIAS_DIFF) - {4'h0, lz};
+  assign sub_exp   = (EXP_BIAS_DIFF) - {4'h0, lz};
 
-  always_comb begin
+  always @* begin
     if (exp16 == 5'h1F) begin
       // Infinity or NaN
       if (mant16 == 10'h0) fp32_out = {sign, 8'hFF, 23'h0};  // Infinity
@@ -68,7 +68,7 @@ module fp16_to_fp32 (
         };
     end else begin
       // Normal: fp32_exp = fp16_exp + EXP_BIAS_DIFF  (127 - 15 = 112)
-      fp32_out = {sign, (8'(exp16) + 8'(EXP_BIAS_DIFF)), mant16, {FP32_MANT_PAD{1'b0}}};
+      fp32_out = {sign, ((exp16) + (EXP_BIAS_DIFF)), mant16, {FP32_MANT_PAD{1'b0}}};
     end
   end
 

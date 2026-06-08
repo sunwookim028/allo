@@ -16,9 +16,9 @@ module fp32_rsqrt (
     input  logic [31:0] x,
     output logic [31:0] result
 );
-  localparam logic [31:0] HALF = 32'h3F000000;  // 0.5
-  localparam logic [31:0] ONEHALF = 32'h3FC00000;  // 1.5
-  localparam logic [31:0] QNAN = 32'hFFC00000;  // quiet NaN
+  localparam [31:0] HALF = 32'h3F000000;  // 0.5
+  localparam [31:0] ONEHALF = 32'h3FC00000;  // 1.5
+  localparam [31:0] QNAN = 32'hFFC00000;  // quiet NaN
 
   logic x_nan, x_inf, x_neg_or_zero;
   assign x_nan         = (&x[30:23]) & (|x[22:0]);
@@ -99,7 +99,7 @@ module fp32_rsqrt (
       .result(y2)
   );
 
-  always_comb begin
+  always @* begin
     if (x_nan || x_neg_or_zero) result = QNAN;
     else if (x_inf) result = 32'h00000000;  // 1/sqrt(Inf) = 0
     else result = y2;

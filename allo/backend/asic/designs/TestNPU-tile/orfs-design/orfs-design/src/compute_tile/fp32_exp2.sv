@@ -73,7 +73,7 @@ module fp32_exp2 (
   // move all integer bits off the top; remaining bits are fractional, left-aligned.
   // Valid only for 0 ≤ E < 23.
   logic [4:0] frac_shift;
-  always_comb begin
+  always @* begin
     if (xE < 9'sd0) frac_shift = 5'd0;
     else if (xE >= 9'sd23) frac_shift = 5'd23;
     else frac_shift = xE[4:0] + 5'd1;
@@ -91,12 +91,12 @@ module fp32_exp2 (
 
   // Integer magnitude |n| for positive x or ceil(|x|) for negative non-integer.
   logic [7:0] n_abs;
-  always_comb begin
+  always @* begin
     if (x_zero || xE < 9'sd0) n_abs = 8'd0;
     else if (xE >= 9'sd7) n_abs = 8'd127;  // clamped (handled by ovf/unf)
     else begin
       // integer bits = top (xE+1) bits of full_mant → shift right by (23-xE)
-      n_abs = 8'(full_mant >> (5'd23 - xE[4:0]));
+      n_abs = (full_mant >> (5'd23 - xE[4:0]));
     end
   end
 
@@ -105,7 +105,7 @@ module fp32_exp2 (
   //   positive zero / xE<0 : n = 0
   //   negative integer   : n = −n_abs
   //   negative non-integer: n = −(n_abs + 1)  (floor rounds toward −∞)
-  always_comb begin
+  always @* begin
     if (x_zero) n_int = 9'sd0;
     else if (!xs) begin  // positive
       n_int = {1'b0, n_abs};
@@ -130,9 +130,9 @@ module fp32_exp2 (
   logic [31:0] float_n;
 
   assign fn_sign = n_int[8];  // sign bit of 9-bit signed
-  assign fn_abs  = fn_sign ? 8'(-n_int) : 8'(n_int);
+  assign fn_abs  = fn_sign ? (-n_int) : (n_int);
 
-  always_comb begin
+  always @* begin
     casez (fn_abs)
       8'b1???????: fn_msb = 3'd7;
       8'b01??????: fn_msb = 3'd6;
@@ -147,7 +147,7 @@ module fp32_exp2 (
 
   logic [7:0] fn_mask;
   assign fn_mask = (8'h01 << fn_msb) - 8'h01;  // bits below leading 1
-  assign fn_mant = 23'(fn_abs & fn_mask) << (5'd23 - {2'b0, fn_msb});
+  assign fn_mant = (fn_abs & fn_mask) << (5'd23 - {2'b0, fn_msb});
   assign fn_exp  = 8'd127 + {5'd0, fn_msb};
   assign float_n = (n_int == 9'sd0) ? 32'h0 : {fn_sign, fn_exp, fn_mant};
 
@@ -179,13 +179,13 @@ module fp32_exp2 (
   // Max polynomial truncation error < 1.5e-5, well below rtol=1e-4.
   // Horner inner-to-outer: start from c6.
   // ------------------------------------------------------------------ //
-  localparam logic [31:0] C0 = 32'h3F800000;  // 1.0
-  localparam logic [31:0] C1 = 32'h3F317218;  // 0.693147
-  localparam logic [31:0] C2 = 32'h3E75FDF0;  // 0.240227
-  localparam logic [31:0] C3 = 32'h3D634247;  // 0.055504
-  localparam logic [31:0] C4 = 32'h3C1D9E88;  // 0.009618
-  localparam logic [31:0] C5 = 32'h3AAEC42B;  // 0.001333
-  localparam logic [31:0] C6 = 32'h39216A85;  // 0.000154
+  localparam [31:0] C0 = 32'h3F800000;  // 1.0
+  localparam [31:0] C1 = 32'h3F317218;  // 0.693147
+  localparam [31:0] C2 = 32'h3E75FDF0;  // 0.240227
+  localparam [31:0] C3 = 32'h3D634247;  // 0.055504
+  localparam [31:0] C4 = 32'h3C1D9E88;  // 0.009618
+  localparam [31:0] C5 = 32'h3AAEC42B;  // 0.001333
+  localparam [31:0] C6 = 32'h39216A85;  // 0.000154
 
   // h5 = c6*f + c5  (innermost, new)
   logic [31:0] h5_mul, h5;
@@ -299,7 +299,7 @@ module fp32_exp2 (
   // ------------------------------------------------------------------ //
   logic [7:0] res_exp_raw;
   logic       p_rounded_up;
-  assign res_exp_raw  = 8'(n_int + 9'sd127);
+  assign res_exp_raw  = (n_int + 9'sd127);
   assign p_rounded_up = (p[30:23] == 8'd128);  // 2.0 due to rounding
 
   logic [7:0] res_exp;
@@ -309,7 +309,7 @@ module fp32_exp2 (
   assign res_mant = p_rounded_up ? 23'h0 : p[22:0];
 
   // Final mux with special cases
-  always_comb begin
+  always @* begin
     if (x_nan) result = {1'b0, 8'hFF, 1'b1, xm[21:0]};  // quiet NaN
     else if (x_pinf) result = 32'h7F800000;  // +Inf
     else if (ovf) result = 32'h7F800000;  // overflow → +Inf

@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 
 module pe #(
-    parameter int          DATA_WIDTH = 32,
-    parameter int unsigned LATENCY    = 0
+    parameter          DATA_WIDTH = 32,
+    parameter LATENCY    = 0
 ) (
     input logic clk,
     input logic rst_n,
@@ -69,7 +69,7 @@ module pe #(
   // mult_out_reg adds 1 explicit pipeline stage (Fix 10); pe_valid_out is
   // one cycle ahead of pe_psum_out by design (mxu.sv PE_LAT += 1 accounts).
   // ------------------------------------------------------------------------
-  localparam int SR_DEPTH = 2 * LATENCY;
+  localparam SR_DEPTH = 2 * LATENCY;
 
   logic        valid_sr [SR_DEPTH+1];
   logic        switch_sr[SR_DEPTH+1];
@@ -82,7 +82,7 @@ module pe #(
   generate
     if (SR_DEPTH > 0) begin : gen_sr_block
       for (genvar i = 1; i <= SR_DEPTH; i++) begin : gen_sr
-        always_ff @(posedge clk or negedge rst_n) begin
+        always @(posedge clk or negedge rst_n) begin
           if (!rst_n) begin
             valid_sr[i]  <= 1'b0;
             switch_sr[i] <= 1'b0;
@@ -101,7 +101,7 @@ module pe #(
   // Sequential control + register updates
   // ASIC FIX: Separated async reset from sync enable (pe_enabled)
   // ------------------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       // Async reset only
       pe_input_out        <= '0;

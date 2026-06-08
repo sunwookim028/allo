@@ -59,7 +59,7 @@ module fp16_mul_fp32 (
   //   +1 when mant_prod[21]=1 (product ≥ 2.0, needs renormalisation → +98).
   logic [7:0] exp_sum;
 
-  always_comb begin
+  always @* begin
     result  = 32'h0;
     exp_sum = 8'h0;
 

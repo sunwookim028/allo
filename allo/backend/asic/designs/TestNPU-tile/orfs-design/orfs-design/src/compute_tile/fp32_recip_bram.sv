@@ -1075,7 +1075,7 @@ module fp32_recip_bram (
   logic [ 7:0] res_exp_r;
   logic x_nan_r, x_inf_r, x_zero_r;
 
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     rom_out_r <= rom[lut_addr];
     xs_r      <= xs;
     res_exp_r <= res_exp;
@@ -1085,8 +1085,8 @@ module fp32_recip_bram (
   end
 
   // ── Assembly ──────────────────────────────────────────────────────────────
-  localparam logic [31:0] QNAN = 32'hFFC00000;
-  always_comb begin
+  localparam [31:0] QNAN = 32'hFFC00000;
+  always @* begin
     if (x_nan_r) result = QNAN;
     else if (x_inf_r) result = {xs_r, 31'h0};  // ±Inf → ±0
     else if (x_zero_r) result = {xs_r, 8'hFF, 23'h0};  // ±0 → ±Inf

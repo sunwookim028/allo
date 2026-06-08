@@ -35,7 +35,7 @@ module vpu
 
     output logic done
 );
-  localparam int NUM_LANES = L1_DATA_WIDTH / DATA_WIDTH;
+  localparam NUM_LANES = L1_DATA_WIDTH / DATA_WIDTH;
 
   // SIMD internal signals
   logic start_simd;
@@ -152,7 +152,7 @@ module vpu
   );
 
   // FSM
-  always_ff @(posedge clk or negedge rst_n) begin
+  always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state <= IDLE;
       bram_en_simd <= 1'b0;
