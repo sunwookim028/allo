@@ -44,3 +44,5 @@ export TNS_END_PERCENT        = 100
 export REMOVE_CELLS_FOR_EQY   = TAPCELL*
 
 export SYNTH_ARGS = -noshare
+export SYNTH_MEMORY_MAX_BITS = 70000
+export SYNTH_MOCK_LARGE_MEMORIES = 1

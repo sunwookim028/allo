@@ -1,0 +1,13 @@
+#=========================================================================
+# ORFS Common Helpers
+#=========================================================================
+
+name: orfs-common
+
+outputs:
+  - orfs-checkpoint.py
+
+commands:
+  - cp prune-orfs-checkpoint.py outputs/orfs-checkpoint.py
+
+parameters: {}

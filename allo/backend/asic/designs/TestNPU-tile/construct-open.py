@@ -31,14 +31,20 @@ def construct():
     'adk_view'       : adk_view,
     # Pick an image from Docker Hub "mflowgen/openroad-flow-scripts-base"
     # - https://hub.docker.com/repository/docker/mflowgen/openroad-flow-scripts-base/general
-    'orfs_image'     : 'mflowgen/openroad-flow-scripts-base:2024-0621-f0caba6',
+    #'orfs_image'     : 'mflowgen/openroad-flow-scripts-base:2024-0621-f0caba6',
+    'orfs_image'     : 'openroad/orfs:26Q2-436-geb14d768b',
+
+    'orfs_prune_checkpoints' : 1,
+    'orfs_delete_flow_dir'   : 1,
   }
 
   #-----------------------------------------------------------------------
   # Create nodes
   #-----------------------------------------------------------------------
 
-  this_dir = os.path.dirname( os.path.abspath( __file__ ) )
+  this_dir  = os.path.dirname( os.path.abspath( __file__ ) )
+  asic_dir  = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  nodes_dir = os.path.join(asic_dir, "nodes")
 
   # ADK node
 
@@ -49,21 +55,22 @@ def construct():
 
   design = Node( this_dir + '/orfs-design' )
 
-  # Default nodes
+  # (modified) Default nodes
 
-  info   = Node( 'info',                    default=True )
-  docker = Node( 'orfs-docker-setup',       default=True)
-  synth  = Node( 'orfs-yosys-synthesis',    default=True)
-  fplan  = Node( 'orfs-openroad-floorplan', default=True)
-  place  = Node( 'orfs-openroad-place',     default=True)
-  cts    = Node( 'orfs-openroad-cts',       default=True)
-  route  = Node( 'orfs-openroad-route',     default=True)
-  finish = Node( 'orfs-openroad-finish',    default=True)
+  common = Node( os.path.join(nodes_dir, 'orfs-common') )
+  docker = Node( os.path.join(nodes_dir, 'orfs-docker-setup') )
+  synth  = Node( os.path.join(nodes_dir, 'orfs-yosys-synthesis') )
+  fplan  = Node( os.path.join(nodes_dir, 'orfs-openroad-floorplan') )
+  place  = Node( os.path.join(nodes_dir, 'orfs-openroad-place') )
+  cts    = Node( os.path.join(nodes_dir, 'orfs-openroad-cts') )
+  route  = Node( os.path.join(nodes_dir, 'orfs-openroad-route') )
+  finish = Node( os.path.join(nodes_dir, 'orfs-openroad-finish') )
 
   #-----------------------------------------------------------------------
   # Graph -- Add nodes
   #-----------------------------------------------------------------------
 
+  g.add_node( common   )
   g.add_node( info     )
   g.add_node( design   )
   g.add_node( docker   )
@@ -86,6 +93,13 @@ def construct():
   g.connect_by_name( docker,  cts    )
   g.connect_by_name( docker,  route  )
   g.connect_by_name( docker,  finish )
+
+  g.connect_by_name( common, synth  )
+  g.connect_by_name( common, fplan  )
+  g.connect_by_name( common, place  )
+  g.connect_by_name( common, cts    )
+  g.connect_by_name( common, route  )
+  g.connect_by_name( common, finish )
 
   g.connect_by_name( synth,   fplan  )
   g.connect_by_name( fplan,   place  )
