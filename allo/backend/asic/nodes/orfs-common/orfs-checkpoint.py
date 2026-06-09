@@ -104,6 +104,52 @@ def prune_intermediate_odbs(flow_dir: Path, platform: str, design: str, variant:
     print(f"[orfs-checkpoint] Deleted approximately: {human_size(deleted_bytes)}")
     print(f"[orfs-checkpoint] Size after pruning: {human_size(after)}")
 
+def prune_static_orfs_dirs(flow_dir: Path, platform: str, design: str, dry_run: bool) -> None:
+    """
+    Remove bulky static ORFS collateral from the checkpoint while keeping the
+    current design's config and RTL. This assumes later nodes restore by
+    overlaying onto a fresh Docker image's /OpenROAD-flow-scripts/flow.
+    """
+    keep_design_platform = flow_dir / "designs" / platform / design
+    keep_design_src = flow_dir / "designs" / "src" / design
+
+    tmp_keep = flow_dir / ".checkpoint_keep"
+    tmp_platform_design = tmp_keep / "designs" / platform / design
+    tmp_src_design = tmp_keep / "designs" / "src" / design
+
+    print("[orfs-checkpoint] Pruning static ORFS designs/platforms")
+    print(f"[orfs-checkpoint] Keeping design config: {keep_design_platform}")
+    print(f"[orfs-checkpoint] Keeping design RTL:    {keep_design_src}")
+
+    if dry_run:
+        print("[orfs-checkpoint] Dry run: not pruning static ORFS directories")
+        return
+
+    if tmp_keep.exists():
+        shutil.rmtree(tmp_keep)
+
+    if keep_design_platform.exists():
+        tmp_platform_design.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(keep_design_platform, tmp_platform_design, symlinks=True)
+    else:
+        print(f"[orfs-checkpoint] WARNING: missing expected design config dir: {keep_design_platform}")
+
+    if keep_design_src.exists():
+        tmp_src_design.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(keep_design_src, tmp_src_design, symlinks=True)
+    else:
+        print(f"[orfs-checkpoint] WARNING: missing expected design RTL dir: {keep_design_src}")
+
+    for dirname in ["designs", "platforms"]:
+        path = flow_dir / dirname
+        if path.exists():
+            print(f"[orfs-checkpoint] Removing {path} ({human_size(dir_size(path))})")
+            shutil.rmtree(path)
+
+    if (tmp_keep / "designs").exists():
+        shutil.copytree(tmp_keep / "designs", flow_dir / "designs", symlinks=True)
+
+    shutil.rmtree(tmp_keep, ignore_errors=True)
 
 def create_checkpoint(flow_dir: Path, checkpoint: Path, dry_run: bool) -> None:
     if not flow_dir.exists():
@@ -164,6 +210,7 @@ def main() -> int:
     parser.add_argument("--delete-flow", default="0")
 
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--prune-static", default="0")
 
     args = parser.parse_args()
 
@@ -181,6 +228,16 @@ def main() -> int:
     else:
         print(f"[orfs-checkpoint] Skipping ODB pruning because --prune={args.prune}")
 
+    if truthy(args.prune_static):
+        prune_static_orfs_dirs(
+            flow_dir=flow_dir,
+            platform=args.platform,
+            design=args.design,
+            dry_run=args.dry_run,
+        )
+    else:
+        print(f"[orfs-checkpoint] Skipping static ORFS pruning because --prune-static={args.prune_static}")
+    
     create_checkpoint(
         flow_dir=flow_dir,
         checkpoint=checkpoint,

@@ -36,6 +36,7 @@ def construct():
 
     'orfs_prune_checkpoints' : 1,
     'orfs_delete_flow_dir'   : 1,
+    'orfs_prune_static' : 1,
   }
 
   #-----------------------------------------------------------------------
@@ -57,6 +58,7 @@ def construct():
 
   # (modified) Default nodes
 
+  info   = Node( 'info',                  default=True )
   common = Node( os.path.join(nodes_dir, 'orfs-common') )
   docker = Node( os.path.join(nodes_dir, 'orfs-docker-setup') )
   synth  = Node( os.path.join(nodes_dir, 'orfs-yosys-synthesis') )
