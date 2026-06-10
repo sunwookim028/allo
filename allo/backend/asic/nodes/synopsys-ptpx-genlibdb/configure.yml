@@ -1,0 +1,66 @@
+#=========================================================================
+# Synopsys PTPX -- Generate .lib, then compile .db with DC
+#=========================================================================
+
+name: synopsys-ptpx-genlibdb
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+inputs:
+  - adk
+  - design.vcs.v
+  - design.spef.gz
+  - design.pt.sdc
+
+outputs:
+  - design.lib
+  - design.db
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - mkdir -p logs
+  - pt_shell -file START.tcl -output_log_file logs/pt.log
+  - dc_shell-xg-t -64bit -output_log_file logs/lib2db.log -f scripts/lib2db.tcl
+  - mkdir -p outputs
+  - ln -sf ../${design_name}.db  outputs/design.db
+  - ln -sf ../${design_name}.lib outputs/design.lib
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  order:
+    - read_design.tcl
+    - extract_model.tcl
+    - write-interface-timing.tcl
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+
+  - assert Tool( 'pt_shell' )                # tool check
+  - assert Tool( 'dc_shell-xg-t' )           # tool check
+  - assert File( 'inputs/adk' )              # must exist
+  - assert File( 'inputs/design.vcs.v' )     # must exist
+  - assert File( 'inputs/design.pt.sdc' )    # must exist
+# - assert File( 'inputs/design.spef.gz' )   # spef is optional
+
+postconditions:
+
+  - assert File( 'outputs/design.lib' )      # must exist
+  - assert File( 'outputs/design.db' )       # must exist
+
+  # Basic error checking
+
+  - assert 'Error:' not in File( 'logs/pt.log' )
+  - assert 'Unresolved references' not in File( 'logs/pt.log' )
+  - assert 'Unable to resolve' not in File( 'logs/pt.log' )

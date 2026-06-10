@@ -47,7 +47,9 @@ def construct():
   # Create nodes
   #-----------------------------------------------------------------------
 
-  this_dir = os.path.dirname( os.path.abspath( __file__ ) )
+  this_dir  = os.path.dirname( os.path.abspath( __file__ ) )
+  asic_dir  = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  nodes_dir = os.path.join(asic_dir, "nodes")
 
   # ADK node
 
@@ -62,28 +64,26 @@ def construct():
 
   # Default nodes
 
-  info           = Node( 'info',                            default=True )
-  synth          = Node( 'synopsys-dc-synthesis',           default=True )
-#  synth          = Node( 'cadence-genus-synthesis',         default=True )
-  iflow          = Node( 'cadence-innovus-flowsetup',       default=True )
-  init           = Node( 'cadence-innovus-init',            default=True )
-  power          = Node( 'cadence-innovus-power',           default=True )
-  place          = Node( 'cadence-innovus-place',           default=True )
-  cts            = Node( 'cadence-innovus-cts',             default=True )
-  postcts_hold   = Node( 'cadence-innovus-postcts_hold',    default=True )
-  route          = Node( 'cadence-innovus-route',           default=True )
-  postroute      = Node( 'cadence-innovus-postroute',       default=True )
-  postroute_hold = Node( 'cadence-innovus-postroute_hold',  default=True )
-  signoff        = Node( 'cadence-innovus-signoff',         default=True )
-  pt_signoff     = Node( 'synopsys-pt-timing-signoff',      default=True )
-  genlibdb       = Node( 'synopsys-ptpx-genlibdb',          default=True )
-  gdsmerge       = Node( 'mentor-calibre-gdsmerge',         default=True )
-  drc            = Node( 'mentor-calibre-drc',              default=True )
-  lvs            = Node( 'mentor-calibre-lvs',              default=True )
-  debugcalibre   = Node( 'cadence-innovus-debug-calibre',   default=True )
-  vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True )
-  power_est      = Node( 'synopsys-pt-power',               default=True )
-  fm             = Node( 'synopsys-formality-verification', default=True )
+  info           = Node( 'info',                            default=True  )
+  synth          = Node( 'synopsys-dc-synthesis',           default=True  )
+  iflow          = Node( 'cadence-innovus-flowsetup',       default=True  )
+  init           = Node( 'cadence-innovus-init',            default=True  )
+  power          = Node( 'cadence-innovus-power',           default=True  )
+  place          = Node( 'cadence-innovus-place',           default=True  )
+  cts            = Node( 'cadence-innovus-cts',             default=True  )
+  postcts_hold   = Node( 'cadence-innovus-postcts_hold',    default=True  )
+  route          = Node( 'cadence-innovus-route',           default=True  )
+  postroute_hold = Node( 'cadence-innovus-postroute_hold',  default=True  )
+  signoff        = Node( 'cadence-innovus-signoff',         default=True  )
+  pt_signoff     = Node( 'synopsys-pt-timing-signoff',      default=True  )
+  genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb'))
+  gdsmerge       = Node( 'mentor-calibre-gdsmerge',         default=True  )
+  drc            = Node( 'mentor-calibre-drc',              default=True  )
+  lvs            = Node( 'mentor-calibre-lvs',              default=True  )
+  debugcalibre   = Node( 'cadence-innovus-debug-calibre',   default=True  )
+  vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True  )
+  power_est      = Node( 'synopsys-pt-power',               default=True  )
+  fm             = Node( 'synopsys-formality-verification', default=True  )
 
   #-----------------------------------------------------------------------
   # Modify Nodes
@@ -112,7 +112,6 @@ def construct():
   g.add_node( cts               )
   g.add_node( postcts_hold      )
   g.add_node( route             )
-  g.add_node( postroute         )
   g.add_node( postroute_hold    )
   g.add_node( signoff           )
   g.add_node( pt_signoff        )
@@ -141,7 +140,6 @@ def construct():
   g.connect_by_name( adk,            cts            )
   g.connect_by_name( adk,            postcts_hold   )
   g.connect_by_name( adk,            route          )
-  g.connect_by_name( adk,            postroute      )
   g.connect_by_name( adk,            postroute_hold )
   g.connect_by_name( adk,            signoff        )
   g.connect_by_name( adk,            pt_signoff     )
@@ -165,7 +163,6 @@ def construct():
   g.connect_by_name( iflow,          cts            )
   g.connect_by_name( iflow,          postcts_hold   )
   g.connect_by_name( iflow,          route          )
-  g.connect_by_name( iflow,          postroute      )
   g.connect_by_name( iflow,          postroute_hold )
   g.connect_by_name( iflow,          signoff        )
 
@@ -174,8 +171,7 @@ def construct():
   g.connect_by_name( place,          cts            )
   g.connect_by_name( cts,            postcts_hold   )
   g.connect_by_name( postcts_hold,   route          )
-  g.connect_by_name( route,          postroute      )
-  g.connect_by_name( postroute,      postroute_hold )
+  g.connect_by_name( route,          postroute_hold )
   g.connect_by_name( postroute_hold, signoff        )
 
   g.connect_by_name( signoff,        pt_signoff     )

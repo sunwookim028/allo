@@ -40,16 +40,18 @@ commands:
   # Execute
   - echo -e "\n- Executing flow commands inside orfs docker container -- $CONTAINER\n"
   - docker exec $CONTAINER bash -c "cd flow && make finish DESIGN_CONFIG=./designs/$orfs_platform/$design_name/config.mk"
-  # Post -- Get the flow snapshot data out of the docker container
-  - echo -e "\n- Moving flow checkpoint out of orfs docker container -- $CONTAINER\n"
-  - docker cp -a $CONTAINER:/OpenROAD-flow-scripts/flow .
+  # Post -- Prune and create checkpoint inside the docker container
+  - echo -e "\n- Managing ORFS checkpoint inside docker container -- $CONTAINER\n"
+  - docker cp -aL inputs/orfs-checkpoint.py $CONTAINER:/OpenROAD-flow-scripts/orfs-checkpoint.py
+  - docker exec $CONTAINER bash -c "cd /OpenROAD-flow-scripts && python3 orfs-checkpoint.py --flow flow --checkpoint flow-checkpoint.tar.gz --platform \"$orfs_platform\" --design \"$design_name\" --prune \"$orfs_prune_checkpoints\" --delete-flow 0 --prune-static \"$orfs_prune_static\""
+  # Post -- Copy only the pruned checkpoint back to the host
+  - echo -e "\n- Moving pruned flow checkpoint out of orfs docker container -- $CONTAINER\n"
+  - docker cp -a $CONTAINER:/OpenROAD-flow-scripts/flow-checkpoint.tar.gz .
   # Post -- Remove containers and images
   - echo -e "\n- Cleaning up docker containers and images\n"
   - docker rm -f $CONTAINER
 #  - docker rmi $orfs_image # Comment this out for performance
-  # Post -- Manage ORFS checkpoint
-  - echo -e "\n- Managing ORFS checkpoint\n"
-  - python inputs/orfs-checkpoint.py --flow flow --checkpoint flow-checkpoint.tar.gz --platform "$orfs_platform" --design "$design_name" --prune "$orfs_prune_checkpoints" --delete-flow "$orfs_delete_flow_dir" --prune-static "$orfs_prune_static"
+  # Post -- Produce output symlink
   - cd outputs && ln -sf ../flow-checkpoint.tar.gz
 
 #-------------------------------------------------------------------------
