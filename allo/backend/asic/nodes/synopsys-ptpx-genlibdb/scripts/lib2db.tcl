@@ -11,9 +11,9 @@
 # Extract db model
 #-------------------------------------------------------------------------
 
-enable_write_lib_mode
+set design_name $::env(design_name)
 
-read_lib ${::env(design_name)}.lib
-write_lib -format db $::env(design_name) -output ${::env(design_name)}.db
+read_lib ${design_name}.lib
+write_lib -format db $design_name -output ${design_name}.db
 
 exit

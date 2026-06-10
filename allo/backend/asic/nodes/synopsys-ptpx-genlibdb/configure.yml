@@ -25,10 +25,13 @@ outputs:
 commands:
   - mkdir -p logs
   - pt_shell -file START.tcl -output_log_file logs/pt.log
-  - dc_shell-xg-t -64bit -output_log_file logs/lib2db.log -f scripts/lib2db.tcl
+  - lc_shell -f scripts/lib2db.tcl | tee logs/lib2db.log
   - mkdir -p outputs
-  - ln -sf ../${design_name}.db  outputs/design.db
-  - ln -sf ../${design_name}.lib outputs/design.lib
+  - ln -sf ../{design_name}.db  outputs/design.db
+  - ln -sf ../{design_name}.lib outputs/design.lib
+
+#  - ln -sf ../*.db  design.db
+#  - ln -sf ../*.lib design.lib
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -48,7 +51,7 @@ parameters:
 preconditions:
 
   - assert Tool( 'pt_shell' )                # tool check
-  - assert Tool( 'dc_shell-xg-t' )           # tool check
+  - assert Tool( 'lc_shell' )                # tool check
   - assert File( 'inputs/adk' )              # must exist
   - assert File( 'inputs/design.vcs.v' )     # must exist
   - assert File( 'inputs/design.pt.sdc' )    # must exist
