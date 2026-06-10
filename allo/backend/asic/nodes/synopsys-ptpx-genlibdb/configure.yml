@@ -1,5 +1,5 @@
 #=========================================================================
-# Synopsys PTPX -- Generate .lib, then compile .db with DC
+# Synopsys PTPX -- Generate .lib, then compile .db with LC
 #=========================================================================
 
 name: synopsys-ptpx-genlibdb

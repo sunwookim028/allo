@@ -83,7 +83,6 @@ def construct():
   debugcalibre   = Node( 'cadence-innovus-debug-calibre',   default=True  )
   vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True  )
   power_est      = Node( 'synopsys-pt-power',               default=True  )
-  fm             = Node( 'synopsys-formality-verification', default=True  )
 
   #-----------------------------------------------------------------------
   # Modify Nodes
@@ -91,11 +90,6 @@ def construct():
 
   vcs_sim.extend_inputs( ['test_vectors.txt'] )
   vcs_sim.update_params( testbench.params() )
-
-  verif_post_synth = fm.clone()
-  verif_post_synth.set_name( 'verif_post_synth' )
-  verif_post_layout = fm.clone()
-  verif_post_layout.set_name( 'verif_post_layout' )
 
   #-----------------------------------------------------------------------
   # Graph -- Add nodes
@@ -123,8 +117,6 @@ def construct():
   g.add_node( testbench         )
   g.add_node( vcs_sim           )
   g.add_node( power_est         )
-  g.add_node( verif_post_synth  )
-  g.add_node( verif_post_layout )
 
   #-----------------------------------------------------------------------
   # Graph -- Add edges
@@ -197,16 +189,6 @@ def construct():
   g.connect_by_name( adk,            power_est      )
   g.connect_by_name( signoff,        power_est      )
   g.connect_by_name( vcs_sim,        power_est      )
-
-  g.connect_by_name( adk,            verif_post_synth )
-  g.connect_by_name( synth,          verif_post_synth )
-  g.connect( rtl.o('design.v'),      verif_post_synth.i('design.ref.v') )
-  g.connect( synth.o('design.v'),    verif_post_synth.i('design.impl.v') )
-
-  g.connect_by_name( adk,            verif_post_layout )
-  g.connect_by_name( synth,          verif_post_layout )
-  g.connect( synth.o('design.v'),    verif_post_layout.i('design.ref.v') )
-  g.connect( signoff.o('design.lvs.v'), verif_post_layout.i('design.impl.v') )
 
   #-----------------------------------------------------------------------
   # Parameterize
