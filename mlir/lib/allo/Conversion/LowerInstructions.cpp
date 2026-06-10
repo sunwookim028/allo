@@ -25,7 +25,9 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #define DEBUG_TYPE "lower-instructions"
@@ -99,7 +101,7 @@ struct SemanticsBuilder {
           return failure();
         continue;
       }
-      if (isa<arith::ConstantOp>(op)) {
+      if (isa<arith::ConstantOp, tosa::ConstOp, tosa::ConstShapeOp>(op)) {
         b.clone(op, mapping);
         continue;
       }
@@ -115,6 +117,15 @@ struct SemanticsBuilder {
       }
       if (isa<arith::ArithDialect, math::MathDialect>(op.getDialect())) {
         if (failed(buildArithLikeOp(&op, newOperands)))
+          return failure();
+        continue;
+      }
+      // Value-semantics ops (TOSA: add/mul/clamp/matmul/reshape/...) infer their
+      // result types from the (re-materialized) operands + attributes — no DPS
+      // init, no tensor.empty, and shape-changing ops (matmul, conv) work the
+      // same as elementwise. This is the op-general inference path.
+      if (auto shapeIface = dyn_cast<InferShapedTypeOpInterface>(op)) {
+        if (failed(buildInferredOp(shapeIface, newOperands)))
           return failure();
         continue;
       }
@@ -199,6 +210,30 @@ private:
     Region &newRegion = newOp->getRegion(0);
     Region &oldRegion = op->getRegion(0);
     b.cloneRegionBefore(oldRegion, newRegion, newRegion.end(), mapping);
+    return success();
+  }
+
+  // Rebuild an op that infers its result types from operands+attrs via the
+  // InferShapedTypeOpInterface (TOSA). Operands are the re-materialized slices,
+  // so the inferred shapes reflect the actual emit-site sizes.
+  LogicalResult buildInferredOp(InferShapedTypeOpInterface iface,
+                                ArrayRef<Value> newOperands) const {
+    Operation *op = iface.getOperation();
+    SmallVector<ShapedTypeComponents> components;
+    if (failed(iface.inferReturnTypeComponents(
+            op->getContext(), op->getLoc(), ValueRange(newOperands),
+            op->getDiscardableAttrDictionary(), op->getPropertiesStorage(),
+            op->getRegions(), components)))
+      return op->emitError() << "failed to infer result types";
+    SmallVector<Type, 4> resultTys;
+    for (auto [comp, oldTy] : llvm::zip_equal(components, op->getResultTypes())) {
+      Type elt = cast<ShapedType>(oldTy).getElementType();
+      if (comp.hasRank())
+        resultTys.push_back(RankedTensorType::get(comp.getDims(), elt));
+      else
+        resultTys.push_back(oldTy);
+    }
+    buildTrivialOp(op, newOperands, resultTys, op->getAttrs());
     return success();
   }
 
@@ -461,7 +496,7 @@ struct LowerInstructionsPass
                         linalg::ContractOp, linalg::SoftmaxOp, linalg::MatmulOp,
                         linalg::BatchMatmulOp, linalg::AddOp, linalg::SubOp,
                         linalg::MulOp, linalg::BroadcastOp>();
-      target.addLegalDialect<arith::ArithDialect>();
+      target.addLegalDialect<arith::ArithDialect, tosa::TosaDialect>();
       target.addIllegalOp<EmitOp>();
       RewritePatternSet patterns(ctx);
       patterns.add<ConvertEmitOpPattern>(ctx);
@@ -480,7 +515,8 @@ struct LowerInstructionsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
                     linalg::LinalgDialect, math::MathDialect,
-                    memref::MemRefDialect, tensor::TensorDialect>();
+                    memref::MemRefDialect, tensor::TensorDialect,
+                    tosa::TosaDialect>();
   }
 };
 } // namespace

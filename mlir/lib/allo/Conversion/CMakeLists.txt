@@ -20,5 +20,6 @@ add_mlir_conversion_library(MLIRAlloConversion
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRTensorDialect
+    MLIRTosaDialect
     MLIRTransformUtils
 )
