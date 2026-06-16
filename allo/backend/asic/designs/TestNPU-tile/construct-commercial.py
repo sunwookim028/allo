@@ -1,10 +1,9 @@
 #=========================================================================
 # construct.py
 #=========================================================================
-# Demo with 16-bit GcdUnit
+# Commercial ASIC flow for the compute_tile block
 #
-# Author : Christopher Torng
-# Date   : June 2, 2019
+# Adapted for TestNPU compute_tile
 #
 
 import os
@@ -24,7 +23,7 @@ def construct():
 
   parameters = {
     'construct_path' : __file__,
-    'design_name'    : 'GcdUnit',
+    'design_name'    : 'compute_tile',
     'clock_period'   : 2.0,
     'adk'            : adk_name,
     'adk_view'       : adk_view,
@@ -137,4 +136,3 @@ def construct():
 if __name__ == '__main__':
   g = construct()
 #  g.plot()
-

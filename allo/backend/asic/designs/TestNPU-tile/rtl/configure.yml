@@ -3,3 +3,5 @@ name: rtl
 outputs:
   - design.v
 
+commands:
+  - cat npu_config_pkg.sv npu_isa_pkg.sv vpu_pkg.sv compute_tile.sv sequencer.sv l1.sv mxu.sv systolic.sv pe.sv vpu.sv vpu_op.sv vec_regfile.sv pc.sv decoder.sv fp16_to_fp32.sv fp32_to_fp16.sv fp16_mul_fp32.sv fp32_add.sv fp32_mul.sv fp32_max.sv fp32_exp2.sv fp32_rsqrt.sv fp32_recip.sv fp32_exp2_bram.sv fp32_rsqrt_bram.sv fp32_recip_bram.sv bram_l1_data.sv bram_iram.sv > outputs/design.v
