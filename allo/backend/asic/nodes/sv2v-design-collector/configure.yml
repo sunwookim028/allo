@@ -1,0 +1,50 @@
+#=========================================================================
+# Synopsys DC Synthesis
+#=========================================================================
+# Author : Julian Bushlow
+# Date   : June 16, 2026
+#
+
+name: sv2v-design-collector
+
+#-------------------------------------------------------------------------
+# Outputs (no inputs)
+#-------------------------------------------------------------------------
+
+inputs: []
+
+outputs:
+  - design.v
+  - source-manifest.f
+  - sv2v.log
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - bash run.sh
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  design_path: undefined
+  top_level_file: undefined
+  manifest: sv2v_manifest.f
+  sv2v_include_dirs: "."
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+
+  - assert Tool( 'sv2v' )           # tool check
+
+postconditions:
+  - assert File( 'outputs/design.v' )
+  - assert File( 'outputs/source-manifest.f' )
+  - assert File( 'outputs/sv2v.log' )
