@@ -76,7 +76,11 @@ for define in $sv2v_defines; do
   args+=("-D" "$define")
 done
 
-for incdir in $sv2v_include_dirs; do
+IFS=':' read -r -a include_dirs <<< "$sv2v_include_dirs"
+
+for incdir in "${include_dirs[@]}"; do
+  [ -z "$incdir" ] && continue
+
   if [[ "$incdir" = /* ]]; then
     args+=("-I" "$incdir")
   else
@@ -85,10 +89,9 @@ for incdir in $sv2v_include_dirs; do
 done
 
 {
-  echo "Running: $sv2v_bin ${args[*]} --top $top_module -w outputs/design.v <files>"
+  echo "Running: $sv2v_bin ${args[*]} -w outputs/design.v <files>"
   "$sv2v_bin" \
     "${args[@]}" \
-    --top "$top_module" \
     -w outputs/design.v \
     "${files[@]}"
 } > outputs/sv2v.log 2>&1
@@ -98,4 +101,12 @@ if [ ! -s outputs/design.v ]; then
   exit 1
 fi
 
+grep -q "module $top_module" outputs/design.v || {
+  echo "ERROR: outputs/design.v does not contain module $top_module" | tee -a outputs/sv2v.log
+  exit 1
+}
+
+# remove not allowed 'string' specifier on parameter/localparams in verilog
+
+perl -0pi -e 's/\b(parameter|localparam)\s+string\s+/$1 /g' outputs/design.v
 
