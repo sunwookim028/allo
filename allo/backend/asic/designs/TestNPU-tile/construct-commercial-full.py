@@ -41,9 +41,7 @@ def construct():
     'hold_target_slack'   : 0.050,
     # Utilization target
     'core_density_target' : 0.70,
-    'core_density_target' : 0.70,
     # SV2V params
-    'design_name'       : 'compute_tile',
     'top_module'        : 'compute_tile',
     'design_path'       : '../../../mininpu/npu/src',
     'sv2v_include_dirs' : '.:compute_tile:compute_tile/fpu',

@@ -37,7 +37,7 @@ fi
 
 files=()
 
-while IFS= read -r line; do
+while IFS= read -r line || [ -n "$line" ]; do
   # Strip comments and surrounding whitespace.
   line="${line%%#*}"
   line="$(echo "$line" | xargs)"

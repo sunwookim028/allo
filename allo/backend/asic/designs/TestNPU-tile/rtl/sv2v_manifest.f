@@ -2,11 +2,6 @@
 npu/npu_config_pkg.sv
 npu/npu_isa_pkg.sv
 
-# SRAM macro wrappers / black-boxes
-# Replace these with OpenRAM-generated Verilog views once the SRAM node is wired.
-../sim/wrappers/bram_spad.sv
-../sim/wrappers/bram_iram.sv
-
 # FPU leaves
 compute_tile/fpu/fp16_mul_fp32.sv
 compute_tile/fpu/bf16_mul_fp32.sv
