@@ -1,9 +1,10 @@
 #=========================================================================
 # construct.py
 #=========================================================================
-# Commercial ASIC flow for the compute_tile block
+# Commercial ASIC flow for the compute tile block
 #
-# Adapted for TestNPU compute_tile
+# Author : Julian Bushlow
+# Date   : June 16, 2026
 #
 
 import os
@@ -24,7 +25,7 @@ def construct():
   parameters = {
     'construct_path'      : __file__,
     'design_name'         : 'compute_tile',
-    'clock_period'        : 2.0,
+    'clock_period'        : 10.0,
     'adk'                 : adk_name,
     'adk_view'            : adk_view,
     # Enable GUIs
@@ -55,15 +56,11 @@ def construct():
   g.set_adk( adk_name )
   adk = g.get_adk_node()
 
-  # Custom nodes
-
-  rtl            = Node( this_dir + '/rtl'         )
   testbench      = Node( this_dir + '/testbench'   )
   constraints    = Node( this_dir + '/constraints' )
 
-  # Default nodes
-
   info           = Node( 'info',                            default=True )
+  sv2v           = Note( os.path.join(nodes_dir, 'sv2v-design-collector'))
   synth          = Node( 'synopsys-dc-synthesis',           default=True )
   iflow          = Node( 'cadence-innovus-flowsetup',       default=True )
   init           = Node( 'cadence-innovus-init',            default=True )
@@ -95,7 +92,7 @@ def construct():
   #-----------------------------------------------------------------------
 
   g.add_node( info              )
-  g.add_node( rtl               )
+  g.add_node( sv2v              )
   g.add_node( constraints       )
   g.add_node( synth             )
   g.add_node( iflow             )
@@ -139,7 +136,7 @@ def construct():
   g.connect_by_name( adk,            lvs            )
   g.connect_by_name( adk,            genlibdb       )
 
-  g.connect_by_name( rtl,            synth          )
+  g.connect_by_name( sv2v,           synth          )
   g.connect_by_name( constraints,    synth          )
 
   g.connect_by_name( synth,          iflow          )

@@ -16,6 +16,7 @@ mkdir -p outputs
 : "${sv2v_bin:=sv2v}"
 : "${sv2v_defines:=TARGET_ASIC=1}"
 : "${sv2v_include_dirs:=.}"
+: "${construct_path:?Missing parameter: construct_path}"
 
 if [ ! -d "$design_path" ]; then
   echo "ERROR: design_path does not exist: $design_path" | tee outputs/sv2v.log
@@ -25,7 +26,8 @@ fi
 if [[ "$manifest" = /* ]]; then
   manifest_path="$manifest"
 else
-  manifest_path="$design_path/$manifest"
+  construct_dir="$(cd "$(dirname "$construct_path")" && pwd)"
+  manifest_path="$construct_dir/$manifest"
 fi
 
 if [ ! -f "$manifest_path" ]; then
