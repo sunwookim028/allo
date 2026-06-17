@@ -78,9 +78,9 @@ def construct():
   signoff        = Node( os.path.join(nodes_dir, 'cadence-innovus-signoff')       )
   pt_signoff     = Node( os.path.join(nodes_dir, 'synopsys-pt-timing-signoff')    )
   genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb')        )
-  gdsmerge       = Node( 'mentor-calibre-gdsmerge',         default=True          )
-  drc            = Node( 'mentor-calibre-drc',              default=True          )
-  lvs            = Node( 'mentor-calibre-lvs',              default=True          )
+  gdsmerge       = Node( os.path.join(nodes_dir, 'mentor-calibre-gdsmerge')       )
+  drc            = Node( os.path.join(nodes_dir, 'mentor-calibre-drc')            )
+  lvs            = Node( os.path.join(nodes_dir, 'mentor-calibre-lvs')            )
   vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True          )
   power_est      = Node( 'synopsys-pt-power',               default=True          )
 

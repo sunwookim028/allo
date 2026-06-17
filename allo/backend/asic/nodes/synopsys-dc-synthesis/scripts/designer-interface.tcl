@@ -62,14 +62,6 @@ set dc_extra_link_libraries     [join "
                                     [lsort [glob -nocomplain inputs/adk/*.db]]
                                 "]
 
-set dc_sram_db_files [glob -nocomplain inputs/srams/*/*.db]
-
-if {[llength $dc_sram_db_files] > 0} {
-  puts "Info: Found SRAM db files: $dc_sram_db_files"
-  set dc_extra_link_libraries [concat $dc_extra_link_libraries $dc_sram_db_files]
-  set dc_target_libraries [concat $dc_target_libraries $dc_sram_db_files]
-}
-
 #-------------------------------------------------------------------------
 # Interface to the ASIC design kit
 #-------------------------------------------------------------------------
@@ -81,6 +73,16 @@ set dc_tluplus_max              $adk_dir/rtk-max.tluplus
 set dc_tluplus_min              $adk_dir/rtk-min.tluplus
 set dc_adk_tcl                  $adk_dir/adk.tcl
 set dc_target_libraries         stdcells.db
+
+# add srams
+
+set dc_sram_db_files [glob -nocomplain inputs/srams/*/*.db]
+
+if {[llength $dc_sram_db_files] > 0} {
+  puts "Info: Found SRAM db files: $dc_sram_db_files"
+  set dc_extra_link_libraries [concat $dc_extra_link_libraries $dc_sram_db_files]
+  set dc_target_libraries [concat $dc_target_libraries $dc_sram_db_files]
+}
 
 # Extra libraries
 
