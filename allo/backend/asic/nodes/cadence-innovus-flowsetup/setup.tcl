@@ -85,7 +85,6 @@ set list_libs_tt \
         [lsort [glob -nocomplain inputs/*-typical*.lib]]
         [lsort [glob -nocomplain inputs/*tt*.lib]]
         [lsort [glob -nocomplain inputs/*TT*.lib]]
-        # add srams
         [lsort [glob -nocomplain inputs/srams/*/*.lib]]
     "]
 
@@ -132,8 +131,7 @@ set list_libs_wc \
         [lsort [glob -nocomplain inputs/*-wc*.lib]]
         [lsort [glob -nocomplain inputs/*ss*.lib]]
         [lsort [glob -nocomplain inputs/*SS*.lib]]
-        # add srams
-        [lsort [glob -nocomplain inputs/srams/*/*.lef]]
+        [lsort [glob -nocomplain inputs/srams/*/*.lib]]
     "]
 
 if {[llength $list_libs_wc] > 0} {
@@ -151,6 +149,7 @@ set vars(lef_files) [join "
                       [lsort [glob -nocomplain $vars(adk_dir)/stdcells-pm.lef]]
                       [lsort [glob -nocomplain $vars(adk_dir)/*.lef]]
                       [lsort [glob -nocomplain inputs/*.lef]]
+                      [lsort [glob -nocomplain inputs/srams/*/*.lef]]
                     "]
 
 #-------------------------------------------------------------------------

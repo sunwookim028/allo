@@ -101,12 +101,14 @@ if [ ! -s outputs/design.v ]; then
   exit 1
 fi
 
+# remove not allowed 'string' specifier on parameter/localparams in verilog
+
+perl -0pi -e 's/\b(parameter|localparam)\s+string\s+/$1 /g' outputs/design.v
+
+# check top module is present
+
 grep -q "module $top_module" outputs/design.v || {
   echo "ERROR: outputs/design.v does not contain module $top_module" | tee -a outputs/sv2v.log
   exit 1
 }
-
-# remove not allowed 'string' specifier on parameter/localparams in verilog
-
-perl -0pi -e 's/\b(parameter|localparam)\s+string\s+/$1 /g' outputs/design.v
 

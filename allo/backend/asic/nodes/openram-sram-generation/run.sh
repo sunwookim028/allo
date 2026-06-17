@@ -47,7 +47,7 @@ if [ "${#cfgs[@]}" -eq 0 ]; then
   exit 1
 fi
 
-for cfg in work/cfgs/*_cfg.py; do
+for cfg in "${cfgs[@]}"; do
   name="$(basename "$cfg" _cfg.py)"
   outdir="outputs/srams/$name"
   mkdir -p "$outdir"
@@ -69,11 +69,13 @@ for cfg in work/cfgs/*_cfg.py; do
   cp "work/$name"/*.sp  "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.cdl "$outdir/" 2>/dev/null || true
 
-  lib_file="$(ls "$outdir"/*.lib | head -n 1)"
-  if [ -z "$lib_file" ]; then
+  lib_files=("$outdir"/*.lib)
+  if [ "${#lib_files[@]}" -eq 0 ]; then
     echo "ERROR: OpenRAM did not produce a .lib for $name"
     exit 1
   fi
+
+  lib_file="${lib_files[0]}"
 
   lc_shell -x "read_lib $lib_file; write_lib ${name}_lib -format db -output $outdir/$name.db; exit" \
     2>&1 | tee "$outdir/$name.lc_shell.log"

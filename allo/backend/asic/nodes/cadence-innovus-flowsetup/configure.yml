@@ -15,6 +15,7 @@ inputs:
   - adk
   - design.v
   - design.sdc
+  - srams
 
 outputs:
   - innovus-foundation-flow

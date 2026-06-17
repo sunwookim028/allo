@@ -20,7 +20,6 @@ set merge_files \
     [concat \
         [lsort [glob -nocomplain inputs/adk/*.gds*]] \
         [lsort [glob -nocomplain inputs/*.gds*]] \
-        # add srams
         [lsort [glob -nocomplain inputs/srams/*/*.gds*]] \
     ]
 
