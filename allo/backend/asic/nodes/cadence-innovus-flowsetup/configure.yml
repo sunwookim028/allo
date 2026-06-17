@@ -1,56 +1,40 @@
 #=========================================================================
-# Cadence Innovus
+# Cadence Innovus Foundation Flow Generator
 #=========================================================================
 # Author : Christopher Torng
-# Date   : October 30, 2019
+# Date   : June 7, 2019
 #
 
-name: cadence-innovus-route
+name: cadence-innovus-flowsetup
 
 #-------------------------------------------------------------------------
 # Inputs and Outputs
 #-------------------------------------------------------------------------
 
 inputs:
-  - innovus-foundation-flow
   - adk
-  - design.checkpoint
-  - srams
+  - design.v
+  - design.sdc
 
 outputs:
-  - design.checkpoint
+  - innovus-foundation-flow
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
-  - ln -sf inputs/innovus-foundation-flow
-  - if [[ "x$enable_gui" == "xTrue" ]]; then gui_flag=""; else gui_flag="-nowin"; fi
-  - innovus -overwrite -64 $gui_flag -init START.tcl -log logs/run.log
-  # Outputs
-  - cd outputs
-  - ln -sf ../checkpoints/design.checkpoint
+  - source ./run.sh
 
 #-------------------------------------------------------------------------
 # Parameters
 #-------------------------------------------------------------------------
 
 parameters:
-  # Enable Innovus GUI
-  enable_gui: true
-  # Subscript execute order
-  order:
-    - main.tcl
-
-#-------------------------------------------------------------------------
-# Debug
-#-------------------------------------------------------------------------
-
-debug:
-  - innovus -overwrite -64
-    -init innovus-foundation-flow/custom-scripts/run-debug.tcl
-    -log logs/debug.log
+  design_name: design
+  nthreads: 16        # multithreading available to the tool
+  express_flow: False # enable express flow
+  skip_verify_connectivity: False
 
 #-------------------------------------------------------------------------
 # Assertions
@@ -59,12 +43,12 @@ debug:
 preconditions:
 
   - assert Tool( 'innovus' )                         # tool check
-  - assert File( 'inputs/innovus-foundation-flow' )  # must exist
   - assert File( 'inputs/adk' )                      # must exist
-  - assert File( 'inputs/design.checkpoint' )        # must exist
+  - assert File( 'inputs/design.sdc' )               # must exist
+  - assert File( 'inputs/design.v' )                 # must exist
 
 postconditions:
 
-  - assert File( 'outputs/design.checkpoint' )       # must exist
+  - assert File( 'outputs/innovus-foundation-flow' ) # must exist
 
 

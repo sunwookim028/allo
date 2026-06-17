@@ -22,6 +22,15 @@ set ptpx_extra_link_libraries     [join "
                                     [lsort [glob -nocomplain inputs/adk/*.db]]
                                 "]
 
+# add srams
+
+set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+
+set ptpx_extra_link_libraries [join "
+  $ptpx_extra_link_libraries
+  $ptpx_sram_db_files
+"]
+
 #-------------------------------------------------------------------------
 # Interface to the build system
 #-------------------------------------------------------------------------

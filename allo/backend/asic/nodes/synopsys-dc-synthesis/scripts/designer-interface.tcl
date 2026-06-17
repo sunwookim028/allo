@@ -62,6 +62,14 @@ set dc_extra_link_libraries     [join "
                                     [lsort [glob -nocomplain inputs/adk/*.db]]
                                 "]
 
+set dc_sram_db_files [glob -nocomplain inputs/srams/*/*.db]
+
+if {[llength $dc_sram_db_files] > 0} {
+  puts "Info: Found SRAM db files: $dc_sram_db_files"
+  set dc_extra_link_libraries [concat $dc_extra_link_libraries $dc_sram_db_files]
+  set dc_target_libraries [concat $dc_target_libraries $dc_sram_db_files]
+}
+
 #-------------------------------------------------------------------------
 # Interface to the ASIC design kit
 #-------------------------------------------------------------------------

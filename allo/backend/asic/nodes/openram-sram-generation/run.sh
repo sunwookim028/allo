@@ -39,6 +39,14 @@ python scripts/gen_openram_cfgs.py \
 
 cp "$manifest_path" outputs/srams/sram_manifest.yml
 
+shopt -s nullglob
+cfgs=(work/cfgs/*_cfg.py)
+
+if [ "${#cfgs[@]}" -eq 0 ]; then
+  echo "ERROR: No OpenRAM cfg files generated in work/cfgs"
+  exit 1
+fi
+
 for cfg in work/cfgs/*_cfg.py; do
   name="$(basename "$cfg" _cfg.py)"
   outdir="outputs/srams/$name"
@@ -58,6 +66,8 @@ for cfg in work/cfgs/*_cfg.py; do
   cp "work/$name"/*.lef "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.gds "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.lib "$outdir/" 2>/dev/null || true
+  cp "work/$name"/*.sp  "$outdir/" 2>/dev/null || true
+  cp "work/$name"/*.cdl "$outdir/" 2>/dev/null || true
 
   lib_file="$(ls "$outdir"/*.lib | head -n 1)"
   if [ -z "$lib_file" ]; then

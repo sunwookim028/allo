@@ -15,6 +15,7 @@ inputs:
   - innovus-foundation-flow
   - adk
   - design.checkpoint
+  - srams
 
 outputs:
   - design.checkpoint

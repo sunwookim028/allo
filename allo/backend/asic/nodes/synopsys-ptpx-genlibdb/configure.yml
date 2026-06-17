@@ -13,6 +13,7 @@ inputs:
   - design.vcs.v
   - design.spef.gz
   - design.pt.sdc
+  - srams
 
 outputs:
   - design.lib

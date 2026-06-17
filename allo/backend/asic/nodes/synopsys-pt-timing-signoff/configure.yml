@@ -18,6 +18,7 @@ inputs:
   - design.vcs.v
   - design.pt.sdc
   - design.spef.gz
+  - srams
 
 outputs:
   - design.sdf

@@ -32,6 +32,15 @@ set ptpx_extra_link_libraries [join "
   [lsort [glob -nocomplain inputs/*-$::env(corner_hold).db]]
 "]
 
+# add srams
+
+set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+
+set ptpx_extra_link_libraries [join "
+  $ptpx_extra_link_libraries
+  $ptpx_sram_db_files
+"]
+
 # Remove any elements of target libraries from extra_link_libraries
 
 set exclusion_result {}

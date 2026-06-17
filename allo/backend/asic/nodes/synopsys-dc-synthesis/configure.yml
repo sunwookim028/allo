@@ -17,6 +17,7 @@ inputs:
   - constraints.tcl
   - run.saif
   - design.upf
+  - srams
 
 outputs:
   - design.v

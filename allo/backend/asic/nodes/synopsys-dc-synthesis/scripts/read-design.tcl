@@ -14,6 +14,15 @@ check_library > $dc_reports_dir/${dc_design_name}.check_library.rpt
 
 define_design_lib WORK -path ${dc_results_dir}/WORK
 
+# import SRAMs
+
+set dc_sram_verilog_files [glob -nocomplain inputs/srams/*/*.v]
+
+foreach sram_v $dc_sram_verilog_files {
+  puts "Info: Reading SRAM Verilog model: $sram_v"
+  if { ![analyze -format verilog $sram_v] } { exit 1 }
+}
+
 # Analyze the RTL source file
 
 if { ![analyze -format sverilog $dc_rtl_handoff] } { exit 1 }

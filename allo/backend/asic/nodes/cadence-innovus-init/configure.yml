@@ -16,6 +16,7 @@ inputs:
   - adk
   - design.v
   - design.sdc
+  - srams
 
 outputs:
   - design.checkpoint
