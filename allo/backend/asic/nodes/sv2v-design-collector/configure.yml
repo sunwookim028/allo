@@ -32,7 +32,7 @@ commands:
 parameters:
   design_name: undefined
   design_path: undefined
-  top_level_file: undefined
+  top_module: undefined
   manifest: rtl/sv2v_manifest.f
   sv2v_include_dirs: "."
   construct_path: undefined

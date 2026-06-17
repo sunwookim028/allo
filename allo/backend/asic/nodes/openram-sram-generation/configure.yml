@@ -1,0 +1,34 @@
+#=========================================================================
+# OpenRAM SRAM Generation
+#=========================================================================
+# Author : Julian Bushlow
+# Date   : June 17, 2026
+#
+
+name: openram-sram-generation
+
+inputs: []
+
+outputs:
+  - srams
+
+commands:
+  - bash run.sh
+
+parameters:
+  construct_path: undefined
+  sram_manifest: rtl/sram_manifest.yml
+  openram_bin: openram
+  tech_name: freepdk45
+  process_corner: TT
+  supply_voltage: 1.1
+  temperature: 25
+  check_lvsdrc: False
+  route_supplies: True
+
+preconditions:
+  - assert Tool( 'openram' )
+  - assert Tool( 'lc_shell' )
+
+postconditions:
+  - assert File( 'outputs/srams' )

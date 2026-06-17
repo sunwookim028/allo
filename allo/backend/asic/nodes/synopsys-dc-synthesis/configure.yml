@@ -48,6 +48,7 @@ parameters:
   nthreads: 16
   # Enable high-effort area optimization (has longer spin time)
   high_effort_area_opt: False
+  write_svsim_wrapper: False
   # Automatic fine-grain clock gating
   gate_clock: True
   # Uniquify by prefixing every module in the design with the design name.

@@ -26,17 +26,19 @@ write -format verilog \
       -hierarchy      \
       -output ${dc_results_dir}/${dc_design_name}.mapped.v
 
-write -format svsim \
-      -output ${dc_results_dir}/${dc_design_name}.mapped.svwrapper.v
-
 # Dump the mapped.v and svwrapper.v into one svsim.v file to make it
 # easier to include a single file for gate-level simulation. The svwrapper
 # matches the interface of the original RTL even if using SystemVerilog
 # features (e.g., array of arrays, uses parameters, etc.).
+      
+if { $write_svsim_wrapper == True } {
+  write -format svsim \
+        -output ${dc_results_dir}/${dc_design_name}.mapped.svwrapper.v
 
-sh cat ${dc_results_dir}/${dc_design_name}.mapped.v \
-       ${dc_results_dir}/${dc_design_name}.mapped.svwrapper.v \
-       > ${dc_results_dir}/${dc_design_name}.mapped.svsim.v
+  sh cat ${dc_results_dir}/${dc_design_name}.mapped.v \
+         ${dc_results_dir}/${dc_design_name}.mapped.svwrapper.v \
+         > ${dc_results_dir}/${dc_design_name}.mapped.svsim.v
+}
 
 # Write top-level verilog view needed for block instantiation
 

@@ -1,0 +1,23 @@
+use_nix = False
+check_lvsdrc = {{ check_lvsdrc }}
+
+num_rw_ports = {{ num_rw_ports }}
+num_r_ports = {{ num_r_ports }}
+num_w_ports = {{ num_w_ports }}
+
+word_size = {{ word_size }}
+num_words = {{ num_words }}
+num_banks = {{ num_banks }}
+words_per_row = {{ words_per_row }}
+write_size = {{ write_size }}
+
+tech_name = "{{ tech_name }}"
+process_corners = ["{{ process_corner }}"]
+supply_voltages = [{{ supply_voltage }}]
+temperatures = [{{ temperature }}]
+
+route_supplies = {{ route_supplies }}
+
+output_path = "{{ name }}"
+output_name = "{{ name }}"
+instance_name = "{{ name }}"

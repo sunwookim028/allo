@@ -1,0 +1,20 @@
+srams:
+  - name: blk_mem_gen_0
+    word_size: 32
+    num_words: 8192
+    num_rw_ports: 2
+    num_r_ports: 0
+    num_w_ports: 0
+    num_banks: 1
+    words_per_row: 4
+    write_size: 32
+
+  - name: blk_mem_gen_1
+    word_size: 64
+    num_words: 1024
+    num_rw_ports: 2
+    num_r_ports: 0
+    num_w_ports: 0
+    num_banks: 1
+    words_per_row: 4
+    write_size: 64

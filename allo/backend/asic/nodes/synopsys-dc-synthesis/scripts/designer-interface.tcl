@@ -31,6 +31,7 @@ set dc_gate_clock                 $::env(gate_clock)
 set dc_uniquify_with_design_name  $::env(uniquify_with_design_name)
 set dc_suppress_msg 			  $::env(suppress_msg)
 set dc_suppressed_msg  			  [split $::env(suppressed_msg) ","]
+set write_svsim_wrapper $::env(write_svsim_wrapper)
 
 #-------------------------------------------------------------------------
 # Inputs

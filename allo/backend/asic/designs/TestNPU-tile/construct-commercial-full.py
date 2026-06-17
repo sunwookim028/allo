@@ -41,6 +41,12 @@ def construct():
     'hold_target_slack'   : 0.050,
     # Utilization target
     'core_density_target' : 0.70,
+    'core_density_target' : 0.70,
+    # SV2V params
+    'design_name'       : 'compute_tile',
+    'top_module'        : 'compute_tile',
+    'design_path'       : '../../../mininpu/npu/src',
+    'sv2v_include_dirs' : '.:compute_tile:compute_tile/fpu',
   }
 
   #-----------------------------------------------------------------------
@@ -60,7 +66,8 @@ def construct():
   constraints    = Node( this_dir + '/constraints' )
 
   info           = Node( 'info',                            default=True )
-  sv2v           = Note( os.path.join(nodes_dir, 'sv2v-design-collector'))
+  openram        = Node( os.path.join(nodes_dir, 'openram-sram-generation'))
+  sv2v           = Node( os.path.join(nodes_dir, 'sv2v-design-collector'))
   synth          = Node( 'synopsys-dc-synthesis',           default=True )
   iflow          = Node( 'cadence-innovus-flowsetup',       default=True )
   init           = Node( 'cadence-innovus-init',            default=True )
@@ -72,11 +79,10 @@ def construct():
   postroute_hold = Node( 'cadence-innovus-postroute_hold',  default=True )
   signoff        = Node( 'cadence-innovus-signoff',         default=True )
   pt_signoff     = Node( os.path.join(nodes_dir, 'synopsys-pt-timing-signoff'))
-  genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb')    )
+  genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb'))
   gdsmerge       = Node( 'mentor-calibre-gdsmerge',         default=True )
   drc            = Node( 'mentor-calibre-drc',              default=True )
   lvs            = Node( 'mentor-calibre-lvs',              default=True )
-  debugcalibre   = Node( 'cadence-innovus-debug-calibre',   default=True )
   vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True )
   power_est      = Node( 'synopsys-pt-power',               default=True )
 
@@ -93,6 +99,7 @@ def construct():
 
   g.add_node( info              )
   g.add_node( sv2v              )
+  g.add_node( openram           )
   g.add_node( constraints       )
   g.add_node( synth             )
   g.add_node( iflow             )
@@ -109,7 +116,6 @@ def construct():
   g.add_node( gdsmerge          )
   g.add_node( drc               )
   g.add_node( lvs               )
-  g.add_node( debugcalibre      )
   g.add_node( testbench         )
   g.add_node( vcs_sim           )
   g.add_node( power_est         )
@@ -135,6 +141,19 @@ def construct():
   g.connect_by_name( adk,            drc            )
   g.connect_by_name( adk,            lvs            )
   g.connect_by_name( adk,            genlibdb       )
+
+  g.connect_by_name( openram,        synth )
+  g.connect_by_name( openram,        iflow )
+  g.connect_by_name( openram,        init )
+  g.connect_by_name( openram,        place )
+  g.connect_by_name( openram,        cts )
+  g.connect_by_name( openram,        route )
+  g.connect_by_name( openram,        postroute_hold )
+  g.connect_by_name( openram,        signoff )
+  g.connect_by_name( openram,        pt_signoff )
+  g.connect_by_name( openram,        genlibdb )
+  g.connect_by_name( openram,        gdsmerge )
+  g.connect_by_name( openram,        lvs )
 
   g.connect_by_name( sv2v,           synth          )
   g.connect_by_name( constraints,    synth          )
@@ -170,13 +189,6 @@ def construct():
 
   g.connect_by_name( gdsmerge,       drc            )
   g.connect_by_name( gdsmerge,       lvs            )
-
-  g.connect_by_name( adk,            debugcalibre   )
-  g.connect_by_name( synth,          debugcalibre   )
-  g.connect_by_name( iflow,          debugcalibre   )
-  g.connect_by_name( signoff,        debugcalibre   )
-  g.connect_by_name( drc,            debugcalibre   )
-  g.connect_by_name( lvs,            debugcalibre   )
 
   g.connect_by_name( adk,            vcs_sim        )
   g.connect_by_name( signoff,        vcs_sim        )
