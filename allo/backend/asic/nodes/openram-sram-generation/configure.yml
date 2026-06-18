@@ -27,6 +27,8 @@ parameters:
   check_lvsdrc: False
   route_supplies: True
   analytical_delay: True
+  use_sram_cache: False
+  sram_cache_path: undefined
 
 preconditions:
   - assert Tool( 'python' )

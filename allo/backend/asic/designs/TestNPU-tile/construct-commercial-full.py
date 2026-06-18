@@ -56,6 +56,8 @@ def construct():
     'check_lvsdrc'   : False,
     'route_supplies' : True,
     'analytical_delay' : True,
+    'use_sram_cache' : True,
+    'sram_cache_path': 'srams',
   }
 
   #-----------------------------------------------------------------------

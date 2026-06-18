@@ -14,6 +14,25 @@ mkdir -p outputs/srams work/logs
 : "${sram_manifest:?Missing parameter: sram_manifest}"
 : "${python_bin:=python}"
 : "${openram_script:=}"
+: "${use_sram_cache:=False}"
+: "${sram_cache_path:=}"
+
+is_true() {
+  case "$1" in
+    True|true|1|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if is_true "$use_sram_cache"; then
+  "$python_bin" scripts/copy_sram_cache.py \
+    --manifest "$manifest_path" \
+    --cache-path "$cache_path" \
+    --out-dir outputs/srams
+
+  cp "$manifest_path" outputs/srams/sram_manifest.yml
+  exit 0
+fi
 
 if [ -z "$openram_script" ]; then
   openram_script="$("$python_bin" - <<'PY'
@@ -71,8 +90,6 @@ for cfg in "${cfgs[@]}"; do
   if [ "$analytical_delay" != "True" ] && [ "$analytical_delay" != "true" ]; then
     openram_args+=("-c")
   fi
-
-  internal_log="work/$name/$name.log"
 
   (
     cd work
