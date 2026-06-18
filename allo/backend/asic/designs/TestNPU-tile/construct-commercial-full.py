@@ -45,6 +45,16 @@ def construct():
     'top_module'        : 'compute_tile',
     'design_path'       : '../../../mininpu/npu/src',
     'sv2v_include_dirs' : '.:compute_tile:compute_tile/fpu',
+    # OpenRAM params
+    'sram_manifest'  : 'rtl/sram_manifest.yml',
+    'python_bin'     : 'python',
+    'openram_script' : '',
+    'tech_name'      : 'freepdk45',
+    'process_corner' : 'TT',
+    'supply_voltage' : 1.1,
+    'temperature'    : 25,
+    'check_lvsdrc'   : False,
+    'route_supplies' : True,
   }
 
   #-----------------------------------------------------------------------

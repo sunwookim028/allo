@@ -12,7 +12,16 @@ mkdir -p outputs/srams work/logs
 
 : "${construct_path:?Missing parameter: construct_path}"
 : "${sram_manifest:?Missing parameter: sram_manifest}"
-: "${openram_bin:=openram}"
+: "${python_bin:=python}"
+: "${openram_script:=}"
+
+if [ -z "$openram_script" ]; then
+  openram_script="$("$python_bin" - <<'PY'
+import openram, pathlib
+print(pathlib.Path(openram.__file__).resolve().parent / "sram_compiler.py")
+PY
+)"
+fi
 
 if [[ "$sram_manifest" = /* ]]; then
   manifest_path="$sram_manifest"
@@ -58,7 +67,7 @@ for cfg in "${cfgs[@]}"; do
 
   (
     cd work
-    "$openram_bin" -v -v "cfgs/${name}_cfg.py"
+    "$python_bin" "$openram_script" -v -v "cfgs/${name}_cfg.py"
   ) 2>&1 | tee "$outdir/$name.openram.log"
 
   cp "$cfg" "$outdir/"

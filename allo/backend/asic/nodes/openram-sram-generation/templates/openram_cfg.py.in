@@ -1,4 +1,5 @@
 use_nix = False
+use_conda = False
 check_lvsdrc = {{ check_lvsdrc }}
 
 num_rw_ports = {{ num_rw_ports }}

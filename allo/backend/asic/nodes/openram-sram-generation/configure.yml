@@ -18,7 +18,8 @@ commands:
 parameters:
   construct_path: undefined
   sram_manifest: rtl/sram_manifest.yml
-  openram_bin: openram
+  python_bin: python
+  openram_script: ""
   tech_name: freepdk45
   process_corner: TT
   supply_voltage: 1.1
@@ -27,8 +28,16 @@ parameters:
   route_supplies: True
 
 preconditions:
-  - assert Tool( 'openram' )
+  - assert Tool( 'python' )
   - assert Tool( 'lc_shell' )
+  - |
+    import pathlib
+    import openram
+
+    openram_root = pathlib.Path(openram.__file__).resolve().parent
+    sram_compiler = openram_root / "sram_compiler.py"
+
+    assert sram_compiler.is_file(), f"Missing OpenRAM SRAM compiler: {sram_compiler}"
 
 postconditions:
   - assert File( 'outputs/srams' )

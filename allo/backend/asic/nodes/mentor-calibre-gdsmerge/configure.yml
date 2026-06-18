@@ -36,11 +36,7 @@ commands:
   # Use calibredrv to merge gds files
   # Need 'echo |' to stop calibredrv from hanging if the step is backgrounded,
   # which is a known calibredrv bug noted in the manual (see calibr_drv_ref.pdf)
-  - echo | calibredrv -a layout filemerge \
-               -indir inputs \
-               $ins
-               -topcell {design_name} \
-               -out design_merged.gds 2>&1 | tee merge.log
+  - echo | calibredrv -a layout filemerge -indir inputs $ins -topcell {design_name} -out design_merged.gds 2>&1 | tee merge.log
   - mkdir -p outputs && cd outputs
   - ln -sf ../design_merged.gds
 
