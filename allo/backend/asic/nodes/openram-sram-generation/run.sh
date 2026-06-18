@@ -66,23 +66,29 @@ for cfg in "${cfgs[@]}"; do
   rm -rf "work/$name"
   mkdir -p "work/$name"
 
-internal_log="work/$name/$name.log"
+  openram_args=(-v -v)
 
-(
-  cd work
+  if [ "$analytical_delay" != "True" ] && [ "$analytical_delay" != "true" ]; then
+    openram_args+=("-c")
+  fi
 
-  touch "$name/$name.log"
-  tail -n +1 -f "$name/$name.log" &
-  tail_pid=$!
+  internal_log="work/$name/$name.log"
 
-  "$python_bin" "$openram_script" -v -v "cfgs/${name}_cfg.py"
-  status=$?
+  (
+    cd work
 
-  kill "$tail_pid" 2>/dev/null || true
-  wait "$tail_pid" 2>/dev/null || true
+    touch "$name/$name.log"
+    tail -n +1 -f "$name/$name.log" &
+    tail_pid=$!
 
-  exit "$status"
-) 2>&1 | tee "$outdir/$name.openram.log"
+    "$python_bin" "$openram_script" "${openram_args[@]}" "cfgs/${name}_cfg.py"
+    status=$?
+
+    kill "$tail_pid" 2>/dev/null || true
+    wait "$tail_pid" 2>/dev/null || true
+
+    exit "$status"
+  ) 2>&1 | tee "$outdir/$name.openram.log"
 
   cp "$cfg" "$outdir/"
   cp "work/$name"/*.v "$outdir/" 2>/dev/null || true

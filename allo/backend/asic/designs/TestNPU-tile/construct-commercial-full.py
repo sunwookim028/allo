@@ -55,6 +55,7 @@ def construct():
     'temperature'    : 25,
     'check_lvsdrc'   : False,
     'route_supplies' : True,
+    'analytical_delay' : True,
   }
 
   #-----------------------------------------------------------------------
