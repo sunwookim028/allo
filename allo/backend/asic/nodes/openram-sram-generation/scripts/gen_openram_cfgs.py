@@ -25,6 +25,7 @@ def main():
     parser.add_argument("--temperature", required=True)
     parser.add_argument("--check-lvsdrc", required=True)
     parser.add_argument("--route-supplies", required=True)
+    parser.add_argument("--analytical-delay", required=True)
     args = parser.parse_args()
 
     manifest = yaml.safe_load(Path(args.manifest).read_text())
@@ -49,6 +50,7 @@ def main():
             "temperature": args.temperature,
             "check_lvsdrc": bool_text(args.check_lvsdrc),
             "route_supplies": bool_text(args.route_supplies),
+            "analytical_delay": bool_text(args.analytical_delay),
         }
         cfg = render(template, values)
         (out_dir / f"{sram['name']}_cfg.py").write_text(cfg)

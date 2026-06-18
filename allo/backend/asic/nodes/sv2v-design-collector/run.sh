@@ -88,13 +88,18 @@ for incdir in "${include_dirs[@]}"; do
   fi
 done
 
+# make flow print more detailed logging info
+
+args+=("-v")
+
 {
-  echo "Running: $sv2v_bin ${args[*]} -w outputs/design.v <files>"
+  echo "Running: $sv2v_bin ${args[*]} -w outputs/design.v"
+  printf "  %s\n" "${files[@]}"
   "$sv2v_bin" \
     "${args[@]}" \
     -w outputs/design.v \
     "${files[@]}"
-} > outputs/sv2v.log 2>&1
+} 2>&1 | tee outputs/sv2v.log
 
 if [ ! -s outputs/design.v ]; then
   echo "ERROR: sv2v did not produce a non-empty outputs/design.v" | tee -a outputs/sv2v.log

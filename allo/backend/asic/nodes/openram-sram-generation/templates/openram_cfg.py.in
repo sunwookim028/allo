@@ -1,6 +1,7 @@
 use_nix = False
 use_conda = False
 check_lvsdrc = {{ check_lvsdrc }}
+analytical_delay = {{ analytical_delay }}
 
 num_rw_ports = {{ num_rw_ports }}
 num_r_ports = {{ num_r_ports }}

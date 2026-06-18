@@ -44,7 +44,8 @@ fi
   --supply-voltage "$supply_voltage" \
   --temperature "$temperature" \
   --check-lvsdrc "$check_lvsdrc" \
-  --route-supplies "$route_supplies"
+  --route-supplies "$route_supplies" \
+  --analytical-delay "$analytical_delay"
 
 cp "$manifest_path" outputs/srams/sram_manifest.yml
 
