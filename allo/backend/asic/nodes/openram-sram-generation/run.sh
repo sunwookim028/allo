@@ -35,7 +35,7 @@ if [ ! -f "$manifest_path" ]; then
   exit 1
 fi
 
-python scripts/gen_openram_cfgs.py \
+"$python_bin" scripts/gen_openram_cfgs.py \
   --manifest "$manifest_path" \
   --template templates/openram_cfg.py.in \
   --out-dir work/cfgs \
@@ -65,10 +65,23 @@ for cfg in "${cfgs[@]}"; do
   rm -rf "work/$name"
   mkdir -p "work/$name"
 
-  (
-    cd work
-    "$python_bin" "$openram_script" -v -v "cfgs/${name}_cfg.py"
-  ) 2>&1 | tee "$outdir/$name.openram.log"
+internal_log="work/$name/$name.log"
+
+(
+  cd work
+
+  touch "$name/$name.log"
+  tail -n +1 -f "$name/$name.log" &
+  tail_pid=$!
+
+  "$python_bin" "$openram_script" -v -v "cfgs/${name}_cfg.py"
+  status=$?
+
+  kill "$tail_pid" 2>/dev/null || true
+  wait "$tail_pid" 2>/dev/null || true
+
+  exit "$status"
+) 2>&1 | tee "$outdir/$name.openram.log"
 
   cp "$cfg" "$outdir/"
   cp "work/$name"/*.v "$outdir/" 2>/dev/null || true
