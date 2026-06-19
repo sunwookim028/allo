@@ -140,15 +140,24 @@ for cfg in "${cfgs[@]}"; do
   cp "work/$name"/*.sp  "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.cdl "$outdir/" 2>/dev/null || true
 
-  lib_files=("$outdir"/*.lib)
+  voltage_tag="${supply_voltage/./p}"
+  lib_files=("$outdir"/*_"$process_corner"_"${voltage_tag}"V_"${temperature}"C.lib)
+
   if [ "${#lib_files[@]}" -eq 0 ]; then
-    echo "ERROR: OpenRAM did not produce a .lib for $name"
-    exit 1
+    echo "WARNING: OpenRAM did not produce a ${process_corner}_${voltage_tag}V_${temperature}C .lib for $name"
+    echo "WARNING: Falling back to the first available .lib for $name"
+    lib_files=("$outdir"/*.lib)
+
+    if [ "${#lib_files[@]}" -eq 0 ]; then
+      echo "ERROR: OpenRAM did not produce a .lib for $name"
+      exit 1
+    fi
   fi
 
   lib_file="${lib_files[0]}"
+  lib_name="$(basename "$lib_file" .lib)_lib"
 
-  lc_shell -x "read_lib $lib_file; write_lib ${name}_lib -format db -output $outdir/$name.db; exit" \
+  lc_shell -x "read_lib $lib_file; write_lib $lib_name -format db -output $outdir/$name.db; exit" \
     2>&1 | tee "$outdir/$name.lc_shell.log"
 
   test -f "$outdir/$name.db"
