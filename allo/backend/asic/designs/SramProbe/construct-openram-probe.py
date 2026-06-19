@@ -22,7 +22,7 @@ def construct():
     'adk_view'          : adk_view,
 
     # OpenRAM params
-    'sram_manifest'    : 'rtl/sram_manifest.yml',
+    'sram_manifest' : 'rtl/sram_manifest_wpr1.yml',
     'python_bin'       : 'python',
     'openram_script'   : '',
     'tech_name'        : 'freepdk45',

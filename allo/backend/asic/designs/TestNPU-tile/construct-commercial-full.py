@@ -56,8 +56,8 @@ def construct():
     'check_lvsdrc'   : False,
     'route_supplies' : True,
     'analytical_delay' : True,
-    'use_sram_cache' : True,
-    'sram_cache_path': 'srams',
+    #'use_sram_cache' : True,
+    #'sram_cache_path': 'srams',
   }
 
   #-----------------------------------------------------------------------
@@ -110,6 +110,7 @@ def construct():
 
   g.add_node( info              )
   g.add_node( sv2v              )
+  g.add_node( testbench         )
   g.add_node( openram           )
   g.add_node( constraints       )
   g.add_node( synth             )
@@ -122,14 +123,13 @@ def construct():
   g.add_node( route             )
   g.add_node( postroute_hold    )
   g.add_node( signoff           )
-  g.add_node( pt_signoff        )
-  g.add_node( genlibdb          )
   g.add_node( gdsmerge          )
   g.add_node( drc               )
   g.add_node( lvs               )
-  g.add_node( testbench         )
   g.add_node( vcs_sim           )
+  g.add_node( pt_signoff        )
   g.add_node( power_est         )
+  g.add_node( genlibdb          )
 
   #-----------------------------------------------------------------------
   # Graph -- Add edges

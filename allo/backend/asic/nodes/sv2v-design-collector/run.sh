@@ -12,7 +12,7 @@ mkdir -p outputs
 
 : "${design_path:?Missing parameter: design_path}"
 : "${manifest:?Missing parameter: manifest}"
-: "${top_module:=${design_name:?Missing parameter: top_module or design_name}}"
+: "${top_module:?Missing parameter: top_module}"
 : "${sv2v_bin:=sv2v}"
 : "${sv2v_defines:=TARGET_ASIC=1}"
 : "${sv2v_include_dirs:=.}"

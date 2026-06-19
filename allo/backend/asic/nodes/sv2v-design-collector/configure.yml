@@ -30,7 +30,6 @@ commands:
 #-------------------------------------------------------------------------
 
 parameters:
-  design_name: undefined
   design_path: undefined
   top_module: undefined
   manifest: rtl/sv2v_manifest.f
