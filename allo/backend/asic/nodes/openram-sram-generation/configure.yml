@@ -33,14 +33,6 @@ parameters:
 preconditions:
   - assert Tool( 'python' )
   - assert Tool( 'lc_shell' )
-  - |
-    import pathlib
-    import openram
-
-    openram_root = pathlib.Path(openram.__file__).resolve().parent
-    sram_compiler = openram_root / "sram_compiler.py"
-
-    assert sram_compiler.is_file(), f"Missing OpenRAM SRAM compiler: {sram_compiler}"
 
 postconditions:
   - assert File( 'outputs/srams' )

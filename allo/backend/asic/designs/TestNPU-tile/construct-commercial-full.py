@@ -21,6 +21,7 @@ def construct():
 
   adk_name = 'freepdk-45nm'
   adk_view = 'view-standard'
+  openram_python = os.environ.get('OPENRAM_PYTHON', 'python')
 
   parameters = {
     'construct_path'      : __file__,
@@ -47,7 +48,7 @@ def construct():
     'sv2v_include_dirs' : '.:compute_tile:compute_tile/fpu',
     # OpenRAM params
     'sram_manifest'  : 'rtl/sram_manifest.yml',
-    'python_bin'     : 'python',
+    'python_bin'     : openram_python,
     'openram_script' : '',
     'tech_name'      : 'freepdk45',
     'process_corner' : 'TT',

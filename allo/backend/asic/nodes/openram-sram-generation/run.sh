@@ -60,6 +60,17 @@ if is_true "$use_sram_cache"; then
   exit 0
 fi
 
+"$python_bin" - <<'PY'
+import openram
+import pathlib
+
+openram_root = pathlib.Path(openram.__file__).resolve().parent
+sram_compiler = openram_root / "sram_compiler.py"
+
+if not sram_compiler.is_file():
+    raise SystemExit(f"ERROR: Missing OpenRAM SRAM compiler: {sram_compiler}")
+PY
+
 if [ -z "$openram_script" ]; then
   openram_script="$("$python_bin" - <<'PY'
 import openram, pathlib

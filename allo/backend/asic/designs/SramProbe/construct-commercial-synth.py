@@ -14,6 +14,7 @@ def construct():
 
   adk_name = 'freepdk-45nm'
   adk_view = 'view-standard'
+  openram_python = os.environ.get('OPENRAM_PYTHON', 'python')
 
   this_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,7 +32,7 @@ def construct():
 
     # OpenRAM params
     'sram_manifest'       : 'rtl/sram_manifest.yml',
-    'python_bin'          : 'python',
+    'python_bin'          : openram_python,
     'openram_script'      : '',
     'tech_name'           : 'freepdk45',
     'process_corner'      : 'TT',
