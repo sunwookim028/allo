@@ -1,0 +1,13 @@
+#=========================================================================
+# Constraints
+#=========================================================================
+
+name: constraints
+
+outputs:
+  - constraints.tcl
+
+parameters:
+  clock_period: 10.0
+  design_name: undefined
+

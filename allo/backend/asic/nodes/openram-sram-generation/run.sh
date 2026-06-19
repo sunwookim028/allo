@@ -24,7 +24,33 @@ is_true() {
   esac
 }
 
+construct_dir="$(cd "$(dirname "$construct_path")" && pwd)"
+
+if [[ "$sram_manifest" = /* ]]; then
+  manifest_path="$sram_manifest"
+else
+  manifest_path="$construct_dir/$sram_manifest"
+fi
+
+if [ ! -f "$manifest_path" ]; then
+  echo "ERROR: SRAM manifest does not exist: $manifest_path"
+  exit 1
+fi
+
 if is_true "$use_sram_cache"; then
+  : "${sram_cache_path:?Missing parameter: sram_cache_path when use_sram_cache is True}"
+
+  if [[ "$sram_cache_path" = /* ]]; then
+    cache_path="$sram_cache_path"
+  else
+    cache_path="$construct_dir/$sram_cache_path"
+  fi
+
+  if [ ! -d "$cache_path" ]; then
+    echo "ERROR: sram_cache_path does not exist: $cache_path"
+    exit 1
+  fi
+
   "$python_bin" scripts/copy_sram_cache.py \
     --manifest "$manifest_path" \
     --cache-path "$cache_path" \
@@ -40,18 +66,6 @@ import openram, pathlib
 print(pathlib.Path(openram.__file__).resolve().parent / "sram_compiler.py")
 PY
 )"
-fi
-
-if [[ "$sram_manifest" = /* ]]; then
-  manifest_path="$sram_manifest"
-else
-  construct_dir="$(cd "$(dirname "$construct_path")" && pwd)"
-  manifest_path="$construct_dir/$sram_manifest"
-fi
-
-if [ ! -f "$manifest_path" ]; then
-  echo "ERROR: SRAM manifest does not exist: $manifest_path"
-  exit 1
 fi
 
 "$python_bin" scripts/gen_openram_cfgs.py \
@@ -128,4 +142,3 @@ for cfg in "${cfgs[@]}"; do
 
   test -f "$outdir/$name.db"
 done
-
