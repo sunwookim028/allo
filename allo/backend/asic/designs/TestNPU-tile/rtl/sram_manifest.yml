@@ -5,7 +5,7 @@ srams:
     num_rw_ports: 2
     num_r_ports: 0
     num_w_ports: 0
-    num_banks: 1
+    num_banks: 2
     words_per_row: 4
     write_size: 32
 
@@ -15,6 +15,6 @@ srams:
     num_rw_ports: 2
     num_r_ports: 0
     num_w_ports: 0
-    num_banks: 1
+    num_banks: 2
     words_per_row: 4
     write_size: 64

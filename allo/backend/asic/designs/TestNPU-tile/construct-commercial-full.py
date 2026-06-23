@@ -94,9 +94,9 @@ def construct():
   genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb')        )
   gdsmerge       = Node( os.path.join(nodes_dir, 'mentor-calibre-gdsmerge')       )
   drc            = Node( os.path.join(nodes_dir, 'mentor-calibre-drc')            )
-  lvs            = Node( os.path.join(nodes_dir, 'mentor-calibre-lvs')            )
-  vcs_sim        = Node( 'synopsys-vcs-sim-old',            default=True          )
-  power_est      = Node( 'synopsys-pt-power',               default=True          )
+  lvs            = Node( os.path.join(nodes_dir, 'mentor-calibre-lvs')            ) 
+  vcs_sim        = Node( os.path.join(nodes_dir, 'synopsys-vcs-sim-old')          )
+  power_est      = Node( os.path.join(nodes_dir, 'synopsys-pt-power')             )
 
   #-----------------------------------------------------------------------
   # Modify Nodes
