@@ -253,4 +253,4 @@ Recommended path: pitch Alt A as the long-horizon design, propose Alt C as the b
 | `tests/dataflow/test_hierachical_mesh.py` | 1-240 | The single upstream multi-kernel-Stateful test; uses *kernel-local* Stateful only — pattern allo-tpu/allo-npu need is not exercised |
 | `examples/feather/feather.py` | 48-139 | The flagship mesh example; uses *zero* Stateful |
 | Local `notes/PITFALLS_DATAFLOW_REGION.md` | 1-50 | The four-item exhibit list as the user found them |
-| `ALLO_SHORTCOMINGS.md` | items 1-3 | Same three Allo gaps re-discovered from the TPU side |
+| `notes/ALLO_SHORTCOMINGS.md` | items 1-3 | Same three Allo gaps re-discovered from the TPU side |

@@ -100,7 +100,7 @@ _(none currently — `wip/simulator-deep-scan` was fixed and landed as
 
 ## Planned (not started)
 
-Sourced from `/work/shared/users/phd/sk3463/projects/ALLO_SHORTCOMINGS.md`.
+Sourced from `notes/ALLO_SHORTCOMINGS.md`.
 Items #1, #3 are partially handled above.
 
 | # | Item | Priority |
@@ -132,7 +132,7 @@ Items #1, #3 are partially handled above.
 - Consumer-side handoff doc is at `/work/shared/users/phd/sk3463/projects/allo-npu/handoff.md`
   (moved out of this repo 2026-05-12).
 - Allo and allo-npu are separate sessions. Never edit the other
-  repo. See `/work/shared/users/phd/sk3463/projects/ALLO_LESSONS.md`.
+  repo. See `notes/ALLO_LESSONS.md`.
 - Before claiming a fix is validated: `rm -rf .cache/llvm_sim/`
   in allo-tpu and rebuild. Cache is keyed only on level `tpu.py`
   + top-level `tpu_config.py`.
