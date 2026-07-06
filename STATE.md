@@ -1,21 +1,24 @@
 # Fork state — `sunwookim028/allo`
 
-This file lives on the `next` branch (fork default) and tracks what
+This file lives on the `main` branch (fork default) and tracks what
 is implemented and what is planned. For open PRs, branch dependencies,
 and housekeeping steps see `BRANCHES.md`. Update this file with any
-merge into `next` or any change to planned work. Consumer repo:
+merge into `main` or any change to planned work. Consumer repo:
 `sunwookim028/allo-npu` consumes this fork as its editable Allo install.
 
-## Branches
+## Remotes and branches
+
+Remotes: `origin` = `sunwookim028/allo` (the fork), `upstream` =
+`cornell-zhang/allo`. Upstream is a read-only baseline reached via
+`upstream/main`; there is no local mirror branch and no `next` branch.
 
 | Branch | Role | Tracks |
 |---|---|---|
-| `main` | mirror of upstream `cornell-zhang/allo:main`. Never commit. | `origin/main` |
-| `next` | integration HEAD. Pulled by allo-npu. Re-merge as features advance. | `fork/next` |
-| `feature/*`, `fix/*` | one branch ↔ one upstream PR, each based on `origin/main` | `fork/<same>` |
-| `wip/*` | known-broken or incomplete work parked for later | `fork/<same>` |
+| `main` | integration HEAD and fork default. The working branch; pulled by allo-npu. NOT a mirror of upstream. | `origin/main` |
+| `feature/*`, `fix/*` | one branch ↔ one upstream PR, each based on `upstream/main` | `origin/<same>` |
+| `wip/*` | known-broken or incomplete work parked for later | `origin/<same>` |
 
-## Implemented in `next` (delta vs `origin/main`)
+## Implemented in `main` (delta vs `upstream/main`)
 
 - **Bare-scalar `@df.region()` args → `s_axilite`** — *(reverted from `next`
   2026-05-10 via revert `a7ae144`; branch `feature/region-bare-scalar-axilite`
@@ -48,10 +51,10 @@ merge into `next` or any change to planned work. Consumer repo:
   `_process_function_streams` so callees nested inside `affine.for` /
   `scf.if` have their streams lowered before LLVM conversion. Does NOT
   add nested calls to `pe_call_define_ops` (avoids OMP over-wrap).
-  Branch: `fix/simulator-nested-call-streams` (merged into `next`).
+  Branch: `fix/simulator-nested-call-streams` (merged into `main`).
 - **Mesh-accelerator tile tests** — tile-based hierarchical
   dataflow regression set. Branch: `feature/mesh-accelerator-v2`
-  (`b73b555`), the maintained successor, already merged into `next`.
+  (`b73b555`), the maintained successor, already merged into `main`.
   Predecessor `feature/mesh-accelerator` (`06ce561`) is an
   intentionally-parked divergent line (22 unique exploratory commits
   not in v2: Catapult-v1 end-to-end, mesh-v1, decoupled-mesh
@@ -61,13 +64,14 @@ merge into `next` or any change to planned work. Consumer repo:
 
 ## Live upstream PRs (cornell-zhang/allo)
 
-Posture: fork-first. All work lands on `fork/next`; only generic and
+Posture: fork-first. All work lands on `origin/main`; only generic and
 clean changes are PR'd to `cornell-zhang/allo` upstream; mininpu-specific
 work stays on the fork.
 
 | PR | Branch | State | Notes |
 |---|---|---|---|
 | #554 | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; CI green; rebase-clean; re-ping @chhzh123 pending |
+| #593 | `fix/region-toparg-aliasing` | OPEN | Fixes #592 (region top-arg dedup by bound name). Polished at `3fd034d`; **cherry-picked onto `main` as `effd2bb`**. |
 
 Merged/closed upstream:
 
@@ -76,27 +80,41 @@ Merged/closed upstream:
 - **#579** (`fix/fp16-hls-half-type`) merged 2026-05-11 (commit `ad8da09`).
 - **#578 / #563 / #562** closed, superseded by #577 / #579 (kept here for history).
 
-Upstream baseline: `origin/main` advanced to `36bc03e` (adds #577 `2211c69`
-plus #586 AIE-backend XRT/driver compat). Local `main` fast-forwarded
-`ad8da09` -> `36bc03e`. A merge of `origin/main` into `next` was attempted
-but conflicts in 6 files (`allo/backend/simulator.py`, `allo/backend/vitis.py`,
-`allo/ir/builder.py`, `allo/ir/visitor.py`,
+Upstream baseline: `upstream/main` is at `36bc03e` (adds #577 `2211c69`
+plus #586 AIE-backend XRT/driver compat). Reconciling `main` with
+`upstream/main` conflicts in 6 files (`allo/backend/simulator.py`,
+`allo/backend/vitis.py`, `allo/ir/builder.py`, `allo/ir/visitor.py`,
 `mlir/lib/Translation/EmitVivadoHLS.cpp`, `tests/test_vhls.py`) - the fork's
 reverted/redesigned lines diverge from the merged-upstream #577 form - so the
-merge was aborted and is deferred to a dedicated reconciliation session. `next`
-still sits on `3458db1` (pre-merge).
+reconciliation is deferred to fork issue #5. `main` is at `effd2bb` (former
+`next` tip `d02719e` plus the #592 polish cherry-pick).
+
+### FORK-LOCAL features (NOT upstream) - preserve during reconciliation (fork issue #5)
+
+These live only on `main` and have no upstream equivalent. The
+main<->upstream reconciliation must not drop them:
+
+1. **Non-blocking stream primitives** - `try_put`/`try_get`/`empty`/`full`
+   (`allo/ir/types.py`; MLIR `StreamTryGet`/`Put`/`Empty`/`Full` ops;
+   `EmitVivadoHLS.cpp` `emitStreamTry*`).
+2. **Full Catapult HLS backend** - `allo/backend/catapult.py`,
+   `mlir/lib/Translation/EmitCatapultHLS.cpp` (+ CAPI + bindings),
+   `harness/catapult`, docs, `tests/test_catapult_hls.py`.
+
+**#592 fix state on `main`:** cherry-picked (commit `effd2bb`); upstream PR
+#593 (`fix/region-toparg-aliasing`, `3fd034d`).
 
 ## Known broken / parked
 
 _(none currently — `wip/simulator-deep-scan` was fixed and landed as
-`fix/simulator-nested-call-streams`, merged into `next` on 2026-05-01.)_
+`fix/simulator-nested-call-streams`, merged into `main` on 2026-05-01.)_
 
 ### Pending investigation
 
 - **L2 NaN** — allo-tpu L2 systolic case may still produce NaN/1e35
   magnitude outputs. The aggressive deep-scan from `feature/nb-streams`
   (commit `8f407bf`) was the suspected cause; replaced by the conservative
-  fix. Re-validate allo-tpu L2 baseline after pulling updated `next`.
+  fix. Re-validate allo-tpu L2 baseline after pulling updated `main`.
 
 ## Planned (not started)
 
@@ -126,7 +144,7 @@ Items #1, #3 are partially handled above.
   Two redundant ones were dropped (bare-scalar WIP already on
   `feature/region-bare-scalar-axilite`; a stale `.claude/scheduled_tasks.lock`).
   One is retained (`stash@{0}`, "region-scope-stateful cross-branch edits") because
-  its untracked payload holds unlanded innovation absent from `next`: 729 lines
+  its untracked payload holds unlanded innovation absent from `main`: 729 lines
   across `tests/dataflow/hls_synth_fp16.py`, `tests/dataflow/test_stream_nb_patterns.py`,
   and `tests/u280_hw_deploy.py`. Land or discard deliberately in a later session.
 - Consumer-side handoff doc is at `/work/shared/users/phd/sk3463/projects/allo-npu/handoff.md`
@@ -139,4 +157,6 @@ Items #1, #3 are partially handled above.
 - One MLIR Context per Python process.
   `LLVM ERROR: Option 'fast' already exists!` means a second
   `customize()` was attempted in the same process.
-- Don't commit to `main`. Don't force-push `next` (only re-merge).
+- `main` is the working/integration branch: commit fork-local work here.
+  Do not force-push `main`; integrate feature branches by merge. Never
+  commit fork-local docs onto `feature/*`/`fix/*` branches bound for upstream.
