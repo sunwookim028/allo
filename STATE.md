@@ -18,7 +18,8 @@ merge into `next` or any change to planned work. Consumer repo:
 ## Implemented in `next` (delta vs `origin/main`)
 
 - **Bare-scalar `@df.region()` args → `s_axilite`** — *(reverted from `next`
-  2026-05-10; branch kept as reference)* — conflicted with PR #577's scalar
+  2026-05-10 via revert `a7ae144`; branch `feature/region-bare-scalar-axilite`
+  kept as reference only)* — conflicted with PR #577's scalar
   rejection (`42df618`). Redesign planned on auto-capture path: auto-captured
   scalars in a `@df.region` should emit `s_axilite` in vitis_hls instead of
   m_axi. Upstream issue TBD. Use `int32[1]` (m_axi) in the meantime.
@@ -30,7 +31,10 @@ merge into `next` or any change to planned work. Consumer repo:
   split). Branch: `feature/region-scope-stateful`.
 - **Hierarchical dataflow simulator deadlock fix** — recursive
   OMP parallel-section injection per function, not just the top.
-  Branch: `fix/hierarchical-dataflow-codegen` (PR #577).
+  *Merged upstream as PR #577 (commit `2211c69`, 2026-05-13).*
+  Branch `fix/hierarchical-dataflow-codegen` deleted from local
+  (fork copy retained). Superseded the earlier closed attempts
+  PR #578 / #563 / #562.
 - **fp16 (half) HLS support** — `f16 → half` ctype mapping, fp16
   scalar math dispatch, `hls::xxx` qualified math ops uniformly.
   *Merged upstream as PR #579 (commit `ad8da09`, 2026-05-11).*
@@ -46,18 +50,41 @@ merge into `next` or any change to planned work. Consumer repo:
   add nested calls to `pe_call_define_ops` (avoids OMP over-wrap).
   Branch: `fix/simulator-nested-call-streams` (merged into `next`).
 - **Mesh-accelerator tile tests** — tile-based hierarchical
-  dataflow regression set. Branch: `feature/mesh-accelerator-v2`.
+  dataflow regression set. Branch: `feature/mesh-accelerator-v2`
+  (`b73b555`), the maintained successor, already merged into `next`.
+  Predecessor `feature/mesh-accelerator` (`06ce561`) is an
+  intentionally-parked divergent line (22 unique exploratory commits
+  not in v2: Catapult-v1 end-to-end, mesh-v1, decoupled-mesh
+  perf-eval framework), kept for archival, not integrated.
 - **Catapult HLS NB stream support** — Catapult backend additions
   + quickstart docs. Branch: `feature/catapult-review`.
 
 ## Live upstream PRs (cornell-zhang/allo)
 
+Posture: fork-first. All work lands on `fork/next`; only generic and
+clean changes are PR'd to `cornell-zhang/allo` upstream; mininpu-specific
+work stays on the fork.
+
 | PR | Branch | State | Notes |
 |---|---|---|---|
-| #554 | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; re-pinged @chhzh123 2026-05-12 |
-| #577 | `fix/hierarchical-dataflow-codegen` | OPEN | EmitVivadoHLS.cpp restored to main (b5ee250); pylint fix (eab77a8); CI green; @chhzh123 pre-approved merge; awaiting @Fangtangtang final pass |
+| #554 | `fix/vhls-mlir-percent-alloc-csim` | OPEN | Rebased + tests added; CI green; rebase-clean; re-ping @chhzh123 pending |
 
-#579 merged 2026-05-11 (commit `ad8da09`).
+Merged/closed upstream:
+
+- **#577** (`fix/hierarchical-dataflow-codegen`) merged 2026-05-13 (commit `2211c69`).
+  Local branch deleted; fork copy retained.
+- **#579** (`fix/fp16-hls-half-type`) merged 2026-05-11 (commit `ad8da09`).
+- **#578 / #563 / #562** closed, superseded by #577 / #579 (kept here for history).
+
+Upstream baseline: `origin/main` advanced to `36bc03e` (adds #577 `2211c69`
+plus #586 AIE-backend XRT/driver compat). Local `main` fast-forwarded
+`ad8da09` -> `36bc03e`. A merge of `origin/main` into `next` was attempted
+but conflicts in 6 files (`allo/backend/simulator.py`, `allo/backend/vitis.py`,
+`allo/ir/builder.py`, `allo/ir/visitor.py`,
+`mlir/lib/Translation/EmitVivadoHLS.cpp`, `tests/test_vhls.py`) - the fork's
+reverted/redesigned lines diverge from the merged-upstream #577 form - so the
+merge was aborted and is deferred to a dedicated reconciliation session. `next`
+still sits on `3458db1` (pre-merge).
 
 ## Known broken / parked
 
@@ -90,10 +117,18 @@ Items #1, #3 are partially handled above.
 ## Conventions for agents working here
 
 - See `BRANCHES.md` for open PR status, not-yet-PR branches, and dependency graph.
-- `/work/shared/users/phd/sk3463/projects/ALLO_HIERARCHY_DESIGN.md` is the pending
-  consolidation lens for items 5–8 of the upstream plan (region-scope `@Stateful`,
-  vhls file-scope statefuls, nested-call streams, auto-capture s_axilite). Read it
-  before pitching maintainers; items are deferred to a fresh session.
+- `notes/HIERARCHY_DESIGN.md` (moved into the repo from the former
+  `ALLO_HIERARCHY_DESIGN.md`) is the pending consolidation lens for items 5–8
+  of the upstream plan (region-scope `@Stateful`, vhls file-scope statefuls,
+  nested-call streams, auto-capture s_axilite). Read it before pitching
+  maintainers; items are deferred to a fresh session.
+- Stash triage (2026-07-06): the 3 previously-undocumented stashes were reviewed.
+  Two redundant ones were dropped (bare-scalar WIP already on
+  `feature/region-bare-scalar-axilite`; a stale `.claude/scheduled_tasks.lock`).
+  One is retained (`stash@{0}`, "region-scope-stateful cross-branch edits") because
+  its untracked payload holds unlanded innovation absent from `next`: 729 lines
+  across `tests/dataflow/hls_synth_fp16.py`, `tests/dataflow/test_stream_nb_patterns.py`,
+  and `tests/u280_hw_deploy.py`. Land or discard deliberately in a later session.
 - Consumer-side handoff doc is at `/work/shared/users/phd/sk3463/projects/allo-npu/handoff.md`
   (moved out of this repo 2026-05-12).
 - Allo and allo-npu are separate sessions. Never edit the other
