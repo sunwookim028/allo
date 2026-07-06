@@ -471,10 +471,18 @@ def _build_top(s, stream_info, enable_layout=False):
         arg_mapping[func_name] = []
         for i, arg in enumerate(func.arguments):
             if "!allo.stream" not in str(arg.type):
-                arg_name = s.func_args[func_name][i].name
+                dtensor = s.func_args[func_name][i]
+                # Deduplicate top-level arguments by the region-level bound name
+                # (`top_name`), not the kernel-local parameter name (`name`).
+                # Two kernels can reuse a local name (e.g. both call their input
+                # `x`) while being bound to distinct region inputs; keying on the
+                # local name would collapse them into a single top-level buffer.
+                # `top_name` falls back to the local name for standalone kernels,
+                # so genuinely shared inputs still merge and non-region behavior
+                # is unchanged.
+                arg_name = dtensor.top_name
                 if arg_name not in used_args:
                     used_args[arg_name] = len(input_types)
-                    dtensor = s.func_args[func_name][i]
                     input_types.append((dtensor.shape, dtensor.dtype))
                     if "itypes" in func.attributes:
                         input_signed += func.attributes["itypes"].value[i]
