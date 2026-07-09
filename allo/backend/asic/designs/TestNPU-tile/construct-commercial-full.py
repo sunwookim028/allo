@@ -55,7 +55,7 @@ def construct():
     'supply_voltage' : 1.1,
     'temperature'    : 25,
     'check_lvsdrc'   : False,
-    'route_supplies' : True,
+    'route_supplies' : False,     ## shortcut to skip power routing
     'analytical_delay' : True,
     #'use_sram_cache' : True,
     #'sram_cache_path': 'srams',
