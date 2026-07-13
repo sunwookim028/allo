@@ -4,6 +4,14 @@ Notes from the Track B step 2 effort to add VPU + hardware loop + on-device
 transpose to `levels/L2/tpu.py`. Each item is a concrete obstacle that
 required either a workaround in user code or a patch to the Allo library.
 
+Priority annotations below were folded in from the former root `STATE.md`
+(now a pointer stub). Related feature-gap tracking lives as fork issues and is
+not restated here: combinational wires (fork issue #9), HLS dependence pragma
+(fork issue #10), shared mutable memory across kernels (fork issue #11; relates
+to items 1-2 below), streams as top-level inputs (fork issue #12), and the
+nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
+relates to item 3).
+
 ## 1. Region-scope `@ Stateful` lowering is incomplete on `main`
 
 - Declaring `int32[N] @ Stateful = 0` at `@df.region` body scope (so the
@@ -31,6 +39,8 @@ required either a workaround in user code or a patch to the Allo library.
 - For an L2 decoder this means 8 single-element `int32[1] @ Stateful`
   arrays at region scope (`pc`, `halted`, `iter_count`, `iter_idx`,
   `loop_start_pc`, `iter_stride_a/b/d`) just to get persistence.
+- **Priority: High** — currently forces 8 single-element region-scope arrays
+  in the L2 decoder.
 
 ## 3. Simulator drops nested-call stream lowering
 
@@ -59,6 +69,7 @@ required either a workaround in user code or a patch to the Allo library.
 - Must use `allo.exp(x)` (and friends) instead.
 - Not documented as a constraint; the failure mode (KeyError on a
   Python-builtin-ish name) does not point at the workaround.
+- **Priority: Low** — `allo.exp` works.
 
 ## 5. Variable shadowing between region params and kernel-local names
 
@@ -72,6 +83,7 @@ required either a workaround in user code or a patch to the Allo library.
   with a region parameter (`d_addr → cmd_d`, etc.).
 - The error message names the variable but not the shadowing, so this
   takes a while to diagnose.
+- **Priority: Medium** — silent/misdirected error.
 
 ## 6. Local `int32` decls inside `elif` branches don't dominate uses
 
@@ -84,6 +96,7 @@ required either a workaround in user code or a patch to the Allo library.
 - Workaround: hoist every such temporary out of the if/elif chain so it
   is declared in a block that dominates all uses. This bloats the
   decoder body.
+- **Priority: Medium** — bloats the decoder.
 
 ## 7. No bitwise `&` operator support in Allo expression DSL
 
@@ -97,6 +110,7 @@ required either a workaround in user code or a patch to the Allo library.
 
 - Works, but verbose and obscures intent (the reader has to recognize
   the division-pair as a single-bit extraction).
+- **Priority: Low** — arithmetic emulation works.
 
 ## 8. Single-MXU-call rule (Allo region instantiation)
 
@@ -109,6 +123,7 @@ required either a workaround in user code or a patch to the Allo library.
 - This forces unnatural code structure — the natural reading is "if
   preloaded, do mxu with these args; if accumulated, do mxu and add" —
   but the compiler needs us to flatten them.
+- **Priority: Medium** — forces unnatural code structure.
 
 ## 9. Sim cache invalidation misses imported helpers
 
@@ -121,6 +136,7 @@ required either a workaround in user code or a patch to the Allo library.
 - Has bitten this project at least twice during the session — commit
   messages claim "validated" because the cached object loaded fine,
   but a clean rebuild fails.
+- **Priority: High** (allo-tpu side) — repeated stale-cache "validated".
 
 ## 10. Error messages point at lowered MLIR, not source
 
@@ -136,3 +152,4 @@ required either a workaround in user code or a patch to the Allo library.
   process without crashing
   (`LLVM ERROR: Option 'fast' already exists!`),
   so debugging via "build twice and diff" doesn't work.
+- **Priority: Low.**
