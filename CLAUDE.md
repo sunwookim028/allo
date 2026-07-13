@@ -24,8 +24,14 @@ OMP_NUM_THREADS=8 conda run -n allo python tests/dataflow/test_region_stateful.p
 
 ## Project state
 
-- `STATE.md` — what is implemented, what is planned, live upstream PRs
-- `BRANCHES.md` — open PR status, not-yet-PR branches, dependency graph, housekeeping steps
+Live state is judged from git/GitHub/notes, not a checked-in status file:
+`git branch -vv`, `gh pr list -R cornell-zhang/allo`,
+`gh issue list -R sunwookim028/allo`, and `notes/`.
+
+- `STATE.md`, `BRANCHES.md`: thin pointer stubs (temporary scratch) that
+  redirect to the sources above; not authorities.
+- `notes/FORK_LOCAL_FEATURES.md`, `notes/MAINTENANCE_CHECKLIST.md`:
+  fork-local file inventory (fork issue #5) and the upstream-merge procedure.
 
 ## Notes from AGENTS.md
 
