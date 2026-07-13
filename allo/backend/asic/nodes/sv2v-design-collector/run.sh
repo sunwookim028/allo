@@ -36,27 +36,86 @@ if [ ! -f "$manifest_path" ]; then
 fi
 
 files=()
+excludes=()
+
+resolve_manifest_path() {
+  local entry="$1"
+
+  if [[ "$entry" = /* ]]; then
+    printf "%s\n" "$entry"
+  else
+    printf "%s\n" "$design_path/$entry"
+  fi
+}
+
+add_entry() {
+  local entry="$1"
+  local path
+  path="$(resolve_manifest_path "$entry")"
+
+  if [ -f "$path" ]; then
+    files+=("$path")
+  elif [ -d "$path" ]; then
+    while IFS= read -r file; do
+      files+=("$file")
+    done < <(find "$path" -maxdepth 1 -type f \( -name '*.sv' -o -name '*.v' \) | sort)
+  else
+    echo "ERROR: manifest entry does not exist: $path" | tee outputs/sv2v.log
+    exit 1
+  fi
+}
+
+add_exclude() {
+  local entry="$1"
+  local path
+  path="$(resolve_manifest_path "$entry")"
+
+  if [ -f "$path" ]; then
+    excludes+=("$path")
+  elif [ -d "$path" ]; then
+    while IFS= read -r file; do
+      excludes+=("$file")
+    done < <(find "$path" -maxdepth 1 -type f \( -name '*.sv' -o -name '*.v' \) | sort)
+  else
+    echo "ERROR: manifest exclude does not exist: $path" | tee outputs/sv2v.log
+    exit 1
+  fi
+}
 
 while IFS= read -r line || [ -n "$line" ]; do
-  # Strip comments and surrounding whitespace.
   line="${line%%#*}"
   line="$(echo "$line" | xargs)"
 
   [ -z "$line" ] && continue
 
-  if [[ "$line" = /* ]]; then
-    file="$line"
+  if [[ "$line" == !* ]]; then
+    add_exclude "${line#!}"
   else
-    file="$design_path/$line"
+    add_entry "$line"
   fi
-
-  if [ ! -f "$file" ]; then
-    echo "ERROR: manifest entry does not exist: $file" | tee outputs/sv2v.log
-    exit 1
-  fi
-
-  files+=("$file")
 done < "$manifest_path"
+
+# Remove excluded files and deduplicate while preserving order.
+filtered=()
+seen=" "
+
+for file in "${files[@]}"; do
+  skip=0
+
+  for ex in "${excludes[@]}"; do
+    if [ "$file" = "$ex" ]; then
+      skip=1
+      break
+    fi
+  done
+
+  if [ "$skip" -eq 0 ] && [[ "$seen" != *" $file "* ]]; then
+    filtered+=("$file")
+    seen="${seen}${file} "
+  fi
+done
+
+files=("${filtered[@]}")
 
 if [ "${#files[@]}" -eq 0 ]; then
   echo "ERROR: manifest has no RTL files: $manifest_path" | tee outputs/sv2v.log
@@ -67,6 +126,9 @@ fi
   echo "# design_path: $design_path"
   echo "# manifest: $manifest_path"
   echo "# top_module: $top_module"
+  echo "# excludes:"
+  printf "#   %s\n" "${excludes[@]}"
+  echo "# files:"
   printf "%s\n" "${files[@]}"
 } > outputs/source-manifest.f
 
@@ -112,7 +174,7 @@ perl -0pi -e 's/\b(parameter|localparam)\s+string\s+/$1 /g' outputs/design.v
 
 # check top module is present
 
-grep -q "module $top_module" outputs/design.v || {
+grep -Eq "^[[:space:]]*module[[:space:]]+$top_module([[:space:]#(;]|$)" outputs/design.v || {
   echo "ERROR: outputs/design.v does not contain module $top_module" | tee -a outputs/sv2v.log
   exit 1
 }

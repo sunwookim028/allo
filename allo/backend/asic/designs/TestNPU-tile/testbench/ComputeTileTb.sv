@@ -19,7 +19,7 @@
 module ComputeTileTb;
 
   localparam VECTOR_WIDTH = 256;
-  localparam IRAM_ADDR_WIDTH = 10;
+  localparam IRAM_ADDR_WIDTH = 12;
   localparam L1_DATA_WIDTH = 256;
   localparam DM_ADDR_WIDTH = 16;
   localparam DM_DATA_WIDTH = 256;

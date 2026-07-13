@@ -45,7 +45,7 @@ def construct():
     # SV2V params
     'top_module'        : 'compute_tile',
     'design_path'       : '../../../mininpu/npu/src',
-    'sv2v_include_dirs' : '.:compute_tile:compute_tile/fpu',
+    'sv2v_include_dirs' : '.:common:compute_tile:compute_tile/fpu',
     # OpenRAM params
     'sram_manifest'  : 'rtl/sram_manifest.yml',
     'python_bin'     : openram_python,
