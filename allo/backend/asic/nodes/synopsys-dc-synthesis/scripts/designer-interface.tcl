@@ -84,15 +84,6 @@ if {[llength $dc_sram_db_files] > 0} {
   set dc_target_libraries [concat $dc_target_libraries $dc_sram_db_files]
 }
 
-# also make node 
-
-set dc_sram_mw_libs [lsort [glob -nocomplain inputs/srams/*/*.mwlib]]
-
-if {[llength $dc_sram_mw_libs] > 0} {
-  puts "Info: Found SRAM Milkyway libraries: $dc_sram_mw_libs"
-  set dc_milkyway_ref_libraries [concat $dc_milkyway_ref_libraries $dc_sram_mw_libs]
-}
-
 # Extra libraries
 
 set dc_additional_search_path   $adk_dir
