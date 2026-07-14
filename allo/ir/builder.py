@@ -2887,7 +2887,6 @@ class ASTTransformer(ASTBuilder):
                 ASTTransformer.get_mlir_op_result(ctx, arg) for arg in new_args
             ]
 
-
             call_op = func_d.CallOp(
                 [],
                 FlatSymbolRefAttr.get(func_def.name),

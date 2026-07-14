@@ -111,6 +111,7 @@ def _process_function_streams(
                     if isinstance(mod_op, func_d.FuncOp):
                         if callee_name == str(mod_op.sym_name).strip('"'):
                             pe_call_define_ops[op] = mod_op
+                            # Recursively process the callee function first
                             _process_function_streams(
                                 module, mod_op, processed_funcs, all_pe_calls_by_func
                             )
