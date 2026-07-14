@@ -13,6 +13,7 @@ Durable procedure moved out of the former root `BRANCHES.md` scratch file.
    support).
 4. Update the affected fork issues (`gh issue list -R sunwookim028/allo`) and
    any relevant `notes/`.
-5. If `feature/nb-streams` or `feature/mesh-accelerator-v2` carried that branch
-   as a merge dep, rebase them onto the refreshed `upstream/main` to drop the
-   merged-in commits.
+5. If `feature/mesh-accelerator` or `wip/simulator-deep-scan` carried that
+   branch as a merge dep, rebase them onto the refreshed `upstream/main` to drop
+   the merged-in commits. (Current local branches: `git branch` ->
+   `main`, `feature/mesh-accelerator`, `wip/simulator-deep-scan`.)
