@@ -1,6 +1,9 @@
 # Maintenance checklist
 
-Durable procedure moved out of the former root `BRANCHES.md` scratch file.
+Durable procedure for reconciling `main` with `upstream/main`. Project state
+(open PRs, branch dependencies) is judged from git/GitHub, not checked-in `.md`
+snapshots; the living fork-vs-upstream feature map is the pinned fork issue
+https://github.com/sunwookim028/allo/issues/13.
 
 ## When a PR merges upstream
 

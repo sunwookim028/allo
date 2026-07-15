@@ -23,8 +23,8 @@
 - Upstream (`cornell-zhang/allo`) is tracked via the `upstream` remote; compare against `upstream/main`. There is no local mirror branch and no `next` branch.
 - Remote convention: `origin` = `sunwookim028/allo` (the fork), `upstream` = `cornell-zhang/allo`.
 - New features/fixes go on `feature/*` or `fix/*` branches based on `upstream/main`, one branch per upstream PR.
-- Fork-local files (docs, notes, CLAUDE.md, STATE.md, BRANCHES.md) live on `main` only — never on feature branches destined for upstream.
-- See `BRANCHES.md` for current open PRs and branch dependencies.
+- Fork-local files (docs, notes, CLAUDE.md) live on `main` only - never on feature branches destined for upstream.
+- Project state (open PRs, branch dependencies, fork-vs-upstream feature map) is judged from git/GitHub, not checked-in `.md` snapshots. The living feature map is the pinned fork issue https://github.com/sunwookim028/allo/issues/13.
 
 # Don'ts
 - Do not modify repository structure without approval

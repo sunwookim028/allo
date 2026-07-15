@@ -5,7 +5,10 @@ transpose to `levels/L2/tpu.py`. Each item is a concrete obstacle that
 required either a workaround in user code or a patch to the Allo library.
 
 Priority annotations below were folded in from the former root `STATE.md`
-(now a pointer stub). Related feature-gap tracking lives as fork issues and is
+(now removed; project state is judged from git/GitHub, and the living
+fork-vs-upstream feature map is the pinned fork issue
+https://github.com/sunwookim028/allo/issues/13). Related feature-gap tracking
+lives as fork issues and is
 not restated here: combinational wires (fork issue #9), HLS dependence pragma
 (fork issue #10), shared mutable memory across kernels (fork issue #11; relates
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
