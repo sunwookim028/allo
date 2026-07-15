@@ -32,8 +32,9 @@ Live state is judged from git/GitHub/notes, not a checked-in status file:
   https://github.com/sunwookim028/allo/issues/13. It is the single living
   picture of what the fork carries vs upstream; project state is otherwise
   judged from git/GitHub, not checked-in `.md` snapshots.
-- `notes/FORK_LOCAL_FEATURES.md`, `notes/MAINTENANCE_CHECKLIST.md`:
-  fork-local file inventory (fork issue #5) and the upstream-merge procedure.
+- Fork-local file inventory: fork issue #5
+  (https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476).
+- `notes/MAINTENANCE_CHECKLIST.md`: the upstream-merge procedure.
 
 ## Notes from AGENTS.md
 

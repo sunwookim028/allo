@@ -12,8 +12,8 @@ https://github.com/sunwookim028/allo/issues/13.
 3. Reconcile `main` with the merged commit. `main` is not a fast-forward of
    `upstream/main`, so this goes through the main<->upstream reconciliation
    (fork issue #5) and MUST preserve the fork-local features inventoried in
-   `notes/FORK_LOCAL_FEATURES.md` (nb-stream primitives, Catapult nb-stream
-   support).
+   fork issue #5 (nb-stream primitives, Catapult nb-stream support):
+   https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476.
 4. Update the affected fork issues (`gh issue list -R sunwookim028/allo`) and
    any relevant `notes/`.
 5. If `feature/mesh-accelerator` or `wip/simulator-deep-scan` carried that
