@@ -286,8 +286,10 @@ fi
 ### 6.2 MLIR Build for RHEL 8
 
 The `.so` files in `allo/_mlir/_mlir_libs/` must be built against the `build-rhel8` LLVM
-(not the default `build/` which was compiled on a glibc 2.35 host). See `notes/ENVIRONMENT.md`
-§ "Rebuild for RHEL 8" for the full cmake + ninja + copy procedure.
+(not the default `build/` which was compiled on a glibc 2.35 host). The conda `allo` env
+already sets `LLVM_BUILD_DIR` to `build-rhel8`; do not override it (see `CLAUDE.md`
+environment notes and `notes/PITFALLS_DATAFLOW_REGION.md`). Build the project with
+`pip install -v -e .` per `AGENTS.md`.
 
 ### 6.3 Codegen, Synthesis, PPA
 
