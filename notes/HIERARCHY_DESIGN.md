@@ -1,10 +1,19 @@
 # Allo hierarchical-region pitch: consolidate or fragment?
 
+## Status update (2026-07-15)
+
+Items 1 and 2 below (simulator nested-call streams; region-scope Stateful
+crash) have landed upstream via PR #577 (merged 2026-05-13). The analysis
+below is kept as-is as the historical design record dated 2026-05-12; it is
+not being rewritten to match. Live tracking of the remaining open design
+questions (items 3-4, and the section 7-8 open questions / architecture
+alternatives) is fork issue #7.
+
 A research artifact for Sunwoo Kim, drafted 2026-05-12 before a future
 "pitch the maintainers" session. The four items in scope are:
 
-1. `fix/simulator-nested-call-streams` — simulator's `_process_function_streams` does not deep-scan sub-region calls in control flow.
-2. `feature/region-scope-stateful` — region-body `@Stateful` shared across inner kernels (crashes on upstream `main`).
+1. `fix/simulator-nested-call-streams` — simulator's `_process_function_streams` does not deep-scan sub-region calls in control flow. (Landed upstream via PR #577; see status update above.)
+2. `feature/region-scope-stateful` — region-body `@Stateful` shared across inner kernels (crashes on upstream `main`). (Crash fix landed upstream via PR #577; see status update above.)
 3. Per-kernel `static` emission of `@Stateful` globals in `EmitVivadoHLS.cpp` (no branch yet).
 4. Bare-scalar auto-capture `s_axilite` (no branch; PR #577 explicitly rejects scalar in `args=[]`).
 
@@ -63,6 +72,10 @@ Mapping each in-scope item to a specific limb this pattern fails to express in u
 | (2) inter-PE streams | **Item 1** — sub-region calls inside parent control flow leave the callee's streams un-lowered. |
 | (3) concurrent PE processes | (lands separately) PR #577's recursive OMP injection makes inner kernels actually run concurrently in the simulator. |
 | (4) mixed control / bulk-data | **Item 4** — auto-captured scalars have no `s_axilite` emission; PR #577's rejection of scalars in `args=[...]` pushes users onto a one-way street with no s_axilite path. |
+
+(Status update 2026-07-15: the item 1 and item 2 crashes referenced in rows
+(1)/(2) above landed upstream via PR #577; see status update near the top of
+this file.)
 
 The four items are *four limbs of the same canonical pattern*, not four unrelated bugs.
 
@@ -141,6 +154,9 @@ Allo's mesh examples (`examples/feather`, `test_hierachical_mesh`) succeed only 
 | 2 | Region-scope `@Stateful` | `ASTContext.copy()` doesn't propagate stateful state | Stateful was designed kernel-local before hierarchy existed; region-scope is a composition that the type-annotation builder (#509) doesn't handle |
 | 3 | Per-kernel `static` emission | `emitFunction` emits stateful globals inside each function | The HLS emitter treats each function independently; module-level Stateful symbols have no module-level emission site |
 | 4 | Bare-scalar auto-capture `s_axilite` | Auto-captured scalars in vitis_hls don't get `s_axilite` pragma | Auto-capture lowering was designed for arrays (memref) and never extended to bare scalars; the AXI-Lite mapping convention only exists in `postprocess_hls_code` for explicit `args=[]` scalars |
+
+(Status update 2026-07-15: items 1 and 2 above landed upstream via PR #577;
+see status update near the top of this file. Items 3 and 4 remain open.)
 
 **Connections between items:**
 

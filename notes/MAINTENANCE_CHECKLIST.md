@@ -16,7 +16,7 @@ https://github.com/sunwookim028/allo/issues/13.
    https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476.
 4. Update the affected fork issues (`gh issue list -R sunwookim028/allo`) and
    any relevant `notes/`.
-5. If `feature/mesh-accelerator` or `wip/simulator-deep-scan` carried that
-   branch as a merge dep, rebase them onto the refreshed `upstream/main` to drop
-   the merged-in commits. (Current local branches: `git branch` ->
-   `main`, `feature/mesh-accelerator`, `wip/simulator-deep-scan`.)
+5. Rebase any live feature/fix/wip branches that carried the merged branch as
+   a dependency onto the refreshed `upstream/main` to drop the merged-in
+   commits; check `git branch -a` for the current set (branches come and go,
+   so do not hardcode names here).

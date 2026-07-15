@@ -244,7 +244,6 @@ The decoupled mesh has higher absolute area because:
 | `hls_projects/decoupled_2x1_csyn.prj/` | Vitis HLS project: top_decoupled_2x1 |
 | `mlir/lib/Translation/EmitVivadoHLS.cpp` | Vitis HLS codegen (NB ops fixed) |
 | `mlir/lib/Translation/EmitTapaHLS.cpp` | Tapa HLS codegen (NB ops fixed) |
-| `ALLO_CHANGE.md` | Full log of Allo codebase modifications |
 
 ---
 

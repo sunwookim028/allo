@@ -511,6 +511,11 @@ With block synthesis, Catapult automatically infers FIFO depths based on the II 
 
 ## 8. Running Synthesis
 
+NOTE (2026-07-15): `tests/dataflow/catapult_synth_decoupled_2x1.py` is not in
+the tree; it stayed on the deleted `feature/mesh-accelerator` branch (last tip
+`06ce561`) and can be recovered from there if needed. The nearest in-tree
+equivalent is `tests/dataflow/hls_synth_decoupled.py`.
+
 ```bash
 # Codegen only (no Catapult needed)
 ./run_allo.sh python tests/dataflow/catapult_synth_decoupled_2x1.py --mode codegen

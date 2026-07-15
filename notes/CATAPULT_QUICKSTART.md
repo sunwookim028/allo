@@ -291,6 +291,11 @@ The `.so` files in `allo/_mlir/_mlir_libs/` must be built against the `build-rhe
 
 ### 6.3 Codegen, Synthesis, PPA
 
+NOTE (2026-07-15): `tests/dataflow/catapult_synth_decoupled_2x1.py` is not in
+the tree; it stayed on the deleted `feature/mesh-accelerator` branch (last tip
+`06ce561`) and can be recovered from there if needed. The nearest in-tree
+equivalent is `tests/dataflow/hls_synth_decoupled.py`.
+
 ```bash
 # Generate kernel.cpp only (no Catapult needed)
 ./run_allo.sh python tests/dataflow/catapult_synth_decoupled_2x1.py --mode codegen
@@ -313,5 +318,4 @@ Project output goes to `catapult_decoupled_2x1.prj/` (put under `/scratch/` to a
 | AC datatypes headers | `$MGC_HOME/shared/include/` |
 | Catapult 2024.2 install | `/opt/siemens/catapult/2024.2/` |
 | Synthesis results & analysis | `notes/CATAPULT.md` |
-| Full env setup (RHEL 8 quirks) | `notes/ENVIRONMENT.md` |
 | Allo Catapult backend | `allo/backend/catapult.py` |

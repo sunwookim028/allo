@@ -25,13 +25,17 @@ relates to item 3).
   `AttributeError: 'ASTContext' object has no attribute 'global_op_cache'`
   or trips an MLIR `Assertion 'value' failed` (null Value) when a kernel
   reads-and-writes a region-scope Stateful inside a loop or branch.
-- Workaround: switch to the `feature/region-scope-stateful` branch
-  (commit `5c4d1b5`). That branch propagates `stateful_var_map` /
-  `stateful_counter` through `ASTContext.copy()`, resets
-  `global_op_cache` per function, and anchors `memref.get_global` at
-  each function's entry block.
-- Net effect: a feature most projects need (sharing scratchpad/acc
-  across decoder + driver kernels) is gated behind an unmerged branch.
+- Update (2026-07-15): the `AttributeError: 'ASTContext' object has no
+  attribute 'global_op_cache'` copy-crash landed on `main` via upstream
+  PR #577 (global_op_cache copy fix). The broader region-scope stateful
+  propagation block (`stateful_var_map` / `stateful_counter` through
+  `ASTContext.copy()`, per-function `global_op_cache` reset, anchoring
+  `memref.get_global` at each function's entry block) remains fork-local
+  on `main`; it did not need its own branch (the former
+  `feature/region-scope-stateful` branch, commit `5c4d1b5`, is deleted).
+- Net effect: the crash fix is upstream; the sharing-scratchpad/acc-across-
+  decoder-and-driver-kernels feature itself is still fork-local, tracked in
+  fork issue #7.
 
 ## 2. `@ Stateful` cannot be declared inside `@df.kernel` bodies
 
