@@ -36,7 +36,7 @@ def construct():
     # Synthesis
     # Flatten effort 0 is strict hierarchy, 3 is full flattening
     'flatten_effort'      : 0,
-    'topographical'       : True,
+    'topographical'       : False,
     # Postroute timing target slack
     'setup_target_slack'  : 0.000,
     'hold_target_slack'   : 0.050,
