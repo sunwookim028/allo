@@ -50,7 +50,7 @@ from .._mlir.dialects import (
 from .._mlir.passmanager import PassManager
 from .._mlir.execution_engine import ExecutionEngine
 from ..ir.transform import find_func_in_module
-from ..passes import decompose_library_function
+from ..passes import decompose_library_function, call_ext_libs_in_ptr
 from ..utils import get_func_inputs_outputs
 
 
@@ -1645,6 +1645,10 @@ class LLVMOMPModule(LLVMModule):
             # Get input/output types
             self.in_types, self.out_types = get_func_inputs_outputs(func)
             self.module = decompose_library_function(self.module)
+            if len(ext_libs) > 0:
+                # Must run before the kernel bodies are wrapped in omp regions:
+                # the rewrite only looks at calls directly in a func's entry block.
+                call_ext_libs_in_ptr(self.module, ext_libs)
 
             self.pe_counts = build_dataflow_simulator(self.module, self.top_func_name)
             # Attach necessary attributes
