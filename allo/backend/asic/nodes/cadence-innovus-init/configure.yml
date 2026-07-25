@@ -49,6 +49,7 @@ parameters:
     - dont-use.tcl
     - quality-of-life.tcl
     - floorplan.tcl
+    - add-macro-place-blockages.tcl
     - add-endcaps-welltaps.tcl
     - pin-assignments.tcl
     - make-path-groups.tcl
