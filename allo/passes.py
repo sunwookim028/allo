@@ -479,6 +479,17 @@ def decompose_library_function(module):
 
 
 def call_ext_libs_in_ptr(module, ext_libs):
+    # The CPU paths (LLVM JIT and the OMP dataflow simulator) link each IP as a
+    # shared library through unranked-memref pointers; an hls::stream<T> port has
+    # no such representation. Refuse it here with a clear message rather than
+    # letting the generated wrapper fail later at g++.
+    for lib in ext_libs:
+        if getattr(lib, "has_stream_args", False):
+            raise NotImplementedError(
+                f"IP '{lib.top}' has hls::stream<T> arguments, which are only "
+                "supported for the vitis_hls/vivado_hls targets, not the CPU "
+                "'llvm'/'simulator' targets."
+            )
     lib_map = {lib.top: lib for lib in ext_libs}
     with module.context, Location.unknown():
         op_to_remove = []
