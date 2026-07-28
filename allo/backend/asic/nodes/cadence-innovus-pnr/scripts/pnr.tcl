@@ -80,10 +80,9 @@ proc report_metrics {phase} {
 set init_layout_view ""
 set init_abstract_name ""
 set sram_lef_files [lsort [glob -nocomplain inputs/srams/*/*.lef]]
-set sram_lib_files [lsort [glob -nocomplain inputs/srams/*/*.lib]]
 
 set init_verilog "./inputs/design.v"
-set init_mmmc_file ""
+set init_mmmc_file "scripts/mmmc.tcl"
 set init_lef_file [concat \
   [list inputs/adk/rtk-tech.lef inputs/adk/stdcells.lef inputs/adk/rtk-tech.lef inputs/adk/stdcells.lef] \
   $sram_lef_files \
@@ -97,41 +96,6 @@ set_db init_no_new_assigns true
 if {[file exists inputs/adk/pdk-qrc-lef.map]} {
   setExtractRCMode -lefTechFileMap inputs/adk/pdk-qrc-lef.map
 }
-
-create_rc_corner -name typical -cap_table inputs/adk/rtk-typical.captable -T 25
-
-create_library_set -name libs_typical \
-  -timing [concat \
-    [list \
-    inputs/adk/stdcells.lib \
-    ] \
-    $sram_lib_files \
-  ]
-
-create_library_set -name libs_bc \
-  -timing [list inputs/adk/stdcells-bc.lib]
-
-create_library_set -name libs_wc \
-  -timing [concat \
-    [list \
-    inputs/adk/stdcells-wc.lib \
-    ] \
-    $sram_lib_files \
-  ]
-
-create_delay_corner -name delay_typical \
-  -early_library_set libs_typical \
-  -late_library_set libs_typical \
-  -rc_corner typical
-
-create_constraint_mode -name constraints_default \
-  -sdc_files [list ./inputs/design.sdc]
-
-create_analysis_view -name analysis_default \
-  -constraint_mode constraints_default \
-  -delay_corner delay_typical
-
-set_analysis_view -setup [list analysis_default] -hold [list analysis_default]
 
 init_design
 
