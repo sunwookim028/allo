@@ -1,0 +1,93 @@
+#=========================================================================
+# Cadence Innovus PNR
+#=========================================================================
+
+name: cadence-innovus-pnr
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+inputs:
+  - adk
+  - design.v
+  - design.sdc
+  - srams
+
+outputs:
+  - design.checkpoint
+  - design.gds.gz
+  - design-merged.gds
+  - design.topdown.v
+  - design.lvs.v
+  - design.vcs.v
+  - design.vcs.pg.v
+  - design.lef
+  - design.pt.sdc
+  - design.sdf
+  - design.virtuoso.v
+  - design.spef.gz
+  - design.def.gz
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - if [[ "x$enable_gui" == "xTrue" ]]; then gui_flag=""; else gui_flag="-nowin"; fi
+  - innovus -overwrite -64 $gui_flag -init START.tcl -log logs/run.log
+  # Outputs
+  - cd outputs
+  - ln -sf ../checkpoints/design.checkpoint design.checkpoint
+  - ln -sf ../typical.spef.gz             design.spef.gz
+  - ln -sf ../results/*.gds.gz            design.gds.gz
+  - ln -sf ../results/*-merged.gds        design-merged.gds
+  - ln -sf ../results/*.topdown.v         design.topdown.v
+  - ln -sf ../results/*.lvs.v             design.lvs.v
+  - ln -sf ../results/*.vcs.v             design.vcs.v
+  - ln -sf ../results/*.vcs.pg.v          design.vcs.pg.v
+  - ln -sf ../results/*.lef               design.lef
+  - ln -sf ../results/*.pt.sdc            design.pt.sdc
+  - ln -sf ../results/*.sdf               design.sdf
+  - ln -sf ../results/*.virtuoso.v        design.virtuoso.v
+  - ln -sf ../results/*.def.gz            design.def.gz
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  enable_gui: true
+  core_density_target: 0.70
+  useful_skew: True
+  useful_skew_ccopt_effort: standard
+  cell_padding: 2
+  signoff_engine: False
+  hold_target_slack: 0.005
+  setup_target_slack: 0.000
+
+#-------------------------------------------------------------------------
+# Debug
+#-------------------------------------------------------------------------
+
+debug:
+  - innovus -overwrite -64 -init START.tcl -log logs/debug.log
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+  - assert Tool( 'innovus' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/design.sdc' )
+
+postconditions:
+  - assert File( 'outputs/design.checkpoint' )
+  - assert File( 'outputs/design.gds.gz' )
+  - assert File( 'outputs/design-merged.gds' )
+  - assert File( 'outputs/design.spef.gz' )
+  - assert File( 'outputs/design.def.gz' )
+  - assert 'ERROR'
+      not in File( 'logs/run.log', enable_case_sensitive=True )
