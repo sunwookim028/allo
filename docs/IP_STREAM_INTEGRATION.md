@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # Integrating HLS IPs that use `hls::stream` interfaces
 
 This document explains a change that lets `allo.IPModule` integrate a
@@ -121,11 +124,16 @@ retargeted to the shared stream too.
 - **Kernel-scope only.** The IP is called from inside a `@df.kernel` body. (An
   earlier experiment showed calling it directly in the `@df.region` body crashes a
   different pass, `_build_top`; supporting that is a separate, larger change.)
-- **HLS targets only.** A stream IP works for `vitis_hls`/`vivado_hls` (csyn and
-  beyond). It cannot run on the CPU targets (`llvm`, `simulator`) or in `csim`
-  mode, because those link the IP as a shared library through raw pointers and
-  have no way to represent a FIFO. We reject those paths with a clear error
-  instead of failing confusingly later.
+- **HLS targets only** *(as of this change)*. A stream IP works for
+  `vitis_hls`/`vivado_hls` (csyn and beyond). It cannot run on the CPU targets
+  (`llvm`, `simulator`) or in `csim` mode, because those link the IP as a shared
+  library through raw pointers and have no way to represent a FIFO. We reject
+  those paths with a clear error instead of failing confusingly later.
+  **Since then**, `target="simulator"` *is* supported, through a stream shim
+  that makes the IP drive Allo's ring buffers directly — see
+  [`IP_STREAM_SIM_SHIM.md`](./IP_STREAM_SIM_SHIM.md). The plain `llvm` target
+  and `csim` remain fenced off, because they run the kernels sequentially and a
+  blocking stream read could never be satisfied.
 
 ---
 
@@ -200,6 +208,10 @@ call @vadd_stream(%2, %0, %1) {stream_dirs = "iio"} : (...) -> ()
 ```
 
 ### Edit 4 — Fence the CPU / simulator paths — `allo/backend/ip.py`, `allo/passes.py`
+
+*(Partly superseded: the dataflow simulator now runs stream IPs through a shim;
+see [`IP_STREAM_SIM_SHIM.md`](./IP_STREAM_SIM_SHIM.md). The fences described
+below still stand for the plain `llvm` target and for `csim`.)*
 
 A stream IP cannot run on the CPU. The two wrapper generators
 (`generate_nanobind_wrapper`, `generate_mlir_c_wrapper`) and the shared-library
@@ -322,7 +334,8 @@ See `tests/ip_integration/test_stream_ip.py` and
   and the `vadd_stream(...)` call; the IP `.cpp` is copied, `#include`d, and
   `add_files`'d.
 - **Fencing:** `target="simulator"` (and the LLVM path) raise a clear
-  `NotImplementedError`.
+  `NotImplementedError`. *(The simulator fence was later lifted — see
+  [`IP_STREAM_SIM_SHIM.md`](./IP_STREAM_SIM_SHIM.md); the LLVM one stands.)*
 - **Regressions:** existing `tests/ip_integration/test_external.py` (7 passed, 1
   skipped) and `tests/dataflow/test_df_unit.py` pass.
 

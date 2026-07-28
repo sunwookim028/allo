@@ -96,12 +96,28 @@ def test_stream_ip_codegen():
         assert "add_files vadd_stream.cpp" in (Path(tmpdir) / "run.tcl").read_text()
 
 
-def test_stream_ip_simulator_rejected():
-    """A stream IP cannot run on the CPU simulator; it must fail loudly."""
+def test_stream_ip_sequential_cpu_paths_rejected():
+    """The sequential CPU paths still refuse a stream IP; they must fail loudly.
+
+    The dataflow *simulator* does support stream IPs now (each kernel is its own
+    thread, so a blocking read can be satisfied -- see
+    ``test_stream_ip_sim.py`` and ``docs/IP_STREAM_SIM_SHIM.md``). The paths that
+    call the IP once, sequentially, cannot: the plain ``llvm`` target
+    (``call_ext_libs_in_ptr`` / ``generate_mlir_c_wrapper``) and vitis_hls
+    ``csim`` (``generate_nanobind_wrapper``).
+    """
+    from allo.dataflow import customize
+    from allo.passes import call_ext_libs_in_ptr
+
     vadd_stream = _make_ip()
-    top = _build_region(vadd_stream)
     with pytest.raises(NotImplementedError):
-        df.build(top, target="simulator")
+        vadd_stream.generate_mlir_c_wrapper()
+    with pytest.raises(NotImplementedError):
+        vadd_stream.generate_nanobind_wrapper()
+
+    s = customize(_build_region(vadd_stream))
+    with pytest.raises(NotImplementedError):
+        call_ext_libs_in_ptr(s.module, s.ext_libs)
 
 
 @pytest.mark.skipif(not hls.is_available(), reason="vitis_hls not available")
@@ -121,5 +137,5 @@ if __name__ == "__main__":
     print("Passed: parser recognizes stream")
     test_stream_ip_codegen()
     print("Passed: stream IP codegen")
-    test_stream_ip_simulator_rejected()
-    print("Passed: simulator rejected")
+    test_stream_ip_sequential_cpu_paths_rejected()
+    print("Passed: sequential CPU paths rejected")

@@ -35,6 +35,7 @@ from .._mlir.ir import (
     FloatType,
     IndexType,
     FlatSymbolRefAttr,
+    UnrankedMemRefType,
 )
 from .._mlir.dialects import (
     allo as allo_d,
@@ -51,7 +52,8 @@ from .._mlir.passmanager import PassManager
 from .._mlir.execution_engine import ExecutionEngine
 from ..ir.transform import find_func_in_module
 from ..passes import decompose_library_function, call_ext_libs_in_ptr
-from ..utils import get_func_inputs_outputs
+from ..utils import get_func_inputs_outputs, get_mlir_dtype_from_str, c2allo_type
+from .ip import STREAM, stream_element_type
 
 
 # The `walk` function
@@ -115,17 +117,246 @@ def _build_spin_wait_loop(module: Module, replace_ip: InsertionPoint) -> Inserti
     return before_ip
 
 
+def _c_type_to_mlir(c_type: str):
+    """MLIR element type for a C type spelled in an IP signature.
+
+    ``"int32_t"`` -> ``i32``. Only the plain C scalar types Allo already knows
+    (``allo/utils.py: c2allo_type``) can be mapped; an HLS type such as
+    ``ap_int<8>`` has no CPU representation here.
+    """
+    if c_type not in c2allo_type:
+        raise NotImplementedError(
+            f"Cannot map the C type '{c_type}' to an Allo type for CPU "
+            "simulation. Use a plain C scalar type "
+            f"(one of: {', '.join(sorted(c2allo_type))})."
+        )
+    return get_mlir_dtype_from_str(c2allo_type[c_type])
+
+
+def _plan_stream_ip_wrapper(lib):
+    """Work out how one stream IP is called from MLIR after lowering.
+
+    Returns ``(arg_plan, input_types)``:
+
+    * ``arg_plan`` -- one entry per *IP argument*: ``("stream", elem_type)``,
+      ``("memref", elem_type)`` or ``("scalar", type)``.
+    * ``input_types`` -- one entry per *MLIR operand* of the generated wrapper.
+      A stream expands to three unranked memrefs (the ring buffer's data, head
+      and tail); an array/pointer to one; a scalar stays a scalar.
+
+    Unranked memrefs (``memref<*xi32>``) are used for the same reason
+    ``call_ext_libs_in_ptr`` uses them: they cross into C as a
+    ``(rank, descriptor pointer)`` pair, which the wrapper hands to
+    ``DynamicMemRefType`` instead of unpacking a descriptor by hand.
+    """
+    int32_type = IntegerType.get_signless(32)
+    arg_plan = []
+    input_types = []
+    for arg_type, shape in lib.args:
+        if shape is STREAM:
+            elem_type = _c_type_to_mlir(stream_element_type(arg_type))
+            arg_plan.append(("stream", elem_type))
+            input_types += [
+                UnrankedMemRefType.get(elem_type, None),  # data
+                UnrankedMemRefType.get(int32_type, None),  # head
+                UnrankedMemRefType.get(int32_type, None),  # tail
+            ]
+        elif shape is None or len(shape) > 0:
+            elem_type = _c_type_to_mlir(arg_type)
+            arg_plan.append(("memref", elem_type))
+            input_types.append(UnrankedMemRefType.get(elem_type, None))
+        else:
+            elem_type = _c_type_to_mlir(arg_type)
+            arg_plan.append(("scalar", elem_type))
+            input_types.append(elem_type)
+    return arg_plan, input_types
+
+
+def declare_stream_ip_wrappers(module: Module, stream_ips: dict):
+    """Swap each stream IP's declaration for its simulator-wrapper declaration.
+
+    Before: ``func.func private @vadd_stream(!allo.stream<i32,4>, ...)`` -- the
+    declaration the FPGA path uses, which no CPU ABI can express.
+    After: ``func.func private @pyvadd_stream_<hash>(memref<*xi32>, ...)`` --
+    the ``extern "C"`` entry point of the generated shim wrapper.
+
+    Only the declaration is replaced here; the call sites are rewritten later,
+    once the ring buffers exist (see :func:`_lower_stream_ip_calls`).
+    """
+    plans = {}
+    for name, lib in stream_ips.items():
+        arg_plan, input_types = _plan_stream_ip_wrapper(lib)
+        old_decl = None
+        for op in module.body.operations:
+            if (
+                isinstance(op, func_d.FuncOp)
+                and str(op.sym_name).strip('"') == name
+                and op.is_external
+            ):
+                old_decl = op
+                break
+        insert_ip = (
+            InsertionPoint(old_decl)
+            if old_decl is not None
+            else InsertionPoint(module.body)
+        )
+        # pylint: disable=unexpected-keyword-arg
+        new_decl = func_d.FuncOp(
+            name=lib.lib_name,
+            type=FunctionType.get(input_types, []),
+            ip=insert_ip,
+        )
+        new_decl.attributes["sym_visibility"] = StringAttr.get("private")
+        if old_decl is not None:
+            old_decl.operation.erase()
+        plans[name] = {"lib": lib, "arg_plan": arg_plan}
+    return plans
+
+
+def _lower_stream_ip_calls(
+    func_def_op: func_d.FuncOp,
+    arg_stream_table: dict,
+    stream_struct_table: dict,
+    stream_type_table: dict,
+    stream_ip_plans: dict,
+    empty_map,
+):
+    """Rewrite ``call @<stream ip>(%s0, ...)`` into a call to its shim wrapper.
+
+    ``func_def_op`` is the kernel that calls the IP. By now its stream arguments
+    have been retyped to ``memref<!allo.struct<data, head, tail>>`` -- the FIFO
+    object the simulator builds for every stream. For each stream operand we
+    open that struct up and pass the three fields on as unranked memrefs, which
+    is exactly what the generated C wrapper expects. Array operands are cast the
+    same way ``call_ext_libs_in_ptr`` casts them; scalars pass straight through.
+    """
+    call_ops: list = []
+    recursive_collect_ops(func_def_op, func_d.CallOp, call_ops)
+    int32_type = IntegerType.get_signless(32)
+    memref_scalar_int_type = MemRefType.get([], int32_type)
+    for call_op in call_ops:
+        callee_name = str(call_op.callee)[1:]
+        plan = stream_ip_plans.get(callee_name)
+        if plan is None:
+            continue
+        lib = plan["lib"]
+        # The IP blocks on its stream ports, so it must run concurrently with
+        # the kernels feeding it: it has to sit in a @df.kernel, which the
+        # simulator turns into its own OpenMP thread (omp.section).
+        if "df.kernel" not in func_def_op.attributes:
+            caller_name = str(func_def_op.sym_name).strip('"')
+            raise NotImplementedError(
+                f"Stream IP '{lib.top}' is called from '{caller_name}', which is "
+                "not a @df.kernel. Wrap the call in its own @df.kernel: it blocks "
+                "on its stream ports and therefore needs its own concurrent "
+                "process."
+            )
+        replace_ip = InsertionPoint(beforeOperation=call_op)
+        new_operands = []
+        for idx, (kind, elem_type) in enumerate(plan["arg_plan"]):
+            operand = call_op.operands[idx]
+            if kind == "scalar":
+                new_operands.append(operand)
+                continue
+            if kind == "memref":
+                cast_op = memref_d.CastOp(
+                    UnrankedMemRefType.get(elem_type, None), operand, ip=replace_ip
+                )
+                new_operands.append(cast_op.result)
+                continue
+            # kind == "stream"
+            try:
+                stream_arg = BlockArgument(operand)
+            except ValueError as exc:
+                raise NotImplementedError(
+                    f"Argument {idx} of stream IP '{lib.top}' is not a stream "
+                    "passed into the enclosing @df.kernel. Declare the stream at "
+                    "@df.region scope and use it in the kernel that calls the IP."
+                ) from exc
+            if stream_arg not in arg_stream_table:
+                raise NotImplementedError(
+                    f"Argument {idx} of stream IP '{lib.top}' is not connected to "
+                    "an Allo stream. Declare the stream at @df.region scope and "
+                    "use it in the kernel that calls the IP."
+                )
+            stream_name = arg_stream_table[stream_arg]
+            stream_type = stream_type_table[stream_name]
+            stream_memref = stream_struct_table[stream_name]
+            if stream_type.rank != 1:
+                raise NotImplementedError(
+                    f"Stream '{stream_name}' carries a non-scalar element "
+                    f"({stream_type}); the hls::stream shim only supports "
+                    "streams of scalars."
+                )
+            if stream_type.element_type != elem_type:
+                raise TypeError(
+                    f"Stream '{stream_name}' carries {stream_type.element_type}, "
+                    f"but IP '{lib.top}' declares argument {idx} as "
+                    f"{lib.args[idx][0]} ({elem_type}). The element types must "
+                    "match: the IP reads and writes Allo's buffer directly."
+                )
+            assert isinstance(stream_memref.type, MemRefType)
+            # Load the FIFO object, then pick its three fields apart.
+            stream_struct = affine_d.AffineLoadOp(
+                result=stream_memref.type.element_type,
+                memref=operand,
+                indices=[],
+                map=empty_map,
+                ip=replace_ip,
+            )
+            field_ops = [
+                allo_d.StructGetOp(  # data (cap = depth + 1 slots)
+                    output=stream_type, input=stream_struct, index=0, ip=replace_ip
+                ),
+                allo_d.StructGetOp(  # head: read index, consumer advances
+                    output=memref_scalar_int_type,
+                    input=stream_struct,
+                    index=1,
+                    ip=replace_ip,
+                ),
+                allo_d.StructGetOp(  # tail: write index, producer advances
+                    output=memref_scalar_int_type,
+                    input=stream_struct,
+                    index=2,
+                    ip=replace_ip,
+                ),
+            ]
+            field_elem_types = [elem_type, int32_type, int32_type]
+            for field_op, field_elem_type in zip(field_ops, field_elem_types):
+                cast_op = memref_d.CastOp(
+                    UnrankedMemRefType.get(field_elem_type, None),
+                    field_op.result,
+                    ip=replace_ip,
+                )
+                new_operands.append(cast_op.result)
+        func_d.CallOp(
+            [],
+            FlatSymbolRefAttr.get(lib.lib_name),
+            new_operands,
+            ip=replace_ip,
+        )
+        call_op.operation.erase()
+
+
 def _process_function_streams(
     module: Module,
     func: func_d.FuncOp,
     processed_funcs: set,
     all_pe_calls_by_func: dict,
+    stream_ip_plans: dict = None,
 ):
     """
     Process streams and PE calls within a single function.
     Returns (stream_struct_table, stream_type_table, pe_call_define_ops, stream_construct_ops)
     for use by the caller.
+
+    ``stream_ip_plans`` maps the name of each hand-written HLS IP with
+    ``hls::stream`` ports to how it must be called on the CPU (see
+    :func:`declare_stream_ip_wrappers`). Such an IP is *not* a PE: it is an
+    opaque external function, so it is excluded from ``pe_call_define_ops`` and
+    its calls are rewritten by :func:`_lower_stream_ip_calls` instead.
     """
+    stream_ip_plans = {} if stream_ip_plans is None else stream_ip_plans
     func_name = str(func.sym_name).strip('"')
     if func_name in processed_funcs:
         return {}, {}, {}, {}
@@ -146,6 +377,9 @@ def _process_function_streams(
             continue
         if isinstance(op, func_d.CallOp):
             callee_name = str(op.callee)[1:]
+            if callee_name in stream_ip_plans:
+                # An external stream IP: not a PE, and it has no body to walk.
+                continue
             if not callee_name.startswith(("load_buf", "store_res")):
                 for mod_op in module.body.operations:
                     if isinstance(mod_op, func_d.FuncOp):
@@ -153,7 +387,11 @@ def _process_function_streams(
                             pe_call_define_ops[op] = mod_op
                             # Recursively process the callee function first
                             _process_function_streams(
-                                module, mod_op, processed_funcs, all_pe_calls_by_func
+                                module,
+                                mod_op,
+                                processed_funcs,
+                                all_pe_calls_by_func,
+                                stream_ip_plans,
                             )
                             break
         elif isinstance(op, allo_d.StreamConstructOp):
@@ -182,11 +420,17 @@ def _process_function_streams(
         callee_name = str(call_op.callee)[1:]
         if callee_name.startswith(("load_buf", "store_res", "usleep")):
             continue
+        if callee_name in stream_ip_plans:
+            continue
         for mod_op in module.body.operations:
             if isinstance(mod_op, func_d.FuncOp):
                 if callee_name == str(mod_op.sym_name).strip('"'):
                     _process_function_streams(
-                        module, mod_op, processed_funcs, all_pe_calls_by_func
+                        module,
+                        mod_op,
+                        processed_funcs,
+                        all_pe_calls_by_func,
+                        stream_ip_plans,
                     )
                     break
 
@@ -290,6 +534,19 @@ def _process_function_streams(
                         new_func_type, module.context
                     )
                     call_op.operands_[arg_def.arg_number] = stream_memref
+        # 1b. A call to a hand-written HLS IP with stream ports is not a
+        # put/get, so the loop below would not touch it -- but its stream
+        # operands have just been retyped to FIFO structs, so it must be
+        # rewritten to the shim wrapper here, while `arg_stream_table` is known.
+        if stream_ip_plans:
+            _lower_stream_ip_calls(
+                func_def_op,
+                arg_stream_table,
+                stream_struct_table,
+                stream_type_table,
+                stream_ip_plans,
+                empty_map,
+            )
         # Collect and replace `stream_get`s and `stream_put`s
         func_stream_ops = []
         recursive_collect_ops(
@@ -1424,7 +1681,30 @@ def _inject_omp_parallel_sections(pe_call_define_ops):
     openmp_d.TerminatorOp(ip=ip_omp_sections)
 
 
-def build_dataflow_simulator(module: Module, top_func_name: str):
+def _check_no_unlowered_stream_ip_calls(module: Module, stream_ips: dict):
+    """Fail loudly if a stream IP call was not reached by the rewrite.
+
+    The rewrite only handles the supported shape: the IP is called inside a
+    ``@df.kernel`` whose stream arguments come from ``@df.region``-scope streams.
+    Anything else (e.g. a call in the region body itself, or in a helper
+    function) would otherwise reach the LLVM lowering as a call to a symbol that
+    no longer exists.
+    """
+    remaining: list = []
+    for op in module.body.operations:
+        recursive_collect_ops(op, func_d.CallOp, remaining)
+    for call_op in remaining:
+        callee_name = str(call_op.callee)[1:]
+        if callee_name in stream_ips:
+            raise NotImplementedError(
+                f"Stream IP '{callee_name}' is called from a place the dataflow "
+                "simulator cannot wire up. Call it inside a @df.kernel, passing "
+                "streams declared at @df.region scope. See "
+                "docs/IP_STREAM_SIM_SHIM.md."
+            )
+
+
+def build_dataflow_simulator(module: Module, top_func_name: str, ext_libs=None):
     # Enable nested OpenMP parallelism so that peer kernels calling
     # sub-regions (which have their own omp.parallel/sections) don't
     # deadlock.  This is safe because the simulator already controls
@@ -1454,6 +1734,16 @@ def build_dataflow_simulator(module: Module, top_func_name: str):
             )
             usleep_op.attributes["sym_visibility"] = StringAttr.get("private")
 
+        # Hand-written HLS IPs whose interface uses hls::stream ports run on the
+        # CPU through the stream shim: their MLIR declaration is swapped for the
+        # generated wrapper's, and their calls are rewritten once the ring
+        # buffers exist. See docs/IP_STREAM_SIM_SHIM.md.
+        ext_libs = [] if ext_libs is None else ext_libs
+        stream_ips = {
+            lib.top: lib for lib in ext_libs if getattr(lib, "has_stream_args", False)
+        }
+        stream_ip_plans = declare_stream_ip_wrappers(module, stream_ips)
+
         # Process all functions with streams recursively, starting from top
         processed_funcs: set = set()
         all_pe_calls_by_func: dict = {}
@@ -1462,8 +1752,10 @@ def build_dataflow_simulator(module: Module, top_func_name: str):
 
         # Recursively process the top function and all its callees
         _, _, pe_call_define_ops, _ = _process_function_streams(
-            module, func, processed_funcs, all_pe_calls_by_func
+            module, func, processed_funcs, all_pe_calls_by_func, stream_ip_plans
         )
+        if stream_ips:
+            _check_no_unlowered_stream_ip_calls(module, stream_ips)
 
         # If no PE calls were found in top function, collect them again from the processed functions
         if not pe_call_define_ops:
@@ -1648,9 +1940,12 @@ class LLVMOMPModule(LLVMModule):
             if len(ext_libs) > 0:
                 # Must run before the kernel bodies are wrapped in omp regions:
                 # the rewrite only looks at calls directly in a func's entry block.
-                call_ext_libs_in_ptr(self.module, ext_libs)
+                # IPs with hls::stream ports are skipped here (allow_stream_ip)
+                # and handled by build_dataflow_simulator, which knows the ring
+                # buffer each stream becomes.
+                call_ext_libs_in_ptr(self.module, ext_libs, allow_stream_ip=True)
 
-            self.pe_counts = build_dataflow_simulator(self.module, self.top_func_name)
+            self.pe_counts = build_dataflow_simulator(self.module, self.top_func_name, ext_libs)
             # Attach necessary attributes
             func = find_func_in_module(self.module, top_func_name)
             if func is None:
@@ -1701,7 +1996,13 @@ class LLVMOMPModule(LLVMModule):
                 ),
                 os.path.join(os.getenv("LLVM_BUILD_DIR"), "lib", "libomp.so"),
             ]
-            shared_libs += [lib.compile_shared_lib() for lib in ext_libs]
+            # A stream IP is compiled against Allo's hls::stream shim; every
+            # other IP keeps the plain unranked-memref wrapper.
+            for lib in ext_libs:
+                if getattr(lib, "has_stream_args", False):
+                    shared_libs.append(lib.compile_shared_lib(stream_sim=True))
+                else:
+                    shared_libs.append(lib.compile_shared_lib())
             self.execution_engine = ExecutionEngine(
                 self.module, opt_level=2, shared_libs=shared_libs
             )
