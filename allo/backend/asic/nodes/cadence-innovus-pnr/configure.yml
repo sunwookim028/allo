@@ -76,15 +76,15 @@ parameters:
   postroute_max_local_cpus: 8
   macro_halo: 2.0
   macro_pg_resource_util: 0.2
-  macro_forbidden_space_to_macro: '20 20'
-  macro_min_space_to_core: '30 30'
-  macro_corner_keepout: '5 5'
+  macro_forbidden_space_to_macro: '20,20'
+  macro_min_space_to_core: '30,30'
+  macro_corner_keepout: '5,5'
   primary_power_net: VDD
   primary_ground_net: VSS
-  power_nets: 'VDD VNW VDDPST POC VDDCE VDDPE'
-  ground_nets: 'VSS VPW VSSPST VSSE'
-  power_pin_names: 'VDD VPWR VNW VPB vcc vdd'
-  ground_pin_names: 'VSS VGND VPW VNB vssx gnd'
+  power_nets: 'VDD,VNW,VDDPST,POC,VDDCE,VDDPE'
+  ground_nets: 'VSS,VPW,VSSPST,VSSE'
+  power_pin_names: 'VDD,VPWR,VNW,VPB,vcc,vdd'
+  ground_pin_names: 'VSS,VGND,VPW,VNB,vssx,gnd'
   adk_tech_lef: inputs/adk/rtk-tech.lef
   adk_stdcell_lef: inputs/adk/stdcells.lef
   adk_gds_layer_map: inputs/adk/rtk-stream-out.map

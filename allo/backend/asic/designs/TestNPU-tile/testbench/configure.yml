@@ -15,3 +15,4 @@ commands:
   - cp ComputeTileTb.sv outputs/testbench.sv
   - python3 generate_test_vectors.py
   - cp test_vectors.txt outputs/test_vectors.txt
+  - cp design.args outputs/design.args

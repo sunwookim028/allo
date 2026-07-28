@@ -1,6 +1,10 @@
-import struct
+"""Generate the self-checking vectors for the legacy compute_tile snapshot.
 
-import numpy as np
+Keep this script dependency-free: the mflowgen testbench step runs with the
+system Python on ASIC hosts, where NumPy is not guaranteed to be installed.
+"""
+
+import struct
 
 N = 8
 OP_MATMUL_TILE = 0x01
@@ -11,7 +15,8 @@ SPM_B = 0
 
 
 def fp16_bits(value):
-    return int(np.float16(value).view(np.uint16))
+    """Return the IEEE-754 binary16 encoding of *value*."""
+    return int.from_bytes(struct.pack(">e", float(value)), byteorder="big")
 
 
 def fp32_bits(value):
@@ -47,13 +52,18 @@ def pack_spad_row_fp32(vals):
 
 
 def main():
-    rng = np.random.default_rng(0xC011EC7)
-
-    # Use small fp16-exact integer values so the ASIC FP units should produce
-    # deterministic fp32 rows while still toggling a nontrivial matrix path.
-    w_mat = rng.integers(-2, 3, size=(N, N)).astype(np.float16).astype(np.float32)
-    x_mat = rng.integers(-2, 3, size=(N, N)).astype(np.float16).astype(np.float32)
-    expected = (x_mat @ w_mat.T).astype(np.float32)
+    # Fixed, small integers are exactly representable in fp16 and keep the
+    # gate-level result deterministic while exercising positive, negative, and
+    # zero values.  The legacy MXU implements X @ W^T.
+    w_mat = [[float(((3 * row + 2 * col + 1) % 5) - 2) for col in range(N)]
+             for row in range(N)]
+    x_mat = [[float(((2 * row + 3 * col + 2) % 5) - 2) for col in range(N)]
+             for row in range(N)]
+    expected = [
+        [sum(x_mat[row][k] * w_mat[col][k] for k in range(N))
+         for col in range(N)]
+        for row in range(N)
+    ]
 
     program = [
         encode_instr(OP_MATMUL_TILE, op0=ACC_DST, op1=SPM_A, op2=SPM_B),

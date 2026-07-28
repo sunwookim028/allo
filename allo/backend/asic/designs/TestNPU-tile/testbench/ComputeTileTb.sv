@@ -19,7 +19,9 @@
 module ComputeTileTb;
 
   localparam VECTOR_WIDTH = 256;
-  localparam IRAM_ADDR_WIDTH = 12;
+  // This must match the compute_tile snapshot synthesized by this example.
+  // The newer MiniNPU tile uses 12 bits, but this legacy top exposes 10 bits.
+  localparam IRAM_ADDR_WIDTH = 10;
   localparam L1_DATA_WIDTH = 256;
   localparam DM_ADDR_WIDTH = 16;
   localparam DM_DATA_WIDTH = 256;
@@ -203,6 +205,8 @@ module ComputeTileTb;
           end
       end
       dma_rd_en <= #`ASSIGNMENT_DELAY 1'b0;
+      dma_read_pointer <= #`ASSIGNMENT_DELAY 16'd0;
+      @(posedge clk);
     end
   endtask
 

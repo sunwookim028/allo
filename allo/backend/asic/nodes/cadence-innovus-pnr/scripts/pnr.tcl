@@ -22,6 +22,10 @@ setDistributeHost -local
 
 source inputs/adk/adk.tcl
 
+proc env_list {name} {
+  return [split [string map {, " "} $::env($name)]]
+}
+
 if {![info exists env(process_node)]} {
   if {[info exists ADK_PROCESS]} {
     set env(process_node) $ADK_PROCESS
@@ -49,16 +53,16 @@ if {![info exists env(primary_ground_net)]} {
   set env(primary_ground_net) VSS
 }
 if {![info exists env(power_nets)]} {
-  set env(power_nets) "VDD VNW VDDPST POC VDDCE VDDPE"
+  set env(power_nets) "VDD,VNW,VDDPST,POC,VDDCE,VDDPE"
 }
 if {![info exists env(ground_nets)]} {
-  set env(ground_nets) "VSS VPW VSSPST VSSE"
+  set env(ground_nets) "VSS,VPW,VSSPST,VSSE"
 }
 if {![info exists env(power_pin_names)]} {
-  set env(power_pin_names) "VDD VPWR VNW VPB vcc vdd"
+  set env(power_pin_names) "VDD,VPWR,VNW,VPB,vcc,vdd"
 }
 if {![info exists env(ground_pin_names)]} {
-  set env(ground_pin_names) "VSS VGND VPW VNB vssx gnd"
+  set env(ground_pin_names) "VSS,VGND,VPW,VNB,vssx,gnd"
 }
 if {![info exists env(adk_tech_lef)]} {
   set env(adk_tech_lef) inputs/adk/rtk-tech.lef
@@ -115,13 +119,13 @@ if {![info exists env(macro_pg_resource_util)]} {
   set env(macro_pg_resource_util) 0.2
 }
 if {![info exists env(macro_forbidden_space_to_macro)]} {
-  set env(macro_forbidden_space_to_macro) "20 20"
+  set env(macro_forbidden_space_to_macro) "20,20"
 }
 if {![info exists env(macro_min_space_to_core)]} {
-  set env(macro_min_space_to_core) "30 30"
+  set env(macro_min_space_to_core) "30,30"
 }
 if {![info exists env(macro_corner_keepout)]} {
-  set env(macro_corner_keepout) "5 5"
+  set env(macro_corner_keepout) "5,5"
 }
 
 set vars(design)          $design_name
@@ -134,6 +138,13 @@ set primary_power_net  $env(primary_power_net)
 set primary_ground_net $env(primary_ground_net)
 set pwr_net_list       [list $primary_power_net $primary_ground_net]
 set pwr_net_list_rev   [list $primary_ground_net $primary_power_net]
+set power_nets         [env_list power_nets]
+set ground_nets        [env_list ground_nets]
+set power_pin_names    [env_list power_pin_names]
+set ground_pin_names   [env_list ground_pin_names]
+set macro_forbidden_space_to_macro [env_list macro_forbidden_space_to_macro]
+set macro_min_space_to_core        [env_list macro_min_space_to_core]
+set macro_corner_keepout           [env_list macro_corner_keepout]
 
 setMultiCpuUsage -localCpu $vars(local_cpus)
 
@@ -182,8 +193,8 @@ set init_lef_file [concat \
   $sram_lef_files \
 ]
 set init_top_cell $design_name
-set init_gnd_net $env(ground_nets)
-set init_pwr_net $env(power_nets)
+set init_gnd_net $ground_nets
+set init_pwr_net $power_nets
 
 set_db init_no_new_assigns true
 
@@ -251,11 +262,11 @@ if {$has_hard_macros} {
     set pg_resource_layer [dbGet [dbGetLayerByZ 1].name]
     set_macro_place_constraint \
       -pg_resource_model [list $pg_resource_layer $env(macro_pg_resource_util)] \
-      -forbidden_space_to_macro $env(macro_forbidden_space_to_macro) \
-      -min_space_to_core $env(macro_min_space_to_core) \
+      -forbidden_space_to_macro $macro_forbidden_space_to_macro \
+      -min_space_to_core $macro_min_space_to_core \
       -honor_strict_spacing_constraint true \
       -avoid_abut_macro_edge_with_pins true \
-      -macro_corner_keepout $env(macro_corner_keepout)
+      -macro_corner_keepout $macro_corner_keepout
   } else {
     puts "Warning: set_macro_place_constraint is unavailable; relying on refine_macro_place/checkPlace"
   }
@@ -385,11 +396,11 @@ maybe_stop_after floorplan
 # Power
 #-------------------------------------------------------------------------
 
-foreach pin $env(power_pin_names) {
+foreach pin $power_pin_names {
   globalNetConnect $primary_power_net -type pgpin -pin $pin -inst * -verbose
 }
 
-foreach pin $env(ground_pin_names) {
+foreach pin $ground_pin_names {
   globalNetConnect $primary_ground_net -type pgpin -pin $pin -inst * -verbose
 }
 
