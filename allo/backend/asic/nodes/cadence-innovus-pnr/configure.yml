@@ -70,6 +70,29 @@ parameters:
   floorplan_aspect_ratio: 1.0
   floorplan_width: ''
   floorplan_height: ''
+  process_node: 45
+  max_route_layer: 7
+  local_cpus: 16
+  postroute_max_local_cpus: 8
+  macro_halo: 2.0
+  macro_pg_resource_util: 0.2
+  macro_forbidden_space_to_macro: '20 20'
+  macro_min_space_to_core: '30 30'
+  macro_corner_keepout: '5 5'
+  primary_power_net: VDD
+  primary_ground_net: VSS
+  power_nets: 'VDD VNW VDDPST POC VDDCE VDDPE'
+  ground_nets: 'VSS VPW VSSPST VSSE'
+  power_pin_names: 'VDD VPWR VNW VPB vcc vdd'
+  ground_pin_names: 'VSS VGND VPW VNB vssx gnd'
+  adk_tech_lef: inputs/adk/rtk-tech.lef
+  adk_stdcell_lef: inputs/adk/stdcells.lef
+  adk_gds_layer_map: inputs/adk/rtk-stream-out.map
+  adk_qrc_lef_map: inputs/adk/pdk-qrc-lef.map
+  adk_cap_table: inputs/adk/rtk-typical.captable
+  adk_typical_lib: inputs/adk/stdcells.lib
+  adk_bc_lib: inputs/adk/stdcells-bc.lib
+  adk_wc_lib: inputs/adk/stdcells-wc.lib
 
 #-------------------------------------------------------------------------
 # Debug

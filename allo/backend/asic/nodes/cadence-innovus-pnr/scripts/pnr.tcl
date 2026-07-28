@@ -1,22 +1,17 @@
 #=========================================================================
-# innovus_single_node_clean_reference.tcl
+# pnr.tcl
 #=========================================================================
-# Clean reference version of the current Mini-NPU Innovus flow.
-# This is meant to be readable starting material for a hand-owned single
-# PNR node. It preserves the important command sequence and flags from the
-# current mflowgen/IFF run, but drops wrapper plumbing and generated comments.
+# Single-node Cadence Innovus PNR flow.
 
-set design_name compute_tile
+if {![info exists env(design_name)]} {
+  error "Missing required parameter: design_name"
+}
+
+set design_name $env(design_name)
 
 set results_dir     results
 set reports_dir     reports
 set checkpoints_dir checkpoints
-
-set vars(design)        $design_name
-set vars(results_dir)   $results_dir
-set vars(rpt_dir)       $reports_dir
-set vars(max_route_layer) 7
-set vars(local_cpus)    16
 
 file mkdir $results_dir
 file mkdir $reports_dir
@@ -24,10 +19,59 @@ file mkdir $checkpoints_dir
 file mkdir $checkpoints_dir/LEC
 
 setDistributeHost -local
-setMultiCpuUsage -localCpu 16
 
 source inputs/adk/adk.tcl
 
+if {![info exists env(process_node)]} {
+  if {[info exists ADK_PROCESS]} {
+    set env(process_node) $ADK_PROCESS
+  } else {
+    set env(process_node) 45
+  }
+}
+if {![info exists env(max_route_layer)]} {
+  if {[info exists ADK_MAX_ROUTING_LAYER_INNOVUS]} {
+    set env(max_route_layer) $ADK_MAX_ROUTING_LAYER_INNOVUS
+  } else {
+    set env(max_route_layer) 7
+  }
+}
+if {![info exists env(local_cpus)]} {
+  set env(local_cpus) 16
+}
+if {![info exists env(postroute_max_local_cpus)]} {
+  set env(postroute_max_local_cpus) 8
+}
+if {![info exists env(primary_power_net)]} {
+  set env(primary_power_net) VDD
+}
+if {![info exists env(primary_ground_net)]} {
+  set env(primary_ground_net) VSS
+}
+if {![info exists env(power_nets)]} {
+  set env(power_nets) "VDD VNW VDDPST POC VDDCE VDDPE"
+}
+if {![info exists env(ground_nets)]} {
+  set env(ground_nets) "VSS VPW VSSPST VSSE"
+}
+if {![info exists env(power_pin_names)]} {
+  set env(power_pin_names) "VDD VPWR VNW VPB vcc vdd"
+}
+if {![info exists env(ground_pin_names)]} {
+  set env(ground_pin_names) "VSS VGND VPW VNB vssx gnd"
+}
+if {![info exists env(adk_tech_lef)]} {
+  set env(adk_tech_lef) inputs/adk/rtk-tech.lef
+}
+if {![info exists env(adk_stdcell_lef)]} {
+  set env(adk_stdcell_lef) inputs/adk/stdcells.lef
+}
+if {![info exists env(adk_gds_layer_map)]} {
+  set env(adk_gds_layer_map) inputs/adk/rtk-stream-out.map
+}
+if {![info exists env(adk_qrc_lef_map)]} {
+  set env(adk_qrc_lef_map) inputs/adk/pdk-qrc-lef.map
+}
 if {![info exists env(core_density_target)]} {
   set env(core_density_target) 0.7
 }
@@ -64,6 +108,34 @@ if {![info exists env(floorplan_width)]} {
 if {![info exists env(floorplan_height)]} {
   set env(floorplan_height) ""
 }
+if {![info exists env(macro_halo)]} {
+  set env(macro_halo) 2.0
+}
+if {![info exists env(macro_pg_resource_util)]} {
+  set env(macro_pg_resource_util) 0.2
+}
+if {![info exists env(macro_forbidden_space_to_macro)]} {
+  set env(macro_forbidden_space_to_macro) "20 20"
+}
+if {![info exists env(macro_min_space_to_core)]} {
+  set env(macro_min_space_to_core) "30 30"
+}
+if {![info exists env(macro_corner_keepout)]} {
+  set env(macro_corner_keepout) "5 5"
+}
+
+set vars(design)          $design_name
+set vars(results_dir)     $results_dir
+set vars(rpt_dir)         $reports_dir
+set vars(max_route_layer) $env(max_route_layer)
+set vars(local_cpus)      $env(local_cpus)
+
+set primary_power_net  $env(primary_power_net)
+set primary_ground_net $env(primary_ground_net)
+set pwr_net_list       [list $primary_power_net $primary_ground_net]
+set pwr_net_list_rev   [list $primary_ground_net $primary_power_net]
+
+setMultiCpuUsage -localCpu $vars(local_cpus)
 
 set valid_stop_steps {none floorplan power place cts route}
 if {[lsearch -exact $valid_stop_steps $env(stop_after_step)] < 0} {
@@ -106,24 +178,24 @@ set sram_lef_files [lsort [glob -nocomplain inputs/srams/*/*.lef]]
 set init_verilog "./inputs/design.v"
 set init_mmmc_file "scripts/mmmc.tcl"
 set init_lef_file [concat \
-  [list inputs/adk/rtk-tech.lef inputs/adk/stdcells.lef inputs/adk/rtk-tech.lef inputs/adk/stdcells.lef] \
+  [list $env(adk_tech_lef) $env(adk_stdcell_lef) $env(adk_tech_lef) $env(adk_stdcell_lef)] \
   $sram_lef_files \
 ]
 set init_top_cell $design_name
-set init_gnd_net "VSS VPW VSSPST VSSE"
-set init_pwr_net "VDD VNW VDDPST POC VDDCE VDDPE"
+set init_gnd_net $env(ground_nets)
+set init_pwr_net $env(power_nets)
 
 set_db init_no_new_assigns true
 
-if {[file exists inputs/adk/pdk-qrc-lef.map]} {
-  setExtractRCMode -lefTechFileMap inputs/adk/pdk-qrc-lef.map
+if {[file exists $env(adk_qrc_lef_map)]} {
+  setExtractRCMode -lefTechFileMap $env(adk_qrc_lef_map)
 }
 
 init_design
 
 set_power_analysis_mode -analysis_view analysis_default
-setDesignMode -topRoutingLayer 7
-setDesignMode -process 45 -powerEffort high
+setDesignMode -topRoutingLayer $vars(max_route_layer)
+setDesignMode -process $env(process_node) -powerEffort high
 
 #-------------------------------------------------------------------------
 # Init / Floorplan / Macros
@@ -139,7 +211,6 @@ if {[info exists ADK_DONT_USE_CELL_LIST]} {
 
 set core_aspect_ratio   $env(floorplan_aspect_ratio)
 set core_density_target $env(core_density_target)
-set pwr_net_list {VDD VSS}
 
 set M1_min_width   [dbGet [dbGetLayerByZ 1].minWidth]
 set M1_min_spacing [dbGet [dbGetLayerByZ 1].minSpacing]
@@ -168,7 +239,7 @@ if {$env(floorplan_mode) == "auto"} {
 
 setFlipping s
 
-set macro_halo 2.0
+set macro_halo $env(macro_halo)
 set blocks [dbGet top.insts.cell.baseClass block -p2]
 set first_block [lindex $blocks 0]
 set has_hard_macros [expr {[llength $blocks] > 0 && $first_block ne "0" && $first_block ne "0x0"}]
@@ -179,12 +250,12 @@ if {$has_hard_macros} {
   if {[llength [info commands set_macro_place_constraint]]} {
     set pg_resource_layer [dbGet [dbGetLayerByZ 1].name]
     set_macro_place_constraint \
-      -pg_resource_model [list $pg_resource_layer 0.2] \
-      -forbidden_space_to_macro {20 20} \
-      -min_space_to_core {30 30} \
+      -pg_resource_model [list $pg_resource_layer $env(macro_pg_resource_util)] \
+      -forbidden_space_to_macro $env(macro_forbidden_space_to_macro) \
+      -min_space_to_core $env(macro_min_space_to_core) \
       -honor_strict_spacing_constraint true \
       -avoid_abut_macro_edge_with_pins true \
-      -macro_corner_keepout {5 5}
+      -macro_corner_keepout $env(macro_corner_keepout)
   } else {
     puts "Warning: set_macro_place_constraint is unavailable; relying on refine_macro_place/checkPlace"
   }
@@ -314,15 +385,15 @@ maybe_stop_after floorplan
 # Power
 #-------------------------------------------------------------------------
 
-foreach pin {VDD VPWR VNW VPB vcc vdd} {
-  globalNetConnect VDD -type pgpin -pin $pin -inst * -verbose
+foreach pin $env(power_pin_names) {
+  globalNetConnect $primary_power_net -type pgpin -pin $pin -inst * -verbose
 }
 
-foreach pin {VSS VGND VPW VNB vssx gnd} {
-  globalNetConnect VSS -type pgpin -pin $pin -inst * -verbose
+foreach pin $env(ground_pin_names) {
+  globalNetConnect $primary_ground_net -type pgpin -pin $pin -inst * -verbose
 }
 
-sroute -nets {VDD VSS}
+sroute -nets $pwr_net_list
 
 if {[info exists ADK_BASE_LAYER_IDX]} {
   set base_layer_idx $ADK_BASE_LAYER_IDX
@@ -335,7 +406,7 @@ set pmesh_bot $ADK_POWER_MESH_BOT_LAYER
 set pmesh_top $ADK_POWER_MESH_TOP_LAYER
 
 if { $M2_direction == "Vertical" } {
-  addRing -nets {VDD VSS} -type core_rings -follow core \
+  addRing -nets $pwr_net_list -type core_rings -follow core \
     -layer [list top $pmesh_top bottom $pmesh_top left $pmesh_bot right $pmesh_bot] \
     -width $savedvars(p_ring_width) \
     -spacing $savedvars(p_ring_spacing) \
@@ -358,7 +429,7 @@ if { $M2_direction == "Vertical" } {
   setAddStripeMode -stacked_via_bottom_layer [expr $base_layer_idx + 1] \
     -stacked_via_top_layer $pmesh_top
 
-  addStripe -nets {VSS VDD} -layer $pmesh_bot -direction vertical \
+  addStripe -nets $pwr_net_list_rev -layer $pmesh_bot -direction vertical \
     -width $pmesh_bot_str_width \
     -spacing $pmesh_bot_str_intraset_spacing \
     -set_to_set_distance $pmesh_bot_str_interset_pitch \
@@ -379,7 +450,7 @@ if { $M2_direction == "Vertical" } {
   setAddStripeMode -stacked_via_bottom_layer $pmesh_bot \
     -stacked_via_top_layer $pmesh_top
 
-  addStripe -nets {VSS VDD} -layer $pmesh_top -direction horizontal \
+  addStripe -nets $pwr_net_list_rev -layer $pmesh_top -direction horizontal \
     -width $pmesh_top_str_width \
     -spacing $pmesh_top_str_intraset_spacing \
     -set_to_set_distance $pmesh_top_str_interset_pitch \
@@ -403,13 +474,13 @@ if { $M2_direction == "Vertical" } {
   setAddStripeMode -stacked_via_bottom_layer 1 \
     -stacked_via_top_layer 3
 
-  addStripe -nets {VSS VDD} -layer 3 -direction vertical \
+  addStripe -nets $pwr_net_list_rev -layer 3 -direction vertical \
     -width $M3_str_width \
     -spacing $M3_str_intraset_spacing \
     -set_to_set_distance $M3_str_interset_pitch \
     -start_offset $M3_str_offset
 
-  addRing -nets {VDD VSS} -type core_rings -follow core \
+  addRing -nets $pwr_net_list -type core_rings -follow core \
     -layer [list top $pmesh_bot bottom $pmesh_bot left $pmesh_top right $pmesh_top] \
     -width $savedvars(p_ring_width) \
     -spacing $savedvars(p_ring_spacing) \
@@ -428,7 +499,7 @@ if { $M2_direction == "Vertical" } {
   setAddStripeMode -stacked_via_bottom_layer 3 \
     -stacked_via_top_layer $pmesh_top
 
-  addStripe -nets {VSS VDD} -layer $pmesh_bot -direction horizontal \
+  addStripe -nets $pwr_net_list_rev -layer $pmesh_bot -direction horizontal \
     -width $pmesh_bot_str_width \
     -spacing $pmesh_bot_str_intraset_spacing \
     -set_to_set_distance $pmesh_bot_str_interset_pitch \
@@ -449,7 +520,7 @@ if { $M2_direction == "Vertical" } {
   setAddStripeMode -stacked_via_bottom_layer $pmesh_bot \
     -stacked_via_top_layer $pmesh_top
 
-  addStripe -nets {VSS VDD} -layer $pmesh_top -direction vertical \
+  addStripe -nets $pwr_net_list_rev -layer $pmesh_top -direction vertical \
     -width $pmesh_top_str_width \
     -spacing $pmesh_top_str_intraset_spacing \
     -set_to_set_distance $pmesh_top_str_interset_pitch \
@@ -495,12 +566,18 @@ set_db opt_enable_podv2_clock_opt_flow true
 
 place_opt_design -out_dir reports -prefix place
 
-setTieHiLoMode -cell "LOGIC1_X1  LOGIC0_X1" -maxDistance 20 -maxFanout 8
-foreach cell {LOGIC1_X1 LOGIC0_X1} {
+if {[info exists ADK_TIE_CELLS] && $ADK_TIE_CELLS ne ""} {
+  set tie_cells $ADK_TIE_CELLS
+} else {
+  set tie_cells "LOGIC1_X1 LOGIC0_X1"
+}
+
+setTieHiLoMode -cell $tie_cells -maxDistance 20 -maxFanout 8
+foreach cell $tie_cells {
   setDontUse $cell false
 }
 addTieHiLo
-foreach cell {LOGIC1_X1 LOGIC0_X1} {
+foreach cell $tie_cells {
   setDontUse $cell true
 }
 
@@ -532,7 +609,7 @@ if {$::env(useful_skew)} {
   setOptMode -usefulSkew false
 }
 
-set_db design_process_node 45
+set_db design_process_node $env(process_node)
 set_db opt_enable_podv2_clock_opt_flow true
 set_db route_design_detail_use_multi_cut_via_effort high
 set_db route_design_with_litho_driven true
@@ -588,13 +665,24 @@ report_metrics postcts_hold
 setAnalysisMode -cppr both
 setDelayCalMode -siAware true -engine aae
 
+if {[info exists ADK_ANTENNA_CELL] && $ADK_ANTENNA_CELL ne ""} {
+  set antenna_cell $ADK_ANTENNA_CELL
+} else {
+  set antenna_cell ANTENNA_X1
+}
+
 setNanoRouteMode -drouteUseMultiCutViaEffort high \
   -routeWithLithoDriven true \
-  -routeAntennaCellName ANTENNA_X1 \
+  -routeAntennaCellName $antenna_cell \
   -routeInsertAntennaDiode true
 
-setFillerMode -core "FILLCELL_X32  FILLCELL_X16  FILLCELL_X8  FILLCELL_X4  FILLCELL_X2  FILLCELL_X1" \
-  -corePrefix FILL
+if {[info exists ADK_FILLER_CELLS] && $ADK_FILLER_CELLS ne ""} {
+  set filler_cells $ADK_FILLER_CELLS
+} else {
+  set filler_cells "FILLCELL_X32 FILLCELL_X16 FILLCELL_X8 FILLCELL_X4 FILLCELL_X2 FILLCELL_X1"
+}
+
+setFillerMode -core $filler_cells -corePrefix FILL
 addFiller
 
 routeDesign -placementCheck
@@ -624,9 +712,9 @@ if { $::env(signoff_engine) } {
 set need_restore_multi false
 if {[getDistributeHost -mode] == "local"} {
   set ncpu [getMultiCpuUsage -localCpu]
-  if {$ncpu > 8} {
+  if {$ncpu > $env(postroute_max_local_cpus)} {
     set need_restore_multi true
-    setMultiCpuUsage -localCpu 8
+    setMultiCpuUsage -localCpu $env(postroute_max_local_cpus)
   }
 }
 
@@ -686,7 +774,7 @@ if { [info exists ADK_DBU_PRECISION] } {
 
 streamOut $results_dir/$design_name.gds.gz \
   -units ${stream_out_units} \
-  -mapFile inputs/adk/rtk-stream-out.map
+  -mapFile $env(adk_gds_layer_map)
 
 set merge_files \
   [concat \
@@ -697,7 +785,7 @@ set merge_files \
 
 streamOut $results_dir/$design_name-merged.gds \
   -units ${stream_out_units} \
-  -mapFile inputs/adk/rtk-stream-out.map \
+  -mapFile $env(adk_gds_layer_map) \
   -uniquifyCellNames \
   -merge $merge_files
 
