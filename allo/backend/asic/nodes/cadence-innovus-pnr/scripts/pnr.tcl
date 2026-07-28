@@ -89,10 +89,10 @@ if {![info exists env(ground_nets)]} {
   set env(ground_nets) "VSS,VPW,VSSPST,VSSE"
 }
 if {![info exists env(power_pin_names)]} {
-  set env(power_pin_names) "VDD,VPWR,VNW,VPB,vcc,vdd"
+  set env(power_pin_names) "VDD"
 }
 if {![info exists env(ground_pin_names)]} {
-  set env(ground_pin_names) "VSS,VGND,VPW,VNB,vssx,gnd"
+  set env(ground_pin_names) "VSS"
 }
 if {![info exists env(adk_tech_lef)]} {
   set env(adk_tech_lef) inputs/adk/rtk-tech.lef
