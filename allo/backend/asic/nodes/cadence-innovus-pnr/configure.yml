@@ -57,6 +57,7 @@ commands:
 #-------------------------------------------------------------------------
 
 parameters:
+  design_name: undefined
   enable_gui: true
   core_density_target: 0.70
   useful_skew: True

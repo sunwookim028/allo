@@ -3,7 +3,13 @@
 #=========================================================================
 # Single-node Cadence Innovus PNR flow.
 
-if {![info exists env(design_name)]} {
+if {![info exists env(design_name)] || $env(design_name) eq "" || $env(design_name) eq "undefined"} {
+  if {[info exists env(top_module)] && $env(top_module) ne "" && $env(top_module) ne "undefined"} {
+    set env(design_name) $env(top_module)
+  }
+}
+
+if {![info exists env(design_name)] || $env(design_name) eq "" || $env(design_name) eq "undefined"} {
   error "Missing required parameter: design_name"
 }
 
