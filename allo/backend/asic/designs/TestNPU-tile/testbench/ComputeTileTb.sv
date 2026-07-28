@@ -5,7 +5,7 @@
 `define FINISH_TIME 5000000
 
 `ifndef NUM_PROGRAM_WORDS
-`define NUM_PROGRAM_WORDS 2
+`define NUM_PROGRAM_WORDS 11
 `endif
 
 `ifndef NUM_L1_INIT_ROWS
@@ -19,11 +19,10 @@
 module ComputeTileTb;
 
   localparam VECTOR_WIDTH = 256;
-  // This must match the compute_tile snapshot synthesized by this example.
-  // The newer MiniNPU tile uses 12 bits, but this legacy top exposes 10 bits.
-  localparam IRAM_ADDR_WIDTH = 10;
+  // Matches the post-route compute_tile wrapper (MiniNPU 0e901466).
+  localparam IRAM_ADDR_WIDTH = 12;
   localparam L1_DATA_WIDTH = 256;
-  localparam DM_ADDR_WIDTH = 16;
+  localparam DM_ADDR_WIDTH = 27;
   localparam DM_DATA_WIDTH = 256;
   localparam TEST_ROWS = `NUM_PROGRAM_WORDS + `NUM_L1_INIT_ROWS + `NUM_EXPECTED_ROWS;
   localparam OUTPUT_BASE = 16;
@@ -57,13 +56,18 @@ module ComputeTileTb;
   reg [DM_DATA_WIDTH-1:0] dm_dout;
   wire dm_en;
   wire dm_we;
+  reg dm_ack;
 
   wire tma_req;
   wire tma_dir;
   wire [15:0] tma_dm_base;
-  wire [14:0] tma_l2_base;
+  wire [14:0] tma_mt_base;
   wire [15:0] tma_len;
   reg tma_done;
+
+  wire [31:0] perf_cnt_cycles_o;
+  wire [31:0] perf_cnt_instrs_o;
+  wire [1:0] dma_slot_done_o;
 
   reg [VECTOR_WIDTH-1:0] test_vectors [0:TEST_ROWS-1];
 
@@ -91,12 +95,16 @@ module ComputeTileTb;
       .dm_dout(dm_dout),
       .dm_en(dm_en),
       .dm_we(dm_we),
+      .dm_ack(dm_ack),
       .tma_req(tma_req),
       .tma_dir(tma_dir),
       .tma_dm_base(tma_dm_base),
-      .tma_l2_base(tma_l2_base),
+      .tma_mt_base(tma_mt_base),
       .tma_len(tma_len),
-      .tma_done(tma_done)
+      .tma_done(tma_done),
+      .perf_cnt_cycles_o(perf_cnt_cycles_o),
+      .perf_cnt_instrs_o(perf_cnt_instrs_o),
+      .dma_slot_done_o(dma_slot_done_o)
   );
 
   always #(`CLK_PERIOD/2) clk = ~clk;
@@ -118,6 +126,7 @@ module ComputeTileTb;
       program_id_csr = 32'd0;
       kernel_arg_csr = 128'd0;
       dm_dout = '0;
+      dm_ack = 1'b0;
       tma_done = 1'b0;
       repeat (6) @(posedge clk);
       rst_n <= #`ASSIGNMENT_DELAY 1'b1;
@@ -173,7 +182,8 @@ module ComputeTileTb;
           $finish(2);
         end
         if (done) begin
-          $display("compute_tile done after %0d cycles", cycle);
+          $display("compute_tile done after %0d cycles (perf=%0d, instrs=%0d)",
+                   cycle, perf_cnt_cycles_o, perf_cnt_instrs_o);
           saw_done = 1'b1;
         end
       end

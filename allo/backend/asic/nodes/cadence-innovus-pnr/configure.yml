@@ -73,6 +73,10 @@ parameters:
   floorplan_height: ''
   process_node: 45
   max_route_layer: 7
+  base_layer_idx: 0
+  pin_layer_offset: 3
+  power_mesh_bot_layer: 8
+  power_mesh_top_layer: 9
   local_cpus: 16
   postroute_max_local_cpus: 8
   macro_halo: 2.0
@@ -80,12 +84,16 @@ parameters:
   macro_forbidden_space_to_macro: '20,20'
   macro_min_space_to_core: '30,30'
   macro_corner_keepout: '5,5'
+  well_tap_cell: WELLTAP_X1
+  well_tap_interval: 120
   primary_power_net: VDD
   primary_ground_net: VSS
   power_nets: 'VDD,VNW,VDDPST,POC,VDDCE,VDDPE'
   ground_nets: 'VSS,VPW,VSSPST,VSSE'
   power_pin_names: 'VDD,VPWR,VNW,VPB,vcc,vdd'
   ground_pin_names: 'VSS,VGND,VPW,VNB,vssx,gnd'
+  lvs_exclude_cell_list: 'FILL*,WELLTAP*'
+  virtuoso_exclude_cell_list: 'FILL*,WELLTAP*'
   adk_tech_lef: inputs/adk/rtk-tech.lef
   adk_stdcell_lef: inputs/adk/stdcells.lef
   adk_gds_layer_map: inputs/adk/rtk-stream-out.map

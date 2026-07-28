@@ -7,16 +7,14 @@ system Python on ASIC hosts, where NumPy is not guaranteed to be installed.
 import struct
 
 N = 8
+OP_MXU_LOAD_W = 0x00
 OP_MATMUL_TILE = 0x01
-FLUSH_INSTR = 0x5200000000000000
+OP_VREG_LOAD = 0x32
+OP_HALT = 0x5F
 ACC_DST = 2 * N
-SPM_A = N
-SPM_B = 0
-
-
-def fp16_bits(value):
-    """Return the IEEE-754 binary16 encoding of *value*."""
-    return int.from_bytes(struct.pack(">e", float(value)), byteorder="big")
+SPM_W = 0
+SPM_X = N
+VREG_X = 0
 
 
 def fp32_bits(value):
@@ -37,10 +35,10 @@ def pack_program_word(word):
     return f"{word & ((1 << 64) - 1):064x}"
 
 
-def pack_spad_row_fp16(vals):
+def pack_spad_row_bf16(vals):
     result = 0
     for i, value in enumerate(vals):
-        result |= (fp16_bits(value) & 0xFFFF) << (i * 16)
+        result |= ((fp32_bits(value) >> 16) & 0xFFFF) << (i * 16)
     return f"{result:064x}"
 
 
@@ -52,7 +50,7 @@ def pack_spad_row_fp32(vals):
 
 
 def main():
-    # Fixed, small integers are exactly representable in fp16 and keep the
+    # Fixed, small integers are exactly representable in bf16 and keep the
     # gate-level result deterministic while exercising positive, negative, and
     # zero values.  The legacy MXU implements X @ W^T.
     w_mat = [[float(((3 * row + 2 * col + 1) % 5) - 2) for col in range(N)]
@@ -66,14 +64,19 @@ def main():
     ]
 
     program = [
-        encode_instr(OP_MATMUL_TILE, op0=ACC_DST, op1=SPM_A, op2=SPM_B),
-        FLUSH_INSTR,
+        # The integrated tile sources MXU activations from eight consecutive
+        # VREGs, so widen each BF16 SPAD row into VREG before starting the MXU.
+        *(encode_instr(OP_VREG_LOAD, op0=VREG_X + row, op1=SPM_X + row)
+          for row in range(N)),
+        encode_instr(OP_MXU_LOAD_W, op0=SPM_W),
+        encode_instr(OP_MATMUL_TILE, op0=ACC_DST, op1=VREG_X),
+        encode_instr(OP_HALT),
     ]
 
     rows = []
     rows.extend(pack_program_word(word) for word in program)
-    rows.extend(pack_spad_row_fp16(w_mat[i]) for i in range(N))
-    rows.extend(pack_spad_row_fp16(x_mat[i]) for i in range(N))
+    rows.extend(pack_spad_row_bf16(w_mat[i]) for i in range(N))
+    rows.extend(pack_spad_row_bf16(x_mat[i]) for i in range(N))
     rows.extend(pack_spad_row_fp32(expected[i]) for i in range(N))
 
     with open("test_vectors.txt", "w", encoding="ascii") as f:

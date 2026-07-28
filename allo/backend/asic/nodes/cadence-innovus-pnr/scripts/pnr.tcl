@@ -46,6 +46,30 @@ if {![info exists env(max_route_layer)]} {
     set env(max_route_layer) 7
   }
 }
+if {![info exists env(base_layer_idx)]} {
+  if {[info exists ADK_BASE_LAYER_IDX]} {
+    set env(base_layer_idx) $ADK_BASE_LAYER_IDX
+  } else {
+    set env(base_layer_idx) 0
+  }
+}
+if {![info exists env(pin_layer_offset)]} {
+  set env(pin_layer_offset) 3
+}
+if {![info exists env(power_mesh_bot_layer)]} {
+  if {[info exists ADK_POWER_MESH_BOT_LAYER]} {
+    set env(power_mesh_bot_layer) $ADK_POWER_MESH_BOT_LAYER
+  } else {
+    set env(power_mesh_bot_layer) 8
+  }
+}
+if {![info exists env(power_mesh_top_layer)]} {
+  if {[info exists ADK_POWER_MESH_TOP_LAYER]} {
+    set env(power_mesh_top_layer) $ADK_POWER_MESH_TOP_LAYER
+  } else {
+    set env(power_mesh_top_layer) 9
+  }
+}
 if {![info exists env(local_cpus)]} {
   set env(local_cpus) 16
 }
@@ -133,6 +157,34 @@ if {![info exists env(macro_min_space_to_core)]} {
 if {![info exists env(macro_corner_keepout)]} {
   set env(macro_corner_keepout) "5,5"
 }
+if {![info exists env(well_tap_cell)]} {
+  if {[info exists ADK_WELL_TAP_CELL]} {
+    set env(well_tap_cell) $ADK_WELL_TAP_CELL
+  } else {
+    set env(well_tap_cell) ""
+  }
+}
+if {![info exists env(well_tap_interval)]} {
+  if {[info exists ADK_WELL_TAP_INTERVAL]} {
+    set env(well_tap_interval) $ADK_WELL_TAP_INTERVAL
+  } else {
+    set env(well_tap_interval) 120
+  }
+}
+if {![info exists env(lvs_exclude_cell_list)]} {
+  if {[info exists ADK_LVS_EXCLUDE_CELL_LIST]} {
+    set env(lvs_exclude_cell_list) [string map {" " ","} $ADK_LVS_EXCLUDE_CELL_LIST]
+  } else {
+    set env(lvs_exclude_cell_list) ""
+  }
+}
+if {![info exists env(virtuoso_exclude_cell_list)]} {
+  if {[info exists ADK_VIRTUOSO_EXCLUDE_CELL_LIST]} {
+    set env(virtuoso_exclude_cell_list) [string map {" " ","} $ADK_VIRTUOSO_EXCLUDE_CELL_LIST]
+  } else {
+    set env(virtuoso_exclude_cell_list) ""
+  }
+}
 
 set vars(design)          $design_name
 set vars(results_dir)     $results_dir
@@ -142,6 +194,9 @@ set vars(local_cpus)      $env(local_cpus)
 
 set primary_power_net  $env(primary_power_net)
 set primary_ground_net $env(primary_ground_net)
+set base_layer_idx     $env(base_layer_idx)
+set pmesh_bot          $env(power_mesh_bot_layer)
+set pmesh_top          $env(power_mesh_top_layer)
 set pwr_net_list       [list $primary_power_net $primary_ground_net]
 set pwr_net_list_rev   [list $primary_ground_net $primary_power_net]
 set power_nets         [env_list power_nets]
@@ -151,6 +206,8 @@ set ground_pin_names   [env_list ground_pin_names]
 set macro_forbidden_space_to_macro [env_list macro_forbidden_space_to_macro]
 set macro_min_space_to_core        [env_list macro_min_space_to_core]
 set macro_corner_keepout           [env_list macro_corner_keepout]
+set lvs_exclude_cell_list          [env_list lvs_exclude_cell_list]
+set virtuoso_exclude_cell_list     [env_list virtuoso_exclude_cell_list]
 
 setMultiCpuUsage -localCpu $vars(local_cpus)
 
@@ -313,21 +370,21 @@ if {$has_hard_macros} {
   }
 }
 
-if {[info exists ADK_WELL_TAP_CELL] && [expr {$ADK_WELL_TAP_CELL ne ""}]} {
-  addWellTap -cell [list $ADK_WELL_TAP_CELL] \
+if {$env(well_tap_cell) ne ""} {
+  addWellTap -cell [list $env(well_tap_cell)] \
     -prefix WELLTAP \
-    -cellInterval $ADK_WELL_TAP_INTERVAL
+    -cellInterval $env(well_tap_interval)
 
-  verifyWellTap -cells [list $ADK_WELL_TAP_CELL] \
+  verifyWellTap -cells [list $env(well_tap_cell)] \
     -report reports/welltap.rpt \
-    -rule [expr $ADK_WELL_TAP_INTERVAL/2]
+    -rule [expr {$env(well_tap_interval)/2}]
 }
 
 #-------------------------------------------------------------------------
 # Pin Assignment / Path Groups / Init Reports
 #-------------------------------------------------------------------------
 
-set ports_layer [expr $ADK_BASE_LAYER_IDX + 3]
+set ports_layer [expr {$base_layer_idx + $env(pin_layer_offset)}]
 set all_ports [dbGet top.terms.name]
 set num_ports [llength $all_ports]
 set split_idx [expr ($num_ports + 1) / 2]
@@ -412,15 +469,7 @@ foreach pin $ground_pin_names {
 
 sroute -nets $pwr_net_list
 
-if {[info exists ADK_BASE_LAYER_IDX]} {
-  set base_layer_idx $ADK_BASE_LAYER_IDX
-} else {
-  set base_layer_idx 0
-}
-
 set M2_direction [dbGet [dbGet head.layers.name [expr $base_layer_idx + 2] -p].direction]
-set pmesh_bot $ADK_POWER_MESH_BOT_LAYER
-set pmesh_top $ADK_POWER_MESH_TOP_LAYER
 
 if { $M2_direction == "Vertical" } {
   addRing -nets $pwr_net_list -type core_rings -follow core \
@@ -819,7 +868,7 @@ sed -i "s/get_design.*$/current_design\]/" $results_dir/$design_name.pt.sdc
 saveNetlist $results_dir/$design_name.topdown.v
 
 set lvs_exclude_list ""
-foreach x $ADK_LVS_EXCLUDE_CELL_LIST {
+foreach x $lvs_exclude_cell_list {
   append lvs_exclude_list [dbGet -u -e top.insts.cell.name $x] " "
 }
 
@@ -829,7 +878,7 @@ saveNetlist -excludeLeafCell \
   $results_dir/$design_name.lvs.v
 
 set virtuoso_exclude_list ""
-foreach x $ADK_VIRTUOSO_EXCLUDE_CELL_LIST {
+foreach x $virtuoso_exclude_cell_list {
   append virtuoso_exclude_list [dbGet -u -e top.physInsts.cell.name $x] " "
 }
 
@@ -844,7 +893,7 @@ saveNetlist -includePowerGround -excludeLeafCell $results_dir/$design_name.vcs.p
 write_lef_abstract \
   -stripePin \
   -specifyTopLayer $vars(max_route_layer) \
-  -PGPinLayers [list $ADK_POWER_MESH_BOT_LAYER $ADK_POWER_MESH_TOP_LAYER] \
+  -PGPinLayers [list $pmesh_bot $pmesh_top] \
   -noCutObs \
   $results_dir/$design_name.lef
 

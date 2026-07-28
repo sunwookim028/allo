@@ -1,8 +1,7 @@
-+define+NUM_PROGRAM_WORDS=2
++define+NUM_PROGRAM_WORDS=11
 +define+NUM_L1_INIT_ROWS=16
 +define+NUM_EXPECTED_ROWS=8
 -debug_access+pp
-+lint=TFIPC-L
 -lca
 +neg_tchk
 -sverilog
