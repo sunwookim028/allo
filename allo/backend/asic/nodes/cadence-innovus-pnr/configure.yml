@@ -39,18 +39,18 @@ commands:
   # Outputs
   - cd outputs
   - ln -sf ../checkpoints/design.checkpoint design.checkpoint
-  - ln -sf ../typical.spef.gz             design.spef.gz
-  - ln -sf ../results/*.gds.gz            design.gds.gz
-  - ln -sf ../results/*-merged.gds        design-merged.gds
-  - ln -sf ../results/*.topdown.v         design.topdown.v
-  - ln -sf ../results/*.lvs.v             design.lvs.v
-  - ln -sf ../results/*.vcs.v             design.vcs.v
-  - ln -sf ../results/*.vcs.pg.v          design.vcs.pg.v
-  - ln -sf ../results/*.lef               design.lef
-  - ln -sf ../results/*.pt.sdc            design.pt.sdc
-  - ln -sf ../results/*.sdf               design.sdf
-  - ln -sf ../results/*.virtuoso.v        design.virtuoso.v
-  - ln -sf ../results/*.def.gz            design.def.gz
+  - if [[ -e ../typical.spef.gz ]]; then ln -sf ../typical.spef.gz design.spef.gz; fi
+  - if compgen -G "../results/*.gds.gz" > /dev/null; then ln -sf ../results/*.gds.gz design.gds.gz; fi
+  - if compgen -G "../results/*-merged.gds" > /dev/null; then ln -sf ../results/*-merged.gds design-merged.gds; fi
+  - if compgen -G "../results/*.topdown.v" > /dev/null; then ln -sf ../results/*.topdown.v design.topdown.v; fi
+  - if compgen -G "../results/*.lvs.v" > /dev/null; then ln -sf ../results/*.lvs.v design.lvs.v; fi
+  - if compgen -G "../results/*.vcs.v" > /dev/null; then ln -sf ../results/*.vcs.v design.vcs.v; fi
+  - if compgen -G "../results/*.vcs.pg.v" > /dev/null; then ln -sf ../results/*.vcs.pg.v design.vcs.pg.v; fi
+  - if compgen -G "../results/*.lef" > /dev/null; then ln -sf ../results/*.lef design.lef; fi
+  - if compgen -G "../results/*.pt.sdc" > /dev/null; then ln -sf ../results/*.pt.sdc design.pt.sdc; fi
+  - if compgen -G "../results/*.sdf" > /dev/null; then ln -sf ../results/*.sdf design.sdf; fi
+  - if compgen -G "../results/*.virtuoso.v" > /dev/null; then ln -sf ../results/*.virtuoso.v design.virtuoso.v; fi
+  - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -65,6 +65,11 @@ parameters:
   signoff_engine: False
   hold_target_slack: 0.005
   setup_target_slack: 0.000
+  stop_after_step: none
+  floorplan_mode: auto
+  floorplan_aspect_ratio: 1.0
+  floorplan_width: ''
+  floorplan_height: ''
 
 #-------------------------------------------------------------------------
 # Debug
@@ -85,9 +90,5 @@ preconditions:
 
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
-  - assert File( 'outputs/design.gds.gz' )
-  - assert File( 'outputs/design-merged.gds' )
-  - assert File( 'outputs/design.spef.gz' )
-  - assert File( 'outputs/design.def.gz' )
   - assert 'ERROR'
       not in File( 'logs/run.log', enable_case_sensitive=True )

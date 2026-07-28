@@ -49,20 +49,42 @@ if {![info exists env(setup_target_slack)]} {
 if {![info exists env(signoff_engine)]} {
   set env(signoff_engine) false
 }
+if {![info exists env(stop_after_step)]} {
+  set env(stop_after_step) none
+}
+if {![info exists env(floorplan_mode)]} {
+  set env(floorplan_mode) auto
+}
+if {![info exists env(floorplan_aspect_ratio)]} {
+  set env(floorplan_aspect_ratio) 1.0
+}
+if {![info exists env(floorplan_width)]} {
+  set env(floorplan_width) ""
+}
+if {![info exists env(floorplan_height)]} {
+  set env(floorplan_height) ""
+}
 
-proc save_phase {phase} {
+set valid_stop_steps {none floorplan power place cts route}
+if {[lsearch -exact $valid_stop_steps $env(stop_after_step)] < 0} {
+  error "Unsupported stop_after_step '$env(stop_after_step)'; expected one of: $valid_stop_steps"
+}
+
+proc save_design_checkpoint {} {
   global checkpoints_dir design_name
 
   file mkdir $checkpoints_dir
   file mkdir $checkpoints_dir/LEC
-  file mkdir $checkpoints_dir/${phase}.checkpoint
+  file mkdir $checkpoints_dir/design.checkpoint
 
-  saveDesign $checkpoints_dir/${phase}.checkpoint/save.enc -compress
-  saveNetlist $checkpoints_dir/LEC/${phase}.v.gz
+  saveDesign $checkpoints_dir/design.checkpoint/save.enc -compress
+}
 
-  if {$phase == "signoff"} {
-    file mkdir $checkpoints_dir/design.checkpoint
-    saveDesign $checkpoints_dir/design.checkpoint/save.enc -compress
+proc maybe_stop_after {phase} {
+  if {$::env(stop_after_step) == $phase} {
+    puts "Info: stop_after_step=$phase requested; saving checkpoint and exiting."
+    save_design_checkpoint
+    exit 0
   }
 }
 
@@ -100,7 +122,7 @@ if {[file exists inputs/adk/pdk-qrc-lef.map]} {
 init_design
 
 set_power_analysis_mode -analysis_view analysis_default
-setMaxRouteLayer 7
+setDesignMode -topRoutingLayer 7
 setDesignMode -process 45 -powerEffort high
 
 #-------------------------------------------------------------------------
@@ -115,7 +137,7 @@ if {[info exists ADK_DONT_USE_CELL_LIST]} {
   }
 }
 
-set core_aspect_ratio   1.00
+set core_aspect_ratio   $env(floorplan_aspect_ratio)
 set core_density_target $env(core_density_target)
 set pwr_net_list {VDD VSS}
 
@@ -130,14 +152,49 @@ set core_margin_b [expr ([llength $pwr_net_list] * ($savedvars(p_ring_width) + $
 set core_margin_r [expr ([llength $pwr_net_list] * ($savedvars(p_ring_width) + $savedvars(p_ring_spacing))) + $savedvars(p_ring_spacing)]
 set core_margin_l [expr ([llength $pwr_net_list] * ($savedvars(p_ring_width) + $savedvars(p_ring_spacing))) + $savedvars(p_ring_spacing)]
 
-floorPlan -r $core_aspect_ratio $core_density_target \
-  $core_margin_l $core_margin_b $core_margin_r $core_margin_t
+if {$env(floorplan_mode) == "auto"} {
+  floorPlan -r $core_aspect_ratio $core_density_target \
+    $core_margin_l $core_margin_b $core_margin_r $core_margin_t
+} elseif {$env(floorplan_mode) == "fixed"} {
+  if {$env(floorplan_width) == "" || $env(floorplan_height) == ""} {
+    error "floorplan_mode=fixed requires floorplan_width and floorplan_height"
+  }
+
+  floorPlan -d $env(floorplan_width) $env(floorplan_height) \
+    $core_margin_l $core_margin_b $core_margin_r $core_margin_t
+} else {
+  error "Unsupported floorplan_mode '$env(floorplan_mode)'; expected 'auto' or 'fixed'"
+}
 
 setFlipping s
-planDesign
 
-# Optional place to replace planDesign with explicit SRAM placement/keepouts.
-# If kept, fix SRAM macro placement here before row cutting, taps, and power.
+set macro_halo 2.0
+set blocks [dbGet top.insts.cell.baseClass block -p2]
+set first_block [lindex $blocks 0]
+set has_hard_macros [expr {[llength $blocks] > 0 && $first_block ne "0" && $first_block ne "0x0"}]
+
+if {$has_hard_macros} {
+  addHaloToBlock $macro_halo $macro_halo $macro_halo $macro_halo -allMacro
+
+  if {[llength [info commands set_macro_place_constraint]]} {
+    set pg_resource_layer [dbGet [dbGetLayerByZ 1].name]
+    set_macro_place_constraint \
+      -pg_resource_model [list $pg_resource_layer 0.2] \
+      -forbidden_space_to_macro {20 20} \
+      -min_space_to_core {30 30} \
+      -honor_strict_spacing_constraint true \
+      -avoid_abut_macro_edge_with_pins true \
+      -macro_corner_keepout {5 5}
+  } else {
+    puts "Warning: set_macro_place_constraint is unavailable; relying on refine_macro_place/checkPlace"
+  }
+
+  place_design -concurrent_macros
+  refine_macro_place
+
+  checkPlace -macroBlockage -verbose > reports/init.checkPlace.macroBlockage.after_macro_place.rpt
+  setInstancePlacementStatus -allHardMacros -status fixed
+}
 
 if {   [info exists ADK_END_CAP_CELL_LEFT]
     && [expr {$ADK_END_CAP_CELL_LEFT ne ""}]
@@ -148,10 +205,7 @@ if {   [info exists ADK_END_CAP_CELL_LEFT]
   addEndCap -prefix ENDCAP
 }
 
-set macro_halo 2.0
-set blocks [dbGet top.insts.cell.baseClass block -p2]
-
-if {![expr {[llength $blocks] == 0 || [lindex $blocks 0] == 0 || [lindex $blocks 0] == "0x0"}]} {
+if {$has_hard_macros} {
   foreach inst $blocks {
     if {[dbGet $inst.isPhysOnly]} {
       continue
@@ -254,7 +308,7 @@ check_timing
 report_ports > reports/init.ports.rpt
 
 report_metrics init
-save_phase init
+maybe_stop_after floorplan
 
 #-------------------------------------------------------------------------
 # Power
@@ -405,7 +459,7 @@ if { $M2_direction == "Vertical" } {
     -start [expr $pmesh_top_str_pitch/2]
 }
 
-save_phase power
+maybe_stop_after power
 
 #-------------------------------------------------------------------------
 # Placement
@@ -430,7 +484,6 @@ if {[info exists ADK_MIN_INST_GAP] && $ADK_MIN_INST_GAP > 0} {
   }
 }
 
-setDesignMode -process 45 -powerEffort high
 setAnalysisMode -analysisType onChipVariation
 
 setPlaceMode -place_global_cong_effort medium \
@@ -459,7 +512,7 @@ checkPlace -macroBlockage -verbose > reports/place.checkPlace.macroBlockage.afte
 reportDensityMap > reports/place.density.rpt
 
 report_metrics place
-save_phase place
+maybe_stop_after place
 
 #-------------------------------------------------------------------------
 # CTS
@@ -515,20 +568,18 @@ report_ccopt_skew_groups -filename reports/cts.skew_groups.rpt
 report_ccopt_clock_tree_structure -show_sinks -expand_generated_clock_trees independently -file reports/cts.structure.rpt
 
 report_metrics cts
-save_phase cts
+maybe_stop_after cts
 
 #-------------------------------------------------------------------------
 # Post-CTS Hold
 #-------------------------------------------------------------------------
 
 setOptMode -fixHoldAllowOverlap TRUE
-setDesignMode -process 45 -powerEffort high
 setOptMode -fixHoldAllowSetupTnsDegrade true
 
 optDesign -postCTS -hold -outDir reports -prefix postcts_hold
 
 report_metrics postcts_hold
-save_phase postcts_hold
 
 #-------------------------------------------------------------------------
 # Route
@@ -555,10 +606,10 @@ setNanoRouteMode -droutePostRouteSpreadWire false
 setExtractRCMode -engine postRoute -effortLevel low
 
 report_metrics route
-save_phase route
+maybe_stop_after route
 
 #-------------------------------------------------------------------------
-# Postroute Hold
+# Postroute Optimization
 #-------------------------------------------------------------------------
 
 setOptMode -verbose true
@@ -579,6 +630,8 @@ if {[getDistributeHost -mode] == "local"} {
   }
 }
 
+optDesign -postRoute -outDir reports -prefix postroute_setup -setup
+optDesign -postRoute -outDir reports -prefix postroute_drv -drv
 optDesign -postRoute -outDir reports -prefix postroute_hold -hold
 
 if {$need_restore_multi == true} {
@@ -586,15 +639,12 @@ if {$need_restore_multi == true} {
   setMultiCpuUsage -localCpu $ncpu
 }
 
-save_phase postroute_hold
-
 #-------------------------------------------------------------------------
 # Signoff
 #-------------------------------------------------------------------------
 
 update_names -nocase
 
-setDesignMode -process 45
 setExtractRCMode -coupled true -effortLevel low
 setAnalysisMode -analysisType onChipVariation -cppr both
 
@@ -698,4 +748,4 @@ defOut -routing -allLayers $results_dir/$design_name.def.gz
 report_area -verbose > reports/signoff.area.rpt
 
 report_metrics signoff
-save_phase signoff
+save_design_checkpoint
