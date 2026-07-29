@@ -26,7 +26,12 @@ module ComputeTileTb;
   localparam DM_DATA_WIDTH = 256;
   localparam TEST_ROWS = `NUM_PROGRAM_WORDS + `NUM_L1_INIT_ROWS + `NUM_EXPECTED_ROWS;
   localparam OUTPUT_BASE = 16;
-  localparam TIMEOUT_CYCLES = 10000;
+  // Post-route SDF simulation is substantially slower in cycle count than RTL
+  // around the SRAM-backed LSU/MXU sequence.  The previous 10k limit expired
+  // just as IRAM returned the final HALT word, before the sequencer could
+  // decode it and pulse done.  The independent 5 ms global watchdog below
+  // still catches a genuinely stuck design.
+  localparam TIMEOUT_CYCLES = 100000;
 
   reg clk;
   reg rst_n;
