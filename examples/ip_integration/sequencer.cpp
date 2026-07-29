@@ -12,8 +12,6 @@
 #define NEXT 2      // Number of external memory slots
 #define NIBUF 2     // Number of operands/input buffer size
 
-extern "C" {
-
 void sequencer(
     int8_t ctrl[1], int32_t d_addr[1],
     int8_t prog_in[4], // TODO: Add support for #define in parameter list
@@ -64,5 +62,4 @@ void sequencer(
       }
     }
   }
-}
 }
