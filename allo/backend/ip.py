@@ -7,6 +7,7 @@ import re
 import importlib
 import subprocess
 import time
+import tempfile
 
 # Template argument list allowing one level of nesting, so that both `int8_t`
 # and `ap_int<8>` work as the argument of an outer template.
@@ -310,6 +311,7 @@ def parse_sc_module(code, target_module):
 
 
 class IPModule:
+    # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         top,
@@ -339,8 +341,20 @@ class IPModule:
                 f"Path does not exist: {self.impl}. Consider using an absolute path."
             )
         self.abs_path = os.path.dirname(self.impl)
-        self.temp_path = os.path.join(self.abs_path, "_tmp")
-        os.makedirs(self.temp_path, exist_ok=True)
+        # Build artifacts (the generated wrapper .cpp, its .o and the .so) go in
+        # a private temp directory instead of a `_tmp` folder beside the IP
+        # source, so a run leaves nothing behind in the user's tree.
+        #
+        # Kept as an attribute rather than used in a `with` block on purpose:
+        # the directory is created here but consumed later, by
+        # `compile_shared_lib()` and `__call__()`, so its lifetime has to be the
+        # IPModule's, not this function's. Cleanup therefore happens when the
+        # IPModule is collected (or at interpreter exit). That is safe for the
+        # JIT: `ExecutionEngine` loads the .so eagerly at construction, and a
+        # loaded library stays mapped after its file is unlinked.
+        # pylint: disable=consider-using-with
+        self._temp_dir = tempfile.TemporaryDirectory(prefix="allo_ip_")
+        self.temp_path = self._temp_dir.name
         if include_paths is None:
             include_paths = []
         self.include_paths = include_paths + [self.abs_path]
