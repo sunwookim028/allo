@@ -104,6 +104,10 @@ def construct():
 
   vcs_sim.extend_inputs( ['test_vectors.txt'] )
   vcs_sim.update_params( testbench.params() )
+  # Pass/fail GLS should not dump the complete post-route gate netlist. The
+  # testbench also leaves VPD/memory dumping off; enable a focused dump only
+  # for a dedicated debug run.
+  vcs_sim.update_params( {'waveform': False} )
 
   #-----------------------------------------------------------------------
   # Graph -- Add nodes

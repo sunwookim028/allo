@@ -2,6 +2,7 @@
 +define+NUM_L1_INIT_ROWS=16
 +define+NUM_EXPECTED_ROWS=8
 -debug_access+pp
++undefine+VERBOSE
 -lca
 +neg_tchk
 -sverilog

@@ -26,12 +26,10 @@ module ComputeTileTb;
   localparam DM_DATA_WIDTH = 256;
   localparam TEST_ROWS = `NUM_PROGRAM_WORDS + `NUM_L1_INIT_ROWS + `NUM_EXPECTED_ROWS;
   localparam OUTPUT_BASE = 16;
-  // Post-route SDF simulation is substantially slower in cycle count than RTL
-  // around the SRAM-backed LSU/MXU sequence.  The previous 10k limit expired
-  // just as IRAM returned the final HALT word, before the sequencer could
-  // decode it and pulse done.  The independent 5 ms global watchdog below
-  // still catches a genuinely stuck design.
-  localparam TIMEOUT_CYCLES = 100000;
+  // A healthy 11-instruction tile smoke test should finish well below this.
+  // Treat expiry as a functional stall to debug, not as a reason to keep
+  // generating an unbounded gate-level transcript.
+  localparam TIMEOUT_CYCLES = 10000;
 
   reg clk;
   reg rst_n;
@@ -240,9 +238,6 @@ module ComputeTileTb;
   end
 
   initial begin
-    $vcdplusfile("dump.vcd");
-    $vcdplusmemon();
-    $vcdpluson(0, ComputeTileTb);
     #(`FINISH_TIME);
     $error("ComputeTileTb timed out");
     $finish(2);
