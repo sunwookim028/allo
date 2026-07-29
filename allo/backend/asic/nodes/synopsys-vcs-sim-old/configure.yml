@@ -32,6 +32,7 @@ inputs:
   - testbench.sv
   - design.sdf
   - design.args
+  - srams
 
 
 # By default, this node will output a waveform dump. To disable this, set

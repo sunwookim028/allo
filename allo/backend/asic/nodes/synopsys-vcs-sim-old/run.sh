@@ -15,6 +15,12 @@ for f in inputs/adk/*.v; do
     ARGS="$ARGS $f"
 done
 
+# SRAM macro models for GLS
+for f in inputs/srams/*/*.v; do
+    [ -e "$f" ] || continue
+    ARGS="$ARGS $f"
+done
+
 # Set-up testbench
 ARGS="$ARGS -top $testbench_name"
 

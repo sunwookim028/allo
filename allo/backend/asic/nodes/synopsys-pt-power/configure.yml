@@ -25,6 +25,7 @@ inputs:
   - run.saif
   - run.vcd
   - design.namemap
+  - srams
 
 outputs:
   - primetime.session

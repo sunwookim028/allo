@@ -170,6 +170,8 @@ def construct():
   g.connect_by_name( openram,        genlibdb )
   g.connect_by_name( openram,        gdsmerge )
   g.connect_by_name( openram,        lvs )
+  g.connect_by_name( openram,        vcs_sim        )
+  g.connect_by_name( openram,        power_est      )
 
   g.connect_by_name( sv2v,           synth          )
   g.connect_by_name( constraints,    synth          )

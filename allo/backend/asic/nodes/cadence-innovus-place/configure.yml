@@ -47,6 +47,7 @@ parameters:
     - setup-inst-gap.tcl
     - main.tcl
     - clean-cellpad.tcl
+    - fix-overlaps.tcl
     - reporting.tcl
   useful_skew: True
   cell_padding: 2 # how much padding to add to specified cells
@@ -75,5 +76,6 @@ preconditions:
 postconditions:
 
   - assert File( 'outputs/design.checkpoint' )       # must exist
+  - assert 'Overlapping with other instance' not in File('reports/place.checkPlace.after_refine.rpt')
 
 
