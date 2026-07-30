@@ -166,7 +166,7 @@ proc place_grouped_macros {} {
     set ::env(macro_edge_keepout) 30.0
   }
   if {![info exists ::env(macro_group_spacing)]} {
-    set ::env(macro_group_spacing) 10.0
+    set ::env(macro_group_spacing) 20.0
   }
   if {![info exists ::env(macro_group_max_depth)]} {
     set ::env(macro_group_max_depth) 2
