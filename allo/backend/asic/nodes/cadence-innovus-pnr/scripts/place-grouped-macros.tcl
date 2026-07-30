@@ -68,9 +68,10 @@ proc mg_snap_up {value grid} {
 }
 
 proc mg_has_r90_symmetry {inst} {
-  set symmetry ""
-  catch {set symmetry [dbGet $inst.cell.symmetry]}
-  return [expr {[string first "R90" $symmetry] >= 0}]
+  # The legal-orientation attribute is version/library dependent in Innovus.
+  # Keep the first deterministic macro placer conservative until pin-side and
+  # symmetry probing are verified on real macro LEFs.
+  return 0
 }
 
 proc mg_orient_for_edge {inst edge width height} {
