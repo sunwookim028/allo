@@ -157,6 +157,15 @@ if {![info exists env(macro_min_space_to_core)]} {
 if {![info exists env(macro_corner_keepout)]} {
   set env(macro_corner_keepout) "5,5"
 }
+if {![info exists env(macro_edge_keepout)]} {
+  set env(macro_edge_keepout) 30.0
+}
+if {![info exists env(macro_group_spacing)]} {
+  set env(macro_group_spacing) 10.0
+}
+if {![info exists env(macro_group_max_depth)]} {
+  set env(macro_group_max_depth) 2
+}
 if {![info exists env(well_tap_cell)]} {
   if {[info exists ADK_WELL_TAP_CELL]} {
     set env(well_tap_cell) $ADK_WELL_TAP_CELL
@@ -314,32 +323,9 @@ if {$env(floorplan_mode) == "auto"} {
 setFlipping s
 
 set macro_halo $env(macro_halo)
+source scripts/place-grouped-macros.tcl
+set has_hard_macros [place_grouped_macros]
 set blocks [dbGet top.insts.cell.baseClass block -p2]
-set first_block [lindex $blocks 0]
-set has_hard_macros [expr {[llength $blocks] > 0 && $first_block ne "0" && $first_block ne "0x0"}]
-
-if {$has_hard_macros} {
-  addHaloToBlock $macro_halo $macro_halo $macro_halo $macro_halo -allMacro
-
-  if {[llength [info commands set_macro_place_constraint]]} {
-    set pg_resource_layer [dbGet [dbGetLayerByZ 1].name]
-    set_macro_place_constraint \
-      -pg_resource_model [list $pg_resource_layer $env(macro_pg_resource_util)] \
-      -forbidden_space_to_macro $macro_forbidden_space_to_macro \
-      -min_space_to_core $macro_min_space_to_core \
-      -honor_strict_spacing_constraint true \
-      -avoid_abut_macro_edge_with_pins true \
-      -macro_corner_keepout $macro_corner_keepout
-  } else {
-    puts "Warning: set_macro_place_constraint is unavailable; relying on refine_macro_place/checkPlace"
-  }
-
-  place_design -concurrent_macros
-  refine_macro_place
-
-  checkPlace -macroBlockage -verbose > reports/init.checkPlace.macroBlockage.after_macro_place.rpt
-  setInstancePlacementStatus -allHardMacros -status fixed
-}
 
 if {   [info exists ADK_END_CAP_CELL_LEFT]
     && [expr {$ADK_END_CAP_CELL_LEFT ne ""}]

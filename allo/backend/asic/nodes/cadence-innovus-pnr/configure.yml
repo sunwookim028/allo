@@ -84,6 +84,9 @@ parameters:
   macro_forbidden_space_to_macro: '20,20'
   macro_min_space_to_core: '30,30'
   macro_corner_keepout: '5,5'
+  macro_edge_keepout: 30.0
+  macro_group_spacing: 10.0
+  macro_group_max_depth: 2
   well_tap_cell: WELLTAP_X1
   well_tap_interval: 120
   primary_power_net: VDD
