@@ -20,8 +20,8 @@ Important parameters are:
   `construct_path`.
 - `allo_entrypoint`: design-module callable, default `build`.
 - `backend`: currently `vitis`; unsupported values fail explicitly.
-- `backend_options`: JSON object interpreted by the selected backend branch.
-  The Vitis branch currently accepts `device`.
+- `backend_options`: shell-safe comma-separated `key=value` options interpreted
+  by the selected backend branch. The Vitis default is `device=u280`.
 - `build_mode`: currently expected to be `csyn`.
 - `clock_period`: target clock period in nanoseconds. The node converts this to
   the MHz value required by Allo/Vitis.

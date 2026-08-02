@@ -6,9 +6,26 @@ from pathlib import Path
 
 
 def parse_backend_options(options_text):
-    """Accept JSON or mflowgen's Python-literal rendering of a dictionary."""
+    """Accept shell-safe key=value options, JSON, or a Python dictionary."""
+    options_text = (options_text or "").strip()
+    if not options_text:
+        return {}
+    if "=" in options_text and not options_text.startswith("{"):
+        options = {}
+        for item in options_text.split(","):
+            if "=" not in item:
+                raise ValueError(
+                    f"invalid backend option {item!r}; expected key=value"
+                )
+            key, value = (part.strip() for part in item.split("=", 1))
+            if not key or not value:
+                raise ValueError(
+                    f"invalid backend option {item!r}; expected key=value"
+                )
+            options[key] = value
+        return options
     try:
-        options = json.loads(options_text or "{}")
+        options = json.loads(options_text)
     except json.JSONDecodeError:
         try:
             options = ast.literal_eval(options_text)
