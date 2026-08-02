@@ -15,6 +15,7 @@ outputs:
   - build-success
 
 commands:
+  - "'{python_bin}' preflight.py --python-bin '{python_bin}' --design '{allo_design_file}' --construct-path '{construct_path}' --backend '{backend}' --mode '{build_mode}'"
   - bash run.sh
 
 parameters:
@@ -28,29 +29,9 @@ parameters:
   python_bin: python
 
 preconditions:
-  - assert Tool( '{python_bin}' )
-  - assert '{build_mode}' == 'csyn'
-  - |
-    backend = '{backend}'
-    if backend == 'vitis':
-      assert Tool( 'vitis_hls' )
-    else:
-      raise AssertionError('unsupported Allo backend: ' + backend)
-  - |
-    from pathlib import Path
-    design = Path('{allo_design_file}')
-    if not design.is_absolute():
-      design = Path('{construct_path}').resolve().parent / design
-    assert design.is_file(), str(design)
-  - |
-    import subprocess
-    result = subprocess.run(
-      ['{python_bin}', '-c', 'import allo'],
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
-      text=True,
-    )
-    assert result.returncode == 0, result.stderr
+  - assert File( 'preflight.py' )
+  - assert File( 'run.sh' )
+  - assert File( 'backend.py' )
 
 postconditions:
   - assert File( 'outputs/build-success' )

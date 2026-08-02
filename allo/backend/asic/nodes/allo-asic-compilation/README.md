@@ -30,3 +30,10 @@ Important parameters are:
 The success marker is written only after the pre-HLS/final manifests, zero
 unmatched joins, debug directory, and synthesized Verilog have all been
 validated.
+
+This mflowgen version does not expand node parameters inside assertion text.
+Parameterized environment checks therefore run in `preflight.py`, invoked as
+the first expanded command. Static mflowgen preconditions only verify that the
+node's required scripts were staged. The preflight checks the selected Python
+executable, Allo import, design path, build mode, backend selection, and backend
+tool availability before `run.sh` starts.
