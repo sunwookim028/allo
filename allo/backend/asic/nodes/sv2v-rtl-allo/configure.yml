@@ -1,0 +1,46 @@
+name: sv2v-rtl-allo
+
+inputs:
+  - backend-rtl
+  - asic-manifest.json
+  - asic-manifest.tcl
+  - asic-manifest-final.json
+  - asic-manifest-final.tcl
+  - build-metadata.json
+
+outputs:
+  - design.v
+  - normalized-rtl
+  - source-rtl
+  - source-manifest.f
+  - asic-manifest.json
+  - asic-manifest.tcl
+  - asic-manifest-final.json
+  - asic-manifest-final.tcl
+  - build-metadata.json
+  - sv2v.log
+
+commands:
+  - bash run.sh
+
+parameters:
+  top_module: top
+  sv2v_bin: sv2v
+  sv2v_defines: ""
+  sv2v_include_dirs: ""
+
+preconditions:
+  - assert Tool( '{sv2v_bin}' )
+  - assert File( 'inputs/backend-rtl' )
+  - assert File( 'inputs/asic-manifest-final.json' )
+  - assert File( 'inputs/build-metadata.json' )
+
+postconditions:
+  - assert File( 'outputs/design.v' )
+  - assert File( 'outputs/normalized-rtl/design.v' )
+  - assert File( 'outputs/source-rtl' )
+  - assert File( 'outputs/source-manifest.f' )
+  - assert File( 'outputs/asic-manifest.json' )
+  - assert File( 'outputs/asic-manifest-final.json' )
+  - assert File( 'outputs/sv2v.log' )
+  - assert 'error:' not in File( 'outputs/sv2v.log' )

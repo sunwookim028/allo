@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${construct_path:?Missing parameter: construct_path}"
+: "${allo_design_file:?Missing parameter: allo_design_file}"
+: "${allo_entrypoint:=build}"
+: "${backend:=vitis}"
+: "${build_mode:=csyn}"
+: "${clock_period:=10.0}"
+: "${backend_options:={\"device\":\"u280\"}}"
+: "${python_bin:=python}"
+
+if [[ "$allo_design_file" = /* ]]; then
+  design_path="$allo_design_file"
+else
+  construct_dir="$(cd "$(dirname "$construct_path")" && pwd)"
+  design_path="$construct_dir/$allo_design_file"
+fi
+
+if [ ! -f "$design_path" ]; then
+  echo "ERROR: Allo design does not exist: $design_path" >&2
+  exit 2
+fi
+
+command -v "$python_bin" >/dev/null
+"$python_bin" -c 'import allo; print(allo.__file__)'
+
+if [ "$backend" = "vitis" ]; then
+  command -v vitis_hls >/dev/null
+else
+  echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
+  exit 2
+fi
+
+rm -rf work
+mkdir -p work/project outputs
+
+set +e
+"$python_bin" run_design.py \
+  --design "$design_path" \
+  --entrypoint "$allo_entrypoint" \
+  --project work/project \
+  --backend "$backend" \
+  --mode "$build_mode" \
+  --clock-period "$clock_period" \
+  --backend-options "$backend_options" \
+  > >(tee outputs/allo-build.log) \
+  2> >(tee -a outputs/allo-build.log >&2)
+build_status=$?
+set -e
+
+if [ "$build_status" -ne 0 ]; then
+  echo "ERROR: Allo backend build exited with status $build_status" \
+    | tee -a outputs/allo-build.log
+  exit "$build_status"
+fi
+
+"$python_bin" validate_build.py \
+  --project work/project \
+  --backend "$backend" \
+  --rtl-output outputs/backend-rtl
+
+cp -a work/project outputs/allo-build
+cp -a work/project/asic-debug outputs/asic-debug
+for name in asic-manifest.json asic-manifest.tcl \
+            asic-manifest-final.json asic-manifest-final.tcl; do
+  cp "work/project/$name" "outputs/$name"
+done
+
+export ALLO_NODE_DESIGN_PATH="$design_path"
+export ALLO_NODE_BACKEND="$backend"
+export ALLO_NODE_BUILD_MODE="$build_mode"
+export ALLO_NODE_CLOCK_PERIOD="$clock_period"
+export ALLO_NODE_BACKEND_OPTIONS="$backend_options"
+"$python_bin" -c '
+import json
+import os
+from pathlib import Path
+metadata = {
+    "design": str(Path(os.environ["ALLO_NODE_DESIGN_PATH"]).resolve()),
+    "backend": os.environ["ALLO_NODE_BACKEND"],
+    "mode": os.environ["ALLO_NODE_BUILD_MODE"],
+    "clock_period_ns": float(os.environ["ALLO_NODE_CLOCK_PERIOD"]),
+    "backend_options": json.loads(os.environ["ALLO_NODE_BACKEND_OPTIONS"]),
+}
+Path("outputs/build-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+'
+touch outputs/build-success

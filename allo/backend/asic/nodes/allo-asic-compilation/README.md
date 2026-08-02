@@ -1,0 +1,32 @@
+# Allo build node
+
+This node loads a parameterized Allo Python design and calls its configured
+entrypoint with:
+
+```python
+build(project, target, mode, configs)
+```
+
+Only `backend: vitis` is currently supported. Backend selection is handled by
+explicit branches in `backend.py`; later backends can add their own target,
+configuration, tool checks, artifact discovery, and validation without adding
+backend-specific path parameters to the graph. The node currently runs Vitis C
+synthesis, validates the enriched ASIC manifest, and publishes the complete
+Allo project, debug artifacts, manifests, and synthesis RTL.
+
+Important parameters are:
+
+- `allo_design_file`: absolute path, or a path relative to the design's
+  `construct_path`.
+- `allo_entrypoint`: design-module callable, default `build`.
+- `backend`: currently `vitis`; unsupported values fail explicitly.
+- `backend_options`: JSON object interpreted by the selected backend branch.
+  The Vitis branch currently accepts `device`.
+- `build_mode`: currently expected to be `csyn`.
+- `clock_period`: target clock period in nanoseconds. The node converts this to
+  the MHz value required by Allo/Vitis.
+- `python_bin`: Python executable, default `python`.
+
+The success marker is written only after the pre-HLS/final manifests, zero
+unmatched joins, debug directory, and synthesized Verilog have all been
+validated.
