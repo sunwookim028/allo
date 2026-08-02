@@ -9,6 +9,17 @@ set -euo pipefail
 : "${clock_period:=10.0}"
 : "${backend_options:={\"device\":\"u280\"}}"
 : "${python_bin:=python}"
+: "${allo_setup_script:=/work/shared/common/allo/setup-llvm-main.sh}"
+
+if [ ! -f "$allo_setup_script" ]; then
+  echo "ERROR: Allo LLVM setup script does not exist: $allo_setup_script" >&2
+  exit 2
+fi
+# The setup modifies this shell's LLVM library/tool environment, so it must be
+# sourced rather than executed as a child process.
+set +u
+source "$allo_setup_script"
+set -u
 
 if [[ "$allo_design_file" = /* ]]; then
   design_path="$allo_design_file"

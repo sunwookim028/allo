@@ -26,6 +26,9 @@ Important parameters are:
 - `clock_period`: target clock period in nanoseconds. The node converts this to
   the MHz value required by Allo/Vitis.
 - `python_bin`: Python executable, default `python`.
+- `allo_setup_script`: shell script sourced before preflight and compilation to
+  configure the prebuilt LLVM backend. It defaults to
+  `/work/shared/common/allo/setup-llvm-main.sh`.
 
 The success marker is written only after the pre-HLS/final manifests, zero
 unmatched joins, debug directory, and synthesized Verilog have all been
@@ -37,3 +40,8 @@ the first expanded command. Static mflowgen preconditions only verify that the
 node's required scripts were staged. The preflight checks the selected Python
 executable, Allo import, design path, build mode, backend selection, and backend
 tool availability before `run.sh` starts.
+
+The LLVM setup is sourced twice because mflowgen commands may execute in
+separate shell processes: once in the preflight command and once inside
+`run.sh`. This guarantees that both the import check and compilation inherit
+the required library paths and LLVM settings.

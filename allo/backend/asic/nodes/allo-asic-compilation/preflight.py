@@ -15,7 +15,12 @@ def main():
     parser.add_argument("--construct-path", required=True)
     parser.add_argument("--backend", required=True)
     parser.add_argument("--mode", required=True)
+    parser.add_argument("--setup-script", required=True)
     args = parser.parse_args()
+
+    setup_script = Path(args.setup_script).expanduser()
+    if not setup_script.is_file():
+        raise RuntimeError(f"Allo LLVM setup script does not exist: {setup_script}")
 
     selected_python = shutil.which(str(Path(args.python_bin).expanduser()))
     if selected_python is None:
@@ -60,6 +65,7 @@ def main():
         )
 
     print(f"Python: {running_python}")
+    print(f"Allo LLVM setup: {setup_script.resolve()}")
     print(f"Allo design: {design.resolve()}")
     print(f"Backend: {args.backend}")
     print(f"Mode: {args.mode}")
