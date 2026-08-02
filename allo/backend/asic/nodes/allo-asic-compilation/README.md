@@ -42,6 +42,8 @@ executable, Allo import, design path, build mode, backend selection, and backend
 tool availability before `run.sh` starts.
 
 The LLVM setup is sourced twice because mflowgen commands may execute in
-separate shell processes: once in the preflight command and once inside
-`run.sh`. This guarantees that both the import check and compilation inherit
-the required library paths and LLVM settings.
+separate shell processes: once through `run_preflight.sh` and once inside
+`run.sh`. Both wrappers disable Bash `nounset` while sourcing because the
+shared setup script unsets and subsequently reads `PYTHONPATH`. This guarantees
+that both the import check and compilation inherit the required library paths
+and LLVM settings.

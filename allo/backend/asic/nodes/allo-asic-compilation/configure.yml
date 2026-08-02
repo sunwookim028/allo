@@ -15,7 +15,7 @@ outputs:
   - build-success
 
 commands:
-  - "source '{allo_setup_script}' && '{python_bin}' preflight.py --python-bin '{python_bin}' --design '{allo_design_file}' --construct-path '{construct_path}' --backend '{backend}' --mode '{build_mode}' --setup-script '{allo_setup_script}'"
+  - "bash run_preflight.sh --python-bin '{python_bin}' --design '{allo_design_file}' --construct-path '{construct_path}' --backend '{backend}' --mode '{build_mode}' --setup-script '{allo_setup_script}'"
   - bash run.sh
 
 parameters:
@@ -31,6 +31,7 @@ parameters:
 
 preconditions:
   - assert File( 'preflight.py' )
+  - assert File( 'run_preflight.sh' )
   - assert File( 'run.sh' )
   - assert File( 'backend.py' )
 
