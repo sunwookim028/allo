@@ -47,3 +47,10 @@ separate shell processes: once through `run_preflight.sh` and once inside
 shared setup script unsets and subsequently reads `PYTHONPATH`. This guarantees
 that both the import check and compilation inherit the required library paths
 and LLVM settings.
+
+The wrappers also clear inherited `LD_LIBRARY_PATH`, `LIBRARY_PATH`, compiler
+include variables, `GCC_EXEC_PREFIX`, and `LD_PRELOAD` before sourcing the
+Allo setup. This prevents commercial ASIC tool modules—especially Synopsys's
+bundled `libstdc++.so.6`—from overriding the GCC 13 runtime required by Allo's
+compiled MLIR extension. `PATH` is retained so a loaded backend such as Vitis
+remains discoverable.

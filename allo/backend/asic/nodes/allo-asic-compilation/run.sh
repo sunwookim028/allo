@@ -17,6 +17,15 @@ if [ ! -f "$allo_setup_script" ]; then
 fi
 # The setup modifies this shell's LLVM library/tool environment, so it must be
 # sourced rather than executed as a child process.
+# Remove inherited commercial-tool compiler/runtime paths first. In particular,
+# Synopsys ships a libstdc++.so.6 that is too old for Allo's MLIR extension.
+unset LD_LIBRARY_PATH
+unset LIBRARY_PATH
+unset CPATH
+unset C_INCLUDE_PATH
+unset CPLUS_INCLUDE_PATH
+unset GCC_EXEC_PREFIX
+unset LD_PRELOAD
 set +u
 source "$allo_setup_script"
 set -u
