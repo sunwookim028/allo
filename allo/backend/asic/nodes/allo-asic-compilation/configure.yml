@@ -27,7 +27,6 @@ parameters:
   backend_options: '{"device":"u280"}'
   python_bin: python
   allo_setup_script: /work/shared/common/allo/setup-llvm-main.sh
-  backend_module: ""
 
 preconditions:
   - assert File( 'preflight.py' )

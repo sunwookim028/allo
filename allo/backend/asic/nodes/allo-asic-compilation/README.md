@@ -29,8 +29,6 @@ Important parameters are:
 - `allo_setup_script`: shell script sourced before preflight and compilation to
   configure the prebuilt LLVM backend. It defaults to
   `/work/shared/common/allo/setup-llvm-main.sh`.
-- `backend_module`: optional environment-module name loaded for the selected
-  backend, for example `vitis/2022.1`.
 
 The success marker is written only after the pre-HLS/final manifests, zero
 unmatched joins, debug directory, and synthesized Verilog have all been
@@ -43,8 +41,10 @@ node's required scripts were staged. The preflight checks the selected Python
 executable, Allo import, design path, build mode, backend selection, and backend
 tool availability before `run.sh` starts.
 
-Preflight and compilation now run from the same `run.sh` command, so the backend
-module and LLVM setup are each loaded only once. The wrapper disables Bash
+Preflight and compilation run from the same `run.sh` command, so the backend
+module and LLVM setup are each loaded only once. Backend selection owns module
+selection: the Vitis branch loads `xilinx-2022.1`, and unsupported backends
+error. The wrapper disables Bash
 `nounset` while sourcing because the shared setup script unsets and subsequently
 reads `PYTHONPATH`.
 

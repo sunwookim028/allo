@@ -10,7 +10,6 @@ set -euo pipefail
 : "${backend_options:={\"device\":\"u280\"}}"
 : "${python_bin:=python}"
 : "${allo_setup_script:=/work/shared/common/allo/setup-llvm-main.sh}"
-: "${backend_module:=}"
 
 if [ ! -f "$allo_setup_script" ]; then
   echo "ERROR: Allo LLVM setup script does not exist: $allo_setup_script" >&2
@@ -29,20 +28,19 @@ unset GCC_EXEC_PREFIX
 unset LD_PRELOAD
 set +u
 
-if [ -n "$backend_module" ]; then
-  if ! type module >/dev/null 2>&1; then
-    source /usr/share/Modules/init/bash
-  fi
-  case "$backend" in
-    vitis)
-      module load "$backend_module"
-      ;;
-    *)
-      echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
-      exit 2
-      ;;
-  esac
+if ! type module >/dev/null 2>&1; then
+  source /usr/share/Modules/init/bash
 fi
+
+case "$backend" in
+  vitis)
+    module load xilinx-2022.1
+    ;;
+  *)
+    echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
+    exit 2
+    ;;
+esac
 
 source "$allo_setup_script"
 set -u
