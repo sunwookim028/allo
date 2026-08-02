@@ -15,7 +15,6 @@ outputs:
   - build-success
 
 commands:
-  - "bash run_preflight.sh --python-bin '{python_bin}' --design '{allo_design_file}' --construct-path '{construct_path}' --backend '{backend}' --mode '{build_mode}' --setup-script '{allo_setup_script}'"
   - bash run.sh
 
 parameters:
@@ -28,10 +27,10 @@ parameters:
   backend_options: '{"device":"u280"}'
   python_bin: python
   allo_setup_script: /work/shared/common/allo/setup-llvm-main.sh
+  backend_module: ""
 
 preconditions:
   - assert File( 'preflight.py' )
-  - assert File( 'run_preflight.sh' )
   - assert File( 'run.sh' )
   - assert File( 'backend.py' )
 

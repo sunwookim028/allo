@@ -10,6 +10,7 @@ set -euo pipefail
 : "${backend_options:={\"device\":\"u280\"}}"
 : "${python_bin:=python}"
 : "${allo_setup_script:=/work/shared/common/allo/setup-llvm-main.sh}"
+: "${backend_module:=}"
 
 if [ ! -f "$allo_setup_script" ]; then
   echo "ERROR: Allo LLVM setup script does not exist: $allo_setup_script" >&2
@@ -27,8 +28,32 @@ unset CPLUS_INCLUDE_PATH
 unset GCC_EXEC_PREFIX
 unset LD_PRELOAD
 set +u
+
+if [ -n "$backend_module" ]; then
+  if ! type module >/dev/null 2>&1; then
+    source /usr/share/Modules/init/bash
+  fi
+  case "$backend" in
+    vitis)
+      module load "$backend_module"
+      ;;
+    *)
+      echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
+      exit 2
+      ;;
+  esac
+fi
+
 source "$allo_setup_script"
 set -u
+
+"$python_bin" preflight.py \
+  --python-bin "$python_bin" \
+  --design "$allo_design_file" \
+  --construct-path "$construct_path" \
+  --backend "$backend" \
+  --mode "$build_mode" \
+  --setup-script "$allo_setup_script"
 
 if [[ "$allo_design_file" = /* ]]; then
   design_path="$allo_design_file"
@@ -93,15 +118,17 @@ export ALLO_NODE_BUILD_MODE="$build_mode"
 export ALLO_NODE_CLOCK_PERIOD="$clock_period"
 export ALLO_NODE_BACKEND_OPTIONS="$backend_options"
 "$python_bin" -c '
-import json
 import os
 from pathlib import Path
+from backend import parse_backend_options
 metadata = {
     "design": str(Path(os.environ["ALLO_NODE_DESIGN_PATH"]).resolve()),
     "backend": os.environ["ALLO_NODE_BACKEND"],
     "mode": os.environ["ALLO_NODE_BUILD_MODE"],
     "clock_period_ns": float(os.environ["ALLO_NODE_CLOCK_PERIOD"]),
-    "backend_options": json.loads(os.environ["ALLO_NODE_BACKEND_OPTIONS"]),
+    "backend_options": parse_backend_options(
+        os.environ["ALLO_NODE_BACKEND_OPTIONS"]
+    ),
 }
 Path("outputs/build-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 '

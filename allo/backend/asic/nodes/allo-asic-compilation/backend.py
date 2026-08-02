@@ -1,19 +1,32 @@
 """Backend-specific configuration and artifact discovery for the Allo node."""
 
+import ast
 import json
 from pathlib import Path
+
+
+def parse_backend_options(options_text):
+    """Accept JSON or mflowgen's Python-literal rendering of a dictionary."""
+    try:
+        options = json.loads(options_text or "{}")
+    except json.JSONDecodeError:
+        try:
+            options = ast.literal_eval(options_text)
+        except (SyntaxError, ValueError) as error:
+            raise ValueError(
+                "backend_options must be a JSON or Python dictionary literal: "
+                f"{error}"
+            ) from error
+    if not isinstance(options, dict):
+        raise TypeError("backend_options must decode to a dictionary")
+    return options
 
 
 def configure_backend(backend, clock_period, options_text):
     """Return target, Allo configuration, and descriptive backend metadata."""
     if clock_period <= 0:
         raise ValueError("clock period must be greater than zero")
-    try:
-        options = json.loads(options_text or "{}")
-    except json.JSONDecodeError as error:
-        raise ValueError(f"backend_options must be valid JSON: {error}") from error
-    if not isinstance(options, dict):
-        raise TypeError("backend_options must decode to a JSON object")
+    options = parse_backend_options(options_text)
 
     if backend == "vitis":
         device = options.get("device", "u280")
