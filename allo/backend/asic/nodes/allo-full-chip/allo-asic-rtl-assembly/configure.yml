@@ -1,0 +1,37 @@
+name: allo-asic-rtl-assembly
+
+inputs:
+  - design.v
+  - assembly-plan.json
+  - macro-registry
+  - macro-registry.json
+
+outputs:
+  - assembled-design.v
+  - macro-interface-stubs.v
+  - macro-collateral.json
+  - macro-collateral.tcl
+  - macro-functional-models.f
+  - rtl-assembly-report.txt
+  - constraints.tcl
+
+commands:
+  - python assemble_rtl.py
+
+parameters:
+  clock_period: 10.0
+
+preconditions:
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/assembly-plan.json' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-registry.json' )
+
+postconditions:
+  - assert File( 'outputs/assembled-design.v' )
+  - assert File( 'outputs/macro-interface-stubs.v' )
+  - assert File( 'outputs/macro-collateral.json' )
+  - assert File( 'outputs/macro-collateral.tcl' )
+  - assert File( 'outputs/macro-functional-models.f' )
+  - assert File( 'outputs/rtl-assembly-report.txt' )
+  - assert File( 'outputs/constraints.tcl' )

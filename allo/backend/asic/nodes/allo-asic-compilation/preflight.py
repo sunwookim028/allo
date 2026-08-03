@@ -8,6 +8,17 @@ import sys
 from pathlib import Path
 
 
+def validate_clock_periods(clock_period: float, macro_clock_period: float) -> None:
+    """Require macros to meet a clock at least as fast as the full chip."""
+    if macro_clock_period <= 0 or clock_period <= 0:
+        raise RuntimeError("clock periods must be positive")
+    if clock_period < macro_clock_period:
+        raise RuntimeError(
+            "chip clock_period must be greater than or equal to "
+            f"macro_clock_period; got {clock_period} < {macro_clock_period} ns"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--python-bin", required=True)
@@ -16,7 +27,11 @@ def main():
     parser.add_argument("--backend", required=True)
     parser.add_argument("--mode", required=True)
     parser.add_argument("--setup-script", required=True)
+    parser.add_argument("--clock-period", required=True, type=float)
+    parser.add_argument("--macro-clock-period", required=True, type=float)
     args = parser.parse_args()
+
+    validate_clock_periods(args.clock_period, args.macro_clock_period)
 
     setup_script = Path(args.setup_script).expanduser()
     if not setup_script.is_file():
@@ -69,6 +84,8 @@ def main():
     print(f"Allo design: {design.resolve()}")
     print(f"Backend: {args.backend}")
     print(f"Mode: {args.mode}")
+    print(f"Chip clock period: {args.clock_period} ns")
+    print(f"Macro/HLS clock period: {args.macro_clock_period} ns")
 
 
 if __name__ == "__main__":

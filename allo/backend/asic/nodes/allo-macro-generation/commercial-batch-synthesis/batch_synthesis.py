@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""Run one isolated Design Compiler worker per selected macro class."""
+
+from __future__ import annotations
+
+import concurrent.futures
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+ROOT = Path.cwd()
+INPUT_BATCH = ROOT / "inputs" / "macro-batch"
+OUTPUT_BATCH = ROOT / "outputs" / "synthesis-batch"
+WORK_ROOT = ROOT / "work"
+
+
+def environment(entry: dict) -> dict[str, str]:
+    env = os.environ.copy()
+    values = {
+        "design_name": entry["top_module"],
+        # The reused DC scripts call the tool variable clock_period; its
+        # Stage-1 source is deliberately macro_clock_period.
+        "clock_period": os.environ.get("macro_clock_period", "8.0"),
+        "saif_instance": "undefined",
+        "flatten_effort": os.environ.get("flatten_effort", "0"),
+        "topographical": os.environ.get("topographical", "True"),
+        "nthreads": os.environ.get("nthreads", "4"),
+        "high_effort_area_opt": os.environ.get("high_effort_area_opt", "False"),
+        "gate_clock": os.environ.get("gate_clock", "True"),
+        "uniquify_with_design_name": os.environ.get(
+            "uniquify_with_design_name", "True"
+        ),
+        "suppress_msg": os.environ.get("suppress_msg", "False"),
+        "suppressed_msg": os.environ.get("suppressed_msg", ""),
+        "write_svsim_wrapper": os.environ.get("write_svsim_wrapper", "False"),
+        "order": ",".join(
+            [
+                "designer-interface.tcl",
+                "setup-session.tcl",
+                "read-design.tcl",
+                "constraints.tcl",
+                "make-path-groups.tcl",
+                "compile-options.tcl",
+                "compile.tcl",
+                "generate-results.tcl",
+                "reporting.tcl",
+            ]
+        ),
+    }
+    env.update(values)
+    return env
+
+
+def symlink(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.symlink_to(source.resolve(), target_is_directory=source.is_dir())
+
+
+def fingerprint(entry: dict) -> str:
+    digest = hashlib.sha256()
+    digest.update(json.dumps(entry, sort_keys=True).encode())
+    digest.update((INPUT_BATCH / entry["rtl"]).read_bytes())
+    digest.update((INPUT_BATCH / entry["constraints"]).read_bytes())
+    for name in [
+        "macro_clock_period",
+        "flatten_effort",
+        "topographical",
+        "nthreads",
+        "high_effort_area_opt",
+        "gate_clock",
+        "uniquify_with_design_name",
+    ]:
+        digest.update(f"{name}={os.environ.get(name, '')}".encode())
+    return digest.hexdigest()
+
+
+def copy_artifact_tree(source: Path, destination: Path) -> None:
+    """Copy a worker tree, dereferencing valid links and skipping broken ones."""
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_symlink():
+            if not item.exists():
+                continue
+            resolved = item.resolve()
+            if resolved.is_dir():
+                copy_artifact_tree(resolved, target)
+            else:
+                shutil.copy2(resolved, target)
+        elif item.is_dir():
+            copy_artifact_tree(item, target)
+        else:
+            shutil.copy2(item, target)
+
+
+def collect_worker(worker: Path, destination: Path, entry: dict, fp: str) -> None:
+    shutil.rmtree(destination, ignore_errors=True)
+    destination.mkdir(parents=True)
+    for directory in ["outputs", "reports", "logs", "results"]:
+        source = worker / directory
+        if source.exists():
+            copy_artifact_tree(source, destination / directory)
+    collateral = destination / "collateral"
+    collateral.mkdir()
+    shutil.copy2(INPUT_BATCH / entry["pin_intent"], collateral / "pin-intent.json")
+    shutil.copy2(INPUT_BATCH / entry["pin_intent_tcl"], collateral / "pin-intent.tcl")
+    result = {
+        **entry,
+        "stage": "synthesis",
+        "fingerprint": fp,
+        "pin_intent": f"entries/{entry['id']}/collateral/pin-intent.json",
+        "pin_intent_tcl": f"entries/{entry['id']}/collateral/pin-intent.tcl",
+        "artifacts": {
+            "netlist": f"entries/{entry['id']}/outputs/design.v",
+            "sdc": f"entries/{entry['id']}/outputs/design.sdc",
+            "spef": f"entries/{entry['id']}/outputs/design.spef.gz",
+            "svf": f"entries/{entry['id']}/outputs/design.svf",
+        },
+    }
+    (destination / "entry.json").write_text(json.dumps(result, indent=2) + "\n")
+
+
+def run_entry(entry: dict) -> dict:
+    worker_start = time.monotonic()
+    entry_id = entry["id"]
+    worker = WORK_ROOT / entry_id
+    destination = OUTPUT_BATCH / "entries" / entry_id
+    shutil.rmtree(worker, ignore_errors=True)
+    shutil.copytree(ROOT / "worker", worker)
+    inputs = worker / "inputs"
+    inputs.mkdir()
+    symlink(INPUT_BATCH / entry["rtl"], inputs / "design.v")
+    symlink(INPUT_BATCH / entry["constraints"], inputs / "constraints.tcl")
+    symlink(ROOT / "inputs" / "adk", inputs / "adk")
+    srams = ROOT / "inputs" / "srams"
+    if srams.exists():
+        symlink(srams, inputs / "srams")
+
+    fp = fingerprint(entry)
+    log_path = worker / "batch-driver.log"
+    with log_path.open("w") as log:
+        process = subprocess.run(
+            ["bash", "run.sh"],
+            cwd=worker,
+            env=environment(entry),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    status = {
+        "id": entry_id,
+        "top_module": entry["top_module"],
+        "status": "passed" if process.returncode == 0 else "failed",
+        "returncode": process.returncode,
+        "fingerprint": fp,
+        "work_dir": str(worker),
+        "wall_seconds": round(time.monotonic() - worker_start, 3),
+    }
+    if process.returncode == 0:
+        required = [worker / "outputs" / "design.v", worker / "outputs" / "design.sdc"]
+        missing = [str(path) for path in required if not path.exists()]
+        if missing:
+            status.update(status="failed", reason=f"missing outputs: {missing}")
+        else:
+            collect_worker(worker, destination, entry, fp)
+    shutil.copy2(log_path, worker / "batch-driver.saved.log")
+    status_dir = OUTPUT_BATCH / "status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+    (status_dir / f"{entry_id}.json").write_text(json.dumps(status, indent=2) + "\n")
+    return status
+
+
+def emit_worker_logs(entries: list[dict]) -> None:
+    """Copy every worker log to stdout for capture by mflowgen-run.log."""
+    print("\n===== BEGIN COMMERCIAL BATCH SYNTHESIS WORKER LOGS =====", flush=True)
+    for entry in entries:
+        entry_id = entry["id"]
+        worker = WORK_ROOT / entry_id
+        logs = sorted(
+            path
+            for path in worker.rglob("*.log")
+            if path.name != "batch-driver.saved.log"
+        )
+        if not logs:
+            print(f"\n===== WORKER {entry_id}: NO LOG FILES FOUND =====", flush=True)
+            continue
+        for path in logs:
+            relative = path.relative_to(worker)
+            print(
+                f"\n===== BEGIN WORKER {entry_id} LOG {relative} =====",
+                flush=True,
+            )
+            with path.open(errors="replace") as source:
+                shutil.copyfileobj(source, sys.stdout)
+            print()
+            print(
+                f"===== END WORKER {entry_id} LOG {relative} =====",
+                flush=True,
+            )
+    print("===== END COMMERCIAL BATCH SYNTHESIS WORKER LOGS =====", flush=True)
+
+
+def main() -> None:
+    batch_start = time.monotonic()
+    index = json.loads((INPUT_BATCH / "index.json").read_text())
+    entries = index.get("entries", [])
+    if not entries:
+        raise RuntimeError("macro batch contains no entries")
+    shutil.rmtree(OUTPUT_BATCH, ignore_errors=True)
+    shutil.rmtree(WORK_ROOT, ignore_errors=True)
+    OUTPUT_BATCH.mkdir(parents=True)
+    WORK_ROOT.mkdir()
+
+    # Intentionally launch the whole batch. Each commercial process has an
+    # isolated work directory; license and scheduler limits remain external.
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
+            statuses = list(executor.map(run_entry, entries))
+    finally:
+        # mflowgen captures this node's stdout/stderr in mflowgen-run.log. Emit
+        # logs after parallel execution so entries are not interleaved, and do
+        # it even if a worker or collection operation raises an exception.
+        emit_worker_logs(entries)
+
+    passed = {status["id"] for status in statuses if status["status"] == "passed"}
+    output_entries = []
+    for entry in entries:
+        if entry["id"] in passed:
+            output_entries.append(
+                json.loads(
+                    (OUTPUT_BATCH / "entries" / entry["id"] / "entry.json").read_text()
+                )
+            )
+    output_index = {
+        **{key: value for key, value in index.items() if key != "entries"},
+        "stage": "synthesis",
+        "entries": output_entries,
+        "status": statuses,
+    }
+    (OUTPUT_BATCH / "index.json").write_text(json.dumps(output_index, indent=2) + "\n")
+    status_doc = {
+        "total": len(statuses),
+        "passed": len(passed),
+        "failed": len(statuses) - len(passed),
+        "entries": statuses,
+    }
+    (ROOT / "outputs" / "synthesis-status.json").write_text(
+        json.dumps(status_doc, indent=2) + "\n"
+    )
+    worker_seconds = [item["wall_seconds"] for item in statuses]
+    metrics = {
+        "schema_version": 1,
+        "node": "commercial-batch-synthesis",
+        "status": "passed" if len(passed) == len(statuses) else "failed",
+        "wall_seconds": round(time.monotonic() - batch_start, 3),
+        "workers": statuses,
+        "aggregate": {
+            "worker_count": len(statuses),
+            "maximum_worker_seconds": max(worker_seconds, default=0.0),
+            "sum_worker_seconds": round(sum(worker_seconds), 3),
+        },
+    }
+    (ROOT / "outputs" / "macro-synthesis-metrics.json").write_text(
+        json.dumps(metrics, indent=2) + "\n"
+    )
+    if len(passed) != len(statuses):
+        failed = [status["id"] for status in statuses if status["status"] != "passed"]
+        raise RuntimeError(f"macro synthesis failed for: {failed}")
+
+
+if __name__ == "__main__":
+    main()

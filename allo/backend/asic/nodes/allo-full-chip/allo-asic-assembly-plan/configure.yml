@@ -1,0 +1,29 @@
+name: allo-asic-assembly-plan
+
+inputs:
+  - design.v
+  - asic-manifest-final.json
+  - macro-registry
+  - macro-registry.json
+
+outputs:
+  - assembly-plan.json
+  - assembly-plan.tcl
+  - assembly-plan-report.txt
+
+commands:
+  - python plan_assembly.py
+
+parameters:
+  top_module: top
+
+preconditions:
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/asic-manifest-final.json' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-registry.json' )
+
+postconditions:
+  - assert File( 'outputs/assembly-plan.json' )
+  - assert File( 'outputs/assembly-plan.tcl' )
+  - assert File( 'outputs/assembly-plan-report.txt' )

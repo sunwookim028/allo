@@ -13,6 +13,7 @@ outputs:
   - build-metadata.json
   - allo-build.log
   - build-success
+  - allo-compilation-metrics.json
 
 commands:
   - bash run.sh
@@ -24,6 +25,7 @@ parameters:
   backend: vitis
   build_mode: csyn
   clock_period: 10.0
+  macro_clock_period: 8.0
   backend_options: device=u280
   python_bin: python
   allo_setup_script: /work/shared/common/allo/setup-llvm-main.sh
@@ -44,5 +46,6 @@ postconditions:
   - assert File( 'outputs/asic-manifest-final.tcl' )
   - assert File( 'outputs/build-metadata.json' )
   - assert File( 'outputs/allo-build.log' )
+  - assert File( 'outputs/allo-compilation-metrics.json' )
   - assert 'traceback' not in File( 'outputs/allo-build.log' )
   - assert 'post_hls_enriched' in File( 'outputs/asic-manifest-final.json' )

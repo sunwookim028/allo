@@ -7,6 +7,7 @@ set -euo pipefail
 : "${backend:=vitis}"
 : "${build_mode:=csyn}"
 : "${clock_period:=10.0}"
+: "${macro_clock_period:=8.0}"
 : "${backend_options:=device=u280}"
 : "${python_bin:=python}"
 : "${allo_setup_script:=/work/shared/common/allo/setup-llvm-main.sh}"
@@ -51,7 +52,9 @@ set -u
   --construct-path "$construct_path" \
   --backend "$backend" \
   --mode "$build_mode" \
-  --setup-script "$allo_setup_script"
+  --setup-script "$allo_setup_script" \
+  --clock-period "$clock_period" \
+  --macro-clock-period "$macro_clock_period"
 
 if [[ "$allo_design_file" = /* ]]; then
   design_path="$allo_design_file"
@@ -78,6 +81,8 @@ fi
 rm -rf work
 mkdir -p work/project outputs
 
+build_start_epoch=$(date +%s)
+build_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 set +e
 "$python_bin" run_design.py \
   --design "$design_path" \
@@ -85,12 +90,36 @@ set +e
   --project work/project \
   --backend "$backend" \
   --mode "$build_mode" \
-  --clock-period "$clock_period" \
+  --clock-period "$macro_clock_period" \
   --backend-options "$backend_options" \
   > >(tee outputs/allo-build.log) \
   2> >(tee -a outputs/allo-build.log >&2)
 build_status=$?
 set -e
+build_end_epoch=$(date +%s)
+build_finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+export ALLO_METRICS_STATUS="$build_status"
+export ALLO_METRICS_SECONDS="$((build_end_epoch - build_start_epoch))"
+export ALLO_METRICS_STARTED_AT="$build_started_at"
+export ALLO_METRICS_FINISHED_AT="$build_finished_at"
+"$python_bin" -c '
+import json
+import os
+from pathlib import Path
+returncode = int(os.environ["ALLO_METRICS_STATUS"])
+metrics = {
+    "schema_version": 1,
+    "node": "allo-asic-compilation",
+    "status": "passed" if returncode == 0 else "failed",
+    "returncode": returncode,
+    "wall_seconds": float(os.environ["ALLO_METRICS_SECONDS"]),
+    "started_at": os.environ["ALLO_METRICS_STARTED_AT"],
+    "finished_at": os.environ["ALLO_METRICS_FINISHED_AT"],
+}
+Path("outputs/allo-compilation-metrics.json").write_text(
+    json.dumps(metrics, indent=2) + "\n"
+)
+'
 
 if [ "$build_status" -ne 0 ]; then
   echo "ERROR: Allo backend build exited with status $build_status" \
@@ -114,6 +143,7 @@ export ALLO_NODE_DESIGN_PATH="$design_path"
 export ALLO_NODE_BACKEND="$backend"
 export ALLO_NODE_BUILD_MODE="$build_mode"
 export ALLO_NODE_CLOCK_PERIOD="$clock_period"
+export ALLO_NODE_MACRO_CLOCK_PERIOD="$macro_clock_period"
 export ALLO_NODE_BACKEND_OPTIONS="$backend_options"
 "$python_bin" -c '
 import os
@@ -125,6 +155,7 @@ metadata = {
     "backend": os.environ["ALLO_NODE_BACKEND"],
     "mode": os.environ["ALLO_NODE_BUILD_MODE"],
     "clock_period_ns": float(os.environ["ALLO_NODE_CLOCK_PERIOD"]),
+    "macro_clock_period_ns": float(os.environ["ALLO_NODE_MACRO_CLOCK_PERIOD"]),
     "backend_options": parse_backend_options(
         os.environ["ALLO_NODE_BACKEND_OPTIONS"]
     ),

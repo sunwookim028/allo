@@ -1,0 +1,28 @@
+name: allo-asic-flow-summary
+
+inputs:
+  - macro-registry
+  - macro-registry.json
+  - allo-compilation-metrics.json
+  - macro-synthesis-metrics.json
+  - macro-pnr-metrics.json
+  - macro-physical-verify-metrics.json
+  - macro-signoff-metrics.json
+  - full-chip-synthesis-metrics.json
+
+outputs:
+  - flow-summary.json
+  - flow-summary.tcl
+  - flow-summary.txt
+
+commands:
+  - python summarize_flow.py
+
+preconditions:
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-registry.json' )
+
+postconditions:
+  - assert File( 'outputs/flow-summary.json' )
+  - assert File( 'outputs/flow-summary.tcl' )
+  - assert File( 'outputs/flow-summary.txt' )

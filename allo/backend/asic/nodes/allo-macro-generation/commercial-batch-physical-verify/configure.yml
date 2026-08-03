@@ -1,0 +1,36 @@
+name: commercial-batch-physical-verify
+
+inputs:
+  - adk
+  - pnr-batch
+  - srams
+
+outputs:
+  - verified-pnr-batch
+  - physical-verify-status.json
+  - macro-physical-verify-metrics.json
+
+commands:
+  - python batch_physical_verify.py
+
+parameters:
+  drc_nthreads: 4
+  drc_rule_deck: calibre-drc-block.rule
+  drc_env_setup: undefined
+  lvs_nthreads: 4
+  lvs_power_name: VDD
+  lvs_ground_name: VSS
+  lvs_hcells_file: ''
+  lvs_connect_names: ''
+  lvs_verify_netlist: 1
+  lvs_extra_spice_include: ''
+
+preconditions:
+  - assert Tool( 'calibre' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/pnr-batch' )
+
+postconditions:
+  - assert File( 'outputs/verified-pnr-batch' )
+  - assert File( 'outputs/physical-verify-status.json' )
+  - assert File( 'outputs/macro-physical-verify-metrics.json' )

@@ -23,8 +23,11 @@ Important parameters are:
 - `backend_options`: shell-safe comma-separated `key=value` options interpreted
   by the selected backend branch. The Vitis default is `device=u280`.
 - `build_mode`: currently expected to be `csyn`.
-- `clock_period`: target clock period in nanoseconds. The node converts this to
-  the MHz value required by Allo/Vitis.
+- `macro_clock_period`: Vitis HLS and hardened-macro target period in
+  nanoseconds. The node converts this to the MHz value required by Allo/Vitis.
+- `clock_period`: full-chip target period in nanoseconds. It must be greater
+  than or equal to `macro_clock_period`, ensuring macros are built for a clock
+  at least as fast as the chip that instantiates them.
 - `python_bin`: Python executable, default `python`.
 - `allo_setup_script`: shell script sourced before preflight and compilation to
   configure the prebuilt LLVM backend. It defaults to
