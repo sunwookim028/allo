@@ -1,0 +1,46 @@
+name: commercial-full-chip-lvs
+
+inputs:
+  - adk
+  - design_merged.gds
+  - design.lvs.v
+  - macro-registry
+  - srams
+
+outputs:
+  - lvs.report
+  - design.schematic.spi
+  - design_merged.lvs.v
+  - full-chip-lvs-metrics.json
+
+commands:
+  - bash run.sh
+
+parameters:
+  design_name: undefined
+  lvs_nthreads: 4
+  lvs_power_name: VDD
+  lvs_ground_name: VSS
+  lvs_hcells_file: ''
+  lvs_connect_names: ''
+  lvs_verify_netlist: 1
+  lvs_extra_spice_include: ''
+
+debug:
+  - calibredrv -m inputs/design_merged.gds -l inputs/adk/calibre.layerprops -rve -lvs svdb
+
+preconditions:
+  - assert Tool( 'calibre' )
+  - assert Tool( 'v2lvs' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design_merged.gds' )
+  - assert File( 'inputs/design.lvs.v' )
+  - assert File( 'inputs/macro-registry' )
+
+postconditions:
+  - assert File( 'outputs/lvs.report' )
+  - assert File( 'outputs/design.schematic.spi' )
+  - assert File( 'outputs/design_merged.lvs.v' )
+  - assert File( 'outputs/full-chip-lvs-metrics.json' )
+  - "assert '#     INCORRECT     #' not in File( 'outputs/lvs.report' )"
+  - "assert '#     CORRECT     #' in File( 'outputs/lvs.report' )"

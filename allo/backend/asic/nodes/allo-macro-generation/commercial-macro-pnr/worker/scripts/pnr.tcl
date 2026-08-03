@@ -68,6 +68,9 @@ if {![info exists env(pin_secondary_layer_offset)]} {
 if {![info exists env(pin_multilayer_threshold)]} {
   set env(pin_multilayer_threshold) 100
 }
+if {![info exists env(pin_corner_keepout)]} {
+  set env(pin_corner_keepout) 3.0
+}
 if {![info exists env(pin_primary_fraction)]} {
   set env(pin_primary_fraction) 0.75
 }
@@ -491,6 +494,52 @@ proc split_pin_groups_by_layer {groups all_ports total threshold fraction} {
   return [list $primary $secondary]
 }
 
+# Place pins only on the middle portion of an edge.  SIDE spreading uses the
+# complete block edge and can put pins directly in a corner, where a route on
+# the neighboring edge (especially ap_clk) has very little legal access room.
+proc edit_pins_with_corner_keepout {pins layer side keepout} {
+  if {[llength $pins] == 0} {
+    return
+  }
+  if {$keepout < 0.0} {
+    error "pin_corner_keepout must be nonnegative"
+  }
+  set box [dbGet top.fPlan.box]
+  if {[llength $box] == 1} {
+    set box [lindex $box 0]
+  }
+  set llx [lindex $box 0]
+  set lly [lindex $box 1]
+  set urx [lindex $box 2]
+  set ury [lindex $box 3]
+  switch -- $side {
+    TOP {
+      set start [list [expr {$llx + $keepout}] $ury]
+      set end   [list [expr {$urx - $keepout}] $ury]
+    }
+    BOTTOM {
+      set start [list [expr {$llx + $keepout}] $lly]
+      set end   [list [expr {$urx - $keepout}] $lly]
+    }
+    RIGHT {
+      set start [list $urx [expr {$lly + $keepout}]]
+      set end   [list $urx [expr {$ury - $keepout}]]
+    }
+    LEFT {
+      set start [list $llx [expr {$lly + $keepout}]]
+      set end   [list $llx [expr {$ury - $keepout}]]
+    }
+    default {
+      error "Unsupported pin side '$side'"
+    }
+  }
+  if {([lindex $start 0] > [lindex $end 0]) ||
+      ([lindex $start 1] > [lindex $end 1])} {
+    error "pin_corner_keepout=$keepout leaves no legal range on $side edge"
+  }
+  editPin -layer $layer -pin $pins -spreadType RANGE -start $start -end $end
+}
+
 set assigned_ports {}
 set pin_assignment_report [open reports/pin-assignment.rpt w]
 foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
@@ -529,12 +578,14 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
     set secondary_side_ports {}
   }
   puts $pin_assignment_report \
-    "$compass SUMMARY total=[llength $side_ports] primary_layer=$ports_layer primary=[llength $primary_side_ports] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports]"
+    "$compass SUMMARY total=[llength $side_ports] primary_layer=$ports_layer primary=[llength $primary_side_ports] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports] corner_keepout=$env(pin_corner_keepout)"
   if {[llength $primary_side_ports] > 0} {
-    editPin -layer $ports_layer -pin $primary_side_ports -side $innovus_side -spreadType SIDE
+    edit_pins_with_corner_keepout \
+      $primary_side_ports $ports_layer $innovus_side $env(pin_corner_keepout)
   }
   if {[llength $secondary_side_ports] > 0} {
-    editPin -layer $secondary_ports_layer -pin $secondary_side_ports -side $innovus_side -spreadType SIDE
+    edit_pins_with_corner_keepout \
+      $secondary_side_ports $secondary_ports_layer $innovus_side $env(pin_corner_keepout)
   }
 }
 set unassigned_ports {}

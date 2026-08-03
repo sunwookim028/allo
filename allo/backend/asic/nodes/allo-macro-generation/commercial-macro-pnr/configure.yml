@@ -36,6 +36,9 @@ parameters:
   pin_secondary_layer_offset: 5
   pin_multilayer_threshold: 100
   pin_primary_fraction: 0.75
+  # Keep signal pins away from macro corners, where orthogonal routes and
+  # clock access otherwise compete for the same small routing region.
+  pin_corner_keepout: 3.0
   power_mesh_bot_layer: 6
   power_mesh_top_layer: 7
   edge_mesh_margin: 2.0

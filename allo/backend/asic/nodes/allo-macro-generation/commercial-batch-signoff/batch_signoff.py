@@ -163,6 +163,7 @@ def run_entry(entry: dict) -> dict:
                 "spef": f"entries/{entry_id}/views/macro.spef.gz",
                 "sdf": f"entries/{entry_id}/views/macro.sdf",
                 "sdc": f"entries/{entry_id}/views/macro.sdc",
+                "lvs_verilog": f"entries/{entry_id}/views/macro.lvs.v",
             },
         }
         (destination / "entry.json").write_text(json.dumps(result, indent=2) + "\n")

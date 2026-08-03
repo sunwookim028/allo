@@ -357,6 +357,13 @@ if {   [info exists ADK_END_CAP_CELL_LEFT]
 }
 
 if {$has_hard_macros} {
+  # Cut the complete PE-cluster rectangles first.  The following per-block
+  # cuts remain useful for the outside halo and for optional SRAMs.  Their
+  # union deliberately removes rows from the narrow gaps inside PE arrays.
+  set cut_kernel_clusters [cut_allo_kernel_cluster_rows]
+  set cluster_cut_rpt [open reports/kernel-cluster-row-cuts.rpt w]
+  puts $cluster_cut_rpt "cut_kernel_clusters $cut_kernel_clusters"
+  close $cluster_cut_rpt
   foreach inst $blocks {
     if {[dbGet $inst.isPhysOnly]} {
       continue

@@ -348,6 +348,24 @@ def main() -> None:
             "  incr placed",
         ])
     tcl.extend(["  setInstancePlacementStatus -allHardMacros -status fixed", "  return $placed", "}"])
+    tcl.extend([
+        "",
+        "# Remove standard-cell rows across each complete PE kernel cluster.",
+        "# This prevents narrow row fragments (and impossible well-tap checks)",
+        "# in the routing channels between closely tiled hard macros.",
+        "proc cut_allo_kernel_cluster_rows {} {",
+        "  set core [dbGet top.fPlan.coreBox]",
+        "  if {[llength $core] == 1} { set core [lindex $core 0] }",
+        "  set llx [lindex $core 0]",
+        "  set lly [lindex $core 1]",
+        "  set cut_count 0",
+    ])
+    for cluster in cluster_records:
+        tcl.extend([
+            f"  cutRow -area [list [expr {{$llx + {cluster['x']}}}] [expr {{$lly + {cluster['y']}}}] [expr {{$llx + {cluster['x']} + {cluster['width']}}}] [expr {{$lly + {cluster['y']} + {cluster['height']}}}]]",
+            "  incr cut_count",
+        ])
+    tcl.extend(["  return $cut_count", "}"])
     (outputs / "physical-intent.tcl").write_text("\n".join(tcl) + "\n")
     scale = min(1000 / max(core_w, 1), 800 / max(core_h, 1))
     colors = {"pe": "#4c78a8", "sram": "#f58518"}

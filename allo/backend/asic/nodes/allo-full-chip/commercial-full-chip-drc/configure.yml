@@ -1,0 +1,34 @@
+name: commercial-full-chip-drc
+
+inputs:
+  - design_merged.gds
+  - adk
+
+outputs:
+  - drc.results
+  - drc.summary
+  - full-chip-drc-metrics.json
+
+commands:
+  - bash run.sh
+
+parameters:
+  design_name: undefined
+  drc_nthreads: 4
+  drc_rule_deck: calibre-drc-block.rule
+  drc_env_setup: undefined
+
+debug:
+  - calibredrv -m inputs/design_merged.gds -l inputs/adk/calibre.layerprops -rve -drc drc.results
+
+preconditions:
+  - assert Tool( 'calibre' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design_merged.gds' )
+
+postconditions:
+  - assert File( 'outputs/drc.results' )
+  - assert File( 'outputs/drc.summary' )
+  - assert File( 'outputs/full-chip-drc-metrics.json' )
+  - assert 'TOTAL DRC Results Generated:' in File( 'outputs/drc.summary' )
+  - assert 'TOTAL DRC Results Generated: 0' in File( 'outputs/drc.summary' )

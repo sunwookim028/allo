@@ -68,3 +68,6 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
         "instance_count": 0,
         "policy": "sequential_perimeter",
     }
+    generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
+    assert "proc cut_allo_kernel_cluster_rows" in generated_tcl
+    assert "cutRow -area" in generated_tcl

@@ -10,7 +10,17 @@ import shutil
 from pathlib import Path
 
 
-REQUIRED_VIEWS = ["verilog", "liberty", "db", "lef", "gds", "spef", "sdf", "sdc"]
+REQUIRED_VIEWS = [
+    "verilog",
+    "liberty",
+    "db",
+    "lef",
+    "gds",
+    "spef",
+    "sdf",
+    "sdc",
+    "lvs_verilog",
+]
 REQUIRED_LEF_SYMMETRIES = {"X", "Y", "R90"}
 
 
