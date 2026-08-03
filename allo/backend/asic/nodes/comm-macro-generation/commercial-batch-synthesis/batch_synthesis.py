@@ -77,18 +77,32 @@ def fingerprint(entry: dict) -> str:
     return digest.hexdigest()
 
 
+def copy_artifact_tree(source: Path, destination: Path) -> None:
+    """Copy a worker tree, dereferencing valid links and skipping broken ones."""
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_symlink():
+            if not item.exists():
+                continue
+            resolved = item.resolve()
+            if resolved.is_dir():
+                copy_artifact_tree(resolved, target)
+            else:
+                shutil.copy2(resolved, target)
+        elif item.is_dir():
+            copy_artifact_tree(item, target)
+        else:
+            shutil.copy2(item, target)
+
+
 def collect_worker(worker: Path, destination: Path, entry: dict, fp: str) -> None:
     shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True)
     for directory in ["outputs", "reports", "logs", "results"]:
         source = worker / directory
         if source.exists():
-            shutil.copytree(
-                source,
-                destination / directory,
-                symlinks=False,
-                ignore_dangling_symlinks=True,
-            )
+            copy_artifact_tree(source, destination / directory)
     collateral = destination / "collateral"
     collateral.mkdir()
     shutil.copy2(INPUT_BATCH / entry["pin_intent"], collateral / "pin-intent.json")

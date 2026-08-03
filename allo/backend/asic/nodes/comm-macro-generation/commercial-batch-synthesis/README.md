@@ -13,8 +13,9 @@ library-analysis cost.
 
 Required output links are created only after resolving a real DC artifact.
 Optional name-map and UPF files are omitted when DC does not emit them, avoiding
-dangling wildcard symlinks. The collector also ignores dangling optional links
-defensively while dereferencing valid artifacts into a self-contained batch.
+dangling wildcard symlinks. The collector resolves every valid worker symlink
+relative to its real filesystem location and copies the target data into a
+self-contained batch, while skipping only links that are genuinely dangling.
 
 After the parallel workers finish, every worker `*.log` is replayed to the node's
 stdout in deterministic class/path order with explicit begin/end delimiters.

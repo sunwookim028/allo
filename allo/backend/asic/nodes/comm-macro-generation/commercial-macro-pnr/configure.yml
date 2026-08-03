@@ -37,6 +37,7 @@ parameters:
   edge_mesh_stripe_spacing_multiplier: 8
   local_cpus: 4
   postroute_max_local_cpus: 4
+  worker_timeout_seconds: 21600
   macro_halo: 2.0
   macro_pg_resource_util: 0.2
   macro_forbidden_space_to_macro: '20,20'

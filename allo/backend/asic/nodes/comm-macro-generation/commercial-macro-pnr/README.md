@@ -21,3 +21,11 @@ After all workers stop, every worker `*.log` is replayed to stdout in stable
 class/path order, with begin/end delimiters and from a `finally` path. Thus the
 node's `mflowgen-run.log` is complete on success and failure without removing
 the individual logs.
+
+Before launching Innovus, each worker now verifies that its synthesized netlist,
+SDC, and JSON/Tcl pin intent are real readable files rather than missing or
+dangling paths. `START.tcl` catches PNR Tcl errors and explicitly exits nonzero,
+stdin is closed to prevent headless Innovus from waiting at an interactive
+prompt, and the complete worker process group has a configurable six-hour
+`worker_timeout_seconds` watchdog. Start/finish messages remain visible in the
+main terminal while detailed logs stay isolated until deterministic replay.

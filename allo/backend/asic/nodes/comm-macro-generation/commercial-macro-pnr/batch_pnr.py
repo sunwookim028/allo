@@ -6,6 +6,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -32,10 +33,24 @@ def run_entry(entry: dict) -> dict:
     inputs = worker / "inputs"
     inputs.mkdir()
     artifacts = entry["artifacts"]
-    symlink(INPUT_BATCH / artifacts["netlist"], inputs / "design.v")
-    symlink(INPUT_BATCH / artifacts["sdc"], inputs / "design.sdc")
-    symlink(INPUT_BATCH / entry["pin_intent_tcl"], inputs / "pin-intent.tcl")
-    symlink(INPUT_BATCH / entry["pin_intent"], inputs / "pin-intent.json")
+    required_inputs = {
+        "synthesis netlist": INPUT_BATCH / artifacts["netlist"],
+        "synthesis SDC": INPUT_BATCH / artifacts["sdc"],
+        "pin-intent Tcl": INPUT_BATCH / entry["pin_intent_tcl"],
+        "pin-intent JSON": INPUT_BATCH / entry["pin_intent"],
+    }
+    missing_inputs = [
+        f"{label}: {path}" for label, path in required_inputs.items() if not path.is_file()
+    ]
+    if missing_inputs:
+        raise FileNotFoundError(
+            f"macro PNR input validation failed for {entry_id}: "
+            + "; ".join(missing_inputs)
+        )
+    symlink(required_inputs["synthesis netlist"], inputs / "design.v")
+    symlink(required_inputs["synthesis SDC"], inputs / "design.sdc")
+    symlink(required_inputs["pin-intent Tcl"], inputs / "pin-intent.tcl")
+    symlink(required_inputs["pin-intent JSON"], inputs / "pin-intent.json")
     symlink(ROOT / "inputs" / "adk", inputs / "adk")
     srams = ROOT / "inputs" / "srams"
     if srams.exists():
@@ -43,16 +58,41 @@ def run_entry(entry: dict) -> dict:
 
     env = os.environ.copy()
     env["design_name"] = entry["top_module"]
+    timeout_seconds = int(os.environ.get("worker_timeout_seconds", "21600"))
     log_path = worker / "batch-driver.log"
+    print(
+        f"[commercial-macro-pnr] {entry_id}: starting Innovus "
+        f"for {entry['top_module']}",
+        flush=True,
+    )
+    timed_out = False
     with log_path.open("w") as log:
-        process = subprocess.run(
+        process = subprocess.Popen(
             ["bash", "run.sh"],
             cwd=worker,
             env=env,
+            stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=subprocess.STDOUT,
-            check=False,
+            start_new_session=True,
         )
+        try:
+            returncode = process.wait(
+                timeout=timeout_seconds if timeout_seconds > 0 else None
+            )
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                returncode = process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                returncode = process.wait()
+    print(
+        f"[commercial-macro-pnr] {entry_id}: finished with return code "
+        f"{returncode}{' (timeout)' if timed_out else ''}",
+        flush=True,
+    )
     required = [
         "design.gds.gz",
         "design-merged.gds",
@@ -62,12 +102,13 @@ def run_entry(entry: dict) -> dict:
         "design.pt.sdc",
     ]
     missing = [name for name in required if not (worker / "outputs" / name).exists()]
-    passed = process.returncode == 0 and not missing
+    passed = returncode == 0 and not timed_out and not missing
     status = {
         "id": entry_id,
         "top_module": entry["top_module"],
         "status": "passed" if passed else "failed",
-        "returncode": process.returncode,
+        "returncode": returncode,
+        "timed_out": timed_out,
         "missing_outputs": missing,
         "work_dir": str(worker),
     }
