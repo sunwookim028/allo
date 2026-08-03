@@ -346,9 +346,17 @@ def build_pin_intent(
         side_loads[bundle["side"]] += sum(
             declaration_width(declarations[port]) for port in bundle["rtl_ports"]
         )
-    side_loads["S"] += sum(declaration_width(declarations[port]) for port in control)
     auxiliary_pin_sides = balance_auxiliary_pins(
         auxiliary, declarations, stream_sides, side_loads
+    )
+    for port, side in auxiliary_pin_sides.items():
+        side_loads[side] += declaration_width(declarations[port])
+    control_candidates = [
+        side for side in ("W", "N", "S", "E") if side not in stream_sides
+    ] or ["W", "N", "S", "E"]
+    control_side = min(
+        control_candidates,
+        key=lambda side: (side_loads[side], control_candidates.index(side)),
     )
     return {
         "schema_version": 1,
@@ -356,7 +364,7 @@ def build_pin_intent(
         "module": canonical.name,
         "stream_bundles": mapped,
         "control_pins": control,
-        "control_side": "S",
+        "control_side": control_side,
         "auxiliary_pins": auxiliary,
         "auxiliary_pin_sides": auxiliary_pin_sides,
         "semantic_to_rtl_method": selection_method,
@@ -365,11 +373,20 @@ def build_pin_intent(
 
 def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
     side_ports = {side: [] for side in ("N", "S", "E", "W")}
+    side_groups = {side: [] for side in ("N", "S", "E", "W")}
     for bundle in intent["stream_bundles"]:
         side_ports[bundle["side"]].extend(bundle["rtl_ports"])
+        side_groups[bundle["side"]].append(list(bundle["rtl_ports"]))
     side_ports[intent["control_side"]].extend(intent["control_pins"])
+    if intent["control_pins"]:
+        side_groups[intent["control_side"]].append(list(intent["control_pins"]))
+    auxiliary_groups = {}
     for port in intent["auxiliary_pins"]:
-        side_ports[intent["auxiliary_pin_sides"][port]].append(port)
+        side = intent["auxiliary_pin_sides"][port]
+        side_ports[side].append(port)
+        auxiliary_groups.setdefault((side, auxiliary_group(port)), []).append(port)
+    for (side, _name), ports in auxiliary_groups.items():
+        side_groups[side].append(ports)
     lines = ["# Generated from the Allo whole-region channel graph."]
     for side in ("N", "S", "E", "W"):
         lines.append(
@@ -377,6 +394,11 @@ def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
             + " ".join(tcl_quote(port) for port in side_ports[side])
             + "]"
         )
+        groups = " ".join(
+            "[list " + " ".join(tcl_quote(port) for port in group) + "]"
+            for group in side_groups[side]
+        )
+        lines.append(f"set allo_asic_signal_pin_groups_{side} [list {groups}]")
     path.write_text("\n".join(lines) + "\n")
 
 

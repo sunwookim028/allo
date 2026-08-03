@@ -56,6 +56,15 @@ if {![info exists env(base_layer_idx)]} {
 if {![info exists env(pin_layer_offset)]} {
   set env(pin_layer_offset) 3
 }
+if {![info exists env(pin_secondary_layer_offset)]} {
+  set env(pin_secondary_layer_offset) 5
+}
+if {![info exists env(pin_multilayer_threshold)]} {
+  set env(pin_multilayer_threshold) 100
+}
+if {![info exists env(pin_primary_fraction)]} {
+  set env(pin_primary_fraction) 0.75
+}
 if {![info exists env(power_mesh_bot_layer)]} {
   if {[info exists ADK_POWER_MESH_BOT_LAYER]} {
     set env(power_mesh_bot_layer) $ADK_POWER_MESH_BOT_LAYER
@@ -379,6 +388,23 @@ if {$env(well_tap_cell) ne ""} {
 #-------------------------------------------------------------------------
 
 set ports_layer [expr {$base_layer_idx + $env(pin_layer_offset)}]
+set secondary_ports_layer [expr {$base_layer_idx + $env(pin_secondary_layer_offset)}]
+if {$secondary_ports_layer > $vars(max_route_layer)} {
+  error "Secondary signal-pin layer $secondary_ports_layer exceeds max_route_layer=$vars(max_route_layer)"
+}
+set primary_pin_layer_obj [dbGetLayerByZ $ports_layer]
+set secondary_pin_layer_obj [dbGetLayerByZ $secondary_ports_layer]
+if {$primary_pin_layer_obj == 0 || $secondary_pin_layer_obj == 0} {
+  error "Signal-pin layer selection is not present in the loaded technology: primary=$ports_layer secondary=$secondary_ports_layer"
+}
+set primary_pin_direction [dbGet $primary_pin_layer_obj.direction]
+set secondary_pin_direction [dbGet $secondary_pin_layer_obj.direction]
+if {$primary_pin_direction ne $secondary_pin_direction} {
+  error "Signal-pin layers must have the same preferred routing direction: layer $ports_layer is $primary_pin_direction but layer $secondary_ports_layer is $secondary_pin_direction"
+}
+if {$env(pin_primary_fraction) <= 0.0 || $env(pin_primary_fraction) >= 1.0} {
+  error "pin_primary_fraction must be strictly between zero and one"
+}
 if {![file exists inputs/pin-intent.tcl]} {
   error "Missing manifest-derived pin intent: inputs/pin-intent.tcl"
 }
@@ -401,6 +427,56 @@ proc resolve_manifest_port {logical_port all_ports} {
     }
   }
   return [lsort -dictionary $resolved]
+}
+
+# Resolve a logical group as a unit. Keeping FIFO bundles, AXI channels and
+# controls together makes the abstract interface regular. A group is moved to
+# the secondary layer only when doing so best approaches the requested primary
+# layer fraction; individual buses are expanded only after that decision.
+proc resolve_manifest_group {logical_group all_ports} {
+  set result {}
+  foreach logical_port $logical_group {
+    set resolved [resolve_manifest_port $logical_port $all_ports]
+    if {[llength $resolved] == 0} {
+      error "Pin intent references unknown top-level scalar or bus '$logical_port'"
+    }
+    set result [concat $result $resolved]
+  }
+  return $result
+}
+
+proc split_pin_groups_by_layer {groups all_ports total threshold fraction} {
+  set primary {}
+  set secondary {}
+  if {$total < $threshold} {
+    foreach group $groups {
+      set primary [concat $primary [resolve_manifest_group $group $all_ports]]
+    }
+    return [list $primary $secondary]
+  }
+  set primary_target [expr {int(ceil($total * $fraction))}]
+  set primary_count 0
+  # Largest-first packing prevents one wide bus from being fragmented and
+  # produces a stable partition independent of dictionary ordering.
+  set weighted {}
+  set ordinal 0
+  foreach group $groups {
+    set resolved [resolve_manifest_group $group $all_ports]
+    lappend weighted [list [llength $resolved] $ordinal $resolved]
+    incr ordinal
+  }
+  set weighted [lsort -integer -decreasing -index 0 $weighted]
+  foreach item $weighted {
+    set resolved [lindex $item 2]
+    set width [llength $resolved]
+    if {$primary_count == 0 || $primary_count + $width <= $primary_target} {
+      set primary [concat $primary $resolved]
+      incr primary_count $width
+    } else {
+      set secondary [concat $secondary $resolved]
+    }
+  }
+  return [list $primary $secondary]
 }
 
 set assigned_ports {}
@@ -429,8 +505,24 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
       lappend side_ports $port
     }
   }
-  if {[llength $side_ports] > 0} {
-    editPin -layer $ports_layer -pin $side_ports -side $innovus_side -spreadType SIDE
+  set groups_variable_name allo_asic_signal_pin_groups_${compass}
+  if {[info exists $groups_variable_name]} {
+    set resolved_layers [split_pin_groups_by_layer \
+      [set $groups_variable_name] $all_ports [llength $side_ports] \
+      $env(pin_multilayer_threshold) $env(pin_primary_fraction)]
+    set primary_side_ports [lindex $resolved_layers 0]
+    set secondary_side_ports [lindex $resolved_layers 1]
+  } else {
+    set primary_side_ports $side_ports
+    set secondary_side_ports {}
+  }
+  puts $pin_assignment_report \
+    "$compass SUMMARY total=[llength $side_ports] primary_layer=$ports_layer primary=[llength $primary_side_ports] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports]"
+  if {[llength $primary_side_ports] > 0} {
+    editPin -layer $ports_layer -pin $primary_side_ports -side $innovus_side -spreadType SIDE
+  }
+  if {[llength $secondary_side_ports] > 0} {
+    editPin -layer $secondary_ports_layer -pin $secondary_side_ports -side $innovus_side -spreadType SIDE
   }
 }
 set unassigned_ports {}

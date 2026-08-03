@@ -184,6 +184,20 @@ endmodule
             [item["side"] for item in intent["stream_bundles"]], ["W", "S"]
         )
         self.assertEqual(intent["control_pins"], ["ap_clk"])
+        # Control pins are movable collateral, so they go to the least-loaded
+        # non-stream edge instead of consuming a semantic stream edge.
+        self.assertEqual(intent["control_side"], "N")
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "pin-intent.tcl"
+            PLAN.write_pin_intent_tcl(output, intent)
+            emitted = output.read_text()
+            self.assertIn("allo_asic_signal_pin_groups_W", emitted)
+            self.assertIn(
+                "[list {west_dout} {west_empty_n} {west_read}]", emitted
+            )
+            self.assertIn(
+                "allo_asic_signal_pin_groups_N [list [list {ap_clk}]]", emitted
+            )
         rotated = json.loads(json.dumps(intent))
         rotated["stream_bundles"][0]["side"] = "S"
         rotated["stream_bundles"][1]["side"] = "E"

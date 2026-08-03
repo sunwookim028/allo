@@ -30,6 +30,9 @@ parameters:
   max_route_layer: 7
   base_layer_idx: 0
   pin_layer_offset: 3
+  pin_secondary_layer_offset: 5
+  pin_multilayer_threshold: 100
+  pin_primary_fraction: 0.75
   power_mesh_bot_layer: 6
   power_mesh_top_layer: 7
   edge_mesh_margin: 2.0
