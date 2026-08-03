@@ -120,7 +120,9 @@ def rewrite_instances(body: str, replacement_by_module: dict[str, dict]) -> tupl
             raise ValueError(f"canonical port collision while rewriting {source}")
         replacement = (
             detail["canonical_module"]
-            + body[match.end("module") : opening + 1]
+            + body[match.end("module") : match.start("instance")]
+            + detail["stable_instance_name"]
+            + body[match.end("instance") : opening + 1]
             + renamed
             + ")"
         )
@@ -130,6 +132,7 @@ def rewrite_instances(body: str, replacement_by_module: dict[str, dict]) -> tupl
                 "source_module": source,
                 "canonical_module": detail["canonical_module"],
                 "instance_name": match.group("instance"),
+                "stable_instance_name": detail["stable_instance_name"],
                 "rewritten_port_count": len(seen),
             }
         )

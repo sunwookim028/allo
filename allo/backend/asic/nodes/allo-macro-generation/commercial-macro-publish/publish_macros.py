@@ -105,6 +105,7 @@ def main() -> None:
             "representative_semantic_id": entry["representative_semantic_id"],
             "member_modules": entry["member_modules"],
             "members": entry["members"],
+            "member_placements": entry.get("member_placements", []),
             "port_maps": entry["port_maps"],
             "lef_symmetry": symmetry,
             "views": view_records,

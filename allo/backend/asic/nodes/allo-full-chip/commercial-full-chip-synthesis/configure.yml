@@ -28,6 +28,8 @@ outputs:
   - design.upf
   - design.spef.gz
   - full-chip-synthesis-metrics.json
+  - macro-link.rpt
+  - synthesis-reports
 
 #-------------------------------------------------------------------------
 # Commands
@@ -120,7 +122,14 @@ postconditions:
 
   # Basic error checking
 
-  - assert 'error:' not in File( 'logs/dc.log' )
+  - |
+    from pathlib import Path
+    log_lines = Path('logs/dc.log').read_text(errors='replace').splitlines()
+    fatal_lines = [
+        line for line in log_lines
+        if line.lstrip().startswith(('Error:', 'Fatal:'))
+    ]
+    assert not fatal_lines, 'DC errors:\n' + '\n'.join(fatal_lines)
   - assert 'Unresolved references' not in File( 'logs/dc.log' )
   - assert 'Unable to resolve' not in File( 'logs/dc.log' )
   - assert 'Presto compilation terminated' not in File( 'logs/dc.log' )

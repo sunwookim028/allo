@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -76,6 +77,12 @@ def tcl_quote(value: object) -> str:
     return "{" + str(value).replace("\\", "\\\\").replace("}", "\\}") + "}"
 
 
+def stable_instance_name(semantic_id: str, source_module: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9_]+", "_", semantic_id).strip("_")
+    digest = hashlib.sha256(f"{semantic_id}|{source_module}".encode()).hexdigest()[:10]
+    return f"allo_pe_{slug}_{digest}"
+
+
 def main() -> None:
     inputs = Path("inputs")
     outputs = Path("outputs")
@@ -116,6 +123,10 @@ def main() -> None:
             if not path.is_file() or path.stat().st_size == 0:
                 raise ValueError(f"missing published {view} view for {class_id}: {path}")
         member_records = []
+        placement_by_module = {
+            item.get("rtl_module"): item
+            for item in macro.get("member_placements", [])
+        }
         for member in members:
             source_module = member["rtl_module"]
             if source_module in replaced_modules:
@@ -149,7 +160,12 @@ def main() -> None:
                     "source_module": source_module,
                     "canonical_module": canonical,
                     "member_to_canonical_ports": member_to_canonical,
-                    "desired_orientation": member.get("orientation", "unassigned"),
+                    "desired_orientation": placement_by_module.get(
+                        source_module, member
+                    ).get("orientation", "unassigned"),
+                    "stable_instance_name": stable_instance_name(
+                        member["semantic_id"], source_module
+                    ),
                     "hierarchical_paths": paths,
                 }
                 replacements.append(replacement)

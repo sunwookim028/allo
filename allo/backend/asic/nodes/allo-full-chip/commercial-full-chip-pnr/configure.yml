@@ -1,0 +1,150 @@
+#=========================================================================
+# Cadence Innovus PNR
+#=========================================================================
+
+name: commercial-full-chip-pnr
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+inputs:
+  - adk
+  - design.v
+  - design.sdc
+  - macro-registry
+  - macro-collateral.json
+  - macro-collateral.tcl
+  - physical-intent.json
+  - physical-intent.tcl
+  - srams
+
+outputs:
+  - design.checkpoint
+  - design.gds.gz
+  - design-merged.gds
+  - design.topdown.v
+  - design.lvs.v
+  - design.vcs.v
+  - design.vcs.pg.v
+  - design.lef
+  - design.pt.sdc
+  - design.sdf
+  - design.virtuoso.v
+  - design.spef.gz
+  - design.def.gz
+  - full-chip-pnr-metrics.json
+  - physical-intent-placement.rpt
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - flow_start_epoch=$(date +%s)
+  - if [[ "x$enable_gui" == "xTrue" ]]; then gui_flag=""; else gui_flag="-nowin"; fi
+  - innovus -overwrite -64 $gui_flag -init START.tcl -log logs/run.log
+  # Outputs
+  - cd outputs
+  - ln -sf ../checkpoints/design.checkpoint design.checkpoint
+  - if [[ -e ../typical.spef.gz ]]; then ln -sf ../typical.spef.gz design.spef.gz; fi
+  - if compgen -G "../results/*.gds.gz" > /dev/null; then ln -sf ../results/*.gds.gz design.gds.gz; fi
+  - if compgen -G "../results/*-merged.gds" > /dev/null; then ln -sf ../results/*-merged.gds design-merged.gds; fi
+  - if compgen -G "../results/*.topdown.v" > /dev/null; then ln -sf ../results/*.topdown.v design.topdown.v; fi
+  - if compgen -G "../results/*.lvs.v" > /dev/null; then ln -sf ../results/*.lvs.v design.lvs.v; fi
+  - if compgen -G "../results/*.vcs.v" > /dev/null; then ln -sf ../results/*.vcs.v design.vcs.v; fi
+  - if compgen -G "../results/*.vcs.pg.v" > /dev/null; then ln -sf ../results/*.vcs.pg.v design.vcs.pg.v; fi
+  - if compgen -G "../results/*.lef" > /dev/null; then ln -sf ../results/*.lef design.lef; fi
+  - if compgen -G "../results/*.pt.sdc" > /dev/null; then ln -sf ../results/*.pt.sdc design.pt.sdc; fi
+  - if compgen -G "../results/*.sdf" > /dev/null; then ln -sf ../results/*.sdf design.sdf; fi
+  - if compgen -G "../results/*.virtuoso.v" > /dev/null; then ln -sf ../results/*.virtuoso.v design.virtuoso.v; fi
+  - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
+  - cd ..
+  - export FULL_PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
+  - python -c 'import json,os; from pathlib import Path; Path("outputs/full-chip-pnr-metrics.json").write_text(json.dumps({"schema_version":1,"node":"commercial-full-chip-pnr","status":"passed","wall_seconds":float(os.environ["FULL_PNR_SECONDS"])},indent=2)+"\n")'
+  - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  top_module: top
+  enable_gui: true
+  core_density_target: 0.70
+  useful_skew: True
+  useful_skew_ccopt_effort: standard
+  cell_padding: 2
+  signoff_engine: False
+  hold_target_slack: 0.005
+  setup_target_slack: 0.000
+  stop_after_step: none
+  floorplan_mode: physical_intent
+  floorplan_aspect_ratio: 1.0
+  floorplan_width: ''
+  floorplan_height: ''
+  process_node: 45
+  gds_stream_out_units: 10000
+  max_route_layer: 7
+  base_layer_idx: 0
+  pin_layer_offset: 3
+  power_mesh_bot_layer: 8
+  power_mesh_top_layer: 9
+  local_cpus: 16
+  postroute_max_local_cpus: 8
+  macro_halo: 2.0
+  macro_pg_resource_util: 0.2
+  macro_forbidden_space_to_macro: '20,20'
+  macro_min_space_to_core: '30,30'
+  macro_corner_keepout: '5,5'
+  macro_edge_keepout: 30.0
+  macro_group_spacing: 20.0
+  macro_group_max_depth: 2
+  well_tap_cell: WELLTAP_X1
+  well_tap_interval: 120
+  primary_power_net: VDD
+  primary_ground_net: VSS
+  power_nets: 'VDD,VNW,VDDPST,POC,VDDCE,VDDPE'
+  ground_nets: 'VSS,VPW,VSSPST,VSSE'
+  power_pin_names: 'VDD'
+  ground_pin_names: 'VSS'
+  lvs_exclude_cell_list: 'FILL*,WELLTAP*'
+  virtuoso_exclude_cell_list: 'FILL*,WELLTAP*'
+  adk_tech_lef: inputs/adk/rtk-tech.lef
+  adk_stdcell_lef: inputs/adk/stdcells.lef
+  adk_gds_layer_map: inputs/adk/rtk-stream-out.map
+  adk_qrc_lef_map: inputs/adk/pdk-qrc-lef.map
+  adk_cap_table: inputs/adk/rtk-typical.captable
+  adk_typical_lib: inputs/adk/stdcells.lib
+  adk_bc_lib: inputs/adk/stdcells-bc.lib
+  adk_wc_lib: inputs/adk/stdcells-wc.lib
+
+#-------------------------------------------------------------------------
+# Debug
+#-------------------------------------------------------------------------
+
+debug:
+  - innovus -overwrite -64 -init START.tcl -log logs/debug.log
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+  - assert Tool( 'innovus' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/design.sdc' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-collateral.json' )
+  - assert File( 'inputs/macro-collateral.tcl' )
+  - assert File( 'inputs/physical-intent.json' )
+  - assert File( 'inputs/physical-intent.tcl' )
+
+postconditions:
+  - assert File( 'outputs/design.checkpoint' )
+  - assert File( 'outputs/full-chip-pnr-metrics.json' )
+  - assert File( 'outputs/physical-intent-placement.rpt' )
+  - assert 'ERROR'
+      not in File( 'logs/run.log', enable_case_sensitive=True )

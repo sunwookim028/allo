@@ -1,0 +1,46 @@
+name: allo-asic-physical-intent
+
+inputs:
+  - assembly-plan.json
+  - macro-registry
+  - macro-registry.json
+  - macro-collateral.json
+  - design.v
+  - macro-link.rpt
+  - synthesis-reports
+  - srams
+
+outputs:
+  - physical-intent.json
+  - physical-intent.tcl
+  - physical-intent.svg
+  - physical-intent-report.txt
+
+commands:
+  - python plan_physical_intent.py
+
+parameters:
+  core_density_target: 0.70
+  floorplan_aspect_ratio: 1.0
+  macro_separation_x: 8.0
+  macro_separation_y: 8.0
+  kernel_separation_x: 30.0
+  kernel_separation_y: 30.0
+  macro_edge_keepout: 30.0
+  sram_separation: 20.0
+  placement_grid: 0.005
+  kernel_optimization_passes: 12
+
+preconditions:
+  - assert File( 'inputs/assembly-plan.json' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-registry.json' )
+  - assert File( 'inputs/macro-collateral.json' )
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/macro-link.rpt' )
+
+postconditions:
+  - assert File( 'outputs/physical-intent.json' )
+  - assert File( 'outputs/physical-intent.tcl' )
+  - assert File( 'outputs/physical-intent.svg' )
+  - assert File( 'outputs/physical-intent-report.txt' )

@@ -20,6 +20,7 @@ METRIC_FILES = [
     "macro-physical-verify-metrics.json",
     "macro-signoff-metrics.json",
     "full-chip-synthesis-metrics.json",
+    "full-chip-pnr-metrics.json",
 ]
 
 

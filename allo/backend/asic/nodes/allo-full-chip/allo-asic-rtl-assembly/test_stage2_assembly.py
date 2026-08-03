@@ -107,8 +107,9 @@ endmodule
     assembled = (assembler_dir / "outputs/assembled-design.v").read_text()
     assert "module canonical" not in assembled
     assert "module member_b" not in assembled
-    assert "canonical u_a(.a(x), .z(x))" in assembled
-    assert "canonical u_b(.a(x), .z(x))" in assembled
+    assert "canonical allo_pe_top_k_pid_0_" in assembled
+    assert "canonical allo_pe_top_k_pid_1_" in assembled
+    assert ".a(x), .z(x)" in assembled
     collateral = json.loads((assembler_dir / "outputs/macro-collateral.json").read_text())
     assert len(collateral["rewritten_instances"]) == 2
     assert "allo_asic_macro_modules" in (
