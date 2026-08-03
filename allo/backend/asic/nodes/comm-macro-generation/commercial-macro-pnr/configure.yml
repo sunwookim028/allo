@@ -29,6 +29,7 @@ parameters:
   process_node: 45
   max_route_layer: 7
   base_layer_idx: 0
+  gds_stream_out_units: 10000
   pin_layer_offset: 3
   pin_secondary_layer_offset: 5
   pin_multilayer_threshold: 100

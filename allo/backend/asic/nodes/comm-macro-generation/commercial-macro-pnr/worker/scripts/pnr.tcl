@@ -53,6 +53,12 @@ if {![info exists env(base_layer_idx)]} {
     set env(base_layer_idx) 0
   }
 }
+if {![info exists env(gds_stream_out_units)]} {
+  set env(gds_stream_out_units) 10000
+}
+if {![string is integer -strict $env(gds_stream_out_units)] || $env(gds_stream_out_units) <= 0} {
+  error "gds_stream_out_units must be a positive integer"
+}
 if {![info exists env(pin_layer_offset)]} {
   set env(pin_layer_offset) 3
 }
@@ -880,11 +886,10 @@ timeDesign -prefix signoff \
   -outDir reports \
   -expandedViews
 
-if { [info exists ADK_DBU_PRECISION] } {
-  set stream_out_units $ADK_DBU_PRECISION
-} else {
-  set stream_out_units 1000
-}
+# Calibre's FreePDK45 LVS deck declares PRECISION 10000. Keep GDS stream
+# precision explicit and independent of Innovus's internal ADK DBU precision;
+# otherwise a legal 1000-DBU Innovus database is rejected before LVS begins.
+set stream_out_units $env(gds_stream_out_units)
 
 streamOut $results_dir/$design_name.gds.gz \
   -units ${stream_out_units} \
