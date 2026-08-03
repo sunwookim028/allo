@@ -31,4 +31,4 @@ postconditions:
   - assert File( 'outputs/drc.summary' )
   - assert File( 'outputs/full-chip-drc-metrics.json' )
   - assert 'TOTAL DRC Results Generated:' in File( 'outputs/drc.summary' )
-  - assert 'TOTAL DRC Results Generated: 0' in File( 'outputs/drc.summary' )
+  - "assert 'TOTAL DRC Results Generated: 0' in File( 'outputs/drc.summary' )"

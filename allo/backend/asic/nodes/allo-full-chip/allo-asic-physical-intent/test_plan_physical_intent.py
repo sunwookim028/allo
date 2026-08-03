@@ -30,6 +30,24 @@ def test_rotated_dimensions():
     assert PLAN.oriented_dimensions(10, 20, "R90") == (20, 10)
 
 
+def test_short_row_cleanup_preserves_large_gaps_and_cuts_only_slivers():
+    placements = [
+        {"x": 10, "y": 10, "width": 20, "height": 20},
+        {"x": 40, "y": 10, "width": 20, "height": 20},
+        {"x": 80, "y": 10, "width": 15, "height": 20},
+    ]
+    cuts = PLAN.short_row_fragment_cuts(placements, 100, 50, 2, 12)
+    horizontal = [cut for cut in cuts if cut["y"] == 8 and cut["height"] == 24]
+    # 8 um at the left edge, 6 um between the first two inflated macros, and
+    # 3 um at the right edge are removed. The 16 um middle gap and all
+    # unobstructed area survive.
+    assert {(cut["x"], cut["width"]) for cut in horizontal} == {
+        (0.0, 8.0),
+        (32, 6),
+        (97, 3),
+    }
+
+
 def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     inputs = tmp_path / "inputs"
     macro_dir = inputs / "macro-registry" / "macro_alpha_test"
@@ -69,5 +87,5 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
         "policy": "sequential_perimeter",
     }
     generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
-    assert "proc cut_allo_kernel_cluster_rows" in generated_tcl
-    assert "cutRow -area" in generated_tcl
+    assert "proc cut_allo_short_row_fragments" in generated_tcl
+    assert intent["row_fragment_policy"]["cut_count"] == 0

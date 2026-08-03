@@ -357,13 +357,13 @@ if {   [info exists ADK_END_CAP_CELL_LEFT]
 }
 
 if {$has_hard_macros} {
-  # Cut the complete PE-cluster rectangles first.  The following per-block
-  # cuts remain useful for the outside halo and for optional SRAMs.  Their
-  # union deliberately removes rows from the narrow gaps inside PE arrays.
-  set cut_kernel_clusters [cut_allo_kernel_cluster_rows]
-  set cluster_cut_rpt [open reports/kernel-cluster-row-cuts.rpt w]
-  puts $cluster_cut_rpt "cut_kernel_clusters $cut_kernel_clusters"
-  close $cluster_cut_rpt
+  # Preserve all useful inter-macro placement area. The generated intent cuts
+  # only geometrically short row fragments that would otherwise fail welltap
+  # insertion; ordinary per-block cuts below enforce each macro's true halo.
+  set cut_short_fragments [cut_allo_short_row_fragments]
+  set fragment_cut_rpt [open reports/selective-row-fragment-cuts.rpt w]
+  puts $fragment_cut_rpt "cut_short_fragments $cut_short_fragments"
+  close $fragment_cut_rpt
   foreach inst $blocks {
     if {[dbGet $inst.isPhysOnly]} {
       continue
@@ -761,9 +761,6 @@ if {[info exists ADK_FILLER_CELLS] && $ADK_FILLER_CELLS ne ""} {
   set filler_cells "FILLCELL_X32 FILLCELL_X16 FILLCELL_X8 FILLCELL_X4 FILLCELL_X2 FILLCELL_X1"
 }
 
-setFillerMode -core $filler_cells -corePrefix FILL
-addFiller
-
 routeDesign -placementCheck
 
 setNanoRouteMode -droutePostRouteSpreadWire true -routeWithTimingDriven false
@@ -800,6 +797,11 @@ if {[getDistributeHost -mode] == "local"} {
 optDesign -postRoute -outDir reports -prefix postroute_setup -setup
 optDesign -postRoute -outDir reports -prefix postroute_drv -drv
 optDesign -postRoute -outDir reports -prefix postroute_hold -hold
+
+# Preserve whitespace for routing, timing repair, and antenna-diode insertion.
+# Physical-only filler cells are safe to add after those operations complete.
+setFillerMode -core $filler_cells -corePrefix FILL
+addFiller
 
 if {$need_restore_multi == true} {
   setDistributeHost -local

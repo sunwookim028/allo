@@ -588,6 +588,25 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
       $secondary_side_ports $secondary_ports_layer $innovus_side $env(pin_corner_keepout)
   }
 }
+if {![info exists allo_asic_clock_pins] || ![info exists allo_asic_clock_side]} {
+  close $pin_assignment_report
+  error "Pin intent does not define dedicated clock-pin placement"
+}
+array set allo_innovus_side {N TOP S BOTTOM E RIGHT W LEFT}
+set resolved_clock_ports [resolve_manifest_group $allo_asic_clock_pins $all_ports]
+if {[llength $resolved_clock_ports] > 0} {
+  editPin -layer $ports_layer -pin $resolved_clock_ports \
+    -side $allo_innovus_side($allo_asic_clock_side) -spreadType CENTER
+  foreach port $resolved_clock_ports {
+    if {[lsearch -exact $assigned_ports $port] >= 0} {
+      close $pin_assignment_report
+      error "Clock terminal '$port' was also assigned as an ordinary signal pin"
+    }
+    lappend assigned_ports $port
+  }
+  puts $pin_assignment_report \
+    "CLOCK side=$allo_asic_clock_side layer=$ports_layer ports=[join $resolved_clock_ports { }]"
+}
 set unassigned_ports {}
 foreach port $all_ports {
   if {[lsearch -exact $assigned_ports $port] < 0} {
@@ -996,6 +1015,7 @@ foreach x $lvs_exclude_cell_list {
 }
 
 saveNetlist -excludeLeafCell \
+  -includePowerGround \
   -phys \
   -excludeCellInst $lvs_exclude_list \
   $results_dir/$design_name.lvs.v

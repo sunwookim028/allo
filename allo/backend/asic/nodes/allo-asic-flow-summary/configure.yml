@@ -10,6 +10,11 @@ inputs:
   - macro-signoff-metrics.json
   - full-chip-synthesis-metrics.json
   - full-chip-pnr-metrics.json
+  - full-chip-gdsmerge-metrics.json
+  - full-chip-drc-metrics.json
+  - drc.summary
+  - full-chip-lvs-metrics.json
+  - lvs.report
 
 outputs:
   - flow-summary.json

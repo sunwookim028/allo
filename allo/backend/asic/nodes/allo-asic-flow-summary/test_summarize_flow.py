@@ -64,6 +64,10 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
             "status": "passed",
             "wall_seconds": 1.5,
         }))
+    (inputs / "drc.summary").write_text(
+        "TOTAL DRC Results Generated: 0 (0)\n"
+    )
+    (inputs / "lvs.report").write_text("# CORRECT #\n")
     monkeypatch.setattr(SUMMARY, "INPUTS", inputs)
     monkeypatch.setattr(SUMMARY, "REGISTRY_ROOT", registry_root)
     monkeypatch.setattr(SUMMARY, "OUTPUTS", outputs)
@@ -72,5 +76,9 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
     assert result["macros"][0]["physical_area_um2"] == 200.0
     assert result["macros"][0]["setup_wns_ns"] == 0.125
     assert result["macros"][0]["hold_wns_ns"] == 0.075
+    assert result["full_chip_verification"] == {
+        "drc_results": 0,
+        "lvs_status": "passed",
+    }
     assert "allo_asic_macro_count 1" in (outputs / "flow-summary.tcl").read_text()
     assert "Power: unavailable" in (outputs / "flow-summary.txt").read_text()

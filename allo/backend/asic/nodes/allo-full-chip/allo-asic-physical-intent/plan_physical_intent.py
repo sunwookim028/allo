@@ -28,6 +28,79 @@ def oriented_dimensions(width: float, height: float, orientation: str) -> tuple[
     return width, height
 
 
+def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Return the union of sorted one-dimensional closed intervals."""
+    merged: list[list[float]] = []
+    for start, end in sorted(intervals):
+        if end <= start:
+            continue
+        if not merged or start > merged[-1][1] + 1e-9:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+    return [(item[0], item[1]) for item in merged]
+
+
+def short_row_fragment_cuts(
+    placements: list[dict],
+    core_width: float,
+    core_height: float,
+    halo: float,
+    minimum_width: float,
+) -> list[dict]:
+    """Find only horizontal row fragments too narrow to retain safely.
+
+    Hard-macro-plus-halo rectangles are treated as existing row cuts. For each
+    y-band with constant obstruction geometry, free x-intervals narrower than
+    ``minimum_width`` are emitted as additional cuts. Larger gaps remain
+    available to standard cells and well taps.
+    """
+    if halo < 0 or minimum_width < 0:
+        raise ValueError("row-fragment halo and minimum width must be nonnegative")
+    obstacles = []
+    for item in placements:
+        x0 = max(0.0, item["x"] - halo)
+        y0 = max(0.0, item["y"] - halo)
+        x1 = min(core_width, item["x"] + item["width"] + halo)
+        y1 = min(core_height, item["y"] + item["height"] + halo)
+        if x1 > x0 and y1 > y0:
+            obstacles.append((x0, y0, x1, y1))
+    y_edges = sorted({0.0, core_height, *(value for box in obstacles for value in (box[1], box[3]))})
+    raw = []
+    for y0, y1 in zip(y_edges, y_edges[1:]):
+        if y1 <= y0 + 1e-9:
+            continue
+        midpoint = (y0 + y1) / 2
+        blocked = merge_intervals([
+            (box[0], box[2]) for box in obstacles
+            if box[1] < midpoint < box[3]
+        ])
+        cursor = 0.0
+        for start, end in blocked + [(core_width, core_width)]:
+            gap = start - cursor
+            if 1e-9 < gap < minimum_width - 1e-9:
+                raw.append([cursor, y0, start, y1])
+            cursor = max(cursor, end)
+
+    # Coalesce vertically adjacent bands with the same x interval so Innovus
+    # receives a compact and deterministic set of cutRow rectangles.
+    cuts: list[list[float]] = []
+    for rectangle in sorted(raw, key=lambda box: (box[0], box[2], box[1], box[3])):
+        if (
+            cuts
+            and abs(cuts[-1][0] - rectangle[0]) < 1e-9
+            and abs(cuts[-1][2] - rectangle[2]) < 1e-9
+            and abs(cuts[-1][3] - rectangle[1]) < 1e-9
+        ):
+            cuts[-1][3] = rectangle[3]
+        else:
+            cuts.append(rectangle)
+    return [
+        {"x": box[0], "y": box[1], "width": box[2] - box[0], "height": box[3] - box[1]}
+        for box in cuts
+    ]
+
+
 def lef_macros(path: Path) -> dict[str, tuple[float, float, list[str]]]:
     text = path.read_text(errors="replace")
     result = {}
@@ -190,6 +263,8 @@ def main() -> None:
     density = parameter("core_density_target", 0.70)
     aspect = parameter("floorplan_aspect_ratio", 1.0)
     passes = int(parameter("kernel_optimization_passes", 12))
+    row_cut_halo = parameter("macro_halo", 2.0)
+    min_row_width = parameter("min_placeable_row_segment_width", 12.0)
     if density <= 0 or density >= 1 or aspect <= 0 or grid <= 0:
         raise ValueError("density must be in (0,1), aspect and grid must be positive")
 
@@ -311,9 +386,11 @@ def main() -> None:
                 "y": snap(cluster_y + member["local_y"], grid),
                 "kernel": kernel,
             })
+    planned_core_w = snap(core_w, grid)
+    planned_core_h = snap(core_h, grid)
     placements = [{**item, "x": snap(item["x"], grid), "y": snap(item["y"], grid)} for item in sram_placements] + pe_placements
     for item in placements:
-        if item["x"] < 0 or item["y"] < 0 or item["x"] + item["width"] > core_w + grid or item["y"] + item["height"] > core_h + grid:
+        if item["x"] < 0 or item["y"] < 0 or item["x"] + item["width"] > planned_core_w + grid or item["y"] + item["height"] > planned_core_h + grid:
             raise ValueError(f"placement outside core: {item['name']}")
     for index, left in enumerate(placements):
         for right in placements[index + 1 :]:
@@ -325,12 +402,21 @@ def main() -> None:
             )
             if overlap:
                 raise ValueError(f"physical-intent overlap: {left['name']} and {right['name']}")
+    row_fragment_cuts = short_row_fragment_cuts(
+        placements, planned_core_w, planned_core_h, row_cut_halo, min_row_width
+    )
     intent = {
         "schema_version": 1, "stage": "physical_intent", "top_module": plan["top_module"],
-        "core": {"width": snap(core_w, grid), "height": snap(core_h, grid), "usable_rectangle": free},
+        "core": {"width": planned_core_w, "height": planned_core_h, "usable_rectangle": free},
         "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout},
         "standard_cell_area_estimate": standard_area, "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
         "kernel_clusters": cluster_records, "placements": placements,
+        "row_fragment_policy": {
+            "macro_halo": row_cut_halo,
+            "minimum_retained_width": min_row_width,
+            "cut_count": len(row_fragment_cuts),
+            "cuts": row_fragment_cuts,
+        },
         "sram_support": {"enabled": bool(srams), "instance_count": len(srams), "policy": "sequential_perimeter"},
     }
     (outputs / "physical-intent.json").write_text(json.dumps(intent, indent=2) + "\n")
@@ -350,19 +436,18 @@ def main() -> None:
     tcl.extend(["  setInstancePlacementStatus -allHardMacros -status fixed", "  return $placed", "}"])
     tcl.extend([
         "",
-        "# Remove standard-cell rows across each complete PE kernel cluster.",
-        "# This prevents narrow row fragments (and impossible well-tap checks)",
-        "# in the routing channels between closely tiled hard macros.",
-        "proc cut_allo_kernel_cluster_rows {} {",
+        "# Remove only row fragments too narrow to support useful placement.",
+        "# Large spaces inside and between kernel clusters remain placeable.",
+        "proc cut_allo_short_row_fragments {} {",
         "  set core [dbGet top.fPlan.coreBox]",
         "  if {[llength $core] == 1} { set core [lindex $core 0] }",
         "  set llx [lindex $core 0]",
         "  set lly [lindex $core 1]",
         "  set cut_count 0",
     ])
-    for cluster in cluster_records:
+    for cut in row_fragment_cuts:
         tcl.extend([
-            f"  cutRow -area [list [expr {{$llx + {cluster['x']}}}] [expr {{$lly + {cluster['y']}}}] [expr {{$llx + {cluster['x']} + {cluster['width']}}}] [expr {{$lly + {cluster['y']} + {cluster['height']}}}]]",
+            f"  cutRow -area [list [expr {{$llx + {cut['x']}}}] [expr {{$lly + {cut['y']}}}] [expr {{$llx + {cut['x']} + {cut['width']}}}] [expr {{$lly + {cut['y']} + {cut['height']}}}]]",
             "  incr cut_count",
         ])
     tcl.extend(["  return $cut_count", "}"])
@@ -379,6 +464,7 @@ def main() -> None:
         f"Core: {intent['core']['width']} x {intent['core']['height']} um\n"
         f"PE macros: {len(pe_placements)}\nSRAMs: {len(srams)} (optional sequential perimeter policy)\n"
         f"Kernel clusters: {len(cluster_records)}\nWeighted inter-kernel cost optimization passes: {passes}\n"
+        f"Selective short-row cuts: {len(row_fragment_cuts)} (minimum retained width {min_row_width} um)\n"
     )
 
 

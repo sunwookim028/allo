@@ -338,8 +338,13 @@ def build_pin_intent(
     canonical_ports = port_names(canonical)
     declarations = port_declarations(canonical, canonical_ports)
     remaining = [port for port in canonical_ports if port not in stream_rtl_ports]
-    control = [port for port in remaining if port.startswith("ap_")]
-    auxiliary = [port for port in remaining if port not in control]
+    clock = [port for port in remaining if port == "ap_clk"]
+    control = [
+        port for port in remaining if port.startswith("ap_") and port != "ap_clk"
+    ]
+    auxiliary = [
+        port for port in remaining if port not in control and port not in clock
+    ]
     stream_sides = {item["side"] for item in mapped}
     side_loads = {side: 0 for side in ("N", "S", "E", "W")}
     for bundle in mapped:
@@ -363,6 +368,8 @@ def build_pin_intent(
         "representative": representative,
         "module": canonical.name,
         "stream_bundles": mapped,
+        "clock_pins": clock,
+        "clock_side": control_side,
         "control_pins": control,
         "control_side": control_side,
         "auxiliary_pins": auxiliary,
@@ -388,6 +395,12 @@ def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
     for (side, _name), ports in auxiliary_groups.items():
         side_groups[side].append(ports)
     lines = ["# Generated from the Allo whole-region channel graph."]
+    lines.append(
+        "set allo_asic_clock_pins [list "
+        + " ".join(tcl_quote(port) for port in intent["clock_pins"])
+        + "]"
+    )
+    lines.append(f"set allo_asic_clock_side {intent['clock_side']}")
     for side in ("N", "S", "E", "W"):
         lines.append(
             f"set allo_asic_signal_pins_{side} [list "
