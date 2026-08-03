@@ -9,7 +9,10 @@ Signal pins are placed from the planner's whole-region Allo channel graph rather
 than split arbitrarily between two edges. Each semantic stream's complete Vitis
 handshake bundle stays together on its requested N/S/E/W side; controls and
 auxiliary interfaces follow explicit planner policies. Unknown, duplicate, or
-unassigned RTL ports are fatal.
+unassigned RTL ports are fatal. Logical vector names from the pre-synthesis
+manifest are expanded into naturally ordered synthesized Innovus terminals
+(`name[0]`, `name[1]`, ...) before placement, and the exact resolution is saved
+in `reports/pin-assignment.rpt`.
 
 The macro power plan is a sparse edge mesh, not a core ring. One VDD/VSS stripe
 pair spans each of two orthogonal upper-metal layers and is exported as LEF PG

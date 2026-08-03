@@ -383,22 +383,51 @@ if {![file exists inputs/pin-intent.tcl]} {
   error "Missing manifest-derived pin intent: inputs/pin-intent.tcl"
 }
 source inputs/pin-intent.tcl
-set all_ports [lsort [dbGet top.terms.name]]
+set all_ports [lsort -dictionary [dbGet top.terms.name]]
+
+# The pre-synthesis manifest uses one logical name for a vector port, while
+# Innovus exposes a synthesized vector as individual terminals such as
+# data[0], data[1], ... . Resolve an exact scalar first, then expand a logical
+# bus name into all terminals with the corresponding bracketed prefix.
+proc resolve_manifest_port {logical_port all_ports} {
+  if {[lsearch -exact $all_ports $logical_port] >= 0} {
+    return [list $logical_port]
+  }
+  set bus_prefix "${logical_port}\["
+  set resolved {}
+  foreach physical_port $all_ports {
+    if {[string first $bus_prefix $physical_port] == 0} {
+      lappend resolved $physical_port
+    }
+  }
+  return [lsort -dictionary $resolved]
+}
+
 set assigned_ports {}
+set pin_assignment_report [open reports/pin-assignment.rpt w]
 foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
   set variable_name allo_asic_signal_pins_${compass}
   if {![info exists $variable_name]} {
     error "Pin intent does not define $variable_name"
   }
-  set side_ports [set $variable_name]
-  foreach port $side_ports {
-    if {[lsearch -exact $all_ports $port] < 0} {
-      error "Pin intent references unknown top-level port '$port'"
+  set logical_side_ports [set $variable_name]
+  set side_ports {}
+  foreach logical_port $logical_side_ports {
+    set resolved_ports [resolve_manifest_port $logical_port $all_ports]
+    if {[llength $resolved_ports] == 0} {
+      close $pin_assignment_report
+      error "Pin intent references unknown top-level scalar or bus '$logical_port'"
     }
-    if {[lsearch -exact $assigned_ports $port] >= 0} {
-      error "Pin intent assigns '$port' more than once"
+    puts $pin_assignment_report \
+      "$compass $logical_port -> [join $resolved_ports { }]"
+    foreach port $resolved_ports {
+      if {[lsearch -exact $assigned_ports $port] >= 0} {
+        close $pin_assignment_report
+        error "Pin intent assigns synthesized terminal '$port' more than once"
+      }
+      lappend assigned_ports $port
+      lappend side_ports $port
     }
-    lappend assigned_ports $port
   }
   if {[llength $side_ports] > 0} {
     editPin -layer $ports_layer -pin $side_ports -side $innovus_side -spreadType SIDE
@@ -411,8 +440,10 @@ foreach port $all_ports {
   }
 }
 if {[llength $unassigned_ports] > 0} {
+  close $pin_assignment_report
   error "Manifest pin intent leaves ports unassigned: $unassigned_ports"
 }
+close $pin_assignment_report
 
 reset_path_group -all
 resetPathGroupOptions
