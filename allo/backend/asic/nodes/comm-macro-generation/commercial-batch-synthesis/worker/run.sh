@@ -85,13 +85,29 @@ cd ..
 
 mkdir -p outputs && cd outputs
 
-ln -sf ../results/*.mapped.v       design.v
-ln -sf ../results/*.mapped.sdc     design.sdc
-ln -sf ../results/*.mapped.spef.gz design.spef.gz
-ln -sf ../reports/*.namemap        design.namemap
-ln -sf ../results/*.svf            design.svf
-ln -sf ../results/*.upf            design.upf
+link_first_match() {
+  local destination="$1"
+  shift
+  local source
+  for source in "$@"; do
+    if [[ -e "$source" ]]; then
+      ln -sf "$source" "$destination"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Required synthesis products.
+link_first_match design.v       ../results/*.mapped.v       || exit 1
+link_first_match design.sdc     ../results/*.mapped.sdc     || exit 1
+link_first_match design.spef.gz ../results/*.mapped.spef.gz || exit 1
+link_first_match design.svf     ../results/*.svf            || exit 1
+
+# These files are not emitted by every DC configuration. Do not create a
+# literal, dangling wildcard symlink when they are absent.
+link_first_match design.namemap ../reports/*.namemap || true
+link_first_match design.upf     ../results/*.upf     || true
 
 cd ..
-
 

@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -98,6 +99,25 @@ def run_entry(entry: dict) -> dict:
     return status
 
 
+def emit_worker_logs(entries: list[dict]) -> None:
+    """Replay every worker log to stdout for mflowgen-run.log."""
+    print("\n===== BEGIN COMMERCIAL MACRO PNR WORKER LOGS =====", flush=True)
+    for entry in entries:
+        entry_id = entry["id"]
+        worker = WORK_ROOT / entry_id
+        logs = sorted(worker.rglob("*.log"))
+        if not logs:
+            print(f"\n===== WORKER {entry_id}: NO LOG FILES FOUND =====", flush=True)
+        for path in logs:
+            relative = path.relative_to(worker)
+            print(f"\n===== BEGIN WORKER {entry_id} LOG {relative} =====", flush=True)
+            with path.open(errors="replace") as source:
+                shutil.copyfileobj(source, sys.stdout)
+            print()
+            print(f"===== END WORKER {entry_id} LOG {relative} =====", flush=True)
+    print("===== END COMMERCIAL MACRO PNR WORKER LOGS =====", flush=True)
+
+
 def main() -> None:
     index = json.loads((INPUT_BATCH / "index.json").read_text())
     entries = index.get("entries", [])
@@ -107,8 +127,11 @@ def main() -> None:
     shutil.rmtree(WORK_ROOT, ignore_errors=True)
     OUTPUT_BATCH.mkdir(parents=True)
     WORK_ROOT.mkdir()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
-        statuses = list(executor.map(run_entry, entries))
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
+            statuses = list(executor.map(run_entry, entries))
+    finally:
+        emit_worker_logs(entries)
     passed = {item["id"] for item in statuses if item["status"] == "passed"}
     output_entries = [
         json.loads((OUTPUT_BATCH / "entries" / entry["id"] / "entry.json").read_text())

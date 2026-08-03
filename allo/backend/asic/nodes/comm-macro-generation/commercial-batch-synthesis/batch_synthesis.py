@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -82,7 +83,12 @@ def collect_worker(worker: Path, destination: Path, entry: dict, fp: str) -> Non
     for directory in ["outputs", "reports", "logs", "results"]:
         source = worker / directory
         if source.exists():
-            shutil.copytree(source, destination / directory, symlinks=False)
+            shutil.copytree(
+                source,
+                destination / directory,
+                symlinks=False,
+                ignore_dangling_symlinks=True,
+            )
     collateral = destination / "collateral"
     collateral.mkdir()
     shutil.copy2(INPUT_BATCH / entry["pin_intent"], collateral / "pin-intent.json")
@@ -151,6 +157,36 @@ def run_entry(entry: dict) -> dict:
     return status
 
 
+def emit_worker_logs(entries: list[dict]) -> None:
+    """Copy every worker log to stdout for capture by mflowgen-run.log."""
+    print("\n===== BEGIN COMMERCIAL BATCH SYNTHESIS WORKER LOGS =====", flush=True)
+    for entry in entries:
+        entry_id = entry["id"]
+        worker = WORK_ROOT / entry_id
+        logs = sorted(
+            path
+            for path in worker.rglob("*.log")
+            if path.name != "batch-driver.saved.log"
+        )
+        if not logs:
+            print(f"\n===== WORKER {entry_id}: NO LOG FILES FOUND =====", flush=True)
+            continue
+        for path in logs:
+            relative = path.relative_to(worker)
+            print(
+                f"\n===== BEGIN WORKER {entry_id} LOG {relative} =====",
+                flush=True,
+            )
+            with path.open(errors="replace") as source:
+                shutil.copyfileobj(source, sys.stdout)
+            print()
+            print(
+                f"===== END WORKER {entry_id} LOG {relative} =====",
+                flush=True,
+            )
+    print("===== END COMMERCIAL BATCH SYNTHESIS WORKER LOGS =====", flush=True)
+
+
 def main() -> None:
     index = json.loads((INPUT_BATCH / "index.json").read_text())
     entries = index.get("entries", [])
@@ -163,8 +199,14 @@ def main() -> None:
 
     # Intentionally launch the whole batch. Each commercial process has an
     # isolated work directory; license and scheduler limits remain external.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
-        statuses = list(executor.map(run_entry, entries))
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
+            statuses = list(executor.map(run_entry, entries))
+    finally:
+        # mflowgen captures this node's stdout/stderr in mflowgen-run.log. Emit
+        # logs after parallel execution so entries are not interleaved, and do
+        # it even if a worker or collection operation raises an exception.
+        emit_worker_logs(entries)
 
     passed = {status["id"] for status in statuses if status["status"] == "passed"}
     output_entries = []

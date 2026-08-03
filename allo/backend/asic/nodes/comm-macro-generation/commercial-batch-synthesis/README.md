@@ -10,3 +10,14 @@ The node deliberately uses separate DC processes. A single process would
 amortize library setup but serialize the designs and make failure recovery and
 state isolation harder. Shared `.alib` data already avoids much of the repeated
 library-analysis cost.
+
+Required output links are created only after resolving a real DC artifact.
+Optional name-map and UPF files are omitted when DC does not emit them, avoiding
+dangling wildcard symlinks. The collector also ignores dangling optional links
+defensively while dereferencing valid artifacts into a self-contained batch.
+
+After the parallel workers finish, every worker `*.log` is replayed to the node's
+stdout in deterministic class/path order with explicit begin/end delimiters.
+mflowgen therefore captures the complete batch transcript in `mflowgen-run.log`
+on both success and failure, while the original per-worker log files remain
+available for focused inspection.
