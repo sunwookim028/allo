@@ -925,12 +925,7 @@ foreach x $lvs_exclude_cell_list {
   append lvs_exclude_list [dbGet -u -e top.insts.cell.name $x] " "
 }
 
-# The GDS/LEF abstract intentionally exports VDD and VSS as macro boundary
-# pins.  Keep those nets as top-level ports in the LVS source as well; without
-# this option Calibre matches every device and signal net but correctly reports
-# the two extracted PG ports as absent from the source.
-saveNetlist -includePowerGround \
-  -excludeLeafCell \
+saveNetlist -excludeLeafCell \
   -phys \
   -excludeCellInst $lvs_exclude_list \
   $results_dir/$design_name.lvs.v

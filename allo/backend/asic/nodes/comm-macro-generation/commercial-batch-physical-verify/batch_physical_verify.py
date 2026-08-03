@@ -46,6 +46,8 @@ def run_entry(entry: dict) -> dict:
     env.setdefault("drc_rule_deck", "calibre-drc-block.rule")
     env.setdefault("drc_env_setup", "undefined")
     env.setdefault("lvs_nthreads", "4")
+    env.setdefault("lvs_power_name", "VDD")
+    env.setdefault("lvs_ground_name", "VSS")
     env.setdefault("lvs_hcells_file", "")
     env.setdefault("lvs_connect_names", "")
     env.setdefault("lvs_verify_netlist", "1")

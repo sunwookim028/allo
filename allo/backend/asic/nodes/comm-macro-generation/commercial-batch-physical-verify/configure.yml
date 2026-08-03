@@ -17,6 +17,8 @@ parameters:
   drc_rule_deck: calibre-drc-block.rule
   drc_env_setup: undefined
   lvs_nthreads: 4
+  lvs_power_name: VDD
+  lvs_ground_name: VSS
   lvs_hcells_file: ''
   lvs_connect_names: ''
   lvs_verify_netlist: 1
