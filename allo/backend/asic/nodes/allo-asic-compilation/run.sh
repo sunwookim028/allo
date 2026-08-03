@@ -117,6 +117,7 @@ export ALLO_NODE_CLOCK_PERIOD="$clock_period"
 export ALLO_NODE_BACKEND_OPTIONS="$backend_options"
 "$python_bin" -c '
 import os
+import json
 from pathlib import Path
 from backend import parse_backend_options
 metadata = {

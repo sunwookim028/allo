@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${top_module:=top}"
-: "${sv2v_bin:=sv2v}"
+#: "${sv2v_bin:=sv2v}"
 : "${sv2v_defines:=}"
 : "${sv2v_include_dirs:=}"
 
@@ -12,7 +12,7 @@ cp -a inputs/backend-rtl outputs/source-rtl
 files=()
 while IFS= read -r file; do
   files+=("$file")
-done < <(find inputs/backend-rtl -type f \( -name '*.v' -o -name '*.sv' \) | sort)
+done < <(find -H inputs/backend-rtl -type f \( -name '*.v' -o -name '*.sv' \) | sort)
 
 if [ "${#files[@]}" -eq 0 ]; then
   echo "ERROR: inputs/backend-rtl contains no Verilog" | tee outputs/sv2v.log
@@ -31,9 +31,9 @@ for incdir in "${include_dirs[@]}"; do
 done
 
 {
-  echo "Running: $sv2v_bin ${args[*]} -w outputs/design.v"
+  echo "Running: sv2v ${args[*]} -w outputs/design.v"
   printf '  %s\n' "${files[@]}"
-  "$sv2v_bin" "${args[@]}" -w outputs/design.v "${files[@]}"
+  "sv2v" "${args[@]}" -w outputs/design.v "${files[@]}"
 } 2>&1 | tee outputs/sv2v.log
 
 if [ ! -s outputs/design.v ]; then
@@ -42,7 +42,7 @@ if [ ! -s outputs/design.v ]; then
 fi
 
 perl -0pi -e 's/\b(parameter|localparam)\s+string\s+/$1 /g' outputs/design.v
-grep -Eq "^[[:space:]]*module[[:space:]]+$top_module([[:space:]#(]|$)" \
+grep -Eq "(^|[[:space:]])module[[:space:]]+$top_module([[:space:]#(]|$)" \
   outputs/design.v || {
     echo "ERROR: normalized RTL does not contain top module $top_module" \
       | tee -a outputs/sv2v.log
