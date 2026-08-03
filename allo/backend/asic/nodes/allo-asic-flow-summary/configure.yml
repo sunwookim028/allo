@@ -20,9 +20,23 @@ outputs:
   - flow-summary.json
   - flow-summary.tcl
   - flow-summary.txt
+  - google-sheets-export.json
 
 commands:
   - python summarize_flow.py
+  - python export_summary_to_google_sheets.py
+
+parameters:
+  design_name: undefined
+  clock_period: 10.0
+  macro_clock_period: 8.0
+  min_macro_reuse: 2
+  google_sheets_enabled: false
+  google_sheets_required: true
+  google_sheets_credentials: /home/jb2698/.config/gspread/service_account.json
+  google_spreadsheet_id: REPLACE_WITH_SPREADSHEET_ID
+  google_worksheet_name: Results
+  google_sheet_columns_file: google-sheet-columns.json
 
 preconditions:
   - assert File( 'inputs/macro-registry' )
@@ -32,3 +46,4 @@ postconditions:
   - assert File( 'outputs/flow-summary.json' )
   - assert File( 'outputs/flow-summary.tcl' )
   - assert File( 'outputs/flow-summary.txt' )
+  - assert File( 'outputs/google-sheets-export.json' )

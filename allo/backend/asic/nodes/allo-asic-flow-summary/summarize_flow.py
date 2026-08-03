@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -198,11 +200,27 @@ def write_text(summary: dict) -> None:
 def main() -> None:
     registry = json.loads((INPUTS / "macro-registry.json").read_text())
     macros = [summarize_macro(item) for item in registry.get("macros", [])]
+    stages = load_stage_metrics()
     summary = {
         "schema_version": 1,
         "source_policy": "reports_and_explicit_metrics_only",
+        "run": {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "design_name": os.environ.get("design_name", "undefined"),
+        },
+        "parameters": {
+            "clock_period": float(os.environ.get("clock_period", "10.0")),
+            "macro_clock_period": float(
+                os.environ.get("macro_clock_period", "8.0")
+            ),
+            "min_macro_reuse": int(os.environ.get("min_macro_reuse", "2")),
+        },
         "macro_count": len(macros),
-        "stages": load_stage_metrics(),
+        "macro_physical_area_um2": round(
+            sum(item["physical_area_um2"] or 0.0 for item in macros), 6
+        ),
+        "stages": stages,
+        "stages_by_node": {item["node"]: item for item in stages},
         "macros": macros,
         "full_chip_verification": {
             "drc_results": parse_drc_count(read_optional(INPUTS / "drc.summary")),

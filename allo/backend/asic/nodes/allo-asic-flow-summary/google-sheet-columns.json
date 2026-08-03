@@ -1,0 +1,72 @@
+{
+  "columns": [
+    {
+      "header": "Timestamp UTC",
+      "path": "run.timestamp_utc"
+    },
+    {
+      "header": "Design",
+      "path": "run.design_name"
+    },
+    {
+      "header": "Clock period (ns)",
+      "path": "parameters.clock_period"
+    },
+    {
+      "header": "Macro clock period (ns)",
+      "path": "parameters.macro_clock_period"
+    },
+    {
+      "header": "Minimum macro reuse",
+      "path": "parameters.min_macro_reuse"
+    },
+    {
+      "header": "Macro classes",
+      "path": "macro_count"
+    },
+    {
+      "header": "Macro physical area (um^2)",
+      "path": "macro_physical_area_um2"
+    },
+    {
+      "header": "Allo compilation time (s)",
+      "path": "stages_by_node.allo-asic-compilation.wall_seconds"
+    },
+    {
+      "header": "Macro synthesis time (s)",
+      "path": "stages_by_node.commercial-batch-synthesis.wall_seconds"
+    },
+    {
+      "header": "Macro PNR time (s)",
+      "path": "stages_by_node.commercial-macro-pnr.wall_seconds"
+    },
+    {
+      "header": "Full-chip synthesis time (s)",
+      "path": "stages_by_node.commercial-full-chip-synthesis.wall_seconds"
+    },
+    {
+      "header": "Full-chip PNR time (s)",
+      "path": "stages_by_node.commercial-full-chip-pnr.wall_seconds"
+    },
+    {
+      "header": "GDS merge time (s)",
+      "path": "stages_by_node.commercial-full-chip-gdsmerge.wall_seconds"
+    },
+    {
+      "header": "DRC time (s)",
+      "path": "stages_by_node.commercial-full-chip-drc.wall_seconds"
+    },
+    {
+      "header": "LVS time (s)",
+      "path": "stages_by_node.commercial-full-chip-lvs.wall_seconds"
+    },
+    {
+      "header": "Full-chip DRC results",
+      "path": "full_chip_verification.drc_results"
+    },
+    {
+      "header": "Full-chip LVS status",
+      "path": "full_chip_verification.lvs_status"
+    }
+  ]
+}
