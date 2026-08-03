@@ -52,8 +52,8 @@ parameters:
   primary_ground_net: VSS
   power_nets: 'VDD,VNW,VDDPST,POC,VDDCE,VDDPE'
   ground_nets: 'VSS,VPW,VSSPST,VSSE'
-  power_pin_names: 'VDD,vdd'
-  ground_pin_names: 'VSS,gnd'
+  power_pin_names: 'VDD'
+  ground_pin_names: 'VSS'
   lvs_exclude_cell_list: 'FILL*,WELLTAP*'
   virtuoso_exclude_cell_list: 'FILL*,WELLTAP*'
   adk_tech_lef: inputs/adk/rtk-tech.lef

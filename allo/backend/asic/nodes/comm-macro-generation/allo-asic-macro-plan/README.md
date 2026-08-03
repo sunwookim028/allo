@@ -14,10 +14,11 @@ For every canonical representative, the node also maps semantic stream ordinals
 onto Vitis FIFO/valid RTL bundles and emits `pin-intent.json` plus a dependency-
 free `pin-intent.tcl`. Explicit compiler compass directions take precedence;
 otherwise same-kernel PID displacement, stream-axis hints, and a recorded
-dataflow fallback are used in that order. Clock/control pins use the south side,
-while non-stream external interfaces use the side opposite a single dominant
-stream direction. The PNR worker validates that every RTL port is assigned
-exactly once.
+dataflow fallback are used in that order. Clock/control pins use the south side.
+Non-stream interfaces do not affect equivalence or D4 selection; each AXI
+channel and logical vector remains intact while those groups are load-balanced
+across sides not occupied by semantic stream traffic. The PNR worker validates
+that every RTL port is assigned exactly once.
 It also emits an Innovus D4 orientation for every equivalent member by proving
 that the member's desired stream sides are a rotation/reflection of the
 canonical pin pattern.

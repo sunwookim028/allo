@@ -13,6 +13,10 @@ unassigned RTL ports are fatal. Logical vector names from the pre-synthesis
 manifest are expanded into naturally ordered synthesized Innovus terminals
 (`name[0]`, `name[1]`, ...) before placement, and the exact resolution is saved
 in `reports/pin-assignment.rpt`.
+FreePDK45 standard cells use uppercase `VDD` and `VSS`; only those PG-pin names
+are requested. Lowercase compatibility aliases are not probed because Innovus
+reports an unmatched `globalNetConnect` pattern as an error even after the real
+uppercase connection succeeds.
 
 The macro power plan is a sparse edge mesh, not a core ring. One VDD/VSS stripe
 pair spans each of two orthogonal upper-metal layers and is exported as LEF PG

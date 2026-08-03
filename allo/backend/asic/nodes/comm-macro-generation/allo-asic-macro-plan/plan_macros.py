@@ -174,6 +174,55 @@ def opposite(side: str) -> str:
     return {"N": "S", "S": "N", "E": "W", "W": "E"}[side]
 
 
+def declaration_width(declaration: str) -> int:
+    match = re.search(r"\[\s*(\d+)\s*:\s*(\d+)\s*\]", declaration)
+    if match is None:
+        return 1
+    return abs(int(match.group(1)) - int(match.group(2))) + 1
+
+
+def auxiliary_group(port: str) -> str:
+    """Keep each AXI channel together while balancing external-interface pins."""
+    match = re.match(r"^(m_axi_[A-Za-z0-9$]+)_(AW|AR|W|R|B)", port)
+    if match is not None:
+        return f"{match.group(1)}_{match.group(2)}"
+    match = re.match(r"^(s_axi_[A-Za-z0-9$]+)_(AW|AR|W|R|B)", port)
+    if match is not None:
+        return f"{match.group(1)}_{match.group(2)}"
+    return port
+
+
+def balance_auxiliary_pins(
+    auxiliary: list[str],
+    declarations: dict[str, str],
+    stream_sides: set[str],
+    initial_loads: dict[str, int],
+) -> dict[str, str]:
+    """Assign auxiliary interface groups to lightly loaded non-stream sides."""
+    candidates = [side for side in ("W", "N", "S", "E") if side not in stream_sides]
+    if not candidates:
+        candidates = ["W", "N", "S", "E"]
+    groups: dict[str, list[str]] = {}
+    for port in auxiliary:
+        groups.setdefault(auxiliary_group(port), []).append(port)
+    weighted_groups = sorted(
+        (
+            sum(declaration_width(declarations[port]) for port in ports),
+            name,
+            ports,
+        )
+        for name, ports in groups.items()
+    )
+    loads = dict(initial_loads)
+    assignments = {}
+    for width, _name, ports in reversed(weighted_groups):
+        side = min(candidates, key=lambda item: (loads[item], candidates.index(item)))
+        for port in ports:
+            assignments[port] = side
+        loads[side] += width
+    return assignments
+
+
 def graph_pin_sides(manifest: dict) -> dict[tuple[str, int], dict[str, str]]:
     """Assign a physical side to every semantic stream endpoint.
 
@@ -286,11 +335,21 @@ def build_pin_intent(
         mapped.append({**semantic, **bundle, **decision})
 
     stream_rtl_ports = {port for item in mapped for port in item["rtl_ports"]}
-    remaining = [port for port in port_names(canonical) if port not in stream_rtl_ports]
+    canonical_ports = port_names(canonical)
+    declarations = port_declarations(canonical, canonical_ports)
+    remaining = [port for port in canonical_ports if port not in stream_rtl_ports]
     control = [port for port in remaining if port.startswith("ap_")]
     auxiliary = [port for port in remaining if port not in control]
     stream_sides = {item["side"] for item in mapped}
-    auxiliary_side = opposite(next(iter(stream_sides))) if len(stream_sides) == 1 else "W"
+    side_loads = {side: 0 for side in ("N", "S", "E", "W")}
+    for bundle in mapped:
+        side_loads[bundle["side"]] += sum(
+            declaration_width(declarations[port]) for port in bundle["rtl_ports"]
+        )
+    side_loads["S"] += sum(declaration_width(declarations[port]) for port in control)
+    auxiliary_pin_sides = balance_auxiliary_pins(
+        auxiliary, declarations, stream_sides, side_loads
+    )
     return {
         "schema_version": 1,
         "representative": representative,
@@ -299,7 +358,7 @@ def build_pin_intent(
         "control_pins": control,
         "control_side": "S",
         "auxiliary_pins": auxiliary,
-        "auxiliary_side": auxiliary_side,
+        "auxiliary_pin_sides": auxiliary_pin_sides,
         "semantic_to_rtl_method": selection_method,
     }
 
@@ -309,7 +368,8 @@ def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
     for bundle in intent["stream_bundles"]:
         side_ports[bundle["side"]].extend(bundle["rtl_ports"])
     side_ports[intent["control_side"]].extend(intent["control_pins"])
-    side_ports[intent["auxiliary_side"]].extend(intent["auxiliary_pins"])
+    for port in intent["auxiliary_pins"]:
+        side_ports[intent["auxiliary_pin_sides"][port]].append(port)
     lines = ["# Generated from the Allo whole-region channel graph."]
     for side in ("N", "S", "E", "W"):
         lines.append(
