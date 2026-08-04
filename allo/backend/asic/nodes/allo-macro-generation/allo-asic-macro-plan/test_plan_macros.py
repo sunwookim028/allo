@@ -18,6 +18,18 @@ SPEC.loader.exec_module(PLAN)
 
 
 class MacroPlanTest(unittest.TestCase):
+    def test_classifies_repeated_children_of_one_semantic_pe(self):
+        repeated = [
+            {"semantic_id": "top/load/pid=0", "rtl_module": "pipe_0"},
+            {"semantic_id": "top/load/pid=0", "rtl_module": "pipe_1"},
+        ]
+        semantic = [
+            {"semantic_id": "top/compute/pid=0", "rtl_module": "pe_0"},
+            {"semantic_id": "top/compute/pid=1", "rtl_module": "pe_1"},
+        ]
+        self.assertEqual(PLAN.classify_macro_candidate(repeated), "repeated_hls_submodule")
+        self.assertEqual(PLAN.classify_macro_candidate(semantic), "semantic_pe")
+
     def test_explicit_bypass_emits_empty_batch_and_unchanged_rtl(self):
         rtl = "module chip(input clk); endmodule\n"
         manifest = {
@@ -149,6 +161,8 @@ endmodule
             index = json.loads((root / "outputs/macro-batch/index.json").read_text())
             self.assertEqual(index["selected_class_count"], 1)
             entry = index["entries"][0]
+            self.assertEqual(entry["candidate_kind"], "semantic_pe")
+            self.assertEqual(entry["owning_kernels"], ["chip/pe"])
             self.assertEqual(entry["dependencies"], ["child"])
             self.assertEqual(
                 entry["port_maps"]["pe_b"],

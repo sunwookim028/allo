@@ -30,6 +30,68 @@ def test_rotated_dimensions():
     assert PLAN.oriented_dimensions(10, 20, "R90") == (20, 10)
 
 
+def test_variable_kernel_slots_do_not_pad_small_kernel_to_largest_width():
+    clusters = {
+        "compute": {"width": 100, "height": 40},
+        "loader": {"width": 20, "height": 10},
+    }
+    columns, rows, width, height = PLAN.variable_slot_extents(
+        clusters,
+        {"compute": (0, 0), "loader": (1, 0)},
+        separation_x=30,
+        separation_y=15,
+    )
+    assert columns == {0: 0.0, 1: 130.0}
+    assert rows == {0: 0.0}
+    assert width == 150
+    assert height == 40
+
+
+def test_whole_kernel_rotation_transforms_hls_children_as_one_block():
+    member = {
+        "name": "pipeline_0",
+        "local_x": 0,
+        "local_y": 0,
+        "width": 60,
+        "height": 10,
+        "orientation": "R0",
+        "lef_symmetry": ["X", "Y", "R90"],
+        "candidate_kind": "repeated_hls_submodule",
+    }
+    rotated = PLAN.rotate_cluster(
+        {"width": 60, "height": 10, "members": [member]}, "R90"
+    )
+    assert (rotated["width"], rotated["height"]) == (10, 60)
+    assert rotated["members"][0]["orientation"] == "R90"
+    assert rotated["members"][0]["candidate_kind"] == "repeated_hls_submodule"
+
+
+def test_rotation_optimizer_can_turn_thin_owner_kernel_cluster():
+    symmetry = ["X", "Y", "R90"]
+    clusters = {
+        "top/compute": {
+            "width": 100,
+            "height": 100,
+            "members": [{"local_x": 0, "local_y": 0, "width": 100, "height": 100, "orientation": "R0", "lef_symmetry": symmetry}],
+        },
+        "top/load": {
+            "width": 120,
+            "height": 10,
+            "members": [{"local_x": 0, "local_y": 0, "width": 120, "height": 10, "orientation": "R0", "lef_symmetry": symmetry}],
+        },
+    }
+    result = PLAN.choose_cluster_rotations(
+        clusters,
+        {"top/compute": (0, 0), "top/load": (1, 0)},
+        {("top/compute", "top/load"): 32},
+        30,
+        30,
+        4,
+    )
+    assert result["top/load"]["orientation"] in {"R90", "R270"}
+    assert (result["top/load"]["width"], result["top/load"]["height"]) == (10, 120)
+
+
 def test_short_row_cleanup_preserves_large_gaps_and_cuts_only_slivers():
     placements = [
         {"x": 10, "y": 10, "width": 20, "height": 20},

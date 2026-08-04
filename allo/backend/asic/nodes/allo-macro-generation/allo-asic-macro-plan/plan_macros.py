@@ -549,6 +549,16 @@ def env_bool(name: str, default: bool = False) -> bool:
     raise ValueError(f"{name} must be a boolean, got {value!r}")
 
 
+def classify_macro_candidate(members: list[dict]) -> str:
+    """Distinguish semantic PE classes from repeated children of one PE."""
+    semantic_ids = [str(member.get("semantic_id", "")) for member in members]
+    return (
+        "repeated_hls_submodule"
+        if len(set(semantic_ids)) < len(semantic_ids)
+        else "semantic_pe"
+    )
+
+
 def main() -> None:
     outputs = Path("outputs")
     batch_dir = outputs / "macro-batch"
@@ -564,6 +574,7 @@ def main() -> None:
     threshold = int(os.environ.get("min_macro_reuse", "2"))
     macro_clock_period = float(os.environ.get("macro_clock_period", "8.0"))
     bypassed = env_bool("bypass_macro_generation")
+    harden_hls_submodules = env_bool("harden_repeated_hls_submodules")
     if threshold < 1:
         raise ValueError("min_macro_reuse must be at least 1")
     if macro_clock_period <= 0:
@@ -585,6 +596,17 @@ def main() -> None:
             continue
         if int(group.get("member_count", len(members))) < threshold:
             continue
+        semantic_ids = [str(member.get("semantic_id", "")) for member in members]
+        candidate_kind = classify_macro_candidate(members)
+        if candidate_kind == "repeated_hls_submodule" and not harden_hls_submodules:
+            continue
+        owning_kernels = sorted(
+            {
+                "/".join(value.split("/")[:2])
+                for value in semantic_ids
+                if len(value.split("/")) >= 2
+            }
+        )
         module_names = [member["rtl_module"] for member in members]
         missing = [name for name in module_names if name not in blocks]
         if missing:
@@ -643,6 +665,8 @@ def main() -> None:
             "top_module": canonical_name,
             "representative_semantic_id": group["representative"],
             "reuse_count": int(group["member_count"]),
+            "candidate_kind": candidate_kind,
+            "owning_kernels": owning_kernels,
             "rtl_hash": group["proof"]["rtl_hash"],
             "rtl_sha256": digest,
             "rtl": f"entries/{entry_id}/rtl/design.v",
@@ -681,6 +705,7 @@ def main() -> None:
         "reuse_threshold": threshold,
         "macro_clock_period_ns": macro_clock_period,
         "bypass_macro_generation": bypassed,
+        "harden_repeated_hls_submodules": harden_hls_submodules,
         "implementation_style": "flat" if bypassed else "hierarchical_macros",
         "source_manifest": str(manifest_path),
         "selected_class_count": len(selected),
@@ -697,6 +722,7 @@ def main() -> None:
         f"set allo_asic_macro_plan_schema_version {plan['schema_version']}",
         f"set allo_asic_macro_reuse_threshold {threshold}",
         f"set allo_asic_bypass_macro_generation {1 if bypassed else 0}",
+        f"set allo_asic_harden_repeated_hls_submodules {1 if harden_hls_submodules else 0}",
         "set allo_asic_macro_class_ids [list "
         + " ".join(tcl_quote(entry["id"]) for entry in selected)
         + "]",
@@ -709,6 +735,7 @@ def main() -> None:
             [
                 f"set allo_asic_macro_top({key}) {tcl_quote(entry['top_module'])}",
                 f"set allo_asic_macro_reuse({key}) {entry['reuse_count']}",
+                f"set allo_asic_macro_candidate_kind({key}) {tcl_quote(entry['candidate_kind'])}",
                 f"set allo_asic_macro_rtl({key}) {tcl_quote(entry['rtl'])}",
             ]
         )

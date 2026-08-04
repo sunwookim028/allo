@@ -18,6 +18,13 @@ def parameter(name: str, default: float) -> float:
     return value
 
 
+def boolean_parameter(name: str, default: bool) -> bool:
+    value = os.environ.get(name, str(default)).strip().lower()
+    if value not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
+        raise ValueError(f"{name} must be a boolean")
+    return value in {"true", "1", "yes", "on"}
+
+
 def snap(value: float, grid: float) -> float:
     return round(math.ceil((value - 1e-12) / grid) * grid, 6)
 
@@ -237,6 +244,151 @@ def optimize_slots(kernels: list[str], weights: dict, passes: int) -> dict[str, 
     return {name: slots[index] for index, name in enumerate(order)}
 
 
+def variable_slot_extents(
+    clusters: dict[str, dict],
+    slot_map: dict[str, tuple[int, int]],
+    separation_x: float,
+    separation_y: float,
+) -> tuple[dict[int, float], dict[int, float], float, float]:
+    """Size grid columns/rows from only the kernels assigned to each one."""
+    if not slot_map:
+        return {}, {}, 0.0, 0.0
+    column_widths: dict[int, float] = defaultdict(float)
+    row_heights: dict[int, float] = defaultdict(float)
+    for kernel, (column, row) in slot_map.items():
+        column_widths[column] = max(column_widths[column], clusters[kernel]["width"])
+        row_heights[row] = max(row_heights[row], clusters[kernel]["height"])
+
+    column_offsets = {}
+    cursor = 0.0
+    for column in sorted(column_widths):
+        column_offsets[column] = cursor
+        cursor += column_widths[column] + separation_x
+    region_width = cursor - separation_x
+
+    row_offsets = {}
+    cursor = 0.0
+    for row in sorted(row_heights):
+        row_offsets[row] = cursor
+        cursor += row_heights[row] + separation_y
+    region_height = cursor - separation_y
+    return column_offsets, row_offsets, region_width, region_height
+
+
+ROTATION_MATRICES = {
+    "R0": ((1, 0), (0, 1)),
+    "R90": ((0, -1), (1, 0)),
+    "R180": ((-1, 0), (0, -1)),
+    "R270": ((0, 1), (-1, 0)),
+    "MX": ((1, 0), (0, -1)),
+    "MY": ((-1, 0), (0, 1)),
+    "MXR90": ((0, 1), (1, 0)),
+    "MYR90": ((0, -1), (-1, 0)),
+}
+MATRIX_ORIENTATIONS = {value: key for key, value in ROTATION_MATRICES.items()}
+
+
+def compose_orientation(rotation: str, orientation: str) -> str:
+    """Apply a whole-cluster rotation outside a member's existing transform."""
+    left, right = ROTATION_MATRICES[rotation], ROTATION_MATRICES[orientation]
+    product = tuple(
+        tuple(sum(left[row][index] * right[index][column] for index in range(2)) for column in range(2))
+        for row in range(2)
+    )
+    return MATRIX_ORIENTATIONS[product]
+
+
+def legal_cluster_rotations(cluster: dict) -> list[str]:
+    # R180 requires X/Y reflection support; quarter turns additionally require
+    # R90. Published macro LEFs normally provide the full X Y R90 set.
+    rotations = ["R0"]
+    if all({"X", "Y"}.issubset(set(item.get("lef_symmetry", []))) for item in cluster["members"]):
+        rotations.append("R180")
+    if all("R90" in item.get("lef_symmetry", []) for item in cluster["members"]):
+        rotations.extend(["R90", "R270"])
+    return rotations
+
+
+def rotate_cluster(cluster: dict, rotation: str) -> dict:
+    width, height = cluster["width"], cluster["height"]
+    transformed = []
+    for item in cluster["members"]:
+        x, y, item_w, item_h = item["local_x"], item["local_y"], item["width"], item["height"]
+        if rotation == "R0":
+            new_x, new_y = x, y
+        elif rotation == "R90":
+            new_x, new_y = height - y - item_h, x
+        elif rotation == "R180":
+            new_x, new_y = width - x - item_w, height - y - item_h
+        elif rotation == "R270":
+            new_x, new_y = y, width - x - item_w
+        else:
+            raise ValueError(f"unsupported cluster rotation {rotation}")
+        transformed.append({
+            **item,
+            "local_x": new_x,
+            "local_y": new_y,
+            "width": item_h if rotation in {"R90", "R270"} else item_w,
+            "height": item_w if rotation in {"R90", "R270"} else item_h,
+            "orientation": compose_orientation(rotation, item["orientation"]),
+        })
+    return {
+        "width": height if rotation in {"R90", "R270"} else width,
+        "height": width if rotation in {"R90", "R270"} else height,
+        "members": transformed,
+        "orientation": rotation,
+    }
+
+
+def choose_cluster_rotations(
+    clusters: dict[str, dict],
+    slot_map: dict[str, tuple[int, int]],
+    weights: dict[tuple[str, str], float],
+    separation_x: float,
+    separation_y: float,
+    passes: int,
+) -> dict[str, dict]:
+    """Choose legal whole-kernel rotations using area and channel distance."""
+    choices = {name: "R0" for name in clusters}
+
+    def materialize() -> dict[str, dict]:
+        return {name: rotate_cluster(cluster, choices[name]) for name, cluster in clusters.items()}
+
+    def score(oriented: dict[str, dict]) -> float:
+        xs, ys, region_w, region_h = variable_slot_extents(
+            oriented, slot_map, separation_x, separation_y
+        )
+        centers = {
+            name: (
+                xs[slot_map[name][0]] + oriented[name]["width"] / 2,
+                ys[slot_map[name][1]] + oriented[name]["height"] / 2,
+            )
+            for name in oriented
+        }
+        wire = sum(
+            weight * (abs(centers[left][0] - centers[right][0]) + abs(centers[left][1] - centers[right][1]))
+            for (left, right), weight in weights.items()
+            if left in centers and right in centers
+        )
+        return region_w * region_h + wire
+
+    for _ in range(max(1, passes)):
+        changed = False
+        for name in sorted(clusters):
+            original = choices[name]
+            best = (score(materialize()), original)
+            for rotation in legal_cluster_rotations(clusters[name]):
+                choices[name] = rotation
+                trial = score(materialize())
+                if trial + 1e-9 < best[0]:
+                    best = (trial, rotation)
+            choices[name] = best[1]
+            changed |= best[1] != original
+        if not changed:
+            break
+    return materialize()
+
+
 def main() -> None:
     inputs, outputs = Path("inputs"), Path("outputs")
     outputs.mkdir(exist_ok=True)
@@ -263,6 +415,7 @@ def main() -> None:
     density = parameter("core_density_target", 0.70)
     aspect = parameter("floorplan_aspect_ratio", 1.0)
     passes = int(parameter("kernel_optimization_passes", 12))
+    enable_kernel_rotation = boolean_parameter("enable_kernel_rotation", True)
     row_cut_halo = parameter("macro_halo", 2.0)
     min_row_width = parameter("min_placeable_row_segment_width", 12.0)
     cluster_density = int(parameter("kernel_cluster_max_density_percent", 55))
@@ -272,12 +425,15 @@ def main() -> None:
         raise ValueError("kernel_cluster_max_density_percent must be in [1,100]")
 
     dimensions = {}
+    symmetries = {}
     for macro in registry.get("macros", []):
         lef = inputs / "macro-registry" / macro["views"]["lef"]["path"]
         parsed = lef_macros(lef)
         if macro["top_module"] not in parsed:
             raise ValueError(f"LEF lacks canonical macro {macro['top_module']}")
-        dimensions[macro["macro_class_id"]] = parsed[macro["top_module"]][:2]
+        geometry = parsed[macro["top_module"]]
+        dimensions[macro["macro_class_id"]] = geometry[:2]
+        symmetries[macro["macro_class_id"]] = geometry[2]
 
     grouped = defaultdict(list)
     for item in plan.get("replacements", []):
@@ -293,6 +449,8 @@ def main() -> None:
             "name": stable, "cell": item["canonical_module"], "semantic_id": item["semantic_id"],
             "pid": semantic_pid(item["semantic_id"]), "width": width, "height": height,
             "orientation": orient, "kind": "pe", "macro_class_id": item["macro_class_id"],
+            "lef_symmetry": symmetries[item["macro_class_id"]],
+            "candidate_kind": item.get("candidate_kind", "semantic_pe"),
         })
 
     clusters = {}
@@ -333,12 +491,15 @@ def main() -> None:
     weights = connection_weights(plan)
     kernel_names = sorted(clusters)
     slot_map = optimize_slots(kernel_names, weights, passes)
-    max_cluster_w = max((item["width"] for item in clusters.values()), default=0.0)
-    max_cluster_h = max((item["height"] for item in clusters.values()), default=0.0)
-    slot_cols = max((slot[0] for slot in slot_map.values()), default=0) + 1
-    slot_rows = max((slot[1] for slot in slot_map.values()), default=0) + 1
-    kernel_region_w = slot_cols * max_cluster_w + max(0, slot_cols - 1) * kernel_x
-    kernel_region_h = slot_rows * max_cluster_h + max(0, slot_rows - 1) * kernel_y
+    if enable_kernel_rotation:
+        clusters = choose_cluster_rotations(
+            clusters, slot_map, weights, kernel_x, kernel_y, passes
+        )
+    else:
+        clusters = {name: rotate_cluster(cluster, "R0") for name, cluster in clusters.items()}
+    column_offsets, row_offsets, kernel_region_w, kernel_region_h = variable_slot_extents(
+        clusters, slot_map, kernel_x, kernel_y
+    )
 
     srams = discover_srams(inputs / "srams", netlist)
     macro_area = sum(item["width"] * item["height"] for values in grouped.values() for item in values)
@@ -378,10 +539,10 @@ def main() -> None:
     pe_placements, cluster_records = [], []
     for kernel in kernel_names:
         col, row = slot_map[kernel]
-        cluster_x = origin_x + col * (max_cluster_w + kernel_x)
-        cluster_y = origin_y + row * (max_cluster_h + kernel_y)
+        cluster_x = origin_x + column_offsets[col]
+        cluster_y = origin_y + row_offsets[row]
         cluster = clusters[kernel]
-        cluster_records.append({"kernel": kernel, "x": snap(cluster_x, grid), "y": snap(cluster_y, grid), **{key: cluster[key] for key in ["width", "height"]}})
+        cluster_records.append({"kernel": kernel, "x": snap(cluster_x, grid), "y": snap(cluster_y, grid), **{key: cluster[key] for key in ["width", "height", "orientation"]}})
         for member in cluster["members"]:
             pe_placements.append({
                 **{key: value for key, value in member.items() if not key.startswith("local_")},
@@ -414,6 +575,12 @@ def main() -> None:
         "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout},
         "standard_cell_area_estimate": standard_area, "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
         "kernel_clusters": cluster_records, "placements": placements,
+        "kernel_packing_policy": {
+            "type": "variable_grid_extents",
+            "whole_kernel_rotation_enabled": enable_kernel_rotation,
+            "region_width": kernel_region_w,
+            "region_height": kernel_region_h,
+        },
         "cluster_placement_policy": {
             "type": "partial_blockage",
             "maximum_density_percent": cluster_density,

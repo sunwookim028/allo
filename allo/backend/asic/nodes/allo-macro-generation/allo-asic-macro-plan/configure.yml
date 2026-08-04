@@ -18,6 +18,7 @@ commands:
 
 parameters:
   min_macro_reuse: 2
+  harden_repeated_hls_submodules: False
   macro_clock_period: 8.0
   bypass_macro_generation: False
 

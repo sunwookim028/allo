@@ -111,6 +111,8 @@ def main() -> None:
             "macro_class_id": class_id,
             "top_module": entry["top_module"],
             "reuse_count": entry["reuse_count"],
+            "candidate_kind": entry.get("candidate_kind", "semantic_pe"),
+            "owning_kernels": entry.get("owning_kernels", []),
             "rtl_hash": entry["rtl_hash"],
             "representative_semantic_id": entry["representative_semantic_id"],
             "member_modules": entry["member_modules"],

@@ -30,6 +30,7 @@ parameters:
   sram_separation: 20.0
   placement_grid: 0.005
   kernel_optimization_passes: 12
+  enable_kernel_rotation: True
   # Must track the PNR macro_halo. Only surviving row segments narrower than
   # this threshold are removed; larger inter-macro placement areas survive.
   macro_halo: 2.0

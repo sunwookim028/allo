@@ -10,6 +10,12 @@ replaces noncanonical definitions in `residual-design.v` with zero-logic alias
 wrappers. The canonical definition is omitted so that Stage 2 must link the
 hardened macro view.
 
+`harden_repeated_hls_submodules` controls identical modules that Vitis creates
+multiple times inside one semantic Allo PE. It defaults to `False`. When it is
+enabled, the plan labels these as `repeated_hls_submodule` and retains their
+owning Allo kernel, rather than treating anonymous HLS pipeline modules as new
+semantic PEs.
+
 For every canonical representative, the node also maps semantic stream ordinals
 onto Vitis FIFO/valid RTL bundles and emits `pin-intent.json` plus a dependency-
 free `pin-intent.tcl`. Explicit compiler compass directions take precedence;
