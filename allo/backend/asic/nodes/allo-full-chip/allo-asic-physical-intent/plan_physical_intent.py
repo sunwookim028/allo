@@ -265,8 +265,11 @@ def main() -> None:
     passes = int(parameter("kernel_optimization_passes", 12))
     row_cut_halo = parameter("macro_halo", 2.0)
     min_row_width = parameter("min_placeable_row_segment_width", 12.0)
+    cluster_density = int(parameter("kernel_cluster_max_density_percent", 55))
     if density <= 0 or density >= 1 or aspect <= 0 or grid <= 0:
         raise ValueError("density must be in (0,1), aspect and grid must be positive")
+    if cluster_density < 1 or cluster_density > 100:
+        raise ValueError("kernel_cluster_max_density_percent must be in [1,100]")
 
     dimensions = {}
     for macro in registry.get("macros", []):
@@ -411,6 +414,11 @@ def main() -> None:
         "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout},
         "standard_cell_area_estimate": standard_area, "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
         "kernel_clusters": cluster_records, "placements": placements,
+        "cluster_placement_policy": {
+            "type": "partial_blockage",
+            "maximum_density_percent": cluster_density,
+            "region_count": len(cluster_records),
+        },
         "row_fragment_policy": {
             "macro_halo": row_cut_halo,
             "minimum_retained_width": min_row_width,
@@ -451,6 +459,28 @@ def main() -> None:
             "  incr cut_count",
         ])
     tcl.extend(["  return $cut_count", "}"])
+    tcl.extend([
+        "",
+        "# Limit local standard-cell density without discarding the useful",
+        "# placement area between macros in each kernel cluster.",
+        "proc create_allo_cluster_density_limits {} {",
+        "  set core [dbGet top.fPlan.coreBox]",
+        "  if {[llength $core] == 1} { set core [lindex $core 0] }",
+        "  set llx [lindex $core 0]",
+        "  set lly [lindex $core 1]",
+        "  set blockage_count 0",
+    ])
+    for index, cluster in enumerate(cluster_records):
+        tcl.extend([
+            "  createPlaceBlockage -type partial "
+            f"-density {cluster_density} -name allo_kernel_density_{index} "
+            f"-box [list [expr {{$llx + {cluster['x']}}}] "
+            f"[expr {{$lly + {cluster['y']}}}] "
+            f"[expr {{$llx + {cluster['x']} + {cluster['width']}}}] "
+            f"[expr {{$lly + {cluster['y']} + {cluster['height']}}}]]",
+            "  incr blockage_count",
+        ])
+    tcl.extend(["  return $blockage_count", "}"])
     (outputs / "physical-intent.tcl").write_text("\n".join(tcl) + "\n")
     scale = min(1000 / max(core_w, 1), 800 / max(core_h, 1))
     colors = {"pe": "#4c78a8", "sram": "#f58518"}
@@ -465,6 +495,7 @@ def main() -> None:
         f"PE macros: {len(pe_placements)}\nSRAMs: {len(srams)} (optional sequential perimeter policy)\n"
         f"Kernel clusters: {len(cluster_records)}\nWeighted inter-kernel cost optimization passes: {passes}\n"
         f"Selective short-row cuts: {len(row_fragment_cuts)} (minimum retained width {min_row_width} um)\n"
+        f"Kernel-cluster partial placement limits: {len(cluster_records)} at {cluster_density}% maximum density\n"
     )
 
 

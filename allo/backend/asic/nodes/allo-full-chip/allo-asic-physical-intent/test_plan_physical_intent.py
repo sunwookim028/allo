@@ -88,4 +88,11 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     }
     generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
     assert "proc cut_allo_short_row_fragments" in generated_tcl
+    assert "proc create_allo_cluster_density_limits" in generated_tcl
+    assert "-density 55" in generated_tcl
+    assert intent["cluster_placement_policy"] == {
+        "type": "partial_blockage",
+        "maximum_density_percent": 55,
+        "region_count": 1,
+    }
     assert intent["row_fragment_policy"]["cut_count"] == 0

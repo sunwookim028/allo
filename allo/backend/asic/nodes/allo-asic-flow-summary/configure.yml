@@ -10,6 +10,8 @@ inputs:
   - macro-signoff-metrics.json
   - full-chip-synthesis-metrics.json
   - full-chip-pnr-metrics.json
+  - innovus-drc.rpt
+  - innovus-antenna.rpt
   - full-chip-gdsmerge-metrics.json
   - full-chip-drc-metrics.json
   - drc.summary
@@ -31,6 +33,7 @@ parameters:
   clock_period: 10.0
   macro_clock_period: 8.0
   min_macro_reuse: 2
+  antenna_check_policy: report
   google_sheets_enabled: false
   google_sheets_required: true
   google_sheets_credentials: /home/jb2698/.config/gspread/service_account.json

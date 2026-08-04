@@ -34,6 +34,10 @@ parameters:
   # this threshold are removed; larger inter-macro placement areas survive.
   macro_halo: 2.0
   min_placeable_row_segment_width: 12.0
+  # Inter-macro space remains placeable, but is capped below the near-100%
+  # local densities that caused detailed routing to spend hours without
+  # converging. Innovus interprets this as the permitted placement density.
+  kernel_cluster_max_density_percent: 55
 
 preconditions:
   - assert File( 'inputs/assembly-plan.json' )

@@ -82,6 +82,15 @@ def parse_drc_count(text: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def parse_innovus_violation_count(text: str) -> int | None:
+    if re.search(r"skipped by antenna_check_policy=off", text, re.I):
+        return None
+    matches = re.findall(
+        r"Verification Complete\s*:\s*(\d+)\s+Viols", text, re.I
+    )
+    return int(matches[-1]) if matches else None
+
+
 def parse_lvs(text: str) -> str:
     if re.search(r"\bINCORRECT\b", text, re.I):
         return "failed"
@@ -152,6 +161,8 @@ def write_tcl(summary: dict) -> None:
         f"set allo_asic_flow_summary_schema_version {summary['schema_version']}",
         f"set allo_asic_macro_count {summary['macro_count']}",
         f"set allo_asic_full_chip_drc_results {tcl_atom(summary['full_chip_verification']['drc_results'])}",
+        f"set allo_asic_innovus_route_drc_results {tcl_atom(summary['full_chip_verification']['innovus_route_drc_results'])}",
+        f"set allo_asic_innovus_antenna_results {tcl_atom(summary['full_chip_verification']['innovus_antenna_results'])}",
         f"set allo_asic_full_chip_lvs_status {tcl_atom(summary['full_chip_verification']['lvs_status'])}",
     ]
     stage_names = []
@@ -181,6 +192,8 @@ def write_text(summary: dict) -> None:
         "",
         "Full-chip verification:",
         f"  DRC results: {verification['drc_results']}",
+        f"  Innovus route DRC results: {verification['innovus_route_drc_results']}",
+        f"  Innovus antenna results: {verification['innovus_antenna_results']}",
         f"  LVS status: {verification['lvs_status']}",
         "",
         "Hardened macros:",
@@ -214,6 +227,9 @@ def main() -> None:
                 os.environ.get("macro_clock_period", "8.0")
             ),
             "min_macro_reuse": int(os.environ.get("min_macro_reuse", "2")),
+            "antenna_check_policy": os.environ.get(
+                "antenna_check_policy", "report"
+            ),
         },
         "macro_count": len(macros),
         "macro_physical_area_um2": round(
@@ -224,6 +240,12 @@ def main() -> None:
         "macros": macros,
         "full_chip_verification": {
             "drc_results": parse_drc_count(read_optional(INPUTS / "drc.summary")),
+            "innovus_route_drc_results": parse_innovus_violation_count(
+                read_optional(INPUTS / "innovus-drc.rpt")
+            ),
+            "innovus_antenna_results": parse_innovus_violation_count(
+                read_optional(INPUTS / "innovus-antenna.rpt")
+            ),
             "lvs_status": parse_lvs(read_optional(INPUTS / "lvs.report")),
         },
     }

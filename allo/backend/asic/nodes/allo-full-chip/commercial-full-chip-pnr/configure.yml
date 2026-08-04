@@ -35,6 +35,8 @@ outputs:
   - design.def.gz
   - full-chip-pnr-metrics.json
   - physical-intent-placement.rpt
+  - innovus-drc.rpt
+  - innovus-antenna.rpt
 
 #-------------------------------------------------------------------------
 # Commands
@@ -63,6 +65,8 @@ commands:
   - export FULL_PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
   - python -c 'import json,os; from pathlib import Path; Path("outputs/full-chip-pnr-metrics.json").write_text(json.dumps({"schema_version":1,"node":"commercial-full-chip-pnr","status":"passed","wall_seconds":float(os.environ["FULL_PNR_SECONDS"])},indent=2)+"\n")'
   - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
+  - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
+  - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -73,6 +77,9 @@ parameters:
   top_module: top
   enable_gui: true
   core_density_target: 0.70
+  # error: require a clean Innovus antenna report; report: record but do not
+  # fail (appropriate for FreePDK45's incomplete LEF antenna model); off: skip.
+  antenna_check_policy: report
   useful_skew: True
   useful_skew_ccopt_effort: standard
   cell_padding: 2
@@ -141,10 +148,13 @@ preconditions:
   - assert File( 'inputs/macro-collateral.tcl' )
   - assert File( 'inputs/physical-intent.json' )
   - assert File( 'inputs/physical-intent.tcl' )
+  - assert '{antenna_check_policy}' in [ 'error', 'report', 'off' ]
 
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
   - assert File( 'outputs/full-chip-pnr-metrics.json' )
   - assert File( 'outputs/physical-intent-placement.rpt' )
+  - assert File( 'outputs/innovus-drc.rpt' )
+  - assert File( 'outputs/innovus-antenna.rpt' )
   - assert 'ERROR'
       not in File( 'logs/run.log', enable_case_sensitive=True )

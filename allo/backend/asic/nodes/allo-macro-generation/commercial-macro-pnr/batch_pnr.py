@@ -6,6 +6,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import re
 import signal
 import shutil
 import subprocess
@@ -23,6 +24,28 @@ WORK_ROOT = ROOT / "work"
 def symlink(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.symlink_to(source.resolve(), target_is_directory=source.is_dir())
+
+
+def add_macro_power_ground_ports(path: Path, module_name: str) -> None:
+    """Expose the PG ports present on the extracted physical macro boundary."""
+    text = path.read_text()
+    header = re.search(
+        rf"(?ms)(\bmodule\s+{re.escape(module_name)}\s*\()(.*?)(\)\s*;)",
+        text,
+    )
+    if header is None:
+        raise ValueError(f"LVS netlist lacks top module {module_name}: {path}")
+    ports = [item.strip() for item in header.group(2).split(",") if item.strip()]
+    additions = [name for name in ("VDD", "VSS") if name not in ports]
+    if not additions:
+        return
+    ports.extend(additions)
+    replacement = header.group(1) + ", ".join(ports) + header.group(3)
+    text = text[: header.start()] + replacement + text[header.end() :]
+    declaration = "\n".join(f"  inout {name};" for name in additions) + "\n"
+    insertion = header.start() + len(replacement)
+    text = text[:insertion] + "\n" + declaration + text[insertion:]
+    path.write_text(text)
 
 
 def run_entry(entry: dict) -> dict:
@@ -104,6 +127,10 @@ def run_entry(entry: dict) -> dict:
         "design.pt.sdc",
     ]
     missing = [name for name in required if not (worker / "outputs" / name).exists()]
+    if returncode == 0 and not timed_out and not missing:
+        add_macro_power_ground_ports(
+            worker / "outputs" / "design.lvs.v", entry["top_module"]
+        )
     passed = returncode == 0 and not timed_out and not missing
     status = {
         "id": entry_id,

@@ -999,8 +999,39 @@ streamOut $results_dir/$design_name-merged.gds \
 
 summaryReport -noHtml -outfile reports/signoff.summaryReport.rpt
 verifyConnectivity -noAntenna
-verify_drc
-verifyProcessAntenna
+redirect -file reports/innovus-drc.rpt { verify_drc }
+set drc_stream [open reports/innovus-drc.rpt r]
+set drc_text [read $drc_stream]
+close $drc_stream
+if {![regexp -nocase {Verification Complete\s*:\s*0\s+Viols} $drc_text]} {
+  error "Final Innovus DRC is not explicitly clean; see reports/innovus-drc.rpt"
+}
+
+set antenna_policy $::env(antenna_check_policy)
+if {$antenna_policy eq "off"} {
+  set antenna_stream [open reports/innovus-antenna.rpt w]
+  puts $antenna_stream "Antenna verification skipped by antenna_check_policy=off"
+  close $antenna_stream
+} else {
+  set antenna_status [catch {
+    redirect -file reports/innovus-antenna.rpt { verify_antena }
+  } antenna_error]
+  if {$antenna_status != 0} {
+    set antenna_stream [open reports/innovus-antenna.rpt a]
+    puts $antenna_stream "ERROR: verify_antena failed: $antenna_error"
+    close $antenna_stream
+    if {$antenna_policy eq "error"} {
+      error "Innovus antenna verification failed: $antenna_error"
+    }
+  } elseif {$antenna_policy eq "error"} {
+    set antenna_stream [open reports/innovus-antenna.rpt r]
+    set antenna_text [read $antenna_stream]
+    close $antenna_stream
+    if {![regexp -nocase {Verification Complete\s*:\s*0\s+Viols} $antenna_text]} {
+      error "Innovus antenna verification is not explicitly clean; see reports/innovus-antenna.rpt"
+    }
+  }
+}
 
 write_sdf $results_dir/$design_name.sdf
 writeTimingCon $results_dir/$design_name.pt.sdc
