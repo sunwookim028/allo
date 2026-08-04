@@ -1015,6 +1015,9 @@ if {![regexp -nocase {Verification Complete\s*:\s*0\s+Viols} $drc_text]} {
 }
 
 set antenna_policy $::env(antenna_check_policy)
+if {[lsearch -exact {error report off} $antenna_policy] < 0} {
+  error "Unsupported antenna_check_policy '$antenna_policy'; expected error, report, or off"
+}
 if {$antenna_policy eq "off"} {
   set antenna_stream [open reports/innovus-antenna.rpt w]
   puts $antenna_stream "Antenna verification skipped by antenna_check_policy=off"

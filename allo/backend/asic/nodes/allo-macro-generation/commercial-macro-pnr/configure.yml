@@ -79,7 +79,6 @@ preconditions:
   - assert Tool( 'innovus' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/synthesis-batch' )
-  - assert '{antenna_check_policy}' in [ 'error', 'report', 'off' ]
 
 postconditions:
   - assert File( 'outputs/pnr-batch' )

@@ -148,7 +148,6 @@ preconditions:
   - assert File( 'inputs/macro-collateral.tcl' )
   - assert File( 'inputs/physical-intent.json' )
   - assert File( 'inputs/physical-intent.tcl' )
-  - assert '{antenna_check_policy}' in [ 'error', 'report', 'off' ]
 
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
