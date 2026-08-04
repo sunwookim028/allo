@@ -260,6 +260,8 @@ def main() -> None:
         verilog_paths.append(resolve("verilog"))
     tcl = [
         "# Registry-relative paths assume the standard macro-registry input name.",
+        "set allo_asic_bypass_macro_generation "
+        + ("1" if collateral["bypass_macro_generation"] else "0"),
         "set allo_asic_macro_modules [list "
         + " ".join(tcl_quote(item["canonical_module"]) for item in collateral_classes)
         + "]",

@@ -115,4 +115,37 @@ endmodule
     assert "allo_asic_macro_modules" in (
         assembler_dir / "outputs/macro-collateral.tcl"
     ).read_text()
+    assert "set allo_asic_bypass_macro_generation 0" in (
+        assembler_dir / "outputs/macro-collateral.tcl"
+    ).read_text()
     assert "-period 10" in (assembler_dir / "outputs/constraints.tcl").read_text()
+
+
+def test_flat_bypass_emits_explicit_empty_macro_collateral(tmp_path, monkeypatch):
+    rtl = "module top(input ap_clk); endmodule\n"
+    plan = {
+        "top_module": "top",
+        "bypass_macro_generation": True,
+        "implementation_style": "flat_standard_cells",
+        "classes": [],
+        "replacements": [],
+    }
+    registry = {"bypass_macro_generation": True, "macros": []}
+    work = tmp_path / "flat"
+    inputs = work / "inputs"
+    inputs.mkdir(parents=True)
+    (inputs / "design.v").write_text(rtl)
+    (inputs / "assembly-plan.json").write_text(json.dumps(plan))
+    (inputs / "macro-registry.json").write_text(json.dumps(registry))
+    monkeypatch.chdir(work)
+
+    ASSEMBLER.main()
+
+    assert (work / "outputs/assembled-design.v").read_text() == rtl
+    collateral = json.loads((work / "outputs/macro-collateral.json").read_text())
+    assert collateral["bypass_macro_generation"] is True
+    assert collateral["macro_classes"] == []
+    tcl = (work / "outputs/macro-collateral.tcl").read_text()
+    assert "set allo_asic_bypass_macro_generation 1" in tcl
+    assert "set allo_asic_macro_modules [list ]" in tcl
+    assert "set allo_asic_macro_db_files [list ]" in tcl

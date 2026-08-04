@@ -441,7 +441,13 @@ def main() -> None:
             f"  placeInstance $actual_name [expr {{$llx + {item['x']}}}] [expr {{$lly + {item['y']}}}] {item['orientation']}",
             "  incr placed",
         ])
-    tcl.extend(["  setInstancePlacementStatus -allHardMacros -status fixed", "  return $placed", "}"])
+    tcl.extend([
+        "  if {$placed > 0} {",
+        "    setInstancePlacementStatus -allHardMacros -status fixed",
+        "  }",
+        "  return $placed",
+        "}",
+    ])
     tcl.extend([
         "",
         "# Remove only row fragments too narrow to support useful placement.",

@@ -71,8 +71,24 @@ if {![file exists inputs/macro-collateral.tcl]} {
 source inputs/macro-collateral.tcl
 if {![info exists allo_asic_macro_db_files] ||
     ![info exists allo_asic_macro_modules] ||
-    [llength $allo_asic_macro_db_files] == 0} {
-  echo "Error: macro collateral does not define macro DBs and modules"
+    ![info exists allo_asic_bypass_macro_generation]} {
+  echo "Error: macro collateral is missing required declarations"
+  exit 1
+}
+set macro_db_count [llength $allo_asic_macro_db_files]
+set macro_module_count [llength $allo_asic_macro_modules]
+if {$macro_db_count != $macro_module_count} {
+  echo "Error: macro collateral defines $macro_db_count DBs but $macro_module_count modules"
+  exit 1
+}
+if {$allo_asic_bypass_macro_generation} {
+  if {$macro_db_count != 0} {
+    echo "Error: flat bypass collateral unexpectedly defines hardened macros"
+    exit 1
+  }
+  echo "Info: flat macro-bypass mode selected; no hardened macro DBs will be linked"
+} elseif {$macro_db_count == 0} {
+  echo "Error: hierarchical macro mode does not define any macro DBs or modules"
   exit 1
 }
 foreach macro_db $allo_asic_macro_db_files {
