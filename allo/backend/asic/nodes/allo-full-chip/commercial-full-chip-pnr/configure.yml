@@ -63,7 +63,7 @@ commands:
   - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
   - cd ..
   - export FULL_PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
-  - python -c 'import json,os; from pathlib import Path; Path("outputs/full-chip-pnr-metrics.json").write_text(json.dumps({"schema_version":1,"node":"commercial-full-chip-pnr","status":"passed","wall_seconds":float(os.environ["FULL_PNR_SECONDS"])},indent=2)+"\n")'
+  - python -c 'import json,os; from pathlib import Path; Path("outputs/full-chip-pnr-metrics.json").write_text(json.dumps({{"schema_version":1,"node":"commercial-full-chip-pnr","status":"passed","wall_seconds":float(os.environ["FULL_PNR_SECONDS"])}},indent=2)+"\n")'
   - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
   - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
   - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt

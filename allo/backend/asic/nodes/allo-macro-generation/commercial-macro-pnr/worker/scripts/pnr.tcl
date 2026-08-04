@@ -484,7 +484,14 @@ proc split_pin_groups_by_layer {groups all_ports total threshold fraction} {
   foreach item $weighted {
     set resolved [lindex $item 2]
     set width [llength $resolved]
-    if {$primary_count == 0 || $primary_count + $width <= $primary_target} {
+    # Preserve ordinary interface groups, but an individual group wider than the
+    # complete primary-layer target must be divided between the two legal layers.
+    if {$width > $primary_target && $primary_count == 0} {
+      set split_index [expr {$primary_target - 1}]
+      set primary [concat $primary [lrange $resolved 0 $split_index]]
+      set secondary [concat $secondary [lrange $resolved $primary_target end]]
+      set primary_count $primary_target
+    } elseif {$primary_count == 0 || $primary_count + $width <= $primary_target} {
       set primary [concat $primary $resolved]
       incr primary_count $width
     } else {
