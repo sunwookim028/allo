@@ -73,6 +73,11 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
     (inputs / "innovus-antenna.rpt").write_text(
         "Verification Complete : 12 Viols.\n"
     )
+    (inputs / "drc-policy.json").write_text(json.dumps({
+        "antenna_check_policy": "report",
+        "antenna_results": 12,
+        "non_antenna_results": 0,
+    }))
     (inputs / "lvs.report").write_text("# CORRECT #\n")
     monkeypatch.setattr(SUMMARY, "INPUTS", inputs)
     monkeypatch.setattr(SUMMARY, "REGISTRY_ROOT", registry_root)
@@ -86,6 +91,9 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
     assert result["macros"][0]["hold_wns_ns"] == 0.075
     assert result["full_chip_verification"] == {
         "drc_results": 0,
+        "calibre_non_antenna_results": 0,
+        "calibre_antenna_results": 12,
+        "calibre_antenna_policy": "report",
         "innovus_route_drc_results": 0,
         "innovus_antenna_results": 12,
         "lvs_status": "passed",

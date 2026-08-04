@@ -15,6 +15,7 @@ inputs:
   - full-chip-gdsmerge-metrics.json
   - full-chip-drc-metrics.json
   - drc.summary
+  - drc-policy.json
   - full-chip-lvs-metrics.json
   - lvs.report
 

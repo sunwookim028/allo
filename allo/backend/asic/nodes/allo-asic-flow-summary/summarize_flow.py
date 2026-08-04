@@ -161,6 +161,9 @@ def write_tcl(summary: dict) -> None:
         f"set allo_asic_flow_summary_schema_version {summary['schema_version']}",
         f"set allo_asic_macro_count {summary['macro_count']}",
         f"set allo_asic_full_chip_drc_results {tcl_atom(summary['full_chip_verification']['drc_results'])}",
+        f"set allo_asic_calibre_non_antenna_results {tcl_atom(summary['full_chip_verification']['calibre_non_antenna_results'])}",
+        f"set allo_asic_calibre_antenna_results {tcl_atom(summary['full_chip_verification']['calibre_antenna_results'])}",
+        f"set allo_asic_calibre_antenna_policy {tcl_atom(summary['full_chip_verification']['calibre_antenna_policy'])}",
         f"set allo_asic_innovus_route_drc_results {tcl_atom(summary['full_chip_verification']['innovus_route_drc_results'])}",
         f"set allo_asic_innovus_antenna_results {tcl_atom(summary['full_chip_verification']['innovus_antenna_results'])}",
         f"set allo_asic_full_chip_lvs_status {tcl_atom(summary['full_chip_verification']['lvs_status'])}",
@@ -192,6 +195,8 @@ def write_text(summary: dict) -> None:
         "",
         "Full-chip verification:",
         f"  DRC results: {verification['drc_results']}",
+        f"  Calibre non-antenna results: {verification['calibre_non_antenna_results']}",
+        f"  Calibre antenna results: {verification['calibre_antenna_results']} (policy={verification['calibre_antenna_policy']})",
         f"  Innovus route DRC results: {verification['innovus_route_drc_results']}",
         f"  Innovus antenna results: {verification['innovus_antenna_results']}",
         f"  LVS status: {verification['lvs_status']}",
@@ -214,6 +219,10 @@ def main() -> None:
     registry = json.loads((INPUTS / "macro-registry.json").read_text())
     macros = [summarize_macro(item) for item in registry.get("macros", [])]
     stages = load_stage_metrics()
+    drc_policy_path = INPUTS / "drc-policy.json"
+    drc_policy = (
+        json.loads(drc_policy_path.read_text()) if drc_policy_path.is_file() else {}
+    )
     summary = {
         "schema_version": 1,
         "source_policy": "reports_and_explicit_metrics_only",
@@ -240,6 +249,9 @@ def main() -> None:
         "macros": macros,
         "full_chip_verification": {
             "drc_results": parse_drc_count(read_optional(INPUTS / "drc.summary")),
+            "calibre_non_antenna_results": drc_policy.get("non_antenna_results"),
+            "calibre_antenna_results": drc_policy.get("antenna_results"),
+            "calibre_antenna_policy": drc_policy.get("antenna_check_policy"),
             "innovus_route_drc_results": parse_innovus_violation_count(
                 read_optional(INPUTS / "innovus-drc.rpt")
             ),
