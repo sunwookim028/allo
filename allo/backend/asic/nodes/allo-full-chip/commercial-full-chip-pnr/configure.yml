@@ -168,5 +168,7 @@ postconditions:
   # Fail the node only after Innovus has saved all diagnostic and downstream
   # artifacts. An error-limit termination or nonzero count lacks this marker.
   - "assert 'Verification Complete : 0 Viols.' in File( 'outputs/innovus-drc.rpt' )"
-  - assert 'ERROR'
+  # Verbose Tcl echo can legitimately contain inactive strings such as
+  # "ERROR: verify_antena failed". Innovus diagnostics use the **ERROR: prefix.
+  - assert '**ERROR:'
       not in File( 'logs/run.log', enable_case_sensitive=True )
