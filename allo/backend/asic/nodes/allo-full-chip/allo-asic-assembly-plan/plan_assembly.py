@@ -206,6 +206,12 @@ def main() -> None:
         "schema_version": 1,
         "stage": "full_chip_assembly_plan",
         "top_module": expected_top,
+        "bypass_macro_generation": bool(
+            registry.get("bypass_macro_generation", False)
+        ),
+        "implementation_style": registry.get(
+            "implementation_style", "hierarchical_macros"
+        ),
         "macro_class_count": len(classes),
         "replacement_instance_count": len(replacements),
         "elaborated_macro_instance_count": sum(

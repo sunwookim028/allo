@@ -18,10 +18,14 @@ parameters:
   corner_hold: bc
 
 preconditions:
-  - assert Tool( 'pt_shell' )
-  - assert Tool( 'lc_shell' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/verified-pnr-batch' )
+  - |
+    import json
+    from pathlib import Path
+    entries = json.loads(Path('inputs/verified-pnr-batch/index.json').read_text()).get('entries', [])
+    assert not entries or Tool( 'pt_shell' )
+    assert not entries or Tool( 'lc_shell' )
 
 postconditions:
   - assert File( 'outputs/signoff-batch' )

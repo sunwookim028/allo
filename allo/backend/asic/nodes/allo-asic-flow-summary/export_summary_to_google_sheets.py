@@ -88,6 +88,10 @@ def main() -> None:
     existing_headers = worksheet.row_values(1)
     if not existing_headers:
         worksheet.update([headers], "A1", value_input_option="RAW")
+    elif headers[: len(existing_headers)] == existing_headers:
+        # Safe schema extension: newly configured columns were appended, so
+        # preserve all existing rows and extend only the header row.
+        worksheet.update([headers], "A1", value_input_option="RAW")
     elif existing_headers != headers:
         raise ValueError(
             "Google worksheet header does not match google-sheet-columns.json; "

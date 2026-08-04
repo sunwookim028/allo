@@ -96,3 +96,30 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
         "region_count": 1,
     }
     assert intent["row_fragment_policy"]["cut_count"] == 0
+
+
+def test_planner_main_for_flat_bypass(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    (inputs / "macro-registry").mkdir(parents=True)
+    (inputs / "assembly-plan.json").write_text(json.dumps({
+        "top_module": "top",
+        "bypass_macro_generation": True,
+        "implementation_style": "flat",
+        "elaborated_macro_instance_count": 0,
+        "replacements": [],
+        "whole_region_connections": [],
+    }))
+    (inputs / "macro-registry.json").write_text(json.dumps({
+        "bypass_macro_generation": True,
+        "implementation_style": "flat",
+        "macros": [],
+    }))
+    (inputs / "macro-collateral.json").write_text("{}")
+    (inputs / "design.v").write_text("module top; endmodule\n")
+    (inputs / "macro-link.rpt").write_text("TOTAL 0\n")
+    monkeypatch.chdir(tmp_path)
+    PLAN.main()
+    intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())
+    assert intent["placements"] == []
+    assert intent["kernel_clusters"] == []
+    assert intent["sram_support"]["enabled"] is False

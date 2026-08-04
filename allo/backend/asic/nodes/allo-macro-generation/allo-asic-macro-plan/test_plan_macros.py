@@ -18,6 +18,45 @@ SPEC.loader.exec_module(PLAN)
 
 
 class MacroPlanTest(unittest.TestCase):
+    def test_explicit_bypass_emits_empty_batch_and_unchanged_rtl(self):
+        rtl = "module chip(input clk); endmodule\n"
+        manifest = {
+            "schema_version": 2,
+            "top": "chip",
+            "summary": {
+                "unmatched_or_ambiguous": 0,
+                "unjoined_post_hls_records": 0,
+            },
+            "macro_groups": [],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inputs = root / "inputs"
+            inputs.mkdir()
+            (inputs / "design.v").write_text(rtl)
+            (inputs / "asic-manifest-final.json").write_text(json.dumps(manifest))
+            (inputs / "build-metadata.json").write_text("{}")
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "min_macro_reuse": "2",
+                        "macro_clock_period": "5",
+                        "bypass_macro_generation": "True",
+                    },
+                ):
+                    PLAN.main()
+            finally:
+                os.chdir(previous)
+
+            index = json.loads((root / "outputs/macro-batch/index.json").read_text())
+            self.assertTrue(index["bypass_macro_generation"])
+            self.assertEqual(index["implementation_style"], "flat")
+            self.assertEqual(index["entries"], [])
+            self.assertEqual((root / "outputs/residual-design.v").read_text(), rtl)
+
     def test_extracts_canonical_and_emits_alias(self):
         rtl = """
 module chip(input clk);

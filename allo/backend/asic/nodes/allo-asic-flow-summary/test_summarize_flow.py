@@ -31,6 +31,14 @@ def test_report_parsers():
     assert SUMMARY.parse_density(
         "default core: bins with density > 0.750 = 44.61 % ( 1 / 2 )"
     ) == 44.61
+    assert SUMMARY.parse_innovus_area(
+        "top 100 250.0 10 5 20 100 0 5 75 0\n", "top"
+    ) == {
+        "full_chip_report_total_area_um2": 250.0,
+        "linked_macro_abstract_area_um2": 75.0,
+        "remaining_top_standard_cell_area_um2": 175.0,
+        "physical_only_cell_area_um2": 0.0,
+    }
 
 
 def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
@@ -48,6 +56,9 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
     (reports / "macro.timing.hold.rpt").write_text("slack (MET) 0.075\n")
     (reports / "drc.summary").write_text("TOTAL DRC Results Generated: 0 (0)\n")
     (reports / "lvs.report").write_text("# CORRECT #\n")
+    (reports / "pnr-signoff.area.rpt").write_text(
+        "m 20 50.0 1 1 10 30 0 8 0 0\n"
+    )
     registry = {
         "macros": [{
             "macro_class_id": "macro_alpha_test",
@@ -79,11 +90,26 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
         "non_antenna_results": 0,
     }))
     (inputs / "lvs.report").write_text("# CORRECT #\n")
+    (inputs / "physical-intent.json").write_text(json.dumps({
+        "core": {"width": 100.0, "height": 80.0},
+        "placements": [
+            {"kind": "pe", "width": 10.0, "height": 20.0},
+            {"kind": "pe", "width": 10.0, "height": 20.0},
+            {"kind": "sram", "width": 20.0, "height": 20.0},
+        ],
+    }))
+    (inputs / "full-chip-area.rpt").write_text(
+        "top 100 1000.0 10 5 20 100 0 5 250.0 0\n"
+    )
     monkeypatch.setattr(SUMMARY, "INPUTS", inputs)
     monkeypatch.setattr(SUMMARY, "REGISTRY_ROOT", registry_root)
     monkeypatch.setattr(SUMMARY, "OUTPUTS", outputs)
+    monkeypatch.setenv("design_name", "top")
+    monkeypatch.setenv("report_design_name", "gemm-4x4")
     SUMMARY.main()
     result = json.loads((outputs / "flow-summary.json").read_text())
+    assert result["run"]["design_name"] == "gemm-4x4"
+    assert result["run"]["rtl_top_module"] == "top"
     assert result["full_chip_verification"]["innovus_route_drc_results"] == 0
     assert result["full_chip_verification"]["innovus_antenna_results"] == 12
     assert result["macros"][0]["physical_area_um2"] == 200.0
@@ -98,5 +124,47 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
         "innovus_antenna_results": 12,
         "lvs_status": "passed",
     }
+    assert result["coverage"] == {
+        "placed_macro_instance_count": 2,
+        "instantiated_macro_footprint_area_um2": 400.0,
+        "core_area_um2": 8000.0,
+        "physical_macro_coverage_percent": 5.0,
+        "full_chip_report_total_area_um2": 1000.0,
+        "linked_macro_abstract_area_um2": 250.0,
+        "remaining_top_standard_cell_area_um2": 750.0,
+        "physical_only_cell_area_um2": 0.0,
+        "hardened_macro_internal_standard_cell_area_um2": 200.0,
+        "equivalent_total_standard_cell_area_um2": 950.0,
+        "logic_hardening_coverage_percent": 21.052632,
+    }
     assert "allo_asic_macro_count 1" in (outputs / "flow-summary.tcl").read_text()
     assert "Power: unavailable" in (outputs / "flow-summary.txt").read_text()
+
+
+def test_summary_classifies_explicit_flat_bypass(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    outputs = tmp_path / "outputs"
+    registry_root = inputs / "macro-registry"
+    registry_root.mkdir(parents=True)
+    (inputs / "macro-registry.json").write_text(json.dumps({
+        "implementation_style": "flat",
+        "bypass_macro_generation": True,
+        "macros": [],
+    }))
+    for name in SUMMARY.METRIC_FILES:
+        (inputs / name).write_text(json.dumps({
+            "node": name.removesuffix("-metrics.json"),
+            "status": "bypassed" if name.startswith("macro-") else "passed",
+            "wall_seconds": 0.0,
+        }))
+    monkeypatch.setattr(SUMMARY, "INPUTS", inputs)
+    monkeypatch.setattr(SUMMARY, "REGISTRY_ROOT", registry_root)
+    monkeypatch.setattr(SUMMARY, "OUTPUTS", outputs)
+    SUMMARY.main()
+    result = json.loads((outputs / "flow-summary.json").read_text())
+    assert result["implementation_style"] == "flat"
+    assert result["macro_generation_bypassed"] is True
+    assert result["macro_count"] == 0
+    assert "allo_asic_macro_generation_bypassed 1" in (
+        outputs / "flow-summary.tcl"
+    ).read_text()

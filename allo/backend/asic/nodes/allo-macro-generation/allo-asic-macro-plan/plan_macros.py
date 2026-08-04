@@ -540,6 +540,15 @@ def tcl_quote(value: object) -> str:
     return "{" + text + "}"
 
 
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name, str(default)).strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean, got {value!r}")
+
+
 def main() -> None:
     outputs = Path("outputs")
     batch_dir = outputs / "macro-batch"
@@ -554,21 +563,23 @@ def main() -> None:
     blocks = module_blocks(rtl)
     threshold = int(os.environ.get("min_macro_reuse", "2"))
     macro_clock_period = float(os.environ.get("macro_clock_period", "8.0"))
+    bypassed = env_bool("bypass_macro_generation")
     if threshold < 1:
         raise ValueError("min_macro_reuse must be at least 1")
     if macro_clock_period <= 0:
         raise ValueError("macro_clock_period must be positive")
 
     summary = manifest.get("summary", {})
-    if summary.get("unmatched_or_ambiguous", 0) or summary.get(
-        "unjoined_post_hls_records", 0
+    if not bypassed and (
+        summary.get("unmatched_or_ambiguous", 0)
+        or summary.get("unjoined_post_hls_records", 0)
     ):
         raise ValueError("final ASIC manifest contains unmatched or unjoined records")
 
     selected = []
     replacements: dict[str, str] = {}
     removed: set[str] = set()
-    for group in manifest.get("macro_groups", []):
+    for group in ([] if bypassed else manifest.get("macro_groups", [])):
         members = group.get("members", [])
         if group.get("proof", {}).get("status") != "proven":
             continue
@@ -647,7 +658,7 @@ def main() -> None:
         (entry_dir / "entry.json").write_text(json.dumps(entry, indent=2) + "\n")
         selected.append(entry)
 
-    if not selected:
+    if not selected and not bypassed:
         raise ValueError(f"no proven macro classes meet reuse threshold {threshold}")
 
     chunks = []
@@ -669,6 +680,8 @@ def main() -> None:
         "top": manifest.get("top"),
         "reuse_threshold": threshold,
         "macro_clock_period_ns": macro_clock_period,
+        "bypass_macro_generation": bypassed,
+        "implementation_style": "flat" if bypassed else "hierarchical_macros",
         "source_manifest": str(manifest_path),
         "selected_class_count": len(selected),
         "selected_instance_count": sum(entry["reuse_count"] for entry in selected),
@@ -683,6 +696,7 @@ def main() -> None:
     tcl_lines = [
         f"set allo_asic_macro_plan_schema_version {plan['schema_version']}",
         f"set allo_asic_macro_reuse_threshold {threshold}",
+        f"set allo_asic_bypass_macro_generation {1 if bypassed else 0}",
         "set allo_asic_macro_class_ids [list "
         + " ".join(tcl_quote(entry["id"]) for entry in selected)
         + "]",
@@ -699,10 +713,13 @@ def main() -> None:
             ]
         )
     (outputs / "macro-plan.tcl").write_text("\n".join(tcl_lines) + "\n")
-    log = (
-        f"Selected {len(selected)} proven macro classes covering "
-        f"{plan['selected_instance_count']} instances at reuse threshold {threshold}.\n"
-    )
+    if bypassed:
+        log = "Macro generation bypassed; normalized RTL remains entirely standard-cell logic.\n"
+    else:
+        log = (
+            f"Selected {len(selected)} proven macro classes covering "
+            f"{plan['selected_instance_count']} instances at reuse threshold {threshold}.\n"
+        )
     (outputs / "macro-plan.log").write_text(log)
     print(log, end="")
 

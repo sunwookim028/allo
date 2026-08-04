@@ -34,6 +34,7 @@ outputs:
   - design.spef.gz
   - design.def.gz
   - full-chip-pnr-metrics.json
+  - full-chip-area.rpt
   - physical-intent-placement.rpt
   - innovus-drc.rpt
   - innovus-antenna.rpt
@@ -73,6 +74,7 @@ commands:
   - ln -sf ../reports/welltap-precleanup.rpt outputs/welltap-precleanup.rpt
   - ln -sf ../reports/welltap-adaptive-cuts.rpt outputs/welltap-adaptive-cuts.rpt
   - ln -sf ../reports/welltap.rpt outputs/welltap.rpt
+  - ln -sf ../reports/signoff.area.rpt outputs/full-chip-area.rpt
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -158,6 +160,7 @@ preconditions:
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
   - assert File( 'outputs/full-chip-pnr-metrics.json' )
+  - assert File( 'outputs/full-chip-area.rpt' )
   - assert File( 'outputs/physical-intent-placement.rpt' )
   - assert File( 'outputs/innovus-drc.rpt' )
   - assert File( 'outputs/innovus-antenna.rpt' )

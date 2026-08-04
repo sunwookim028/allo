@@ -72,10 +72,8 @@ for file in inputs/macro-registry/*/*.lvs.v; do
   cat "$file" >> merged.lvs.v
   macro_lvs_count=$((macro_lvs_count + 1))
 done
-if [[ $macro_lvs_count -eq 0 ]]; then
-  echo 'ERROR: macro registry contains no published LVS Verilog views' >&2
-  exit 1
-fi
+# A zero-count registry is the intentional contract for a flat bypass run.
+# The publisher validates nonempty registries before they reach this node.
 
 v2lvs_args=(
   -v merged.lvs.v

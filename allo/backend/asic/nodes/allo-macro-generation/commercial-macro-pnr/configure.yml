@@ -76,9 +76,13 @@ parameters:
   adk_wc_lib: inputs/adk/stdcells-wc.lib
 
 preconditions:
-  - assert Tool( 'innovus' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/synthesis-batch' )
+  - |
+    import json
+    from pathlib import Path
+    entries = json.loads(Path('inputs/synthesis-batch/index.json').read_text()).get('entries', [])
+    assert not entries or Tool( 'innovus' )
 
 postconditions:
   - assert File( 'outputs/pnr-batch' )

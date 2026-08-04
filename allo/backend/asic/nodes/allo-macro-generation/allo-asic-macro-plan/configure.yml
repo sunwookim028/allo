@@ -19,6 +19,7 @@ commands:
 parameters:
   min_macro_reuse: 2
   macro_clock_period: 8.0
+  bypass_macro_generation: False
 
 preconditions:
   - assert File( 'inputs/design.v' )

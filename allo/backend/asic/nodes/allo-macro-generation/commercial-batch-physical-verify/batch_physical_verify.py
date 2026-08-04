@@ -135,12 +135,26 @@ def main() -> None:
     batch_start = time.monotonic()
     index = json.loads((INPUT_BATCH / "index.json").read_text())
     entries = index.get("entries", [])
-    if not entries:
-        raise RuntimeError("PNR batch contains no entries")
     shutil.rmtree(OUTPUT_BATCH, ignore_errors=True)
     shutil.rmtree(WORK_ROOT, ignore_errors=True)
     OUTPUT_BATCH.mkdir(parents=True)
     WORK_ROOT.mkdir()
+    if not entries:
+        output_index = {
+            **{key: value for key, value in index.items() if key not in {"entries", "status"}},
+            "stage": "physical_verify", "entries": [], "status": [],
+        }
+        (OUTPUT_BATCH / "index.json").write_text(json.dumps(output_index, indent=2) + "\n")
+        status_doc = {"status": "bypassed", "total": 0, "passed": 0, "failed": 0, "entries": []}
+        (ROOT / "outputs/physical-verify-status.json").write_text(json.dumps(status_doc, indent=2) + "\n")
+        metrics = {
+            "schema_version": 1, "node": "commercial-batch-physical-verify", "status": "bypassed",
+            "wall_seconds": round(time.monotonic() - batch_start, 3), "workers": [],
+            "aggregate": {"worker_count": 0, "maximum_worker_seconds": 0.0, "sum_worker_seconds": 0.0},
+        }
+        (ROOT / "outputs/macro-physical-verify-metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+        print("Macro physical verification bypassed: batch contains zero entries.")
+        return
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(entries)) as executor:
             statuses = list(executor.map(run_entry, entries))

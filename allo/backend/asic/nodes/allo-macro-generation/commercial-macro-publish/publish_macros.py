@@ -126,11 +126,17 @@ def main() -> None:
         (destination / "macro.json").write_text(json.dumps(record, indent=2) + "\n")
         published.append(record)
 
-    if not published:
-        raise ValueError("signoff batch contains no publishable macro entries")
+    bypassed = bool(index.get("bypass_macro_generation", False))
+    if not published and not bypassed:
+        raise ValueError(
+            "signoff batch contains no publishable macro entries and was not "
+            "marked as an intentional macro-generation bypass"
+        )
     registry = {
         "schema_version": 1,
         "stage": "hardened_macro_registry",
+        "bypass_macro_generation": bypassed,
+        "implementation_style": "flat" if bypassed else "hierarchical_macros",
         "macro_count": len(published),
         "macros": published,
     }
@@ -139,6 +145,7 @@ def main() -> None:
     Path("outputs/macro-registry.json").write_text(text)
     tcl = [
         "set allo_asic_macro_registry_schema_version 1",
+        f"set allo_asic_bypass_macro_generation {1 if bypassed else 0}",
         "set allo_asic_hardened_macro_classes [list "
         + " ".join(tcl_quote(item["macro_class_id"]) for item in published)
         + "]",
@@ -159,7 +166,10 @@ def main() -> None:
                 f"{tcl_quote(detail['path'])}"
             )
     Path("outputs/macro-registry.tcl").write_text("\n".join(tcl) + "\n")
-    message = f"Published {len(published)} hardened canonical macro classes.\n"
+    if bypassed:
+        message = "Published an intentionally empty macro registry for a flat implementation.\n"
+    else:
+        message = f"Published {len(published)} hardened canonical macro classes.\n"
     Path("outputs/macro-publish.log").write_text(message)
     print(message, end="")
 

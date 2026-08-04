@@ -230,6 +230,12 @@ def main() -> None:
         "schema_version": 1,
         "stage": "full_chip_rtl_assembly",
         "top_module": plan["top_module"],
+        "bypass_macro_generation": bool(
+            plan.get("bypass_macro_generation", False)
+        ),
+        "implementation_style": plan.get(
+            "implementation_style", "hierarchical_macros"
+        ),
         "macro_classes": collateral_classes,
         "removed_module_definitions": sorted(removed),
         "rewritten_instances": rewritten,

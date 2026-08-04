@@ -9,6 +9,10 @@
       "path": "run.design_name"
     },
     {
+      "header": "Implementation style",
+      "path": "implementation_style"
+    },
+    {
       "header": "Clock period (ns)",
       "path": "parameters.clock_period"
     },
@@ -67,6 +71,30 @@
     {
       "header": "Full-chip LVS status",
       "path": "full_chip_verification.lvs_status"
+    },
+    {
+      "header": "Physical macro coverage (%)",
+      "path": "coverage.physical_macro_coverage_percent"
+    },
+    {
+      "header": "Logic hardening coverage (%)",
+      "path": "coverage.logic_hardening_coverage_percent"
+    },
+    {
+      "header": "Instantiated macro footprint (um^2)",
+      "path": "coverage.instantiated_macro_footprint_area_um2"
+    },
+    {
+      "header": "Core area (um^2)",
+      "path": "coverage.core_area_um2"
+    },
+    {
+      "header": "Hardened macro internal cell area (um^2)",
+      "path": "coverage.hardened_macro_internal_standard_cell_area_um2"
+    },
+    {
+      "header": "Equivalent total standard-cell area (um^2)",
+      "path": "coverage.equivalent_total_standard_cell_area_um2"
     }
   ]
 }

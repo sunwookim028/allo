@@ -10,6 +10,8 @@ inputs:
   - macro-signoff-metrics.json
   - full-chip-synthesis-metrics.json
   - full-chip-pnr-metrics.json
+  - full-chip-area.rpt
+  - physical-intent.json
   - innovus-drc.rpt
   - innovus-antenna.rpt
   - full-chip-gdsmerge-metrics.json
@@ -31,6 +33,7 @@ commands:
 
 parameters:
   design_name: undefined
+  report_design_name: undefined
   clock_period: 10.0
   macro_clock_period: 8.0
   min_macro_reuse: 2

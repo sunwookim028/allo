@@ -104,6 +104,100 @@ def parse_density(text: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
+def parse_innovus_area(text: str, design_name: str) -> dict:
+    """Parse the top row of an Innovus ``report_area -verbose`` report."""
+    for line in text.splitlines():
+        fields = line.split()
+        if not fields or fields[0] != design_name:
+            continue
+        numeric = fields[1:]
+        if len(numeric) != 10:
+            continue
+        try:
+            values = [float(value) for value in numeric]
+        except ValueError:
+            continue
+        total_area = values[1]
+        macro_area = values[8]
+        physical_only_area = values[9]
+        return {
+            "full_chip_report_total_area_um2": total_area,
+            "linked_macro_abstract_area_um2": macro_area,
+            "remaining_top_standard_cell_area_um2": max(
+                0.0, total_area - macro_area
+            ),
+            "physical_only_cell_area_um2": physical_only_area,
+        }
+    return {
+        "full_chip_report_total_area_um2": None,
+        "linked_macro_abstract_area_um2": None,
+        "remaining_top_standard_cell_area_um2": None,
+        "physical_only_cell_area_um2": None,
+    }
+
+
+def percentage(numerator: float | None, denominator: float | None) -> float | None:
+    if numerator is None or denominator is None or denominator <= 0:
+        return None
+    return round(100.0 * numerator / denominator, 6)
+
+
+def coverage_metrics(intent: dict, area: dict, macros: list[dict]) -> dict:
+    core = intent.get("core", {})
+    width = core.get("width")
+    height = core.get("height")
+    core_area = (
+        float(width) * float(height)
+        if width is not None and height is not None
+        else None
+    )
+    placements = intent.get("placements")
+    footprint = None
+    instance_count = None
+    if isinstance(placements, list):
+        pe_macros = [item for item in placements if item.get("kind") == "pe"]
+        instance_count = len(pe_macros)
+        footprint = sum(
+            float(item["width"]) * float(item["height"])
+            for item in pe_macros
+        )
+    internal_areas = [
+        item.get("instantiated_internal_standard_cell_area_um2")
+        for item in macros
+    ]
+    hardened_internal_area = (
+        sum(internal_areas)
+        if internal_areas and all(value is not None for value in internal_areas)
+        else (0.0 if not macros else None)
+    )
+    remaining_area = area["remaining_top_standard_cell_area_um2"]
+    equivalent_total = (
+        hardened_internal_area + remaining_area
+        if hardened_internal_area is not None and remaining_area is not None
+        else None
+    )
+    return {
+        "placed_macro_instance_count": instance_count,
+        "instantiated_macro_footprint_area_um2": (
+            round(footprint, 6) if footprint is not None else None
+        ),
+        "core_area_um2": round(core_area, 6) if core_area is not None else None,
+        "physical_macro_coverage_percent": percentage(footprint, core_area),
+        **area,
+        "hardened_macro_internal_standard_cell_area_um2": (
+            round(hardened_internal_area, 6)
+            if hardened_internal_area is not None
+            else None
+        ),
+        "equivalent_total_standard_cell_area_um2": (
+            round(equivalent_total, 6) if equivalent_total is not None else None
+        ),
+        "logic_hardening_coverage_percent": percentage(
+            hardened_internal_area, equivalent_total
+        ),
+    }
+
+
 def load_stage_metrics() -> list[dict]:
     stages = []
     for name in METRIC_FILES:
@@ -133,13 +227,26 @@ def summarize_macro(macro: dict) -> dict:
     drc_reports = list(reports.glob("*drc.summary"))
     lvs_reports = list(reports.glob("*lvs.report"))
     density_reports = list(reports.glob("*density.rpt"))
+    area_reports = list(reports.glob("*signoff.area.rpt"))
+    internal_area = None
+    if area_reports:
+        internal_area = parse_innovus_area(
+            read_optional(area_reports[0]), macro.get("top_module", "")
+        )["full_chip_report_total_area_um2"]
+    reuse_count = macro.get("reuse_count")
     return {
         "macro_class_id": macro_id,
         "top_module": macro.get("top_module"),
-        "reuse_count": macro.get("reuse_count"),
+        "reuse_count": reuse_count,
         "width_um": width,
         "height_um": height,
         "physical_area_um2": round(width * height, 6) if width is not None and height is not None else None,
+        "internal_standard_cell_area_um2": internal_area,
+        "instantiated_internal_standard_cell_area_um2": (
+            round(internal_area * reuse_count, 6)
+            if internal_area is not None and reuse_count is not None
+            else None
+        ),
         "density_over_threshold_percent": parse_density(read_optional(density_reports[0])) if density_reports else None,
         **timing,
         "drc_results": parse_drc_count(read_optional(drc_reports[0])) if drc_reports else None,
@@ -156,10 +263,17 @@ def tcl_atom(value: object) -> str:
 
 
 def write_tcl(summary: dict) -> None:
+    coverage = summary["coverage"]
     lines = [
         "# Generated by allo-asic-flow-summary; sourceable by Tcl.",
         f"set allo_asic_flow_summary_schema_version {summary['schema_version']}",
+        f"set allo_asic_report_design_name {tcl_atom(summary['run']['design_name'])}",
+        f"set allo_asic_rtl_top_module {tcl_atom(summary['run']['rtl_top_module'])}",
+        f"set allo_asic_implementation_style {tcl_atom(summary['implementation_style'])}",
+        f"set allo_asic_macro_generation_bypassed {1 if summary['macro_generation_bypassed'] else 0}",
         f"set allo_asic_macro_count {summary['macro_count']}",
+        f"set allo_asic_physical_macro_coverage_percent {tcl_atom(coverage['physical_macro_coverage_percent'])}",
+        f"set allo_asic_logic_hardening_coverage_percent {tcl_atom(coverage['logic_hardening_coverage_percent'])}",
         f"set allo_asic_full_chip_drc_results {tcl_atom(summary['full_chip_verification']['drc_results'])}",
         f"set allo_asic_calibre_non_antenna_results {tcl_atom(summary['full_chip_verification']['calibre_non_antenna_results'])}",
         f"set allo_asic_calibre_antenna_results {tcl_atom(summary['full_chip_verification']['calibre_antenna_results'])}",
@@ -187,11 +301,23 @@ def write_tcl(summary: dict) -> None:
 
 
 def write_text(summary: dict) -> None:
-    lines = ["Allo ASIC flow summary", "", "Stage runtimes:"]
+    lines = [
+        "Allo ASIC flow summary",
+        f"Design: {summary['run']['design_name']}",
+        f"RTL top module: {summary['run']['rtl_top_module']}",
+        "",
+        "Stage runtimes:",
+    ]
     for stage in summary["stages"]:
         lines.append(f"  {stage['node']}: {stage.get('status')} ({stage.get('wall_seconds', 'unavailable')} s)")
     verification = summary["full_chip_verification"]
+    coverage = summary["coverage"]
     lines.extend([
+        "",
+        "Macro coverage:",
+        f"  Physical footprint/core: {coverage['instantiated_macro_footprint_area_um2']} / {coverage['core_area_um2']} um^2 ({coverage['physical_macro_coverage_percent']}%)",
+        f"  Hardened logic/equivalent total cell area: {coverage['hardened_macro_internal_standard_cell_area_um2']} / {coverage['equivalent_total_standard_cell_area_um2']} um^2 ({coverage['logic_hardening_coverage_percent']}%)",
+        f"  Remaining top-level standard-cell area: {coverage['remaining_top_standard_cell_area_um2']} um^2",
         "",
         "Full-chip verification:",
         f"  DRC results: {verification['drc_results']}",
@@ -223,12 +349,27 @@ def main() -> None:
     drc_policy = (
         json.loads(drc_policy_path.read_text()) if drc_policy_path.is_file() else {}
     )
+    physical_intent = json.loads(read_optional(INPUTS / "physical-intent.json") or "{}")
+    area = parse_innovus_area(
+        read_optional(INPUTS / "full-chip-area.rpt"),
+        os.environ.get("design_name", "undefined"),
+    )
+    report_design_name = os.environ.get("report_design_name", "").strip()
+    if not report_design_name or report_design_name == "undefined":
+        report_design_name = os.environ.get("design_name", "undefined")
     summary = {
         "schema_version": 1,
         "source_policy": "reports_and_explicit_metrics_only",
+        "implementation_style": registry.get(
+            "implementation_style", "hierarchical_macros"
+        ),
+        "macro_generation_bypassed": bool(
+            registry.get("bypass_macro_generation", False)
+        ),
         "run": {
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-            "design_name": os.environ.get("design_name", "undefined"),
+            "design_name": report_design_name,
+            "rtl_top_module": os.environ.get("design_name", "undefined"),
         },
         "parameters": {
             "clock_period": float(os.environ.get("clock_period", "10.0")),
@@ -236,6 +377,9 @@ def main() -> None:
                 os.environ.get("macro_clock_period", "8.0")
             ),
             "min_macro_reuse": int(os.environ.get("min_macro_reuse", "2")),
+            "bypass_macro_generation": bool(
+                registry.get("bypass_macro_generation", False)
+            ),
             "antenna_check_policy": os.environ.get(
                 "antenna_check_policy", "report"
             ),
@@ -244,6 +388,7 @@ def main() -> None:
         "macro_physical_area_um2": round(
             sum(item["physical_area_um2"] or 0.0 for item in macros), 6
         ),
+        "coverage": coverage_metrics(physical_intent, area, macros),
         "stages": stages,
         "stages_by_node": {item["node"]: item for item in stages},
         "macros": macros,
