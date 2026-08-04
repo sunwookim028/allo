@@ -22,8 +22,8 @@ commands:
 parameters:
   core_density_target: 0.70
   floorplan_aspect_ratio: 1.0
-  macro_separation_x: 8.0
-  macro_separation_y: 8.0
+  macro_separation_x: 18.0
+  macro_separation_y: 18.0
   kernel_separation_x: 30.0
   kernel_separation_y: 30.0
   macro_edge_keepout: 30.0

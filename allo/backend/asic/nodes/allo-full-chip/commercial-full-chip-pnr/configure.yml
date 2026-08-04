@@ -37,6 +37,9 @@ outputs:
   - physical-intent-placement.rpt
   - innovus-drc.rpt
   - innovus-antenna.rpt
+  - welltap-precleanup.rpt
+  - welltap-adaptive-cuts.rpt
+  - welltap.rpt
 
 #-------------------------------------------------------------------------
 # Commands
@@ -67,6 +70,9 @@ commands:
   - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
   - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
   - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt
+  - ln -sf ../reports/welltap-precleanup.rpt outputs/welltap-precleanup.rpt
+  - ln -sf ../reports/welltap-adaptive-cuts.rpt outputs/welltap-adaptive-cuts.rpt
+  - ln -sf ../reports/welltap.rpt outputs/welltap.rpt
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -155,5 +161,12 @@ postconditions:
   - assert File( 'outputs/physical-intent-placement.rpt' )
   - assert File( 'outputs/innovus-drc.rpt' )
   - assert File( 'outputs/innovus-antenna.rpt' )
+  - assert File( 'outputs/welltap-precleanup.rpt' )
+  - assert File( 'outputs/welltap-adaptive-cuts.rpt' )
+  - assert File( 'outputs/welltap.rpt' )
+  - assert 'Found 0 violations in total' in File( 'outputs/welltap.rpt' )
+  # Fail the node only after Innovus has saved all diagnostic and downstream
+  # artifacts. An error-limit termination or nonzero count lacks this marker.
+  - "assert 'Verification Complete : 0 Viols.' in File( 'outputs/innovus-drc.rpt' )"
   - assert 'ERROR'
       not in File( 'logs/run.log', enable_case_sensitive=True )
