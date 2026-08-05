@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import math
 from pathlib import Path
 
 
@@ -9,6 +10,14 @@ PATH = Path(__file__).with_name("plan_physical_intent.py")
 SPEC = importlib.util.spec_from_file_location("plan_physical_intent", PATH)
 PLAN = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PLAN)
+
+
+def write_area_report(inputs, total=1000, macro=0):
+    reports = inputs / "synthesis-reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    (reports / "top.mapped.area.rpt").write_text(
+        f"Macro/Black Box area: {macro}\nTotal cell area: {total}\n"
+    )
 
 
 def test_optional_srams_and_sequential_perimeter_pack():
@@ -30,6 +39,17 @@ def test_rotated_dimensions():
     assert PLAN.oriented_dimensions(10, 20, "R90") == (20, 10)
 
 
+def test_density_sanity_check_rejects_underprovisioned_floorplan():
+    predicted, limit = PLAN.validate_predicted_density(70, 100, 0.70)
+    assert (predicted, limit) == (0.70, 0.77)
+    try:
+        PLAN.validate_predicted_density(82, 100, 0.70)
+    except ValueError as error:
+        assert "under-provisioned" in str(error)
+    else:
+        raise AssertionError("82% predicted density passed a 77% sanity limit")
+
+
 def test_variable_kernel_slots_do_not_pad_small_kernel_to_largest_width():
     clusters = {
         "compute": {"width": 100, "height": 40},
@@ -45,6 +65,48 @@ def test_variable_kernel_slots_do_not_pad_small_kernel_to_largest_width():
     assert rows == {0: 0.0}
     assert width == 150
     assert height == 40
+
+
+def test_systolic_pid_rows_are_placed_north_to_south(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    macro_dir = inputs / "macro-registry" / "macro_alpha_test"
+    macro_dir.mkdir(parents=True)
+    (macro_dir / "m.lef").write_text(
+        "MACRO m\n  SIZE 10 BY 20 ;\n  SYMMETRY X Y R90 ;\nEND m\n"
+    )
+    replacements = [
+        {
+            "stable_instance_name": f"allo_pe_{row}",
+            "semantic_id": f"top/kernel/pid={row},0",
+            "macro_class_id": "macro_alpha_test",
+            "canonical_module": "m",
+            "desired_orientation": "R0",
+        }
+        for row in (0, 1)
+    ]
+    (inputs / "assembly-plan.json").write_text(json.dumps({
+        "top_module": "top",
+        "elaborated_macro_instance_count": 2,
+        "replacements": replacements,
+        "whole_region_connections": [],
+    }))
+    (inputs / "macro-registry.json").write_text(json.dumps({"macros": [{
+        "macro_class_id": "macro_alpha_test",
+        "top_module": "m",
+        "views": {"lef": {"path": "macro_alpha_test/m.lef"}},
+    }]}))
+    (inputs / "macro-collateral.json").write_text("{}")
+    (inputs / "design.v").write_text(
+        "module top; m allo_pe_0(); m allo_pe_1(); endmodule\n"
+    )
+    (inputs / "macro-link.rpt").write_text("m 2\nTOTAL 2\n")
+    write_area_report(inputs, total=1000, macro=200)
+    monkeypatch.chdir(tmp_path)
+    PLAN.main()
+    intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())
+    by_pid = {tuple(item["pid"]): item for item in intent["placements"]}
+    assert by_pid[(0, 0)]["y"] > by_pid[(1, 0)]["y"]
+    assert intent["pe_stream_facing_policy"]["pid_row_direction"] == "south"
 
 
 def test_whole_kernel_rotation_transforms_hls_children_as_one_block():
@@ -110,6 +172,33 @@ def test_short_row_cleanup_preserves_large_gaps_and_cuts_only_slivers():
     }
 
 
+def test_synthesis_area_keeps_dc_abstract_and_physical_areas_distinct(tmp_path):
+    write_area_report(tmp_path, total=1000, macro=200)
+    area = PLAN.synthesis_area(tmp_path, require_macro_area=True)
+    assert area == {
+        "dc_total_cell_area_um2": 1000,
+        "dc_macro_abstract_area_um2": 200,
+        "estimated_standard_cell_area_um2": 800,
+    }
+    physical_macro_area = 350
+    assert math.isclose(
+        area["estimated_standard_cell_area_um2"] / 0.70 + physical_macro_area,
+        (1000 - 200) / 0.70 + 350,
+    )
+
+
+def test_synthesis_area_requires_macro_area_for_hierarchical_floorplan(tmp_path):
+    reports = tmp_path / "synthesis-reports"
+    reports.mkdir()
+    (reports / "top.mapped.area.rpt").write_text("Total cell area: 1000\n")
+    try:
+        PLAN.synthesis_area(reports, require_macro_area=True)
+    except ValueError as error:
+        assert "requires Macro/Black Box area" in str(error)
+    else:
+        raise AssertionError("missing DC macro area was accepted")
+
+
 def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     inputs = tmp_path / "inputs"
     macro_dir = inputs / "macro-registry" / "macro_alpha_test"
@@ -139,6 +228,7 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     (inputs / "macro-collateral.json").write_text("{}")
     (inputs / "design.v").write_text("module top; m allo_pe_test(); endmodule\n")
     (inputs / "macro-link.rpt").write_text("m 1\nTOTAL 1\n")
+    write_area_report(inputs, total=1000, macro=200)
     monkeypatch.chdir(tmp_path)
     PLAN.main()
     intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())
@@ -151,13 +241,17 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
     assert "proc cut_allo_short_row_fragments" in generated_tcl
     assert "proc create_allo_cluster_density_limits" in generated_tcl
-    assert "-density 55" in generated_tcl
+    assert "createPlaceBlockage" not in generated_tcl
     assert intent["cluster_placement_policy"] == {
-        "type": "partial_blockage",
-        "maximum_density_percent": 55,
-        "region_count": 1,
+        "type": "none",
+        "reason": "cluster-wide partial placement blockages disabled",
+        "region_count": 0,
     }
     assert intent["row_fragment_policy"]["cut_count"] == 0
+    assert intent["area_budget"]["dc_macro_abstract_area_um2"] == 200
+    assert intent["area_budget"]["estimated_standard_cell_area_um2"] == 800
+    assert intent["area_budget"]["physical_pe_macro_area_um2"] == 200
+    assert intent["area_budget"]["target_standard_cell_density"] == 0.70
 
 
 def test_planner_main_for_flat_bypass(tmp_path, monkeypatch):
@@ -179,6 +273,7 @@ def test_planner_main_for_flat_bypass(tmp_path, monkeypatch):
     (inputs / "macro-collateral.json").write_text("{}")
     (inputs / "design.v").write_text("module top; endmodule\n")
     (inputs / "macro-link.rpt").write_text("TOTAL 0\n")
+    write_area_report(inputs, total=1000, macro=0)
     monkeypatch.chdir(tmp_path)
     PLAN.main()
     intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())

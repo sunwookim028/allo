@@ -1,5 +1,10 @@
 # Allo ASIC physical intent
 
+Within each systolic kernel, PID columns increase east and PID rows increase
+south. Innovus coordinates increase north, so the planner emits larger PID rows
+at smaller Y coordinates. This makes the west/east and north/south stream pin
+bundles generated during macro planning face their connected neighbors.
+
 This dependency-free planner reads actual LEF dimensions, separation parameters,
 the whole-region stream graph, the synthesized netlist, and optional SRAM views.
 It packs SRAM instances sequentially around the perimeter to preserve a large

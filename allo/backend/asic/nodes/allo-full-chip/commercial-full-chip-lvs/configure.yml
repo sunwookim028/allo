@@ -18,6 +18,9 @@ commands:
 
 parameters:
   design_name: undefined
+  # Reuse the full-chip physical-verification policy: report preserves an
+  # INCORRECT LVS result for experiment summaries; error remains strict.
+  drc_check_policy: error
   lvs_nthreads: 4
   lvs_power_name: VDD
   lvs_ground_name: VSS
@@ -42,5 +45,9 @@ postconditions:
   - assert File( 'outputs/design.schematic.spi' )
   - assert File( 'outputs/design_merged.lvs.v' )
   - assert File( 'outputs/full-chip-lvs-metrics.json' )
-  - "assert '#     INCORRECT     #' not in File( 'outputs/lvs.report' )"
-  - "assert '#     CORRECT     #' in File( 'outputs/lvs.report' )"
+  - >-
+    assert 'drc_check_policy: report' in File( 'configure.yml' ) or
+    '#     INCORRECT     #' not in File( 'outputs/lvs.report' )
+  - >-
+    assert 'drc_check_policy: report' in File( 'configure.yml' ) or
+    '#     CORRECT     #' in File( 'outputs/lvs.report' )

@@ -377,12 +377,16 @@ def main() -> None:
                 os.environ.get("macro_clock_period", "8.0")
             ),
             "min_macro_reuse": int(os.environ.get("min_macro_reuse", "2")),
+            "highest_macro_routing_layer": int(
+                os.environ.get("highest_macro_routing_layer", "6")
+            ),
             "bypass_macro_generation": bool(
                 registry.get("bypass_macro_generation", False)
             ),
             "antenna_check_policy": os.environ.get(
                 "antenna_check_policy", "report"
             ),
+            "drc_check_policy": os.environ.get("drc_check_policy", "error"),
         },
         "macro_count": len(macros),
         "macro_physical_area_um2": round(

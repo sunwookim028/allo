@@ -24,6 +24,16 @@ file mkdir $reports_dir
 file mkdir $checkpoints_dir
 file mkdir $checkpoints_dir/LEC
 
+set pnr_stage_report [open reports/pnr-stage-times.rpt w]
+close $pnr_stage_report
+proc record_pnr_stage {name started_ms} {
+  set elapsed [expr {([clock milliseconds] - $started_ms) / 1000.0}]
+  set stream [open reports/pnr-stage-times.rpt a]
+  puts $stream "$name $elapsed"
+  close $stream
+}
+set pnr_stage_started [clock milliseconds]
+
 setDistributeHost -local
 
 source inputs/adk/adk.tcl
@@ -628,6 +638,9 @@ maybe_stop_after power
 # Placement
 #-------------------------------------------------------------------------
 
+record_pnr_stage initialization_floorplan_power $pnr_stage_started
+set pnr_stage_started [clock milliseconds]
+
 if {$::env(useful_skew)} {
   setOptMode -usefulSkew       true
   setOptMode -usefulSkewPreCTS true
@@ -681,11 +694,14 @@ checkPlace -macroBlockage -verbose > reports/place.checkPlace.macroBlockage.afte
 reportDensityMap > reports/place.density.rpt
 
 report_metrics place
+record_pnr_stage placement $pnr_stage_started
 maybe_stop_after place
 
 #-------------------------------------------------------------------------
 # CTS
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 set_ccopt_property clone_clock_gates true
 set_ccopt_property clone_clock_logic true
@@ -737,11 +753,14 @@ report_ccopt_skew_groups -filename reports/cts.skew_groups.rpt
 report_ccopt_clock_tree_structure -show_sinks -expand_generated_clock_trees independently -file reports/cts.structure.rpt
 
 report_metrics cts
+record_pnr_stage cts $pnr_stage_started
 maybe_stop_after cts
 
 #-------------------------------------------------------------------------
 # Post-CTS Hold
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 setOptMode -fixHoldAllowOverlap TRUE
 setOptMode -fixHoldAllowSetupTnsDegrade true
@@ -749,10 +768,13 @@ setOptMode -fixHoldAllowSetupTnsDegrade true
 optDesign -postCTS -hold -outDir reports -prefix postcts_hold
 
 report_metrics postcts_hold
+record_pnr_stage post_cts_optimization $pnr_stage_started
 
 #-------------------------------------------------------------------------
 # Route
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 setAnalysisMode -cppr both
 setDelayCalMode -siAware true -engine aae
@@ -783,11 +805,14 @@ setNanoRouteMode -droutePostRouteSpreadWire false
 setExtractRCMode -engine postRoute -effortLevel low
 
 report_metrics route
+record_pnr_stage routing $pnr_stage_started
 maybe_stop_after route
 
 #-------------------------------------------------------------------------
 # Postroute Optimization
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 setOptMode -verbose true
 setOptMode -usefulSkewPostRoute true
@@ -815,15 +840,22 @@ optDesign -postRoute -outDir reports -prefix postroute_hold -hold
 # Physical-only filler cells are safe to add after those operations complete.
 setFillerMode -core $filler_cells -corePrefix FILL
 addFiller
+# Innovus recommends a targeted ECO route after post-route filler insertion.
+# Keep this cleanup deliberately narrow; it repairs local route/filler DRCs
+# without reopening global placement or optimization.
+ecoRoute -target
 
 if {$need_restore_multi == true} {
   setDistributeHost -local
   setMultiCpuUsage -localCpu $ncpu
 }
+record_pnr_stage post_route_optimization $pnr_stage_started
 
 #-------------------------------------------------------------------------
 # Signoff
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 update_names -nocase
 
@@ -899,11 +931,18 @@ if {$antenna_policy eq "off"} {
   close $antenna_stream
 } else {
   set antenna_status [catch {
-    redirect -file reports/innovus-antenna.rpt { verify_antena }
+    redirect -file reports/innovus-antenna.rpt { verifyProcessAntenna }
   } antenna_error]
+  # Legacy-mode Innovus writes the detailed report beside the database while
+  # printing only its path and summary to the console. Preserve the detailed
+  # report under the flow's stable output name when it is present.
+  set native_antenna_report "$design_name.antenna.rpt"
+  if {$antenna_status == 0 && [file exists $native_antenna_report]} {
+    file copy -force $native_antenna_report reports/innovus-antenna.rpt
+  }
   if {$antenna_status != 0} {
     set antenna_stream [open reports/innovus-antenna.rpt a]
-    puts $antenna_stream "ERROR: verify_antena failed: $antenna_error"
+    puts $antenna_stream "ERROR: verifyProcessAntenna failed: $antenna_error"
     close $antenna_stream
     if {$antenna_policy eq "error"} {
       error "Innovus antenna verification failed: $antenna_error"
@@ -912,7 +951,7 @@ if {$antenna_policy eq "off"} {
     set antenna_stream [open reports/innovus-antenna.rpt r]
     set antenna_text [read $antenna_stream]
     close $antenna_stream
-    if {![regexp -nocase {Verification Complete\s*:\s*0\s+Viols} $antenna_text]} {
+    if {![regexp -nocase {Verification Complete\s*:\s*0\s+(Viols|Violations)} $antenna_text]} {
       error "Innovus antenna verification is not explicitly clean; see reports/innovus-antenna.rpt"
     }
   }
@@ -961,3 +1000,4 @@ report_area -verbose > reports/signoff.area.rpt
 
 report_metrics signoff
 save_design_checkpoint
+record_pnr_stage signoff_and_output $pnr_stage_started

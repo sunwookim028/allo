@@ -37,7 +37,9 @@ parameters:
   clock_period: 10.0
   macro_clock_period: 8.0
   min_macro_reuse: 2
+  highest_macro_routing_layer: 6
   antenna_check_policy: report
+  drc_check_policy: error
   google_sheets_enabled: false
   google_sheets_required: true
   google_sheets_credentials: /home/jb2698/.config/gspread/service_account.json

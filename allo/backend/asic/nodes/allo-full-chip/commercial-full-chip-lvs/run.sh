@@ -3,13 +3,21 @@ set -euo pipefail
 
 flow_start_epoch=$(date +%s)
 mkdir -p outputs
+lvs_result=unavailable
 
 finish_metrics() {
   rc=$?
   flow_end_epoch=$(date +%s)
   status=failed
-  if [[ $rc -eq 0 ]]; then status=passed; fi
-  python - "$status" "$((flow_end_epoch - flow_start_epoch))" <<'PY'
+  if [[ $rc -eq 0 ]]; then
+    if [[ "$lvs_result" == incorrect ]]; then
+      if [[ "$drc_check_policy" == report ]]; then status=reported; fi
+    else
+      status=passed
+    fi
+  fi
+  python - "$status" "$((flow_end_epoch - flow_start_epoch))" \
+    "$drc_check_policy" "$lvs_result" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -21,6 +29,8 @@ Path("outputs/full-chip-lvs-metrics.json").write_text(
             "node": "commercial-full-chip-lvs",
             "status": sys.argv[1],
             "wall_seconds": float(sys.argv[2]),
+            "policy": sys.argv[3],
+            "lvs_result": sys.argv[4],
         },
         indent=2,
     )
@@ -30,6 +40,11 @@ PY
   exit "$rc"
 }
 trap finish_metrics EXIT
+
+if [[ "$drc_check_policy" != error && "$drc_check_policy" != report ]]; then
+  echo "ERROR: unsupported drc_check_policy '$drc_check_policy'; expected error or report" >&2
+  exit 1
+fi
 
 for supply_name in "$lvs_power_name" "$lvs_ground_name"; do
   if [[ ! "$supply_name" =~ ^[A-Za-z_][A-Za-z0-9_$]*$ ]]; then
@@ -103,15 +118,21 @@ grep -Eiq "^\\.GLOBAL.*(^|[[:space:]])${lvs_ground_name}([[:space:]]|$)" source.
 
 calibre -gui -lvs -batch -runset lvs.runset
 test -s lvs.report
-if grep -Eq '#[[:space:]]+INCORRECT[[:space:]]+#' lvs.report; then
-  echo 'ERROR: Calibre LVS reported INCORRECT' >&2
-  exit 1
-fi
-if ! grep -Eq '#[[:space:]]+CORRECT[[:space:]]+#' lvs.report; then
-  echo 'ERROR: Calibre LVS report does not contain a CORRECT result' >&2
-  exit 1
-fi
 
 ln -sf ../lvs.report outputs/lvs.report
 ln -sf ../source.lvs.sp outputs/design.schematic.spi
 ln -sf ../merged.lvs.v outputs/design_merged.lvs.v
+
+if grep -Eq '#[[:space:]]+INCORRECT[[:space:]]+#' lvs.report; then
+  lvs_result=incorrect
+  if [[ "$drc_check_policy" == error ]]; then
+    echo 'ERROR: Calibre LVS reported INCORRECT; mflowgen postconditions will fail' >&2
+  else
+    echo 'WARNING: Calibre LVS reported INCORRECT; continuing under drc_check_policy=report' >&2
+  fi
+elif grep -Eq '#[[:space:]]+CORRECT[[:space:]]+#' lvs.report; then
+  lvs_result=correct
+else
+  echo 'ERROR: Calibre LVS report does not contain a CORRECT result' >&2
+  exit 1
+fi

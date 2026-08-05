@@ -25,6 +25,10 @@
       "path": "parameters.min_macro_reuse"
     },
     {
+      "header": "Highest macro routing layer",
+      "path": "parameters.highest_macro_routing_layer"
+    },
+    {
       "header": "Macro classes",
       "path": "macro_count"
     },
@@ -67,6 +71,10 @@
     {
       "header": "Full-chip DRC results",
       "path": "full_chip_verification.drc_results"
+    },
+    {
+      "header": "Innovus route DRC results",
+      "path": "full_chip_verification.innovus_route_drc_results"
     },
     {
       "header": "Full-chip LVS status",

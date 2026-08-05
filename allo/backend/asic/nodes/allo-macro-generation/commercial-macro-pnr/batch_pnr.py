@@ -21,6 +21,26 @@ OUTPUT_BATCH = ROOT / "outputs" / "pnr-batch"
 WORK_ROOT = ROOT / "work"
 
 
+def macro_routing_layer_environment(highest_layer: str) -> dict[str, str]:
+    """Derive coupled macro-routing and PG-layer settings from one knob."""
+    try:
+        highest = int(highest_layer)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "highest_macro_routing_layer must be an integer"
+        ) from error
+    if highest < 2:
+        raise ValueError(
+            "highest_macro_routing_layer must be at least 2 so the power "
+            "mesh can use it and the layer below"
+        )
+    return {
+        "max_route_layer": str(highest),
+        "power_mesh_bot_layer": str(highest - 1),
+        "power_mesh_top_layer": str(highest),
+    }
+
+
 def symlink(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.symlink_to(source.resolve(), target_is_directory=source.is_dir())
@@ -83,6 +103,11 @@ def run_entry(entry: dict) -> dict:
 
     env = os.environ.copy()
     env["design_name"] = entry["top_module"]
+    env.update(
+        macro_routing_layer_environment(
+            os.environ.get("highest_macro_routing_layer", "6")
+        )
+    )
     timeout_seconds = int(os.environ.get("worker_timeout_seconds", "21600"))
     log_path = worker / "batch-driver.log"
     print(

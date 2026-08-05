@@ -35,6 +35,23 @@ def oriented_dimensions(width: float, height: float, orientation: str) -> tuple[
     return width, height
 
 
+def validate_predicted_density(
+    standard_area: float,
+    placeable_area: float,
+    requested_density: float,
+    tolerance: float = 0.07,
+) -> tuple[float, float]:
+    predicted = standard_area / placeable_area if placeable_area > 0 else math.inf
+    limit = min(0.99, requested_density + tolerance)
+    if predicted > limit:
+        raise ValueError(
+            "planned floorplan is under-provisioned: predicted standard-cell "
+            f"density {predicted:.3f} exceeds sanity limit {limit:.3f} "
+            f"for requested density {requested_density:.3f}"
+        )
+    return predicted, limit
+
+
 def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Return the union of sorted one-dimensional closed intervals."""
     merged: list[list[float]] = []
@@ -133,16 +150,45 @@ def semantic_pid(semantic_id: str) -> tuple[int, ...]:
     return tuple(int(item) for item in match.group(1).split(",")) if match else (0,)
 
 
-def timing_area(reports: Path) -> float:
+def synthesis_area(reports: Path, require_macro_area: bool = False) -> dict[str, float]:
+    """Read DC total and abstract macro areas from one mapped area report.
+
+    The macro value here is the Liberty/DB area included in DC's total.  It is
+    deliberately distinct from the physical LEF footprint used for floorplan
+    geometry.
+    """
     if not reports.exists():
-        return 0.0
+        raise ValueError(f"synthesis report directory does not exist: {reports}")
     for path in reports.rglob("*.area.rpt"):
         text = path.read_text(errors="replace")
+        total = None
         for pattern in [r"Total cell area:\s*([0-9.eE+-]+)", r"^\s*Total\s+cell\s+area\s+([0-9.eE+-]+)"]:
             match = re.search(pattern, text, re.I | re.M)
             if match:
-                return float(match.group(1))
-    return 0.0
+                total = float(match.group(1))
+                break
+        if total is None:
+            continue
+        macro_match = re.search(
+            r"Macro(?:/Black Box|/black box|\s+and\s+black\s+box)?\s+area:\s*([0-9.eE+-]+)",
+            text,
+            re.I,
+        )
+        if require_macro_area and macro_match is None:
+            raise ValueError(
+                f"hierarchical floorplanning requires Macro/Black Box area in {path}"
+            )
+        macro = float(macro_match.group(1)) if macro_match else 0.0
+        if macro < 0 or macro > total:
+            raise ValueError(
+                f"invalid synthesis areas in {path}: total={total}, macro={macro}"
+            )
+        return {
+            "dc_total_cell_area_um2": total,
+            "dc_macro_abstract_area_um2": macro,
+            "estimated_standard_cell_area_um2": total - macro,
+        }
+    raise ValueError(f"no Total cell area found under {reports}")
 
 
 def discover_srams(root: Path, netlist: str) -> list[dict]:
@@ -418,11 +464,8 @@ def main() -> None:
     enable_kernel_rotation = boolean_parameter("enable_kernel_rotation", True)
     row_cut_halo = parameter("macro_halo", 2.0)
     min_row_width = parameter("min_placeable_row_segment_width", 12.0)
-    cluster_density = int(parameter("kernel_cluster_max_density_percent", 55))
     if density <= 0 or density >= 1 or aspect <= 0 or grid <= 0:
         raise ValueError("density must be in (0,1), aspect and grid must be positive")
-    if cluster_density < 1 or cluster_density > 100:
-        raise ValueError("kernel_cluster_max_density_percent must be in [1,100]")
 
     dimensions = {}
     symmetries = {}
@@ -475,8 +518,11 @@ def main() -> None:
         for col in cols:
             x_offsets[col], cursor = cursor, cursor + col_width[col] + macro_x
         cluster_width = max(0.0, cursor - macro_x)
+        # Allo systolic rows advance south: macro pin intent places vertical
+        # stream inputs on N and outputs on S.  Innovus Y increases north, so
+        # lay larger PID rows at smaller Y to make adjacent stream pins face.
         y_offsets, cursor = {}, 0.0
-        for row in rows:
+        for row in reversed(rows):
             y_offsets[row], cursor = cursor, cursor + row_height[row] + macro_y
         cluster_height = max(0.0, cursor - macro_y)
         local = []
@@ -504,12 +550,16 @@ def main() -> None:
     srams = discover_srams(inputs / "srams", netlist)
     macro_area = sum(item["width"] * item["height"] for values in grouped.values() for item in values)
     sram_area = sum(item["width"] * item["height"] for item in srams)
-    reported_cell_area = timing_area(inputs / "synthesis-reports")
-    # DC hierarchical area includes linked hard macros when their Liberty/DB
-    # models carry area. Subtract physical hard-macro area before applying the
-    # standard-cell utilization target, then add macros back exactly once.
-    standard_area = max(0.0, reported_cell_area - macro_area - sram_area)
-    target_area = standard_area / density + macro_area + sram_area + 4 * keepout * keepout
+    area_budget = synthesis_area(
+        inputs / "synthesis-reports",
+        require_macro_area=bool(grouped or srams),
+    )
+    # DC's total contains the abstract Liberty/DB area, which need not equal
+    # the physical LEF footprint. Remove the former, apply utilization only to
+    # standard cells, and add the physical macro footprints exactly once.
+    standard_area = area_budget["estimated_standard_cell_area_um2"]
+    keepout_allowance = 4 * keepout * keepout
+    target_area = standard_area / density + macro_area + sram_area + keepout_allowance
     core_w = max(kernel_region_w + 2 * keepout, math.sqrt(target_area * aspect))
     core_h = max(kernel_region_h + 2 * keepout, math.sqrt(target_area / aspect))
     for _ in range(12):
@@ -552,6 +602,11 @@ def main() -> None:
             })
     planned_core_w = snap(core_w, grid)
     planned_core_h = snap(core_h, grid)
+    planned_core_area = planned_core_w * planned_core_h
+    estimated_placeable_area = planned_core_area - macro_area - sram_area
+    predicted_density, density_limit = validate_predicted_density(
+        standard_area, estimated_placeable_area, density
+    )
     placements = [{**item, "x": snap(item["x"], grid), "y": snap(item["y"], grid)} for item in sram_placements] + pe_placements
     for item in placements:
         if item["x"] < 0 or item["y"] < 0 or item["x"] + item["width"] > planned_core_w + grid or item["y"] + item["height"] > planned_core_h + grid:
@@ -573,7 +628,20 @@ def main() -> None:
         "schema_version": 1, "stage": "physical_intent", "top_module": plan["top_module"],
         "core": {"width": planned_core_w, "height": planned_core_h, "usable_rectangle": free},
         "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout},
-        "standard_cell_area_estimate": standard_area, "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
+        "standard_cell_area_estimate": standard_area,
+        "area_budget": {
+            **area_budget,
+            "physical_pe_macro_area_um2": macro_area,
+            "physical_sram_area_um2": sram_area,
+            "target_standard_cell_density": density,
+            "keepout_allowance_um2": keepout_allowance,
+            "target_core_area_um2": target_area,
+            "planned_core_area_um2": planned_core_area,
+            "estimated_placeable_standard_cell_area_um2": estimated_placeable_area,
+            "predicted_standard_cell_density": predicted_density,
+            "density_sanity_limit": density_limit,
+        },
+        "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
         "kernel_clusters": cluster_records, "placements": placements,
         "kernel_packing_policy": {
             "type": "variable_grid_extents",
@@ -582,9 +650,15 @@ def main() -> None:
             "region_height": kernel_region_h,
         },
         "cluster_placement_policy": {
-            "type": "partial_blockage",
-            "maximum_density_percent": cluster_density,
-            "region_count": len(cluster_records),
+            "type": "none",
+            "reason": "cluster-wide partial placement blockages disabled",
+            "region_count": 0,
+        },
+        "pe_stream_facing_policy": {
+            "pid_column_direction": "east",
+            "pid_row_direction": "south",
+            "placement_y_direction": "north",
+            "method": "reverse_pid_row_order",
         },
         "row_fragment_policy": {
             "macro_halo": row_cut_halo,
@@ -634,26 +708,12 @@ def main() -> None:
     tcl.extend(["  return $cut_count", "}"])
     tcl.extend([
         "",
-        "# Limit local standard-cell density without discarding the useful",
-        "# placement area between macros in each kernel cluster.",
+        "# Compatibility hook retained for the PNR node. Cluster-wide partial",
+        "# placement blockages are intentionally disabled.",
         "proc create_allo_cluster_density_limits {} {",
-        "  set core [dbGet top.fPlan.coreBox]",
-        "  if {[llength $core] == 1} { set core [lindex $core 0] }",
-        "  set llx [lindex $core 0]",
-        "  set lly [lindex $core 1]",
-        "  set blockage_count 0",
+        "  return 0",
+        "}",
     ])
-    for index, cluster in enumerate(cluster_records):
-        tcl.extend([
-            "  createPlaceBlockage -type partial "
-            f"-density {cluster_density} -name allo_kernel_density_{index} "
-            f"-box [list [expr {{$llx + {cluster['x']}}}] "
-            f"[expr {{$lly + {cluster['y']}}}] "
-            f"[expr {{$llx + {cluster['x']} + {cluster['width']}}}] "
-            f"[expr {{$lly + {cluster['y']} + {cluster['height']}}}]]",
-            "  incr blockage_count",
-        ])
-    tcl.extend(["  return $blockage_count", "}"])
     (outputs / "physical-intent.tcl").write_text("\n".join(tcl) + "\n")
     scale = min(1000 / max(core_w, 1), 800 / max(core_h, 1))
     colors = {"pe": "#4c78a8", "sram": "#f58518"}
@@ -668,7 +728,7 @@ def main() -> None:
         f"PE macros: {len(pe_placements)}\nSRAMs: {len(srams)} (optional sequential perimeter policy)\n"
         f"Kernel clusters: {len(cluster_records)}\nWeighted inter-kernel cost optimization passes: {passes}\n"
         f"Selective short-row cuts: {len(row_fragment_cuts)} (minimum retained width {min_row_width} um)\n"
-        f"Kernel-cluster partial placement limits: {len(cluster_records)} at {cluster_density}% maximum density\n"
+        "Kernel-cluster partial placement limits: disabled\n"
     )
 
 

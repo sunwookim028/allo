@@ -10,6 +10,19 @@ BATCH = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BATCH)
 
 
+def test_macro_routing_layer_environment():
+    assert BATCH.macro_routing_layer_environment("6") == {
+        "max_route_layer": "6",
+        "power_mesh_bot_layer": "5",
+        "power_mesh_top_layer": "6",
+    }
+    assert BATCH.macro_routing_layer_environment("5") == {
+        "max_route_layer": "5",
+        "power_mesh_bot_layer": "4",
+        "power_mesh_top_layer": "5",
+    }
+
+
 def test_add_macro_power_ground_ports(tmp_path):
     netlist = tmp_path / "macro.lvs.v"
     netlist.write_text(

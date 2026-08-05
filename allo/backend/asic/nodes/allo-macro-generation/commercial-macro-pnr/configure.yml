@@ -30,7 +30,9 @@ parameters:
   floorplan_width: ''
   floorplan_height: ''
   process_node: 45
-  max_route_layer: 7
+  # Macro signal routing stops here. The batch driver derives a sparse PG mesh
+  # on this layer and the layer immediately below it.
+  highest_macro_routing_layer: 6
   base_layer_idx: 0
   gds_stream_out_units: 10000
   pin_layer_offset: 3
@@ -40,8 +42,6 @@ parameters:
   # Keep signal pins away from macro corners, where orthogonal routes and
   # clock access otherwise compete for the same small routing region.
   pin_corner_keepout: 3.0
-  power_mesh_bot_layer: 6
-  power_mesh_top_layer: 7
   edge_mesh_margin: 2.0
   edge_mesh_stripe_width_multiplier: 8
   edge_mesh_stripe_spacing_multiplier: 8

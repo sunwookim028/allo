@@ -161,6 +161,75 @@ def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
     return bundles
 
 
+def semantic_stream_width(port: dict[str, object]) -> int | None:
+    """Return the flattened payload width of a manifest stream port."""
+    type_text = str(port.get("type", ""))
+    memref = re.search(r"memref<((?:\d+x)*)i(\d+)", type_text)
+    if memref is not None:
+        dimensions = [int(value) for value in re.findall(r"\d+", memref.group(1))]
+        elements = 1
+        for dimension in dimensions:
+            elements *= dimension
+        return elements * int(memref.group(2))
+    scalar = re.search(r"(?:^|[<,])\s*i(\d+)\b", type_text)
+    return int(scalar.group(1)) if scalar is not None else None
+
+
+def rtl_stream_width(
+    block: ModuleBlock, bundle: dict[str, object]
+) -> int | None:
+    """Return the data payload width of one generated Vitis stream bundle."""
+    ports = port_names(block)
+    declarations = port_declarations(block, ports)
+    root = str(bundle["root"])
+    candidates = (
+        [f"{root}_dout"] if bundle["direction"] == "in" else [f"{root}_din", root]
+    )
+    data_port = next((name for name in candidates if name in declarations), None)
+    if data_port is None:
+        return None
+    return declaration_width(declarations[data_port])
+
+
+def ordered_semantic_port_subset(
+    block: ModuleBlock,
+    semantic_ports: list[dict[str, object]],
+    bundles: list[dict[str, object]],
+) -> list[dict[str, object]] | None:
+    """Find a unique ordered semantic subset matching RTL direction and width.
+
+    Vitis can move loop-invariant control streams into a parent wrapper while
+    leaving a mixed-direction subset in a generated pipeline process. Matching
+    both payload shape and order avoids guessing which semantic stream vanished.
+    """
+    bundle_widths = [rtl_stream_width(block, bundle) for bundle in bundles]
+    semantic_widths = [semantic_stream_width(port) for port in semantic_ports]
+    if any(width is None for width in bundle_widths + semantic_widths):
+        return None
+
+    solutions: list[list[dict[str, object]]] = []
+
+    def search(bundle_index: int, semantic_index: int, selected: list[dict[str, object]]):
+        if len(solutions) > 1:
+            return
+        if bundle_index == len(bundles):
+            solutions.append(list(selected))
+            return
+        remaining = len(bundles) - bundle_index
+        stop = len(semantic_ports) - remaining + 1
+        for index in range(semantic_index, stop):
+            semantic = semantic_ports[index]
+            bundle = bundles[bundle_index]
+            if (
+                semantic.get("direction") == bundle["direction"]
+                and semantic_widths[index] == bundle_widths[bundle_index]
+            ):
+                search(bundle_index + 1, index + 1, [*selected, semantic])
+
+    search(0, 0, [])
+    return solutions[0] if len(solutions) == 1 else None
+
+
 def axis_hint(stream: str) -> str | None:
     lowered = stream.lower()
     if any(token in lowered for token in ("horizontal", "hori", "east", "west")):
@@ -286,42 +355,49 @@ def build_pin_intent(
     bundles = stream_bundles(canonical)
     selection_method = "complete_process_interface"
     if len(bundles) != len(semantic_ports):
-        # Vitis may split one Allo kernel into several independently instantiated
-        # pipeline processes (for example, one loader process per stream).  The
-        # final manifest lists those process records in specialization order.
-        # Select the corresponding same-direction semantic port by that stable
-        # record ordinal.
-        bundle_directions = {item["direction"] for item in bundles}
-        matching_records = [
-            record
-            for record in pe.get("post_hls_records", [])
-            if any(
-                module.get("name") == canonical.name
-                for module in record.get("rtl_modules", [])
-            )
-        ]
-        all_process_records = [
-            record
-            for record in pe.get("post_hls_records", [])
-            if record.get("rtl_modules")
-        ]
-        if len(bundle_directions) != 1 or len(matching_records) != 1:
-            raise ValueError(
-                f"cannot map split Vitis process {canonical.name} to semantic ports"
-            )
-        direction = next(iter(bundle_directions))
-        candidates = [
-            item for item in semantic_ports if item.get("direction") == direction
-        ]
-        record_index = all_process_records.index(matching_records[0])
-        start = record_index * len(bundles)
-        semantic_ports = candidates[start : start + len(bundles)]
-        selection_method = "split_process_record_ordinal"
-        if len(semantic_ports) != len(bundles):
-            raise ValueError(
-                f"split-process ordinal {record_index} is outside the {direction} "
-                f"semantic interface of {canonical.name}"
-            )
+        ordered_subset = ordered_semantic_port_subset(
+            canonical, semantic_ports, bundles
+        )
+        if ordered_subset is not None:
+            semantic_ports = ordered_subset
+            selection_method = "ordered_direction_width_subset"
+        else:
+            # Vitis may split one Allo kernel into several independently instantiated
+            # pipeline processes (for example, one loader process per stream).  The
+            # final manifest lists those process records in specialization order.
+            # Select the corresponding same-direction semantic port by that stable
+            # record ordinal.
+            bundle_directions = {item["direction"] for item in bundles}
+            matching_records = [
+                record
+                for record in pe.get("post_hls_records", [])
+                if any(
+                    module.get("name") == canonical.name
+                    for module in record.get("rtl_modules", [])
+                )
+            ]
+            all_process_records = [
+                record
+                for record in pe.get("post_hls_records", [])
+                if record.get("rtl_modules")
+            ]
+            if len(bundle_directions) != 1 or len(matching_records) != 1:
+                raise ValueError(
+                    f"cannot map split Vitis process {canonical.name} to semantic ports"
+                )
+            direction = next(iter(bundle_directions))
+            candidates = [
+                item for item in semantic_ports if item.get("direction") == direction
+            ]
+            record_index = all_process_records.index(matching_records[0])
+            start = record_index * len(bundles)
+            semantic_ports = candidates[start : start + len(bundles)]
+            selection_method = "split_process_record_ordinal"
+            if len(semantic_ports) != len(bundles):
+                raise ValueError(
+                    f"split-process ordinal {record_index} is outside the {direction} "
+                    f"semantic interface of {canonical.name}"
+                )
     side_map = graph_pin_sides(manifest)
     mapped = []
     for semantic, bundle in zip(semantic_ports, bundles):

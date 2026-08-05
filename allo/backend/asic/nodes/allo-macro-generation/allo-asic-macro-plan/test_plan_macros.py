@@ -265,6 +265,102 @@ endmodule
             PLAN.select_member_orientation(intent, rotated, identity_map), "R90"
         )
 
+    def test_maps_mixed_direction_pipeline_after_control_stream_is_removed(self):
+        block = PLAN.module_blocks(
+            """
+module pe_pipeline (
+  ap_clk,
+  command_dout, command_empty_n, command_read,
+  weight_in_dout, weight_in_empty_n, weight_in_read,
+  weight_out_din, weight_out_full_n, weight_out_write,
+  input_dout, input_empty_n, input_read,
+  partial_in_dout, partial_in_empty_n, partial_in_read,
+  input_out_din, input_out_full_n, input_out_write,
+  partial_out_din, partial_out_full_n, partial_out_write
+);
+ input ap_clk;
+ input [127:0] command_dout;
+ input command_empty_n;
+ output command_read;
+ input [31:0] weight_in_dout;
+ input weight_in_empty_n;
+ output weight_in_read;
+ output [31:0] weight_out_din;
+ input weight_out_full_n;
+ output weight_out_write;
+ input [31:0] input_dout;
+ input input_empty_n;
+ output input_read;
+ input [31:0] partial_in_dout;
+ input partial_in_empty_n;
+ output partial_in_read;
+ output [31:0] input_out_din;
+ input input_out_full_n;
+ output input_out_write;
+ output [31:0] partial_out_din;
+ input partial_out_full_n;
+ output partial_out_write;
+endmodule
+"""
+        )["pe_pipeline"]
+        directions = ["in", "in", "in", "out", "in", "in", "out", "out"]
+        types = [
+            "!allo.stream<i32, 1>",
+            "!allo.stream<memref<4xi32>, 16>",
+            "!allo.stream<i32, 16>",
+            "!allo.stream<i32, 16>",
+            "!allo.stream<i32, 16>",
+            "!allo.stream<i32, 16>",
+            "!allo.stream<i32, 16>",
+            "!allo.stream<i32, 16>",
+        ]
+        ports = [
+            {
+                "ordinal": ordinal,
+                "channel_id": f"channel_{ordinal}",
+                "stream": f"stream_{ordinal}",
+                "direction": direction,
+                "type": type_text,
+            }
+            for ordinal, (direction, type_text) in enumerate(zip(directions, types))
+        ]
+        representative = "r/compute/pid=2,1"
+        manifest = {
+            "pe_instances": [
+                {
+                    "semantic_id": representative,
+                    "kernel": "compute",
+                    "pid": [2, 1],
+                    "ports": ports,
+                    "post_hls_records": [],
+                }
+            ],
+            "channels": [
+                {
+                    "stream": port["stream"],
+                    "endpoints": [
+                        {
+                            "pe": representative,
+                            "direction": port["direction"],
+                            "accesses": [{"port_ordinal": port["ordinal"]}],
+                        }
+                    ],
+                }
+                for port in ports
+            ],
+        }
+
+        intent = PLAN.build_pin_intent(manifest, representative, block)
+
+        self.assertEqual(
+            [bundle["ordinal"] for bundle in intent["stream_bundles"]],
+            [1, 2, 3, 4, 5, 6, 7],
+        )
+        self.assertEqual(
+            intent["semantic_to_rtl_method"],
+            "ordered_direction_width_subset",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

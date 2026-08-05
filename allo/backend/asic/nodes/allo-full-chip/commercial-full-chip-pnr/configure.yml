@@ -67,7 +67,7 @@ commands:
   - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
   - cd ..
   - export FULL_PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
-  - python -c 'import json,os; from pathlib import Path; Path("outputs/full-chip-pnr-metrics.json").write_text(json.dumps({{"schema_version":1,"node":"commercial-full-chip-pnr","status":"passed","wall_seconds":float(os.environ["FULL_PNR_SECONDS"])}},indent=2)+"\n")'
+  - python collect_pnr_metrics.py --wall-seconds "$FULL_PNR_SECONDS" --stop-after-step "$stop_after_step" --drc-check-policy "$drc_check_policy"
   - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
   - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
   - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt
@@ -88,6 +88,9 @@ parameters:
   # error: require a clean Innovus antenna report; report: record but do not
   # fail (appropriate for FreePDK45's incomplete LEF antenna model); off: skip.
   antenna_check_policy: report
+  # error: require zero Innovus route DRCs; report: publish the count without
+  # failing this node's postconditions.
+  drc_check_policy: error
   useful_skew: True
   useful_skew_ccopt_effort: standard
   cell_padding: 2
@@ -160,18 +163,26 @@ preconditions:
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
   - assert File( 'outputs/full-chip-pnr-metrics.json' )
-  - assert File( 'outputs/full-chip-area.rpt' )
   - assert File( 'outputs/physical-intent-placement.rpt' )
-  - assert File( 'outputs/innovus-drc.rpt' )
-  - assert File( 'outputs/innovus-antenna.rpt' )
   - assert File( 'outputs/welltap-precleanup.rpt' )
   - assert File( 'outputs/welltap-adaptive-cuts.rpt' )
   - assert File( 'outputs/welltap.rpt' )
   - assert 'Found 0 violations in total' in File( 'outputs/welltap.rpt' )
-  # Fail the node only after Innovus has saved all diagnostic and downstream
-  # artifacts. An error-limit termination or nonzero count lacks this marker.
-  - "assert 'Verification Complete : 0 Viols.' in File( 'outputs/innovus-drc.rpt' )"
-  # Verbose Tcl echo can legitimately contain inactive strings such as
-  # "ERROR: verify_antena failed". Innovus diagnostics use the **ERROR: prefix.
+  - |
+      import json
+      from pathlib import Path
+      metrics = json.loads(Path('outputs/full-chip-pnr-metrics.json').read_text())
+      assert metrics['status'] == 'passed'
+      assert metrics['completed_step'] in {'floorplan', 'power', 'place', 'cts', 'route', 'signoff'}
+      if metrics['run_mode'] == 'full':
+          assert metrics['completed_step'] == 'signoff'
+          assert File('outputs/full-chip-area.rpt')
+          assert File('outputs/innovus-drc.rpt')
+          assert File('outputs/innovus-antenna.rpt')
+          assert metrics['drc']['policy'] in {'error', 'report'}
+          if metrics['drc']['policy'] == 'error':
+              assert metrics['drc']['violation_count'] == 0
+  # Innovus diagnostics use the **ERROR: prefix; report-policy antenna results
+  # are recorded in the dedicated report and metrics without failing the run.
   - assert '**ERROR:'
       not in File( 'logs/run.log', enable_case_sensitive=True )
