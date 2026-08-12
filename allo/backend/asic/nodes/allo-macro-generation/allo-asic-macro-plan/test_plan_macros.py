@@ -18,6 +18,84 @@ SPEC.loader.exec_module(PLAN)
 
 
 class MacroPlanTest(unittest.TestCase):
+    def test_generates_producer_owned_fifo_wrapper(self):
+        rtl = """
+module top(ap_clk, reset);
+  input ap_clk; input reset;
+  pe pe_0_U0(
+    .ap_clk(ap_clk), .ap_rst(reset),
+    .stream_din(producer_data),
+    .stream_num_data_valid(count), .stream_fifo_cap(capacity),
+    .stream_full_n(full_n), .stream_write(producer_write));
+  fifo fifo_0_U(
+    .clk(ap_clk), .reset(reset), .if_read_ce(1'b1), .if_write_ce(1'b1),
+    .if_din(producer_data), .if_full_n(full_n), .if_write(producer_write),
+    .if_dout(consumer_data), .if_num_data_valid(count), .if_fifo_cap(capacity),
+    .if_empty_n(empty_n), .if_read(consumer_read));
+endmodule
+module pe(ap_clk, ap_rst, stream_din, stream_num_data_valid,
+          stream_fifo_cap, stream_full_n, stream_write);
+  input ap_clk; input ap_rst;
+  output [31:0] stream_din;
+  input [1:0] stream_num_data_valid; input [1:0] stream_fifo_cap;
+  input stream_full_n; output stream_write;
+endmodule
+module fifo(clk, reset, if_read_ce, if_write_ce, if_din, if_full_n,
+            if_write, if_dout, if_num_data_valid, if_fifo_cap,
+            if_empty_n, if_read);
+  input clk; input reset; input if_read_ce; input if_write_ce;
+  input [31:0] if_din; output if_full_n; input if_write;
+  output [31:0] if_dout; output [1:0] if_num_data_valid;
+  output [1:0] if_fifo_cap; output if_empty_n; input if_read;
+endmodule
+"""
+        blocks = PLAN.module_blocks(rtl)
+        instances = PLAN.module_instances(blocks["top"], set(blocks))
+        pe_instance = next(item for item in instances if item.module == "pe")
+        manifest = {
+            "top": "top",
+            "pe_instances": [
+                {
+                    "semantic_id": "top/compute/pid=0,0",
+                    "kernel": "compute",
+                    "pid": [0, 0],
+                    "ports": [{
+                        "ordinal": 0, "channel_id": "c0", "stream": "horizontal_0_1",
+                        "direction": "out", "type": "!allo.stream<i32, 1>",
+                    }],
+                    "post_hls_records": [],
+                },
+                {
+                    "semantic_id": "top/compute/pid=0,1",
+                    "kernel": "compute", "pid": [0, 1], "ports": [],
+                },
+            ],
+            "channels": [{
+                "channel_id": "c0", "stream": "horizontal_0_1",
+                "endpoints": [
+                    {"pe": "top/compute/pid=0,0", "direction": "out",
+                     "accesses": [{"port_ordinal": 0}]},
+                    {"pe": "top/compute/pid=0,1", "direction": "in", "accesses": []},
+                ],
+            }],
+        }
+        wrapper, folding, connections = PLAN.generate_fifo_wrapper(
+            "canonical_wrapper",
+            manifest["pe_instances"][0],
+            blocks["pe"],
+            pe_instance,
+            instances,
+            manifest,
+            blocks,
+        )
+        self.assertIn("module canonical_wrapper", wrapper)
+        self.assertIn("pe producer_kernel", wrapper)
+        self.assertIn("fifo folded_fifo_0_U", wrapper)
+        self.assertNotIn("stream_din,\n", wrapper.split(");", 1)[0])
+        self.assertIn("stream_dout", wrapper.split(");", 1)[0])
+        self.assertEqual(folding["owned_fifos"][0]["fifo_instance"], "fifo_0_U")
+        self.assertEqual(connections["stream_dout"], "consumer_data")
+
     def test_classifies_repeated_children_of_one_semantic_pe(self):
         repeated = [
             {"semantic_id": "top/load/pid=0", "rtl_module": "pipe_0"},
@@ -359,6 +437,86 @@ endmodule
         self.assertEqual(
             intent["semantic_to_rtl_method"],
             "ordered_direction_width_subset",
+        )
+
+    def test_maps_reordered_split_process_through_parent_bundle_identity(self):
+        blocks = PLAN.module_blocks(
+            """
+module pe_parent (
+  ap_clk,
+  v_mode_dout, v_mode_empty_n, v_mode_read,
+  v_command_dout, v_command_empty_n, v_command_read,
+  v_result_dout, v_result_empty_n, v_result_read,
+  v_result_id_dout, v_result_id_empty_n, v_result_id_read,
+  v_store_din, v_store_full_n, v_store_write
+);
+ input ap_clk;
+ input [31:0] v_mode_dout; input v_mode_empty_n; output v_mode_read;
+ input [127:0] v_command_dout; input v_command_empty_n; output v_command_read;
+ input [31:0] v_result_dout; input v_result_empty_n; output v_result_read;
+ input [31:0] v_result_id_dout; input v_result_id_empty_n; output v_result_id_read;
+ output [31:0] v_store_din; input v_store_full_n; output v_store_write;
+endmodule
+module pe_pipeline (
+  ap_clk,
+  v_store_din, v_store_full_n, v_store_write,
+  v_result_dout, v_result_empty_n, v_result_read,
+  v_result_id_dout, v_result_id_empty_n, v_result_id_read,
+  v_command_dout, v_command_empty_n, v_command_read
+);
+ input ap_clk;
+ output [31:0] v_store_din; input v_store_full_n; output v_store_write;
+ input [31:0] v_result_dout; input v_result_empty_n; output v_result_read;
+ input [31:0] v_result_id_dout; input v_result_id_empty_n; output v_result_id_read;
+ input [127:0] v_command_dout; input v_command_empty_n; output v_command_read;
+endmodule
+"""
+        )
+        representative = "r/vpu_lane/pid=0"
+        directions = ["in", "in", "in", "in", "out"]
+        widths = [32, 128, 32, 32, 32]
+        ports = [
+            {
+                "ordinal": ordinal,
+                "channel_id": f"channel_{ordinal}",
+                "stream": f"stream_{ordinal}",
+                "direction": direction,
+                "type": f"!allo.stream<i{width}, 1>",
+            }
+            for ordinal, (direction, width) in enumerate(zip(directions, widths))
+        ]
+        manifest = {
+            "pe_instances": [{
+                "semantic_id": representative,
+                "kernel": "vpu_lane",
+                "pid": [0],
+                "ports": ports,
+                "post_hls_records": [{
+                    "rtl_modules": [{"name": "pe_pipeline"}],
+                    "rtl_instances": [{"parent_file": "/tmp/pe_parent.v"}],
+                }],
+            }],
+            "channels": [{
+                "stream": port["stream"],
+                "endpoints": [{
+                    "pe": representative,
+                    "direction": port["direction"],
+                    "accesses": [{"port_ordinal": port["ordinal"]}],
+                }],
+            } for port in ports],
+        }
+
+        intent = PLAN.build_pin_intent(
+            manifest, representative, blocks["pe_pipeline"], blocks
+        )
+
+        self.assertEqual(
+            [bundle["ordinal"] for bundle in intent["stream_bundles"]],
+            [4, 2, 3, 1],
+        )
+        self.assertEqual(
+            intent["semantic_to_rtl_method"],
+            "parent_wrapper_bundle_identity",
         )
 
 

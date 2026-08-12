@@ -1,0 +1,42 @@
+name: commercial-batch-macro-power
+
+inputs:
+  - adk
+  - macro-registry
+  - macro-activity
+  - power.rpt
+  - srams
+
+outputs:
+  - macro-power-reports
+  - macro-power-summary.json
+  - aggregate-power.rpt
+
+commands:
+  - python3 batch_macro_power.py
+
+parameters:
+  macro_power_max_workers: 4
+  lib_op_condition: undefined
+
+preconditions:
+  - assert Tool( 'python3' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-activity' )
+  - assert File( 'inputs/power.rpt' )
+  - |
+      import json
+      from pathlib import Path
+      entries = json.loads(Path('inputs/macro-registry/index.json').read_text()).get('macros', [])
+      assert not entries or Tool( 'pt_shell' )
+
+postconditions:
+  - assert File( 'outputs/macro-power-reports' )
+  - assert File( 'outputs/macro-power-summary.json' )
+  - assert File( 'outputs/aggregate-power.rpt' )
+  - |
+      import json
+      from pathlib import Path
+      summary = json.loads(Path('outputs/macro-power-summary.json').read_text())
+      assert summary['failed_count'] == 0

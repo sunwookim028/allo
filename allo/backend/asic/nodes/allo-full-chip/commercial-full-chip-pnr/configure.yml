@@ -67,7 +67,7 @@ commands:
   - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
   - cd ..
   - export FULL_PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
-  - python collect_pnr_metrics.py --wall-seconds "$FULL_PNR_SECONDS" --stop-after-step "$stop_after_step" --drc-check-policy "$drc_check_policy"
+  - python collect_pnr_metrics.py --wall-seconds "$FULL_PNR_SECONDS" --stop-after-step "$stop_after_step" --drc-check-policy "$drc_check_policy" --hold-target-slack "$hold_target_slack"
   - ln -sf ../reports/physical-intent-placement.rpt outputs/physical-intent-placement.rpt
   - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
   - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt
@@ -95,7 +95,12 @@ parameters:
   useful_skew_ccopt_effort: standard
   cell_padding: 2
   signoff_engine: False
-  hold_target_slack: 0.005
+  # Maintain practical hold margin for SDF simulation, not merely nonnegative
+  # STA slack. FreePDK45 BAGL exposed data corruption with only +0.009 ns WNS.
+  hold_target_slack: 0.150
+  # Optimize beyond the mandatory signoff threshold so extraction and
+  # optimization convergence can lose some margin without failing signoff.
+  hold_optimization_target_slack: 0.200
   setup_target_slack: 0.000
   stop_after_step: none
   floorplan_mode: physical_intent
@@ -182,6 +187,9 @@ postconditions:
           assert metrics['drc']['policy'] in {'error', 'report'}
           if metrics['drc']['policy'] == 'error':
               assert metrics['drc']['violation_count'] == 0
+          assert metrics['timing']['signoff_hold']['target_met'], (
+              'final signoff hold WNS did not meet hold_target_slack'
+          )
   # Innovus diagnostics use the **ERROR: prefix; report-policy antenna results
   # are recorded in the dedicated report and metrics without failing the run.
   - assert '**ERROR:'

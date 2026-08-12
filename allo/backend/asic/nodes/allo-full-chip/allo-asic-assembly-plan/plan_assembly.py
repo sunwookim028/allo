@@ -77,7 +77,10 @@ def tcl_quote(value: object) -> str:
     return "{" + str(value).replace("\\", "\\\\").replace("}", "\\}") + "}"
 
 
-def stable_instance_name(semantic_id: str, source_module: str) -> str:
+def stable_instance_name(member: dict, semantic_id: str, source_module: str) -> str:
+    semantic_name = member.get("semantic_instance_name")
+    if semantic_name:
+        return str(semantic_name)
     slug = re.sub(r"[^A-Za-z0-9_]+", "_", semantic_id).strip("_")
     digest = hashlib.sha256(f"{semantic_id}|{source_module}".encode()).hexdigest()[:10]
     return f"allo_pe_{slug}_{digest}"
@@ -106,14 +109,15 @@ def main() -> None:
     replaced_modules = set()
     for macro in registry.get("macros", []):
         class_id = macro["macro_class_id"]
-        group = manifest_groups.get(class_id)
+        group = manifest_groups.get(macro.get("source_macro_class_id", class_id))
         if group is None:
             raise ValueError(f"published class absent from final manifest: {class_id}")
-        members = group.get("members", [])
+        members = macro.get("members", group.get("members", []))
         if macro.get("reuse_count") != len(members):
             raise ValueError(f"reuse/member mismatch for {class_id}")
         canonical = macro["top_module"]
-        if canonical not in blocks:
+        folding_enabled = bool(macro.get("fold_fifos_into_macro", False))
+        if canonical not in blocks and not folding_enabled:
             raise ValueError(f"canonical module is absent from normalized RTL: {canonical}")
         missing_views = REQUIRED_VIEWS - set(macro.get("views", {}))
         if missing_views:
@@ -135,6 +139,12 @@ def main() -> None:
             if source_module not in blocks:
                 raise ValueError(f"selected member module absent from RTL: {source_module}")
             instances = find_instances(blocks, source_module)
+            requested_instance = member.get("source_instance")
+            if requested_instance:
+                instances = [
+                    item for item in instances
+                    if item["instance_name"] == requested_instance
+                ]
             if not instances:
                 raise ValueError(f"selected member module is never instantiated: {source_module}")
             raw_map = macro.get("port_maps", {}).get(source_module)
@@ -166,10 +176,18 @@ def main() -> None:
                         source_module, member
                     ).get("orientation", "unassigned"),
                     "stable_instance_name": stable_instance_name(
-                        member["semantic_id"], source_module
+                        member, member["semantic_id"], source_module
                     ),
                     "hierarchical_paths": paths,
                 }
+                folding = member.get("fifo_folding", {})
+                if folding.get("enabled"):
+                    member_connections = folding.get("wrapper_connections", {})
+                    replacement["explicit_canonical_connections"] = {
+                        item["canonical"]: member_connections[item["member"]]
+                        for item in raw_map
+                    }
+                    replacement["folded_fifos"] = folding.get("owned_fifos", [])
                 replacements.append(replacement)
                 member_records.append(replacement)
         classes.append(
@@ -182,6 +200,7 @@ def main() -> None:
                 "lef_symmetry": macro.get("lef_symmetry", []),
                 "members": member_records,
                 "views": macro["views"],
+                "fold_fifos_into_macro": folding_enabled,
             }
         )
 
@@ -222,6 +241,9 @@ def main() -> None:
             len(item["hierarchical_paths"]) for item in replacements
         ),
         "replaced_module_count": len(replaced_modules),
+        "folded_fifo_count": sum(
+            len(item.get("folded_fifos", [])) for item in replacements
+        ),
         "classes": classes,
         "replacements": replacements,
         "whole_region_connections": connections,

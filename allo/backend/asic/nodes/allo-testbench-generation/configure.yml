@@ -1,0 +1,46 @@
+name: allo-testbench-generation
+
+inputs:
+  - allo-build
+  - backend-rtl
+  - build-metadata.json
+  - workload-manifest.json
+  - workload-vectors
+
+outputs:
+  - testbench.sv
+  - vitis-axi-memory-bfm.sv
+  - vitis-axilite-master-bfm.sv
+  - workload-vectors
+  - testbench-contract.json
+  - testbench-generation-report.json
+  - vcs-rtl.f
+
+commands:
+  - python3 generate_testbench.py
+
+parameters:
+  backend: vitis
+  clock_period: 10.0
+
+preconditions:
+  - assert File( 'generate_testbench.py' )
+  - assert File( 'templates/vitis/testbench.sv.tpl' )
+  - assert File( 'templates/vitis/vitis-axi-memory-bfm.sv' )
+  - assert File( 'templates/vitis/vitis-axilite-master-bfm.sv' )
+  - assert File( 'inputs/allo-build' )
+  - assert File( 'inputs/backend-rtl' )
+  - assert File( 'inputs/build-metadata.json' )
+  - assert File( 'inputs/workload-manifest.json' )
+  - assert File( 'inputs/workload-vectors' )
+
+postconditions:
+  - assert File( 'outputs/testbench.sv' )
+  - assert File( 'outputs/vitis-axi-memory-bfm.sv' )
+  - assert File( 'outputs/vitis-axilite-master-bfm.sv' )
+  - assert File( 'outputs/workload-vectors' )
+  - assert File( 'outputs/testbench-contract.json' )
+  - assert File( 'outputs/testbench-generation-report.json' )
+  - assert File( 'outputs/vcs-rtl.f' )
+  - >-
+    assert '"status": "passed"' in File( 'outputs/testbench-generation-report.json' )

@@ -6,6 +6,7 @@
 #
 # Both average and time-base power analysis can be done
 # Either gate-level or rtl switching activities can be used
+# Optional hardened-macro DBs are discovered under macro-registry/*/*.db.
 #
 # Author : Maximilian Koschay
 # Date   : 05.03.2021
@@ -25,18 +26,26 @@ inputs:
   - run.saif
   - run.vcd
   - design.namemap
+  - macro-registry
   - srams
 
 outputs:
   - primetime.session
   - design.sdf
+  - power-reports
+  - power.rpt
+  - activity.rpt
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
+  - python3 prepare_pt_sdc.py inputs/design.pt.sdc prepared-design.pt.sdc
   - source run.sh
+  - cp -a reports outputs/power-reports
+  - ln -sf ../reports/$design_name.power.rpt outputs/power.rpt
+  - ln -sf ../reports/$design_name.activity.post.rpt outputs/activity.rpt
 
 debug:
   - source debug.sh
@@ -66,4 +75,18 @@ parameters:
     - report-timing.tcl
     - report-power.tcl
 
+preconditions:
+  - assert Tool( 'pt_shell' )
+  - assert Tool( 'python3' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.vcs.v' )
+  - assert File( 'inputs/design.pt.sdc' )
+  - assert File( 'inputs/design.spef.gz' )
+  - assert File( 'inputs/run.vcd' )
 
+postconditions:
+  - assert File( 'outputs/primetime.session' )
+  - assert File( 'outputs/design.sdf' )
+  - assert File( 'outputs/power-reports' )
+  - assert File( 'outputs/power.rpt' )
+  - assert File( 'outputs/activity.rpt' )

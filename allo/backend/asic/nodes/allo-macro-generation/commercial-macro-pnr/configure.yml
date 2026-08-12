@@ -21,8 +21,8 @@ parameters:
   useful_skew_ccopt_effort: standard
   cell_padding: 2
   signoff_engine: False
-  hold_target_slack: 0.050
-  setup_target_slack: 0.050
+  macro_hold_target_slack: 0.050
+  macro_setup_target_slack: 0.050
   postroute_optimization_passes: 2
   stop_after_step: none
   floorplan_mode: auto
@@ -37,7 +37,9 @@ parameters:
   gds_stream_out_units: 10000
   pin_layer_offset: 3
   pin_secondary_layer_offset: 5
-  pin_multilayer_threshold: 100
+  # Minimum center-to-center signal-pin pitch is this multiple of the loaded
+  # ADK routing-layer pitch. Secondary-layer use is decided from edge capacity.
+  pin_min_pitch_multiplier: 2.0
   pin_primary_fraction: 0.75
   # Keep signal pins away from macro corners, where orthogonal routes and
   # clock access otherwise compete for the same small routing region.

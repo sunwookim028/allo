@@ -28,3 +28,18 @@ that every RTL port is assigned exactly once.
 It also emits an Innovus D4 orientation for every equivalent member by proving
 that the member's desired stream sides are a rotation/reflection of the
 canonical pin pattern.
+
+`fold_fifos_into_macro` defaults to `False`. When enabled for a hierarchical
+run, semantic PE candidates are promoted from their inner Vitis pipeline to the
+complete outer kernel module. The planner locates every FIFO driven by an Allo
+`put` bundle, generates a producer-owned kernel-plus-FIFO wrapper, and hardens
+that wrapper as the canonical macro. Its external stream pins are the folded
+FIFO's dequeue-side interface. Allo's point-to-point stream rule is treated as
+a compiler contract; the planner still requires an unambiguous realized RTL
+binding, recognized FIFO ports, and matching kernel/FIFO clock and reset nets.
+
+Wrappers with different external shapes or FIFO module sets are split into
+separate derived equivalence classes before applying `min_macro_reuse`. Module
+names remain canonical-class based. Concrete instances are named
+`<kernel>_<pid...>` during Stage-2 assembly—for example `compute_3_5`—without
+sacrificing macro reuse. Bypass/flat mode always disables folding.

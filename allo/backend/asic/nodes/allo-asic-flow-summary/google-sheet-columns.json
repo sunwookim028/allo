@@ -103,6 +103,30 @@
     {
       "header": "Equivalent total standard-cell area (um^2)",
       "path": "coverage.equivalent_total_standard_cell_area_um2"
+    },
+    {
+      "header": "FFGL status",
+      "path": "simulation.ffgl.status"
+    },
+    {
+      "header": "BAGL status",
+      "path": "simulation.bagl.status"
+    },
+    {
+      "header": "Macro activity status",
+      "path": "macro_activity.status"
+    },
+    {
+      "header": "Top-level shell power (W)",
+      "path": "power.top_level_power_w.total_w"
+    },
+    {
+      "header": "Weighted macro power (W)",
+      "path": "power.weighted_macro_power_w.total_w"
+    },
+    {
+      "header": "Combined power (W)",
+      "path": "power.combined_power_w.total_w"
     }
   ]
 }

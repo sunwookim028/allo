@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate that Allo and Vitis produced a complete ASIC capture."""
+"""Validate that Allo and the selected HLS backend produced an ASIC capture."""
 
 import argparse
 import json

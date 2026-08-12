@@ -8,7 +8,10 @@ set -euo pipefail
 : "${build_mode:=csyn}"
 : "${clock_period:=10.0}"
 : "${macro_clock_period:=8.0}"
-: "${backend_options:=device=u280}"
+: "${backend_options:=}"
+: "${allo_testbench_enabled:=True}"
+: "${allo_testbench_workload_factory:=testbench_workload}"
+: "${allo_testbench_top_function:=undefined}"
 : "${python_bin:=python}"
 : "${allo_setup_script:=/work/shared/common/allo/setup-llvm-main.sh}"
 
@@ -37,8 +40,11 @@ case "$backend" in
   vitis)
     module load xilinx-2022.1
     ;;
+  catapult)
+    module load catapult
+    ;;
   *)
-    echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
+    echo "ERROR: unsupported backend '$backend'; supported: vitis, catapult" >&2
     exit 2
     ;;
 esac
@@ -71,12 +77,13 @@ fi
 command -v "$python_bin" >/dev/null
 "$python_bin" -c 'import allo; print(allo.__file__)'
 
-if [ "$backend" = "vitis" ]; then
-  command -v vitis_hls >/dev/null
-else
-  echo "ERROR: unsupported backend '$backend'; currently supported: vitis" >&2
-  exit 2
-fi
+case "$backend" in
+  vitis) command -v vitis_hls >/dev/null ;;
+  catapult)
+    command -v catapult >/dev/null
+    : "${MGC_HOME:?Catapult backend selected, but MGC_HOME is unset}"
+    ;;
+esac
 
 rm -rf work
 mkdir -p work/project outputs
@@ -138,6 +145,14 @@ for name in asic-manifest.json asic-manifest.tcl \
             asic-manifest-final.json asic-manifest-final.tcl; do
   cp "work/project/$name" "outputs/$name"
 done
+
+"$python_bin" export_workload.py \
+  --design "$design_path" \
+  --enabled "$allo_testbench_enabled" \
+  --factory "$allo_testbench_workload_factory" \
+  --top-function "$allo_testbench_top_function" \
+  --output-manifest outputs/workload-manifest.json \
+  --output-vectors outputs/workload-vectors
 
 export ALLO_NODE_DESIGN_PATH="$design_path"
 export ALLO_NODE_BACKEND="$backend"

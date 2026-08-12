@@ -1,0 +1,84 @@
+name: allo-bagl-sim
+
+inputs:
+  - adk
+  - design.vcs.v
+  - design.sdf
+  - design.pt.sdc
+  - macro-collateral.json
+  - testbench.sv
+  - vitis-axi-memory-bfm.sv
+  - vitis-axilite-master-bfm.sv
+  - workload-vectors
+  - testbench-contract.json
+  - macro-registry
+  - srams
+
+outputs:
+  - run.vcd
+  - compile.log
+  - simulation.log
+  - simulation-report.json
+  - sdf-annotation-manifest.json
+  - timing-config.json
+  - timing-config.values
+
+commands:
+  - python3 prepare_sdf.py
+  - bash run.sh
+
+parameters:
+  testbench_name: allo_generated_testbench
+  dut_name: dut
+  clock_period: 10.0
+  sdf_corner: typ
+  waveform: True
+  sdf_warning_policy: report
+  sdf_unmatched_timingcheck_policy: report
+  sdf_unmatched_iopath_policy: report
+  sdf_uphier_interconnect_policy: report
+  bagl_input_delay_ns: 0.025
+  bagl_output_delay_ns: 0.025
+  bagl_num_reset_cycles: 8
+
+preconditions:
+  - assert Tool( 'vcs' )
+  - assert File( 'run.sh' )
+  - assert File( 'report_sim.py' )
+  - assert File( 'prepare_sdf.py' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.vcs.v' )
+  - assert File( 'inputs/design.sdf' )
+  - assert File( 'inputs/design.pt.sdc' )
+  - assert File( 'inputs/macro-collateral.json' )
+  - assert File( 'inputs/testbench.sv' )
+  - assert File( 'inputs/vitis-axi-memory-bfm.sv' )
+  - assert File( 'inputs/vitis-axilite-master-bfm.sv' )
+  - assert File( 'inputs/workload-vectors' )
+  - assert File( 'inputs/testbench-contract.json' )
+
+postconditions:
+  - assert File( 'outputs/run.vcd' )
+  - assert File( 'outputs/compile.log' )
+  - assert File( 'outputs/simulation.log' )
+  - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/sdf-annotation-manifest.json' )
+  - assert File( 'outputs/timing-config.json' )
+  - assert File( 'outputs/timing-config.values' )
+  - |
+      import json
+      from pathlib import Path
+      report = json.loads(Path('outputs/simulation-report.json').read_text())
+      assert report['mode'] == 'bagl'
+      assert report['status'] == 'passed'
+      assert report['pass_marker_found']
+      assert report['sdf_requested']
+      assert report['sdf_error_count'] == 0
+      assert report['top_sdf_annotation_completed']
+      assert report['macro_sdf_expected_count'] == report['macro_sdf_annotated_count']
+      assert report['missing_macro_sdf_count'] == 0
+      assert report['timing_violation_count'] == 0
+      assert not report['dut_unknown_detected']
+      if report['sdf_warning_policy'] == 'error':
+          assert report['sdf_warning_count'] == 0
+      assert report['vcd_bytes'] > 0

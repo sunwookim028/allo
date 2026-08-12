@@ -71,9 +71,10 @@ def main() -> None:
     published = []
     for entry in index.get("entries", []):
         class_id = entry["id"]
-        if class_id not in manifest_classes:
+        source_class_id = entry.get("source_macro_class_id", class_id)
+        if source_class_id not in manifest_classes:
             raise ValueError(f"signoff entry {class_id} is absent from ASIC manifest")
-        if entry.get("reuse_count") != manifest_classes[class_id].get("member_count"):
+        if entry.get("reuse_count", 0) > manifest_classes[source_class_id].get("member_count", 0):
             raise ValueError(f"reuse count changed for {class_id}")
         destination = output_root / class_id
         destination.mkdir()
@@ -109,6 +110,7 @@ def main() -> None:
         )
         record = {
             "macro_class_id": class_id,
+            "source_macro_class_id": source_class_id,
             "top_module": entry["top_module"],
             "reuse_count": entry["reuse_count"],
             "candidate_kind": entry.get("candidate_kind", "semantic_pe"),
@@ -119,6 +121,10 @@ def main() -> None:
             "members": entry["members"],
             "member_placements": entry.get("member_placements", []),
             "port_maps": entry["port_maps"],
+            "fold_fifos_into_macro": bool(
+                entry.get("fold_fifos_into_macro", False)
+            ),
+            "folded_fifo_count": int(entry.get("folded_fifo_count", 0)),
             "lef_symmetry": symmetry,
             "views": view_records,
             "reports": sorted(

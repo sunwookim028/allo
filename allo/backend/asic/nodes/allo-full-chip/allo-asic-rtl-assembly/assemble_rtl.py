@@ -109,15 +109,22 @@ def rewrite_instances(body: str, replacement_by_module: dict[str, dict]) -> tupl
             seen.append(member)
             return "." + port_map[member] + port_match.group("spacing") + "("
 
-        renamed = re.sub(
-            rf"\.(?P<port>{IDENT})(?P<spacing>\s*)\(", rename_port, connections
-        )
-        if not seen:
-            raise ValueError(
-                f"instance {match.group('instance')} of {source} is not named-port RTL"
+        explicit = detail.get("explicit_canonical_connections")
+        if explicit:
+            renamed = ",\n".join(
+                f".{port}({expression})" for port, expression in explicit.items()
             )
-        if len(set(port_map[name] for name in seen)) != len(seen):
-            raise ValueError(f"canonical port collision while rewriting {source}")
+            seen = list(explicit)
+        else:
+            renamed = re.sub(
+                rf"\.(?P<port>{IDENT})(?P<spacing>\s*)\(", rename_port, connections
+            )
+            if not seen:
+                raise ValueError(
+                    f"instance {match.group('instance')} of {source} is not named-port RTL"
+                )
+            if len(set(port_map[name] for name in seen)) != len(seen):
+                raise ValueError(f"canonical port collision while rewriting {source}")
         replacement = (
             detail["canonical_module"]
             + body[match.end("module") : match.start("instance")]
@@ -140,6 +147,35 @@ def rewrite_instances(body: str, replacement_by_module: dict[str, dict]) -> tupl
     for start, end, replacement in reversed(edits):
         body = body[:start] + replacement + body[end:]
     return body, records
+
+
+def remove_instances(body: str, removals: list[dict]) -> tuple[str, list[dict]]:
+    edits = []
+    removed = []
+    for item in removals:
+        pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$]){re.escape(item['fifo_module'])}\s+"
+            rf"{re.escape(item['fifo_instance'])}\s*\("
+        )
+        matches = list(pattern.finditer(body))
+        if len(matches) != 1:
+            raise ValueError(
+                f"expected one folded FIFO instance {item['fifo_module']} "
+                f"{item['fifo_instance']}, found {len(matches)}"
+            )
+        match = matches[0]
+        opening = body.find("(", match.start())
+        closing = closing_parenthesis(body, opening)
+        end = closing + 1
+        while end < len(body) and body[end].isspace():
+            end += 1
+        if end >= len(body) or body[end] != ";":
+            raise ValueError(f"folded FIFO {item['fifo_instance']} lacks semicolon")
+        edits.append((match.start(), end + 1, ""))
+        removed.append(item)
+    for start, end, replacement in sorted(edits, reverse=True):
+        body = body[:start] + replacement + body[end:]
+    return body, removed
 
 
 def interface_stub(block: str, module_name: str) -> str:
@@ -186,11 +222,21 @@ def main() -> None:
 
     pieces = []
     rewritten = []
+    removed_fifos = []
+    fifo_removals_by_parent = {}
+    for replacement in replacements:
+        for fifo in replacement.get("folded_fifos", []):
+            fifo_removals_by_parent.setdefault(fifo["parent_module"], []).append(fifo)
     cursor = 0
     for block in blocks:
         pieces.append(source[cursor : block["start"]])
         if block["name"] not in removed:
-            updated, records = rewrite_instances(block["text"], replacement_by_module)
+            body = block["text"]
+            body, removed_here = remove_instances(
+                body, fifo_removals_by_parent.get(block["name"], [])
+            )
+            removed_fifos.extend(removed_here)
+            updated, records = rewrite_instances(body, replacement_by_module)
             pieces.append(updated)
             for record in records:
                 record["parent_module"] = block["name"]
@@ -202,6 +248,12 @@ def main() -> None:
     if len(rewritten) != expected_instances:
         raise ValueError(
             f"rewrote {len(rewritten)} instances but plan requires {expected_instances}"
+        )
+    expected_fifos = int(plan.get("folded_fifo_count", 0))
+    if len(removed_fifos) != expected_fifos:
+        raise ValueError(
+            f"removed {len(removed_fifos)} FIFO instances but plan requires "
+            f"{expected_fifos}"
         )
     surviving = {item["name"] for item in module_blocks(assembled)}
     if surviving & removed:
@@ -215,7 +267,19 @@ def main() -> None:
         class_id = class_plan["macro_class_id"]
         macro = macros_by_id[class_id]
         canonical = class_plan["canonical_module"]
-        stubs.append(interface_stub(block_by_name[canonical]["text"], canonical))
+        if canonical in block_by_name:
+            canonical_block = block_by_name[canonical]["text"]
+        else:
+            verilog_path = inputs / "macro-registry" / macro["views"]["verilog"]["path"]
+            published_blocks = {
+                item["name"]: item for item in module_blocks(verilog_path.read_text())
+            }
+            if canonical not in published_blocks:
+                raise ValueError(
+                    f"published functional model lacks canonical wrapper {canonical}"
+                )
+            canonical_block = published_blocks[canonical]["text"]
+        stubs.append(interface_stub(canonical_block, canonical))
         collateral_classes.append(
             {
                 "macro_class_id": class_id,
@@ -239,6 +303,7 @@ def main() -> None:
         "macro_classes": collateral_classes,
         "removed_module_definitions": sorted(removed),
         "rewritten_instances": rewritten,
+        "removed_folded_fifos": removed_fifos,
         "synthesis_policy": (
             "read assembled-design.v and link canonical macro DB views; do not read "
             "macro-interface-stubs.v as an implementation"

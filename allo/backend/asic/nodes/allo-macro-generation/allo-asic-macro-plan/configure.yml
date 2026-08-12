@@ -21,6 +21,7 @@ parameters:
   harden_repeated_hls_submodules: False
   macro_clock_period: 8.0
   bypass_macro_generation: False
+  fold_fifos_into_macro: False
 
 preconditions:
   - assert File( 'inputs/design.v' )

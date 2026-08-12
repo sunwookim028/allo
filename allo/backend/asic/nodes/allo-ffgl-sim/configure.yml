@@ -1,0 +1,51 @@
+name: allo-ffgl-sim
+
+inputs:
+  - adk
+  - design.v
+  - testbench.sv
+  - vitis-axi-memory-bfm.sv
+  - vitis-axilite-master-bfm.sv
+  - workload-vectors
+  - testbench-contract.json
+  - macro-registry
+  - srams
+
+outputs:
+  - run.vcd
+  - compile.log
+  - simulation.log
+  - simulation-report.json
+
+commands:
+  - bash run.sh
+
+parameters:
+  testbench_name: allo_generated_testbench
+  waveform: True
+
+preconditions:
+  - assert Tool( 'vcs' )
+  - assert File( 'run.sh' )
+  - assert File( 'report_sim.py' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/testbench.sv' )
+  - assert File( 'inputs/vitis-axi-memory-bfm.sv' )
+  - assert File( 'inputs/vitis-axilite-master-bfm.sv' )
+  - assert File( 'inputs/workload-vectors' )
+  - assert File( 'inputs/testbench-contract.json' )
+
+postconditions:
+  - assert File( 'outputs/run.vcd' )
+  - assert File( 'outputs/compile.log' )
+  - assert File( 'outputs/simulation.log' )
+  - assert File( 'outputs/simulation-report.json' )
+  - |
+      import json
+      from pathlib import Path
+      report = json.loads(Path('outputs/simulation-report.json').read_text())
+      assert report['mode'] == 'ffgl'
+      assert report['status'] == 'passed'
+      assert report['pass_marker_found']
+      assert report['vcd_bytes'] > 0

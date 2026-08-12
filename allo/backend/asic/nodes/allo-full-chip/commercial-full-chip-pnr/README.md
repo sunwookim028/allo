@@ -9,3 +9,12 @@ and Allo kernel/PE tiling before standard-cell placement.
 
 The optional `srams` input retains the original directory interface. When it is
 absent or empty, physical-intent generation and PNR operate as a PE-only flow.
+
+Hold repair uses `hold_optimization_target_slack` during both post-CTS and
+post-route optimization; its default is 0.20 ns. The separate mandatory
+`hold_target_slack` defaults to 0.15 ns, providing convergence and extraction
+headroom instead of treating barely nonnegative slack as sufficient for SDF
+simulation. A full PNR run fails its postconditions if final signoff hold WNS
+misses the mandatory target. The metrics JSON records post-CTS, post-route,
+and signoff setup/hold summaries. Detailed path reports produced by the setup
+and hold `timeDesign` calls are retained under `reports/`.

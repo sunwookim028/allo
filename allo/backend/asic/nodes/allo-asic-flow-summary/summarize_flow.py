@@ -211,7 +211,7 @@ def load_stage_metrics() -> list[dict]:
     return stages
 
 
-def summarize_macro(macro: dict) -> dict:
+def summarize_macro(macro: dict, macro_power_by_class: dict[str, dict]) -> dict:
     macro_id = macro["macro_class_id"]
     reports = REGISTRY_ROOT / macro_id / "reports"
     lef_info = macro.get("views", {}).get("lef", {})
@@ -251,7 +251,10 @@ def summarize_macro(macro: dict) -> dict:
         **timing,
         "drc_results": parse_drc_count(read_optional(drc_reports[0])) if drc_reports else None,
         "lvs_status": parse_lvs(read_optional(lvs_reports[0])) if lvs_reports else "unavailable",
-        "power": {"status": "unavailable", "reason": "no power-analysis report is emitted in Stage 1"},
+        "power": macro_power_by_class.get(
+            macro_id,
+            {"status": "unavailable", "reason": "no class power result"},
+        ),
     }
 
 
@@ -281,6 +284,10 @@ def write_tcl(summary: dict) -> None:
         f"set allo_asic_innovus_route_drc_results {tcl_atom(summary['full_chip_verification']['innovus_route_drc_results'])}",
         f"set allo_asic_innovus_antenna_results {tcl_atom(summary['full_chip_verification']['innovus_antenna_results'])}",
         f"set allo_asic_full_chip_lvs_status {tcl_atom(summary['full_chip_verification']['lvs_status'])}",
+        f"set allo_asic_ffgl_status {tcl_atom(summary['simulation']['ffgl'].get('status'))}",
+        f"set allo_asic_bagl_status {tcl_atom(summary['simulation']['bagl'].get('status'))}",
+        f"set allo_asic_macro_activity_status {tcl_atom(summary['macro_activity'].get('status'))}",
+        f"set allo_asic_combined_total_power_w {tcl_atom(summary['power']['combined_power_w'].get('total_w'))}",
     ]
     stage_names = []
     for stage in summary["stages"]:
@@ -327,6 +334,12 @@ def write_text(summary: dict) -> None:
         f"  Innovus antenna results: {verification['innovus_antenna_results']}",
         f"  LVS status: {verification['lvs_status']}",
         "",
+        "Gate-level simulation and activity:",
+        f"  FFGL: {summary['simulation']['ffgl'].get('status')}",
+        f"  BAGL: {summary['simulation']['bagl'].get('status')}",
+        f"  Macro SAIF extraction: {summary['macro_activity'].get('status')} "
+        f"({summary['macro_activity'].get('extracted_count')}/{summary['macro_activity'].get('class_count')} classes)",
+        "",
         "Hardened macros:",
     ])
     for macro in summary["macros"]:
@@ -337,13 +350,32 @@ def write_text(summary: dict) -> None:
             f"hold_wns/tns={macro['hold_wns_ns']}/{macro['hold_tns_ns']} ns "
             f"DRC={macro['drc_results']} LVS={macro['lvs_status']}"
         )
-    lines.extend(["", "Power: unavailable (Stage 1 currently emits no power report)."])
+    power = summary["power"]
+    if power["status"] == "unavailable":
+        lines.extend(["", "Power: unavailable."])
+    else:
+        lines.extend([
+            "",
+            "Workload-driven power:",
+            f"  Top-level shell: {power['top_level_power_w'].get('total_w')} W",
+            f"  Reuse-weighted macros: {power['weighted_macro_power_w'].get('total_w')} W",
+            f"  Combined estimate: {power['combined_power_w'].get('total_w')} W",
+        ])
     (OUTPUTS / "flow-summary.txt").write_text("\n".join(lines) + "\n")
 
 
 def main() -> None:
     registry = json.loads((INPUTS / "macro-registry.json").read_text())
-    macros = [summarize_macro(item) for item in registry.get("macros", [])]
+    macro_power = json.loads(
+        read_optional(INPUTS / "macro-power-summary.json") or "{}"
+    )
+    macro_power_by_class = {
+        item["macro_class_id"]: item for item in macro_power.get("classes", [])
+    }
+    macros = [
+        summarize_macro(item, macro_power_by_class)
+        for item in registry.get("macros", [])
+    ]
     stages = load_stage_metrics()
     drc_policy_path = INPUTS / "drc-policy.json"
     drc_policy = (
@@ -358,7 +390,7 @@ def main() -> None:
     if not report_design_name or report_design_name == "undefined":
         report_design_name = os.environ.get("design_name", "undefined")
     summary = {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_policy": "reports_and_explicit_metrics_only",
         "implementation_style": registry.get(
             "implementation_style", "hierarchical_macros"
@@ -396,6 +428,26 @@ def main() -> None:
         "stages": stages,
         "stages_by_node": {item["node"]: item for item in stages},
         "macros": macros,
+        "simulation": {
+            "ffgl": json.loads(
+                read_optional(INPUTS / "ffgl-simulation-report.json") or "{}"
+            ),
+            "bagl": json.loads(
+                read_optional(INPUTS / "bagl-simulation-report.json") or "{}"
+            ),
+        },
+        "macro_activity": {},
+        "power": {
+            "status": (
+                "unavailable" if not macro_power else
+                ("passed" if macro_power.get("failed_count") == 0 else "failed")
+            ),
+            "top_level_power_w": macro_power.get("top_level_power_w", {}),
+            "weighted_macro_power_w": macro_power.get("weighted_macro_power_w", {}),
+            "combined_power_w": macro_power.get("combined_power_w", {}),
+            "represented_instance_count": macro_power.get("represented_instance_count"),
+            "class_count": macro_power.get("class_count"),
+        },
         "full_chip_verification": {
             "drc_results": parse_drc_count(read_optional(INPUTS / "drc.summary")),
             "calibre_non_antenna_results": drc_policy.get("non_antenna_results"),
@@ -409,6 +461,15 @@ def main() -> None:
             ),
             "lvs_status": parse_lvs(read_optional(INPUTS / "lvs.report")),
         },
+    }
+    activity = json.loads(
+        read_optional(INPUTS / "macro-activity-manifest.json") or "{}"
+    )
+    summary["macro_activity"] = {
+        "status": "passed" if activity.get("failed_count") == 0 else "failed",
+        "class_count": activity.get("class_count"),
+        "extracted_count": activity.get("extracted_count"),
+        "failed_count": activity.get("failed_count"),
     }
     OUTPUTS.mkdir(exist_ok=True)
     (OUTPUTS / "flow-summary.json").write_text(json.dumps(summary, indent=2) + "\n")

@@ -58,9 +58,25 @@ def configure_backend(backend, clock_period, options_text):
             },
         }
         return "vitis_hls", configs, {"device": device, "rtl_stage": "syn"}
+    if backend == "catapult":
+        device = options.get("device", "nangate-45nm_beh")
+        configs = {
+            "frequency": 1000.0 / clock_period,
+            "device": device,
+            "preserve_hierarchy": options.get("preserve_hierarchy", True),
+            "asic_manifest": {
+                "enabled": True,
+                "path": "asic-manifest.json",
+                "debug_artifacts": True,
+                "debug_dir": "asic-debug",
+            },
+        }
+        if "sub_funcs" in options:
+            configs["sub_funcs"] = options["sub_funcs"]
+        return "catapult", configs, {"device": device, "rtl_stage": "rtl"}
     else:
         raise ValueError(
-            f"unsupported Allo backend {backend!r}; currently supported: vitis"
+            f"unsupported Allo backend {backend!r}; supported: vitis, catapult"
         )
 
 
@@ -78,7 +94,19 @@ def find_rtl_directory(backend, project):
                 f"under {project}, found {len(candidates)}: {candidates}"
             )
         return candidates[0]
+    if backend == "catapult":
+        candidates = sorted(
+            rtl.parent
+            for rtl in project.glob("Catapult*/*.v1/rtl.v")
+            if rtl.is_file()
+        )
+        if len(candidates) != 1:
+            raise RuntimeError(
+                "expected exactly one Catapult Catapult*/*.v1/rtl.v directory "
+                f"under {project}, found {len(candidates)}: {candidates}"
+            )
+        return candidates[0]
     else:
         raise ValueError(
-            f"unsupported Allo backend {backend!r}; currently supported: vitis"
+            f"unsupported Allo backend {backend!r}; supported: vitis, catapult"
         )

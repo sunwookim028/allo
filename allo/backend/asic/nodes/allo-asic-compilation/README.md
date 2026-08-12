@@ -32,6 +32,20 @@ Important parameters are:
 - `allo_setup_script`: shell script sourced before preflight and compilation to
   configure the prebuilt LLVM backend. It defaults to
   `/work/shared/common/allo/setup-llvm-main.sh`.
+- `allo_testbench_enabled`: when true, freeze a design-supplied workload after
+  HLS succeeds while the same Allo environment and design parameters remain
+  active.
+- `allo_testbench_workload_factory`: design-module callable returning the
+  backend-independent call signature, initial argument arrays, and expected
+  output arrays. It defaults to `testbench_workload`.
+- `allo_testbench_top_function`: fallback top-function name if the workload
+  does not provide one.
+
+The frozen outputs are `workload-manifest.json` and `workload-vectors/`.
+Array dtype, shape, element width, and count are recorded in JSON; values are
+serialized as one hexadecimal element per line. This means downstream
+testbench generation does not receive design-only parameters such as array
+size, FIFO depth, or dtype—it consumes the realized workload and HLS outputs.
 
 The success marker is written only after the pre-HLS/final manifests, zero
 unmatched joins, debug directory, and synthesized Verilog have all been

@@ -132,7 +132,10 @@ if {![info exists env(cell_padding)]} {
   set env(cell_padding) 0
 }
 if {![info exists env(hold_target_slack)]} {
-  set env(hold_target_slack) 0.05
+  set env(hold_target_slack) 0.15
+}
+if {![info exists env(hold_optimization_target_slack)]} {
+  set env(hold_optimization_target_slack) 0.20
 }
 if {![info exists env(setup_target_slack)]} {
   set env(setup_target_slack) 0.0
@@ -764,6 +767,7 @@ set pnr_stage_started [clock milliseconds]
 
 setOptMode -fixHoldAllowOverlap TRUE
 setOptMode -fixHoldAllowSetupTnsDegrade true
+setOptMode -holdTargetSlack $::env(hold_optimization_target_slack)
 
 optDesign -postCTS -hold -outDir reports -prefix postcts_hold
 
@@ -816,7 +820,7 @@ set pnr_stage_started [clock milliseconds]
 
 setOptMode -verbose true
 setOptMode -usefulSkewPostRoute true
-setOptMode -holdTargetSlack  $::env(hold_target_slack)
+setOptMode -holdTargetSlack  $::env(hold_optimization_target_slack)
 setOptMode -setupTargetSlack $::env(setup_target_slack)
 
 if { $::env(signoff_engine) } {
@@ -957,7 +961,11 @@ if {$antenna_policy eq "off"} {
   }
 }
 
-write_sdf $results_dir/$design_name.sdf
+# Recompute each timing arc explicitly for functional back-annotated
+# simulation. Innovus' high-performance shared-arc approximation is useful
+# during optimization but can disagree with the specify arcs in the Verilog
+# timing models.
+write_sdf -recompute_delay_calc $results_dir/$design_name.sdf
 writeTimingCon $results_dir/$design_name.pt.sdc
 sed -i "s/^current_design/\#current_design/" $results_dir/$design_name.pt.sdc
 sed -i "s/get_design.*$/current_design\]/" $results_dir/$design_name.pt.sdc

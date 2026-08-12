@@ -74,9 +74,14 @@ def main():
             raise RuntimeError(
                 "Vitis backend selected, but vitis_hls is not available on PATH"
             )
+    elif args.backend == "catapult":
+        if shutil.which("catapult") is None:
+            raise RuntimeError(
+                "Catapult backend selected, but catapult is not available on PATH"
+            )
     else:
         raise RuntimeError(
-            f"unsupported Allo backend {args.backend!r}; currently supported: vitis"
+            f"unsupported Allo backend {args.backend!r}; supported: vitis, catapult"
         )
 
     print(f"Python: {running_python}")

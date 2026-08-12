@@ -65,14 +65,18 @@ if {![info exists env(pin_layer_offset)]} {
 if {![info exists env(pin_secondary_layer_offset)]} {
   set env(pin_secondary_layer_offset) 5
 }
-if {![info exists env(pin_multilayer_threshold)]} {
-  set env(pin_multilayer_threshold) 100
+if {![info exists env(pin_min_pitch_multiplier)]} {
+  set env(pin_min_pitch_multiplier) 2.0
 }
 if {![info exists env(pin_corner_keepout)]} {
   set env(pin_corner_keepout) 3.0
 }
 if {![info exists env(pin_primary_fraction)]} {
   set env(pin_primary_fraction) 0.75
+}
+if {![string is double -strict $env(pin_min_pitch_multiplier)] ||
+    $env(pin_min_pitch_multiplier) < 1.0} {
+  error "pin_min_pitch_multiplier must be a number greater than or equal to one"
 }
 if {![info exists env(power_mesh_bot_layer)]} {
   if {[info exists ADK_POWER_MESH_BOT_LAYER]} {
@@ -136,11 +140,11 @@ if {![info exists env(useful_skew_ccopt_effort)]} {
 if {![info exists env(cell_padding)]} {
   set env(cell_padding) 0
 }
-if {![info exists env(hold_target_slack)]} {
-  set env(hold_target_slack) 0.05
+if {![info exists env(macro_hold_target_slack)]} {
+  set env(macro_hold_target_slack) 0.05
 }
-if {![info exists env(setup_target_slack)]} {
-  set env(setup_target_slack) 0.05
+if {![info exists env(macro_setup_target_slack)]} {
+  set env(macro_setup_target_slack) 0.05
 }
 if {![info exists env(postroute_optimization_passes)]} {
   set env(postroute_optimization_passes) 2
@@ -318,6 +322,9 @@ setDesignMode -process $env(process_node) -powerEffort high
 #-------------------------------------------------------------------------
 
 setOptMode -timeDesignCompressReports false
+if {[info exists ADK_HOLD_FIXING_CELL_LIST] && $ADK_HOLD_FIXING_CELL_LIST ne ""} {
+  setOptMode -holdFixingCells $ADK_HOLD_FIXING_CELL_LIST
+}
 
 if {[info exists ADK_DONT_USE_CELL_LIST]} {
   foreach_in_collection cell [get_lib_cells $ADK_DONT_USE_CELL_LIST] {
@@ -460,45 +467,123 @@ proc resolve_manifest_group {logical_group all_ports} {
   return $result
 }
 
-proc split_pin_groups_by_layer {groups all_ports total threshold fraction} {
-  set primary {}
-  set secondary {}
-  if {$total < $threshold} {
-    foreach group $groups {
-      set primary [concat $primary [resolve_manifest_group $group $all_ports]]
+# Return the routing pitch declared by the loaded ADK for an Innovus layer.
+proc pin_layer_pitch {layer_obj} {
+  set candidates {}
+  foreach attribute {pitchX pitchY} {
+    set value [dbGet $layer_obj.$attribute]
+    if {[llength $value] > 0} {
+      set value [lindex $value 0]
+      if {[string is double -strict $value] && $value > 0.0} {
+        lappend candidates $value
+      }
     }
-    return [list $primary $secondary]
   }
-  set primary_target [expr {int(ceil($total * $fraction))}]
-  set primary_count 0
-  # Largest-first packing prevents one wide bus from being fragmented and
-  # produces a stable partition independent of dictionary ordering.
-  set weighted {}
-  set ordinal 0
+  if {[llength $candidates] == 0} {
+    error "Loaded ADK does not provide a positive routing pitch for layer [dbGet $layer_obj.name]"
+  }
+  return [lindex [lsort -real $candidates] 0]
+}
+
+proc pin_edge_usable_length {side keepout} {
+  set box [dbGet top.fPlan.box]
+  if {[llength $box] == 1} {
+    set box [lindex $box 0]
+  }
+  set width [expr {[lindex $box 2] - [lindex $box 0]}]
+  set height [expr {[lindex $box 3] - [lindex $box 1]}]
+  if {$side eq "TOP" || $side eq "BOTTOM"} {
+    set length $width
+  } else {
+    set length $height
+  }
+  set usable [expr {$length - 2.0 * $keepout}]
+  if {$usable < 0.0} {
+    error "pin_corner_keepout=$keepout leaves no usable length on $side edge"
+  }
+  return $usable
+}
+
+# N pins require N-1 pitch intervals. Capacity is therefore floor(L/P)+1.
+proc pin_layer_capacity {side layer_obj keepout pitch_multiplier} {
+  set usable [pin_edge_usable_length $side $keepout]
+  set adk_pitch [pin_layer_pitch $layer_obj]
+  set required_pitch [expr {$adk_pitch * $pitch_multiplier}]
+  set capacity [expr {int(floor($usable / $required_pitch)) + 1}]
+  return [list $capacity $adk_pitch $required_pitch $usable]
+}
+
+# Pack complete semantic groups onto two layers. A small subset-sum search
+# selects the primary-layer groups closest to the requested fraction while
+# respecting both physical capacities. No bus or handshake group is divided.
+proc pack_pin_groups_by_capacity {
+  groups all_ports primary_capacity secondary_capacity fraction
+} {
+  set resolved_groups {}
+  set widths {}
+  set total 0
   foreach group $groups {
     set resolved [resolve_manifest_group $group $all_ports]
-    lappend weighted [list [llength $resolved] $ordinal $resolved]
-    incr ordinal
-  }
-  set weighted [lsort -integer -decreasing -index 0 $weighted]
-  foreach item $weighted {
-    set resolved [lindex $item 2]
     set width [llength $resolved]
-    # Preserve ordinary interface groups, but an individual group wider than the
-    # complete primary-layer target must be divided between the two legal layers.
-    if {$width > $primary_target && $primary_count == 0} {
-      set split_index [expr {$primary_target - 1}]
-      set primary [concat $primary [lrange $resolved 0 $split_index]]
-      set secondary [concat $secondary [lrange $resolved $primary_target end]]
-      set primary_count $primary_target
-    } elseif {$primary_count == 0 || $primary_count + $width <= $primary_target} {
+    lappend resolved_groups $resolved
+    lappend widths $width
+    incr total $width
+  }
+  if {$total <= $primary_capacity} {
+    set primary {}
+    foreach resolved $resolved_groups {
       set primary [concat $primary $resolved]
-      incr primary_count $width
+    }
+    return [list $primary {} $widths]
+  }
+  if {$total > $primary_capacity + $secondary_capacity} {
+    error "Pin groups require $total slots but the two layers provide only [expr {$primary_capacity + $secondary_capacity}]"
+  }
+
+  # Map reachable primary counts to the group indices assigned there.
+  set states [dict create 0 {}]
+  for {set index 0} {$index < [llength $widths]} {incr index} {
+    set width [lindex $widths $index]
+    set next $states
+    dict for {count indices} $states {
+      set candidate [expr {$count + $width}]
+      if {$candidate <= $primary_capacity && ![dict exists $next $candidate]} {
+        dict set next $candidate [concat $indices [list $index]]
+      }
+    }
+    set states $next
+  }
+
+  set target [expr {$total * $fraction}]
+  set best_count -1
+  set best_score 1.0e30
+  dict for {count indices} $states {
+    set secondary_count [expr {$total - $count}]
+    if {$secondary_count > $secondary_capacity} {
+      continue
+    }
+    set score [expr {abs($count - $target)}]
+    if {$score < $best_score || ($score == $best_score && $count > $best_count)} {
+      set best_score $score
+      set best_count $count
+    }
+  }
+  if {$best_count < 0} {
+    error "Whole pin groups with widths {$widths} cannot fit capacities primary=$primary_capacity secondary=$secondary_capacity"
+  }
+
+  set primary_indices [dict get $states $best_count]
+  set primary {}
+  set secondary {}
+  for {set index 0} {$index < [llength $resolved_groups]} {incr index} {
+    set resolved [lindex $resolved_groups $index]
+    if {[lsearch -exact $primary_indices $index] >= 0} {
+      set primary [concat $primary $resolved]
     } else {
       set secondary [concat $secondary $resolved]
     }
   }
-  return [list $primary $secondary]
+  return [list $primary $secondary $widths]
 }
 
 # Place pins only on the middle portion of an edge.  SIDE spreading uses the
@@ -525,12 +610,16 @@ proc edit_pins_with_corner_keepout {pins layer side keepout} {
       set end   [list [expr {$urx - $keepout}] $ury]
     }
     BOTTOM {
-      set start [list [expr {$llx + $keepout}] $lly]
-      set end   [list [expr {$urx - $keepout}] $lly]
+      # Innovus interprets RANGE endpoints as a directed walk around the block
+      # boundary. Reverse the bottom edge so the range stays on that edge
+      # instead of taking the long path through the other three sides.
+      set start [list [expr {$urx - $keepout}] $lly]
+      set end   [list [expr {$llx + $keepout}] $lly]
     }
     RIGHT {
-      set start [list $urx [expr {$lly + $keepout}]]
-      set end   [list $urx [expr {$ury - $keepout}]]
+      # Use the same perimeter direction as TOP and LEFT.
+      set start [list $urx [expr {$ury - $keepout}]]
+      set end   [list $urx [expr {$lly + $keepout}]]
     }
     LEFT {
       set start [list $llx [expr {$lly + $keepout}]]
@@ -540,15 +629,13 @@ proc edit_pins_with_corner_keepout {pins layer side keepout} {
       error "Unsupported pin side '$side'"
     }
   }
-  if {([lindex $start 0] > [lindex $end 0]) ||
-      ([lindex $start 1] > [lindex $end 1])} {
-    error "pin_corner_keepout=$keepout leaves no legal range on $side edge"
-  }
-  editPin -layer $layer -pin $pins -spreadType RANGE -start $start -end $end
+  editPin -layer $layer -pin $pins -spreadType RANGE -start $start -end $end \
+    -fixedPin true
 }
 
 set assigned_ports {}
 set pin_assignment_report [open reports/pin-assignment.rpt w]
+setPinAssignMode -pinEditInBatch true
 foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
   set variable_name allo_asic_signal_pins_${compass}
   if {![info exists $variable_name]} {
@@ -575,17 +662,40 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
   }
   set groups_variable_name allo_asic_signal_pin_groups_${compass}
   if {[info exists $groups_variable_name]} {
-    set resolved_layers [split_pin_groups_by_layer \
-      [set $groups_variable_name] $all_ports [llength $side_ports] \
-      $env(pin_multilayer_threshold) $env(pin_primary_fraction)]
+    set primary_capacity_data [pin_layer_capacity $innovus_side \
+      $primary_pin_layer_obj $env(pin_corner_keepout) \
+      $env(pin_min_pitch_multiplier)]
+    set secondary_capacity_data [pin_layer_capacity $innovus_side \
+      $secondary_pin_layer_obj $env(pin_corner_keepout) \
+      $env(pin_min_pitch_multiplier)]
+    set resolved_layers [pack_pin_groups_by_capacity \
+      [set $groups_variable_name] $all_ports \
+      [lindex $primary_capacity_data 0] [lindex $secondary_capacity_data 0] \
+      $env(pin_primary_fraction)]
     set primary_side_ports [lindex $resolved_layers 0]
     set secondary_side_ports [lindex $resolved_layers 1]
+    set group_widths [lindex $resolved_layers 2]
   } else {
     set primary_side_ports $side_ports
     set secondary_side_ports {}
+    set group_widths [list [llength $side_ports]]
+    set primary_capacity_data [pin_layer_capacity $innovus_side \
+      $primary_pin_layer_obj $env(pin_corner_keepout) \
+      $env(pin_min_pitch_multiplier)]
+    set secondary_capacity_data [pin_layer_capacity $innovus_side \
+      $secondary_pin_layer_obj $env(pin_corner_keepout) \
+      $env(pin_min_pitch_multiplier)]
   }
   puts $pin_assignment_report \
-    "$compass SUMMARY total=[llength $side_ports] primary_layer=$ports_layer primary=[llength $primary_side_ports] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports] corner_keepout=$env(pin_corner_keepout)"
+    "$compass SUMMARY total=[llength $side_ports] groups={$group_widths} primary_layer=$ports_layer primary=[llength $primary_side_ports] primary_capacity=[lindex $primary_capacity_data 0] primary_adk_pitch=[lindex $primary_capacity_data 1] primary_min_pitch=[lindex $primary_capacity_data 2] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports] secondary_capacity=[lindex $secondary_capacity_data 0] secondary_adk_pitch=[lindex $secondary_capacity_data 1] secondary_min_pitch=[lindex $secondary_capacity_data 2] usable_edge=[lindex $primary_capacity_data 3] corner_keepout=$env(pin_corner_keepout)"
+  set primary_layer_name [dbGet $primary_pin_layer_obj.name]
+  set secondary_layer_name [dbGet $secondary_pin_layer_obj.name]
+  foreach port $primary_side_ports {
+    puts $pin_assignment_report "PLAN $port side=$compass layer=$primary_layer_name"
+  }
+  foreach port $secondary_side_ports {
+    puts $pin_assignment_report "PLAN $port side=$compass layer=$secondary_layer_name"
+  }
   if {[llength $primary_side_ports] > 0} {
     edit_pins_with_corner_keepout \
       $primary_side_ports $ports_layer $innovus_side $env(pin_corner_keepout)
@@ -603,7 +713,8 @@ array set allo_innovus_side {N TOP S BOTTOM E RIGHT W LEFT}
 set resolved_clock_ports [resolve_manifest_group $allo_asic_clock_pins $all_ports]
 if {[llength $resolved_clock_ports] > 0} {
   editPin -layer $ports_layer -pin $resolved_clock_ports \
-    -side $allo_innovus_side($allo_asic_clock_side) -spreadType CENTER
+    -side $allo_innovus_side($allo_asic_clock_side) -spreadType CENTER \
+    -fixedPin true
   foreach port $resolved_clock_ports {
     if {[lsearch -exact $assigned_ports $port] >= 0} {
       close $pin_assignment_report
@@ -614,6 +725,7 @@ if {[llength $resolved_clock_ports] > 0} {
   puts $pin_assignment_report \
     "CLOCK side=$allo_asic_clock_side layer=$ports_layer ports=[join $resolved_clock_ports { }]"
 }
+setPinAssignMode -pinEditInBatch false
 set unassigned_ports {}
 foreach port $all_ports {
   if {[lsearch -exact $assigned_ports $port] < 0} {
@@ -625,6 +737,29 @@ if {[llength $unassigned_ports] > 0} {
   error "Manifest pin intent leaves ports unassigned: $unassigned_ports"
 }
 close $pin_assignment_report
+
+# TEMPORARY PIN-EXPORT DIAGNOSTIC (remove after the next pin experiment).
+# Capture a non-stripe abstract at several milestones to identify whether pin
+# side/layer drift is introduced by implementation or by -stripePin export.
+proc write_pin_debug_snapshot {label} {
+  global reports_dir results_dir design_name vars
+  set lef_path $reports_dir/pin-debug-${label}.lef
+  set check_path $reports_dir/pin-debug-${label}.check.rpt
+  if {[catch {
+    write_lef_abstract \
+      -specifyTopLayer $vars(max_route_layer) \
+      -noCutObs \
+      $lef_path
+    exec python3 scripts/check_final_lef_pins.py \
+      $reports_dir/pin-assignment.rpt $lef_path $check_path
+  } snapshot_error]} {
+    set error_stream [open $reports_dir/pin-debug-${label}.error.rpt w]
+    puts $error_stream "SNAPSHOT_ERROR $snapshot_error"
+    close $error_stream
+  }
+}
+
+write_pin_debug_snapshot post-edit
 
 reset_path_group -all
 resetPathGroupOptions
@@ -791,6 +926,8 @@ checkPlace -verbose > reports/place.checkPlace.after_refine.rpt
 checkPlace -macroBlockage -verbose > reports/place.checkPlace.macroBlockage.after_refine.rpt
 reportDensityMap > reports/place.density.rpt
 
+write_pin_debug_snapshot post-place
+
 report_metrics place
 maybe_stop_after place
 
@@ -856,8 +993,8 @@ maybe_stop_after cts
 
 setOptMode -fixHoldAllowOverlap TRUE
 setOptMode -fixHoldAllowSetupTnsDegrade false
-setOptMode -holdTargetSlack  $::env(hold_target_slack)
-setOptMode -setupTargetSlack $::env(setup_target_slack)
+setOptMode -holdTargetSlack  $::env(macro_hold_target_slack)
+setOptMode -setupTargetSlack $::env(macro_setup_target_slack)
 
 optDesign -postCTS -setup -outDir reports -prefix postcts_setup
 optDesign -postCTS -hold -outDir reports -prefix postcts_hold
@@ -891,6 +1028,8 @@ setNanoRouteMode -droutePostRouteSpreadWire false
 
 setExtractRCMode -engine postRoute -effortLevel low
 
+write_pin_debug_snapshot post-route-no-stripe
+
 report_metrics route
 maybe_stop_after route
 
@@ -901,8 +1040,8 @@ maybe_stop_after route
 setOptMode -verbose true
 setOptMode -usefulSkewPostRoute true
 setOptMode -fixHoldAllowSetupTnsDegrade false
-setOptMode -holdTargetSlack  $::env(hold_target_slack)
-setOptMode -setupTargetSlack $::env(setup_target_slack)
+setOptMode -holdTargetSlack  $::env(macro_hold_target_slack)
+setOptMode -setupTargetSlack $::env(macro_setup_target_slack)
 
 if { $::env(signoff_engine) } {
   setExtractRCMode -engine postRoute -effortLevel signoff
@@ -1080,6 +1219,19 @@ write_lef_abstract \
   -PGPinLayers [list $pmesh_bot $pmesh_top] \
   -noCutObs \
   $results_dir/$design_name.lef
+
+# Diagnostic only: compare the requested scalar side/layer contract with the
+# final abstract. Keep macro PNR usable while the abstract-export behavior is
+# being characterized; mismatches are recorded rather than made fatal.
+if {[catch {
+  exec python3 scripts/check_final_lef_pins.py \
+    reports/pin-assignment.rpt $results_dir/$design_name.lef \
+    reports/final-lef-pin-check.rpt
+} pin_check_error]} {
+  set pin_check_stream [open reports/final-lef-pin-check.rpt w]
+  puts $pin_check_stream "CHECK_ERROR $pin_check_error"
+  close $pin_check_stream
+}
 
 defOut -routing -allLayers $results_dir/$design_name.def.gz
 

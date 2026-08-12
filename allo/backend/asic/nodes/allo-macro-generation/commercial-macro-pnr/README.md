@@ -12,7 +12,22 @@ auxiliary interfaces follow explicit planner policies. Unknown, duplicate, or
 unassigned RTL ports are fatal. Logical vector names from the pre-synthesis
 manifest are expanded into naturally ordered synthesized Innovus terminals
 (`name[0]`, `name[1]`, ...) before placement, and the exact resolution is saved
-in `reports/pin-assignment.rpt`.
+in `reports/pin-assignment.rpt`. Layer allocation is capacity-driven: the
+usable edge length and routing pitch are read from the loaded ADK, the required
+center pitch is scaled by `pin_min_pitch_multiplier`, and whole semantic groups
+are packed across the primary and secondary layers. A stream group is never
+split merely to meet a target layer fraction. The resulting pins are explicitly
+fixed during batched `editPin` placement so later placement optimization cannot
+legally redistribute them. The report records group widths, ADK pitch, required
+pitch, and capacity for both layers on every edge.
+
+After abstract export, `check_final_lef_pins.py` compares those planned scalar
+assignments with the actual LEF rectangles. Its
+`reports/final-lef-pin-check.rpt` output is diagnostic rather than a strict
+postcondition while `write_lef_abstract -stripePin` behavior is being studied.
+For the next experiment only, the PNR script also writes checked non-stripe
+abstracts at post-edit, post-place, and post-route milestones. This temporary
+instrumentation is explicitly marked for removal after that run.
 FreePDK45 standard cells use uppercase `VDD` and `VSS`; only those PG-pin names
 are requested. Lowercase compatibility aliases are not probed because Innovus
 reports an unmatched `globalNetConnect` pattern as an error even after the real

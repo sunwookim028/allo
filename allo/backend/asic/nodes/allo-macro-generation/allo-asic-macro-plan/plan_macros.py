@@ -25,6 +25,15 @@ class ModuleBlock:
     text: str
 
 
+@dataclass(frozen=True)
+class InstanceBlock:
+    module: str
+    name: str
+    start: int
+    end: int
+    connections: dict[str, str]
+
+
 def module_blocks(text: str) -> dict[str, ModuleBlock]:
     """Return non-nested Verilog module definitions with source spans."""
     blocks: dict[str, ModuleBlock] = {}
@@ -64,6 +73,320 @@ def balanced_parentheses(text: str, opening: int) -> int:
             if depth == 0:
                 return index
     raise ValueError("unterminated parenthesized list")
+
+
+def named_connections(text: str) -> dict[str, str]:
+    result = {}
+    cursor = 0
+    pattern = re.compile(rf"\.({IDENT})\s*\(")
+    while match := pattern.search(text, cursor):
+        opening = text.find("(", match.start())
+        closing = balanced_parentheses(text, opening)
+        name = match.group(1)
+        if name in result:
+            raise ValueError(f"duplicate named connection {name}")
+        result[name] = text[opening + 1 : closing].strip()
+        cursor = closing + 1
+    return result
+
+
+def module_instances(block: ModuleBlock, modules: set[str]) -> list[InstanceBlock]:
+    """Return named-port instances of known modules in one module body."""
+    result = []
+    for module in sorted(modules, key=len, reverse=True):
+        pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$]){re.escape(module)}\s+(?P<name>{IDENT})\s*\("
+        )
+        for match in pattern.finditer(block.text):
+            opening = block.text.find("(", match.start())
+            closing = balanced_parentheses(block.text, opening)
+            end = closing + 1
+            while end < len(block.text) and block.text[end].isspace():
+                end += 1
+            if end >= len(block.text) or block.text[end] != ";":
+                continue
+            result.append(
+                InstanceBlock(
+                    module,
+                    match.group("name"),
+                    match.start(),
+                    end + 1,
+                    named_connections(block.text[opening + 1 : closing]),
+                )
+            )
+    return sorted(result, key=lambda item: item.start)
+
+
+def replace_declared_name(declaration: str, old: str, new: str) -> str:
+    return re.sub(rf"\b{re.escape(old)}\b", new, declaration)
+
+
+def wire_declaration(declaration: str, name: str) -> str:
+    width = re.search(r"\[[^\]]+\]", declaration)
+    return "wire " + (width.group(0) + " " if width else "") + name + ";"
+
+
+def change_declaration_direction(declaration: str, direction: str) -> str:
+    return re.sub(r"\b(?:input|output|inout)\b", direction, declaration, count=1)
+
+
+def outer_module_for_member(pe: dict, inner_module: str) -> str:
+    matches = []
+    for record in pe.get("post_hls_records", []):
+        if any(item.get("name") == inner_module for item in record.get("rtl_modules", [])):
+            matches.extend(
+                Path(item["parent_file"]).stem
+                for item in record.get("rtl_instances", [])
+                if item.get("parent_file")
+            )
+    unique = sorted(set(matches))
+    if len(unique) != 1:
+        raise ValueError(
+            f"cannot resolve unique outer kernel module for {pe['semantic_id']} "
+            f"inner module {inner_module}: {unique}"
+        )
+    return unique[0]
+
+
+def semantic_instance_name(pe: dict) -> str:
+    kernel = re.sub(r"[^A-Za-z0-9_$]+", "_", str(pe["kernel"])).strip("_")
+    pid = "_".join(str(value) for value in pe.get("pid", []))
+    return kernel + ("_" + pid if pid else "")
+
+
+FIFO_PRODUCER_PORTS = {
+    "din": "if_din",
+    "full_n": "if_full_n",
+    "write": "if_write",
+}
+FIFO_SHARED_PORTS = {
+    "num_data_valid": "if_num_data_valid",
+    "fifo_cap": "if_fifo_cap",
+}
+FIFO_CONSUMER_PORTS = {
+    "dout": "if_dout",
+    "empty_n": "if_empty_n",
+    "read": "if_read",
+}
+
+
+def normalize_expression(expression: str) -> str:
+    return re.sub(r"\s+", "", expression)
+
+
+def find_owned_fifo(
+    root: str,
+    pe_instance: InstanceBlock,
+    top_instances: list[InstanceBlock],
+    blocks: dict[str, ModuleBlock],
+) -> InstanceBlock:
+    expected = {
+        fifo_port: normalize_expression(pe_instance.connections[f"{root}_{suffix}"])
+        for suffix, fifo_port in FIFO_PRODUCER_PORTS.items()
+    }
+    matches = []
+    for instance in top_instances:
+        if "fifo" not in instance.module.lower():
+            continue
+        if all(
+            normalize_expression(instance.connections.get(port, "")) == expression
+            for port, expression in expected.items()
+        ):
+            matches.append(instance)
+    if len(matches) != 1:
+        raise ValueError(
+            f"cannot bind output bundle {pe_instance.module}.{root} to one FIFO: "
+            f"{[(item.module, item.name) for item in matches]}"
+        )
+    fifo = matches[0]
+    required = {
+        "clk", "reset", "if_read_ce", "if_write_ce", *FIFO_PRODUCER_PORTS.values(),
+        *FIFO_SHARED_PORTS.values(), *FIFO_CONSUMER_PORTS.values(),
+    }
+    missing = sorted(required - set(fifo.connections))
+    if missing:
+        raise ValueError(f"FIFO {fifo.name} lacks expected ports {missing}")
+    if fifo.module not in blocks:
+        raise ValueError(f"FIFO module definition is absent: {fifo.module}")
+    return fifo
+
+
+def generate_fifo_wrapper(
+    wrapper_name: str,
+    pe: dict,
+    outer: ModuleBlock,
+    pe_instance: InstanceBlock,
+    top_instances: list[InstanceBlock],
+    manifest: dict,
+    blocks: dict[str, ModuleBlock],
+) -> tuple[str, dict, dict[str, str]]:
+    """Wrap one complete kernel module and every stream FIFO it produces."""
+    outer_ports = port_names(outer)
+    outer_decls = port_declarations(outer, outer_ports)
+    intent = build_pin_intent(manifest, pe["semantic_id"], outer, blocks)
+    outgoing = [item for item in intent["stream_bundles"] if item["direction"] == "out"]
+    owned = []
+    removed_ports = set()
+    wrapper_decls = dict(outer_decls)
+    wrapper_connections = dict(pe_instance.connections)
+    pe_connection_values = {
+        normalize_expression(value) for value in pe_instance.connections.values()
+    }
+    top_ports = set(port_names(blocks[str(manifest["top"])]))
+
+    for bundle in outgoing:
+        root = str(bundle["root"])
+        fifo = find_owned_fifo(root, pe_instance, top_instances, blocks)
+        for control_port in ("clk", "reset"):
+            if normalize_expression(fifo.connections[control_port]) not in pe_connection_values:
+                raise ValueError(
+                    f"FIFO {fifo.name} {control_port} does not match a producer-kernel "
+                    "clock/reset connection"
+                )
+        externally_visible = [
+            fifo.connections[fifo_port]
+            for fifo_port in FIFO_CONSUMER_PORTS.values()
+            if normalize_expression(fifo.connections[fifo_port]) in top_ports
+        ]
+        if externally_visible:
+            raise ValueError(
+                f"FIFO {fifo.name} has top-level-visible consumer connections "
+                f"{externally_visible}"
+            )
+        removed_ports.update(f"{root}_{suffix}" for suffix in FIFO_PRODUCER_PORTS)
+        declaration_sources = {
+            "num_data_valid": (f"{root}_num_data_valid", "output"),
+            "fifo_cap": (f"{root}_fifo_cap", "output"),
+            "dout": (f"{root}_din", "output"),
+            "empty_n": (f"{root}_full_n", "output"),
+            "read": (f"{root}_write", "input"),
+        }
+        for suffix, fifo_port in {**FIFO_SHARED_PORTS, **FIFO_CONSUMER_PORTS}.items():
+            wrapper_port = f"{root}_{suffix}"
+            source_port, direction = declaration_sources[suffix]
+            wrapper_decls[wrapper_port] = change_declaration_direction(
+                replace_declared_name(
+                    outer_decls[source_port], source_port, wrapper_port
+                ),
+                direction,
+            )
+            wrapper_connections[wrapper_port] = fifo.connections[fifo_port]
+        owned.append(
+            {
+                "channel_id": bundle.get("channel_id"),
+                "stream": bundle.get("stream"),
+                "root": root,
+                "fifo_module": fifo.module,
+                "fifo_instance": fifo.name,
+                "parent_module": manifest["top"],
+                "fifo_connections": fifo.connections,
+            }
+        )
+
+    for port in removed_ports:
+        wrapper_decls.pop(port, None)
+        wrapper_connections.pop(port, None)
+    wrapper_ports = [port for port in outer_ports if port not in removed_ports]
+    for bundle in outgoing:
+        root = str(bundle["root"])
+        for suffix in (*FIFO_SHARED_PORTS, *FIFO_CONSUMER_PORTS):
+            port = f"{root}_{suffix}"
+            if port not in wrapper_ports:
+                wrapper_ports.append(port)
+
+    lines = [f"module {wrapper_name} (", "  " + ",\n  ".join(wrapper_ports), ");"]
+    lines.extend("  " + wrapper_decls[port] for port in wrapper_ports)
+    for port in sorted(removed_ports):
+        lines.append("  " + wire_declaration(outer_decls[port], port))
+    lines.append(f"  {outer.name} producer_kernel (")
+    lines.append(",\n".join(f"    .{port}({port})" for port in outer_ports))
+    lines.append("  );")
+
+    expression_to_pe_port = {
+        normalize_expression(expression): port
+        for port, expression in pe_instance.connections.items()
+    }
+    for item in owned:
+        root = item["root"]
+        fifo_connections = []
+        for fifo_port, expression in item["fifo_connections"].items():
+            producer_suffix = next(
+                (suffix for suffix, name in FIFO_PRODUCER_PORTS.items() if name == fifo_port),
+                None,
+            )
+            shared_suffix = next(
+                (suffix for suffix, name in FIFO_SHARED_PORTS.items() if name == fifo_port),
+                None,
+            )
+            consumer_suffix = next(
+                (suffix for suffix, name in FIFO_CONSUMER_PORTS.items() if name == fifo_port),
+                None,
+            )
+            if producer_suffix:
+                connected = f"{root}_{producer_suffix}"
+            elif shared_suffix:
+                connected = f"{root}_{shared_suffix}"
+            elif consumer_suffix:
+                connected = f"{root}_{consumer_suffix}"
+            else:
+                connected = expression_to_pe_port.get(
+                    normalize_expression(expression), expression
+                )
+            fifo_connections.append(f"    .{fifo_port}({connected})")
+        lines.append(f"  {item['fifo_module']} folded_{item['fifo_instance']} (")
+        lines.append(",\n".join(fifo_connections))
+        lines.append("  );")
+    lines.extend(["endmodule", ""])
+
+    wrapper_text = "\n".join(lines)
+    wrapper_block = module_blocks(wrapper_text)[wrapper_name]
+    # Retain semantic side/direction but replace each folded producer bundle
+    # with the consumer-facing FIFO boundary pins.
+    for bundle in intent["stream_bundles"]:
+        if bundle["direction"] == "out":
+            root = str(bundle["root"])
+            bundle["rtl_ports"] = [
+                f"{root}_{suffix}"
+                for suffix in (*FIFO_SHARED_PORTS, *FIFO_CONSUMER_PORTS)
+            ]
+    wrapper_port_set = set(port_names(wrapper_block))
+    stream_ports = {
+        port for bundle in intent["stream_bundles"] for port in bundle["rtl_ports"]
+    }
+    remaining = [port for port in wrapper_ports if port not in stream_ports]
+    intent["module"] = wrapper_name
+    intent["clock_pins"] = [port for port in remaining if port == "ap_clk"]
+    intent["control_pins"] = [
+        port for port in remaining if port.startswith("ap_") and port != "ap_clk"
+    ]
+    intent["auxiliary_pins"] = [
+        port for port in remaining
+        if port not in intent["clock_pins"] and port not in intent["control_pins"]
+    ]
+    stream_sides = {item["side"] for item in intent["stream_bundles"]}
+    side_loads = {side: 0 for side in ("N", "S", "E", "W")}
+    for bundle in intent["stream_bundles"]:
+        side_loads[bundle["side"]] += sum(
+            declaration_width(wrapper_decls[port]) for port in bundle["rtl_ports"]
+        )
+    intent["auxiliary_pin_sides"] = balance_auxiliary_pins(
+        intent["auxiliary_pins"], wrapper_decls, stream_sides, side_loads
+    )
+    for port, side in intent["auxiliary_pin_sides"].items():
+        side_loads[side] += declaration_width(wrapper_decls[port])
+    control_candidates = [
+        side for side in ("W", "N", "S", "E") if side not in stream_sides
+    ] or ["W", "N", "S", "E"]
+    intent["control_side"] = min(
+        control_candidates,
+        key=lambda side: (side_loads[side], control_candidates.index(side)),
+    )
+    intent["clock_side"] = intent["control_side"]
+    if set(wrapper_decls) != wrapper_port_set:
+        extra = set(wrapper_decls) - wrapper_port_set
+        if extra - removed_ports:
+            raise ValueError(f"wrapper declaration mismatch: {sorted(extra)}")
+    return wrapper_text, {"owned_fifos": owned, "pin_intent": intent}, wrapper_connections
 
 
 def port_names(block: ModuleBlock) -> list[str]:
@@ -230,6 +553,68 @@ def ordered_semantic_port_subset(
     return solutions[0] if len(solutions) == 1 else None
 
 
+def parent_wrapper_semantic_port_subset(
+    pe: dict[str, object],
+    canonical: ModuleBlock,
+    semantic_ports: list[dict[str, object]],
+    bundles: list[dict[str, object]],
+    blocks: dict[str, ModuleBlock] | None,
+) -> list[dict[str, object]] | None:
+    """Map a split process through its complete parent-wrapper interface.
+
+    Generated Vitis processes retain their parent's opaque stream-bundle roots,
+    even when Vitis removes loop-invariant streams or reorders the remaining
+    process ports.  First map the complete parent interface positionally, then
+    use those stable roots to select and order the child process's semantics.
+    """
+    if blocks is None:
+        return None
+    matching_records = [
+        record
+        for record in pe.get("post_hls_records", [])
+        if any(
+            module.get("name") == canonical.name
+            for module in record.get("rtl_modules", [])
+        )
+    ]
+    if len(matching_records) != 1:
+        return None
+    parent_names = {
+        Path(instance["parent_file"]).stem
+        for instance in matching_records[0].get("rtl_instances", [])
+        if instance.get("parent_file")
+    }
+    solutions: list[list[dict[str, object]]] = []
+    for parent_name in parent_names:
+        parent = blocks.get(parent_name)
+        if parent is None:
+            continue
+        parent_bundles = stream_bundles(parent)
+        if len(parent_bundles) != len(semantic_ports):
+            continue
+        compatible = all(
+            semantic.get("direction") == bundle["direction"]
+            and semantic_stream_width(semantic) == rtl_stream_width(parent, bundle)
+            and semantic_stream_width(semantic) is not None
+            for semantic, bundle in zip(semantic_ports, parent_bundles)
+        )
+        if not compatible:
+            continue
+        semantic_by_root = {
+            str(bundle["root"]): semantic
+            for semantic, bundle in zip(semantic_ports, parent_bundles)
+        }
+        if all(str(bundle["root"]) in semantic_by_root for bundle in bundles):
+            solutions.append(
+                [semantic_by_root[str(bundle["root"])] for bundle in bundles]
+            )
+    unique = {
+        tuple(int(port["ordinal"]) for port in solution): solution
+        for solution in solutions
+    }
+    return next(iter(unique.values())) if len(unique) == 1 else None
+
+
 def axis_hint(stream: str) -> str | None:
     lowered = stream.lower()
     if any(token in lowered for token in ("horizontal", "hori", "east", "west")):
@@ -345,7 +730,10 @@ def graph_pin_sides(manifest: dict) -> dict[tuple[str, int], dict[str, str]]:
 
 
 def build_pin_intent(
-    manifest: dict, representative: str, canonical: ModuleBlock
+    manifest: dict,
+    representative: str,
+    canonical: ModuleBlock,
+    blocks: dict[str, ModuleBlock] | None = None,
 ) -> dict[str, object]:
     pes = {item["semantic_id"]: item for item in manifest.get("pe_instances", [])}
     if representative not in pes:
@@ -355,12 +743,20 @@ def build_pin_intent(
     bundles = stream_bundles(canonical)
     selection_method = "complete_process_interface"
     if len(bundles) != len(semantic_ports):
-        ordered_subset = ordered_semantic_port_subset(
-            canonical, semantic_ports, bundles
+        selected_subset = parent_wrapper_semantic_port_subset(
+            pe, canonical, semantic_ports, bundles, blocks
         )
-        if ordered_subset is not None:
-            semantic_ports = ordered_subset
-            selection_method = "ordered_direction_width_subset"
+        if selected_subset is not None:
+            semantic_ports = selected_subset
+            selection_method = "parent_wrapper_bundle_identity"
+        else:
+            selected_subset = ordered_semantic_port_subset(
+                canonical, semantic_ports, bundles
+            )
+        if selected_subset is not None:
+            semantic_ports = selected_subset
+            if selection_method == "complete_process_interface":
+                selection_method = "ordered_direction_width_subset"
         else:
             # Vitis may split one Allo kernel into several independently instantiated
             # pipeline processes (for example, one loader process per stream).  The
@@ -635,6 +1031,26 @@ def classify_macro_candidate(members: list[dict]) -> str:
     )
 
 
+def wrapper_interface_signature(wrapper_text: str, wrapper_name: str, folding: dict) -> str:
+    block = module_blocks(wrapper_text)[wrapper_name]
+    ports = port_names(block)
+    declarations = port_declarations(block, ports)
+    shapes = []
+    for port in ports:
+        shapes.append(
+            normalized_declaration(
+                declarations[port].replace(port, "PORT")
+            )
+        )
+    payload = {
+        "port_shapes": shapes,
+        "fifo_modules": [
+            item["fifo_module"] for item in folding.get("owned_fifos", [])
+        ],
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
 def main() -> None:
     outputs = Path("outputs")
     batch_dir = outputs / "macro-batch"
@@ -651,6 +1067,7 @@ def main() -> None:
     macro_clock_period = float(os.environ.get("macro_clock_period", "8.0"))
     bypassed = env_bool("bypass_macro_generation")
     harden_hls_submodules = env_bool("harden_repeated_hls_submodules")
+    fold_fifos = env_bool("fold_fifos_into_macro") and not bypassed
     if threshold < 1:
         raise ValueError("min_macro_reuse must be at least 1")
     if macro_clock_period <= 0:
@@ -663,10 +1080,69 @@ def main() -> None:
     ):
         raise ValueError("final ASIC manifest contains unmatched or unjoined records")
 
+    pes = {item["semantic_id"]: item for item in manifest.get("pe_instances", [])}
+    top_block = blocks.get(str(manifest.get("top")))
+    if fold_fifos and top_block is None:
+        raise ValueError("FIFO folding requires the realized top RTL module")
+    top_instances = module_instances(top_block, set(blocks)) if top_block else []
+
+    planning_groups = []
+    for group in manifest.get("macro_groups", []):
+        if not fold_fifos:
+            planning_groups.append(group)
+            continue
+        original_members = group.get("members", [])
+        if group.get("proof", {}).get("status") != "proven":
+            continue
+        if int(group.get("member_count", len(original_members))) < threshold:
+            continue
+        if classify_macro_candidate(original_members) != "semantic_pe":
+            continue
+        members_by_signature = {}
+        for member in original_members:
+            pe = pes[member["semantic_id"]]
+            outer_name = outer_module_for_member(pe, member["rtl_module"])
+            instances = [item for item in top_instances if item.module == outer_name]
+            if len(instances) != 1:
+                raise ValueError(
+                    f"expected one top-level instance of {outer_name}, found "
+                    f"{[item.name for item in instances]}"
+                )
+            provisional_name = f"{outer_name}_fifo_signature"
+            wrapper_text, folding, _connections = generate_fifo_wrapper(
+                provisional_name,
+                pe,
+                blocks[outer_name],
+                instances[0],
+                top_instances,
+                manifest,
+                blocks,
+            )
+            signature = wrapper_interface_signature(
+                wrapper_text, provisional_name, folding
+            )
+            members_by_signature.setdefault(signature, []).append(member)
+        split = len(members_by_signature) > 1
+        for signature, variant_members in sorted(members_by_signature.items()):
+            class_id = group["macro_class_id"]
+            if split:
+                class_id = f"{class_id}_fifo_{signature[:8]}"
+            planning_groups.append(
+                {
+                    **group,
+                    "macro_class_id": class_id,
+                    "source_macro_class_id": group["macro_class_id"],
+                    "representative": variant_members[0]["semantic_id"],
+                    "member_count": len(variant_members),
+                    "members": variant_members,
+                    "fifo_wrapper_signature": signature,
+                }
+            )
+
     selected = []
     replacements: dict[str, str] = {}
     removed: set[str] = set()
-    for group in ([] if bypassed else manifest.get("macro_groups", [])):
+    for group in ([] if bypassed else planning_groups):
         members = group.get("members", [])
         if group.get("proof", {}).get("status") != "proven":
             continue
@@ -689,30 +1165,114 @@ def main() -> None:
             raise ValueError(
                 f"class {group['macro_class_id']} references missing RTL modules {missing}"
             )
-        canonical_name = module_names[0]
-        canonical = blocks[canonical_name]
         entry_id = group["macro_class_id"]
+        folding_by_module = {}
+        wrapper_text_by_module = {}
+        prepared_members = []
+        if fold_fifos:
+            if candidate_kind != "semantic_pe":
+                continue
+            for index, member in enumerate(members):
+                semantic_id = member["semantic_id"]
+                pe = pes[semantic_id]
+                inner_module = member["rtl_module"]
+                outer_name = outer_module_for_member(pe, inner_module)
+                if outer_name not in blocks:
+                    raise ValueError(f"outer kernel module is absent: {outer_name}")
+                instances = [
+                    item for item in top_instances if item.module == outer_name
+                ]
+                if len(instances) != 1:
+                    raise ValueError(
+                        f"expected one top-level instance of {outer_name}, found "
+                        f"{[item.name for item in instances]}"
+                    )
+                wrapper_name = (
+                    f"allo_fifo_{entry_id}"
+                    if index == 0
+                    else f"{outer_name}_fifo_member"
+                )
+                wrapper_text, folding, wrapper_connections = generate_fifo_wrapper(
+                    wrapper_name,
+                    pe,
+                    blocks[outer_name],
+                    instances[0],
+                    top_instances,
+                    manifest,
+                    blocks,
+                )
+                folding.update(
+                    {
+                        "enabled": True,
+                        "inner_rtl_module": inner_module,
+                        "source_module": outer_name,
+                        "source_instance": instances[0].name,
+                        "semantic_instance_name": semantic_instance_name(pe),
+                        "wrapper_module": wrapper_name,
+                        "wrapper_connections": wrapper_connections,
+                    }
+                )
+                prepared = {
+                    **member,
+                    "inner_rtl_module": inner_module,
+                    "rtl_module": outer_name,
+                    "source_instance": instances[0].name,
+                    "semantic_instance_name": semantic_instance_name(pe),
+                    "fifo_folding": folding,
+                }
+                prepared_members.append(prepared)
+                folding_by_module[outer_name] = folding
+                wrapper_text_by_module[outer_name] = wrapper_text
+            module_names = [member["rtl_module"] for member in prepared_members]
+            members = prepared_members
+
+        canonical_name = module_names[0]
+        canonical_wrapper_name = f"allo_fifo_{entry_id}" if fold_fifos else canonical_name
+        canonical_text = (
+            wrapper_text_by_module[canonical_name]
+            if fold_fifos else blocks[canonical_name].text
+        )
+        canonical = module_blocks(canonical_text)[canonical_wrapper_name]
         entry_dir = batch_dir / "entries" / entry_id
         rtl_dir = entry_dir / "rtl"
         rtl_dir.mkdir(parents=True)
 
         port_maps = {}
         for member_name in module_names:
-            mapping = validate_and_map_ports(canonical, blocks[member_name])
+            member_block = (
+                module_blocks(wrapper_text_by_module[member_name])[
+                    folding_by_module[member_name]["wrapper_module"]
+                ]
+                if fold_fifos else blocks[member_name]
+            )
+            mapping = validate_and_map_ports(canonical, member_block)
             port_maps[member_name] = mapping
             removed.add(member_name)
-            if member_name != canonical_name:
+            if member_name != canonical_name and not fold_fifos:
                 replacements[member_name] = alias_wrapper(
                     canonical, blocks[member_name], mapping
                 )
 
-        dependencies = dependency_closure(canonical_name, blocks)
-        design_text = "\n".join(blocks[name].text for name in dependencies)
+        if fold_fifos:
+            design_blocks = dict(blocks)
+            design_blocks[canonical_wrapper_name] = canonical
+            dependencies = dependency_closure(canonical_wrapper_name, design_blocks)
+            design_text = "\n".join(
+                canonical_text if name == canonical_wrapper_name else blocks[name].text
+                for name in dependencies
+            )
+        else:
+            dependencies = dependency_closure(canonical_name, blocks)
+            design_text = "\n".join(blocks[name].text for name in dependencies)
         design_file = rtl_dir / "design.v"
         design_file.write_text(design_text.rstrip() + "\n")
         constraints_file = entry_dir / "constraints.tcl"
         write_constraints(constraints_file, macro_clock_period)
-        pin_intent = build_pin_intent(manifest, group["representative"], canonical)
+        pin_intent = (
+            folding_by_module[canonical_name]["pin_intent"]
+            if fold_fifos else
+            build_pin_intent(manifest, group["representative"], canonical, blocks)
+        )
         pin_intent_json = entry_dir / "pin-intent.json"
         pin_intent_tcl = entry_dir / "pin-intent.tcl"
         pin_intent_json.write_text(json.dumps(pin_intent, indent=2) + "\n")
@@ -720,8 +1280,12 @@ def main() -> None:
         member_placements = []
         for member in members:
             member_module = member["rtl_module"]
-            member_intent = build_pin_intent(
-                manifest, member["semantic_id"], blocks[member_module]
+            member_intent = (
+                folding_by_module[member_module]["pin_intent"]
+                if fold_fifos else
+                build_pin_intent(
+                    manifest, member["semantic_id"], blocks[member_module], blocks
+                )
             )
             member_placements.append(
                 {
@@ -738,7 +1302,10 @@ def main() -> None:
         digest = hashlib.sha256(design_file.read_bytes()).hexdigest()
         entry = {
             "id": entry_id,
-            "top_module": canonical_name,
+            "source_macro_class_id": group.get(
+                "source_macro_class_id", group["macro_class_id"]
+            ),
+            "top_module": canonical_wrapper_name,
             "representative_semantic_id": group["representative"],
             "reuse_count": int(group["member_count"]),
             "candidate_kind": candidate_kind,
@@ -754,6 +1321,11 @@ def main() -> None:
             "members": members,
             "member_placements": member_placements,
             "port_maps": port_maps,
+            "fold_fifos_into_macro": fold_fifos,
+            "folded_fifo_count": sum(
+                len(item.get("fifo_folding", {}).get("owned_fifos", []))
+                for item in members
+            ),
         }
         (entry_dir / "entry.json").write_text(json.dumps(entry, indent=2) + "\n")
         selected.append(entry)
@@ -782,10 +1354,22 @@ def main() -> None:
         "macro_clock_period_ns": macro_clock_period,
         "bypass_macro_generation": bypassed,
         "harden_repeated_hls_submodules": harden_hls_submodules,
+        "fold_fifos_into_macro": fold_fifos,
         "implementation_style": "flat" if bypassed else "hierarchical_macros",
         "source_manifest": str(manifest_path),
         "selected_class_count": len(selected),
         "selected_instance_count": sum(entry["reuse_count"] for entry in selected),
+        "fifo_folding": {
+            "enabled": fold_fifos,
+            "ownership": "producer_put_side" if fold_fifos else "disabled",
+            "wrapped_pe_instance_count": sum(
+                entry["reuse_count"] for entry in selected
+                if entry.get("fold_fifos_into_macro")
+            ),
+            "folded_fifo_instance_count": sum(
+                entry.get("folded_fifo_count", 0) for entry in selected
+            ),
+        },
         "entries": selected,
     }
     index_text = json.dumps(plan, indent=2) + "\n"
@@ -799,6 +1383,7 @@ def main() -> None:
         f"set allo_asic_macro_reuse_threshold {threshold}",
         f"set allo_asic_bypass_macro_generation {1 if bypassed else 0}",
         f"set allo_asic_harden_repeated_hls_submodules {1 if harden_hls_submodules else 0}",
+        f"set allo_asic_fold_fifos_into_macro {1 if fold_fifos else 0}",
         "set allo_asic_macro_class_ids [list "
         + " ".join(tcl_quote(entry["id"]) for entry in selected)
         + "]",
@@ -823,6 +1408,13 @@ def main() -> None:
             f"Selected {len(selected)} proven macro classes covering "
             f"{plan['selected_instance_count']} instances at reuse threshold {threshold}.\n"
         )
+        if fold_fifos:
+            log += (
+                "Producer-owned FIFO folding wrapped "
+                f"{plan['fifo_folding']['wrapped_pe_instance_count']} PE instances "
+                f"and internalized {plan['fifo_folding']['folded_fifo_instance_count']} "
+                "FIFO instances.\n"
+            )
     (outputs / "macro-plan.log").write_text(log)
     print(log, end="")
 
