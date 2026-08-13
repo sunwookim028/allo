@@ -3079,7 +3079,7 @@ class ASTTransformer(ASTBuilder):
             and not obj.__module__.startswith("allo._mlir")
         ):
             # Local imports to avoid cyclic dependencies
-            from ..backend.ip import IPModule
+            from ..backend.ip import IPModule, STREAM
 
             try:
                 from ..backend.aie.external_kernel import ExternalModule
@@ -3318,12 +3318,79 @@ class ASTTransformer(ASTBuilder):
                         return alloc_op
                     return for_op if not ctx.unroll else None
             # Allo library functions
-            new_args = build_stmts(ctx, node.args)
+            if isinstance(obj, (IPModule, ExternalModule)) and any(
+                shape is STREAM for _, shape in obj.args
+            ):
+                # Do not build stream arguments as value expressions. A bare
+                # stream name happens to build (it resolves to its construct op),
+                # but a *stream array element* -- `cr_e[0, 0]`, which is how a
+                # mesh design names its links -- does not: the array symbol is a
+                # tuple of constructs, so build_Subscript fails with
+                # "'tuple' object has no attribute 'result'".
+                #
+                # Nothing needs them anyway: the branch below re-derives each
+                # stream through get_stream_name(), and the copy-back loop skips
+                # stream operands (they pass by reference). So leave a None
+                # placeholder to keep the positions aligned with call_operands.
+                new_args = [
+                    None if shape is STREAM else build_stmt(ctx, arg)
+                    for arg, (_, shape) in zip(node.args, obj.args)
+                ]
+            else:
+                new_args = build_stmts(ctx, node.args)
             if isinstance(obj, (IPModule, ExternalModule)):
-                input_idx = obj.input_idx if isinstance(obj, ExternalModule) else None
+                # input_idx / output_idx give per-argument direction (which args
+                # the IP reads vs writes). ExternalModule has always carried them;
+                # IPModule now does too, which is what lets us direct hls::stream
+                # ports (C++ `hls::stream<T>&` is used for both read and write).
+                input_idx = obj.input_idx
+                output_idx = getattr(obj, "output_idx", None)
                 input_types = []
                 call_operands = []
+                # Per-operand direction string attached to the emitted call: one
+                # char per argument -- 'i' input stream, 'o' output stream, '_'
+                # anything else. move_stream_to_interface() reads it to classify
+                # a stream whose only use is this call (a func.call is neither a
+                # StreamPut nor a StreamGet, so it cannot infer direction itself).
+                stream_dirs = ""
+                stream_indices = set()
                 for idx, (arg_type, shape) in enumerate(obj.args):
+                    if shape is STREAM:
+                        # An `hls::stream<T> &` port. Adopt the operand's own
+                        # stream type: it already carries the element type AND the
+                        # FIFO depth, neither of which the C++ signature encodes.
+                        # Clone the stream_construct into this kernel exactly as
+                        # put/get do (builder ~L2604), so the call becomes a use
+                        # of a same-named construct local to this function;
+                        # move_stream_to_interface() later dedups by name.
+                        stream_indices.add(idx)
+                        new_name, _, _ = ASTTransformer.get_stream_name(
+                            ctx, node.args[idx]
+                        )
+                        stream = ctx.get_symbol(new_name).clone(
+                            ip=ctx.get_stream_construct_ip()
+                        )
+                        input_types.append(stream.result.type)
+                        call_operands.append(stream.result)
+                        # A SystemC port states its own direction in the type
+                        # (Connections::In vs Out), so sc_dirs is authoritative
+                        # and input_idx/output_idx are neither needed nor read.
+                        sc_dirs = getattr(obj, "sc_dirs", None)
+                        if sc_dirs is not None:
+                            stream_dirs += sc_dirs[idx]
+                        elif output_idx is not None and idx in output_idx:
+                            stream_dirs += "o"
+                        elif input_idx is not None and idx in input_idx:
+                            stream_dirs += "i"
+                        else:
+                            raise RuntimeError(
+                                f"Stream argument {idx} of IP '{obj.top}' must be "
+                                "listed in input_idx or output_idx to declare its "
+                                "direction: hls::stream<T>& is written the same way "
+                                "whether the IP reads or writes it."
+                            )
+                        continue
+                    stream_dirs += "_"
                     ele_type = get_mlir_dtype_from_str(c2allo_type[arg_type])
                     if len(shape) != 0:
                         memref = MemRefType.get(shape, ele_type)
@@ -3358,9 +3425,14 @@ class ASTTransformer(ASTBuilder):
                     call_operands,
                     ip=ctx.get_ip(),
                 )
+                if "i" in stream_dirs or "o" in stream_dirs:
+                    call_op.attributes["stream_dirs"] = StringAttr.get(stream_dirs)
                 for idx, (call_operand, operand_op) in enumerate(
                     zip(call_operands, new_args)
                 ):
+                    # Streams pass by reference; there is nothing to copy back.
+                    if idx in stream_indices:
+                        continue
                     if input_idx is not None and idx not in input_idx:
                         operand_op_result = ASTTransformer.get_mlir_op_result(
                             ctx, operand_op
