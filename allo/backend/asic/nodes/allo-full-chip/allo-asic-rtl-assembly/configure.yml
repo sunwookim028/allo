@@ -20,6 +20,7 @@ commands:
 
 parameters:
   clock_period: 10.0
+  backend: vitis
 
 preconditions:
   - assert File( 'inputs/design.v' )
@@ -35,3 +36,11 @@ postconditions:
   - assert File( 'outputs/macro-functional-models.f' )
   - assert File( 'outputs/rtl-assembly-report.txt' )
   - assert File( 'outputs/constraints.tcl' )
+  - |
+      import json
+      from pathlib import Path
+      collateral = json.loads(Path('outputs/macro-collateral.json').read_text())
+      expected_clock = {'vitis': 'ap_clk', 'catapult': 'clk'}[collateral['backend']]
+      assert collateral['clock_port'] == expected_clock
+      constraints = Path('outputs/constraints.tcl').read_text()
+      assert f'[get_ports {expected_clock}]' in constraints

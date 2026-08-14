@@ -20,6 +20,7 @@ commands:
   - bash run.sh
 
 parameters:
+  backend: vitis
   testbench_name: allo_generated_testbench
   waveform: True
 
@@ -29,8 +30,15 @@ preconditions:
   - assert File( 'report_sim.py' )
   - assert File( 'inputs/design.v' )
   - assert File( 'inputs/testbench.sv' )
-  - assert File( 'inputs/vitis-axi-memory-bfm.sv' )
-  - assert File( 'inputs/vitis-axilite-master-bfm.sv' )
+  - >-
+    assert '{backend}' != 'vitis' or
+    File( 'inputs/vitis-axi-memory-bfm.sv' )
+  - >-
+    assert '{backend}' != 'vitis' or
+    File( 'inputs/vitis-axilite-master-bfm.sv' )
+  - >-
+    assert '{backend}' != 'catapult' or
+    '"backend": "catapult"' in File( 'inputs/testbench-contract.json' )
   - assert File( 'inputs/workload-vectors' )
   - assert File( 'inputs/testbench-contract.json' )
 

@@ -52,10 +52,15 @@ preconditions:
   - assert File( 'inputs/design.pt.sdc' )
   - assert File( 'inputs/macro-collateral.json' )
   - assert File( 'inputs/testbench.sv' )
-  - assert File( 'inputs/vitis-axi-memory-bfm.sv' )
-  - assert File( 'inputs/vitis-axilite-master-bfm.sv' )
   - assert File( 'inputs/workload-vectors' )
   - assert File( 'inputs/testbench-contract.json' )
+  - |
+      import json
+      from pathlib import Path
+      backend = json.loads(Path('inputs/testbench-contract.json').read_text()).get('backend')
+      assert backend in {'vitis', 'catapult'}
+      assert backend != 'vitis' or Path('inputs/vitis-axi-memory-bfm.sv').is_file()
+      assert backend != 'vitis' or Path('inputs/vitis-axilite-master-bfm.sv').is_file()
 
 postconditions:
   - assert File( 'outputs/run.vcd' )

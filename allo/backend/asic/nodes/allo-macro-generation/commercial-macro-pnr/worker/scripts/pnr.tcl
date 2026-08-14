@@ -62,11 +62,20 @@ if {![string is integer -strict $env(gds_stream_out_units)] || $env(gds_stream_o
 if {![info exists env(pin_layer_offset)]} {
   set env(pin_layer_offset) 3
 }
+if {![info exists env(pin_vertical_layer_offset)]} {
+  set env(pin_vertical_layer_offset) 4
+}
 if {![info exists env(pin_secondary_layer_offset)]} {
   set env(pin_secondary_layer_offset) 5
 }
 if {![info exists env(pin_min_pitch_multiplier)]} {
   set env(pin_min_pitch_multiplier) 2.0
+}
+if {![info exists env(pin_primary_depth_width_multiplier)]} {
+  set env(pin_primary_depth_width_multiplier) 3.0
+}
+if {![info exists env(pin_other_depth_width_multiplier)]} {
+  set env(pin_other_depth_width_multiplier) 2.0
 }
 if {![info exists env(pin_corner_keepout)]} {
   set env(pin_corner_keepout) 3.0
@@ -74,9 +83,46 @@ if {![info exists env(pin_corner_keepout)]} {
 if {![info exists env(pin_primary_fraction)]} {
   set env(pin_primary_fraction) 0.75
 }
+if {![info exists env(pin_spread_multiple_stream_groups)]} {
+  set env(pin_spread_multiple_stream_groups) true
+}
+if {![info exists env(pin_stream_group_min_width)]} {
+  set env(pin_stream_group_min_width) 16
+}
+if {![info exists env(top_layer_obs_grid_tracks)]} {
+  set env(top_layer_obs_grid_tracks) 4
+}
+if {![info exists env(top_layer_obs_pin_grid_tracks)]} {
+  set env(top_layer_obs_pin_grid_tracks) 1
+}
+if {![info exists env(top_layer_obs_spacing_tracks)]} {
+  set env(top_layer_obs_spacing_tracks) 1
+}
 if {![string is double -strict $env(pin_min_pitch_multiplier)] ||
     $env(pin_min_pitch_multiplier) < 1.0} {
   error "pin_min_pitch_multiplier must be a number greater than or equal to one"
+}
+foreach parameter {pin_primary_depth_width_multiplier pin_other_depth_width_multiplier} {
+  if {![string is double -strict $env($parameter)] || $env($parameter) < 1.0} {
+    error "$parameter must be a number greater than or equal to one"
+  }
+}
+if {![string is integer -strict $env(pin_stream_group_min_width)] ||
+    $env(pin_stream_group_min_width) < 1} {
+  error "pin_stream_group_min_width must be a positive integer"
+}
+if {![string is integer -strict $env(top_layer_obs_grid_tracks)] ||
+    $env(top_layer_obs_grid_tracks) < 1} {
+  error "top_layer_obs_grid_tracks must be a positive integer"
+}
+if {![string is integer -strict $env(top_layer_obs_pin_grid_tracks)] ||
+    $env(top_layer_obs_pin_grid_tracks) < 1 ||
+    $env(top_layer_obs_grid_tracks) % $env(top_layer_obs_pin_grid_tracks) != 0} {
+  error "top_layer_obs_pin_grid_tracks must be a positive divisor of top_layer_obs_grid_tracks"
+}
+if {![string is integer -strict $env(top_layer_obs_spacing_tracks)] ||
+    $env(top_layer_obs_spacing_tracks) < 0} {
+  error "top_layer_obs_spacing_tracks must be a non-negative integer"
 }
 if {![info exists env(power_mesh_bot_layer)]} {
   if {[info exists ADK_POWER_MESH_BOT_LAYER]} {
@@ -410,19 +456,29 @@ if {$env(well_tap_cell) ne ""} {
 #-------------------------------------------------------------------------
 
 set ports_layer [expr {$base_layer_idx + $env(pin_layer_offset)}]
+set vertical_ports_layer [expr {$base_layer_idx + $env(pin_vertical_layer_offset)}]
 set secondary_ports_layer [expr {$base_layer_idx + $env(pin_secondary_layer_offset)}]
+if {$vertical_ports_layer > $vars(max_route_layer)} {
+  error "Vertical signal-pin layer $vertical_ports_layer exceeds max_route_layer=$vars(max_route_layer)"
+}
 if {$secondary_ports_layer > $vars(max_route_layer)} {
   error "Secondary signal-pin layer $secondary_ports_layer exceeds max_route_layer=$vars(max_route_layer)"
 }
 set primary_pin_layer_obj [dbGetLayerByZ $ports_layer]
+set vertical_pin_layer_obj [dbGetLayerByZ $vertical_ports_layer]
 set secondary_pin_layer_obj [dbGetLayerByZ $secondary_ports_layer]
-if {$primary_pin_layer_obj == 0 || $secondary_pin_layer_obj == 0} {
-  error "Signal-pin layer selection is not present in the loaded technology: primary=$ports_layer secondary=$secondary_ports_layer"
+if {$primary_pin_layer_obj == 0 || $vertical_pin_layer_obj == 0 ||
+    $secondary_pin_layer_obj == 0} {
+  error "Signal-pin layer selection is not present in the loaded technology: horizontal=$ports_layer vertical=$vertical_ports_layer secondary_horizontal=$secondary_ports_layer"
 }
 set primary_pin_direction [dbGet $primary_pin_layer_obj.direction]
+set vertical_pin_direction [dbGet $vertical_pin_layer_obj.direction]
 set secondary_pin_direction [dbGet $secondary_pin_layer_obj.direction]
 if {$primary_pin_direction ne $secondary_pin_direction} {
-  error "Signal-pin layers must have the same preferred routing direction: layer $ports_layer is $primary_pin_direction but layer $secondary_ports_layer is $secondary_pin_direction"
+  error "East/west signal-pin layers must have the same preferred routing direction: layer $ports_layer is $primary_pin_direction but layer $secondary_ports_layer is $secondary_pin_direction"
+}
+if {[string equal -nocase $primary_pin_direction $vertical_pin_direction]} {
+  error "North/south signal-pin layer $vertical_ports_layer must be orthogonal to east/west layer $ports_layer"
 }
 if {$env(pin_primary_fraction) <= 0.0 || $env(pin_primary_fraction) >= 1.0} {
   error "pin_primary_fraction must be strictly between zero and one"
@@ -485,6 +541,21 @@ proc pin_layer_pitch {layer_obj} {
   return [lindex [lsort -real $candidates] 0]
 }
 
+# Return the normal routing width. This remains the edge-parallel pin
+# dimension; only depth into the macro is enlarged.
+proc pin_layer_width {layer_obj} {
+  foreach attribute {width minWidth} {
+    set value [dbGet $layer_obj.$attribute]
+    if {[llength $value] > 0} {
+      set value [lindex $value 0]
+      if {[string is double -strict $value] && $value > 0.0} {
+        return $value
+      }
+    }
+  }
+  error "Loaded ADK does not provide a positive routing width for layer [dbGet $layer_obj.name]"
+}
+
 proc pin_edge_usable_length {side keepout} {
   set box [dbGet top.fPlan.box]
   if {[llength $box] == 1} {
@@ -518,6 +589,7 @@ proc pin_layer_capacity {side layer_obj keepout pitch_multiplier} {
 # respecting both physical capacities. No bus or handshake group is divided.
 proc pack_pin_groups_by_capacity {
   groups all_ports primary_capacity secondary_capacity fraction
+  spread_multiple_streams stream_group_min_width
 } {
   set resolved_groups {}
   set widths {}
@@ -529,7 +601,16 @@ proc pack_pin_groups_by_capacity {
     lappend widths $width
     incr total $width
   }
-  if {$total <= $primary_capacity} {
+  set large_group_count 0
+  foreach width $widths {
+    if {$width >= $stream_group_min_width} {
+      incr large_group_count
+    }
+  }
+  set require_secondary_large_group [expr {
+    $spread_multiple_streams && $large_group_count >= 2
+  }]
+  if {$total <= $primary_capacity && !$require_secondary_large_group} {
     set primary {}
     foreach resolved $resolved_groups {
       set primary [concat $primary $resolved]
@@ -562,6 +643,19 @@ proc pack_pin_groups_by_capacity {
     if {$secondary_count > $secondary_capacity} {
       continue
     }
+    if {$require_secondary_large_group} {
+      set secondary_has_large_group false
+      for {set index 0} {$index < [llength $widths]} {incr index} {
+        if {[lsearch -exact $indices $index] < 0 &&
+            [lindex $widths $index] >= $stream_group_min_width} {
+          set secondary_has_large_group true
+          break
+        }
+      }
+      if {!$secondary_has_large_group} {
+        continue
+      }
+    }
     set score [expr {abs($count - $target)}]
     if {$score < $best_score || ($score == $best_score && $count > $best_count)} {
       set best_score $score
@@ -589,7 +683,9 @@ proc pack_pin_groups_by_capacity {
 # Place pins only on the middle portion of an edge.  SIDE spreading uses the
 # complete block edge and can put pins directly in a corner, where a route on
 # the neighboring edge (especially ap_clk) has very little legal access room.
-proc edit_pins_with_corner_keepout {pins layer side keepout} {
+proc edit_pins_with_corner_keepout {
+  pins layer layer_obj side keepout depth_width_multiplier
+} {
   if {[llength $pins] == 0} {
     return
   }
@@ -629,12 +725,139 @@ proc edit_pins_with_corner_keepout {pins layer side keepout} {
       error "Unsupported pin side '$side'"
     }
   }
+  set pin_width [pin_layer_width $layer_obj]
+  set pin_depth [expr {$pin_width * $depth_width_multiplier}]
   editPin -layer $layer -pin $pins -spreadType RANGE -start $start -end $end \
-    -fixedPin true
+    -pinWidth $pin_width -pinDepth $pin_depth -fixedPin true
 }
 
 set assigned_ports {}
 set pin_assignment_report [open reports/pin-assignment.rpt w]
+
+# Allocate splittable non-neighbor data buses only after floorplanning, when
+# real edge capacities are known. Start with the two least-loaded edges, then
+# use three or four only when the smaller subset cannot fit. Data slices remain
+# contiguous; handshake pins remain one atomic group.
+if {[info exists allo_asic_non_neighbor_split_bundles]} {
+  array set split_capacity {}
+  array set split_load {}
+  foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
+    if {$compass eq "N" || $compass eq "S"} {
+      set capacity_data [pin_layer_capacity $innovus_side \
+        $vertical_pin_layer_obj $env(pin_corner_keepout) \
+        $env(pin_min_pitch_multiplier)]
+      set split_capacity($compass) [lindex $capacity_data 0]
+    } else {
+      set primary_data [pin_layer_capacity $innovus_side \
+        $primary_pin_layer_obj $env(pin_corner_keepout) \
+        $env(pin_min_pitch_multiplier)]
+      set secondary_data [pin_layer_capacity $innovus_side \
+        $secondary_pin_layer_obj $env(pin_corner_keepout) \
+        $env(pin_min_pitch_multiplier)]
+      set split_capacity($compass) [expr {
+        [lindex $primary_data 0] + [lindex $secondary_data 0]
+      }]
+    }
+    set logical_name allo_asic_signal_pins_${compass}
+    set split_load($compass) 0
+    foreach logical_port [set $logical_name] {
+      incr split_load($compass) [llength [resolve_manifest_port $logical_port $all_ports]]
+    }
+  }
+
+  foreach bundle $allo_asic_non_neighbor_split_bundles {
+    lassign $bundle data_port data_width handshake_ports
+    set ordered_sides {}
+    set remaining_sides {N S E W}
+    while {[llength $remaining_sides] > 0} {
+      set best_side [lindex $remaining_sides 0]
+      foreach side [lrange $remaining_sides 1 end] {
+        set best_ratio [expr {double($split_load($best_side)) / $split_capacity($best_side)}]
+        set side_ratio [expr {double($split_load($side)) / $split_capacity($side)}]
+        if {$side_ratio < $best_ratio ||
+            ($side_ratio == $best_ratio && [string compare $side $best_side] < 0)} {
+          set best_side $side
+        }
+      }
+      lappend ordered_sides $best_side
+      set index [lsearch -exact $remaining_sides $best_side]
+      set remaining_sides [lreplace $remaining_sides $index $index]
+    }
+
+    set chosen_count 0
+    for {set side_count 2} {$side_count <= 4} {incr side_count} {
+      set selected [lrange $ordered_sides 0 [expr {$side_count - 1}]]
+      array unset trial_load
+      array unset trial_groups
+      foreach side {N S E W} {
+        set trial_load($side) $split_load($side)
+        set trial_groups($side) {}
+      }
+      set quotient [expr {$data_width / $side_count}]
+      set remainder [expr {$data_width % $side_count}]
+      set bit 0
+      for {set slice 0} {$slice < $side_count} {incr slice} {
+        set side [lindex $selected $slice]
+        set slice_width [expr {$quotient + ($slice < $remainder ? 1 : 0)}]
+        set pins {}
+        for {set offset 0} {$offset < $slice_width} {incr offset} {
+          if {$data_width == 1} {
+            lappend pins $data_port
+          } else {
+            lappend pins "${data_port}\[$bit\]"
+          }
+          incr bit
+        }
+        if {[llength $pins] > 0} {
+          lappend trial_groups($side) $pins
+          incr trial_load($side) [llength $pins]
+        }
+      }
+      if {[llength $handshake_ports] > 0} {
+        set handshake_side [lindex $selected 0]
+        foreach side [lrange $selected 1 end] {
+          set handshake_ratio [expr {
+            double($trial_load($handshake_side)) / $split_capacity($handshake_side)
+          }]
+          set side_ratio [expr {
+            double($trial_load($side)) / $split_capacity($side)
+          }]
+          if {$side_ratio < $handshake_ratio} {
+            set handshake_side $side
+          }
+        }
+        lappend trial_groups($handshake_side) $handshake_ports
+        incr trial_load($handshake_side) [llength $handshake_ports]
+      }
+      set fits true
+      foreach side $selected {
+        if {$trial_load($side) > $split_capacity($side)} {
+          set fits false
+        }
+      }
+      if {$fits} {
+        set chosen_count $side_count
+        foreach side {N S E W} {
+          set split_load($side) $trial_load($side)
+          set pin_variable allo_asic_signal_pins_${side}
+          set group_variable allo_asic_signal_pin_groups_${side}
+          foreach group $trial_groups($side) {
+            set $pin_variable [concat [set $pin_variable] $group]
+            lappend $group_variable $group
+          }
+        }
+        puts $pin_assignment_report \
+          "SPLIT $data_port width=$data_width sides=[join $selected ,] handshake={[join $handshake_ports { }]}"
+        break
+      }
+    }
+    if {$chosen_count == 0} {
+      close $pin_assignment_report
+      error "Non-neighbor stream $data_port cannot fit across all four macro edges"
+    }
+  }
+}
+
 setPinAssignMode -pinEditInBatch true
 foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
   set variable_name allo_asic_signal_pins_${compass}
@@ -661,7 +884,31 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
     }
   }
   set groups_variable_name allo_asic_signal_pin_groups_${compass}
-  if {[info exists $groups_variable_name]} {
+  if {$compass eq "N" || $compass eq "S"} {
+    # Pins leave a north/south boundary vertically, so keep every complete
+    # group on the ADK's vertical-preferred signal layer (M4 in FreePDK45).
+    set vertical_capacity_data [pin_layer_capacity $innovus_side \
+      $vertical_pin_layer_obj $env(pin_corner_keepout) \
+      $env(pin_min_pitch_multiplier)]
+    if {[llength $side_ports] > [lindex $vertical_capacity_data 0]} {
+      close $pin_assignment_report
+      error "$compass pin groups require [llength $side_ports] slots but vertical layer $vertical_ports_layer provides only [lindex $vertical_capacity_data 0]"
+    }
+    set primary_side_ports $side_ports
+    set secondary_side_ports {}
+    if {[info exists $groups_variable_name]} {
+      set group_widths {}
+      foreach group [set $groups_variable_name] {
+        lappend group_widths [llength [resolve_manifest_group $group $all_ports]]
+      }
+    } else {
+      set group_widths [list [llength $side_ports]]
+    }
+    set side_primary_layer $vertical_ports_layer
+    set side_primary_layer_obj $vertical_pin_layer_obj
+    set primary_capacity_data $vertical_capacity_data
+    set secondary_capacity_data [list 0 0.0 0.0 [lindex $vertical_capacity_data 3]]
+  } elseif {[info exists $groups_variable_name]} {
     set primary_capacity_data [pin_layer_capacity $innovus_side \
       $primary_pin_layer_obj $env(pin_corner_keepout) \
       $env(pin_min_pitch_multiplier)]
@@ -671,10 +918,14 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
     set resolved_layers [pack_pin_groups_by_capacity \
       [set $groups_variable_name] $all_ports \
       [lindex $primary_capacity_data 0] [lindex $secondary_capacity_data 0] \
-      $env(pin_primary_fraction)]
+      $env(pin_primary_fraction) \
+      $env(pin_spread_multiple_stream_groups) \
+      $env(pin_stream_group_min_width)]
     set primary_side_ports [lindex $resolved_layers 0]
     set secondary_side_ports [lindex $resolved_layers 1]
     set group_widths [lindex $resolved_layers 2]
+    set side_primary_layer $ports_layer
+    set side_primary_layer_obj $primary_pin_layer_obj
   } else {
     set primary_side_ports $side_ports
     set secondary_side_ports {}
@@ -685,10 +936,12 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
     set secondary_capacity_data [pin_layer_capacity $innovus_side \
       $secondary_pin_layer_obj $env(pin_corner_keepout) \
       $env(pin_min_pitch_multiplier)]
+    set side_primary_layer $ports_layer
+    set side_primary_layer_obj $primary_pin_layer_obj
   }
   puts $pin_assignment_report \
-    "$compass SUMMARY total=[llength $side_ports] groups={$group_widths} primary_layer=$ports_layer primary=[llength $primary_side_ports] primary_capacity=[lindex $primary_capacity_data 0] primary_adk_pitch=[lindex $primary_capacity_data 1] primary_min_pitch=[lindex $primary_capacity_data 2] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports] secondary_capacity=[lindex $secondary_capacity_data 0] secondary_adk_pitch=[lindex $secondary_capacity_data 1] secondary_min_pitch=[lindex $secondary_capacity_data 2] usable_edge=[lindex $primary_capacity_data 3] corner_keepout=$env(pin_corner_keepout)"
-  set primary_layer_name [dbGet $primary_pin_layer_obj.name]
+    "$compass SUMMARY total=[llength $side_ports] groups={$group_widths} primary_layer=$side_primary_layer primary=[llength $primary_side_ports] primary_capacity=[lindex $primary_capacity_data 0] primary_adk_pitch=[lindex $primary_capacity_data 1] primary_min_pitch=[lindex $primary_capacity_data 2] secondary_layer=$secondary_ports_layer secondary=[llength $secondary_side_ports] secondary_capacity=[lindex $secondary_capacity_data 0] secondary_adk_pitch=[lindex $secondary_capacity_data 1] secondary_min_pitch=[lindex $secondary_capacity_data 2] spread_multiple_streams=$env(pin_spread_multiple_stream_groups) stream_group_min_width=$env(pin_stream_group_min_width) usable_edge=[lindex $primary_capacity_data 3] corner_keepout=$env(pin_corner_keepout)"
+  set primary_layer_name [dbGet $side_primary_layer_obj.name]
   set secondary_layer_name [dbGet $secondary_pin_layer_obj.name]
   foreach port $primary_side_ports {
     puts $pin_assignment_report "PLAN $port side=$compass layer=$primary_layer_name"
@@ -697,12 +950,20 @@ foreach {compass innovus_side} {N TOP S BOTTOM E RIGHT W LEFT} {
     puts $pin_assignment_report "PLAN $port side=$compass layer=$secondary_layer_name"
   }
   if {[llength $primary_side_ports] > 0} {
+    if {$side_primary_layer == $ports_layer} {
+      set primary_depth_multiplier $env(pin_primary_depth_width_multiplier)
+    } else {
+      set primary_depth_multiplier $env(pin_other_depth_width_multiplier)
+    }
     edit_pins_with_corner_keepout \
-      $primary_side_ports $ports_layer $innovus_side $env(pin_corner_keepout)
+      $primary_side_ports $side_primary_layer $side_primary_layer_obj \
+      $innovus_side $env(pin_corner_keepout) $primary_depth_multiplier
   }
   if {[llength $secondary_side_ports] > 0} {
     edit_pins_with_corner_keepout \
-      $secondary_side_ports $secondary_ports_layer $innovus_side $env(pin_corner_keepout)
+      $secondary_side_ports $secondary_ports_layer $secondary_pin_layer_obj \
+      $innovus_side $env(pin_corner_keepout) \
+      $env(pin_other_depth_width_multiplier)
   }
 }
 if {![info exists allo_asic_clock_pins] || ![info exists allo_asic_clock_side]} {
@@ -737,29 +998,6 @@ if {[llength $unassigned_ports] > 0} {
   error "Manifest pin intent leaves ports unassigned: $unassigned_ports"
 }
 close $pin_assignment_report
-
-# TEMPORARY PIN-EXPORT DIAGNOSTIC (remove after the next pin experiment).
-# Capture a non-stripe abstract at several milestones to identify whether pin
-# side/layer drift is introduced by implementation or by -stripePin export.
-proc write_pin_debug_snapshot {label} {
-  global reports_dir results_dir design_name vars
-  set lef_path $reports_dir/pin-debug-${label}.lef
-  set check_path $reports_dir/pin-debug-${label}.check.rpt
-  if {[catch {
-    write_lef_abstract \
-      -specifyTopLayer $vars(max_route_layer) \
-      -noCutObs \
-      $lef_path
-    exec python3 scripts/check_final_lef_pins.py \
-      $reports_dir/pin-assignment.rpt $lef_path $check_path
-  } snapshot_error]} {
-    set error_stream [open $reports_dir/pin-debug-${label}.error.rpt w]
-    puts $error_stream "SNAPSHOT_ERROR $snapshot_error"
-    close $error_stream
-  }
-}
-
-write_pin_debug_snapshot post-edit
 
 reset_path_group -all
 resetPathGroupOptions
@@ -926,8 +1164,6 @@ checkPlace -verbose > reports/place.checkPlace.after_refine.rpt
 checkPlace -macroBlockage -verbose > reports/place.checkPlace.macroBlockage.after_refine.rpt
 reportDensityMap > reports/place.density.rpt
 
-write_pin_debug_snapshot post-place
-
 report_metrics place
 maybe_stop_after place
 
@@ -1028,8 +1264,6 @@ setNanoRouteMode -droutePostRouteSpreadWire false
 
 setExtractRCMode -engine postRoute -effortLevel low
 
-write_pin_debug_snapshot post-route-no-stripe
-
 report_metrics route
 maybe_stop_after route
 
@@ -1076,6 +1310,10 @@ if {[info exists ADK_FILLER_CELLS] && $ADK_FILLER_CELLS ne ""} {
 }
 setFillerMode -core $filler_cells -corePrefix FILL
 addFiller
+
+# Perform a narrow filler/local-route cleanup before extraction and the
+# mandatory final DRC check; do not reopen global routing or optimization.
+ecoRoute -target
 
 if {$need_restore_multi == true} {
   setDistributeHost -local
@@ -1213,12 +1451,108 @@ saveNetlist -excludeLeafCell \
 saveNetlist -excludeLeafCell $results_dir/$design_name.vcs.v
 saveNetlist -includePowerGround -excludeLeafCell $results_dir/$design_name.vcs.pg.v
 
+# Export resolved post-route rectangles from the configured top macro-routing
+# layer. Unlike DEF path syntax, these database boxes already include wire
+# width and generated-via enclosure geometry.
+set top_obs_layer_obj [dbGetLayerByZ $vars(max_route_layer)]
+if {$top_obs_layer_obj == 0} {
+  error "Cannot generate top-layer occupancy OBS: layer $vars(max_route_layer) is absent"
+}
+set top_obs_layer_name [dbGet $top_obs_layer_obj.name]
+set top_obs_pitch [pin_layer_pitch $top_obs_layer_obj]
+set top_obs_geometry $reports_dir/top-layer-geometry.tsv
+set top_obs_stream [open $top_obs_geometry w]
+set top_obs_die_box [dbGet top.fPlan.box]
+if {[llength $top_obs_die_box] == 1} {
+  set top_obs_die_box [lindex $top_obs_die_box 0]
+}
+puts $top_obs_stream "DIE\t[join $top_obs_die_box \t]"
+puts $top_obs_stream "LAYER\t$top_obs_layer_name"
+puts $top_obs_stream "PITCH\t$top_obs_pitch"
+
+proc emit_top_obs_rects {stream kind net_name rects} {
+  set count 0
+  foreach rect $rects {
+    # Some Innovus database attributes return one rectangle as {{x y x y}},
+    # while list(rect) attributes return {{...} {...}}. Normalize the former.
+    if {[llength $rect] == 1 && [llength [lindex $rect 0]] == 4} {
+      set rect [lindex $rect 0]
+    }
+    if {[llength $rect] == 4} {
+      puts $stream "RECT\t$kind\t$net_name\t[join $rect \t]"
+      incr count
+    }
+  }
+  return $count
+}
+
+proc top_obs_object_net_name {object} {
+  set net_name [dbGet -e $object.net.name]
+  if {[llength $net_name] != 1 || $net_name eq ""} {
+    error "Top-layer geometry object $object has no unique owning net"
+  }
+  # dbGet may return a one-element Tcl list rendered with braces for names that
+  # contain bus brackets. lindex returns the canonical element without list
+  # serialization, so the TSV agrees with LEF PIN names.
+  return [lindex $net_name 0]
+}
+
+set top_obs_rect_count 0
+set top_obs_objects [dbQuery \
+  -areas [list $top_obs_die_box] \
+  -layers [list $top_obs_layer_name] \
+  -objType {wire sWire viaInst sViaInst}]
+foreach object $top_obs_objects {
+  set object_type [dbGet $object.objType]
+  if {$object_type eq "wire"} {
+    set object_net [top_obs_object_net_name $object]
+    incr top_obs_rect_count [emit_top_obs_rects \
+      $top_obs_stream wire $object_net [dbGet $object.box]]
+  } elseif {$object_type eq "sWire"} {
+    set object_net [top_obs_object_net_name $object]
+    incr top_obs_rect_count [emit_top_obs_rects \
+      $top_obs_stream special_wire $object_net [dbGet $object.box]]
+  } elseif {$object_type eq "viaInst" || $object_type eq "sViaInst"} {
+    set object_net [top_obs_object_net_name $object]
+    set prefix [expr {$object_type eq "sViaInst" ? "special_via" : "via"}]
+    if {[dbGet $object.via.botLayer.name] eq $top_obs_layer_name} {
+      incr top_obs_rect_count [emit_top_obs_rects \
+        $top_obs_stream ${prefix}_bottom $object_net [dbGet $object.botRects]]
+    }
+    if {[dbGet $object.via.topLayer.name] eq $top_obs_layer_name} {
+      incr top_obs_rect_count [emit_top_obs_rects \
+        $top_obs_stream ${prefix}_top $object_net [dbGet $object.topRects]]
+    }
+  } else {
+    close $top_obs_stream
+    error "Unexpected dbQuery object type '$object_type' in top-layer occupancy extraction"
+  }
+}
+close $top_obs_stream
+if {$top_obs_rect_count == 0} {
+  error "Top-layer occupancy query found no geometry on $top_obs_layer_name; refusing to emit an unsafe unobstructed abstract"
+}
+
+# Keep conservative full-layer OBS below the top layer, but omit the single
+# full rectangle on the top layer. Embedded block OBS on otherwise uncovered
+# layers is retained by -extractBlockObs.
 write_lef_abstract \
   -stripePin \
   -specifyTopLayer $vars(max_route_layer) \
+  -excludeObsLayers [list $top_obs_layer_name] \
+  -extractBlockObs \
   -PGPinLayers [list $pmesh_bot $pmesh_top] \
   -noCutObs \
-  $results_dir/$design_name.lef
+  $reports_dir/$design_name.base.lef
+
+exec python3 scripts/build_coarse_top_layer_obs.py \
+  --input-lef $reports_dir/$design_name.base.lef \
+  --geometry $top_obs_geometry \
+  --output-lef $results_dir/$design_name.lef \
+  --report $reports_dir/top-layer-obs.rpt \
+  --grid-tracks $env(top_layer_obs_grid_tracks) \
+  --pin-grid-tracks $env(top_layer_obs_pin_grid_tracks) \
+  --spacing-tracks $env(top_layer_obs_spacing_tracks)
 
 # Diagnostic only: compare the requested scalar side/layer contract with the
 # final abstract. Keep macro PNR usable while the abstract-export behavior is

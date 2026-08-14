@@ -58,6 +58,22 @@ class PublishMacrosTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "expected macro other"):
                 PUBLISH.lef_symmetries(lef, "other")
 
+    def test_preserves_hls_proof_and_rtl_audit_provenance(self):
+        provenance = PUBLISH.equivalence_provenance({
+            "implementation_contract_hash": "contract123",
+            "equivalence_method": "specialized_mlir_emitted_hls_contract",
+            "rtl_audit_status": "agree",
+            "rtl_audit_hashes": ["rtl123"],
+            "rtl_hash": "rtl123",
+        })
+        self.assertEqual(provenance, {
+            "implementation_contract_hash": "contract123",
+            "equivalence_method": "specialized_mlir_emitted_hls_contract",
+            "rtl_audit_status": "agree",
+            "rtl_audit_hashes": ["rtl123"],
+            "rtl_hash": "rtl123",
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,8 @@
 set -euo pipefail
 
 : "${top_module:=top}"
-#: "${sv2v_bin:=sv2v}"
+: "${backend:=vitis}"
+: "${sv2v_bin:=sv2v}"
 : "${sv2v_defines:=}"
 : "${sv2v_include_dirs:=}"
 
@@ -10,9 +11,21 @@ mkdir -p outputs/normalized-rtl
 cp -a inputs/backend-rtl outputs/source-rtl
 
 files=()
-while IFS= read -r file; do
-  files+=("$file")
-done < <(find -H inputs/backend-rtl -type f \( -name '*.v' -o -name '*.sv' \) | sort)
+case "$backend" in
+  vitis)
+    while IFS= read -r file; do
+      files+=("$file")
+    done < <(find -H inputs/backend-rtl -type f \( -name '*.v' -o -name '*.sv' \) | sort)
+    ;;
+  catapult)
+    files+=(inputs/backend-rtl/concat_rtl.v)
+    ;;
+  *)
+    echo "ERROR: unsupported RTL normalization backend: $backend" \
+      | tee outputs/sv2v.log
+    exit 2
+    ;;
+esac
 
 if [ "${#files[@]}" -eq 0 ]; then
   echo "ERROR: inputs/backend-rtl contains no Verilog" | tee outputs/sv2v.log
@@ -20,6 +33,12 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 
 printf '%s\n' "${files[@]}" > outputs/source-manifest.f
+
+if [[ "$backend" == "catapult" && "${#files[@]}" -ne 1 ]]; then
+  echo "ERROR: Catapult normalization must consume only concat_rtl.v" \
+    | tee outputs/sv2v.log
+  exit 1
+fi
 
 args=()
 for define in $sv2v_defines; do
@@ -31,9 +50,9 @@ for incdir in "${include_dirs[@]}"; do
 done
 
 {
-  echo "Running: sv2v ${args[*]} -w outputs/design.v"
+  echo "Running: $sv2v_bin ${args[*]} -w outputs/design.v"
   printf '  %s\n' "${files[@]}"
-  "sv2v" "${args[@]}" -w outputs/design.v "${files[@]}"
+  "$sv2v_bin" "${args[@]}" -w outputs/design.v "${files[@]}"
 } 2>&1 | tee outputs/sv2v.log
 
 if [ ! -s outputs/design.v ]; then

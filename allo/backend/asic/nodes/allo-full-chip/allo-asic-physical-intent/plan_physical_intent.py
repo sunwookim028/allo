@@ -257,6 +257,248 @@ def connection_weights(plan: dict) -> dict[tuple[str, str], float]:
     return dict(weights)
 
 
+D4_PID_TRANSFORMS = {
+    "R0": lambda row, col: (row, col),
+    "R90": lambda row, col: (-col, row),
+    "R180": lambda row, col: (-row, -col),
+    "R270": lambda row, col: (col, -row),
+    "MX": lambda row, col: (-row, col),
+    "MY": lambda row, col: (row, -col),
+    "MXR90": lambda row, col: (col, row),
+    "MYR90": lambda row, col: (-col, -row),
+}
+
+
+def pid_2d(pid: tuple[int, ...]) -> tuple[int, int]:
+    """Use the two spatial PID axes, treating a 1-D mapping as one row."""
+    return (pid[-2], pid[-1]) if len(pid) > 1 else (0, pid[-1])
+
+
+def cross_kernel_pid_relations(plan: dict) -> dict[tuple[str, str], set[tuple[tuple[int, ...], tuple[int, ...]]]]:
+    """Return concrete cross-kernel PID pairs from the whole-region graph."""
+    relations: dict[tuple[str, str], set] = defaultdict(set)
+    for channel in plan.get("whole_region_connections", []):
+        endpoints = []
+        for endpoint in channel.get("endpoints", []):
+            semantic_id = endpoint.get("pe")
+            if not semantic_id:
+                continue
+            endpoints.append((semantic_kernel(semantic_id), semantic_pid(semantic_id)))
+        for index, (left_kernel, left_pid) in enumerate(endpoints):
+            for right_kernel, right_pid in endpoints[index + 1 :]:
+                if left_kernel == right_kernel:
+                    continue
+                if left_kernel < right_kernel:
+                    key, pair = (left_kernel, right_kernel), (left_pid, right_pid)
+                else:
+                    key, pair = (right_kernel, left_kernel), (right_pid, left_pid)
+                relations[key].add(pair)
+    return dict(relations)
+
+
+def infer_directed_interleave(
+    anchor_kernel: str,
+    target_kernel: str,
+    anchor_members: list[dict],
+    target_members: list[dict],
+    pairs: set[tuple[tuple[int, ...], tuple[int, ...]]],
+) -> dict | None:
+    """Recognize one exact repeated, nonoverlapping D4 PID stencil.
+
+    This deliberately requires complete coverage. It is an opt-in physical
+    grouping proof, not a best-effort graph partitioner.
+    """
+    anchor_slots: dict[tuple[int, ...], list[dict]] = defaultdict(list)
+    target_slots: dict[tuple[int, ...], list[dict]] = defaultdict(list)
+    for member in anchor_members:
+        anchor_slots[tuple(member["pid"])].append(member)
+    for member in target_members:
+        target_slots[tuple(member["pid"])].append(member)
+    if (
+        len(anchor_slots) < 2
+        or any(len(values) != 1 for values in anchor_slots.values())
+        or any(len(values) != 1 for values in target_slots.values())
+    ):
+        return None
+
+    adjacency: dict[tuple[int, ...], set[tuple[int, ...]]] = defaultdict(set)
+    for left_pid, right_pid in pairs:
+        if left_pid in anchor_slots and right_pid in target_slots:
+            adjacency[left_pid].add(right_pid)
+    if set(adjacency) != set(anchor_slots):
+        return None
+    assigned_targets = [pid for values in adjacency.values() for pid in values]
+    if set(assigned_targets) != set(target_slots) or len(assigned_targets) != len(set(assigned_targets)):
+        return None
+
+    candidates = []
+    for transform_index, (transform_name, transform) in enumerate(D4_PID_TRANSFORMS.items()):
+        stencil = None
+        valid = True
+        for anchor_pid in sorted(anchor_slots):
+            anchor_row, anchor_col = transform(*pid_2d(anchor_pid))
+            offsets = tuple(sorted(
+                (target_row - anchor_row, target_col - anchor_col)
+                for target_row, target_col in (
+                    pid_2d(target_pid) for target_pid in adjacency[anchor_pid]
+                )
+            ))
+            if stencil is None:
+                stencil = offsets
+            elif offsets != stencil:
+                valid = False
+                break
+        if valid and stencil:
+            span = (
+                max(offset[0] for offset in stencil) - min(offset[0] for offset in stencil)
+                + max(offset[1] for offset in stencil) - min(offset[1] for offset in stencil)
+            )
+            candidates.append((span, transform_index, transform_name, stencil))
+    if not candidates:
+        return None
+    _span, _transform_index, transform_name, stencil = min(candidates)
+    return {
+        "anchor_kernel": anchor_kernel,
+        "target_kernel": target_kernel,
+        "transform": transform_name,
+        "stencil": [list(offset) for offset in stencil],
+        "anchor_count": len(anchor_slots),
+        "target_count": len(target_slots),
+        "groups": [
+            {
+                "anchor_pid": list(anchor_pid),
+                "target_pids": [list(pid) for pid in sorted(adjacency[anchor_pid])],
+            }
+            for anchor_pid in sorted(anchor_slots)
+        ],
+        "coverage": 1.0,
+        "method": "exact_complete_d4_pid_stencil",
+    }
+
+
+def infer_interleave_pairs(grouped: dict[str, list[dict]], plan: dict) -> tuple[list[dict], list[dict]]:
+    """Select nonoverlapping, exact interleaving pairs; report every decision."""
+    relations = cross_kernel_pid_relations(plan)
+    accepted_candidates = []
+    decisions = []
+    for (left, right), pairs in sorted(relations.items()):
+        if left not in grouped or right not in grouped:
+            continue
+        directed_pairs = [
+            (left, right, pairs),
+            (right, left, {(right_pid, left_pid) for left_pid, right_pid in pairs}),
+        ]
+        candidates = [
+            candidate
+            for anchor, target, directed in directed_pairs
+            if (candidate := infer_directed_interleave(
+                anchor, target, grouped[anchor], grouped[target], directed
+            )) is not None
+        ]
+        if not candidates:
+            decisions.append({
+                "kernels": [left, right], "accepted": False,
+                "reason": "no exact complete nonoverlapping repeated PID stencil",
+            })
+            continue
+        # Prefer fewer composite tiles and then a deterministic kernel name.
+        candidate = min(candidates, key=lambda item: (item["anchor_count"], item["anchor_kernel"]))
+        accepted_candidates.append(candidate)
+
+    # Stronger/repeated candidates claim kernels first. Kernel-disjoint pairing
+    # avoids silently constructing transitive many-kernel superclusters.
+    claimed = set()
+    accepted = []
+    for candidate in sorted(
+        accepted_candidates,
+        key=lambda item: (-item["target_count"], item["anchor_count"], item["anchor_kernel"], item["target_kernel"]),
+    ):
+        pair = {candidate["anchor_kernel"], candidate["target_kernel"]}
+        if pair & claimed:
+            decisions.append({
+                "kernels": sorted(pair), "accepted": False,
+                "reason": "kernel already claimed by a stronger disjoint interleave pair",
+            })
+            continue
+        claimed.update(pair)
+        candidate = {**candidate, "accepted": True}
+        accepted.append(candidate)
+        decisions.append(candidate)
+    return accepted, decisions
+
+
+def build_kernel_cluster(members: list[dict], macro_x: float, macro_y: float) -> dict:
+    """Build the original rigid PID-grid cluster for one semantic kernel."""
+    slots = defaultdict(list)
+    for member in members:
+        slots[tuple(member["pid"])].append(member)
+    pids = sorted(slots)
+    rows = sorted({pid_2d(pid)[0] for pid in pids})
+    cols = sorted({pid_2d(pid)[1] for pid in pids})
+    col_width = {col: 0.0 for col in cols}
+    row_height = {row: 0.0 for row in rows}
+    for pid, values in slots.items():
+        row, col = pid_2d(pid)
+        width = sum(item["width"] for item in values) + macro_x * max(0, len(values) - 1)
+        col_width[col] = max(col_width[col], width)
+        row_height[row] = max(row_height[row], max(item["height"] for item in values))
+    x_offsets, cursor = {}, 0.0
+    for col in cols:
+        x_offsets[col], cursor = cursor, cursor + col_width[col] + macro_x
+    cluster_width = max(0.0, cursor - macro_x)
+    y_offsets, cursor = {}, 0.0
+    for row in reversed(rows):
+        y_offsets[row], cursor = cursor, cursor + row_height[row] + macro_y
+    cluster_height = max(0.0, cursor - macro_y)
+    local = []
+    for pid in pids:
+        row, col = pid_2d(pid)
+        local_x = x_offsets[col]
+        for member in sorted(slots[pid], key=lambda value: value["name"]):
+            local.append({**member, "local_x": local_x, "local_y": y_offsets[row]})
+            local_x += member["width"] + macro_x
+    return {"width": cluster_width, "height": cluster_height, "members": local}
+
+
+def build_interleaved_cluster(
+    inference: dict, grouped: dict[str, list[dict]], macro_x: float, macro_y: float
+) -> dict:
+    """Tile repeated cross-kernel composite groups on the anchor PID grid."""
+    anchor_by_pid = {tuple(item["pid"]): item for item in grouped[inference["anchor_kernel"]]}
+    target_by_pid = {tuple(item["pid"]): item for item in grouped[inference["target_kernel"]]}
+    tiles = {}
+    for group in inference["groups"]:
+        anchor_pid = tuple(group["anchor_pid"])
+        members = [anchor_by_pid[anchor_pid]] + [
+            target_by_pid[tuple(pid)] for pid in group["target_pids"]
+        ]
+        members = sorted(members, key=lambda item: (item["kernel"] != inference["anchor_kernel"], pid_2d(tuple(item["pid"])), item["name"]))
+        width = sum(item["width"] for item in members) + macro_x * (len(members) - 1)
+        height = max(item["height"] for item in members)
+        tiles[anchor_pid] = {"members": members, "width": width, "height": height}
+
+    rows = sorted({pid_2d(pid)[0] for pid in tiles})
+    cols = sorted({pid_2d(pid)[1] for pid in tiles})
+    col_width = {col: max(tile["width"] for pid, tile in tiles.items() if pid_2d(pid)[1] == col) for col in cols}
+    row_height = {row: max(tile["height"] for pid, tile in tiles.items() if pid_2d(pid)[0] == row) for row in rows}
+    x_offsets, cursor = {}, 0.0
+    for col in cols:
+        x_offsets[col], cursor = cursor, cursor + col_width[col] + macro_x
+    width = cursor - macro_x
+    y_offsets, cursor = {}, 0.0
+    for row in reversed(rows):
+        y_offsets[row], cursor = cursor, cursor + row_height[row] + macro_y
+    height = cursor - macro_y
+    local = []
+    for pid, tile in sorted(tiles.items()):
+        row, col = pid_2d(pid)
+        x = x_offsets[col]
+        for member in tile["members"]:
+            local.append({**member, "local_x": x, "local_y": y_offsets[row]})
+            x += member["width"] + macro_x
+    return {"width": width, "height": height, "members": local}
+
+
 def optimize_slots(kernels: list[str], weights: dict, passes: int) -> dict[str, tuple[int, int]]:
     cols = max(1, math.ceil(math.sqrt(len(kernels))))
     degrees = {kernel: 0.0 for kernel in kernels}
@@ -288,6 +530,18 @@ def optimize_slots(kernels: list[str], weights: dict, passes: int) -> dict[str, 
             break
         order = best[1]
     return {name: slots[index] for index, name in enumerate(order)}
+
+
+def remap_connection_weights(weights: dict, cluster_by_kernel: dict[str, str]) -> dict:
+    """Aggregate semantic-kernel edges onto their selected spatial clusters."""
+    result = defaultdict(float)
+    for (left, right), weight in weights.items():
+        mapped_left = cluster_by_kernel.get(left, left)
+        mapped_right = cluster_by_kernel.get(right, right)
+        if mapped_left == mapped_right:
+            continue
+        result[tuple(sorted((mapped_left, mapped_right)))] += weight
+    return dict(result)
 
 
 def variable_slot_extents(
@@ -462,6 +716,7 @@ def main() -> None:
     aspect = parameter("floorplan_aspect_ratio", 1.0)
     passes = int(parameter("kernel_optimization_passes", 12))
     enable_kernel_rotation = boolean_parameter("enable_kernel_rotation", True)
+    interleave_macros = boolean_parameter("interleave_macros", False)
     row_cut_halo = parameter("macro_halo", 2.0)
     min_row_width = parameter("min_placeable_row_segment_width", 12.0)
     if density <= 0 or density >= 1 or aspect <= 0 or grid <= 0:
@@ -488,58 +743,46 @@ def main() -> None:
         if orient not in {"R0", "R90", "R180", "R270", "MX", "MY", "MXR90", "MYR90"}:
             orient = "R0"
         width, height = oriented_dimensions(width, height, orient)
-        grouped[semantic_kernel(item["semantic_id"])].append({
+        kernel = semantic_kernel(item["semantic_id"])
+        grouped[kernel].append({
             "name": stable, "cell": item["canonical_module"], "semantic_id": item["semantic_id"],
             "pid": semantic_pid(item["semantic_id"]), "width": width, "height": height,
             "orientation": orient, "kind": "pe", "macro_class_id": item["macro_class_id"],
             "lef_symmetry": symmetries[item["macro_class_id"]],
             "candidate_kind": item.get("candidate_kind", "semantic_pe"),
+            "kernel": kernel,
         })
 
+    # Preserve the original one-rigid-cluster-per-kernel behavior unless the
+    # explicit experimental flag is enabled and a complete repeated stencil is
+    # proven. Rejected/unclaimed kernels still use precisely the same builder.
+    interleave_inferences, interleave_decisions = (
+        infer_interleave_pairs(grouped, plan) if interleave_macros else ([], [])
+    )
     clusters = {}
+    interleaved_kernels = set()
+    spatial_cluster_by_kernel = {kernel: kernel for kernel in grouped}
+    for inference in interleave_inferences:
+        anchor = inference["anchor_kernel"]
+        target = inference["target_kernel"]
+        cluster_name = f"interleave:{anchor}+{target}"
+        clusters[cluster_name] = build_interleaved_cluster(
+            inference, grouped, macro_x, macro_y
+        )
+        interleaved_kernels.update({anchor, target})
+        spatial_cluster_by_kernel[anchor] = cluster_name
+        spatial_cluster_by_kernel[target] = cluster_name
     for kernel, members in grouped.items():
-        slots = defaultdict(list)
-        for member in members:
-            slots[member["pid"]].append(member)
-        pids = sorted(slots)
-        rows = sorted({pid[-2] if len(pid) > 1 else 0 for pid in pids})
-        cols = sorted({pid[-1] for pid in pids})
-        col_width = {col: 0.0 for col in cols}
-        row_height = {row: 0.0 for row in rows}
-        slot_width = {}
-        for pid, values in slots.items():
-            row, col = (pid[-2], pid[-1]) if len(pid) > 1 else (0, pid[-1])
-            width = sum(item["width"] for item in values) + macro_x * max(0, len(values) - 1)
-            height = max(item["height"] for item in values)
-            slot_width[pid] = width
-            col_width[col] = max(col_width[col], width)
-            row_height[row] = max(row_height[row], height)
-        x_offsets, cursor = {}, 0.0
-        for col in cols:
-            x_offsets[col], cursor = cursor, cursor + col_width[col] + macro_x
-        cluster_width = max(0.0, cursor - macro_x)
-        # Allo systolic rows advance south: macro pin intent places vertical
-        # stream inputs on N and outputs on S.  Innovus Y increases north, so
-        # lay larger PID rows at smaller Y to make adjacent stream pins face.
-        y_offsets, cursor = {}, 0.0
-        for row in reversed(rows):
-            y_offsets[row], cursor = cursor, cursor + row_height[row] + macro_y
-        cluster_height = max(0.0, cursor - macro_y)
-        local = []
-        for pid in pids:
-            row, col = (pid[-2], pid[-1]) if len(pid) > 1 else (0, pid[-1])
-            local_x = x_offsets[col]
-            for member in sorted(slots[pid], key=lambda value: value["name"]):
-                local.append({**member, "local_x": local_x, "local_y": y_offsets[row]})
-                local_x += member["width"] + macro_x
-        clusters[kernel] = {"width": cluster_width, "height": cluster_height, "members": local}
+        if kernel not in interleaved_kernels:
+            clusters[kernel] = build_kernel_cluster(members, macro_x, macro_y)
 
     weights = connection_weights(plan)
+    placement_weights = remap_connection_weights(weights, spatial_cluster_by_kernel)
     kernel_names = sorted(clusters)
-    slot_map = optimize_slots(kernel_names, weights, passes)
+    slot_map = optimize_slots(kernel_names, placement_weights, passes)
     if enable_kernel_rotation:
         clusters = choose_cluster_rotations(
-            clusters, slot_map, weights, kernel_x, kernel_y, passes
+            clusters, slot_map, placement_weights, kernel_x, kernel_y, passes
         )
     else:
         clusters = {name: rotate_cluster(cluster, "R0") for name, cluster in clusters.items()}
@@ -598,7 +841,8 @@ def main() -> None:
                 **{key: value for key, value in member.items() if not key.startswith("local_")},
                 "x": snap(cluster_x + member["local_x"], grid),
                 "y": snap(cluster_y + member["local_y"], grid),
-                "kernel": kernel,
+                "kernel": member.get("kernel", kernel),
+                "spatial_cluster": kernel,
             })
     planned_core_w = snap(core_w, grid)
     planned_core_h = snap(core_h, grid)
@@ -648,6 +892,14 @@ def main() -> None:
             "whole_kernel_rotation_enabled": enable_kernel_rotation,
             "region_width": kernel_region_w,
             "region_height": kernel_region_h,
+        },
+        "cross_kernel_interleaving": {
+            "enabled": interleave_macros,
+            "mode": "exact_complete_d4_pid_stencil" if interleave_macros else "disabled",
+            "accepted_pair_count": len(interleave_inferences),
+            "accepted_pairs": interleave_inferences,
+            "decisions": interleave_decisions,
+            "fallback": "rigid_semantic_kernel_cluster",
         },
         "cluster_placement_policy": {
             "type": "none",
@@ -727,6 +979,8 @@ def main() -> None:
         f"Core: {intent['core']['width']} x {intent['core']['height']} um\n"
         f"PE macros: {len(pe_placements)}\nSRAMs: {len(srams)} (optional sequential perimeter policy)\n"
         f"Kernel clusters: {len(cluster_records)}\nWeighted inter-kernel cost optimization passes: {passes}\n"
+        f"Cross-kernel interleaving enabled: {interleave_macros}\n"
+        f"Accepted interleave pairs: {len(interleave_inferences)}\n"
         f"Selective short-row cuts: {len(row_fragment_cuts)} (minimum retained width {min_row_width} um)\n"
         "Kernel-cluster partial placement limits: disabled\n"
     )

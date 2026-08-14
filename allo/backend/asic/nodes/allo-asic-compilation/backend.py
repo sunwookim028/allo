@@ -2,6 +2,7 @@
 
 import ast
 import json
+import shutil
 from pathlib import Path
 
 
@@ -110,3 +111,47 @@ def find_rtl_directory(backend, project):
         raise ValueError(
             f"unsupported Allo backend {backend!r}; supported: vitis, catapult"
         )
+
+
+def publish_rtl_artifacts(backend, project, output):
+    """Publish the stable RTL contract, excluding backend work databases."""
+    source = find_rtl_directory(backend, project)
+    output = Path(output)
+    if output.exists():
+        shutil.rmtree(output)
+    if backend == "vitis":
+        shutil.copytree(source, output)
+        return source
+
+    output.mkdir(parents=True)
+    required = ("concat_rtl.v",)
+    optional = (
+        "cycle.rpt",
+        "rtl.rpt",
+        "concat_rtl.v.dc.sdc",
+    )
+    for name in required:
+        path = source / name
+        if not path.is_file():
+            raise RuntimeError(f"missing required Catapult RTL artifact: {path}")
+        shutil.copy2(path, output / name)
+    for name in optional:
+        path = source / name
+        if path.is_file():
+            shutil.copy2(path, output / name)
+
+    scverify_names = (
+        "dut_v_ports.map",
+        "mc_dut_wrapper.h",
+        "mc_testbench.cpp",
+        "mc_testbench.h",
+        "scverify_top.cpp",
+    )
+    scverify_source = source / "scverify"
+    selected = [name for name in scverify_names if (scverify_source / name).is_file()]
+    if selected:
+        scverify_output = output / "scverify"
+        scverify_output.mkdir()
+        for name in selected:
+            shutil.copy2(scverify_source / name, scverify_output / name)
+    return source

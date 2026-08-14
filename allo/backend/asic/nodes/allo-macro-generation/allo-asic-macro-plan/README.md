@@ -43,3 +43,12 @@ separate derived equivalence classes before applying `min_macro_reuse`. Module
 names remain canonical-class based. Concrete instances are named
 `<kernel>_<pid...>` during Stage-2 assembly—for example `compute_3_5`—without
 sacrificing macro reuse. Bypass/flat mode always disables folding.
+# Backend behavior
+
+Vitis retains the configured reuse threshold and optional producer-owned FIFO
+folding behavior. Catapult recognizes `*_rsc_dat`, `*_rsc_vld`, and
+`*_rsc_rdy` as one ready/valid stream bundle, recognizes `clk` and active-high
+`rst`, and applies the same configured reuse threshold as Vitis. A Catapult
+FIFO-folding request is recorded but automatically disabled until an
+ownership-preserving implementation exists; required support modules remain in
+each selected PE's dependency closure.

@@ -16,6 +16,7 @@ commands:
 
 parameters:
   top_module: top
+  backend: vitis
 
 preconditions:
   - assert File( 'inputs/design.v' )

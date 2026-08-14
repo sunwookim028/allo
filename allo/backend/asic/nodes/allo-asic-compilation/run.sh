@@ -134,18 +134,6 @@ if [ "$build_status" -ne 0 ]; then
   exit "$build_status"
 fi
 
-"$python_bin" validate_build.py \
-  --project work/project \
-  --backend "$backend" \
-  --rtl-output outputs/backend-rtl
-
-cp -a work/project outputs/allo-build
-cp -a work/project/asic-debug outputs/asic-debug
-for name in asic-manifest.json asic-manifest.tcl \
-            asic-manifest-final.json asic-manifest-final.tcl; do
-  cp "work/project/$name" "outputs/$name"
-done
-
 "$python_bin" export_workload.py \
   --design "$design_path" \
   --enabled "$allo_testbench_enabled" \
@@ -153,6 +141,20 @@ done
   --top-function "$allo_testbench_top_function" \
   --output-manifest outputs/workload-manifest.json \
   --output-vectors outputs/workload-vectors
+
+"$python_bin" validate_build.py \
+  --project work/project \
+  --backend "$backend" \
+  --rtl-output outputs/backend-rtl \
+  --workload-manifest outputs/workload-manifest.json \
+  --workload-vectors outputs/workload-vectors
+
+cp -a work/project outputs/allo-build
+cp -a work/project/asic-debug outputs/asic-debug
+for name in asic-manifest.json asic-manifest.tcl \
+            asic-manifest-final.json asic-manifest-final.tcl; do
+  cp "work/project/$name" "outputs/$name"
+done
 
 export ALLO_NODE_DESIGN_PATH="$design_path"
 export ALLO_NODE_BACKEND="$backend"

@@ -24,10 +24,14 @@ pitch, and capacity for both layers on every edge.
 After abstract export, `check_final_lef_pins.py` compares those planned scalar
 assignments with the actual LEF rectangles. Its
 `reports/final-lef-pin-check.rpt` output is diagnostic rather than a strict
-postcondition while `write_lef_abstract -stripePin` behavior is being studied.
-For the next experiment only, the PNR script also writes checked non-stripe
-abstracts at post-edit, post-place, and post-route milestones. This temporary
-instrumentation is explicitly marked for removal after that run.
+postcondition. North/south edge pins use the configured vertical-preferred
+layer (`pin_vertical_layer_offset`, M4 in FreePDK45); east/west pins use the
+horizontal-preferred primary/secondary layers (M3/M5 in FreePDK45). When an
+east/west edge contains at least two groups of
+`pin_stream_group_min_width` terminals, the default
+`pin_spread_multiple_stream_groups` policy requires at least one complete
+large group on M5 even if all pins geometrically fit on M3. Small control and
+auxiliary groups remain on M3 when possible.
 FreePDK45 standard cells use uppercase `VDD` and `VSS`; only those PG-pin names
 are requested. Lowercase compatibility aliases are not probed because Innovus
 reports an unmatched `globalNetConnect` pattern as an error even after the real
@@ -57,3 +61,27 @@ hold are repaired after CTS, routing remains timing-driven, and configurable
 post-route optimization passes end with hold repair while prohibiting setup-TNS
 degradation. Fill cells are inserted only after those passes so optimization
 has whitespace available for delay buffers and resizing.
+
+The configured highest macro-routing layer uses a hybrid occupancy abstract.
+Four-track tiles keep the macro interior compact, while tiles around exported
+pins and their access paths are refined to `top_layer_obs_pin_grid_tracks`
+(one track by default). Post-route geometry retains its owning-net name. A pin
+opening is rejected if it overlaps another net's clearance-expanded metal, and
+each pin must have a continuous clear fine-grid path to a macro boundary. This
+replaces the unsafe earlier behavior that removed an entire coarse OBS tile
+whenever any pin touched it.
+
+LEF `USE POWER` and `USE GROUND` pins are handled as distributed power-grid
+shapes rather than point-to-point signal terminals. Their real top-layer pin
+cells are published after verifying matching routed geometry on the owning
+net, without fabricating a separate top-layer boundary corridor for every PG
+stripe. Signal and clock pins retain the strict unrelated-net clearance and
+continuous boundary-path checks.
+
+Signal-pin rectangles retain the technology routing width parallel to the
+macro edge and extend farther inward. The primary horizontal layer defaults to
+three routing widths of depth; vertical and secondary horizontal layers use two
+widths. Pin center pitch and edge capacity therefore remain unchanged while
+the detailed router receives a longer landing area for pin escape and vias.
+After timing repair and filler insertion, macro PNR runs a targeted
+`ecoRoute -target` cleanup before extraction and the mandatory final DRC check.

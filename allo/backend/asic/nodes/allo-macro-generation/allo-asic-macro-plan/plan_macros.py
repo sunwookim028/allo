@@ -340,6 +340,7 @@ def generate_fifo_wrapper(
 
     wrapper_text = "\n".join(lines)
     wrapper_block = module_blocks(wrapper_text)[wrapper_name]
+    wrapper_decls = port_declarations(wrapper_block, port_names(wrapper_block))
     # Retain semantic side/direction but replace each folded producer bundle
     # with the consumer-facing FIFO boundary pins.
     for bundle in intent["stream_bundles"]:
@@ -349,13 +350,17 @@ def generate_fifo_wrapper(
                 f"{root}_{suffix}"
                 for suffix in (*FIFO_SHARED_PORTS, *FIFO_CONSUMER_PORTS)
             ]
+        bundle["rtl_port_widths"] = {
+            port: declaration_width(wrapper_decls[port])
+            for port in bundle["rtl_ports"]
+        }
     wrapper_port_set = set(port_names(wrapper_block))
     stream_ports = {
         port for bundle in intent["stream_bundles"] for port in bundle["rtl_ports"]
     }
     remaining = [port for port in wrapper_ports if port not in stream_ports]
     intent["module"] = wrapper_name
-    intent["clock_pins"] = [port for port in remaining if port == "ap_clk"]
+    intent["clock_pins"] = [port for port in remaining if port in {"ap_clk", "clk"}]
     intent["control_pins"] = [
         port for port in remaining if port.startswith("ap_") and port != "ap_clk"
     ]
@@ -434,10 +439,14 @@ STREAM_SUFFIXES = (
     "_din",
     "_write",
 )
+CATAPULT_STREAM_SUFFIXES = ("_rsc_dat", "_rsc_vld", "_rsc_rdy")
 
 
 def stream_bundle_root(port: str) -> str | None:
-    """Return the Vitis interface-bundle root for a generated RTL port."""
+    """Return a Vitis or Catapult interface-bundle root."""
+    for suffix in CATAPULT_STREAM_SUFFIXES:
+        if port.endswith(suffix):
+            return port[: -len(suffix)]
     for suffix in STREAM_SUFFIXES:
         if port.endswith(suffix):
             return port[: -len(suffix)]
@@ -445,7 +454,7 @@ def stream_bundle_root(port: str) -> str | None:
 
 
 def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
-    """Find Vitis FIFO/stream bundles in declaration order.
+    """Find Vitis FIFO or Catapult ready/valid bundles in declaration order.
 
     FIFO inputs are rooted at ``*_dout`` and FIFO outputs at ``*_din``.  Vitis
     also emits scalar/AXIS-like outputs as ``value,value_ap_vld``; those are
@@ -467,10 +476,28 @@ def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
     bundles = []
     for root in sorted(grouped, key=first.get):
         names = grouped[root]
-        if f"{root}_dout" in names:
+        catapult_triplet = {
+            f"{root}_rsc_dat",
+            f"{root}_rsc_vld",
+            f"{root}_rsc_rdy",
+        }
+        if catapult_triplet.issubset(names):
+            data_direction = (
+                "in" if declarations[f"{root}_rsc_dat"].lstrip().startswith("input")
+                else "out"
+            )
+            direction = data_direction
+            protocol = "catapult_ready_valid"
+        elif any(name.endswith(CATAPULT_STREAM_SUFFIXES) for name in names):
+            # Direct-array Catapult arguments have ``*_rsc_dat`` without the
+            # ready/valid pair. They are boundary auxiliary ports, not streams.
+            continue
+        elif f"{root}_dout" in names:
             direction = "in"
+            protocol = "vitis_fifo"
         elif f"{root}_din" in names or f"{root}_ap_vld" in names:
             direction = "out"
+            protocol = "vitis_fifo"
         else:
             continue
         # Retain only actual top-level ports and validate their declarations.
@@ -478,6 +505,7 @@ def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
             {
                 "root": root,
                 "direction": direction,
+                "protocol": protocol,
                 "rtl_ports": [name for name in names if name in declarations],
             }
         )
@@ -506,7 +534,13 @@ def rtl_stream_width(
     declarations = port_declarations(block, ports)
     root = str(bundle["root"])
     candidates = (
-        [f"{root}_dout"] if bundle["direction"] == "in" else [f"{root}_din", root]
+        [f"{root}_rsc_dat"]
+        if bundle.get("protocol") == "catapult_ready_valid"
+        else (
+            [f"{root}_dout"]
+            if bundle["direction"] == "in"
+            else [f"{root}_din", root]
+        )
     )
     data_port = next((name for name in candidates if name in declarations), None)
     if data_port is None:
@@ -624,6 +658,35 @@ def axis_hint(stream: str) -> str | None:
     return None
 
 
+def semantic_stream_pin_weight(port: dict) -> int:
+    """Estimate the physical pin count of one FIFO-style stream interface."""
+    for key in ("width", "bitwidth", "dtype_bits"):
+        value = port.get(key)
+        if isinstance(value, int) and value > 0:
+            return value + 2
+    match = re.search(
+        r"(?:^|[<,\s])i(\d+)(?:[,>\s]|$)", str(port.get("type", ""))
+    )
+    return (int(match.group(1)) if match is not None else 1) + 2
+
+
+def neighboring_pid_side(here: list, there: list) -> str | None:
+    """Return the physical side for an immediately adjacent logical PE."""
+    if not here or len(here) != len(there):
+        return None
+    differences = [int(other) - int(current) for current, other in zip(here, there)]
+    changed = [index for index, difference in enumerate(differences) if difference]
+    if len(changed) != 1 or abs(differences[changed[0]]) != 1:
+        return None
+    axis = changed[0]
+    difference = differences[axis]
+    if axis == len(differences) - 1:
+        return "E" if difference > 0 else "W"
+    if axis == len(differences) - 2:
+        return "S" if difference > 0 else "N"
+    return None
+
+
 def opposite(side: str) -> str:
     return {"N": "S", "S": "N", "E": "W", "W": "E"}[side]
 
@@ -680,14 +743,17 @@ def balance_auxiliary_pins(
 def graph_pin_sides(manifest: dict) -> dict[tuple[str, int], dict[str, str]]:
     """Assign a physical side to every semantic stream endpoint.
 
-    Explicit compiler directions win.  Otherwise same-kernel PID displacement
-    determines the side.  For cross-kernel edges, stream axis names select the
-    axis and dataflow direction selects the sign.  The final fallback is the
-    conventional west-to-east producer/consumer orientation.  Every decision
-    records its method so downstream validation can reject or review fallbacks.
+    Explicit directions win and immediate same-kernel neighbors use their real
+    relative direction. All other traffic is assigned as complete, weighted
+    bundles to the least-loaded macro side. The balancing key depends only on
+    local interface structure, preserving physical-macro reuse.
     """
     pes = {item["semantic_id"]: item for item in manifest.get("pe_instances", [])}
     result: dict[tuple[str, int], dict[str, str]] = {}
+    side_loads = {
+        pe_id: {side: 0 for side in ("N", "S", "E", "W")} for pe_id in pes
+    }
+    deferred: dict[str, list[tuple[int, int, str]]] = {pe_id: [] for pe_id in pes}
     for channel in manifest.get("channels", []):
         endpoints = channel.get("endpoints", [])
         for endpoint in endpoints:
@@ -701,31 +767,48 @@ def graph_pin_sides(manifest: dict) -> dict[tuple[str, int], dict[str, str]]:
                     item for item in pe.get("ports", []) if int(item["ordinal"]) == ordinal
                 )
                 explicit = str(port.get("desired_compass_direction", "unassigned")).upper()
+                weight = semantic_stream_pin_weight(port)
                 if explicit in {"N", "S", "E", "W"}:
                     side, method = explicit, "manifest_explicit"
                 elif peer is not None and pes[peer["pe"]].get("kernel") == pe.get("kernel"):
                     here = list(pe.get("pid", []))
                     there = list(pes[peer["pe"]].get("pid", []))
-                    if len(here) >= 2 and len(there) >= 2 and here[-1] != there[-1]:
-                        side = "E" if there[-1] > here[-1] else "W"
-                        method = "same_kernel_pid_column"
-                    elif len(here) >= 1 and len(there) >= 1 and here[-2:] != there[-2:]:
-                        # Increasing row index is physically south.
-                        side = "S" if there[-2] > here[-2] else "N"
-                        method = "same_kernel_pid_row"
+                    side = neighboring_pid_side(here, there)
+                    if side is not None:
+                        method = "same_kernel_neighbor"
                     else:
-                        side = "E" if endpoint.get("direction") == "out" else "W"
-                        method = "dataflow_fallback"
+                        deferred[pe_id].append((weight, ordinal, str(port.get("direction", ""))))
+                        continue
                 else:
-                    hint = axis_hint(channel.get("stream", ""))
-                    is_out = endpoint.get("direction") == "out"
-                    if hint == "vertical":
-                        side = "S" if is_out else "N"
-                        method = "stream_axis_hint"
-                    else:
-                        side = "E" if is_out else "W"
-                        method = "stream_axis_hint" if hint == "horizontal" else "dataflow_fallback"
+                    deferred[pe_id].append((weight, ordinal, str(port.get("direction", ""))))
+                    continue
                 result[(pe_id, ordinal)] = {"side": side, "method": method}
+                side_loads[pe_id][side] += weight
+
+    base_order = ("W", "N", "S", "E")
+    for pe_id, pending in deferred.items():
+        if not pending:
+            continue
+        signature = ";".join(
+            f"{ordinal}:{direction}:{weight}"
+            for weight, ordinal, direction in sorted(pending, key=lambda item: item[1])
+        )
+        rotation = int(hashlib.sha256(signature.encode()).hexdigest()[:8], 16) % 4
+        side_order = base_order[rotation:] + base_order[:rotation]
+        for weight, ordinal, _direction in sorted(
+            pending, key=lambda item: (-item[0], item[1], item[2])
+        ):
+            side = min(
+                side_order,
+                key=lambda candidate: (
+                    side_loads[pe_id][candidate], side_order.index(candidate)
+                ),
+            )
+            result[(pe_id, ordinal)] = {
+                "side": side,
+                "method": "non_neighbor_load_balance",
+            }
+            side_loads[pe_id][side] += weight
     return result
 
 
@@ -809,10 +892,17 @@ def build_pin_intent(
     stream_rtl_ports = {port for item in mapped for port in item["rtl_ports"]}
     canonical_ports = port_names(canonical)
     declarations = port_declarations(canonical, canonical_ports)
+    for bundle in mapped:
+        bundle["rtl_port_widths"] = {
+            port: declaration_width(declarations[port])
+            for port in bundle["rtl_ports"]
+        }
     remaining = [port for port in canonical_ports if port not in stream_rtl_ports]
-    clock = [port for port in remaining if port == "ap_clk"]
+    clock = [port for port in remaining if port in {"ap_clk", "clk"}]
     control = [
-        port for port in remaining if port.startswith("ap_") and port != "ap_clk"
+        port
+        for port in remaining
+        if (port.startswith("ap_") and port != "ap_clk") or port == "rst"
     ]
     auxiliary = [
         port for port in remaining if port not in control and port not in clock
@@ -853,7 +943,20 @@ def build_pin_intent(
 def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
     side_ports = {side: [] for side in ("N", "S", "E", "W")}
     side_groups = {side: [] for side in ("N", "S", "E", "W")}
+    split_bundles = []
     for bundle in intent["stream_bundles"]:
+        if bundle.get("method") == "non_neighbor_load_balance":
+            widths = bundle.get("rtl_port_widths", {})
+            data_port = max(
+                bundle["rtl_ports"],
+                key=lambda port: (int(widths.get(port, 1)), port),
+            )
+            split_bundles.append((
+                data_port,
+                int(widths.get(data_port, 1)),
+                [port for port in bundle["rtl_ports"] if port != data_port],
+            ))
+            continue
         side_ports[bundle["side"]].extend(bundle["rtl_ports"])
         side_groups[bundle["side"]].append(list(bundle["rtl_ports"]))
     side_ports[intent["control_side"]].extend(intent["control_pins"])
@@ -867,6 +970,13 @@ def write_pin_intent_tcl(path: Path, intent: dict[str, object]) -> None:
     for (side, _name), ports in auxiliary_groups.items():
         side_groups[side].append(ports)
     lines = ["# Generated from the Allo whole-region channel graph."]
+    lines.append("set allo_asic_non_neighbor_split_bundles [list]")
+    for data_port, data_width, handshake_ports in split_bundles:
+        handshakes = " ".join(tcl_quote(port) for port in handshake_ports)
+        lines.append(
+            "lappend allo_asic_non_neighbor_split_bundles "
+            f"[list {tcl_quote(data_port)} {data_width} [list {handshakes}]]"
+        )
     lines.append(
         "set allo_asic_clock_pins [list "
         + " ".join(tcl_quote(port) for port in intent["clock_pins"])
@@ -900,9 +1010,15 @@ D4_SIDE_MAPS = {
 
 
 def stream_side_by_rtl_port(intent: dict[str, object]) -> dict[str, str]:
+    # Non-neighbor bundles are divided across multiple sides later, after the
+    # macro floorplan exposes real edge capacities. Their provisional planner
+    # side is therefore not a physical orientation constraint. Only explicit
+    # and neighbor-facing bundles can require rotating/mirroring a reused
+    # macro instance.
     return {
         port: bundle["side"]
         for bundle in intent["stream_bundles"]
+        if bundle.get("method") != "non_neighbor_load_balance"
         for port in bundle["rtl_ports"]
     }
 
@@ -993,11 +1109,12 @@ def dependency_closure(top: str, blocks: dict[str, ModuleBlock]) -> list[str]:
     return closure
 
 
-def write_constraints(path: Path, clock_period: float) -> None:
+def write_constraints(path: Path, clock_period: float, clock_pin: str) -> None:
     path.write_text(
         "# Generic HLS macro constraints generated by allo-asic-macro-plan\n"
-        f"create_clock -name clk -period {clock_period:g} [get_ports ap_clk]\n"
-        "set nonclock_inputs [remove_from_collection [all_inputs] [get_ports ap_clk]]\n"
+        f"create_clock -name clk -period {clock_period:g} [get_ports {clock_pin}]\n"
+        "set nonclock_inputs "
+        f"[remove_from_collection [all_inputs] [get_ports {clock_pin}]]\n"
         "if {[sizeof_collection $nonclock_inputs] > 0} {\n"
         "  set_input_delay 0.0 -clock clk $nonclock_inputs\n"
         "}\n"
@@ -1062,16 +1179,26 @@ def main() -> None:
     manifest_path = Path("inputs/asic-manifest-final.json")
     rtl = rtl_path.read_text()
     manifest = json.loads(manifest_path.read_text())
+    backend = os.environ.get("backend", manifest.get("backend", "vitis"))
     blocks = module_blocks(rtl)
     threshold = int(os.environ.get("min_macro_reuse", "2"))
     macro_clock_period = float(os.environ.get("macro_clock_period", "8.0"))
     bypassed = env_bool("bypass_macro_generation")
     harden_hls_submodules = env_bool("harden_repeated_hls_submodules")
-    fold_fifos = env_bool("fold_fifos_into_macro") and not bypassed
+    fold_fifos_requested = env_bool("fold_fifos_into_macro")
+    fold_fifos = fold_fifos_requested and not bypassed and backend == "vitis"
     if threshold < 1:
         raise ValueError("min_macro_reuse must be at least 1")
     if macro_clock_period <= 0:
         raise ValueError("macro_clock_period must be positive")
+    if backend not in {"vitis", "catapult"}:
+        raise ValueError(f"unsupported macro-plan backend {backend!r}")
+    manifest_backend = manifest.get("backend")
+    if manifest_backend and manifest_backend != backend:
+        raise ValueError(
+            f"macro-plan backend {backend!r} does not match manifest "
+            f"backend {manifest_backend!r}"
+        )
 
     summary = manifest.get("summary", {})
     if not bypassed and (
@@ -1266,12 +1393,20 @@ def main() -> None:
             design_text = "\n".join(blocks[name].text for name in dependencies)
         design_file = rtl_dir / "design.v"
         design_file.write_text(design_text.rstrip() + "\n")
-        constraints_file = entry_dir / "constraints.tcl"
-        write_constraints(constraints_file, macro_clock_period)
         pin_intent = (
             folding_by_module[canonical_name]["pin_intent"]
             if fold_fifos else
             build_pin_intent(manifest, group["representative"], canonical, blocks)
+        )
+        clock_pins = pin_intent["clock_pins"]
+        if len(clock_pins) != 1:
+            raise ValueError(
+                f"macro {canonical_wrapper_name} must have exactly one recognized "
+                f"clock port (ap_clk or clk), found {clock_pins}"
+            )
+        constraints_file = entry_dir / "constraints.tcl"
+        write_constraints(
+            constraints_file, macro_clock_period, str(clock_pins[0])
         )
         pin_intent_json = entry_dir / "pin-intent.json"
         pin_intent_tcl = entry_dir / "pin-intent.tcl"
@@ -1300,6 +1435,29 @@ def main() -> None:
                 }
             )
         digest = hashlib.sha256(design_file.read_bytes()).hexdigest()
+        proof = group.get("proof", {})
+        rtl_audit = group.get("rtl_audit", {})
+        rtl_audit_hashes = sorted(rtl_audit.get("distinct_hashes", []))
+        representative_records = pes[group["representative"]].get(
+            "post_hls_records", []
+        )
+        representative_rtl_hash = next(
+            (
+                record.get("rtl_equivalence_hash")
+                for record in representative_records
+                if record.get("rtl_equivalence_hash")
+            ),
+            None,
+        )
+        compatibility_rtl_hash = (
+            representative_rtl_hash
+            or (rtl_audit_hashes[0] if len(rtl_audit_hashes) == 1 else None)
+            or proof.get("rtl_hash")
+        )
+        if compatibility_rtl_hash is None:
+            raise ValueError(
+                f"class {group['macro_class_id']} has no representative RTL hash"
+            )
         entry = {
             "id": entry_id,
             "source_macro_class_id": group.get(
@@ -1310,7 +1468,15 @@ def main() -> None:
             "reuse_count": int(group["member_count"]),
             "candidate_kind": candidate_kind,
             "owning_kernels": owning_kernels,
-            "rtl_hash": group["proof"]["rtl_hash"],
+            "implementation_contract_hash": proof.get(
+                "implementation_contract_hash", proof.get("rtl_hash")
+            ),
+            "equivalence_method": proof.get("method", "rtl_hash"),
+            "rtl_audit_status": rtl_audit.get("status", "legacy_authoritative"),
+            "rtl_audit_hashes": rtl_audit_hashes or [compatibility_rtl_hash],
+            # Retained for downstream compatibility. Equivalence authority is
+            # carried by implementation_contract_hash/equivalence_method.
+            "rtl_hash": compatibility_rtl_hash,
             "rtl_sha256": digest,
             "rtl": f"entries/{entry_id}/rtl/design.v",
             "constraints": f"entries/{entry_id}/constraints.tcl",
@@ -1350,11 +1516,13 @@ def main() -> None:
         "schema_version": 1,
         "stage": "macro_plan",
         "top": manifest.get("top"),
+        "backend": backend,
         "reuse_threshold": threshold,
         "macro_clock_period_ns": macro_clock_period,
         "bypass_macro_generation": bypassed,
         "harden_repeated_hls_submodules": harden_hls_submodules,
         "fold_fifos_into_macro": fold_fifos,
+        "fold_fifos_requested": fold_fifos_requested,
         "implementation_style": "flat" if bypassed else "hierarchical_macros",
         "source_manifest": str(manifest_path),
         "selected_class_count": len(selected),
@@ -1406,8 +1574,14 @@ def main() -> None:
     else:
         log = (
             f"Selected {len(selected)} proven macro classes covering "
-            f"{plan['selected_instance_count']} instances at reuse threshold {threshold}.\n"
+            f"{plan['selected_instance_count']} instances at reuse threshold {threshold}"
+            ".\n"
         )
+        if backend == "catapult" and fold_fifos_requested:
+            log += (
+                "Catapult FIFO folding request ignored; ready/valid support logic "
+                "remains in each macro dependency closure.\n"
+            )
         if fold_fifos:
             log += (
                 "Producer-owned FIFO folding wrapped "

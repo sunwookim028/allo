@@ -58,6 +58,17 @@ def lef_symmetries(path: Path, macro_name: str) -> list[str]:
     return symmetries
 
 
+def equivalence_provenance(entry: dict) -> dict:
+    """Preserve the proof/audit distinction in the published registry."""
+    return {
+        "implementation_contract_hash": entry.get("implementation_contract_hash"),
+        "equivalence_method": entry.get("equivalence_method"),
+        "rtl_audit_status": entry.get("rtl_audit_status"),
+        "rtl_audit_hashes": entry.get("rtl_audit_hashes", []),
+        "rtl_hash": entry["rtl_hash"],
+    }
+
+
 def main() -> None:
     source_root = Path("inputs/signoff-batch")
     output_root = Path("outputs/macro-registry")
@@ -115,7 +126,7 @@ def main() -> None:
             "reuse_count": entry["reuse_count"],
             "candidate_kind": entry.get("candidate_kind", "semantic_pe"),
             "owning_kernels": entry.get("owning_kernels", []),
-            "rtl_hash": entry["rtl_hash"],
+            **equivalence_provenance(entry),
             "representative_semantic_id": entry["representative_semantic_id"],
             "member_modules": entry["member_modules"],
             "members": entry["members"],

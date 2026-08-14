@@ -24,6 +24,7 @@ commands:
   - bash run.sh
 
 parameters:
+  backend: vitis
   top_module: top
   sv2v_bin: sv2v
   sv2v_defines: ""
@@ -34,6 +35,15 @@ preconditions:
   - assert File( 'inputs/backend-rtl' )
   - assert File( 'inputs/asic-manifest-final.json' )
   - assert File( 'inputs/build-metadata.json' )
+  - >-
+    assert '{backend}' != 'catapult' or
+    File( 'inputs/backend-rtl/concat_rtl.v' )
+  - |
+      from pathlib import Path
+      assert '{backend}' != 'vitis' or any(
+          path.suffix in {'.v', '.sv'}
+          for path in Path('inputs/backend-rtl').rglob('*')
+      )
 
 postconditions:
   - assert File( 'outputs/design.v' )

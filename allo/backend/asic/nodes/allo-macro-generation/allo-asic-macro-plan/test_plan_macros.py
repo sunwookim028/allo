@@ -18,6 +18,55 @@ SPEC.loader.exec_module(PLAN)
 
 
 class MacroPlanTest(unittest.TestCase):
+    def test_writes_vitis_clock_constraints(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "constraints.tcl"
+            PLAN.write_constraints(path, 8.0, "ap_clk")
+            constraints = path.read_text()
+
+        self.assertIn(
+            "create_clock -name clk -period 8 [get_ports ap_clk]", constraints
+        )
+        self.assertIn(
+            "[remove_from_collection [all_inputs] [get_ports ap_clk]]",
+            constraints,
+        )
+
+    def test_writes_catapult_clock_constraints(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "constraints.tcl"
+            PLAN.write_constraints(path, 8.0, "clk")
+            constraints = path.read_text()
+
+        self.assertIn(
+            "create_clock -name clk -period 8 [get_ports clk]", constraints
+        )
+        self.assertIn(
+            "[remove_from_collection [all_inputs] [get_ports clk]]", constraints
+        )
+
+    def test_maps_catapult_ready_valid_bundles(self):
+        block = PLAN.module_blocks(
+            """
+module pe(clk, rst, v0_rsc_dat, v0_rsc_vld, v0_rsc_rdy,
+                   v1_rsc_dat, v1_rsc_vld, v1_rsc_rdy);
+ input clk; input rst;
+ output [25:0] v0_rsc_dat; output v0_rsc_vld; input v0_rsc_rdy;
+ input [15:0] v1_rsc_dat; input v1_rsc_vld; output v1_rsc_rdy;
+endmodule
+"""
+        )["pe"]
+        bundles = PLAN.stream_bundles(block)
+        self.assertEqual(
+            [(item["root"], item["direction"], item["protocol"]) for item in bundles],
+            [
+                ("v0", "out", "catapult_ready_valid"),
+                ("v1", "in", "catapult_ready_valid"),
+            ],
+        )
+        self.assertEqual(PLAN.rtl_stream_width(block, bundles[0]), 26)
+        self.assertEqual(PLAN.rtl_stream_width(block, bundles[1]), 16)
+
     def test_generates_producer_owned_fifo_wrapper(self):
         rtl = """
 module top(ap_clk, reset);
@@ -63,7 +112,9 @@ endmodule
                         "ordinal": 0, "channel_id": "c0", "stream": "horizontal_0_1",
                         "direction": "out", "type": "!allo.stream<i32, 1>",
                     }],
-                    "post_hls_records": [],
+                    "post_hls_records": [
+                        {"rtl_equivalence_hash": "representative-rtl"}
+                    ],
                 },
                 {
                     "semantic_id": "top/compute/pid=0,1",
@@ -212,7 +263,13 @@ endmodule
                     ],
                     "proof": {
                         "status": "proven",
-                        "rtl_hash": "abc123",
+                        "method": "specialized_mlir_emitted_hls_contract",
+                        "implementation_contract_hash": "hls-contract-123",
+                    },
+                    "rtl_audit": {
+                        "authority": False,
+                        "status": "generated_rtl_diverged",
+                        "distinct_hashes": ["abc123", "different-rtl"],
                     },
                 }
             ],
@@ -240,6 +297,16 @@ endmodule
             self.assertEqual(index["selected_class_count"], 1)
             entry = index["entries"][0]
             self.assertEqual(entry["candidate_kind"], "semantic_pe")
+            self.assertEqual(entry["implementation_contract_hash"], "hls-contract-123")
+            self.assertEqual(
+                entry["equivalence_method"],
+                "specialized_mlir_emitted_hls_contract",
+            )
+            self.assertEqual(entry["rtl_audit_status"], "generated_rtl_diverged")
+            self.assertEqual(
+                entry["rtl_audit_hashes"], ["abc123", "different-rtl"]
+            )
+            self.assertEqual(entry["rtl_hash"], "representative-rtl")
             self.assertEqual(entry["owning_kernels"], ["chip/pe"])
             self.assertEqual(entry["dependencies"], ["child"])
             self.assertEqual(
@@ -341,6 +408,165 @@ endmodule
         ]
         self.assertEqual(
             PLAN.select_member_orientation(intent, rotated, identity_map), "R90"
+        )
+
+    def test_balances_non_neighbor_streams_without_location_prediction(self):
+        representative = "r/compute/pid=3,4"
+        ports = [
+            {
+                "ordinal": ordinal,
+                "channel_id": f"external_{ordinal}",
+                "stream": f"external_{ordinal}",
+                "direction": "out",
+                "type": "!allo.stream<i32, 1>",
+            }
+            for ordinal in range(4)
+        ]
+        manifest = {
+            "pe_instances": [{
+                "semantic_id": representative,
+                "kernel": "compute",
+                "pid": [3, 4],
+                "ports": ports,
+            }],
+            "channels": [{
+                "stream": port["stream"],
+                "endpoints": [{
+                    "pe": representative,
+                    "direction": "out",
+                    "accesses": [{"port_ordinal": port["ordinal"]}],
+                }],
+            } for port in ports],
+        }
+
+        decisions = PLAN.graph_pin_sides(manifest)
+        self.assertEqual(
+            {decision["method"] for decision in decisions.values()},
+            {"non_neighbor_load_balance"},
+        )
+        self.assertEqual(
+            {decision["side"] for decision in decisions.values()},
+            {"N", "S", "E", "W"},
+        )
+
+        relocated = json.loads(json.dumps(manifest))
+        relocated_id = "r/compute/pid=99,100"
+        relocated["pe_instances"][0]["semantic_id"] = relocated_id
+        relocated["pe_instances"][0]["pid"] = [99, 100]
+        for channel in relocated["channels"]:
+            channel["endpoints"][0]["pe"] = relocated_id
+        relocated_decisions = PLAN.graph_pin_sides(relocated)
+        self.assertEqual(
+            [decisions[(representative, ordinal)]["side"] for ordinal in range(4)],
+            [relocated_decisions[(relocated_id, ordinal)]["side"] for ordinal in range(4)],
+        )
+
+        intent = {
+            "stream_bundles": [{
+                "method": "non_neighbor_load_balance",
+                "side": "E",
+                "rtl_ports": ["result_dout", "result_empty_n", "result_read"],
+                "rtl_port_widths": {
+                    "result_dout": 37,
+                    "result_empty_n": 1,
+                    "result_read": 1,
+                },
+            }],
+            "clock_pins": [],
+            "clock_side": "N",
+            "control_pins": [],
+            "control_side": "N",
+            "auxiliary_pins": [],
+            "auxiliary_pin_sides": {},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "pin-intent.tcl"
+            PLAN.write_pin_intent_tcl(output, intent)
+            emitted = output.read_text()
+            self.assertIn(
+                "[list {result_dout} 37 [list {result_empty_n} {result_read}]]",
+                emitted,
+            )
+            self.assertNotIn(
+                "allo_asic_signal_pins_E [list {result_dout}", emitted
+            )
+
+    def test_keeps_immediate_neighbor_direction_ahead_of_balancing(self):
+        manifest = {
+            "pe_instances": [
+                {
+                    "semantic_id": "r/k/pid=0,0",
+                    "kernel": "k",
+                    "pid": [0, 0],
+                    "ports": [{
+                        "ordinal": 0,
+                        "channel_id": "local",
+                        "stream": "local",
+                        "direction": "out",
+                        "type": "!allo.stream<i32, 1>",
+                    }],
+                },
+                {
+                    "semantic_id": "r/k/pid=0,1",
+                    "kernel": "k",
+                    "pid": [0, 1],
+                    "ports": [],
+                },
+            ],
+            "channels": [{
+                "stream": "local",
+                "endpoints": [
+                    {
+                        "pe": "r/k/pid=0,0",
+                        "direction": "out",
+                        "accesses": [{"port_ordinal": 0}],
+                    },
+                    {
+                        "pe": "r/k/pid=0,1",
+                        "direction": "in",
+                        "accesses": [],
+                    },
+                ],
+            }],
+        }
+        decision = PLAN.graph_pin_sides(manifest)[("r/k/pid=0,0", 0)]
+        self.assertEqual(decision, {"side": "E", "method": "same_kernel_neighbor"})
+
+    def test_non_neighbor_provisional_sides_do_not_constrain_reuse_orientation(self):
+        canonical = {
+            "stream_bundles": [
+                {
+                    "method": "same_kernel_neighbor",
+                    "side": "N",
+                    "rtl_ports": ["local_dout"],
+                },
+                {
+                    "method": "non_neighbor_load_balance",
+                    "side": "E",
+                    "rtl_ports": ["result_dout"],
+                },
+            ]
+        }
+        member = {
+            "stream_bundles": [
+                {
+                    "method": "same_kernel_neighbor",
+                    "side": "N",
+                    "rtl_ports": ["member_local_dout"],
+                },
+                {
+                    "method": "non_neighbor_load_balance",
+                    "side": "S",
+                    "rtl_ports": ["member_result_dout"],
+                },
+            ]
+        }
+        mapping = [
+            {"canonical": "local_dout", "member": "member_local_dout"},
+            {"canonical": "result_dout", "member": "member_result_dout"},
+        ]
+        self.assertEqual(
+            PLAN.select_member_orientation(canonical, member, mapping), "R0"
         )
 
     def test_maps_mixed_direction_pipeline_after_control_stream_is_removed(self):

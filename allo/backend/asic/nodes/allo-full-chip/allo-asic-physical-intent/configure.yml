@@ -31,6 +31,9 @@ parameters:
   placement_grid: 0.005
   kernel_optimization_passes: 12
   enable_kernel_rotation: True
+  # Experimental and conservative: only exact, complete, repeated D4 PID
+  # stencils may combine two semantic kernels into interleaved spatial tiles.
+  interleave_macros: False
   # Must track the PNR macro_halo. Only surviving row segments narrower than
   # this threshold are removed; larger inter-macro placement areas survive.
   macro_halo: 2.0

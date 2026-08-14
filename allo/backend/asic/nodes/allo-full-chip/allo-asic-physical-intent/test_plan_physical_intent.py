@@ -67,6 +67,109 @@ def test_variable_kernel_slots_do_not_pad_small_kernel_to_largest_width():
     assert height == 40
 
 
+def interleave_member(kernel, row, col, name):
+    return {
+        "kernel": kernel,
+        "pid": (row, col),
+        "name": name,
+        "width": 10,
+        "height": 8,
+        "orientation": "R0",
+        "lef_symmetry": ["X", "Y", "R90"],
+    }
+
+
+def test_exact_repeated_cross_kernel_stencil_is_interleaved_when_enabled():
+    grouped = {
+        "top/compute": [
+            interleave_member("top/compute", 1, 0, "c1"),
+            interleave_member("top/compute", 2, 0, "c2"),
+        ],
+        "top/router": [
+            interleave_member("top/router", 1, 2, "r12"),
+            interleave_member("top/router", 1, 3, "r13"),
+            interleave_member("top/router", 2, 2, "r22"),
+            interleave_member("top/router", 2, 3, "r23"),
+        ],
+    }
+    channels = []
+    for row in (1, 2):
+        for col in (2, 3):
+            channels.append({"endpoints": [
+                {"pe": f"top/compute/pid={row},0"},
+                {"pe": f"top/router/pid={row},{col}"},
+            ]})
+    accepted, decisions = PLAN.infer_interleave_pairs(
+        grouped, {"whole_region_connections": channels}
+    )
+    assert len(accepted) == 1
+    assert accepted[0]["anchor_kernel"] == "top/compute"
+    assert accepted[0]["target_kernel"] == "top/router"
+    assert accepted[0]["transform"] == "R0"
+    assert accepted[0]["stencil"] == [[0, 2], [0, 3]]
+    assert accepted[0]["coverage"] == 1.0
+    assert decisions[-1]["accepted"] is True
+    cluster = PLAN.build_interleaved_cluster(accepted[0], grouped, 4, 5)
+    assert [item["name"] for item in cluster["members"]] == [
+        "c1", "r12", "r13", "c2", "r22", "r23"
+    ]
+    assert cluster["width"] == 38
+    assert cluster["height"] == 21
+
+
+def test_irregular_or_partial_cross_kernel_pattern_falls_back():
+    grouped = {
+        "top/a": [
+            interleave_member("top/a", 0, 0, "a0"),
+            interleave_member("top/a", 1, 0, "a1"),
+        ],
+        "top/b": [
+            interleave_member("top/b", 0, 1, "b0"),
+            interleave_member("top/b", 1, 1, "b1"),
+            interleave_member("top/b", 2, 1, "b2"),
+        ],
+    }
+    plan = {"whole_region_connections": [
+        {"endpoints": [{"pe": "top/a/pid=0,0"}, {"pe": "top/b/pid=0,1"}]},
+        {"endpoints": [{"pe": "top/a/pid=1,0"}, {"pe": "top/b/pid=1,1"}]},
+    ]}
+    accepted, decisions = PLAN.infer_interleave_pairs(grouped, plan)
+    assert accepted == []
+    assert decisions == [{
+        "kernels": ["top/a", "top/b"],
+        "accepted": False,
+        "reason": "no exact complete nonoverlapping repeated PID stencil",
+    }]
+
+
+def test_disabled_path_uses_original_rigid_kernel_cluster_geometry():
+    members = [
+        interleave_member("top/compute", 0, 0, "c00"),
+        interleave_member("top/compute", 0, 1, "c01"),
+        interleave_member("top/compute", 1, 0, "c10"),
+        interleave_member("top/compute", 1, 1, "c11"),
+    ]
+    cluster = PLAN.build_kernel_cluster(members, 4, 5)
+    assert (cluster["width"], cluster["height"]) == (24, 21)
+    by_name = {item["name"]: (item["local_x"], item["local_y"]) for item in cluster["members"]}
+    assert by_name == {
+        "c00": (0.0, 13.0), "c01": (14.0, 13.0),
+        "c10": (0.0, 0.0), "c11": (14.0, 0.0),
+    }
+
+
+def test_connection_weights_are_remapped_around_composite_cluster():
+    weights = {
+        ("top/a", "top/b"): 32,
+        ("top/a", "top/c"): 8,
+        ("top/b", "top/c"): 16,
+    }
+    mapping = {"top/a": "interleave:a+b", "top/b": "interleave:a+b", "top/c": "top/c"}
+    assert PLAN.remap_connection_weights(weights, mapping) == {
+        ("interleave:a+b", "top/c"): 24,
+    }
+
+
 def test_systolic_pid_rows_are_placed_north_to_south(tmp_path, monkeypatch):
     inputs = tmp_path / "inputs"
     macro_dir = inputs / "macro-registry" / "macro_alpha_test"
@@ -252,6 +355,73 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
     assert intent["area_budget"]["estimated_standard_cell_area_um2"] == 800
     assert intent["area_budget"]["physical_pe_macro_area_um2"] == 200
     assert intent["area_budget"]["target_standard_cell_density"] == 0.70
+
+
+def test_planner_main_interleaves_only_with_explicit_flag(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    macro_dir = inputs / "macro-registry" / "macro_alpha_test"
+    macro_dir.mkdir(parents=True)
+    (macro_dir / "m.lef").write_text(
+        "MACRO m\n  SIZE 10 BY 8 ;\n  SYMMETRY X Y R90 ;\nEND m\n"
+    )
+    replacements = []
+    names = []
+    for kernel, pids in {
+        "compute": [(1, 0), (2, 0)],
+        "router": [(1, 2), (1, 3), (2, 2), (2, 3)],
+    }.items():
+        for row, col in pids:
+            name = f"allo_{kernel}_{row}_{col}"
+            names.append(name)
+            replacements.append({
+                "stable_instance_name": name,
+                "semantic_id": f"top/{kernel}/pid={row},{col}",
+                "macro_class_id": "macro_alpha_test",
+                "canonical_module": "m",
+                "desired_orientation": "R0",
+            })
+    channels = []
+    for row in (1, 2):
+        for col in (2, 3):
+            channels.append({"type": "i32", "endpoints": [
+                {"pe": f"top/compute/pid={row},0"},
+                {"pe": f"top/router/pid={row},{col}"},
+            ]})
+    (inputs / "assembly-plan.json").write_text(json.dumps({
+        "top_module": "top",
+        "elaborated_macro_instance_count": len(replacements),
+        "replacements": replacements,
+        "whole_region_connections": channels,
+    }))
+    (inputs / "macro-registry.json").write_text(json.dumps({"macros": [{
+        "macro_class_id": "macro_alpha_test",
+        "top_module": "m",
+        "views": {"lef": {"path": "macro_alpha_test/m.lef"}},
+    }]}))
+    (inputs / "macro-collateral.json").write_text("{}")
+    (inputs / "design.v").write_text(
+        "module top; " + " ".join(f"m {name}();" for name in names) + " endmodule\n"
+    )
+    (inputs / "macro-link.rpt").write_text(f"m {len(names)}\nTOTAL {len(names)}\n")
+    write_area_report(inputs, total=1000, macro=480)
+    monkeypatch.setenv("interleave_macros", "True")
+    monkeypatch.setenv("enable_kernel_rotation", "False")
+    monkeypatch.chdir(tmp_path)
+    PLAN.main()
+    intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())
+    policy = intent["cross_kernel_interleaving"]
+    assert policy["enabled"] is True
+    assert policy["accepted_pair_count"] == 1
+    assert len(intent["kernel_clusters"]) == 1
+    assert {item["kernel"] for item in intent["placements"]} == {
+        "top/compute", "top/router"
+    }
+    assert {item["spatial_cluster"] for item in intent["placements"]} == {
+        "interleave:top/compute+top/router"
+    }
+    assert "Accepted interleave pairs: 1" in (
+        tmp_path / "outputs/physical-intent-report.txt"
+    ).read_text()
 
 
 def test_planner_main_for_flat_bypass(tmp_path, monkeypatch):

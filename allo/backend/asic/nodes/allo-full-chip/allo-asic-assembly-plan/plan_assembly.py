@@ -95,6 +95,16 @@ def main() -> None:
     manifest = json.loads((inputs / "asic-manifest-final.json").read_text())
     registry = json.loads((inputs / "macro-registry.json").read_text())
     expected_top = os.environ.get("top_module", "top")
+    configured_backend = os.environ.get("backend")
+    backend = configured_backend or manifest.get("backend", "vitis")
+    if backend not in {"vitis", "catapult"}:
+        raise ValueError(f"unsupported full-chip assembly backend {backend!r}")
+    manifest_backend = manifest.get("backend")
+    if manifest_backend is not None and manifest_backend != backend:
+        raise ValueError(
+            f"assembly backend {backend!r} does not match manifest backend "
+            f"{manifest_backend!r}"
+        )
     if manifest.get("top") != expected_top or expected_top not in blocks:
         raise ValueError(
             f"top mismatch: requested={expected_top}, manifest={manifest.get('top')}, "
@@ -229,6 +239,7 @@ def main() -> None:
         "schema_version": 1,
         "stage": "full_chip_assembly_plan",
         "top_module": expected_top,
+        "backend": backend,
         "bypass_macro_generation": bool(
             registry.get("bypass_macro_generation", False)
         ),
@@ -253,6 +264,7 @@ def main() -> None:
     lines = [
         "set allo_asic_assembly_plan_schema_version 1",
         f"set allo_asic_assembly_top {tcl_quote(expected_top)}",
+        f"set allo_asic_backend {tcl_quote(backend)}",
         "set allo_asic_replaced_modules [list "
         + " ".join(tcl_quote(name) for name in sorted(replaced_modules))
         + "]",
@@ -270,6 +282,7 @@ def main() -> None:
     report = [
         "Full-chip assembly plan",
         f"Top module: {expected_top}",
+        f"Backend: {backend}",
         f"Hardened macro classes: {len(classes)}",
         f"Replaced RTL module definitions: {len(replaced_modules)}",
         f"Replaced instances: {len(replacements)}",

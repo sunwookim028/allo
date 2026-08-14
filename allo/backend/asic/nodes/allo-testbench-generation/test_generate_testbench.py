@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -89,3 +90,209 @@ def test_vitis_bfms_drive_away_from_propagated_clock_edge():
     assert "@(negedge clk);" in axil_bfm
     assert 'ALLO_BAGL_CLK_INS_SRC_LAT_NS=%f' in testbench
     assert "#(allo_bagl_clock_compensation_ns + allo_bagl_output_delay_ns);" in testbench
+
+
+def test_catapult_direct_array_generation(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    outputs = tmp_path / "outputs"
+    rtl = inputs / "backend-rtl"
+    rtl.mkdir(parents=True)
+    outputs.mkdir()
+    (rtl / "concat_rtl.v").write_text(
+        "module top(input clk, input rst, input [31:0] v7_rsc_dat, "
+        "output v7_triosy_lz, output [31:0] v8_rsc_dat, "
+        "output v8_triosy_lz); endmodule\n"
+    )
+    manifest = {
+        "backend": "catapult",
+        "top": "top",
+        "rtl_artifact": {"published_path": "backend-rtl/concat_rtl.v"},
+        "top_interface": {
+            "protocol": "catapult_direct_array",
+            "clock": {"name": "clk", "edge": "rising", "period_ns": 8.0},
+            "reset": {
+                "name": "rst",
+                "polarity": "active_high",
+                "default_asserted_cycles": 2,
+            },
+            "completion": {"kind": "per_argument_triosy", "active_level": 1},
+        },
+        "top_arguments": [
+            {
+                "name": "A",
+                "catapult_argument": "v7",
+                "rtl_direction": "input",
+                "data_ports": [{"name": "v7_rsc_dat", "direction": "input", "width": 32}],
+                "triosy_ports": [{"name": "v7_triosy_lz", "direction": "output", "width": 1}],
+                "packing": {
+                    "layout": "row_major",
+                    "element_order": "element_zero_at_lsb",
+                    "element_bits": 16,
+                    "element_count": 2,
+                    "packed_width": 32,
+                    "width_matches_shape": True,
+                },
+            },
+            {
+                "name": "C",
+                "catapult_argument": "v8",
+                "rtl_direction": "output",
+                "data_ports": [{"name": "v8_rsc_dat", "direction": "output", "width": 32}],
+                "triosy_ports": [{"name": "v8_triosy_lz", "direction": "output", "width": 1}],
+                "packing": {
+                    "layout": "row_major",
+                    "element_order": "element_zero_at_lsb",
+                    "element_bits": 16,
+                    "element_count": 2,
+                    "packed_width": 32,
+                    "width_matches_shape": True,
+                },
+            },
+        ],
+    }
+    (inputs / "asic-manifest-final.json").write_text(json.dumps(manifest))
+    workload = {
+        "top_function": "top",
+        "call_signature": ["A", "C"],
+        "default_timeout_cycles": 100,
+        "calls": [
+            {
+                "name": "basic",
+                "reset_before": True,
+                "arguments": {
+                    "A": {
+                        "element_bits": 16,
+                        "element_count": 2,
+                        "file": "workload-vectors/call_000/A.initial.hex",
+                    },
+                    "C": {
+                        "element_bits": 16,
+                        "element_count": 2,
+                        "file": "workload-vectors/call_000/C.initial.hex",
+                    },
+                },
+                "expected": {
+                    "C": {
+                        "element_count": 2,
+                        "file": "workload-vectors/call_000/C.expected.hex",
+                    }
+                },
+            }
+        ],
+    }
+    monkeypatch.setattr(GENERATOR, "INPUTS", inputs)
+    monkeypatch.setattr(GENERATOR, "OUTPUTS", outputs)
+    monkeypatch.setattr(GENERATOR, "TEMPLATES", SCRIPT.parent / "templates")
+
+    contract = GENERATOR._generate_catapult(
+        workload, {"backend": "catapult", "clock_period_ns": 10.0}
+    )
+
+    testbench = (outputs / "testbench.sv").read_text()
+    assert "v7_rsc_dat[index*16 +: 16] = value;" in testbench
+    assert "if (v8_triosy_lz === 1'b1) completion_seen[0] <= 1'b1;" in testbench
+    assert "wait_for_completion(1'h1, 100);" in testbench
+    assert "v8_rsc_dat[index*16 +: 16] !== expected" in testbench
+    assert "ap_start" not in testbench
+    assert contract["backend"] == "catapult"
+    assert contract["arguments"][0]["semantic_name"] == "A"
+    assert (outputs / "vcs-rtl.f").read_text().rstrip().endswith("concat_rtl.v")
+
+
+def test_catapult_synchronous_memory_generation(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    outputs = tmp_path / "outputs"
+    rtl = inputs / "backend-rtl"
+    rtl.mkdir(parents=True)
+    outputs.mkdir()
+    (rtl / "concat_rtl.v").write_text(
+        "module top(input clk, input rst, output [1:0] v7_rsc_radr, "
+        "output v7_rsc_re, input [15:0] v7_rsc_q, "
+        "output [1:0] v8_rsc_wadr, output v8_rsc_we, "
+        "output [15:0] v8_rsc_d, output v8_triosy_lz); endmodule\n"
+    )
+    def port(name, direction, width):
+        return {"name": name, "direction": direction, "width": width}
+    read_roles = {
+        "read_address": port("v7_rsc_radr", "output", 2),
+        "read_enable": port("v7_rsc_re", "output", 1),
+        "read_data": port("v7_rsc_q", "input", 16),
+    }
+    write_roles = {
+        "write_address": port("v8_rsc_wadr", "output", 2),
+        "write_enable": port("v8_rsc_we", "output", 1),
+        "write_data": port("v8_rsc_d", "output", 16),
+    }
+    manifest = {
+        "backend": "catapult", "top": "top",
+        "rtl_artifact": {"published_path": "backend-rtl/concat_rtl.v"},
+        "top_interface": {
+            "protocol": "catapult_argument_protocols",
+            "argument_protocols": [
+                "catapult_sync_memory_read", "catapult_sync_memory_write"
+            ],
+            "clock": {"name": "clk", "edge": "rising", "period_ns": 8.0},
+            "reset": {"name": "rst", "polarity": "active_high", "default_asserted_cycles": 2},
+        },
+        "top_arguments": [
+            {
+                "name": "A", "catapult_argument": "v7",
+                "semantic_direction": "input",
+                "interface_protocol": "catapult_sync_memory_read",
+                "interface": {
+                    "roles": read_roles, "layout": "row_major",
+                    "element_bits": 16, "element_count": 4,
+                    "data_width": 16, "address_width": 2,
+                    "address_capacity": 4, "read_latency_cycles": 1,
+                },
+                "rtl_ports": list(read_roles.values()), "triosy_ports": [],
+            },
+            {
+                "name": "C", "catapult_argument": "v8",
+                "semantic_direction": "output",
+                "interface_protocol": "catapult_sync_memory_write",
+                "interface": {
+                    "roles": write_roles, "layout": "row_major",
+                    "element_bits": 16, "element_count": 4,
+                    "data_width": 16, "address_width": 2,
+                    "address_capacity": 4, "read_latency_cycles": None,
+                },
+                "rtl_ports": [*write_roles.values(), port("v8_triosy_lz", "output", 1)],
+                "triosy_ports": [port("v8_triosy_lz", "output", 1)],
+            },
+        ],
+    }
+    (inputs / "asic-manifest-final.json").write_text(json.dumps(manifest))
+    vector = lambda name: {
+        "element_bits": 16, "element_count": 4,
+        "file": f"workload-vectors/call_000/{name}.initial.hex",
+    }
+    workload = {
+        "top_function": "top", "call_signature": ["A", "C"],
+        "default_timeout_cycles": 100,
+        "calls": [{
+            "name": "memory", "reset_before": True,
+            "arguments": {"A": vector("A"), "C": vector("C")},
+            "expected": {"C": {
+                "element_count": 4,
+                "file": "workload-vectors/call_000/C.expected.hex",
+            }},
+        }],
+    }
+    monkeypatch.setattr(GENERATOR, "INPUTS", inputs)
+    monkeypatch.setattr(GENERATOR, "OUTPUTS", outputs)
+    monkeypatch.setattr(GENERATOR, "TEMPLATES", SCRIPT.parent / "templates")
+    contract = GENERATOR._generate_catapult(
+        workload, {"backend": "catapult", "clock_period_ns": 10.0}
+    )
+    testbench = (outputs / "testbench.sv").read_text()
+    assert "logic [15:0] memory_A [0:3];" in testbench
+    assert "if ((rst === 1'b0) && (v7_rsc_re === 1'b1)) begin" in testbench
+    assert "if ($isunknown(v7_rsc_radr))" in testbench
+    assert "v7_rsc_q <= memory_A[v7_rsc_radr];" in testbench
+    assert "if ((rst === 1'b0) && (v8_rsc_we === 1'b1)) begin" in testbench
+    assert "if ($isunknown(v8_rsc_wadr))" in testbench
+    assert "memory_C[v8_rsc_wadr] <= v8_rsc_d;" in testbench
+    assert 'load_A("inputs/workload-vectors/call_000/A.initial.hex")' in testbench
+    assert 'check_C("inputs/workload-vectors/call_000/C.expected.hex")' in testbench
+    assert contract["arguments"][0]["protocol"] == "catapult_sync_memory_read"

@@ -17,6 +17,7 @@ commands:
   - python plan_macros.py
 
 parameters:
+  backend: vitis
   min_macro_reuse: 2
   harden_repeated_hls_submodules: False
   macro_clock_period: 8.0
@@ -27,6 +28,12 @@ preconditions:
   - assert File( 'inputs/design.v' )
   - assert File( 'inputs/asic-manifest-final.json' )
   - assert File( 'inputs/build-metadata.json' )
+  - >-
+    assert '{backend}' != 'vitis' or
+    '"backend": "vitis"' in File( 'inputs/build-metadata.json' )
+  - >-
+    assert '{backend}' != 'catapult' or
+    '"backend": "catapult"' in File( 'inputs/asic-manifest-final.json' )
 
 postconditions:
   - assert File( 'outputs/macro-batch' )

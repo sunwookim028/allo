@@ -388,6 +388,417 @@ def _generate_vitis(workload, metadata):
     return contract
 
 
+def _sv_identifier(name):
+    value = re.sub(r"\W", "_", name)
+    if not value or value[0].isdigit():
+        value = "arg_" + value
+    return value
+
+
+def _catapult_arguments(workload, manifest):
+    arguments = manifest.get("top_arguments", [])
+    if workload["call_signature"] != [item.get("name") for item in arguments]:
+        raise RuntimeError(
+            "Catapult manifest argument order does not match workload call_signature"
+        )
+    mappings = []
+    first_call = workload["calls"][0]["arguments"]
+    for argument in arguments:
+        name = argument["name"]
+        protocol = argument.get("interface_protocol", "catapult_direct_array")
+        data_ports = argument.get("data_ports", [])
+        triosy_ports = argument.get("triosy_ports", [])
+        vector = first_call[name]
+        semantic_direction = argument.get(
+            "semantic_direction", argument.get("rtl_direction", argument.get("direction"))
+        )
+        if semantic_direction in {"output", "inout"} and len(triosy_ports) != 1:
+            raise RuntimeError(
+                f"Catapult output argument {name} requires exactly one triosy port"
+            )
+        common = {
+            "semantic_name": name,
+            "identifier": _sv_identifier(name),
+            "hls_argument": argument["catapult_argument"],
+            "protocol": protocol,
+            "semantic_direction": semantic_direction,
+            "triosy_port": triosy_ports[0]["name"] if triosy_ports else None,
+            "rtl_ports": argument.get("rtl_ports", data_ports + triosy_ports),
+        }
+        if protocol == "catapult_direct_array":
+            if len(data_ports) != 1:
+                raise RuntimeError(
+                    f"Catapult direct-array argument {name} requires exactly one data port"
+                )
+            packing = argument.get("packing") or {}
+            if packing.get("layout") != "row_major":
+                raise RuntimeError(f"unsupported Catapult array layout for {name}")
+            if packing.get("element_order") != "element_zero_at_lsb":
+                raise RuntimeError(f"unsupported Catapult element order for {name}")
+            if not packing.get("width_matches_shape", False):
+                raise RuntimeError(f"invalid Catapult packed width for {name}")
+            if packing.get("element_bits") != vector["element_bits"]:
+                raise RuntimeError(f"Catapult/workload element width mismatch for {name}")
+            if packing.get("element_count") != vector["element_count"]:
+                raise RuntimeError(f"Catapult/workload element count mismatch for {name}")
+            common.update({
+                "data_port": data_ports[0]["name"],
+                "data_width": data_ports[0]["width"],
+                "element_width": packing["element_bits"],
+                "element_count": packing["element_count"],
+                "packing": packing,
+            })
+        elif protocol in {
+            "catapult_sync_memory_read", "catapult_sync_memory_write",
+            "catapult_sync_memory_readwrite",
+        }:
+            interface = argument.get("interface") or {}
+            roles = interface.get("roles", {})
+            expected_roles = {
+                "catapult_sync_memory_read": {"read_address", "read_enable", "read_data"},
+                "catapult_sync_memory_write": {"write_address", "write_enable", "write_data"},
+                "catapult_sync_memory_readwrite": {
+                    "read_address", "read_enable", "read_data",
+                    "write_address", "write_enable", "write_data",
+                },
+            }[protocol]
+            if set(roles) != expected_roles:
+                raise RuntimeError(
+                    f"Catapult memory argument {name} has roles {sorted(roles)}; "
+                    f"expected {sorted(expected_roles)}"
+                )
+            if interface.get("layout") != "row_major":
+                raise RuntimeError(f"unsupported Catapult memory layout for {name}")
+            if interface.get("read_latency_cycles") not in {None, 1}:
+                raise RuntimeError(f"unsupported Catapult memory read latency for {name}")
+            if interface.get("element_bits") != vector["element_bits"]:
+                raise RuntimeError(f"Catapult/workload element width mismatch for {name}")
+            if interface.get("element_count") != vector["element_count"]:
+                raise RuntimeError(f"Catapult/workload element count mismatch for {name}")
+            if interface.get("data_width") != interface.get("element_bits"):
+                raise RuntimeError(f"Catapult memory data width mismatch for {name}")
+            if interface.get("address_capacity", 0) < vector["element_count"]:
+                raise RuntimeError(f"Catapult memory address capacity mismatch for {name}")
+            common.update({
+                "roles": roles,
+                "element_width": interface["element_bits"],
+                "element_count": interface["element_count"],
+                "address_width": interface["address_width"],
+                "read_latency_cycles": interface.get("read_latency_cycles"),
+            })
+        else:
+            raise RuntimeError(f"unsupported Catapult argument protocol {protocol!r}")
+        mappings.append(common)
+    return mappings
+
+
+def _catapult_load_task(mapping):
+    ident = mapping["identifier"]
+    port = mapping["data_port"]
+    bits = mapping["element_width"]
+    count = mapping["element_count"]
+    return f"""  task automatic load_{ident}(input string path);
+    integer fd;
+    integer index;
+    integer status;
+    logic [{bits - 1}:0] value;
+    begin
+      fd = $fopen(path, \"r\");
+      if (fd == 0)
+        $fatal(1, \"cannot open Catapult input vector %s\", path);
+      for (index = 0; index < {count}; index = index + 1) begin
+        status = $fscanf(fd, \"%h\", value);
+        if (status != 1)
+          $fatal(1, \"short or malformed Catapult input vector %s at element %0d\", path, index);
+        {port}[index*{bits} +: {bits}] = value;
+      end
+      $fclose(fd);
+    end
+  endtask"""
+
+
+def _catapult_check_task(mapping):
+    ident = mapping["identifier"]
+    port = mapping["data_port"]
+    bits = mapping["element_width"]
+    count = mapping["element_count"]
+    return f"""  task automatic check_{ident}(input string path);
+    integer fd;
+    integer index;
+    integer status;
+    logic [{bits - 1}:0] expected;
+    begin
+      fd = $fopen(path, \"r\");
+      if (fd == 0)
+        $fatal(1, \"cannot open Catapult expected vector %s\", path);
+      for (index = 0; index < {count}; index = index + 1) begin
+        status = $fscanf(fd, \"%h\", expected);
+        if (status != 1)
+          $fatal(1, \"short or malformed Catapult expected vector %s at element %0d\", path, index);
+        if ({port}[index*{bits} +: {bits}] !== expected)
+          $fatal(1, \"Catapult output {mapping['semantic_name']} mismatch at element %0d: expected %h, got %h\", index, expected, {port}[index*{bits} +: {bits}]);
+      end
+      $fclose(fd);
+    end
+  endtask"""
+
+
+def _catapult_memory_load_task(mapping):
+    ident, bits, count = (
+        mapping["identifier"], mapping["element_width"], mapping["element_count"]
+    )
+    return f"""  task automatic load_{ident}(input string path);
+    integer fd;
+    integer index;
+    integer status;
+    logic [{bits - 1}:0] value;
+    begin
+      fd = $fopen(path, "r");
+      if (fd == 0)
+        $fatal(1, "cannot open Catapult memory vector %s", path);
+      for (index = 0; index < {count}; index = index + 1) begin
+        status = $fscanf(fd, "%h", value);
+        if (status != 1)
+          $fatal(1, "short or malformed Catapult memory vector %s at element %0d", path, index);
+        memory_{ident}[index] = value;
+      end
+      $fclose(fd);
+    end
+  endtask"""
+
+
+def _catapult_memory_check_task(mapping):
+    ident, bits, count = (
+        mapping["identifier"], mapping["element_width"], mapping["element_count"]
+    )
+    return f"""  task automatic check_{ident}(input string path);
+    integer fd;
+    integer index;
+    integer status;
+    logic [{bits - 1}:0] expected;
+    begin
+      fd = $fopen(path, "r");
+      if (fd == 0)
+        $fatal(1, "cannot open Catapult expected memory %s", path);
+      for (index = 0; index < {count}; index = index + 1) begin
+        status = $fscanf(fd, "%h", expected);
+        if (status != 1)
+          $fatal(1, "short or malformed Catapult expected memory %s at element %0d", path, index);
+        if (memory_{ident}[index] !== expected)
+          $fatal(1, "Catapult memory {mapping['semantic_name']} mismatch at element %0d: expected %h, got %h", index, expected, memory_{ident}[index]);
+      end
+      $fclose(fd);
+    end
+  endtask"""
+
+
+def _catapult_memory_model(mapping, clock, reset):
+    ident, bits, count = (
+        mapping["identifier"], mapping["element_width"], mapping["element_count"]
+    )
+    roles = mapping["roles"]
+    lines = [f"  logic [{bits - 1}:0] memory_{ident} [0:{count - 1}];"]
+    if "read_data" in roles:
+        address = roles["read_address"]["name"]
+        enable = roles["read_enable"]["name"]
+        data = roles["read_data"]["name"]
+        lines += [
+            f"  initial {data} = '0;",
+            f"  always @(posedge {clock}) begin",
+            f"    if (({reset} === 1'b0) && ({enable} === 1'b1)) begin",
+            f"      if ($isunknown({address}))",
+            f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} read address is unknown after reset");',
+            f"      if ({address} >= {count})",
+            f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} read address out of range: %0d", {address});',
+            f"      {data} <= memory_{ident}[{address}];",
+            "    end",
+            "  end",
+        ]
+    if "write_data" in roles:
+        address = roles["write_address"]["name"]
+        enable = roles["write_enable"]["name"]
+        data = roles["write_data"]["name"]
+        lines += [
+            f"  always @(posedge {clock}) begin",
+            f"    if (({reset} === 1'b0) && ({enable} === 1'b1)) begin",
+            f"      if ($isunknown({address}))",
+            f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} write address is unknown after reset");',
+            f"      if ({address} >= {count})",
+            f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} write address out of range: %0d", {address});',
+            f"      memory_{ident}[{address}] <= {data};",
+            "    end",
+            "  end",
+        ]
+    return "\n".join(lines)
+
+
+def _generate_catapult(workload, metadata):
+    manifest_path = INPUTS / "asic-manifest-final.json"
+    if not manifest_path.is_file():
+        raise RuntimeError(f"missing Catapult ASIC manifest: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("backend") != "catapult":
+        raise RuntimeError("Catapult generator received a non-Catapult manifest")
+    interface = manifest.get("top_interface", {})
+    if interface.get("protocol") not in {
+        "catapult_direct_array", "catapult_argument_protocols"
+    }:
+        raise RuntimeError(
+            f"unsupported Catapult top protocol {interface.get('protocol')!r}"
+        )
+    reset = interface.get("reset", {})
+    clock = interface.get("clock", {})
+    if reset.get("polarity") != "active_high" or clock.get("edge") != "rising":
+        raise RuntimeError("unsupported Catapult clock/reset contract")
+
+    mappings = _catapult_arguments(workload, manifest)
+    ports = {
+        clock["name"]: {"direction": "input", "width": 1},
+        reset["name"]: {"direction": "input", "width": 1},
+    }
+    for mapping in mappings:
+        for port in mapping["rtl_ports"]:
+            ports[port["name"]] = {
+                "direction": port["direction"], "width": port["width"]
+            }
+    declarations = "\n".join(
+        _logic_declaration(name, info["width"]) for name, info in ports.items()
+    )
+    connections = ",\n".join(f"    .{name}({name})" for name in ports)
+
+    output_mappings = [
+        mapping for mapping in mappings
+        if mapping["semantic_direction"] in {"output", "inout"}
+    ]
+    output_indices = {
+        mapping["semantic_name"]: index for index, mapping in enumerate(output_mappings)
+    }
+    completion_updates = "\n".join(
+        f"      if ({mapping['triosy_port']} === 1'b1) completion_seen[{index}] <= 1'b1;"
+        for index, mapping in enumerate(output_mappings)
+    )
+    tasks = []
+    memory_models = []
+    for mapping in mappings:
+        if mapping["protocol"] == "catapult_direct_array":
+            if mapping["semantic_direction"] in {"input", "inout"}:
+                tasks.append(_catapult_load_task(mapping))
+            if mapping["semantic_direction"] in {"output", "inout"}:
+                tasks.append(_catapult_check_task(mapping))
+        else:
+            memory_models.append(
+                _catapult_memory_model(mapping, clock["name"], reset["name"])
+            )
+            tasks.append(_catapult_memory_load_task(mapping))
+            if mapping["semantic_direction"] in {"output", "inout"}:
+                tasks.append(_catapult_memory_check_task(mapping))
+
+    sequence = []
+    for call_index, call in enumerate(workload["calls"]):
+        if not call.get("reset_before", False):
+            raise RuntimeError(
+                "Catapult direct-array calls currently require reset_before=true"
+            )
+        sequence.append(
+            f'    $display("Starting workload call {call_index}: {call["name"]}");'
+        )
+        sequence.extend(
+            [
+                f"    @(negedge {clock['name']});",
+                "    #(allo_bagl_input_delay_ns);",
+                f"    {reset['name']} = 1'b1;",
+                "    clear_completion = 1'b1;",
+            ]
+        )
+        for mapping in mappings:
+            if (
+                mapping["protocol"] == "catapult_direct_array"
+                and mapping["semantic_direction"] not in {"input", "inout"}
+            ):
+                continue
+            vector = call["arguments"][mapping["semantic_name"]]
+            sequence.append(
+                f'    load_{mapping["identifier"]}("{_simulation_path(vector["file"])}");'
+            )
+        sequence.extend(
+            [
+                "    repeat (allo_bagl_num_reset_cycles) "
+                f"@(negedge {clock['name']});",
+                "    #(allo_bagl_input_delay_ns);",
+                "    clear_completion = 1'b0;",
+                f"    {reset['name']} = 1'b0;",
+            ]
+        )
+        expected_names = list(call.get("expected", {}))
+        invalid = [name for name in expected_names if name not in output_indices]
+        if invalid:
+            raise RuntimeError(f"Catapult expected values target non-outputs: {invalid}")
+        required_mask = sum(1 << output_indices[name] for name in expected_names)
+        if required_mask:
+            sequence.append(
+                f"    wait_for_completion({len(output_mappings)}'h{required_mask:x}, "
+                f"{workload['default_timeout_cycles']});"
+            )
+        for name, expected in call.get("expected", {}).items():
+            mapping = next(item for item in mappings if item["semantic_name"] == name)
+            sequence.append(
+                "    #(allo_bagl_clock_compensation_ns + allo_bagl_output_delay_ns);"
+            )
+            sequence.append(
+                f'    check_{mapping["identifier"]}("{_simulation_path(expected["file"])}");'
+            )
+
+    top = manifest.get("top", workload["top_function"])
+    clock_half = float(metadata["clock_period_ns"]) / 2.0
+    reset_cycles = int(reset.get("default_asserted_cycles", 2))
+    testbench = _replace_template(
+        TEMPLATES / "catapult" / "testbench.sv.tpl",
+        {
+            "CLOCK": clock["name"],
+            "RESET": reset["name"],
+            "CLOCK_HALF_PERIOD": f"{clock_half:g}",
+            "DEFAULT_RESET_CYCLES": str(reset_cycles),
+            "SIGNAL_DECLARATIONS": declarations,
+            "TOP_MODULE": top,
+            "DUT_CONNECTIONS": connections,
+            "OUTPUT_COUNT": str(len(output_mappings)),
+            "COMPLETION_UPDATES": completion_updates,
+            "ARGUMENT_TASKS": "\n\n".join(tasks),
+            "ARGUMENT_MODELS": "\n\n".join(memory_models),
+            "WORKLOAD_SEQUENCE": "\n".join(sequence),
+        },
+    )
+    (OUTPUTS / "testbench.sv").write_text(testbench)
+    # Keep the established node output contract for existing simulation nodes.
+    # These Vitis modules are compiled but uninstantiated on the Catapult path.
+    vitis_templates = TEMPLATES / "vitis"
+    shutil.copy(vitis_templates / "vitis-axi-memory-bfm.sv", OUTPUTS)
+    shutil.copy(vitis_templates / "vitis-axilite-master-bfm.sv", OUTPUTS)
+    artifact = manifest.get("rtl_artifact", {}).get(
+        "published_path", "backend-rtl/concat_rtl.v"
+    )
+    rtl_path = INPUTS / artifact
+    if not rtl_path.is_file():
+        raise RuntimeError(f"missing published Catapult RTL artifact: {rtl_path}")
+    file_list = [
+        "outputs/vitis-axi-memory-bfm.sv",
+        "outputs/vitis-axilite-master-bfm.sv",
+        "outputs/testbench.sv",
+        str(rtl_path.resolve()),
+    ]
+    (OUTPUTS / "vcs-rtl.f").write_text("\n".join(file_list) + "\n")
+    return {
+        "schema_version": 1,
+        "backend": "catapult",
+        "top_module": top,
+        "clock_period_ns": float(metadata["clock_period_ns"]),
+        "interface": interface,
+        "arguments": mappings,
+        "calls": workload["calls"],
+        "completion_output_count": len(output_mappings),
+    }
+
+
 def main():
     OUTPUTS.mkdir(exist_ok=True)
     workload = json.loads((INPUTS / "workload-manifest.json").read_text())
@@ -396,7 +807,7 @@ def main():
         raise RuntimeError("testbench generation requested with disabled workload manifest")
 
     backend = os.environ.get("backend", metadata.get("backend"))
-    generators = {"vitis": _generate_vitis}
+    generators = {"catapult": _generate_catapult, "vitis": _generate_vitis}
     generator = generators.get(backend)
     if generator is None:
         raise RuntimeError(

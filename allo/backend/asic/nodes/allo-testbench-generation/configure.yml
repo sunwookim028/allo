@@ -3,6 +3,7 @@ name: allo-testbench-generation
 inputs:
   - allo-build
   - backend-rtl
+  - asic-manifest-final.json
   - build-metadata.json
   - workload-manifest.json
   - workload-vectors
@@ -28,8 +29,10 @@ preconditions:
   - assert File( 'templates/vitis/testbench.sv.tpl' )
   - assert File( 'templates/vitis/vitis-axi-memory-bfm.sv' )
   - assert File( 'templates/vitis/vitis-axilite-master-bfm.sv' )
+  - assert File( 'templates/catapult/testbench.sv.tpl' )
   - assert File( 'inputs/allo-build' )
   - assert File( 'inputs/backend-rtl' )
+  - assert File( 'inputs/asic-manifest-final.json' )
   - assert File( 'inputs/build-metadata.json' )
   - assert File( 'inputs/workload-manifest.json' )
   - assert File( 'inputs/workload-vectors' )

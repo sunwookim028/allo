@@ -26,12 +26,21 @@ if [[ -d inputs/macro-registry ]]; then
       \( -name '*.v' -o -name '*.sv' \) \
       ! -name '*.lvs.v' ! -name '*.pg.v' -print0 | sort -z)
 fi
-sources+=(
-  inputs/design.v
-  inputs/vitis-axi-memory-bfm.sv
-  inputs/vitis-axilite-master-bfm.sv
-  inputs/testbench.sv
-)
+sources+=(inputs/design.v)
+backend=$(python3 -c \
+  'import json, sys; print(json.load(open(sys.argv[1])).get(sys.argv[2], sys.argv[3]))' \
+  inputs/testbench-contract.json backend vitis)
+case "$backend" in
+  vitis)
+    sources+=(
+      inputs/vitis-axi-memory-bfm.sv
+      inputs/vitis-axilite-master-bfm.sv
+    )
+    ;;
+  catapult) ;;
+  *) echo "unsupported testbench backend: $backend" >&2; exit 2 ;;
+esac
+sources+=(inputs/testbench.sv)
 
 vcs -full64 -sverilog -xprop=tmerge -override_timescale=1ns/1ps \
   -top "$testbench_name" +delay_mode_zero -o simv "${sources[@]}" \

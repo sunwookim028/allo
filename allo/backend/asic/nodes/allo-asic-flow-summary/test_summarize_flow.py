@@ -64,6 +64,11 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
             "macro_class_id": "macro_alpha_test",
             "top_module": "m",
             "reuse_count": 4,
+            "implementation_contract_hash": "contract123",
+            "equivalence_method": "specialized_mlir_emitted_hls_contract",
+            "rtl_audit_status": "agree",
+            "rtl_audit_hashes": ["rtl123"],
+            "rtl_hash": "rtl123",
             "views": {"lef": {"path": "macro_alpha_test/macro.lef"}},
         }]
     }
@@ -115,6 +120,11 @@ def test_summary_outputs_are_json_tcl_and_text(tmp_path, monkeypatch):
     assert result["macros"][0]["physical_area_um2"] == 200.0
     assert result["macros"][0]["setup_wns_ns"] == 0.125
     assert result["macros"][0]["hold_wns_ns"] == 0.075
+    assert result["macros"][0]["implementation_contract_hash"] == "contract123"
+    assert result["macros"][0]["equivalence_method"] == (
+        "specialized_mlir_emitted_hls_contract"
+    )
+    assert result["macros"][0]["rtl_audit_status"] == "agree"
     assert result["full_chip_verification"] == {
         "drc_results": 0,
         "calibre_non_antenna_results": 0,

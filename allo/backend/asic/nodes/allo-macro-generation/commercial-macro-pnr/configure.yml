@@ -33,14 +33,29 @@ parameters:
   # Macro signal routing stops here. The batch driver derives a sparse PG mesh
   # on this layer and the layer immediately below it.
   highest_macro_routing_layer: 6
+  # Represent actual post-route occupancy on the highest macro routing layer
+  # with merged, track-aligned OBS tiles. Lower layers remain fully obstructed.
+  top_layer_obs_grid_tracks: 4
+  top_layer_obs_pin_grid_tracks: 1
+  top_layer_obs_spacing_tracks: 1
   base_layer_idx: 0
   gds_stream_out_units: 10000
   pin_layer_offset: 3
+  # North/south edge pins use a vertical-preferred layer.
+  pin_vertical_layer_offset: 4
   pin_secondary_layer_offset: 5
   # Minimum center-to-center signal-pin pitch is this multiple of the loaded
   # ADK routing-layer pitch. Secondary-layer use is decided from edge capacity.
   pin_min_pitch_multiplier: 2.0
+  # Preserve edge-parallel width and extend pins only inward.
+  pin_primary_depth_width_multiplier: 3.0
+  pin_other_depth_width_multiplier: 2.0
   pin_primary_fraction: 0.75
+  # When an east/west edge carries multiple stream-sized groups, move at
+  # least one complete group to the secondary horizontal layer instead of
+  # waiting for the primary layer to reach its absolute geometric capacity.
+  pin_spread_multiple_stream_groups: True
+  pin_stream_group_min_width: 16
   # Keep signal pins away from macro corners, where orthogonal routes and
   # clock access otherwise compete for the same small routing region.
   pin_corner_keepout: 3.0

@@ -7,7 +7,7 @@ entrypoint with:
 build(project, target, mode, configs)
 ```
 
-Only `backend: vitis` is currently supported. Backend selection is handled by
+Both `backend: vitis` and `backend: catapult` are supported. Backend selection is handled by
 explicit branches in `backend.py`; later backends can add their own target,
 configuration, tool checks, artifact discovery, and validation without adding
 backend-specific path parameters to the graph. The node currently runs Vitis C
@@ -19,7 +19,7 @@ Important parameters are:
 - `allo_design_file`: absolute path, or a path relative to the design's
   `construct_path`.
 - `allo_entrypoint`: design-module callable, default `build`.
-- `backend`: currently `vitis`; unsupported values fail explicitly.
+- `backend`: `vitis` or `catapult`; unsupported values fail explicitly.
 - `backend_options`: shell-safe comma-separated `key=value` options interpreted
   by the selected backend branch. The Vitis default is `device=u280`.
 - `build_mode`: currently expected to be `csyn`.
@@ -48,8 +48,11 @@ testbench generation does not receive design-only parameters such as array
 size, FIFO depth, or dtype—it consumes the realized workload and HLS outputs.
 
 The success marker is written only after the pre-HLS/final manifests, zero
-unmatched joins, debug directory, and synthesized Verilog have all been
-validated.
+unmatched joins, debug directory, synthesized Verilog, and frozen workload
+interface have all been validated. Catapult publishes a compact RTL contract:
+the self-contained `concat_rtl.v`, available reports/constraints, and selected
+SCVerify protocol sources. Its complete project remains available under
+`allo-build` but is not duplicated into `backend-rtl`.
 
 This mflowgen version does not expand node parameters inside assertion text.
 Parameterized environment checks therefore run in `preflight.py`, invoked as
@@ -70,4 +73,5 @@ include variables, `GCC_EXEC_PREFIX`, and `LD_PRELOAD` before sourcing the
 Allo setup. This prevents commercial ASIC tool modules—especially Synopsys's
 bundled `libstdc++.so.6`—from overriding the GCC 13 runtime required by Allo's
 compiled MLIR extension. `PATH` is retained so a loaded backend such as Vitis
-remains discoverable.
+remains discoverable. The Catapult branch instead loads the `catapult` module
+and verifies `MGC_HOME`.

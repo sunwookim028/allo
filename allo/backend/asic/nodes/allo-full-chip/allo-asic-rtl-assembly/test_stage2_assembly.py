@@ -22,7 +22,7 @@ ASSEMBLER = load("assemble_rtl", HERE / "assemble_rtl.py")
 
 def test_member_instances_become_one_canonical_macro(tmp_path, monkeypatch):
     rtl = """
-module top();
+module top(input ap_clk);
   wrap_a wa();
   wrap_b wb();
 endmodule
@@ -86,6 +86,7 @@ endmodule
     monkeypatch.chdir(planner_dir)
     PLANNER.main()
     plan = json.loads((planner_dir / "outputs/assembly-plan.json").read_text())
+    assert plan["backend"] == "vitis"
     assert plan["replacement_instance_count"] == 2
     assert plan["elaborated_macro_instance_count"] == 2
     assert {path for item in plan["replacements"] for path in item["hierarchical_paths"]} == {
@@ -112,19 +113,24 @@ endmodule
     assert ".a(x), .z(x)" in assembled
     collateral = json.loads((assembler_dir / "outputs/macro-collateral.json").read_text())
     assert len(collateral["rewritten_instances"]) == 2
+    assert collateral["backend"] == "vitis"
+    assert collateral["clock_port"] == "ap_clk"
     assert "allo_asic_macro_modules" in (
         assembler_dir / "outputs/macro-collateral.tcl"
     ).read_text()
     assert "set allo_asic_bypass_macro_generation 0" in (
         assembler_dir / "outputs/macro-collateral.tcl"
     ).read_text()
-    assert "-period 10" in (assembler_dir / "outputs/constraints.tcl").read_text()
+    constraints = (assembler_dir / "outputs/constraints.tcl").read_text()
+    assert "-period 10" in constraints
+    assert "[get_ports ap_clk]" in constraints
 
 
 def test_flat_bypass_emits_explicit_empty_macro_collateral(tmp_path, monkeypatch):
     rtl = "module top(input ap_clk); endmodule\n"
     plan = {
         "top_module": "top",
+        "backend": "vitis",
         "bypass_macro_generation": True,
         "implementation_style": "flat_standard_cells",
         "classes": [],
@@ -149,3 +155,33 @@ def test_flat_bypass_emits_explicit_empty_macro_collateral(tmp_path, monkeypatch
     assert "set allo_asic_bypass_macro_generation 1" in tcl
     assert "set allo_asic_macro_modules [list ]" in tcl
     assert "set allo_asic_macro_db_files [list ]" in tcl
+
+
+def test_catapult_backend_selects_clk(tmp_path, monkeypatch):
+    rtl = "module top(input clk); endmodule\n"
+    plan = {
+        "top_module": "top",
+        "backend": "catapult",
+        "bypass_macro_generation": True,
+        "implementation_style": "flat_standard_cells",
+        "classes": [],
+        "replacements": [],
+    }
+    registry = {"bypass_macro_generation": True, "macros": []}
+    work = tmp_path / "catapult"
+    inputs = work / "inputs"
+    inputs.mkdir(parents=True)
+    (inputs / "design.v").write_text(rtl)
+    (inputs / "assembly-plan.json").write_text(json.dumps(plan))
+    (inputs / "macro-registry.json").write_text(json.dumps(registry))
+    monkeypatch.setenv("backend", "catapult")
+    monkeypatch.chdir(work)
+
+    ASSEMBLER.main()
+
+    collateral = json.loads((work / "outputs/macro-collateral.json").read_text())
+    assert collateral["backend"] == "catapult"
+    assert collateral["clock_port"] == "clk"
+    constraints = (work / "outputs/constraints.tcl").read_text()
+    assert "create_clock -name clk -period 10 [get_ports clk]" in constraints
+    assert "[remove_from_collection [all_inputs] [get_ports clk]]" in constraints
