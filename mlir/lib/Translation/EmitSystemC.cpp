@@ -466,6 +466,34 @@ char SystemCModuleEmitter::streamDir(func::FuncOp func, unsigned i) {  // new (S
   return (c == 'i' || c == 'o') ? c : 0;
 }
 
+//===----------------------------------------------------------------------===//
+// External SystemC IP calls.
+//
+// An IP is a BODYLESS `func.func private` whose call carries `sc_ports` -- the
+// comma-separated port names the IP itself declares, in operand order, put there
+// by builder.py from parse_sc_module. It is INSTANTIATED and bound BY NAME, not
+// called: an SC_MODULE's ports are members, so there is no positional signature
+// to match, and the emitter's generated names would bind nothing.
+//===----------------------------------------------------------------------===//
+
+// The IP's declared port names, or empty if this call is not an IP call.
+static SmallVector<StringRef, 4> ipPortNames(func::CallOp call) {
+  SmallVector<StringRef, 4> names;
+  auto attr = call->getAttrOfType<StringAttr>("sc_ports");
+  if (!attr)
+    return names;
+  attr.getValue().split(names, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  return names;
+}
+
+// Is this call an instantiation of an external IP rather than a generated kernel?
+static bool isIPCall(func::CallOp call, ModuleOp parent) {
+  if (!call->hasAttr("sc_ports"))
+    return false;
+  auto callee = parent.lookupSymbol<func::FuncOp>(call.getCallee());
+  return callee && callee.isExternal();
+}
+
 // arg_dirs is a string with one char per arg: 'i'=in, 'o'=out, 'b'=both, else '_'.
 char SystemCModuleEmitter::argDir(func::FuncOp func, unsigned i) {  // new (SystemC-only)
   auto attr = func->getAttrOfType<StringAttr>("arg_dirs");
@@ -2435,7 +2463,13 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     else if (auto call = llvm::dyn_cast<func::CallOp>(&op))
       calls.push_back(call);
   }
-  numKernelInsts = calls.size(); // single-shot tb waits for this many completions
+  // single-shot tb waits for this many completions. External IPs are excluded:
+  // a third-party SC_MODULE has no `done` port and never signals retirement, so
+  // counting it would leave the testbench waiting forever.
+  numKernelInsts = 0;
+  for (auto call : calls)
+    if (!isIPCall(call, parent))
+      numKernelInsts++;
 
   // Channel members. A Stream's depth (from its type) picks the flavor:
   //   depth 0  -> a bare Connections::Combinational (combinational wire)
@@ -2510,8 +2544,20 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     os << it.value().getCallee() << " " << inst << ";\n";
   }
   // Per-kernel completion signals; an SC_METHOD ANDs them into the top `done` port.
-  for (auto &inst : instNames) {
-    indent(); os << "sc_signal<bool> " << inst << "_done;\n";
+  // An external IP has no `done` port -- it is a third-party SC_MODULE that never
+  // agreed to Allo's completion protocol -- so it gets no signal and is not
+  // bound below. It also never retires, which is why it is excluded from
+  // numKernelInsts: a testbench waiting on it would wait forever.
+  // doneInstNames = the instances that actually have a completion flag, i.e.
+  // every generated kernel but no external IP. The `done` aggregator below must
+  // iterate THIS list, not instNames, or it would read a signal that was never
+  // declared.
+  SmallVector<std::string, 4> doneInstNames;
+  for (auto it : llvm::enumerate(calls)) {
+    if (isIPCall(it.value(), parent))
+      continue;
+    doneInstNames.push_back(instNames[it.index()]);
+    indent(); os << "sc_signal<bool> " << instNames[it.index()] << "_done;\n";
   }
   // Discover one physical memory per (call, memory-port arg). A grid replica
   // that uses a shared boundary array gets its OWN memory (replication), keyed
@@ -2717,6 +2763,51 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
   for (auto it : llvm::enumerate(calls)) {
     auto call = it.value();
     auto callee = parent.lookupSymbol<func::FuncOp>(call.getCallee());
+    // ---- External SystemC IP: bind BY NAME and skip Allo's own protocol ----
+    // The instance member `<callee> uN;` above is already correct -- the callee
+    // symbol IS the SC_MODULE's name. What differs is everything bound to it:
+    // the IP declares its own port names, has no `done`, and may not have a
+    // reset the parser could identify.
+    if (isIPCall(call, parent)) {
+      std::string inst = instNames[it.index()];
+      if (auto clk = call->getAttrOfType<StringAttr>("sc_clk")) {
+        indent(); os << inst << "." << clk.getValue() << "(clk);\n";
+      }
+      // rst is absent when the IP has several sc_in<bool> and parse_sc_module
+      // refused to guess (hl5 has rst and fetch_en). Leaving it unbound is a
+      // SystemC elaboration error, so say so rather than bind the wrong port.
+      if (auto rst = call->getAttrOfType<StringAttr>("sc_rst")) {
+        indent(); os << inst << "." << rst.getValue() << "(rst);\n";
+      } else {
+        indent();
+        os << "// NOTE: reset port not identified for IP '" << call.getCallee()
+           << "'; bind it by hand.\n";
+      }
+      auto names = ipPortNames(call);
+      StringRef dirs;
+      if (auto d = call->getAttrOfType<StringAttr>("stream_dirs"))
+        dirs = d.getValue();
+      // sc_ports lists the IP's Connections ports in declaration order, which
+      // matches the STREAM operands in order -- so count streams, do not use the
+      // raw operand index (a non-stream arg would desynchronise them).
+      unsigned sidx = 0;
+      for (auto opnd : llvm::enumerate(call.getOperands())) {
+        auto sty = llvm::dyn_cast<StreamType>(opnd.value().getType());
+        if (!sty)
+          continue;
+        if (sidx >= names.size())
+          break; // fewer names than streams: malformed sc_ports, bind no further
+        std::string chan = std::string(getName(opnd.value()).str());
+        if (sty.getDepth() != 0) {
+          char d = (opnd.index() < dirs.size()) ? dirs[opnd.index()] : 'i';
+          chan += (d == 'o') ? "_in" : "_out";
+        }
+        indent();
+        os << inst << "." << names[sidx] << "(" << chan << ");\n";
+        sidx++;
+      }
+      continue;
+    }
     indent(); os << instNames[it.index()] << ".clk(clk);\n";
     indent(); os << instNames[it.index()] << ".rst(rst);\n";
     indent(); os << instNames[it.index()] << ".done(" << instNames[it.index()]
@@ -2881,7 +2972,7 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
   }
   // Combinational aggregator: drive the top `done` port from all kernel dones.
   indent(); os << "SC_METHOD(_agg_done); sensitive";
-  for (auto &inst : instNames)
+  for (auto &inst : doneInstNames)
     os << " << " << inst << "_done";
   os << ";\n";
   reduceIndent();
@@ -2890,11 +2981,14 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
 
   // done = AND of every kernel's completion flag (all kernels finished their pass).
   indent(); os << "void _agg_done() { done.write(";
-  if (instNames.empty()) {
+  // An all-IP top has no completion flags at all; `done` is then trivially true,
+  // which is the honest answer -- nothing here knows when a third-party IP is
+  // finished.
+  if (doneInstNames.empty()) {
     os << "true";
   } else {
     std::string sep2;
-    for (auto &inst : instNames) {
+    for (auto &inst : doneInstNames) {
       os << sep2 << inst << "_done.read()";
       sep2 = " && ";
     }
@@ -3452,6 +3546,12 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
   // return-by-pointer convention, matching the `helper(a,b,&r)` call sites the
   // kernel bodies already emit). They must precede the modules that call them.
   for (auto func : module.getOps<func::FuncOp>()) {
+    // An external IP is a BODYLESS `func.func private`: its SC_MODULE lives in
+    // the IP's own header, which copy_ext_libs brings in. Emitting it here would
+    // produce a stray C++ free-function declaration for something that is not a
+    // function at all, so skip every declaration-only func.
+    if (func.isExternal())
+      continue;
     if (!func->hasAttr("top") && !func->hasAttr("df.kernel") &&
         !func->hasAttr("dataflow"))
       VhlsModuleEmitter::emitFunction(func);
