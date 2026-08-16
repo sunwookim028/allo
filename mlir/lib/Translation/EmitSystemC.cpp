@@ -19,6 +19,7 @@
 #include "allo/Translation/EmitVivadoHLS.h" // reuse the Vhls emitter base
 #include "allo/Translation/EmitCatapultHLS.h" // reuse Catapult's ac_int type map
 #include "allo/Translation/Utils.h"
+#include "llvm/ADT/SetVector.h"  // SmallSetVector: dedupe external IP headers
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -225,6 +226,77 @@ static void flattenHierarchy(ModuleOp module) {
         erased = true;
       }
   }
+}
+
+//===----------------------------------------------------------------------===//
+// External IP promotion (pre-pass).
+// The frontend wraps an IP call in a @df.kernel, so the TOP calls the wrapper
+// and the IP call sits one level down:
+//     @top    { call @cpu_0(%s1, %s0) }
+//     @cpu_0  { call @hl5(%arg1, %arg0) {sc_ports=...} ; return }
+// But a kernel whose entire body is one IP call is not a kernel -- it is a
+// placeholder for the instance. Rewrite the top to call the IP directly, so
+// emitTopModule sees an IP call and INSTANTIATES it (see isIPCall) instead of
+// emitting a thread that calls it as a function. A kernel that does anything
+// else besides the call is left alone: it genuinely needs its thread.
+//
+// Runs BEFORE flattenHierarchy so that pass's dead-func sweep erases the
+// orphaned wrapper. flattenHierarchy will not touch the IP itself: it only
+// inlines callees with exactly one block, and an external func has none.
+//===----------------------------------------------------------------------===//
+static void promoteIPKernels(ModuleOp module) {
+  func::FuncOp top;
+  for (auto f : module.getOps<func::FuncOp>())
+    if (f->hasAttr("top"))
+      top = f;
+  if (!top)
+    return;
+  SmallVector<func::CallOp> deadCalls;
+  for (auto &op : top.front()) {
+    auto call = llvm::dyn_cast<func::CallOp>(&op);
+    if (!call)
+      continue;
+    auto callee = module.lookupSymbol<func::FuncOp>(call.getCallee());
+    if (!callee || callee.isExternal() || !callee->hasAttr("df.kernel"))
+      continue;
+    // The body must be EXACTLY one call to an external IP, plus the terminator.
+    func::CallOp inner;
+    unsigned nOps = 0;
+    for (auto &b : callee.front().without_terminator()) {
+      nOps++;
+      inner = llvm::dyn_cast<func::CallOp>(&b);
+    }
+    if (nOps != 1 || !inner || !inner->hasAttr("sc_ports"))
+      continue;
+    auto ipFn = module.lookupSymbol<func::FuncOp>(inner.getCallee());
+    if (!ipFn || !ipFn.isExternal())
+      continue;
+    // Map each IP operand back through the wrapper's block args to the value the
+    // TOP passed, so the IP binds the top's own channels. The two argument
+    // orders differ -- the wrapper's follow the call site, the IP's follow its
+    // own declaration -- so this remap is what keeps ports on the right streams.
+    SmallVector<Value> args;
+    bool ok = true;
+    for (Value v : inner.getOperands()) {
+      auto ba = llvm::dyn_cast<BlockArgument>(v);
+      if (!ba || ba.getOwner() != &callee.front()) {
+        ok = false;
+        break;
+      }
+      args.push_back(call.getOperand(ba.getArgNumber()));
+    }
+    if (!ok)
+      continue;
+    OpBuilder builder(call);
+    auto promoted = builder.create<func::CallOp>(
+        call.getLoc(), TypeRange{}, inner.getCalleeAttr(), args);
+    for (auto na : inner->getAttrs())
+      if (na.getName() != "callee")
+        promoted->setAttr(na.getName(), na.getValue());
+    deadCalls.push_back(call);
+  }
+  for (auto c : deadCalls)
+    c.erase();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1124,7 +1196,8 @@ char SystemCModuleEmitter::regArgMemPort(func::FuncOp top, Value regArg) {  // n
       for (auto opnd : llvm::enumerate(call.getOperands()))
         if (opnd.value() == regArg) {
           auto callee = parent.lookupSymbol<func::FuncOp>(call.getCallee());
-          if (callee)
+          // An external IP has NO block arguments -- getArgument would assert.
+          if (callee && !callee.isExternal())
             if (char d = memPortArgDir(callee.getArgument(opnd.index())))
               return d;
         }
@@ -2564,6 +2637,8 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
   // uniquely by mp<call>_<arg>; its file index comes from the region array.
   for (auto it : llvm::enumerate(calls)) {
     auto callee = parent.lookupSymbol<func::FuncOp>(it.value().getCallee());
+    if (!callee || callee.isExternal())
+      continue; // external IP: no block args to inspect
     for (auto opnd : llvm::enumerate(it.value().getOperands())) {
       Value ov = opnd.value();
       if (!llvm::isa<MemRefType>(ov.getType()))
@@ -3028,6 +3103,9 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 
   // Flatten any @df.region hierarchy (sub-regions called from kernels) into a
   // flat top before emission — SystemC can't nest regions inside a thread.
+  // Promote IP-only kernels first, so the wrapper is gone before flattening
+  // and its dead-func sweep collects it.
+  promoteIPKernels(module);
   flattenHierarchy(module);
 
   // Argument classification (streamDir / argDir) indexes `stypes` / `arg_dirs` by
@@ -3105,7 +3183,8 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
     });
     for (auto c : callv) {
       auto callee = module.lookupSymbol<func::FuncOp>(c.getCallee());
-      if (!callee)
+      // External IP: no block args, and it is never a self-FIFO producer.
+      if (!callee || callee.isExternal())
         continue;
       for (auto it : llvm::enumerate(c.getArgOperands()))
         if (llvm::isa<StreamType>(it.value().getType()) && cnt[it.value()] == 1) {
@@ -3126,8 +3205,8 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
     topf.walk([&](func::CallOp c) { callv.push_back(c); });
     auto seqDirArg = [&](func::CallOp c, unsigned idx, char &d) -> Value {
       auto callee = module.lookupSymbol<func::FuncOp>(c.getCallee());
-      if (!callee)
-        return nullptr;
+      if (!callee || callee.isExternal())
+        return nullptr; // external IP: no block args
       Value carg = callee.getArgument(idx);
       d = argDir(callee, idx);
       if ((d == 'i' || d == 'o' || d == 'b') && isSeqStreamable(carg))
@@ -3158,7 +3237,8 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
       continue;
     topf.walk([&](func::CallOp c) {
       auto callee = module.lookupSymbol<func::FuncOp>(c.getCallee());
-      if (!callee)
+      // External IP: no block args to alias, and getArgument would assert.
+      if (!callee || callee.isExternal())
         return;
       llvm::DenseMap<Value, Value> primaryArg; // operand -> its first callee arg
       for (auto it : llvm::enumerate(c.getArgOperands())) {
@@ -3539,6 +3619,25 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
     os << dh;
   } else {
     os << device_header;
+  }
+
+  // Every external SystemC IP the design instantiates needs its own header: the
+  // SC_MODULE is defined there, not generated here, and copy_ext_libs only
+  // copies the file into the project without splicing an include. Emitted once
+  // per distinct header, after the standard preamble so the IP can rely on
+  // Connections and the ac_* types being visible.
+  {
+    llvm::SmallSetVector<StringRef, 4> ipHeaders;
+    module.walk([&](func::CallOp c) {
+      if (auto impl = c->getAttrOfType<StringAttr>("sc_impl"))
+        if (auto callee = module.lookupSymbol<func::FuncOp>(c.getCallee()))
+          if (callee.isExternal())
+            ipHeaders.insert(impl.getValue());
+    });
+    for (auto h : ipHeaders)
+      os << "#include \"" << h << "\"   // external SystemC IP\n";
+    if (!ipHeaders.empty())
+      os << "\n";
   }
 
   // Helper functions (pure compute — no `top`/`df.kernel`/`dataflow` attr) are

@@ -4,6 +4,7 @@
 # pylint: disable=no-name-in-module, unused-argument, unexpected-keyword-arg, no-value-for-parameter, eval-used
 
 import gc
+import os
 import ast
 import copy
 import inspect
@@ -3443,6 +3444,12 @@ class ASTTransformer(ASTBuilder):
                         call_op.attributes["sc_clk"] = StringAttr.get(obj.sc_clk)
                     if obj.sc_rst is not None:
                         call_op.attributes["sc_rst"] = StringAttr.get(obj.sc_rst)
+                    # The header to #include. copy_ext_libs copies the file into
+                    # the project but splices no include, so without this the
+                    # emitted SystemC names the IP module and never declares it.
+                    call_op.attributes["sc_impl"] = StringAttr.get(
+                        os.path.basename(obj.impl)
+                    )
                 for idx, (call_operand, operand_op) in enumerate(
                     zip(call_operands, new_args)
                 ):
