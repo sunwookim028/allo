@@ -3427,6 +3427,22 @@ class ASTTransformer(ASTBuilder):
                 )
                 if "i" in stream_dirs or "o" in stream_dirs:
                     call_op.attributes["stream_dirs"] = StringAttr.get(stream_dirs)
+                # A SystemC IP is INSTANTIATED and its ports bound BY NAME, not
+                # called positionally, so the emitter needs the names the IP
+                # actually declares -- stream_dirs alone cannot bind mmio_in and
+                # mmio_out. Comma-separated, in argument order.
+                if getattr(obj, "is_systemc", False):
+                    call_op.attributes["sc_ports"] = StringAttr.get(
+                        ",".join(obj.sc_names)
+                    )
+                    # clk is needed to bind the instance. rst is None when the IP
+                    # has more than one sc_in<bool> and the parser refuses to
+                    # guess, so that attribute is simply absent and the emitter
+                    # has to cope rather than assume a name.
+                    if obj.sc_clk is not None:
+                        call_op.attributes["sc_clk"] = StringAttr.get(obj.sc_clk)
+                    if obj.sc_rst is not None:
+                        call_op.attributes["sc_rst"] = StringAttr.get(obj.sc_rst)
                 for idx, (call_operand, operand_op) in enumerate(
                     zip(call_operands, new_args)
                 ):

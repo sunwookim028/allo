@@ -158,6 +158,21 @@ def move_stream_to_interface(
                             if isinstance(use.owner, allo_d.StreamEmptyOp)
                             else "out"
                         )
+                    elif (
+                        isinstance(use.owner, func_d.CallOp)
+                        and "stream_dirs" in use.owner.attributes
+                    ):
+                        # An IP call. The stream is passed as an ARGUMENT rather
+                        # than read or written by a get/put op, so the direction
+                        # comes from the IP's own declaration: stream_dirs holds
+                        # one character per operand, in operand order.
+                        dirs = use.owner.attributes["stream_dirs"].value
+                        idx = next(
+                            i
+                            for i, o in enumerate(use.owner.operands)
+                            if o == op.result
+                        )
+                        direction = "in" if dirs[idx] == "i" else "out"
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
                 if with_stream_type and stream_name not in stream_types_dict:
@@ -359,6 +374,21 @@ def move_stream_to_interface(
                             if isinstance(use.owner, allo_d.StreamEmptyOp)
                             else "out"
                         )
+                    elif (
+                        isinstance(use.owner, func_d.CallOp)
+                        and "stream_dirs" in use.owner.attributes
+                    ):
+                        # An IP call. The stream is passed as an ARGUMENT rather
+                        # than read or written by a get/put op, so the direction
+                        # comes from the IP's own declaration: stream_dirs holds
+                        # one character per operand, in operand order.
+                        dirs = use.owner.attributes["stream_dirs"].value
+                        idx = next(
+                            i
+                            for i, o in enumerate(use.owner.operands)
+                            if o == op.result
+                        )
+                        direction = "in" if dirs[idx] == "i" else "out"
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
                 stream_name = op.attributes["name"].value
