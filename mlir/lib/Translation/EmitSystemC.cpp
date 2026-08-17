@@ -558,6 +558,26 @@ static SmallVector<StringRef, 4> ipPortNames(func::CallOp call) {
   return names;
 }
 
+// One non-stream port of an IP: name, "in"/"out", C++ type, and (inputs only)
+// the constant to tie it to. Encoded by builder.py as `name|dir|type|const`
+// records joined by ';'.
+struct IPScalar { StringRef name, dir, type, cst; };
+static SmallVector<IPScalar, 8> ipScalars(func::CallOp call) {
+  SmallVector<IPScalar, 8> out;
+  auto attr = call->getAttrOfType<StringAttr>("sc_scalars");
+  if (!attr)
+    return out;
+  SmallVector<StringRef, 8> recs;
+  attr.getValue().split(recs, ';', -1, /*KeepEmpty=*/false);
+  for (StringRef r : recs) {
+    SmallVector<StringRef, 4> f;
+    r.split(f, '|', -1, /*KeepEmpty=*/true);
+    if (f.size() == 4)
+      out.push_back({f[0], f[1], f[2], f[3]});
+  }
+  return out;
+}
+
 // Is this call an instantiation of an external IP rather than a generated kernel?
 static bool isIPCall(func::CallOp call, ModuleOp parent) {
   if (!call->hasAttr("sc_ports"))
@@ -2615,6 +2635,14 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     instNames.push_back(inst);
     indent();
     os << it.value().getCallee() << " " << inst << ";\n";
+    // One signal per non-stream IP port. Every port must be bound or SystemC
+    // aborts elaboration (E109), and outputs need somewhere to go even when
+    // nothing reads them.
+    for (auto &sc : ipScalars(it.value())) {
+      indent();
+      os << "sc_signal< " << sc.type << " > " << inst << "_" << sc.name
+         << ";\n";
+    }
   }
   // Per-kernel completion signals; an SC_METHOD ANDs them into the top `done` port.
   // An external IP has no `done` port -- it is a third-party SC_MODULE that never
@@ -2857,6 +2885,17 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
         indent();
         os << "// NOTE: reset port not identified for IP '" << call.getCallee()
            << "'; bind it by hand.\n";
+      }
+      // Non-stream ports: bind the signal, and drive inputs with their
+      // constant. write() during construction is an elaboration-time
+      // initialisation, which is what a tie-off is.
+      for (auto &sc : ipScalars(call)) {
+        indent();
+        os << inst << "." << sc.name << "(" << inst << "_" << sc.name << ");\n";
+        if (sc.dir == "in") {
+          indent();
+          os << inst << "_" << sc.name << ".write(" << sc.cst << ");\n";
+        }
       }
       auto names = ipPortNames(call);
       StringRef dirs;

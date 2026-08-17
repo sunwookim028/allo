@@ -222,8 +222,21 @@ def parse_cpp_function(code, target_function):
     return result
 
 
+def _strip_comments(code):
+    """Blank out // and /* */ comments, preserving newlines so lines still align.
+
+    Not cosmetic: hl5.hpp carries `// sc_out<bool> main_start;` under a
+    "TODO: removeme", and a port regex run over the raw text matches it. The
+    emitter would then bind a port that does not exist. Braces inside comments
+    would also confuse the body's brace matching.
+    """
+    code = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), code, flags=re.S)
+    return re.sub(r"//[^\n]*", "", code)
+
+
 def _sc_module_body(code, target_module):
     """The brace-matched body of `SC_MODULE(name) { ... };`, or None."""
+    code = _strip_comments(code)
     m = re.search(r"SC_MODULE\s*\(\s*" + re.escape(target_module) + r"\s*\)\s*\{", code)
     if m is None:
         return None
@@ -244,6 +257,11 @@ _SC_PORT = re.compile(
 # argument list, or the arity would disagree with the `ip(a, b)` call site.
 # But their NAMES must be captured: the emitter binds them at instantiation,
 # and a third-party module may call them clock/reset_n/rstn, not clk/rst.
+# Every SCALAR port: `sc_in<T> name;` / `sc_out<T> name;`. These carry no
+# dataflow, so they are NOT Allo arguments -- but the emitter must still bind
+# each one or SystemC aborts elaboration with E109 "port not bound".
+_SC_SCALAR = re.compile(r"sc_(in|out)\s*<\s*(" + _TEMPLATE_ARGS + r")\s*>\s*(\w+)\s*;")
+
 _SC_CLK = re.compile(r"sc_in_clk\s+(\w+)\s*;")
 _SC_RST = re.compile(r"sc_in\s*<\s*bool\s*>\s*(\w+)\s*;")
 
@@ -277,7 +295,11 @@ def parse_sc_module(code, target_module):
     # that elaborates and then hangs on an unreset channel.
     clk = clks[0] if len(clks) == 1 else None
     rst = rsts[0] if len(rsts) == 1 else None
-    return args, dirs, names, clk, rst
+    # Every scalar port, INCLUDING the reset -- excluding it here would be wrong
+    # once a caller overrides sc_rst, since that decision happens later. clk
+    # never appears: `sc_in_clk` is a distinct declaration form.
+    scalars = [(n, d, t.strip()) for d, t, n in _SC_SCALAR.findall(body)]
+    return args, dirs, names, clk, rst, scalars
 
 
 class IPModule:
@@ -291,6 +313,7 @@ class IPModule:
         output_idx=None,
         sc_clk=None,
         sc_rst=None,
+        sc_bind=None,
     ):
         # ``input_idx`` / ``output_idx`` declare, per argument position, whether
         # the IP *reads* (input) or *writes* (output) that argument. They are
@@ -338,6 +361,8 @@ class IPModule:
         self.args = parse_cpp_function(code, self.top)
         self.is_systemc = self.args is None
         self.sc_dirs = self.sc_names = self.sc_clk = self.sc_rst = None
+        self.sc_scalars = []   # [(name, 'in'|'out', type)] for non-stream ports
+        self.sc_bind = {}      # {port: constant} for non-stream inputs
         if self.is_systemc:
             parsed = parse_sc_module(code, self.top)
             if parsed is None:
@@ -345,7 +370,8 @@ class IPModule:
                     f"'{self.top}' is neither a function nor an SC_MODULE "
                     f"in {self.impl}"
                 )
-            self.args, self.sc_dirs, self.sc_names, self.sc_clk, self.sc_rst = parsed
+            (self.args, self.sc_dirs, self.sc_names,
+             self.sc_clk, self.sc_rst, self.sc_scalars) = parsed
             # Explicit overrides win. parse_sc_module deliberately reports
             # rst=None when a module has several `sc_in<bool>` and it cannot
             # tell which is the reset -- hl5 has `rst` and `fetch_en` -- so this
@@ -354,6 +380,10 @@ class IPModule:
                 self.sc_clk = sc_clk
             if sc_rst is not None:
                 self.sc_rst = sc_rst
+            # Constants for the IP's non-stream INPUT ports, {name: value}. Any
+            # input not named here is tied to 0; outputs never need a value, but
+            # still get a signal so they are not left unbound (E109).
+            self.sc_bind = dict(sc_bind or {})
         self.lib_name = f"py{self.top}_{hash(time.time_ns())}"
         self.c_wrapper_file = os.path.join(self.temp_path, f"{self.lib_name}.cpp")
 

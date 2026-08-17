@@ -3450,6 +3450,16 @@ class ASTTransformer(ASTBuilder):
                     call_op.attributes["sc_impl"] = StringAttr.get(
                         os.path.basename(obj.impl)
                     )
+                    # Non-stream ports the emitter must still bind, as
+                    # `name|in|type|const` records joined by ';'. Inputs default
+                    # to 0; the reset is excluded because it is bound separately.
+                    recs = [
+                        f"{n}|{d}|{t}|{obj.sc_bind.get(n, 0) if d == 'in' else ''}"
+                        for n, d, t in obj.sc_scalars
+                        if n != obj.sc_rst
+                    ]
+                    if recs:
+                        call_op.attributes["sc_scalars"] = StringAttr.get(";".join(recs))
                 for idx, (call_operand, operand_op) in enumerate(
                     zip(call_operands, new_args)
                 ):
