@@ -289,6 +289,8 @@ class IPModule:
         link_hls=True,
         input_idx=None,
         output_idx=None,
+        sc_clk=None,
+        sc_rst=None,
     ):
         # ``input_idx`` / ``output_idx`` declare, per argument position, whether
         # the IP *reads* (input) or *writes* (output) that argument. They are
@@ -344,6 +346,14 @@ class IPModule:
                     f"in {self.impl}"
                 )
             self.args, self.sc_dirs, self.sc_names, self.sc_clk, self.sc_rst = parsed
+            # Explicit overrides win. parse_sc_module deliberately reports
+            # rst=None when a module has several `sc_in<bool>` and it cannot
+            # tell which is the reset -- hl5 has `rst` and `fetch_en` -- so this
+            # is how the caller resolves that rather than the tool guessing.
+            if sc_clk is not None:
+                self.sc_clk = sc_clk
+            if sc_rst is not None:
+                self.sc_rst = sc_rst
         self.lib_name = f"py{self.top}_{hash(time.time_ns())}"
         self.c_wrapper_file = os.path.join(self.temp_path, f"{self.lib_name}.cpp")
 
