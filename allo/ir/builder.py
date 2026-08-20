@@ -3440,8 +3440,12 @@ class ASTTransformer(ASTBuilder):
                     # The emitter declares the channel with THIS rather than the
                     # type derived from the Allo stream: an IP is third-party, so
                     # at its boundary its own type is the one that cannot change.
+                    # ';' not ',': a payload type can CONTAIN a comma
+                    # (`ac_int<26, false>`), which a comma-separated list
+                    # silently truncates. Port names cannot, so sc_ports above
+                    # is fine as it is.
                     call_op.attributes["sc_ptypes"] = StringAttr.get(
-                        ",".join(obj.sc_ptypes)
+                        ";".join(obj.sc_ptypes)
                     )
                     # clk is needed to bind the instance. rst is None when the IP
                     # has more than one sc_in<bool> and the parser refuses to

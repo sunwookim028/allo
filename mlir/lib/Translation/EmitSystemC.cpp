@@ -558,6 +558,16 @@ static SmallVector<StringRef, 4> ipPortNames(func::CallOp call) {
   return names;
 }
 
+// Type spellings differ harmlessly by whitespace -- `ac_int<26, false>` from an
+// IP header versus `ac_int<26,false>` as emitted -- so compare without it.
+static std::string normalizeType(StringRef t) {
+  std::string out;
+  for (char c : t)
+    if (!isspace((unsigned char)c))
+      out.push_back(c);
+  return out;
+}
+
 // One non-stream port of an IP: name, "in"/"out", C++ type, and (inputs only)
 // the constant to tie it to. Encoded by builder.py as `name|dir|type|const`
 // records joined by ';'.
@@ -2577,7 +2587,7 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     if (!pts)
       continue;
     SmallVector<StringRef, 4> tys;
-    pts.getValue().split(tys, ',', -1, /*KeepEmpty=*/false);
+    pts.getValue().split(tys, ';', -1, /*KeepEmpty=*/false);
     unsigned si = 0;
     for (Value ov : call.getOperands()) {
       if (!llvm::isa<StreamType>(ov.getType()))
@@ -2607,18 +2617,23 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     std::string T = std::string(getStreamPayloadTypeName(st.getBaseType(), linkPayloadUnsigned(sc.getResult())).str());
     auto ipT = ipChanType.find(sc.getResult());
     if (ipT != ipChanType.end()) {
-      // A generated kernel on the same channel would still emit its port with
-      // the Allo-derived type, so the two ends would disagree. Refuse rather
-      // than emit something that silently fails to Bind.
-      for (auto &use : sc.getResult().getUses()) {
-        auto uc = llvm::dyn_cast<func::CallOp>(use.getOwner());
-        if (uc && !isIPCall(uc, parent)) {
-          llvm::errs() << "error: stream '" << getName(sc.getResult())
-                       << "' is shared between an external IP (payload "
-                       << ipT->second << ") and kernel '" << uc.getCallee()
-                       << "'. Mixing an IP and a kernel on one channel is not "
-                          "supported: their payload types would disagree.\n";
-          break;
+      // Sharing a channel with a generated kernel is FINE as long as the types
+      // agree -- an IP written against this design's packet type is exactly the
+      // intended case. Only complain when they actually differ, since then the
+      // kernel's port keeps the Allo-derived type and Bind fails with a
+      // template error that says nothing about the cause.
+      if (normalizeType(ipT->second) != normalizeType(T)) {
+        for (auto &use : sc.getResult().getUses()) {
+          auto uc = llvm::dyn_cast<func::CallOp>(use.getOwner());
+          if (uc && !isIPCall(uc, parent)) {
+            llvm::errs() << "error: stream '" << getName(sc.getResult())
+                         << "' is shared between an external IP (payload "
+                         << ipT->second << ") and kernel '" << uc.getCallee()
+                         << "' (payload " << T
+                         << "). Give the IP's port the design's payload type, "
+                            "or keep the channel private to the IP.\n";
+            break;
+          }
         }
       }
       T = ipT->second;
