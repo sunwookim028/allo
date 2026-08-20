@@ -2564,6 +2564,30 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     if (!isIPCall(call, parent))
       numKernelInsts++;
 
+  // A stream bound to an external IP port must be declared with the IP's OWN
+  // payload type, not the one derived from the Allo stream type. Allo's int32
+  // becomes ac_int<32,true>; an IP port may be sc_uint<32> or a struct like
+  // imem_out_t, and Connections::Bind is exact -- same width is not enough.
+  // The IP is third-party, so its type is the one that cannot be changed.
+  llvm::DenseMap<Value, std::string> ipChanType;
+  for (auto call : calls) {
+    if (!isIPCall(call, parent))
+      continue;
+    auto pts = call->getAttrOfType<StringAttr>("sc_ptypes");
+    if (!pts)
+      continue;
+    SmallVector<StringRef, 4> tys;
+    pts.getValue().split(tys, ',', -1, /*KeepEmpty=*/false);
+    unsigned si = 0;
+    for (Value ov : call.getOperands()) {
+      if (!llvm::isa<StreamType>(ov.getType()))
+        continue;
+      if (si < tys.size())
+        ipChanType[ov] = tys[si].str();
+      si++;
+    }
+  }
+
   // Channel members. A Stream's depth (from its type) picks the flavor:
   //   depth 0  -> a bare Connections::Combinational (combinational wire)
   //   depth>=1 -> an AlloFifo<T,depth> between two _in/_out wires (buffered)
@@ -2581,6 +2605,24 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     // depth>=1 stream; the one kernel simply binds BOTH ends (see the bind loop).
     auto st = llvm::dyn_cast<StreamType>(sc.getResult().getType());
     std::string T = std::string(getStreamPayloadTypeName(st.getBaseType(), linkPayloadUnsigned(sc.getResult())).str());
+    auto ipT = ipChanType.find(sc.getResult());
+    if (ipT != ipChanType.end()) {
+      // A generated kernel on the same channel would still emit its port with
+      // the Allo-derived type, so the two ends would disagree. Refuse rather
+      // than emit something that silently fails to Bind.
+      for (auto &use : sc.getResult().getUses()) {
+        auto uc = llvm::dyn_cast<func::CallOp>(use.getOwner());
+        if (uc && !isIPCall(uc, parent)) {
+          llvm::errs() << "error: stream '" << getName(sc.getResult())
+                       << "' is shared between an external IP (payload "
+                       << ipT->second << ") and kernel '" << uc.getCallee()
+                       << "'. Mixing an IP and a kernel on one channel is not "
+                          "supported: their payload types would disagree.\n";
+          break;
+        }
+      }
+      T = ipT->second;
+    }
     std::string nm = std::string(addName(sc.getResult(), /*isPtr=*/false).str());
     if (st.getDepth() == 0) {
       indent();

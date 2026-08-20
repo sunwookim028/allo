@@ -3436,6 +3436,13 @@ class ASTTransformer(ASTBuilder):
                     call_op.attributes["sc_ports"] = StringAttr.get(
                         ",".join(obj.sc_names)
                     )
+                    # The payload type each port declares, in the same order.
+                    # The emitter declares the channel with THIS rather than the
+                    # type derived from the Allo stream: an IP is third-party, so
+                    # at its boundary its own type is the one that cannot change.
+                    call_op.attributes["sc_ptypes"] = StringAttr.get(
+                        ",".join(obj.sc_ptypes)
+                    )
                     # clk is needed to bind the instance. rst is None when the IP
                     # has more than one sc_in<bool> and the parser refuses to
                     # guess, so that attribute is simply absent and the emitter

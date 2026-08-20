@@ -391,6 +391,17 @@ class IPModule:
             # input not named here is tied to 0; outputs never need a value, but
             # still get a signal so they are not left unbound (E109).
             self.sc_bind = dict(sc_bind or {})
+            # The payload type each port actually declares, e.g. `sc_uint<32>`
+            # or `imem_out_t`, pulled back out of the `Connections::In<...>`
+            # strings in self.args. The emitter needs these because it would
+            # otherwise declare the channel from the ALLO stream type -- int32
+            # becomes ac_int<32,true>, which will not Bind to a port declared
+            # sc_uint<32>, let alone to a struct. At an IP's boundary the IP's
+            # own type has to win: it is third-party and cannot be changed.
+            self.sc_ptypes = [
+                re.sub(r"^Connections::(?:In|Out)<(.*)>$", r"\1", t).strip()
+                for t, _ in self.args
+            ]
         self.lib_name = f"py{self.top}_{hash(time.time_ns())}"
         self.c_wrapper_file = os.path.join(self.temp_path, f"{self.lib_name}.cpp")
 
