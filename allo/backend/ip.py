@@ -234,9 +234,16 @@ def _strip_comments(code):
     return re.sub(r"//[^\n]*", "", code)
 
 
+# MatchLib's declare-and-name macros: `CCS_INIT_S1(n)` expands to `n{#n}`, so
+# `Connections::In<T> CCS_INIT_S1(din);` declares a port called `din`. Catapult-
+# native IPs are written this way (DRIM4HLS is), and without unwrapping it the
+# port regexes see the macro where the name should be and match nothing.
+_CCS_INIT = re.compile(r"CCS_INIT_S\d\s*\(\s*(\w+)\s*(?:,[^()]*)?\)")
+
+
 def _sc_module_body(code, target_module):
     """The brace-matched body of `SC_MODULE(name) { ... };`, or None."""
-    code = _strip_comments(code)
+    code = _CCS_INIT.sub(r"\1", _strip_comments(code))
     m = re.search(r"SC_MODULE\s*\(\s*" + re.escape(target_module) + r"\s*\)\s*\{", code)
     if m is None:
         return None

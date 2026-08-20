@@ -3456,7 +3456,12 @@ class ASTTransformer(ASTBuilder):
                     recs = [
                         f"{n}|{d}|{t}|{obj.sc_bind.get(n, 0) if d == 'in' else ''}"
                         for n, d, t in obj.sc_scalars
-                        if n != obj.sc_rst
+                        # clk and rst are bound separately. Both must be
+                        # excluded here, not just rst: a module that declares
+                        # `sc_in<bool> clk` rather than `sc_in_clk` puts its
+                        # clock in this list too, and binding a port twice is
+                        # a SystemC error.
+                        if n not in (obj.sc_rst, obj.sc_clk)
                     ]
                     if recs:
                         call_op.attributes["sc_scalars"] = StringAttr.get(";".join(recs))
