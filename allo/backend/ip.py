@@ -321,6 +321,7 @@ class IPModule:
         sc_clk=None,
         sc_rst=None,
         sc_bind=None,
+        sc_directives=None,
     ):
         # ``input_idx`` / ``output_idx`` declare, per argument position, whether
         # the IP *reads* (input) or *writes* (output) that argument. They are
@@ -370,6 +371,14 @@ class IPModule:
         self.sc_dirs = self.sc_names = self.sc_clk = self.sc_rst = None
         self.sc_scalars = []   # [(name, 'in'|'out', type)] for non-stream ports
         self.sc_bind = {}      # {port: constant} for non-stream inputs
+        # Catapult directives the IP needs in order to SYNTHESISE -- opaque tcl,
+        # never parsed here. An IP's own constraints do not travel with it: they
+        # live in its vendor's tcl against ITS top, and once the IP is
+        # instantiated in an Allo design those paths no longer resolve. Without
+        # them DRIM4HLS's decode stage fails outright with "could not schedule
+        # even with unlimited resources", because its register file becomes a
+        # RAM. See write_ip_directives() in backend/hls.py.
+        self.sc_directives = list(sc_directives or [])
         if self.is_systemc:
             parsed = parse_sc_module(code, self.top)
             if parsed is None:
