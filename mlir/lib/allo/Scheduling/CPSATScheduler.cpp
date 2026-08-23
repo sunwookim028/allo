@@ -1168,6 +1168,17 @@ void pinStructure(CpModelBuilder &model, const CpSolverResponse &from,
 /// proving anything the fold does not.
 constexpr double kAreaTieBreakShare = 0.3;
 
+/// The area fold minimizes in deterministic-time slices and releases the rest
+/// of its budget once the area has stopped improving. The bound the solver
+/// proves on this objective is too weak to read an optimality gap from (its
+/// register-chain terms relax poorly), so the stop reads the incumbent curve
+/// instead: a slice improving the modeled area by less than `kFoldPlateauEps`
+/// is a stall, and `kFoldPatience` consecutive stalls end the fold. A region
+/// still paying for its budget runs the whole of it; a plateaued one does not.
+constexpr double kFoldChunkShare = 0.25;
+constexpr double kFoldPlateauEps = 0.01;
+constexpr unsigned kFoldPatience = 2;
+
 /// What \p decided costs the device: every resource, at the price of the count
 /// it settled on.
 int64_t areaOf(OccupancyProblem &prob, const Allocated &decided) {
@@ -2054,9 +2065,47 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       model.AddLessOrEqual(area, *areaBound);
     model.Minimize(area);
     SchedulerOptions restArea = lessBudget(opts, boot);
-    CpSolverResponse first = solveBuilt(model, solverParameters(restArea));
-    if (first.status() == CpSolverStatus::INFEASIBLE)
-      return ModuloOutcome::Infeasible;
+    // The area minimization runs in deterministic-time slices, each warm
+    // started from the last incumbent, and stops once the area plateaus so the
+    // rest of the budget (a proven span still reclaims its slack below) is
+    // released instead of burned on a solve that no longer improves.
+    CpSolverResponse first;
+    double areaSpent = 0.0;
+    int64_t bestArea = 0;
+    bool haveBest = false;
+    unsigned stalls = 0;
+    while (areaSpent < restArea.budget) {
+      SchedulerOptions slice = restArea;
+      slice.budget = std::min(restArea.budget - areaSpent,
+                              opts.budget * kFoldChunkShare);
+      CpSolverResponse r = solveBuilt(model, solverParameters(slice));
+      areaSpent += r.deterministic_time();
+      if (r.status() == CpSolverStatus::INFEASIBLE) {
+        if (!haveBest)
+          return ModuloOutcome::Infeasible;
+        break; // nothing beats the incumbent under the area bound
+      }
+      if (!solved(r))
+        break; // this slice found nothing; the bootstrap stands
+      int64_t a = SolutionIntegerValue(r, area);
+      bool improved = !haveBest || bestArea - a > bestArea * kFoldPlateauEps;
+      first = r;
+      if (improved) {
+        bestArea = a;
+        haveBest = true;
+        stalls = 0;
+      } else if (++stalls >= kFoldPatience) {
+        info(Stage::Sched, prob.getContainingOp())
+            << "Area fold at II=" << ii << " plateaued after "
+            << llvm::format("%.1f", areaSpent) << " of "
+            << llvm::format("%g", restArea.budget)
+            << " deterministic units; releasing the rest";
+        break; // area has plateaued
+      }
+      if (r.status() == CpSolverStatus::OPTIMAL)
+        break; // proven minimal
+      rehintAll(model, r); // warm start the next slice from the incumbent
+    }
     out.areaProven = first.status() == CpSolverStatus::OPTIMAL;
     const CpSolverResponse *pick = solved(first) ? &first : &boot;
     CpSolverResponse second;
@@ -2066,7 +2115,9 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       pinStructure(model, first, allocs, sels, shared);
       model.Minimize(*drainVar);
       rehintAll(model, first);
-      second = solveBuilt(model, solverParameters(lessBudget(restArea, first)));
+      SchedulerOptions afterArea = restArea;
+      afterArea.budget = std::max(restArea.budget - areaSpent, 0.0);
+      second = solveBuilt(model, solverParameters(afterArea));
       assert(second.status() != CpSolverStatus::INFEASIBLE &&
              "the area solve's schedule satisfies the pinned model");
       out.spanProven = second.status() == CpSolverStatus::OPTIMAL;
@@ -2469,11 +2520,12 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
   // area minimal: a proven span then ships the datapath at the span solve's
   // incidental allocation. Re-solve once at the winning interval in the area
   // order, leashed to the proven span and seeded from its own schedule, on a
-  // fresh budget, so the same cycles hold on the fewest units. A fold whose own
-  // area solve runs out of budget ships an unminimized bootstrap, so it is
-  // adopted only where its modeled area beats the tie-break's (or the tie-break
-  // found none), a tie going to the shorter drain. Where the tie-break already
-  // proved the area minimal the fold is skipped.
+  // fresh budget the area solve releases early once it stops improving, so the
+  // same cycles hold on the fewest units. A fold whose own area solve runs out
+  // of budget ships an unminimized bootstrap, so it is adopted only where its
+  // modeled area beats the tie-break's (or the tie-break found none), a tie
+  // going to the shorter drain. Where the tie-break already proved the area
+  // minimal the fold is skipped.
   bool foldedArea = false;
   if (bySpan && !areaMode && !bestAttempt.areaProven &&
       (allocates || !choices.empty() || !span.regs.empty() ||
