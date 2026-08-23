@@ -123,7 +123,8 @@ struct SolveReport {
   int64_t workers = 0, seed = 0;
   double budgetSeconds = 0.0;
   /// The solver's own verdict; see `SolveTelemetry`.
-  bool proven = false, budgetExhausted = false, fallback = false;
+  bool proven = false, spanProven = false, budgetExhausted = false,
+       fallback = false;
   std::optional<int64_t> exhaustedAtII;
   /// Whether re-running the compile reproduces this schedule: workers
   /// interleaved and budget held.

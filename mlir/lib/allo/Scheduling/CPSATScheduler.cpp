@@ -1303,10 +1303,10 @@ void reportUnsolved(Problem &prob, const CpSolverResponse &response,
 /// cover them all. The longest path is this with S a singleton, where the
 /// middle term vanishes.
 ///
-/// Valid at every initiation interval, so the cyclic search computes it once:
-/// within one iteration a window of length L touches `min(L, ii)` congruence
-/// classes, each admitting `limit` units from that iteration, and work above
-/// `ii * limit` is an interval `computeResMinII` already ruled out.
+/// Only intra-iteration edges count, so the bound holds at every initiation
+/// interval: within one iteration a window of length L touches `min(L, ii)`
+/// congruence classes, each admitting `limit` units from that iteration, and
+/// work above `ii * limit` is an interval `computeResMinII` already ruled out.
 ///
 /// \p latencyOf must under-approximate every latency the model can decide
 /// (the least candidate of a decided realization), or the floor cuts the
@@ -1315,55 +1315,56 @@ template <typename ProblemT>
 int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
                    ArrayRef<DrainTerm> terms,
                    llvm::function_ref<int64_t(Operation *)> latencyOf) {
-  constexpr int64_t kUnreached = std::numeric_limits<int64_t>::min();
   auto offsetOf = [&](const DrainTerm &term) {
     return term.offset + (term.plusLatency ? latencyOf(term.op) : 0);
   };
 
-  // The edges the model imposes, weighted as it weights them, in both
-  // directions: heads are read off one end and tails off the other. Only the
-  // edges that stay within one iteration bound this iteration's outputs, which
-  // is every edge of a straight-line region and the distance-0 ones of a modulo
-  // problem.
-  DenseMap<Operation *, SmallVector<std::pair<Operation *, int64_t>>> in, out;
-  auto edge = [&](Operation *src, Operation *dst, int64_t weight) {
-    in[dst].push_back({src, weight});
-    out[src].push_back({dst, weight});
+  // The edges the model imposes, weighted as it weights them. A forwarded
+  // store->load edge separates by zero (its shadow supplies the datum), so it
+  // must not tighten this floor.
+  struct FloorEdge {
+    Operation *src, *dst;
+    int64_t weight;
   };
+  SmallVector<FloorEdge> edges;
   for (Operation *op : prob.getOperations())
     for (auto &dep : prob.getDependences(op)) {
+      int64_t dist = 0;
       if constexpr (std::is_same_v<ProblemT, ChainingModuloProblem>)
-        if (prob.getDistance(dep).value_or(0) != 0)
-          continue;
-      // A forwarded store->load edge separates by zero (its shadow supplies
-      // the datum), so it must not tighten this floor.
-      edge(dep.getSource(), op,
-           prob.isForwarded(dep) ? 0 : latencyOf(dep.getSource()));
+        dist = prob.getDistance(dep).value_or(0);
+      if (dist != 0)
+        continue;
+      int64_t weight = prob.isForwarded(dep) ? 0 : latencyOf(dep.getSource());
+      edges.push_back({dep.getSource(), op, weight});
     }
   // A chain break is intra-iteration whichever problem this is.
   for (const auto &dep : breaks)
-    edge(dep.getSource(), dep.getDestination(), latencyOf(dep.getSource()) + 1);
+    edges.push_back({dep.getSource(), dep.getDestination(),
+                     latencyOf(dep.getSource()) + 1});
 
-  // Longest path in, memoized; the seeded zero keeps a cycle from recursing
-  // forever if the distance-0 subgraph were ever not acyclic.
+  unsigned nOps = prob.getOperations().size();
+
+  // Longest paths from the zero floor over the intra-iteration DAG, by
+  // relaxation to a fixpoint.
   DenseMap<Operation *, int64_t> heads;
-  auto head = [&](auto &self, Operation *op) -> int64_t {
-    auto seen = heads.find(op);
-    if (seen != heads.end())
-      return seen->second;
+  for (Operation *op : prob.getOperations())
     heads[op] = 0;
-    int64_t longest = 0;
-    auto edges = in.find(op);
-    if (edges != in.end())
-      for (auto [src, weight] : edges->second)
-        longest = std::max(longest, self(self, src) + weight);
-    heads[op] = longest;
-    return longest;
-  };
+  bool changed = true;
+  for (unsigned round = 0; changed && round <= nOps; ++round) {
+    changed = false;
+    for (const FloorEdge &e : edges) {
+      int64_t reach = heads[e.src] + e.weight;
+      if (reach > heads[e.dst]) {
+        heads[e.dst] = reach;
+        changed = true;
+      }
+    }
+  }
+  assert(!changed && "a positive cycle at the floor's interval");
 
   int64_t bound = 0;
   for (const DrainTerm &term : terms)
-    bound = std::max(bound, head(head, term.op) + offsetOf(term));
+    bound = std::max(bound, heads.lookup(term.op) + offsetOf(term));
 
   SmallVector<std::pair<Problem::ResourceType, int64_t>> capped;
   for (Problem::ResourceType rsrc : prob.getResourceTypes())
@@ -1398,37 +1399,41 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
 
   DenseSet<Operation *> feeding;
   for (const DrainTerm &term : terms) {
-    // Longest path on to this output, absent for an operation that cannot
-    // reach it.
+    // Longest path on to this output by the reverse relaxation, absent for an
+    // operation that cannot reach it. A carried path can weigh negative,
+    // which stays a valid (if weak) tail.
     DenseMap<Operation *, int64_t> tails;
-    auto tail = [&](auto &self, Operation *op) -> int64_t {
-      if (op == term.op)
-        return 0;
-      auto seen = tails.find(op);
-      if (seen != tails.end())
-        return seen->second;
-      tails[op] = kUnreached;
-      int64_t longest = kUnreached;
-      auto edges = out.find(op);
-      if (edges != out.end())
-        for (auto [dst, weight] : edges->second) {
-          int64_t onward = self(self, dst);
-          if (onward != kUnreached)
-            longest = std::max(longest, weight + onward);
+    tails[term.op] = 0;
+    changed = true;
+    for (unsigned round = 0; changed && round <= nOps; ++round) {
+      changed = false;
+      for (const FloorEdge &e : edges) {
+        auto to = tails.find(e.dst);
+        if (to == tails.end())
+          continue;
+        int64_t reach = e.weight + to->second;
+        auto from = tails.find(e.src);
+        if (from == tails.end()) {
+          tails[e.src] = reach;
+          changed = true;
+        } else if (reach > from->second) {
+          from->second = reach;
+          changed = true;
         }
-      tails[op] = longest;
-      return longest;
-    };
+      }
+    }
+    assert(!changed && "a positive cycle at the floor's interval");
     for (auto [rsrc, limit] : capped) {
       SmallVector<Contender> group;
       for (Operation *op : prob.getOperations()) {
         if (!prob.usesResource(op, rsrc))
           continue;
-        int64_t onward = tail(tail, op);
-        if (onward == kUnreached)
+        auto it = tails.find(op);
+        if (it == tails.end())
           continue;
         feeding.insert(op);
-        group.push_back({head(head, op), onward, prob.getResourceDemand(op)});
+        group.push_back({heads.lookup(op), it->second,
+                         static_cast<int64_t>(prob.getResourceDemand(op))});
       }
       if (!group.empty())
         bound = std::max(bound, strongest(group, limit) + offsetOf(term));
@@ -1441,7 +1446,8 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
     SmallVector<Contender> group;
     for (Operation *op : feeding)
       if (prob.usesResource(op, rsrc))
-        group.push_back({head(head, op), 0, prob.getResourceDemand(op)});
+        group.push_back({heads.lookup(op), 0,
+                         static_cast<int64_t>(prob.getResourceDemand(op))});
     if (!group.empty())
       bound = std::max(bound, strongest(group, limit));
   }
@@ -1526,6 +1532,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
       floorDrain >= span.drainOf(prob)) {
     // The floor proves the heuristic's drain minimal with nothing to solve.
     prob.telemetry.proven = true;
+    prob.telemetry.spanProven = true;
     return success();
   }
 
@@ -1695,6 +1702,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
         << ", drain " << SolutionIntegerValue(*pick, drain);
     prob.telemetry.proven =
         areaProven && second.status() == CpSolverStatus::OPTIMAL;
+    prob.telemetry.spanProven = second.status() == CpSolverStatus::OPTIMAL;
     prob.telemetry.budgetExhausted = !prob.telemetry.proven;
     return ship(*pick);
   }
@@ -1755,6 +1763,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
 
   prob.telemetry.proven =
       spanProven && second.status() == CpSolverStatus::OPTIMAL;
+  prob.telemetry.spanProven = spanProven;
   prob.telemetry.budgetExhausted = !prob.telemetry.proven;
   return ship(pick);
 }
@@ -2074,31 +2083,57 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
     return ModuloOutcome::Scheduled;
   }
 
-  model.Minimize(primary);
-  CpSolverResponse first = solveBuilt(model, solverParameters(opts));
-  if (first.status() == CpSolverStatus::INFEASIBLE)
-    return ModuloOutcome::Infeasible;
-  if (!solved(first)) {
-    assert(first.status() != CpSolverStatus::MODEL_INVALID &&
-           "the encoding built an ill-formed model");
-    return ModuloOutcome::Exhausted;
+  // The span skip, the cyclic mirror of the acyclic path's: at the greedy's
+  // own interval a floor that reaches the heuristic's drain proves that
+  // schedule span-optimal, so the span solve has nothing left to decide and
+  // the budget goes to the area tie-break. Solving anyway is worse than
+  // redundant: the presolve can break the completed hint, and on a saturated
+  // packing the search then burns the whole budget failing to rebuild a
+  // schedule the heuristic already holds.
+  bool skipSpan =
+      hint && drainVar && floorDrain >= span.drainOf(prob);
+  CpSolverResponse first;
+  if (skipSpan) {
+    out.spanProven = true;
+  } else {
+    model.Minimize(primary);
+    first = solveBuilt(model, solverParameters(opts));
+    if (first.status() == CpSolverStatus::INFEASIBLE)
+      return ModuloOutcome::Infeasible;
+    if (!solved(first)) {
+      assert(first.status() != CpSolverStatus::MODEL_INVALID &&
+             "the encoding built an ill-formed model");
+      return ModuloOutcome::Exhausted;
+    }
+    out.spanProven = first.status() == CpSolverStatus::OPTIMAL;
   }
-  out.spanProven = first.status() == CpSolverStatus::OPTIMAL;
 
-  // The area solve, under the span the first settled, on what is left of the
-  // budget.
-  model.AddLessOrEqual(primary, SolutionIntegerValue(first, primary));
+  // The area solve, under the span the first settled (or the floor proved),
+  // on what is left of the budget.
+  model.AddLessOrEqual(primary, skipSpan
+                                    ? span.drainOf(prob)
+                                    : SolutionIntegerValue(first, primary));
   LinearExpr area = areaTerms(model, orderedStarts, span, startVars, allocs, ii,
                               horizon, latExpr, sels, shared);
   model.Minimize(area);
-  rehintFrom(model, ops.getArrayRef(), startVars, allocs, sels, shared, first);
-  SchedulerOptions rest = lessBudget(opts, first);
+  SchedulerOptions rest = opts;
+  if (!skipSpan) {
+    rehintFrom(model, ops.getArrayRef(), startVars, allocs, sels, shared,
+               first);
+    rest = lessBudget(opts, first);
+  }
   if (span.trip)
     rest.budget = std::min(rest.budget, opts.budget * kAreaTieBreakShare);
   CpSolverResponse second = solveBuilt(model, solverParameters(rest));
   assert(second.status() != CpSolverStatus::INFEASIBLE &&
-         "the span solve's schedule satisfies the pinned model");
+         "the span solve's (or the hinted heuristic's) schedule satisfies the "
+         "pinned model");
   out.areaProven = second.status() == CpSolverStatus::OPTIMAL;
+  // With the span skipped there is no first solution to fall back on; the
+  // heuristic's schedule stands and the caller's fallback ships it,
+  // span-proven by the floor.
+  if (skipSpan && !solved(second))
+    return ModuloOutcome::Exhausted;
   const CpSolverResponse &pick = solved(second) ? second : first;
 
   for (Operation *op : ops)
@@ -2414,8 +2449,13 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
           << greedyII << "; keeping it";
     prob.telemetry.fallback = true;
     // Every interval decided and none beat the incumbent: the heuristic's
-    // schedule is thereby proven optimal.
+    // schedule is thereby proven optimal. An exhaustion at the greedy's own
+    // interval with the floor at the heuristic's drain spent the budget on
+    // area alone; the span is still proven.
     prob.telemetry.proven = !exhaustedAt;
+    prob.telemetry.spanProven =
+        !exhaustedAt || (bySpan && *exhaustedAt == greedyII &&
+                         floorDrain >= span.drainOf(prob));
     prob.telemetry.budgetExhausted = exhaustedAt.has_value();
     if (exhaustedAt)
       prob.telemetry.exhaustedAtII = (int64_t)*exhaustedAt;
@@ -2450,6 +2490,11 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
         (!bestAttempt.modelArea || *folded.modelArea < *bestAttempt.modelArea ||
          (*folded.modelArea == *bestAttempt.modelArea &&
           folded.drain < bestAttempt.drain))) {
+      // The fold is leashed to the adopted drain and floored like any
+      // schedule, so it cannot regress a proven span; its own flag only says
+      // whether the re-min under the pinned structure proved, a stricter
+      // question than the region's.
+      folded.spanProven |= bestAttempt.spanProven;
       best = iiWeight * bestII + folded.drain;
       bestArea = *folded.modelArea;
       bestAttempt = std::move(folded);
@@ -2523,6 +2568,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
            "the best of the intervals it did decide";
   prob.telemetry.proven =
       bestAttempt.spanProven && bestAttempt.areaProven && !exhaustedAt;
+  prob.telemetry.spanProven = bestAttempt.spanProven && !exhaustedAt;
   prob.telemetry.budgetExhausted = !prob.telemetry.proven;
   if (exhaustedAt)
     prob.telemetry.exhaustedAtII = (int64_t)*exhaustedAt;

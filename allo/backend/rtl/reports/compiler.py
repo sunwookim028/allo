@@ -37,6 +37,9 @@ class SolveReport:
     #: every deciding CP-SAT solve proved its optimum; the shipped schedule is
     #: that optimum.
     proven: bool = False
+    #: the span half's own verdict; exhausted with this set means the
+    #: budget went to the area tie-break alone.
+    span_proven: bool = False
     #: some solve hit its time limit, so the shipped schedule may differ between
     #: runs of the same compile.
     budget_exhausted: bool = False
@@ -64,6 +67,7 @@ class SolveReport:
             seed=d.get("seed", 0),
             budget_s=d.get("budget_s", 0.0),
             proven=d.get("proven", False),
+            span_proven=d.get("span_proven", False),
             budget_exhausted=d.get("budget_exhausted", False),
             fallback=d.get("fallback", False),
             exhausted_at_ii=d.get("exhausted_at_ii"),

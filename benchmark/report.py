@@ -205,9 +205,6 @@ _II_GAP = re.compile(r"Scheduled at II=(\d+) against a lower bound of II=(\d+)")
 # ALLO_LOG_LEVEL=info and is absent otherwise; it prices what a better raise
 # could still recover.
 _RAISED = re.compile(r"Raised (\d+) loop\(s\) and (\d+) further memref access")
-# The scheduler's drain-floor measurements, emitted under ALLO_DRAIN_PROBE=1.
-# Kept as raw lines for an offline script to parse.
-_PROBE = re.compile(r"^ALLOPROBE(?:II)? .*$", re.M)
 
 
 def measure_one(item, knobs: Knobs) -> dict:
@@ -306,6 +303,7 @@ def measure_one(item, knobs: Knobs) -> dict:
                 "ms": round(s.ms, 2),
                 "solver": s.solver,
                 "proven": s.proven,
+                "span_proven": s.span_proven,
                 "exhausted": s.budget_exhausted,
                 "fallback": s.fallback,
             }
@@ -398,7 +396,6 @@ def _run_child(item, knobs: Knobs, timeout: int) -> dict:
     # the bound is settled inside the simplex and reported only as a diagnostic.
     d["ii_gaps"] = [{"ii": int(a), "bound": int(b)} for a, b in _II_GAP.findall(text)]
     d["budget_exhausted"] = sum(1 for s in d.get("solves", []) if s.get("exhausted"))
-    d["probes"] = _PROBE.findall(text)
     d["raised"] = [sum(int(m[i]) for m in _RAISED.findall(text)) for i in (0, 1)]
     d["warnings"] = [l.strip()[:300] for l in text.splitlines() if "WARN" in l][:20]
     return d

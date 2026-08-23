@@ -826,6 +826,7 @@ void FuncScheduler::recordSolve(OccupancyProblem &problem, StringRef kind,
     s.seed = opts.seed;
     s.budgetSeconds = opts.budget;
     s.proven = problem.telemetry.proven;
+    s.spanProven = problem.telemetry.spanProven;
     s.budgetExhausted = problem.telemetry.budgetExhausted;
     s.fallback = problem.telemetry.fallback;
     s.exhaustedAtII = problem.telemetry.exhaustedAtII;

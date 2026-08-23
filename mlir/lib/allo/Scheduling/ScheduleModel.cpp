@@ -222,6 +222,7 @@ std::string mlir::allo::ScheduleModel::toJSON() const {
       entry["seed"] = s.seed;
       entry["budget_s"] = s.budgetSeconds;
       entry["proven"] = s.proven;
+      entry["span_proven"] = s.spanProven;
       entry["budget_exhausted"] = s.budgetExhausted;
       entry["fallback"] = s.fallback;
       entry["deterministic"] = s.deterministic;

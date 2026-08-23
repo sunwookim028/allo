@@ -4,14 +4,14 @@
  */
 
 //===----------------------------------------------------------------------===//
-// Fork of CIRCT's linear-programming (SDC) simplex schedulers
-// (externals/circt/lib/Scheduling/SimplexSchedulers.cpp). Only the solver lives
-// here; the Problem data model and the chaining utilities stay CIRCT's.
-//
-// A PARTIAL fork, deliberately: only the two rungs this backend solves against
-// survive, the chaining modulo and chaining shared-operators ones. Every Allo
-// region carries a clock period and a resource model, so CIRCT's resource-free
-// and non-chaining schedulers have nothing here to solve.
+// The SDC scheduling engine: the two rungs this backend solves against, the
+// chaining modulo and chaining shared-operators problems. The difference
+// constraints are solved on their constraint graph (longest-path potentials,
+// incremental under pins); the greedy resource placement around it (the MRT,
+// the II growth) remains derived from CIRCT's SimplexSchedulers
+// (externals/circt/lib/Scheduling/SimplexSchedulers.cpp), whose parametric
+// simplex this engine replaced. The Problem data model and the chaining
+// utilities stay CIRCT's.
 //
 // Portions derived from LLVM/CIRCT, Apache-2.0 WITH LLVM-exception.
 //===----------------------------------------------------------------------===//
@@ -24,6 +24,7 @@
 #include "mlir/IR/Operation.h"
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 
@@ -68,122 +69,87 @@ static std::string render(const Recurrence &rec) {
   return s;
 }
 
-/// Models a scheduling problem as a lexico-parametric linear program (LP),
-/// solved with an extended dual simplex algorithm, per:
-///  [1] B. D. de Dinechin, "Simplex Scheduling: More than Lifetime-Sensitive
-///      Instruction Scheduling", PRISM 1994.22, 1994.
-///  [2] B. D. de Dinechin, "Fast Modulo Scheduling Under the Simplex Scheduling
-///      Framework", PRISM 1995.01, 1995.
+/// Solves the difference-constraint core of a scheduling problem on its
+/// constraint graph. Every constraint is
+/// `start(dst) - start(src) >= lat + extra - II*dist` (a dependence, a
+/// chain break, or a pin), so the feasible set is a lattice: the
+/// component-wise least solution exists, is unique, and is the longest-path
+/// potential from a virtual origin. That least point simultaneously minimizes
+/// the last operation's start and every other start, i.e. exactly the
+/// lexicographic (latency, then sum-of-starts) optimum the simplex fork this
+/// engine replaced steered to, so the two return the same schedule. The
+/// tie-break matters: the emitter builds an operation's start pulse as
+/// `delayValid(regionStart, t)`, one flip-flop per cycle of `t`, so a
+/// slack-bearing node placed late costs registers for no latency.
 ///
-/// A resource-free ("central") problem's ILP has a totally unimodular
-/// constraint matrix, so the plain (non-integer) simplex already returns an
-/// integer optimum.
-class SimplexSchedulerBase {
+/// Feasibility is the absence of a positive cycle. The initial solve grows the
+/// II to the smallest feasible value (feasibility is monotone in the II: only
+/// the `-II*dist` terms move with it); a positive cycle found on the way names
+/// the recurrence and the least II it admits. A pin (`scheduleAt`) becomes a
+/// virtual edge pair through the origin, applied by an incremental relaxation
+/// with an undo log, so a failed pin rolls back in O(touched nodes).
+class SDCSchedulerBase {
 protected:
-  /// The objective is to minimize the start time of this operation.
+  /// The last operation, whose start time the least solution minimizes first.
   Operation *lastOp;
 
-  /// S is part of a mechanism to assign fixed values to the LP variables.
-  int parameterS;
+  /// The initiation interval the constraint weights are taken at. The initial
+  /// solve grows it to the smallest feasible value; placement grows it more.
+  int parameterT = 0;
 
-  /// T represents the initiation interval (II). Its minimally-feasible value is
-  /// computed by the algorithm.
-  int parameterT;
+  /// One difference constraint:
+  /// `start(dst) >= start(src) + lat + extra - parameterT * dist`.
+  /// `extra` is 1 on a chain-breaking constraint. The weight is derived at
+  /// relaxation time, so growing the II rebuilds nothing.
+  struct Edge {
+    unsigned src, dst;
+    int64_t lat;
+    unsigned dist;
+    int extra;
+  };
+  /// Dependence and chain-break edges. A pin is a VIRTUAL edge pair through
+  /// the origin (`frozenVariables`), added and removed without touching this.
+  SmallVector<Edge> edges;
+  /// Out-adjacency into `edges` by variable. The origin's outgoing edges are
+  /// the pins' lower bounds and the implicit `start >= 0`, which seeding every
+  /// potential at zero already applies.
+  SmallVector<SmallVector<unsigned, 4>> staticOut;
 
-  /// The simplex tableau is the algorithm's main data structure.
-  /// The dashed parts always contain the zero respectively the identity matrix,
-  /// and therefore are not stored explicitly.
-  ///
-  ///                        ◀───nColumns────▶
-  ///           nParameters────┐
-  ///                        ◀─┴─▶
-  ///                       ┌─────┬───────────┬ ─ ─ ─ ─ ┐
-  ///                      ▲│. . .│. . ... . .│    0        ▲
-  ///           nObjectives││. . .│. . ... . .│         │   │
-  ///                      ▼│. . .│. . ... . .│             │
-  ///                       ├─────┼───────────┼ ─ ─ ─ ─ ┤   │
-  ///  firstConstraintRow > │. . .│. . ... . .│1            │nRows
-  ///                       │. . .│. . ... . .│  1      │   │
-  ///                       │. . .│. . ... . .│    1        │
-  ///                       │. . .│. . ... . .│      1  │   │
-  ///                       │. . .│. . ... . .│        1    ▼
-  ///                       └─────┴───────────┴ ─ ─ ─ ─ ┘
-  ///       parameter1Column ^
-  ///         parameterSColumn ^
-  ///           parameterTColumn ^
-  ///  firstNonBasicVariableColumn ^
-  ///                              ─────────── ──────────
-  ///                       nonBasicVariables   basicVariables
-  SmallVector<SmallVector<int>> tableau;
+  /// The virtual origin variable (index == number of operations): the zero
+  /// every bound is stated against.
+  unsigned origin = 0;
 
-  /// During the pivot operation, one column in the elided part of the tableau
-  /// is modified; this vector temporarily catches the changes.
-  SmallVector<int> implicitBasicVariableColumnVector;
+  /// The least solution: longest path from the origin, kept current across
+  /// pins.
+  SmallVector<int64_t> potentials;
+  /// Whether `potentials` reflect the current constraints; only a frozen
+  /// variable may be read while this is false.
+  bool potentialsCurrent = false;
 
-  /// The linear program models the operations' start times as variables, which
-  /// we identify here as 0, ..., |ops|-1.
-  /// Additionally, for each dependence (precisely, the inequality modeling the
-  /// precedence constraint), a slack variable is required; these are identified
-  /// as |ops|, ..., |ops|+|deps|-1.
-  ///
-  /// This vector stores the numeric IDs of non-basic variables. A variable's
-  /// index *i* in this vector corresponds to the tableau *column*
-  /// `firstNonBasicVariableColumn`+*i*.
-  SmallVector<unsigned> nonBasicVariables;
+  /// Pinned start times, in insertion order so a diagnostic's cycle is
+  /// deterministic. A pin is the edge pair origin->v (weight t) and v->origin
+  /// (weight -t).
+  llvm::MapVector<unsigned, unsigned> frozenVariables;
 
-  /// This vector store the numeric IDs of basic variables. A variable's index
-  /// *i* in this vector corresponds to the tableau *row*
-  /// `firstConstraintRow`+*i*.
-  SmallVector<unsigned> basicVariables;
-
-  /// An operation's start time variable id.
+  /// An operation's start time variable id, in problem order.
   DenseMap<Operation *, unsigned> startTimeVariables;
-
-  /// This vector keeps track of the current locations (i.e. row or column) of
-  /// a start time variable in the tableau. We encode column numbers as positive
-  /// integers, and row numbers as negative integers. We do not track the slack
-  /// variables.
-  SmallVector<int> startTimeLocations;
-
-  /// Non-basic variables can be "frozen" to a specific value, which prevents
-  /// them from being pivoted into basis again.
-  DenseMap<unsigned, unsigned> frozenVariables;
-
-  /// Number of rows in the tableau = |obj| + |deps|.
-  unsigned nRows;
-  /// Number of explicitly stored columns in the tableau = |params| + |ops|.
-  unsigned nColumns;
-
-  // Number of objective rows.
-  unsigned nObjectives;
-  /// All other rows encode linear constraints.
-  unsigned &firstConstraintRow = nObjectives;
-
-  // Number of parameters.
-  static constexpr unsigned nParameters = 3;
-  /// The first column corresponds to the always-one "parameter" in u = (1,S,T).
-  static constexpr unsigned parameter1Column = 0;
-  /// The second column corresponds to the variable-freezing parameter S.
-  static constexpr unsigned parameterSColumn = 1;
-  /// The third column corresponds to the parameter T, i.e. the current II.
-  static constexpr unsigned parameterTColumn = 2;
-  /// All other (explicitly stored) columns represent non-basic variables.
-  static constexpr unsigned firstNonBasicVariableColumn = nParameters;
+  /// The inverse, for naming a cycle's operations.
+  SmallVector<Operation *> varOps;
 
   /// Allow subclasses to collect additional constraints that are not part of
-  /// the input problem, but should be modeled in the linear problem.
+  /// the input problem (the chain breaks), each one time step stronger than a
+  /// plain dependence.
   SmallVector<Problem::Dependence> additionalConstraints;
 
   virtual Problem &getProblem() = 0;
   /// The problem as the resource layer sees it, where the forwarded-edge set
-  /// lives; set by the concrete schedulers, null only on the resource-free
-  /// cyclic rung.
+  /// lives; set by the concrete schedulers.
   OccupancyProblem *occupancy = nullptr;
   /// The latency a dependence separates its endpoints by: its source's, or
   /// zero for a forwarded store->load edge.
   int64_t sourceLatencyOf(Problem::Dependence dep);
   /// Iteration distance a dependence spans. The base answers 0 (the acyclic
-  /// `distance == 0` special case); the cyclic subclasses override.
+  /// `distance == 0` special case); the cyclic subclass overrides.
   virtual unsigned distanceOf(Problem::Dependence dep);
   /// The dependence circuit that binds the II at \p ii: the constraints are
   /// `t_dst - t_src >= latency(src) + extra - ii*distance`, so a schedule
@@ -194,87 +160,92 @@ protected:
   /// Report a failed initial solve, naming the recurrence responsible.
   void reportInfeasible();
   virtual LogicalResult checkLastOp();
-  /// The objective rows, optimized lexicographically in this order. The second
-  /// one is a TIEBREAK: minimizing the last operation's start time leaves a
-  /// whole face of optimal solutions, and the emitter builds an operation's
-  /// start pulse as `delayValid(regionStart, t)`, one flip-flop per cycle of
-  /// `t`, so a slack-bearing node placed late costs registers for no latency.
-  enum { OBJ_LATENCY = 0, OBJ_AXAP /* i.e. either ASAP or ALAP */ };
-  virtual bool fillObjectiveRow(SmallVector<int> &row, unsigned obj);
-  virtual void fillConstraintRow(SmallVector<int> &row,
-                                 Problem::Dependence dep);
-  virtual void fillAdditionalConstraintRow(SmallVector<int> &row,
-                                           Problem::Dependence dep);
-  void buildTableau();
 
-  int getParametricConstant(unsigned row);
-  SmallVector<int> getObjectiveVector(unsigned column);
-  std::optional<unsigned> findDualPivotRow();
-  std::optional<unsigned> findDualPivotColumn(unsigned pivotRow,
-                                              bool allowPositive = false);
-  std::optional<unsigned> findPrimalPivotColumn();
-  std::optional<unsigned> findPrimalPivotRow(unsigned pivotColumn);
-  void multiplyRow(unsigned row, int factor);
-  void addMultipleOfRow(unsigned sourceRow, int factor, unsigned targetRow);
-  void pivot(unsigned pivotRow, unsigned pivotColumn);
-  LogicalResult solveTableau();
-  LogicalResult restoreDualFeasibility();
-  bool isInBasis(unsigned startTimeVariable);
-  unsigned freeze(unsigned startTimeVariable, unsigned timeStep);
-  void translate(unsigned column, int factor1, int factorS, int factorT);
-  LogicalResult scheduleAt(unsigned startTimeVariable, unsigned timeStep);
-  void moveBy(unsigned startTimeVariable, unsigned amount);
+  /// Build the variables and edges off the problem + `additionalConstraints`.
+  void buildGraph();
+
+  /// Recompute the least solution from scratch. With \p allowRaise, a
+  /// positive cycle carrying iteration distance raises the II to the least
+  /// value it admits and retries (the parametric-T bump of the simplex);
+  /// without it, or on a zero-distance cycle, the system is infeasible.
+  LogicalResult solveGraph(bool allowRaise);
+
+  /// Pin \p startTimeVariable to \p timeStep, updating the least solution by
+  /// an incremental relaxation. Failure (a positive cycle through the pin)
+  /// rolls everything back, leaving the previous solution standing.
+  /// \p conflictPins, non-null, receives the other pins on the certifying
+  /// cycle: the ones a placement repair would evict.
+  LogicalResult scheduleAt(unsigned startTimeVariable, unsigned timeStep,
+                           SmallVectorImpl<unsigned> *conflictPins = nullptr);
+
   unsigned getStartTime(unsigned startTimeVariable);
 
-  /// A restorable copy of the linear program's mutable state. A failed
-  /// `solveTableau` cannot be undone by inverting the moves that led to it, so
-  /// a speculative transform must keep a copy. Holds everything a pivot, a
-  /// `translate` or a `moveBy` touches; `implicitBasicVariableColumnVector` is
-  /// pivot scratch and the tableau's dimensions never change.
-  struct LPState {
-    SmallVector<SmallVector<int>> tableau;
-    SmallVector<unsigned> nonBasicVariables, basicVariables;
-    SmallVector<int> startTimeLocations;
-    DenseMap<unsigned, unsigned> frozenVariables;
-    int parameterS, parameterT;
-  };
-  LPState saveLP();
-  void restoreLP(LPState &saved);
+  /// ASAP is the maintained least solution; ALAP is the greatest solution
+  /// with the last operation held at its already-minimal start, the pair the
+  /// simplex read off its negated objective row. Both extremes of the lattice
+  /// are unique, so the two engines' margins agree. The greatest solution is
+  /// a longest path TO the origin over the same edges (a path i -> origin of
+  /// weight W states `start(i) <= -W`), a temporary pin on the last operation
+  /// supplying every unpinned chain's upper bound through the anchor.
+  void computeMargins(SmallVectorImpl<unsigned> &asap,
+                      SmallVectorImpl<unsigned> &alap);
 
-  void dumpTableau();
+  /// A restorable copy of the engine's mutable state for a speculative
+  /// transform (the targeted II growth): the static edges never change, so
+  /// the pins, the potentials and the interval are the whole of it.
+  struct GraphState {
+    llvm::MapVector<unsigned, unsigned> frozenVariables;
+    SmallVector<int64_t> potentials;
+    int parameterT;
+    bool potentialsCurrent;
+  };
+  GraphState saveState();
+  void restoreState(GraphState &saved);
+
+private:
+  /// A positive cycle: its constraint sums, and its operation nodes for the
+  /// diagnostic (the origin, where a pin closes it, is skipped).
+  struct FoundCycle {
+    int64_t lat = 0;
+    int64_t dist = 0;
+    SmallVector<unsigned> nodes;
+  };
+  /// Monotone longest-path relaxation from the queued seeds over the static
+  /// edges plus the pins' virtual edges. Returns the cycle that certifies the
+  /// system infeasible at the current interval, or nullopt at the fixpoint.
+  /// \p undo, non-null, records each first-touched potential for rollback.
+  /// `resetScratch` must run first; a caller may seed pred entries after it.
+  std::optional<FoundCycle>
+  relaxCore(SmallVector<unsigned> queue,
+            SmallVectorImpl<std::pair<unsigned, int64_t>> *undo);
+  /// The cycle in the pred bookkeeping reachable from \p v: a proper cycle,
+  /// or a walk off the origin that closes through an implicit zero edge.
+  FoundCycle extractCycle(unsigned v);
+  void resetScratch();
+
+  /// Relaxation scratch: the last relaxing edge per node (its source, its
+  /// `lat + extra`, its distance), the provenance chain length whose
+  /// overflow past the node count certifies a positive cycle (a feasible
+  /// least solution needs no chain longer than that; a longer one repeats a
+  /// node, and the repeated segment sums positive), the queue membership,
+  /// and the first-touch marks feeding an undo log.
+  SmallVector<int> predNode;
+  SmallVector<int64_t> predLat;
+  SmallVector<unsigned> predDist;
+  SmallVector<unsigned> chainLen;
+  SmallVector<uint8_t> inQueue;
+  SmallVector<uint8_t> touchedFlag;
 
 public:
-  explicit SimplexSchedulerBase(Operation *lastOp) : lastOp(lastOp) {}
-  virtual ~SimplexSchedulerBase() = default;
+  explicit SDCSchedulerBase(Operation *lastOp) : lastOp(lastOp) {}
+  virtual ~SDCSchedulerBase() = default;
   virtual LogicalResult schedule() = 0;
 };
 
-/// This class solves the resource-free `CyclicProblem`.  The optimal initiation
-/// interval (II) is determined as a side product of solving the parametric
-/// problem, and corresponds to the "RecMII" (= recurrence-constrained minimum
-/// II) usually considered as one component in the lower II bound used by modulo
-/// schedulers.
-class CyclicSimplexScheduler : public SimplexSchedulerBase {
-private:
-  CyclicProblem &prob;
 
-protected:
-  Problem &getProblem() override { return prob; }
-  unsigned distanceOf(Problem::Dependence dep) override {
-    return prob.getDistance(dep).value_or(0);
-  }
-  void fillConstraintRow(SmallVector<int> &row,
-                         Problem::Dependence dep) override;
-
-public:
-  CyclicSimplexScheduler(CyclicProblem &prob, Operation *lastOp)
-      : SimplexSchedulerBase(lastOp), prob(prob) {}
-  LogicalResult schedule() override;
-};
-
-// This class solves acyclic, resource-constrained `OccupancyProblem` with a
-// simplified version of the iterative heuristic presented in [2].
-class SharedOperatorsSimplexScheduler : public SimplexSchedulerBase {
+// This class solves acyclic, resource-constrained `OccupancyProblem` with
+// LP-guided first-fit placement, after de Dinechin.
+class SharedOperatorsSimplexScheduler : public SDCSchedulerBase {
 private:
   OccupancyProblem &prob;
 
@@ -283,7 +254,7 @@ protected:
 
 public:
   SharedOperatorsSimplexScheduler(OccupancyProblem &prob, Operation *lastOp)
-      : SimplexSchedulerBase(lastOp), prob(prob) {
+      : SDCSchedulerBase(lastOp), prob(prob) {
     occupancy = &prob;
   }
   LogicalResult schedule() override;
@@ -298,9 +269,12 @@ struct BindingResource {
   Operation *witness = nullptr;
 };
 
-// This class solves the `ModuloOccupancyProblem` using the iterative heuristic
-// presented in [2].
-class ModuloSimplexScheduler : public CyclicSimplexScheduler {
+// This class solves the `ModuloOccupancyProblem` with the iterative modulo
+// heuristic of de Dinechin, "Fast Modulo Scheduling Under the Simplex
+// Scheduling Framework", PRISM 1995.01, plus budgeted eviction after Rau's
+// iterative modulo scheduling, which repairs a failed placement at the
+// current II before any growth.
+class ModuloSimplexScheduler : public SDCSchedulerBase {
 private:
   struct MRT {
     ModuloSimplexScheduler &sched;
@@ -329,12 +303,8 @@ private:
   // Lower bound on the II from a pipeline directive. The search only ever grows
   // the II, so the achieved II is max(this, the natural minimum).
   unsigned minII = 1;
-  // Set when any limited op occupies its unit for >1 cycle (non-pipelined). The
-  // de Dinechin II-increment assumes fully-pipelined (1-slot) reservations, so
-  // a problem with blocking ops uses a conservative II-growth path instead.
-  bool hasBlockingOps = false;
-  // Sum of occupancies over limited ops; the conservative II-growth path
-  // must converge within this bound (all ops fit in disjoint windows by then).
+  // Sum of occupancies over limited ops; the II growth must converge within
+  // this bound (all ops fit in disjoint windows by then).
   unsigned totalResourceCycles = 0;
   // The largest II any bound justifies before resources are placed: the
   // resource-min II, a loop-carried recurrence, and the pipeline directive's
@@ -346,14 +316,38 @@ private:
   // `SimplexWarmStart`). It changes only what a placement failure is reported
   // AS, never what the placement does.
   bool placementAdvisory = false;
+  // Placement repair bookkeeping: how often each operation was evicted, and
+  // the evictions the region may still spend. Both caps keep the repair
+  // finite; exhaustion falls back to growing the II.
+  DenseMap<Operation *, unsigned> evictCount;
+  unsigned evictionBudget = 0;
+  static constexpr unsigned kMaxEvictionsPerOp = 6;
+  static constexpr unsigned kMaxCommitAttempts = 16;
+  static constexpr unsigned kMaxDepRounds = 6;
+  static constexpr unsigned kMaxSpanRepairMoves = 64;
 
 protected:
   Problem &getProblem() override { return prob; }
+  unsigned distanceOf(Problem::Dependence dep) override {
+    return prob.getDistance(dep).value_or(0);
+  }
   LogicalResult checkLastOp() override;
   void updateMargins();
   LogicalResult scheduleOperation(Operation *n);
-  LogicalResult growIIByDeDinechin(Operation *n);
-  LogicalResult growIIUniformly(Operation *n);
+  LogicalResult scheduleWithEviction(Operation *n);
+  LogicalResult growIIAndRestart(Operation *n);
+  /// After placement, lower the region's span: relocate critical limited ops
+  /// first fit seated at a free-but-high slot down to a lower class, evicting
+  /// the holders in the way, committing only strictly-improving moves.
+  void repairSpan();
+  /// Try to reseat the pinned op \p stvX below \p oldPin by evicting the
+  /// holders of a lower class; victims are re-placed by first fit. Returns true
+  /// if the op ended up below oldPin with every victim replaced (the caller
+  /// checks the span).
+  bool trySeatLower(unsigned stvX, unsigned oldPin, unsigned &budget);
+  /// The least start \p stv could take from its dependences alone, given the
+  /// other pins: a pin above this was pushed up by first fit's slot choice.
+  int64_t depAsapOf(unsigned stv);
   /// The fewest cycles one iteration's resource demand can be issued in.
   /// \p binding receives what set it, untouched where nothing does.
   unsigned computeResMinII(BindingResource &binding);
@@ -361,8 +355,7 @@ protected:
 public:
   ModuloSimplexScheduler(ModuloOccupancyProblem &prob, Operation *lastOp,
                          unsigned minII = 1)
-      : CyclicSimplexScheduler(prob, lastOp), prob(prob), mrt(*this),
-        minII(minII) {
+      : SDCSchedulerBase(lastOp), prob(prob), mrt(*this), minII(minII) {
     occupancy = &prob;
   }
   LogicalResult schedule() override;
@@ -375,7 +368,7 @@ public:
 
 // This class solves the resource-constrained, cyclic, chaining-enabled
 // `ChainingModuloProblem` on top of the `ModuloSimplexScheduler`: a pre-pass
-// fills the chain-breaking dependences (consumed by `buildTableau`), and a
+// fills the chain-breaking dependences (consumed by `buildGraph`), and a
 // post-pass fills the sub-cycle start times.
 class ChainingModuloSimplexScheduler : public ModuloSimplexScheduler {
 private:
@@ -385,14 +378,6 @@ private:
 
 protected:
   Problem &getProblem() override { return prob; }
-  void fillAdditionalConstraintRow(SmallVector<int> &row,
-                                   Problem::Dependence dep) override {
-    // Inherited (cyclic) constraint row: latency + II*distance, plus one
-    // extra time step to break the combinational chain.
-    fillConstraintRow(row, dep);
-    row[parameter1Column] -= 1;
-  }
-
 public:
   ChainingModuloSimplexScheduler(ChainingModuloProblem &prob, Operation *lastOp,
                                  float cycleTime, float regFloor,
@@ -427,14 +412,6 @@ private:
 
 protected:
   Problem &getProblem() override { return prob; }
-  void fillAdditionalConstraintRow(SmallVector<int> &row,
-                                   Problem::Dependence dep) override {
-    // Acyclic constraint row (latency only, no II term), plus one extra time
-    // step to break the combinational chain.
-    fillConstraintRow(row, dep);
-    row[parameter1Column] -= 1;
-  }
-
 public:
   ChainingSharedOperatorsSimplexScheduler(ChainingSharedOperatorsProblem &prob,
                                           Operation *lastOp, float cycleTime,
@@ -573,19 +550,19 @@ mlir::allo::computeChainBreaks(ChainingProblem &prob, float cycleTime,
 }
 
 //===----------------------------------------------------------------------===//
-// SimplexSchedulerBase
+// SDCSchedulerBase
 //===----------------------------------------------------------------------===//
 
-unsigned SimplexSchedulerBase::distanceOf(Problem::Dependence) { return 0; }
+unsigned SDCSchedulerBase::distanceOf(Problem::Dependence) { return 0; }
 
-int64_t SimplexSchedulerBase::sourceLatencyOf(Problem::Dependence dep) {
+int64_t SDCSchedulerBase::sourceLatencyOf(Problem::Dependence dep) {
   if (occupancy && occupancy->isForwarded(dep))
     return 0;
   auto &prob = getProblem();
   return *prob.getLatency(*prob.getLinkedOperatorType(dep.getSource()));
 }
 
-Recurrence SimplexSchedulerBase::bindingRecurrence(unsigned ii) {
+Recurrence SDCSchedulerBase::bindingRecurrence(unsigned ii) {
   auto &prob = getProblem();
   DenseMap<Operation *, unsigned> index;
   SmallVector<Operation *> nodes;
@@ -594,7 +571,7 @@ Recurrence SimplexSchedulerBase::bindingRecurrence(unsigned ii) {
     nodes.push_back(op);
   }
 
-  // One edge per constraint row `buildTableau` would emit, carrying the same
+  // One edge per constraint the engine builds, carrying the same
   // latency / distance / chain-break terms.
   struct Edge {
     unsigned src, dst;
@@ -615,8 +592,7 @@ Recurrence SimplexSchedulerBase::bindingRecurrence(unsigned ii) {
   for (auto *op : prob.getOperations())
     for (auto &dep : prob.getDependences(op))
       addEdge(dep, /*extra=*/0);
-  // A chain-breaking constraint costs one extra time step (see the
-  // `fillAdditionalConstraintRow` overrides).
+  // A chain-breaking constraint costs one extra time step.
   for (auto &dep : additionalConstraints)
     addEdge(dep, /*extra=*/1);
 
@@ -661,7 +637,7 @@ Recurrence SimplexSchedulerBase::bindingRecurrence(unsigned ii) {
   return rec;
 }
 
-void SimplexSchedulerBase::reportInfeasible() {
+void SDCSchedulerBase::reportInfeasible() {
   auto &prob = getProblem();
   // The initial solve grows the II freely, so failing it means no II works:
   // some circuit carries positive latency over zero distance. Search at an II
@@ -687,7 +663,7 @@ void SimplexSchedulerBase::reportInfeasible() {
           "spurious";
 }
 
-LogicalResult SimplexSchedulerBase::checkLastOp() {
+LogicalResult SDCSchedulerBase::checkLastOp() {
   auto &prob = getProblem();
   if (!prob.hasOperation(lastOp)) {
     assert(false && "the scheduling problem does not include its last "
@@ -698,512 +674,291 @@ LogicalResult SimplexSchedulerBase::checkLastOp() {
   return success();
 }
 
-bool SimplexSchedulerBase::fillObjectiveRow(SmallVector<int> &row,
-                                            unsigned obj) {
-  switch (obj) {
-  case OBJ_LATENCY:
-    // Minimize start time of user-specified last operation.
-    row[startTimeLocations[startTimeVariables[lastOp]]] = 1;
-    return true;
-  case OBJ_AXAP:
-    // Minimize sum of start times of all-but-the-last operation.
-    for (auto *op : getProblem().getOperations())
-      if (op != lastOp)
-        row[startTimeLocations[startTimeVariables[op]]] = 1;
-    return false;
-  default:
-    llvm_unreachable("Unsupported objective requested");
-  }
-}
-
-void SimplexSchedulerBase::fillConstraintRow(SmallVector<int> &row,
-                                             Problem::Dependence dep) {
-  auto *src = dep.getSource();
-  auto *dst = dep.getDestination();
-  int64_t latency = sourceLatencyOf(dep);
-  row[parameter1Column] = -latency; // note the negation
-  if (src != dst) {                 // coefficients zero out for self-arcs.
-    row[startTimeLocations[startTimeVariables[src]]] = 1;
-    row[startTimeLocations[startTimeVariables[dst]]] = -1;
-  }
-}
-
-void SimplexSchedulerBase::fillAdditionalConstraintRow(
-    SmallVector<int> &row, Problem::Dependence dep) {
-  // Handling is subclass-specific, so do nothing by default.
-  (void)row;
-  (void)dep;
-}
-
-void SimplexSchedulerBase::buildTableau() {
+void SDCSchedulerBase::buildGraph() {
   auto &prob = getProblem();
-
-  // The initial tableau is constructed so that operations' start time variables
-  // are out of basis, whereas all slack variables are in basis. We will number
-  // them accordingly.
-  unsigned var = 0;
   for (auto *op : prob.getOperations()) {
-    nonBasicVariables.push_back(var);
-    startTimeVariables[op] = var;
-    startTimeLocations.push_back(firstNonBasicVariableColumn + var);
-    ++var;
+    startTimeVariables[op] = varOps.size();
+    varOps.push_back(op);
   }
-
-  // one column for each parameter (1,S,T), and for all operations
-  nColumns = nParameters + nonBasicVariables.size();
-
-  auto addRow = [&]() -> SmallVector<int> & {
-    implicitBasicVariableColumnVector.push_back(0);
-    return tableau.emplace_back(nColumns, 0);
+  origin = varOps.size();
+  auto addEdge = [&](Problem::Dependence dep, int extra) {
+    // A self-arc stays: its row constrains no start, but a positive weight is
+    // a one-node circuit forcing `II >= ceil(lat / dist)` like any other.
+    edges.push_back({startTimeVariables[dep.getSource()],
+                     startTimeVariables[dep.getDestination()],
+                     sourceLatencyOf(dep), distanceOf(dep), extra});
   };
-
-  nObjectives = 0;
-  bool hasMoreObjectives;
-  do {
-    auto &objRowVec = addRow();
-    hasMoreObjectives = fillObjectiveRow(objRowVec, nObjectives);
-    ++nObjectives;
-  } while (hasMoreObjectives);
-
-  for (auto *op : prob.getOperations()) {
-    for (auto &dep : prob.getDependences(op)) {
-      auto &consRowVec = addRow();
-      fillConstraintRow(consRowVec, dep);
-      basicVariables.push_back(var);
-      ++var;
-    }
-  }
-  for (auto &dep : additionalConstraints) {
-    auto &consRowVec = addRow();
-    fillAdditionalConstraintRow(consRowVec, dep);
-    basicVariables.push_back(var);
-    ++var;
-  }
-
-  // one row per objective + one row per dependence
-  nRows = tableau.size();
-}
-
-int SimplexSchedulerBase::getParametricConstant(unsigned row) {
-  auto &rowVec = tableau[row];
-  // Compute the dot-product ~B[row] * u between the constant matrix and the
-  // parameter vector.
-  return rowVec[parameter1Column] + rowVec[parameterSColumn] * parameterS +
-         rowVec[parameterTColumn] * parameterT;
-}
-
-SmallVector<int> SimplexSchedulerBase::getObjectiveVector(unsigned column) {
-  SmallVector<int> objVec;
-  // Extract the column vector C^T[column] from the cost matrix.
-  for (unsigned obj = 0; obj < nObjectives; ++obj)
-    objVec.push_back(tableau[obj][column]);
-  return objVec;
-}
-
-std::optional<unsigned> SimplexSchedulerBase::findDualPivotRow() {
-  // Find the first row in which the parametric constant is negative.
-  for (unsigned row = firstConstraintRow; row < nRows; ++row)
-    if (getParametricConstant(row) < 0)
-      return row;
-
-  return std::nullopt;
-}
-
-std::optional<unsigned>
-SimplexSchedulerBase::findDualPivotColumn(unsigned pivotRow,
-                                          bool allowPositive) {
-  SmallVector<int> maxQuot(nObjectives, std::numeric_limits<int>::min());
-  std::optional<unsigned> pivotCol;
-
-  // Among nonzero entries in the constraint matrix (~A part of the tableau),
-  // pick the one with the lexicographical maximum (over objective rows) of
-  // the quotient tableau[<objective row>][col] / pivotCand.
-  for (unsigned col = firstNonBasicVariableColumn; col < nColumns; ++col) {
-    if (frozenVariables.count(
-            nonBasicVariables[col - firstNonBasicVariableColumn]))
-      continue;
-
-    int pivotCand = tableau[pivotRow][col];
-    // Only negative candidates bring us closer to the optimal solution.
-    // However, when freezing variables to a certain value, we accept that the
-    // value of the objective function degrades.
-    if (pivotCand < 0 || (allowPositive && pivotCand > 0)) {
-      // The constraint matrix has only {-1, 0, 1} entries by construction.
-      assert(pivotCand * pivotCand == 1);
-
-      SmallVector<int> quot;
-      for (unsigned obj = 0; obj < nObjectives; ++obj)
-        quot.push_back(tableau[obj][col] / pivotCand);
-
-      if (std::lexicographical_compare(maxQuot.begin(), maxQuot.end(),
-                                       quot.begin(), quot.end())) {
-        maxQuot = quot;
-        pivotCol = col;
-      }
-    }
-  }
-
-  return pivotCol;
-}
-
-std::optional<unsigned> SimplexSchedulerBase::findPrimalPivotColumn() {
-  // Find the first lexico-negative column in the cost matrix.
-  SmallVector<int> zeroVec(nObjectives, 0);
-  for (unsigned col = firstNonBasicVariableColumn; col < nColumns; ++col) {
-    if (frozenVariables.count(
-            nonBasicVariables[col - firstNonBasicVariableColumn]))
-      continue;
-
-    auto objVec = getObjectiveVector(col);
-    if (std::lexicographical_compare(objVec.begin(), objVec.end(),
-                                     zeroVec.begin(), zeroVec.end()))
-      return col;
-  }
-
-  return std::nullopt;
-}
-
-std::optional<unsigned>
-SimplexSchedulerBase::findPrimalPivotRow(unsigned pivotColumn) {
-  int minQuot = std::numeric_limits<int>::max();
-  std::optional<unsigned> pivotRow;
-
-  // Among positive entries in the constraint matrix (~A part of the tableau),
-  // pick the one minimizing the quotient parametricConstant(row) / pivotCand.
-  for (unsigned row = firstConstraintRow; row < nRows; ++row) {
-    int pivotCand = tableau[row][pivotColumn];
-    if (pivotCand > 0) {
-      // The constraint matrix has only {-1, 0, 1} entries by construction.
-      assert(pivotCand == 1);
-      int quot = getParametricConstant(row) / pivotCand;
-      if (quot < minQuot) {
-        minQuot = quot;
-        pivotRow = row;
-      }
-    }
-  }
-
-  return pivotRow;
-}
-
-void SimplexSchedulerBase::multiplyRow(unsigned row, int factor) {
-  assert(factor != 0);
-  for (unsigned col = 0; col < nColumns; ++col)
-    tableau[row][col] *= factor;
-  // Also multiply the corresponding entry in the temporary column vector.
-  implicitBasicVariableColumnVector[row] *= factor;
-}
-
-void SimplexSchedulerBase::addMultipleOfRow(unsigned sourceRow, int factor,
-                                            unsigned targetRow) {
-  assert(factor != 0 && sourceRow != targetRow);
-  for (unsigned col = 0; col < nColumns; ++col)
-    tableau[targetRow][col] += tableau[sourceRow][col] * factor;
-  // Again, perform row operation on the temporary column vector as well.
-  implicitBasicVariableColumnVector[targetRow] +=
-      implicitBasicVariableColumnVector[sourceRow] * factor;
-}
-
-/// The pivot operation applies elementary row operations to the tableau in
-/// order to make the \p pivotColumn (corresponding to a non-basic variable) a
-/// unit vector (only the \p pivotRow'th entry is 1). Then, a basis exchange is
-/// performed: the non-basic variable is swapped with the basic variable
-/// associated with the pivot row.
-void SimplexSchedulerBase::pivot(unsigned pivotRow, unsigned pivotColumn) {
-  // The implicit columns are part of an identity matrix.
-  implicitBasicVariableColumnVector[pivotRow] = 1;
-
-  int pivotElem = tableau[pivotRow][pivotColumn];
-  // The constraint matrix has only {-1, 0, 1} entries by construction.
-  assert(pivotElem * pivotElem == 1);
-  // Make `tableau[pivotRow][pivotColumn]` := 1
-  multiplyRow(pivotRow, 1 / pivotElem);
-
-  for (unsigned row = 0; row < nRows; ++row) {
-    if (row == pivotRow)
-      continue;
-
-    int elem = tableau[row][pivotColumn];
-    if (elem == 0)
-      continue; // nothing to do
-
-    // Make `tableau[row][pivotColumn]` := 0.
-    addMultipleOfRow(pivotRow, -elem, row);
-  }
-
-  // Swap the pivot column with the implicitly constructed column vector.
-  // We really only need to copy in one direction here, as the former pivot
-  // column is a unit vector, which is not stored explicitly.
-  for (unsigned row = 0; row < nRows; ++row) {
-    tableau[row][pivotColumn] = implicitBasicVariableColumnVector[row];
-    implicitBasicVariableColumnVector[row] = 0; // Reset for next pivot step.
-  }
-
-  unsigned &nonBasicVar =
-      nonBasicVariables[pivotColumn - firstNonBasicVariableColumn];
-  unsigned &basicVar = basicVariables[pivotRow - firstConstraintRow];
-
-  // Keep track of where start time variables are; ignore slack variables.
-  if (nonBasicVar < startTimeLocations.size())
-    startTimeLocations[nonBasicVar] = -pivotRow; // ...going into basis.
-  if (basicVar < startTimeLocations.size())
-    startTimeLocations[basicVar] = pivotColumn; // ...going out of basis.
-
-  std::swap(nonBasicVar, basicVar);
-}
-
-LogicalResult SimplexSchedulerBase::solveTableau() {
-  // "Solving" technically means performing dual pivot steps until primal
-  // feasibility is reached, i.e. the parametric constants in all constraint
-  // rows are non-negative.
-  while (auto pivotRow = findDualPivotRow()) {
-    if (auto pivotCol = findDualPivotColumn(*pivotRow)) {
-      pivot(*pivotRow, *pivotCol);
-      continue;
-    }
-
-    // No pivot column: infeasible unless the parameterT entry is positive,
-    // which lets growing II rescue it, but only when parameterS == 0 (initial
-    // solves). scheduleAt sets parameterS != 0 and instead fails, rolling back.
-    int entry1Col = tableau[*pivotRow][parameter1Column];
-    int entryTCol = tableau[*pivotRow][parameterTColumn];
-    if (parameterS == 0 && entryTCol > 0) {
-      // The negation of `entry1Col` is not in the paper, likely an oversight:
-      // it is always negative here (else this would not be a valid pivot row),
-      // so omitting the negation would make the new II negative.
-      assert(entry1Col < 0);
-      int newParameterT = (-entry1Col - 1) / entryTCol + 1;
-      if (newParameterT > parameterT) {
-        // Name the circuit that forces the bump. The search is
-        // O(|ops| * |deps|), so only run it when the message will be printed.
-        auto diag = info(Stage::Sched, getProblem().getContainingOp());
-        diag << "II=" << parameterT
-             << " is not achievable: a loop-carried recurrence requires II>="
-             << newParameterT << ", increasing II to " << newParameterT;
-        if (Recurrence rec = bindingRecurrence(parameterT))
-          diag << "; the binding recurrence is " << render(rec);
-        parameterT = newParameterT;
-        continue;
-      }
-    }
-
-    // Otherwise, the linear program is infeasible.
-    return failure();
-  }
-
-  // Optimal solution found!
-  return success();
-}
-
-LogicalResult SimplexSchedulerBase::restoreDualFeasibility() {
-  // Dual feasibility requires all columns in the cost matrix to be
-  // non-lexico-negative. Changing the order of the objective rows can violate
-  // that; primal pivot steps restore it.
-  while (auto pivotCol = findPrimalPivotColumn()) {
-    if (auto pivotRow = findPrimalPivotRow(*pivotCol)) {
-      pivot(*pivotRow, *pivotCol);
-      continue;
-    }
-
-    // Otherwise, the linear program is unbounded.
-    return failure();
-  }
-
-  // Optimal solution found!
-  return success();
-}
-
-bool SimplexSchedulerBase::isInBasis(unsigned startTimeVariable) {
-  assert(startTimeVariable < startTimeLocations.size());
-  int loc = startTimeLocations[startTimeVariable];
-  if (-loc >= (int)firstConstraintRow)
-    return true;
-  if (loc >= (int)firstNonBasicVariableColumn)
-    return false;
-  llvm_unreachable("Invalid variable location");
-}
-
-unsigned SimplexSchedulerBase::freeze(unsigned startTimeVariable,
-                                      unsigned timeStep) {
-  assert(startTimeVariable < startTimeLocations.size());
-  assert(!frozenVariables.count(startTimeVariable));
-
-  frozenVariables[startTimeVariable] = timeStep;
-
-  if (!isInBasis(startTimeVariable))
-    // That's all for non-basic variables.
-    return startTimeLocations[startTimeVariable];
-
-  // We need to pivot this variable one out of basis.
-  unsigned pivotRow = -startTimeLocations[startTimeVariable];
-
-  // Here, positive pivot elements can be considered as well, hence finding a
-  // suitable column should not fail.
-  auto pivotCol = findDualPivotColumn(pivotRow, /* allowPositive= */ true);
-  assert(pivotCol);
-  pivot(pivotRow, *pivotCol);
-
-  // After the exchange, `startTimeVariable` is represented by `pivotCol`.
-  return *pivotCol;
-}
-
-void SimplexSchedulerBase::translate(unsigned column, int factor1, int factorS,
-                                     int factorT) {
-  for (unsigned row = 0; row < nRows; ++row) {
-    auto &rowVec = tableau[row];
-    int elem = rowVec[column];
-    if (elem == 0)
-      continue;
-
-    rowVec[parameter1Column] += -elem * factor1;
-    rowVec[parameterSColumn] += -elem * factorS;
-    rowVec[parameterTColumn] += -elem * factorT;
-  }
-}
-
-LogicalResult SimplexSchedulerBase::scheduleAt(unsigned startTimeVariable,
-                                               unsigned timeStep) {
-  assert(startTimeVariable < startTimeLocations.size());
-  assert(!frozenVariables.count(startTimeVariable));
-
-  unsigned frozenCol = freeze(startTimeVariable, timeStep);
-  translate(frozenCol, /* factor1= */ 0, /* factorS= */ 1, /* factorT= */ 0);
-
-  // Temporarily set S to the desired value, and attempt to solve.
-  parameterS = timeStep;
-  auto solved = solveTableau();
-  parameterS = 0;
-
-  if (failed(solved)) {
-    // The LP is infeasible with the new constraint. Other values of S could
-    // be tried, but instead this rolls back and signals failure to the driver.
-    translate(frozenCol, /* factor1= */ 0, /* factorS= */ -1, /* factorT= */ 0);
-    frozenVariables.erase(startTimeVariable);
-    auto solvedAfterRollback = solveTableau();
-    assert(succeeded(solvedAfterRollback));
-    (void)solvedAfterRollback;
-    return failure();
-  }
-
-  // Zero the S-column again via factor1=timeStep, factorS=1 (negating the
-  // factors, which isn't in the paper's text but is implied by its example).
-  // This doesn't change the parametric constants, so no re-solve is needed.
-  translate(parameterSColumn, /* factor1= */ -timeStep, /* factorS= */ 1,
-            /* factorT= */ 0);
-
-  return success();
-}
-
-void SimplexSchedulerBase::moveBy(unsigned startTimeVariable, unsigned amount) {
-  assert(startTimeVariable < startTimeLocations.size());
-  assert(frozenVariables.count(startTimeVariable));
-
-  frozenVariables[startTimeVariable] += amount;
-
-  // Translate by the desired amount; solving to restore primal feasibility is
-  // deferred to the caller, which typically batch-moves several operations
-  // (an intermediate solve could see a still-infeasible tableau).
-  translate(startTimeLocations[startTimeVariable], /* factor1= */ amount,
-            /* factorS= */ 0, /* factorT= */ 0);
-}
-
-SimplexSchedulerBase::LPState SimplexSchedulerBase::saveLP() {
-  return {
-      tableau,         nonBasicVariables, basicVariables, startTimeLocations,
-      frozenVariables, parameterS,        parameterT};
-}
-
-void SimplexSchedulerBase::restoreLP(LPState &saved) {
-  tableau = std::move(saved.tableau);
-  nonBasicVariables = std::move(saved.nonBasicVariables);
-  basicVariables = std::move(saved.basicVariables);
-  startTimeLocations = std::move(saved.startTimeLocations);
-  frozenVariables = std::move(saved.frozenVariables);
-  parameterS = saved.parameterS;
-  parameterT = saved.parameterT;
-}
-
-unsigned SimplexSchedulerBase::getStartTime(unsigned startTimeVariable) {
-  assert(startTimeVariable < startTimeLocations.size());
-
-  if (!isInBasis(startTimeVariable))
-    // Non-basic variables that are not already fixed to a specific time step
-    // are 0 at the end of the simplex algorithm.
-    return frozenVariables.lookup(startTimeVariable);
-
-  // For a variable in basis, look up the solution in the tableau.
-  return getParametricConstant(-startTimeLocations[startTimeVariable]);
-}
-
-void SimplexSchedulerBase::dumpTableau() {
-  for (unsigned j = 0; j < nColumns; ++j)
-    dbgs() << "====";
-  dbgs() << "==\n";
-  for (unsigned i = 0; i < nRows; ++i) {
-    if (i == firstConstraintRow) {
-      for (unsigned j = 0; j < nColumns; ++j) {
-        if (j == firstNonBasicVariableColumn)
-          dbgs() << "-+";
-        dbgs() << "----";
-      }
-      dbgs() << '\n';
-    }
-    for (unsigned j = 0; j < nColumns; ++j) {
-      if (j == firstNonBasicVariableColumn)
-        dbgs() << " |";
-      dbgs() << format(" %3d", tableau[i][j]);
-    }
-    if (i >= firstConstraintRow)
-      dbgs() << format(" |< %2d", basicVariables[i - firstConstraintRow]);
-    dbgs() << '\n';
-  }
-  for (unsigned j = 0; j < nColumns; ++j)
-    dbgs() << "====";
-  dbgs() << "==\n";
-  dbgs() << format(" %3d %3d %3d | ", 1, parameterS, parameterT);
-  for (unsigned j = firstNonBasicVariableColumn; j < nColumns; ++j)
-    dbgs() << format(" %2d^",
-                     nonBasicVariables[j - firstNonBasicVariableColumn]);
-  dbgs() << '\n';
-}
-
-//===----------------------------------------------------------------------===//
-// CyclicSimplexScheduler
-//===----------------------------------------------------------------------===//
-
-void CyclicSimplexScheduler::fillConstraintRow(SmallVector<int> &row,
-                                               Problem::Dependence dep) {
-  SimplexSchedulerBase::fillConstraintRow(row, dep);
-  if (auto dist = prob.getDistance(dep))
-    row[parameterTColumn] = *dist;
-}
-
-LogicalResult CyclicSimplexScheduler::schedule() {
-  if (failed(checkLastOp()))
-    return failure();
-
-  parameterS = 0;
-  parameterT = 1;
-  buildTableau();
-
-  LLVM_DEBUG(dbgs() << "Initial tableau:\n"; dumpTableau());
-
-  if (failed(solveTableau())) {
-    reportInfeasible();
-    return failure();
-  }
-
-  LLVM_DEBUG(dbgs() << "Final tableau:\n"; dumpTableau();
-             dbgs() << "Optimal solution found with II = " << parameterT
-                    << " and start time of last operation = "
-                    << -getParametricConstant(0) << '\n');
-
-  prob.setInitiationInterval(parameterT);
   for (auto *op : prob.getOperations())
-    prob.setStartTime(op, getStartTime(startTimeVariables[op]));
+    for (auto &dep : prob.getDependences(op))
+      addEdge(dep, 0);
+  for (auto &dep : additionalConstraints)
+    addEdge(dep, 1);
+  staticOut.assign(origin + 1, {});
+  for (auto [i, e] : llvm::enumerate(edges))
+    staticOut[e.src].push_back(i);
+  potentials.assign(origin + 1, 0);
+}
 
+void SDCSchedulerBase::resetScratch() {
+  unsigned nNodes = origin + 1;
+  predNode.assign(nNodes, -1);
+  predLat.assign(nNodes, 0);
+  predDist.assign(nNodes, 0);
+  chainLen.assign(nNodes, 0);
+  inQueue.assign(nNodes, 0);
+  touchedFlag.assign(nNodes, 0);
+}
+
+SDCSchedulerBase::FoundCycle SDCSchedulerBase::extractCycle(unsigned v) {
+  SmallVector<uint8_t> stamp(origin + 1, 0);
+  unsigned x = v;
+  while (predNode[x] >= 0 && !stamp[x]) {
+    stamp[x] = 1;
+    x = unsigned(predNode[x]);
+  }
+  FoundCycle cyc;
+  if (predNode[x] < 0) {
+    // The chain runs off a zero-seeded node: only a walk started AT the
+    // origin closes that way, through the implicit `start >= 0` edge. Sum
+    // every walked node's incoming edge; the implicit closure adds nothing.
+    assert(v == origin && "a chain-length trip walks into a proper cycle");
+    for (unsigned y = v; predNode[y] >= 0; y = unsigned(predNode[y])) {
+      cyc.lat += predLat[y];
+      cyc.dist += predDist[y];
+      if (y != origin)
+        cyc.nodes.push_back(y);
+    }
+    if (x != origin)
+      cyc.nodes.push_back(x);
+    return cyc;
+  }
+  for (unsigned y = x;;) {
+    cyc.lat += predLat[y];
+    cyc.dist += predDist[y];
+    if (y != origin)
+      cyc.nodes.push_back(y);
+    y = unsigned(predNode[y]);
+    if (y == x)
+      break;
+  }
+  return cyc;
+}
+
+std::optional<SDCSchedulerBase::FoundCycle>
+SDCSchedulerBase::relaxCore(SmallVector<unsigned> queue,
+                            SmallVectorImpl<std::pair<unsigned, int64_t>> *undo) {
+  unsigned nNodes = origin + 1;
+  std::optional<unsigned> trip;
+  for (unsigned head = 0; head < queue.size() && !trip; ++head) {
+    unsigned u = queue[head];
+    inQueue[u] = 0;
+    auto relax = [&](unsigned dst, int64_t lat, unsigned dist) {
+      int64_t np = potentials[u] + lat - int64_t(parameterT) * dist;
+      if (np <= potentials[dst])
+        return;
+      if (undo && !touchedFlag[dst]) {
+        touchedFlag[dst] = 1;
+        undo->push_back({dst, potentials[dst]});
+      }
+      potentials[dst] = np;
+      predNode[dst] = int(u);
+      predLat[dst] = lat;
+      predDist[dst] = dist;
+      chainLen[dst] = chainLen[u] + 1;
+      // The origin is the zero every bound is stated against: raising it
+      // closes a positive cycle through a pin. A provenance chain longer than
+      // the node count certifies one anywhere else.
+      if ((dst == origin && np > 0) || chainLen[dst] > nNodes) {
+        trip = dst;
+        return;
+      }
+      if (!inQueue[dst]) {
+        inQueue[dst] = 1;
+        queue.push_back(dst);
+      }
+    };
+    for (unsigned ei : staticOut[u]) {
+      const Edge &e = edges[ei];
+      relax(e.dst, e.lat + e.extra, e.dist);
+      if (trip)
+        break;
+    }
+    if (trip)
+      break;
+    if (u == origin) {
+      for (auto &[v, t] : frozenVariables) {
+        relax(v, int64_t(t), 0);
+        if (trip)
+          break;
+      }
+    } else if (const auto *it = frozenVariables.find(u);
+               it != frozenVariables.end()) {
+      relax(origin, -int64_t(it->second), 0);
+    }
+  }
+  if (!trip)
+    return std::nullopt;
+  return extractCycle(*trip);
+}
+
+LogicalResult SDCSchedulerBase::solveGraph(bool allowRaise) {
+  potentialsCurrent = false;
+  unsigned nNodes = origin + 1;
+  // Past this interval every distance-carrying circuit sums negative, so a
+  // still-infeasible system is a zero-distance circuit no interval fixes.
+  int64_t latBound = 1;
+  for (const Edge &e : edges)
+    latBound += (e.lat < 0 ? -e.lat : e.lat) + e.extra;
+  for (auto &[v, t] : frozenVariables)
+    latBound += t;
+  while (true) {
+    potentials.assign(nNodes, 0);
+    resetScratch();
+    SmallVector<unsigned> queue;
+    queue.reserve(nNodes);
+    for (unsigned v = 0; v < nNodes; ++v) {
+      queue.push_back(v);
+      inQueue[v] = 1;
+    }
+    std::optional<FoundCycle> cyc = relaxCore(std::move(queue), nullptr);
+    if (!cyc) {
+      potentialsCurrent = true;
+      return success();
+    }
+    int64_t cw = cyc->lat - int64_t(parameterT) * cyc->dist;
+    if (!allowRaise || (cyc->dist == 0 && cw > 0) || parameterT > latBound)
+      return failure();
+    // Never past the least feasible interval: the trip certifies the current
+    // one infeasible, and every real circuit independently requires
+    // `ceil(lat / dist)`, so the climb lands exactly on the minimum.
+    int64_t newT = parameterT + 1;
+    if (cyc->dist > 0 && cyc->lat > 0)
+      newT = std::max(newT, (cyc->lat + cyc->dist - 1) / cyc->dist);
+    {
+      auto diag = info(Stage::Sched, getProblem().getContainingOp());
+      diag << "II=" << parameterT
+           << " is not achievable: a loop-carried recurrence requires II>="
+           << newT << ", increasing II to " << newT;
+      if (!cyc->nodes.empty()) {
+        Recurrence rec;
+        for (unsigned v : llvm::reverse(cyc->nodes))
+          rec.ops.push_back(varOps[v]);
+        rec.latency = cyc->lat;
+        rec.distance = cyc->dist;
+        diag << "; the binding recurrence is " << render(rec);
+      }
+    }
+    parameterT = int(newT);
+  }
+}
+
+LogicalResult
+SDCSchedulerBase::scheduleAt(unsigned startTimeVariable, unsigned timeStep,
+                             SmallVectorImpl<unsigned> *conflictPins) {
+  assert(startTimeVariable < origin);
+  assert(!frozenVariables.count(startTimeVariable));
+  assert(potentialsCurrent && "a pin lands on a solved system");
+  int64_t t = timeStep;
+  if (potentials[startTimeVariable] > t)
+    return failure(); // already forced later than the pin allows
+  frozenVariables.insert({startTimeVariable, timeStep});
+  if (potentials[startTimeVariable] == t)
+    return success(); // the solution already sits on the pin
+  SmallVector<std::pair<unsigned, int64_t>> undo;
+  undo.push_back({startTimeVariable, potentials[startTimeVariable]});
+  potentials[startTimeVariable] = t;
+  resetScratch();
+  touchedFlag[startTimeVariable] = 1;
+  predNode[startTimeVariable] = int(origin);
+  predLat[startTimeVariable] = t;
+  predDist[startTimeVariable] = 0;
+  chainLen[startTimeVariable] = 1;
+  inQueue[startTimeVariable] = 1;
+  if (auto cyc = relaxCore({startTimeVariable}, &undo)) {
+    for (auto &[node, old] : llvm::reverse(undo))
+      potentials[node] = old;
+    frozenVariables.pop_back();
+    if (conflictPins)
+      for (unsigned v : cyc->nodes)
+        if (frozenVariables.count(v))
+          conflictPins->push_back(v);
+    return failure();
+  }
   return success();
 }
+
+unsigned SDCSchedulerBase::getStartTime(unsigned startTimeVariable) {
+  assert(startTimeVariable < origin);
+  if (const auto *it = frozenVariables.find(startTimeVariable);
+      it != frozenVariables.end())
+    return it->second;
+  assert(potentialsCurrent && "an unpinned start is read off a solved system");
+  return unsigned(potentials[startTimeVariable]);
+}
+
+SDCSchedulerBase::GraphState SDCSchedulerBase::saveState() {
+  return {frozenVariables, potentials, parameterT, potentialsCurrent};
+}
+
+void SDCSchedulerBase::restoreState(GraphState &saved) {
+  frozenVariables = std::move(saved.frozenVariables);
+  potentials = std::move(saved.potentials);
+  parameterT = saved.parameterT;
+  potentialsCurrent = saved.potentialsCurrent;
+}
+
+void SDCSchedulerBase::computeMargins(SmallVectorImpl<unsigned> &asap,
+                                      SmallVectorImpl<unsigned> &alap) {
+  assert(potentialsCurrent && "margins are read off a solved system");
+  unsigned nNodes = origin + 1;
+  for (unsigned stv = 0; stv < origin; ++stv)
+    asap[stv] = unsigned(potentials[stv]);
+
+  // g[i] = longest path i -> origin, i.e. `start(i) <= -g[i]`. Only upper
+  // bounds shape the greatest element: an edge u -> v of weight w relaxes
+  // g[u] against w + g[v], a pin's own upper edge starts its chain, and the
+  // temporary pin holds the last operation at its minimal start.
+  unsigned lastVar = startTimeVariables[lastOp];
+  constexpr int64_t kUnreached = std::numeric_limits<int64_t>::min();
+  SmallVector<int64_t> g(nNodes, kUnreached);
+  SmallVector<SmallVector<std::pair<unsigned, int64_t>, 4>> gOut(nNodes);
+  for (const Edge &e : edges)
+    gOut[e.dst].push_back(
+        {e.src, e.lat + e.extra - int64_t(parameterT) * e.dist});
+  for (auto &[v, t] : frozenVariables)
+    gOut[origin].push_back({v, -int64_t(t)});
+  gOut[origin].push_back({lastVar, -potentials[lastVar]});
+
+  g[origin] = 0;
+  chainLen.assign(nNodes, 0);
+  inQueue.assign(nNodes, 0);
+  SmallVector<unsigned> queue{origin};
+  inQueue[origin] = 1;
+  for (unsigned head = 0; head < queue.size(); ++head) {
+    unsigned u = queue[head];
+    inQueue[u] = 0;
+    for (auto [dst, w] : gOut[u]) {
+      int64_t ng = g[u] + w;
+      if (ng <= g[dst])
+        continue;
+      g[dst] = ng;
+      chainLen[dst] = chainLen[u] + 1;
+      assert(chainLen[dst] <= nNodes &&
+             "the solved system has no positive circuit, so no chain repeats");
+      if (!inQueue[dst]) {
+        inQueue[dst] = 1;
+        queue.push_back(dst);
+      }
+    }
+  }
+  for (unsigned stv = 0; stv < origin; ++stv) {
+    assert(g[stv] != kUnreached &&
+           "every operation is bounded above through the anchor");
+    assert(-g[stv] >= potentials[stv] && "the two lattice extremes are ordered");
+    alap[stv] = unsigned(-g[stv]);
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // SharedOperatorsSimplexScheduler
@@ -1237,21 +992,16 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
   if (failed(checkLastOp()))
     return failure();
 
-  parameterS = 0;
   parameterT = 0;
-  buildTableau();
+  buildGraph();
 
-  LLVM_DEBUG(dbgs() << "Initial tableau:\n"; dumpTableau());
-
-  if (failed(solveTableau())) {
+  if (failed(solveGraph(/*allowRaise=*/false))) {
     reportInfeasible();
     return failure();
   }
 
-  LLVM_DEBUG(dbgs() << "After solving resource-free problem:\n"; dumpTableau());
-
   // Heuristic phase: greedily fix start times for shared-operator ops within
-  // allocation limits, re-solving the LP with each added constraint. Each solve
+  // allocation limits, the least solution updated with each pin. Each state
   // is optimal given prior fixes; overall optimality is not guaranteed.
 
   auto &ops = prob.getOperations();
@@ -1266,7 +1016,7 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
   // below is first fit over rectangles, which needs largest-first to behave.
   //
   // Slack is not available as a further tie-break here: an ALAP would maximize
-  // the start times, and with dependences the only rows in this tableau an
+  // the start times, and with dependences the only constraints here an
   // operation without an outgoing one (any store) is unbounded above.
   auto rectangle = [&](Operation *op) {
     return prob.getResourceCycles(op) * prob.getResourceDemand(op);
@@ -1318,16 +1068,9 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
       for (unsigned i = 0; i < occ; ++i)
         reservationTable[rsrc][candTime + i] += slots;
 
-    LLVM_DEBUG(dbgs() << "After scheduling " << startTimeVar
-                      << " to t=" << candTime << ":\n";
-               dumpTableau());
   }
 
   assert(parameterT == 0);
-  LLVM_DEBUG(
-      dbgs() << "Final tableau:\n"; dumpTableau();
-      dbgs() << "Feasible solution found with start time of last operation = "
-             << -getParametricConstant(0) << '\n');
 
   for (auto *op : ops)
     prob.setStartTime(op, getStartTime(startTimeVariables[op]));
@@ -1429,27 +1172,13 @@ void ModuloSimplexScheduler::MRT::release(Operation *op) {
 }
 
 void ModuloSimplexScheduler::updateMargins() {
-  // Assumes the current secondary objective is "ASAP". Negating the objective
-  // row maximizes the sum of start times, yielding the "ALAP" times; negating
-  // again restores "ASAP". Both sets of times are stored.
-  for (auto *axapTimes : {&alapTimes, &asapTimes}) {
-    multiplyRow(OBJ_AXAP, -1);
-    // This should not fail for a feasible tableau.
-    auto dualFeasRestored = restoreDualFeasibility();
-    auto solved = solveTableau();
-    assert(succeeded(dualFeasRestored) && succeeded(solved));
-    (void)dualFeasRestored, (void)solved;
-
-    for (unsigned stv = 0; stv < startTimeLocations.size(); ++stv)
-      (*axapTimes)[stv] = getStartTime(stv);
-  }
+  computeMargins(asapTimes, alapTimes);
 }
 
-/// Tries `n` at its current time step and the II-1 slots after it, then grows
-/// the II if none admit it (`growIIByDeDinechin` first, `growIIUniformly` as
-/// fallback). The de Dinechin move assumes fully-pipelined reservations
-/// (`hasBlockingOps` bypasses it) and is only SPECULATIVE, so a failed re-solve
-/// there is rolled back rather than asserted.
+/// Tries `n` at its current time step and the II-1 slots after it. When none
+/// admits it, repairs the placement by evicting blockers
+/// (`scheduleWithEviction`); failure past that is the caller's cue to grow
+/// the II and restart placement.
 LogicalResult ModuloSimplexScheduler::scheduleOperation(Operation *n) {
   unsigned stvN = startTimeVariables[n];
 
@@ -1476,167 +1205,445 @@ LogicalResult ModuloSimplexScheduler::scheduleOperation(Operation *n) {
       break;
     }
 
-  // `n` does not fit at this II, so the II has to grow.
-  if (!hasBlockingOps) {
-    LPState savedLP = saveLP();
-    auto savedTables = mrt.tables;
-    auto savedReverseTables = mrt.reverseTables;
-    if (succeeded(growIIByDeDinechin(n)))
-      return success();
-    restoreLP(savedLP);
-    mrt.tables = std::move(savedTables);
-    mrt.reverseTables = std::move(savedReverseTables);
-    info(Stage::Sched, n) << "The targeted II increment did not carry the "
-                             "partial schedule over; growing the II uniformly "
-                             "instead, which may cost more than one cycle";
-  }
-  return growIIUniformly(n);
+  // `n` does not fit at this II: repair the placement by evicting blockers.
+  // Failure here means the repair budget could not buy a slot either.
+  return scheduleWithEviction(n);
 }
 
-// Grow the II without assuming anything about the partial schedule: every
-// scheduled op is shifted by its own `phi`, which keeps it in its modulo slot
-// once the II is one larger, then the reservation table is rebuilt and `n` is
-// retried. The path for non-pipelined ops, whose multi-slot reservations the
-// targeted move cannot express, and the fallback when that move fails.
-LogicalResult ModuloSimplexScheduler::growIIUniformly(Operation *n) {
-  unsigned stvN = startTimeVariables[n];
-  info(Stage::Sched, n) << "II=" << parameterT << " is not achievable for "
-                        << n->getName().getStringRef()
-                        << ", growing the II uniformly until it fits";
-  // Where the compile stops on the default path, and only advice when an exact
-  // solver is going to place the region itself.
-  auto placementFailed = [&](Operation *at) {
-    return placementAdvisory
-               ? warn(Stage::Sched, at)
-               : unsupported(Stage::Sched, Code::PlacementFailed, at);
-  };
-  while (true) {
-    SmallVector<std::pair<unsigned, unsigned>> phis;
-    for (Operation *j : scheduled) {
-      unsigned stvJ = startTimeVariables[j];
-      phis.push_back({stvJ, getStartTime(stvJ) / parameterT});
-    }
-    for (auto [stvJ, phiJ] : phis)
-      moveBy(stvJ, phiJ);
-    ++parameterT;
-    // Every op fits in a disjoint window by II=totalResourceCycles; 2x+2
-    // leaves slack for cross-window fragmentation. Past that, growth is not
-    // converging: a scheduler limit, not a fact about the kernel.
-    if (parameterT > 2 * static_cast<int>(totalResourceCycles) + 2 ||
-        failed(solveTableau())) {
-      auto d = placementFailed(n);
-      d << "The modulo scheduler could not place "
-        << n->getName().getStringRef()
-        << ": resource placement is greedy, and the operations it already "
-           "pinned leave this one no feasible cycle, which growing the "
-           "initiation interval (tried up to II="
-        << parameterT << ") does not undo";
-      if (placementAdvisory)
-        d << "; the exact scheduler places the region instead";
-      else
-        d << ". Partitioning the array it contends for, or reducing how many "
-             "times one iteration accesses that array, gives the placement "
-             "room";
-      return failure();
-    }
-
-    mrt.clear();
-    for (Operation *j : scheduled)
-      if (failed(mrt.enter(j, getStartTime(startTimeVariables[j])))) {
-        placementFailed(n)
-            << "The modulo scheduler could not rebuild its reservation table "
-               "after growing the initiation interval to II="
-            << parameterT;
-        return failure();
-      }
-
-    unsigned lo = getStartTime(stvN);
-    for (unsigned ct = lo; ct <= lo + parameterT - 1; ++ct)
-      if (succeeded(mrt.enter(n, ct))) {
-        if (succeeded(scheduleAt(stvN, ct)))
-          return success();
-        mrt.release(n);
-      }
-  }
-}
-
-// De Dinechin's Theorem 1: move the ops that precede `n` on its own resource
-// one modulo slot right, grow the II by one, and place `n` in the slot they
-// vacate. Fails, leaving the caller to roll back, when the partial schedule
-// does not survive the moves.
-LogicalResult ModuloSimplexScheduler::growIIByDeDinechin(Operation *n) {
-  // `n` contends for the physical units it holds (a memref port, a unit pool);
-  // the reservation table arbitrates those, not the operator type. Every op
-  // reaching here is limited, so it holds at least one.
-  SmallVector<Problem::ResourceType> unitsN = limitedUnits(prob, n);
+/// Repairs a failed placement at the current II: choose a start in the same
+/// window first fit scanned, evict the placed operations blocking it (their
+/// reservations first, then the pins a certifying cycle names), and pin `n`
+/// there. Victims return to `unscheduled` to be placed again. The
+/// per-operation cap and the region budget keep the repair finite; once they
+/// are spent the caller grows the II exactly as without repair.
+LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
+  if (evictionBudget == 0)
+    return failure();
   unsigned stvN = startTimeVariables[n];
   unsigned stN = getStartTime(stvN);
+  SmallVector<Problem::ResourceType> unitsN = limitedUnits(prob, n);
+  unsigned occN = prob.getResourceCycles(n);
+  unsigned slotsN = prob.getResourceDemand(n);
+  unsigned ii = parameterT;
 
-  info(Stage::Sched, n) << "II=" << parameterT
-                        << " is not achievable: a shared-resource conflict for "
-                        << n->getName().getStringRef()
-                        << ", trying II=" << parameterT + 1;
-  info(Stage::Sched) << "Incrementing II to " << (parameterT + 1)
-                     << " to resolve resource conflict for " << *n;
+  auto evictable = [&](Operation *op) {
+    return evictCount.lookup(op) < kMaxEvictionsPerOp;
+  };
+  // How often `slot` falls inside a reservation window starting at `base`: a
+  // window wider than the II wraps and can hold one slot more than once.
+  auto covers = [&](unsigned base, unsigned occ, unsigned slot) {
+    unsigned m = 0;
+    for (unsigned i = 0; i < occ; ++i)
+      if ((base + i) % ii == slot)
+        ++m;
+    return m;
+  };
 
-  // Fully-pipelined operators mean incrementing the II by one always suffices
-  // here (the paper's general case may need more).
-  unsigned phiN = stN / parameterT;
-  unsigned tauN = stN % parameterT;
-
-  // Track whether the following moves free an operator instance in the slot
-  // the current op wants, so it can stay there.
-  unsigned deltaN = 1;
-
-  SmallVector<Operation *> moved;
-  for (Operation *j : scheduled) {
-    unsigned stvJ = startTimeVariables[j];
-    unsigned stJ = getStartTime(stvJ);
-    unsigned phiJ = stJ / parameterT;
-    unsigned tauJ = stJ % parameterT;
-    unsigned deltaJ = 0;
-
-    // `j` stands in `n`'s way only where they hold a unit in common.
-    if (llvm::any_of(limitedUnits(prob, j), [&](Problem::ResourceType rsrc) {
-          return llvm::is_contained(unitsN, rsrc);
-        })) {
-      // Resolve conflicts by moving ops contending for a unit `n` also needs
-      // (e.g. a load/store pair shares a memref port despite distinct
-      // operator types) that are "preceded" (de Dinechin's ≺ relation) right.
-      if (tauN < tauJ || (tauN == tauJ && phiN > phiJ) ||
-          (tauN == tauJ && phiN == phiJ && stvN < stvJ)) {
-        // TODO: Replace the last condition with a proper graph analysis.
-
-        deltaJ = 1;
-        moved.push_back(j);
-        if (tauN == tauJ)
-          deltaN = 0;
-      }
-    }
-
-    // Move: add `phiJ` to keep `j` in its modulo slot `tauJ` after II grows
-    // (stJ + phiJ = phiJ*(parameterT+1) + tauJ), plus `deltaJ` to shift it to
-    // a different slot when it conflicts with the op that triggered growth.
-    moveBy(stvJ, phiJ + deltaJ);
+  // The holders of each unit `n` needs, least-evicted first with problem
+  // order breaking ties, so victim choice is deterministic and a contested
+  // pair runs out of budget instead of cycling.
+  SmallDenseMap<Problem::ResourceType,
+                SmallVector<std::pair<Operation *, unsigned>>>
+      holders;
+  for (Problem::ResourceType rsrc : unitsN) {
+    auto &hs = holders[rsrc];
+    hs.assign(mrt.reverseTables[rsrc].begin(), mrt.reverseTables[rsrc].end());
+    llvm::sort(hs, [&](auto &a, auto &b) {
+      unsigned ea = evictCount.lookup(a.first);
+      unsigned eb = evictCount.lookup(b.first);
+      if (ea != eb)
+        return ea < eb;
+      return startTimeVariables[a.first] < startTimeVariables[b.first];
+    });
   }
 
-  // Finally, increment the II and solve to apply the moves.
+  // For every start in the window, the placed operations whose reservations
+  // must leave for `n`'s whole occupancy window to fit there. A start whose
+  // deficit the evictable holders cannot cover is skipped.
+  struct Candidate {
+    unsigned ct;
+    unsigned cost;
+    SmallVector<Operation *> victims;
+  };
+  SmallVector<Candidate> cands;
+  for (unsigned ct = stN; ct < stN + ii; ++ct) {
+    SmallDenseMap<unsigned, unsigned> want;
+    for (unsigned i = 0; i < occN; ++i)
+      want[(ct + i) % ii] += slotsN;
+
+    SmallVector<Operation *> victims;
+    SmallPtrSet<Operation *, 8> taken;
+    unsigned cost = 0;
+    bool feasible = true;
+    for (Problem::ResourceType rsrc : unitsN) {
+      unsigned limit = *prob.getLimit(rsrc);
+      auto &table = mrt.tables[rsrc];
+      auto &revTab = mrt.reverseTables[rsrc];
+      for (auto [slot, need] : want) {
+        // What already-chosen victims free in this slot counts against the
+        // deficit; a victim may hold several of `n`'s units at once.
+        unsigned freed = 0;
+        for (Operation *v : victims)
+          if (auto it = revTab.find(v); it != revTab.end())
+            freed += covers(it->second, prob.getResourceCycles(v), slot) *
+                     prob.getResourceDemand(v);
+        while (table.lookup(slot) + need > limit + freed) {
+          Operation *pick = nullptr;
+          unsigned mult = 0;
+          for (auto &[op, base] : holders[rsrc]) {
+            if (taken.count(op) || !evictable(op))
+              continue;
+            mult = covers(base, prob.getResourceCycles(op), slot);
+            if (mult) {
+              pick = op;
+              break;
+            }
+          }
+          if (!pick) {
+            feasible = false;
+            break;
+          }
+          taken.insert(pick);
+          victims.push_back(pick);
+          freed += mult * prob.getResourceDemand(pick);
+          cost += 1 + evictCount.lookup(pick);
+        }
+        if (!feasible)
+          break;
+      }
+      if (!feasible)
+        break;
+    }
+    if (feasible && victims.size() <= evictionBudget)
+      cands.push_back({ct, cost, std::move(victims)});
+  }
+
+  // Cheapest victim set first, earliest start breaking ties.
+  llvm::stable_sort(cands, [](const Candidate &a, const Candidate &b) {
+    return std::tie(a.cost, a.ct) < std::tie(b.cost, b.ct);
+  });
+
+  unsigned attempts = std::min<size_t>(cands.size(), kMaxCommitAttempts);
+  for (unsigned c = 0; c < attempts; ++c) {
+    Candidate &cand = cands[c];
+    GraphState saved = saveState();
+    auto savedTables = mrt.tables;
+    auto savedReverse = mrt.reverseTables;
+    SmallVector<Operation *> evicted;
+    auto evict = [&](Operation *v) {
+      mrt.release(v);
+      frozenVariables.erase(startTimeVariables[v]);
+      evicted.push_back(v);
+    };
+    auto resolve = [&] {
+      LogicalResult r = solveGraph(/*allowRaise=*/false);
+      assert(succeeded(r) && "removing pins keeps the system feasible");
+      (void)r;
+    };
+    for (Operation *v : cand.victims)
+      evict(v);
+    if (!evicted.empty())
+      resolve();
+    LogicalResult entered = mrt.enter(n, cand.ct);
+    assert(succeeded(entered) && "the victim set frees the whole window");
+    (void)entered;
+
+    // A pin failure certifies a cycle through other pins; evict those too and
+    // retry, a bounded number of rounds.
+    bool placed = false;
+    for (unsigned round = 0; round < kMaxDepRounds; ++round) {
+      SmallVector<unsigned> conflicts;
+      if (succeeded(scheduleAt(stvN, cand.ct, &conflicts))) {
+        placed = true;
+        break;
+      }
+      if (conflicts.empty() ||
+          evicted.size() + conflicts.size() > evictionBudget ||
+          !llvm::all_of(conflicts,
+                        [&](unsigned v) { return evictable(varOps[v]); }))
+        break;
+      for (unsigned v : conflicts)
+        evict(varOps[v]);
+      resolve();
+    }
+    if (placed) {
+      for (Operation *v : evicted) {
+        llvm::erase(scheduled, v);
+        unscheduled.push_back(v);
+        ++evictCount[v];
+      }
+      evictionBudget -= evicted.size();
+      info(Stage::Sched, n)
+          << "Placement repair at II=" << ii << ": evicted " << evicted.size()
+          << " operation(s) so " << n->getName().getStringRef()
+          << " can start at t=" << cand.ct;
+      return success();
+    }
+    restoreState(saved);
+    mrt.tables = std::move(savedTables);
+    mrt.reverseTables = std::move(savedReverse);
+  }
+  return failure();
+}
+
+
+/// Grows the II by one and restarts placement from scratch at the larger
+/// interval, after Rau: pins made at the smaller II would otherwise carry
+/// their scars (evicted victims stranded on late slots) into the new one. The
+/// caller's worklist loop then re-places every limited operation with a fresh
+/// reservation table and repair budget.
+LogicalResult ModuloSimplexScheduler::growIIAndRestart(Operation *n) {
   ++parameterT;
-  if (failed(solveTableau()))
+  // Every op fits in a disjoint window by II=totalResourceCycles; 2x+2 leaves
+  // slack for cross-window fragmentation. Past that, growth is not
+  // converging: a scheduler limit, not a fact about the kernel.
+  if (parameterT > 2 * static_cast<int>(totalResourceCycles) + 2) {
+    // Where the compile stops on the default path, and only advice when an
+    // exact solver is going to place the region itself.
+    auto d = placementAdvisory
+                 ? warn(Stage::Sched, n)
+                 : unsupported(Stage::Sched, Code::PlacementFailed, n);
+    d << "The modulo scheduler could not place " << n->getName().getStringRef()
+      << " at any initiation interval tried (up to II=" << parameterT
+      << "): resource placement is greedy with a budgeted eviction repair, "
+         "and neither found this operation a feasible cycle";
+    if (placementAdvisory)
+      d << "; the exact scheduler places the region instead";
+    else
+      d << ". Partitioning the array it contends for, or reducing how many "
+           "times one iteration accesses that array, gives the placement "
+           "room";
     return failure();
+  }
+  info(Stage::Sched, n) << "II=" << parameterT - 1 << " is not achievable for "
+                        << n->getName().getStringRef()
+                        << "; restarting placement at II=" << parameterT;
+  frozenVariables.clear();
+  mrt.clear();
+  scheduled.clear();
+  unscheduled.clear();
+  for (auto *op : prob.getOperations())
+    if (isLimited(op, prob))
+      unscheduled.push_back(op);
+  evictCount.clear();
+  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
+  LogicalResult solved = solveGraph(/*allowRaise=*/true);
+  assert(succeeded(solved) &&
+         "the pin-free system was feasible at a smaller II");
+  return solved;
+}
 
-  // Re-enter moved operations into their new slots.
-  for (auto *m : moved)
-    mrt.release(m);
-  for (auto *m : moved)
-    if (failed(mrt.enter(m, getStartTime(startTimeVariables[m]))))
-      return failure();
+int64_t ModuloSimplexScheduler::depAsapOf(unsigned stv) {
+  // The longest path from the origin to `stv` over the dependence edges alone
+  // (its own pin excluded), read off the current potentials. A pin above this
+  // was not forced by dependences but by first fit taking a free-but-high slot.
+  int64_t d = 0;
+  for (const Edge &e : edges)
+    if (e.dst == stv) {
+      int64_t c = potentials[e.src] + e.lat + e.extra -
+                  int64_t(parameterT) * e.dist;
+      d = std::max(d, c);
+    }
+  return d;
+}
 
-  // Finally, schedule the operation. Again, adding `phiN` accounts for the
-  // implicit shift caused by incrementing the II.
-  if (failed(scheduleAt(stvN, stN + phiN + deltaN)))
-    return failure();
-  return mrt.enter(n, tauN + deltaN);
+bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
+                                          unsigned &budget) {
+  Operation *crit = varOps[stvX];
+  SmallVector<Problem::ResourceType> unitsX = limitedUnits(prob, crit);
+  unsigned occX = prob.getResourceCycles(crit);
+  unsigned slotsX = prob.getResourceDemand(crit);
+  unsigned ii = parameterT;
+
+  // Release crit and let its start fall to the dependence bound.
+  mrt.release(crit);
+  frozenVariables.erase(stvX);
+  {
+    LogicalResult r = solveGraph(/*allowRaise=*/false);
+    assert(succeeded(r) && "removing a pin keeps the system feasible");
+    (void)r;
+  }
+  auto repin = [&] {
+    LogicalResult e = mrt.enter(crit, oldPin);
+    assert(succeeded(e) && "the slot crit just vacated still fits it");
+    (void)e;
+    LogicalResult p = scheduleAt(stvX, oldPin);
+    assert(succeeded(p) && "crit's old pin is still feasible");
+    (void)p;
+  };
+  unsigned lo = getStartTime(stvX);
+  if (lo >= oldPin) {
+    repin();
+    return false;
+  }
+
+  auto covers = [&](unsigned base, unsigned occ, unsigned slot) {
+    unsigned m = 0;
+    for (unsigned i = 0; i < occ; ++i)
+      if ((base + i) % ii == slot)
+        ++m;
+    return m;
+  };
+
+  // The lowest class in [lo, oldPin) crit fits after evicting the holders that
+  // stand in its way.
+  SmallVector<Operation *> victims;
+  unsigned chosen = oldPin;
+  for (unsigned ct = lo; ct < oldPin && chosen == oldPin; ++ct) {
+    SmallDenseMap<unsigned, unsigned> want;
+    for (unsigned i = 0; i < occX; ++i)
+      want[(ct + i) % ii] += slotsX;
+    SmallVector<Operation *> vic;
+    SmallPtrSet<Operation *, 8> taken;
+    bool feasible = true;
+    for (Problem::ResourceType rsrc : unitsX) {
+      unsigned limit = *prob.getLimit(rsrc);
+      auto &table = mrt.tables[rsrc];
+      auto &revTab = mrt.reverseTables[rsrc];
+      // Victim order must be deterministic: the reverse table is keyed by
+      // pointer, so problem order sorts the holders the way scheduleWithEviction
+      // does before a scan.
+      SmallVector<std::pair<Operation *, unsigned>> sortedHolders(revTab.begin(),
+                                                                  revTab.end());
+      llvm::sort(sortedHolders, [&](auto &a, auto &b) {
+        return startTimeVariables[a.first] < startTimeVariables[b.first];
+      });
+      for (auto [slot, need] : want) {
+        unsigned freed = 0;
+        for (Operation *v : vic)
+          if (auto it = revTab.find(v); it != revTab.end())
+            freed += covers(it->second, prob.getResourceCycles(v), slot) *
+                     prob.getResourceDemand(v);
+        while (table.lookup(slot) + need > limit + freed) {
+          Operation *pick = nullptr;
+          unsigned mult = 0;
+          for (auto &[op, base] : sortedHolders) {
+            // Any evictable holder is a candidate victim; re-placing it may
+            // land it in another low class at the same time (a swap), so the
+            // final span check, not a slack pre-filter, is what rejects a move
+            // that would raise the span.
+            if (taken.count(op) ||
+                evictCount.lookup(op) >= kMaxEvictionsPerOp)
+              continue;
+            mult = covers(base, prob.getResourceCycles(op), slot);
+            if (mult) {
+              pick = op;
+              break;
+            }
+          }
+          if (!pick) {
+            feasible = false;
+            break;
+          }
+          taken.insert(pick);
+          vic.push_back(pick);
+          freed += mult * prob.getResourceDemand(pick);
+        }
+        if (!feasible)
+          break;
+      }
+      if (!feasible)
+        break;
+    }
+    if (feasible && vic.size() <= budget) {
+      chosen = ct;
+      victims = std::move(vic);
+    }
+  }
+  if (chosen == oldPin) {
+    repin();
+    return false;
+  }
+
+  // Commit: evict the victims, seat crit low, then re-place the victims by first
+  // fit. Any failure leaves the state dirty for the caller to roll back.
+  for (Operation *v : victims) {
+    mrt.release(v);
+    frozenVariables.erase(startTimeVariables[v]);
+  }
+  {
+    LogicalResult r = solveGraph(/*allowRaise=*/false);
+    assert(succeeded(r) && "removing pins keeps the system feasible");
+    (void)r;
+  }
+  if (failed(mrt.enter(crit, chosen)))
+    return false;
+  if (failed(scheduleAt(stvX, chosen))) {
+    mrt.release(crit);
+    return false;
+  }
+  llvm::sort(victims, [&](Operation *a, Operation *b) {
+    unsigned va = startTimeVariables[a], vb = startTimeVariables[b];
+    return std::make_pair(getStartTime(va), va) <
+           std::make_pair(getStartTime(vb), vb);
+  });
+  for (Operation *v : victims) {
+    unsigned sv = getStartTime(startTimeVariables[v]);
+    bool placed = false;
+    for (unsigned cv = sv; cv < sv + ii; ++cv)
+      if (succeeded(mrt.enter(v, cv))) {
+        if (succeeded(scheduleAt(startTimeVariables[v], cv))) {
+          placed = true;
+          break;
+        }
+        mrt.release(v);
+      }
+    if (!placed)
+      return false;
+  }
+  budget -= victims.size();
+  ++evictCount[crit];
+  return true;
+}
+
+/// Hill-climbs the region span down after the placement loop: each pass lowers
+/// the highest critical op that first fit pushed above its dependence bound,
+/// keeping the move only when the last operation's start strictly drops. An
+/// already-span-optimal region has no such op, so the pass is a no-op and its
+/// schedule is left byte-identical.
+void ModuloSimplexScheduler::repairSpan() {
+  unsigned lastVar = startTimeVariables[lastOp];
+  unsigned budget = kMaxEvictionsPerOp * scheduled.size();
+  for (unsigned moves = 0; moves < kMaxSpanRepairMoves && budget > 0; ++moves) {
+    updateMargins();
+    int64_t span = potentials[lastVar];
+
+    // Critical pinned ops sitting above their dependence bound, highest first:
+    // lowering the top of the critical path frees the most.
+    SmallVector<std::pair<unsigned, unsigned>> cand; // (pin, stv)
+    for (auto &[stv, pin] : frozenVariables) {
+      if (alapTimes[stv] != asapTimes[stv])
+        continue;
+      if (depAsapOf(stv) < int64_t(pin))
+        cand.push_back({pin, stv});
+    }
+    llvm::sort(cand, [](auto &a, auto &b) {
+      return std::tie(b.first, a.second) < std::tie(a.first, b.second);
+    });
+
+    bool improved = false;
+    for (auto [pin, stv] : cand) {
+      GraphState saved = saveState();
+      auto savedTables = mrt.tables;
+      auto savedReverse = mrt.reverseTables;
+      unsigned tryBudget = budget;
+      if (trySeatLower(stv, pin, tryBudget) && potentials[lastVar] < span) {
+        info(Stage::Sched, varOps[stv])
+            << "Span repair at II=" << parameterT << ": moved "
+            << varOps[stv]->getName().getStringRef() << " from t=" << pin
+            << " to t=" << getStartTime(stv) << ", region span " << span
+            << " -> " << potentials[lastVar];
+        budget = tryBudget;
+        improved = true;
+        break;
+      }
+      restoreState(saved);
+      mrt.tables = std::move(savedTables);
+      mrt.reverseTables = std::move(savedReverse);
+    }
+    if (!improved)
+      break;
+  }
 }
 
 unsigned ModuloSimplexScheduler::computeResMinII(BindingResource &binding) {
@@ -1684,7 +1691,6 @@ LogicalResult ModuloSimplexScheduler::schedule() {
   if (failed(checkLastOp()))
     return failure();
 
-  parameterS = 0;
   // Seed the II at the resource-min II, but never below the pipeline
   // directive's target; the search only grows it from there.
   BindingResource binding;
@@ -1696,13 +1702,11 @@ LogicalResult ModuloSimplexScheduler::schedule() {
       << ", pipeline-directive floor minII=" << minII << ")";
   LLVM_DEBUG(dbgs() << "ResMinII = " << parameterT << " (minII=" << minII
                     << ")\n");
-  buildTableau();
-  asapTimes.resize(startTimeLocations.size());
-  alapTimes.resize(startTimeLocations.size());
+  buildGraph();
+  asapTimes.resize(startTimeVariables.size());
+  alapTimes.resize(startTimeVariables.size());
 
-  LLVM_DEBUG(dbgs() << "Initial tableau:\n"; dumpTableau());
-
-  if (failed(solveTableau())) {
+  if (failed(solveGraph(/*allowRaise=*/true))) {
     reportInfeasible();
     return failure();
   }
@@ -1734,13 +1738,13 @@ LogicalResult ModuloSimplexScheduler::schedule() {
   for (auto *op : ops)
     if (isLimited(op, prob)) {
       unscheduled.push_back(op);
-      unsigned occ = prob.getResourceCycles(op);
-      totalResourceCycles += occ;
-      if (occ > 1)
-        hasBlockingOps = true;
+      totalResourceCycles += prob.getResourceCycles(op);
     }
+  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
 
-  // Main loop: iteratively fix limited operations to time steps.
+  // Main loop: iteratively fix limited operations to time steps. An operation
+  // that fits nowhere even after eviction repair grows the II and restarts
+  // the placement from scratch at the larger interval.
   while (!unscheduled.empty()) {
     // ASAP/ALAP margins, refreshed against the operations pinned so far.
     updateMargins();
@@ -1757,10 +1761,18 @@ LogicalResult ModuloSimplexScheduler::schedule() {
     Operation *op = *opIt;
     unscheduled.erase(opIt);
 
-    if (failed(scheduleOperation(op)))
+    if (succeeded(scheduleOperation(op))) {
+      scheduled.push_back(op);
+      continue;
+    }
+    if (failed(growIIAndRestart(op)))
       return failure();
-    scheduled.push_back(op);
   }
+
+  // Lower the span where first fit left a critical op above its dependence
+  // bound. Only strictly-improving moves commit, so this never grows the II
+  // or the latency, and a span-optimal region is untouched.
+  repairSpan();
 
   // Resource placement is greedy, so an II above the LP's bound may be the
   // problem's real minimum or just what the heuristic cost; nothing here can
@@ -1772,11 +1784,6 @@ LogicalResult ModuloSimplexScheduler::schedule() {
         << " (resource-min II=" << resMinII
         << "): resource placement is a greedy heuristic, so this gap is not "
            "known to be necessary";
-
-  LLVM_DEBUG(dbgs() << "Final tableau:\n"; dumpTableau();
-             dbgs() << "Solution found with II = " << parameterT
-                    << " and start time of last operation = "
-                    << -getParametricConstant(0) << '\n');
 
   prob.setInitiationInterval(parameterT);
   for (auto *op : ops)

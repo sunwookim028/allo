@@ -28,6 +28,11 @@ class OperatorLibrary;
 /// `budgetExhausted` solve may ship a different schedule on the next run.
 struct SolveTelemetry {
   bool proven = false;
+  /// The span half's own verdict, which `proven` conflates with the area
+  /// tie-break's: an exhausted budget with the span proven spent its time on
+  /// area alone. Under the area objective, the drain-under-settled-area
+  /// solve's verdict.
+  bool spanProven = false;
   bool budgetExhausted = false;
   bool fallback = false; // shipped the heuristic's schedule instead
   /// The interval whose solve exhausted the budget, ending the cyclic search.

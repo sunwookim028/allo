@@ -1,8 +1,8 @@
 # Building
 - Always run `conda activate allo-rtlgen` before building or running tests
 - Run `ninja -C build [target]` to build specific targets when only using C++ side tools (e.g. `allo-opt`)
-- Run `pip install -e .` to synchronize python packages when modifying both Python side and C++ side
-  (it also rebuilds C++ side automatically)
+- Always run `pip install -e .` to synchronize python packages when modifying both Python side and C++ side
+  (it also rebuilds C++ side automatically). `ninja -C build` **will not** synchronize Python packages.
 - OR-Tools is a required dependency; set `CMAKE_PREFIX_PATH=$HOME/.local/share/or-tools-9.15`
   so CMake finds its packages.
 
