@@ -60,9 +60,8 @@ uint64_t mlir::allo::magicMultiplier(uint64_t d, unsigned w, unsigned &shift) {
 
 // Adders and levels of the shift-add network a positive constant multiply
 // recodes to, at \p width.
-static std::pair<unsigned, double> constMulCost(uint64_t k,
-                                                const AddressDelays &delays,
-                                                unsigned width) {
+static std::pair<unsigned, double>
+constMulCost(uint64_t k, const AddressDelays &delays, unsigned width) {
   unsigned terms = nafWeight(k);
   unsigned adds = terms ? terms - 1 : 0;
   double delay =

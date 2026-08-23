@@ -30,13 +30,11 @@ def build():
                     C[k, j] = C[k, j] + ALPHA * B[i, j] * A[i, k]
             for j2 in range(N):
                 C[i, j2] = (
-                    BETA * C[i, j2] + ALPHA * B[i, j2] * A[i, i]
-                    + ALPHA * summ[i, j2]
+                    BETA * C[i, j2] + ALPHA * B[i, j2] * A[i, i] + ALPHA * summ[i, j2]
                 )
 
     @kernel
-    def symm(A0: f32[M, M], A1: f32[M, M], B0: f32[M, N], B1: f32[M, N],
-             C: f32[M, N]):
+    def symm(A0: f32[M, M], A1: f32[M, M], B0: f32[M, N], B1: f32[M, N], C: f32[M, N]):
         summ: f32[M, N] = 0.0
         compute_sum(A0, B0, summ)
         update_C(A1, B1, summ, C)

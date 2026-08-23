@@ -24,8 +24,14 @@ def build():
                     Cout[i0, j0] = Cin[i0, j0]
 
     @kernel
-    def compute_sum(A: f32[N, M], A_copy: f32[N, M], B: f32[N, M],
-                    B_copy: f32[N, M], Cin: f32[N, N], Cout: f32[N, N]):
+    def compute_sum(
+        A: f32[N, M],
+        A_copy: f32[N, M],
+        B: f32[N, M],
+        B_copy: f32[N, M],
+        Cin: f32[N, N],
+        Cout: f32[N, N],
+    ):
         buffer: f32[N, N] = 0.0
         for i0 in range(N):
             for j0 in range(N):
@@ -43,8 +49,14 @@ def build():
                 Cout[i2, j2] = buffer[i2, j2]
 
     @kernel
-    def syr2k(A: f32[N, M], A_copy: f32[N, M], B: f32[N, M], B_copy: f32[N, M],
-              Cin: f32[N, N], Cout: f32[N, N]):
+    def syr2k(
+        A: f32[N, M],
+        A_copy: f32[N, M],
+        B: f32[N, M],
+        B_copy: f32[N, M],
+        Cin: f32[N, N],
+        Cout: f32[N, N],
+    ):
         C: f32[N, N] = 0.0
         update_C(Cin, C)
         compute_sum(A, A_copy, B, B_copy, C, Cout)

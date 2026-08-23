@@ -285,8 +285,7 @@ llvm::SmallVector<unsigned> greedyShare(const Datapath &dp,
     llvm::sort(cands);
     Bin *dest = nullptr;
     for (auto [delta, b] : cands)
-      if (cone.tryFold(bins[b].members, i,
-                       bins[b].coneArms + cone.armsOf(i))) {
+      if (cone.tryFold(bins[b].members, i, bins[b].coneArms + cone.armsOf(i))) {
         dest = &bins[b];
         break;
       }

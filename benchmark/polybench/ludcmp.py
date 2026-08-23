@@ -60,8 +60,7 @@ def inputs(rng):
     A = rng.uniform(-0.01, 0.01, (N, N)).astype(np.float32)
     A += np.eye(N, dtype=np.float32) * np.float32(2.0)
     b = rng.uniform(0.01, 0.25, N).astype(np.float32)
-    return (A.astype(np.float32), b, np.zeros(N, np.float32),
-            np.zeros(N, np.float32))
+    return (A.astype(np.float32), b, np.zeros(N, np.float32), np.zeros(N, np.float32))
 
 
 def reference(A, b, x, y):

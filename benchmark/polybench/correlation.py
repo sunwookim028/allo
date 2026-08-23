@@ -25,8 +25,7 @@ def build():
             mean[x] = total / N
 
     @kernel
-    def compute_stddev(data: f32[N, M], mean: f32[M], mean_out: f32[M],
-                       stddev: f32[M]):
+    def compute_stddev(data: f32[N, M], mean: f32[M], mean_out: f32[M], stddev: f32[M]):
         for x2 in range(M):
             variance: f32 = 0.0
             for m in range(N):
@@ -37,8 +36,9 @@ def build():
                 stddev[x2] = 1.0
 
     @kernel
-    def center_reduce(data: f32[N, M], data_out: f32[N, M], mean: f32[M],
-                      stddev: f32[M]):
+    def center_reduce(
+        data: f32[N, M], data_out: f32[N, M], mean: f32[M], stddev: f32[M]
+    ):
         for x3 in range(N):
             for y3 in range(M):
                 d: f32 = data[x3, y3]
@@ -60,8 +60,12 @@ def build():
         corr[M - 1, M - 1] = 1.0
 
     @kernel
-    def correlation(data_mean: f32[N, M], data_stddev: f32[N, M],
-                    data_for_center: f32[N, M], corr: f32[M, M]):
+    def correlation(
+        data_mean: f32[N, M],
+        data_stddev: f32[N, M],
+        data_for_center: f32[N, M],
+        corr: f32[M, M],
+    ):
         mean: f32[M] = 0.0
         mean_passed_on: f32[M] = 0.0
         stddev: f32[M] = 0.0
@@ -71,9 +75,13 @@ def build():
         center_reduce(data_for_center, data_centered, mean_passed_on, stddev)
         compute_corr(data_centered, corr)
 
-    return {"top": correlation, "compute_mean": compute_mean,
-            "compute_stddev": compute_stddev, "center_reduce": center_reduce,
-            "compute_corr": compute_corr}
+    return {
+        "top": correlation,
+        "compute_mean": compute_mean,
+        "compute_stddev": compute_stddev,
+        "center_reduce": center_reduce,
+        "compute_corr": compute_corr,
+    }
 
 
 def _none(parts):
@@ -116,7 +124,9 @@ BENCHMARK = Benchmark(
     outputs=(3,),
     tolerance=(5e-3, 5e-3),
     skip={
-        "none": "math.sqrt has no RTL lowering on the default device",
-        "v1": "math.sqrt has no RTL lowering on the default device",
+        # sqrt now lowers (none passes); v1 hits a separate exact-scheduler crash
+        # (IndexError: absl::btree_map::at) placing center_reduce at II=20 under
+        # exact only (heuristic compiles it). Unrelated to sqrt.
+        "v1": "exact scheduler crashes placing center_reduce (II=20); heuristic ok",
     },
 )

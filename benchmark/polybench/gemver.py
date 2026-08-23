@@ -15,8 +15,17 @@ ALPHA, BETA = 0.1, 0.1
 
 def build():
     @kernel
-    def gemver(A: f32[N, N], u1: f32[N], u2: f32[N], v1: f32[N], v2: f32[N],
-               x: f32[N], y: f32[N], w: f32[N], z: f32[N]):
+    def gemver(
+        A: f32[N, N],
+        u1: f32[N],
+        u2: f32[N],
+        v1: f32[N],
+        v2: f32[N],
+        x: f32[N],
+        y: f32[N],
+        w: f32[N],
+        z: f32[N],
+    ):
         for i0 in range(N):
             for j0 in range(N):
                 A[i0, j0] = A[i0, j0] + u1[i0] * v1[j0] + u2[i0] * v2[j0]
@@ -52,8 +61,17 @@ def inputs(rng):
     A = rng.uniform(0.01, 0.25, (N, N)).astype(np.float32)
     vecs = [rng.uniform(0.01, 0.25, N).astype(np.float32) for _ in range(6)]
     u1, u2, v1, v2, x, y = vecs
-    return (A, u1, u2, v1, v2, x, y,
-            np.zeros(N, np.float32), rng.uniform(0.01, 0.25, N).astype(np.float32))
+    return (
+        A,
+        u1,
+        u2,
+        v1,
+        v2,
+        x,
+        y,
+        np.zeros(N, np.float32),
+        rng.uniform(0.01, 0.25, N).astype(np.float32),
+    )
 
 
 def reference(A, u1, u2, v1, v2, x, y, w, z):

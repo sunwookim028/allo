@@ -349,10 +349,13 @@ FuncUarch::FuncUarch(const Datapath &dp, llvm::StringRef symbol,
     for (UnitId uid : rb.units) {
       const FuncUnit &u = dp.units[uid];
       r.computeOps += u.boundOps.size();
-      UnitReport ur{u.identity.key(), u.identity.ipSymbol,
+      UnitReport ur{u.identity.key(),
+                    u.identity.ipSymbol,
                     u.identity.comb ? std::string() : operatorModuleName(u),
-                    datapathWidth(u.identity.resultType), u.latency,
-                    (unsigned)u.boundOps.size(), u.identity.comb.has_value(),
+                    datapathWidth(u.identity.resultType),
+                    u.latency,
+                    (unsigned)u.boundOps.size(),
+                    u.identity.comb.has_value(),
                     u.pipelined};
       if (u.identity.comb == CombOpKindEnum::Apply) {
         AffineMap map = cast<AffineMapAttr>(u.identity.map).getValue();

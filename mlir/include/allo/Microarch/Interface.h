@@ -21,8 +21,8 @@ namespace mlir::allo::iface {
 /// `valid`, drives `ready`. Output (a `put`): the module drives `data`/`valid`,
 /// reads `ready`.
 struct FIFO {
-  int arg;        // kernel block-argument index (-1 if not an argument)
-  bool isInput;   // get (input) vs put (output)
+  int arg;      // kernel block-argument index (-1 if not an argument)
+  bool isInput; // get (input) vs put (output)
   int depth;
   unsigned width; // payload bit width
   std::string base, data, valid, ready;

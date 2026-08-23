@@ -19,10 +19,10 @@ struct Datapath;
 
 /// What the microarchitecture stage decided, as data: a projection of the
 /// `Datapath` taken once per emitted module, read back through JSON by Python.
-/// Nothing here duplicates the schedule report, which publishes op start cycles,
-/// region trip counts and realizations joined on (func, region order); only the
-/// binding and what the emitter built downstream of it live here. Write-only: no
-/// pass reads it back.
+/// Nothing here duplicates the schedule report, which publishes op start
+/// cycles, region trip counts and realizations joined on (func, region order);
+/// only the binding and what the emitter built downstream of it live here.
+/// Write-only: no pass reads it back.
 
 /// One functional-unit instance. `boundOps > 1` is a sharing decision; the
 /// trivial binding leaves every operation its own unit.

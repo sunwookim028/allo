@@ -867,9 +867,8 @@ static std::optional<ValueHull> hullOfValue(Value v, unsigned fuel) {
     auto a = of(0), b = of(1);
     if (!a || !b)
       return std::nullopt;
-    h = *kind == CombOpKindEnum::Addi
-            ? ValueHull{a->lo + b->lo, a->hi + b->hi}
-            : ValueHull{a->lo - b->hi, a->hi - b->lo};
+    h = *kind == CombOpKindEnum::Addi ? ValueHull{a->lo + b->lo, a->hi + b->hi}
+                                      : ValueHull{a->lo - b->hi, a->hi - b->lo};
     break;
   }
   case CombOpKindEnum::Muli: {

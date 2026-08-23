@@ -46,8 +46,9 @@ def build():
 
     @kernel
     def rasterization1(tri2d: i32[7], max_min: i32[5], max_index: i32[1]) -> i32:
-        cw: i32 = ((tri2d[4] - tri2d[0]) * (tri2d[3] - tri2d[1])
-                   - (tri2d[5] - tri2d[1]) * (tri2d[2] - tri2d[0]))
+        cw: i32 = (tri2d[4] - tri2d[0]) * (tri2d[3] - tri2d[1]) - (
+            tri2d[5] - tri2d[1]
+        ) * (tri2d[2] - tri2d[0])
         flag: i32 = 0
         if cw == 0:
             flag = 1
@@ -72,19 +73,27 @@ def build():
         return flag
 
     @kernel
-    def rasterization2(flag: i32, max_min: i32[5], max_index: i32[1], tri2d: i32[7],
-                       fragment: i32[MAX_FRAGMENT, 4]) -> i32:
+    def rasterization2(
+        flag: i32,
+        max_min: i32[5],
+        max_index: i32[1],
+        tri2d: i32[7],
+        fragment: i32[MAX_FRAGMENT, 4],
+    ) -> i32:
         size: i32 = 0
         if flag == 0:
             for k in range(max_index[0]):
                 x: i32 = max_min[0] + k % max_min[4]
                 y: i32 = max_min[2] + k // max_min[4]
-                pi0: i32 = ((x - tri2d[0]) * (tri2d[3] - tri2d[1])
-                            - (y - tri2d[1]) * (tri2d[2] - tri2d[0]))
-                pi1: i32 = ((x - tri2d[2]) * (tri2d[5] - tri2d[3])
-                            - (y - tri2d[3]) * (tri2d[4] - tri2d[2]))
-                pi2: i32 = ((x - tri2d[4]) * (tri2d[1] - tri2d[5])
-                            - (y - tri2d[5]) * (tri2d[0] - tri2d[4]))
+                pi0: i32 = (x - tri2d[0]) * (tri2d[3] - tri2d[1]) - (y - tri2d[1]) * (
+                    tri2d[2] - tri2d[0]
+                )
+                pi1: i32 = (x - tri2d[2]) * (tri2d[5] - tri2d[3]) - (y - tri2d[3]) * (
+                    tri2d[4] - tri2d[2]
+                )
+                pi2: i32 = (x - tri2d[4]) * (tri2d[1] - tri2d[5]) - (y - tri2d[5]) * (
+                    tri2d[0] - tri2d[4]
+                )
                 if pi0 >= 0 and pi1 >= 0 and pi2 >= 0 and size < MAX_FRAGMENT:
                     fragment[size, 0] = x
                     fragment[size, 1] = y
@@ -94,8 +103,13 @@ def build():
         return size
 
     @kernel
-    def zculling(counter: i32, fragment: i32[MAX_FRAGMENT, 4], size: i32,
-                 pixels: i32[MAX_FRAGMENT, 3], z_buffer: i32[MAX_X, MAX_Y]) -> i32:
+    def zculling(
+        counter: i32,
+        fragment: i32[MAX_FRAGMENT, 4],
+        size: i32,
+        pixels: i32[MAX_FRAGMENT, 3],
+        z_buffer: i32[MAX_X, MAX_Y],
+    ) -> i32:
         if counter == 0:
             for zi in range(MAX_X):
                 for zj in range(MAX_Y):
@@ -114,8 +128,12 @@ def build():
         return pixel_cntr
 
     @kernel
-    def coloring_fb(counter: i32, size_pixels: i32, pixels: i32[MAX_FRAGMENT, 3],
-                    frame_buffer: i32[MAX_X, MAX_Y]):
+    def coloring_fb(
+        counter: i32,
+        size_pixels: i32,
+        pixels: i32[MAX_FRAGMENT, 3],
+        frame_buffer: i32[MAX_X, MAX_Y],
+    ):
         if counter == 0:
             for ci in range(MAX_X):
                 for cj in range(MAX_Y):
@@ -134,13 +152,20 @@ def build():
         for i in range(NUM_3D_TRI):
             projection(tri3d, i, 0, tri2d)
             flag: i32 = rasterization1(tri2d, max_min, max_index)
-            size_fragment: i32 = rasterization2(flag, max_min, max_index, tri2d, fragment)
+            size_fragment: i32 = rasterization2(
+                flag, max_min, max_index, tri2d, fragment
+            )
             size_pixels: i32 = zculling(i, fragment, size_fragment, pixels, z_buffer)
             coloring_fb(i, size_pixels, pixels, output)
 
-    return {"top": rendering, "projection": projection, "rasterization1": rasterization1,
-            "rasterization2": rasterization2, "zculling": zculling,
-            "coloring_fb": coloring_fb}
+    return {
+        "top": rendering,
+        "projection": projection,
+        "rasterization1": rasterization1,
+        "rasterization2": rasterization2,
+        "zculling": zculling,
+        "coloring_fb": coloring_fb,
+    }
 
 
 def _none(parts):

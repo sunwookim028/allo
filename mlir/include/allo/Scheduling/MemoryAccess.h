@@ -21,10 +21,10 @@ enum class AccessKind { Array, Stream };
 
 /// A recognized memory access. `root` is the underlying buffer/stream SSA value
 /// (`resolveRoot`), so distinct roots are distinct storage. `map` is the
-/// element-space subscript map, one result per memref dimension; an array access
-/// always carries one, a stream none. `indices` are the subscript operands
-/// (array) or FIFO-select operands (stream). Whether an access is affine is a
-/// question about the op, not about the map.
+/// element-space subscript map, one result per memref dimension; an array
+/// access always carries one, a stream none. `indices` are the subscript
+/// operands (array) or FIFO-select operands (stream). Whether an access is
+/// affine is a question about the op, not about the map.
 struct MemAccess {
   Operation *op = nullptr;
   Value root;

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from ....lang import (
+    f16,
     f32,
     f64,
     bf16,
@@ -48,6 +49,10 @@ def fdiv(a: f32, b: f32) -> f32: ...
 def fcmp(a: f32, b: f32) -> _bool: ...
 
 
+@operator_ip(optype="sqrt", **_ARCHETYPE)
+def fsqrt(a: f32) -> f32: ...
+
+
 @operator_ip(optype=OperatorType.ADD, **_ARCHETYPE)
 def dadd(a: f64, b: f64) -> f64: ...
 
@@ -68,6 +73,10 @@ def ddiv(a: f64, b: f64) -> f64: ...
 def dcmp(a: f64, b: f64) -> _bool: ...
 
 
+@operator_ip(optype="sqrt", **_ARCHETYPE)
+def dsqrt(a: f64) -> f64: ...
+
+
 @operator_ip(optype=OperatorType.ADD, **_ARCHETYPE)
 def bfadd(a: bf16, b: bf16) -> bf16: ...
 
@@ -78,6 +87,27 @@ def bfsub(a: bf16, b: bf16) -> bf16: ...
 
 @operator_ip(optype=OperatorType.MUL, **_ARCHETYPE)
 def bfmul(a: bf16, b: bf16) -> bf16: ...
+
+
+# IEEE fp16 (half)
+@operator_ip(optype=OperatorType.ADD, **_ARCHETYPE)
+def hadd(a: f16, b: f16) -> f16: ...
+
+
+@operator_ip(optype=OperatorType.SUB, **_ARCHETYPE)
+def hsub(a: f16, b: f16) -> f16: ...
+
+
+@operator_ip(optype=OperatorType.MUL, **_ARCHETYPE)
+def hmul(a: f16, b: f16) -> f16: ...
+
+
+@operator_ip(optype=OperatorType.DIV, **_ARCHETYPE)
+def hdiv(a: f16, b: f16) -> f16: ...
+
+
+@operator_ip(optype=OperatorType.CMP, **_ARCHETYPE)
+def hcmp(a: f16, b: f16) -> _bool: ...
 
 
 # Int/float conversion and float resize: one archetype per exact width pair,
@@ -208,14 +238,21 @@ CATALOG = (
     fmul,
     fdiv,
     fcmp,
+    fsqrt,
     dadd,
     dsub,
     dmul,
     ddiv,
     dcmp,
+    dsqrt,
     bfadd,
     bfsub,
     bfmul,
+    hadd,
+    hsub,
+    hmul,
+    hdiv,
+    hcmp,
     i2f,
     f2i,
     fcvt,

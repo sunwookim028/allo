@@ -32,14 +32,14 @@ enum class RegRole {
 llvm::StringRef roleName(RegRole role);
 
 /// One class of register run: `count` runs of `depth` registers in series,
-/// `width` bits each, all built for the same reason. A lone register is a run of
-/// depth 1, so the design's flip-flop count is `sum(width * depth * count)`.
+/// `width` bits each, all built for the same reason. A lone register is a run
+/// of depth 1, so the design's flip-flop count is `sum(width * depth * count)`.
 ///
 /// The run, not the register, is the cost unit: past the synthesizer's
-/// shift-register extraction threshold a run stops costing flip-flops per stage.
-/// A multi-tapped chain is charged as one run per maximal inter-tap segment.
-/// `reset` blocks extraction and pays fabric per bit; `enable` is free; a cost
-/// model needs both to pick its characterization row.
+/// shift-register extraction threshold a run stops costing flip-flops per
+/// stage. A multi-tapped chain is charged as one run per maximal inter-tap
+/// segment. `reset` blocks extraction and pays fabric per bit; `enable` is
+/// free; a cost model needs both to pick its characterization row.
 struct RegClass {
   RegRole role = RegRole::Control;
   unsigned width = 0, depth = 0, count = 0;

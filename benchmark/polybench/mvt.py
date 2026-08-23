@@ -30,8 +30,16 @@ def build():
             x2_out[i1] = x
 
     @kernel
-    def mvt(A: f32[N, N], A_copy: f32[N, N], y1: f32[N], y2: f32[N], x1: f32[N],
-            x2: f32[N], x1_out: f32[N], x2_out: f32[N]):
+    def mvt(
+        A: f32[N, N],
+        A_copy: f32[N, N],
+        y1: f32[N],
+        y2: f32[N],
+        x1: f32[N],
+        x2: f32[N],
+        x1_out: f32[N],
+        x2_out: f32[N],
+    ):
         stageA(x1, x1_out, A, y1)
         stageB(x2, x2_out, A_copy, y2)
 
@@ -58,8 +66,16 @@ def inputs(rng):
     y2 = rng.uniform(0.01, 0.25, N).astype(np.float32)
     x1 = rng.uniform(0.01, 0.25, N).astype(np.float32)
     x2 = rng.uniform(0.01, 0.25, N).astype(np.float32)
-    return (A, A.copy(), y1, y2, x1, x2,
-            np.zeros(N, np.float32), np.zeros(N, np.float32))
+    return (
+        A,
+        A.copy(),
+        y1,
+        y2,
+        x1,
+        x2,
+        np.zeros(N, np.float32),
+        np.zeros(N, np.float32),
+    )
 
 
 def reference(A, A_copy, y1, y2, x1, x2, x1_out, x2_out):

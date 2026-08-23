@@ -52,9 +52,9 @@ alloEmitSplitVerilog(MlirModule module, MlirStringRef directory);
 /// `seed` tune the CP-SAT search; changing either makes a compile
 /// non-reproducible. `deterministic` off lets the workers race instead of
 /// interleaving, each under `budget / workers` wall seconds, so no exact solve
-/// is then reproducible. `areaSlack` is the span an area solve may pay beyond its
-/// leash, as a fraction of the reference span. Returns failure (callback not
-/// invoked) on any failed phase.
+/// is then reproducible. `areaSlack` is the span an area solve may pay beyond
+/// its leash, as a fraction of the reference span. Returns failure (callback
+/// not invoked) on any failed phase.
 MLIR_CAPI_EXPORTED MlirLogicalResult alloRunSDCSchedulingPipeline(
     MlirModule module, MlirStringRef top, float cycleTime,
     MlirStringRef scheduler, MlirStringRef objective, double budget,

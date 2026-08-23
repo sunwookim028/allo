@@ -75,7 +75,8 @@ struct ScheduledOpReport {
 };
 
 /// One scheduling region as the report names it, with the ops it issues
-/// directly. A nested region's ops are reported under it, so an op appears once.
+/// directly. A nested region's ops are reported under it, so an op appears
+/// once.
 struct RegionReport {
   /// `cyclic` for a pipeline, `acyclic` for a straight-line span, `guard` for a
   /// select, which carries no compute of its own.

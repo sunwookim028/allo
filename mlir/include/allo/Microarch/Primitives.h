@@ -257,9 +257,9 @@ struct EmitContext {
   /// or Pulse role powers on to it and carries no reset, since a reset blocks
   /// shift-register extraction on the fabric.
   ///
-  /// The one place a register is built (with `enabledReg`), which makes `ledger`
-  /// exact. \p role is charged as a run of one unless a chain builder is already
-  /// charging the whole run it belongs to.
+  /// The one place a register is built (with `enabledReg`), which makes
+  /// `ledger` exact. \p role is charged as a run of one unless a chain builder
+  /// is already charging the whole run it belongs to.
   Value reg(Value in, Value rstVal, RegRole role = RegRole::Control);
   /// Clock-enabled register (1-cycle when enabled): out[t+1] = ce[t] ? in[t] :
   /// out[t], built as `seq.compreg.ce` so identical runs stay CSE-able. Reset
@@ -273,9 +273,9 @@ struct EmitContext {
   /// Stall-hold: transparent (combinational passthrough) while \p sh's
   /// `chainEnable` is high, holds its last enabled value while low. out = ce ?
   /// in : held; held[t+1] = out[t]. Unlike `enabledReg` it adds no latency when
-  /// enabled, so a read address stays == the counter in steady state but freezes
-  /// on back-pressure, keeping the in-flight read alive. A no-op (returns `in`)
-  /// under a rigid shell.
+  /// enabled, so a read address stays == the counter in steady state but
+  /// freezes on back-pressure, keeping the in-flight read alive. A no-op
+  /// (returns `in`) under a rigid shell.
   Value stallHold(Value in, const StallShell &sh);
   /// A while iter-arg's frozen result register: out[t+1] = load ? init :
   /// (advance ? next : out[t]). Frozen once the loop exits, so it holds the

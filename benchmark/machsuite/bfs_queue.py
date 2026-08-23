@@ -18,8 +18,13 @@ MAX_LEVEL = 999999
 
 def build():
     @kernel
-    def bfs_queue(nodes: i32[N_NODES_2], edges: i32[N_EDGES], starting_node: i32,
-                  level: i32[N_NODES], level_counts: i32[N_LEVELS]):
+    def bfs_queue(
+        nodes: i32[N_NODES_2],
+        edges: i32[N_EDGES],
+        starting_node: i32,
+        level: i32[N_NODES],
+        level_counts: i32[N_LEVELS],
+    ):
         queue: i32[N_NODES] = 0
         front: i32 = 0
         rear: i32 = 0
@@ -67,8 +72,13 @@ def inputs(rng):
     for node in range(1, N_NODES):
         nodes[2 * node] = fanout
         nodes[2 * node + 1] = fanout
-    return (nodes, edges, np.int32(0), np.zeros(N_NODES, np.int32),
-            np.zeros(N_LEVELS, np.int32))
+    return (
+        nodes,
+        edges,
+        np.int32(0),
+        np.zeros(N_NODES, np.int32),
+        np.zeros(N_LEVELS, np.int32),
+    )
 
 
 def reference(nodes, edges, starting_node, level, level_counts):

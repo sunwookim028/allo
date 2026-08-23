@@ -748,8 +748,7 @@ ParseResult DCPathOperatorOp::parse(OpAsmParser &p, OperationState &result) {
   if (!fnTy)
     return p.emitError(p.getNameLoc(), "expected a function-type signature");
   double minPeriod = 0.0;
-  if (succeeded(p.parseOptionalKeyword("min_period")) &&
-      parseNum(p, minPeriod))
+  if (succeeded(p.parseOptionalKeyword("min_period")) && parseNum(p, minPeriod))
     return failure();
   bool pipelined = succeeded(p.parseOptionalKeyword("pipelined"));
   if (p.parseKeyword(&stall))

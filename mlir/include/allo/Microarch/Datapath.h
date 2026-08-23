@@ -126,9 +126,9 @@ struct FuncUnit {
   unsigned latency = 0;  // result available `latency` cycles after issue
   bool pipelined = true; // accepts a new input every cycle
   /// The delay this unit's inputs must settle within, in ns, from the
-  /// `in_delay` stamped beside `z`. Marginal for a combinational unit, whose `z`
-  /// already carries the register floor. Zero for an op that renames bits rather
-  /// than computing them.
+  /// `in_delay` stamped beside `z`. Marginal for a combinational unit, whose
+  /// `z` already carries the register floor. Zero for an op that renames bits
+  /// rather than computing them.
   double inDelay = 0.0;
   // The IP's port/back-pressure contract (from its `dcp.operator`), unused for
   // a combinational unit. Clock-enable is the only one the emitter builds.
@@ -165,8 +165,8 @@ struct FuncUnit {
   // Per-input reduction identities (parallel to `inputs`), one per iteration of
   // the recurrence distance: port k reads `inputInits[k][n]` at iteration n and
   // takes `inputs[k]` from iteration `inputInits[k].size()` on. Empty for a
-  // non-recurrence input, and on a shared port, whose identities are arms of the
-  // input mux instead (`Mux::Phase`).
+  // non-recurrence input, and on a shared port, whose identities are arms of
+  // the input mux instead (`Mux::Phase`).
   llvm::SmallVector<llvm::SmallVector<Source, 1>, 2> inputInits;
 };
 
@@ -234,17 +234,18 @@ struct MemUnit {
   /// any other. An access's index meaning comes from the layout's `skew()`.
   bool skewed = false;
   /// Held as one cell per element rather than an addressed interface, which
-  /// `layout.registers` (a complete partition) asks for: unlimited combinational
-  /// ports, where an addressed port serves one element per cycle. A top-level
-  /// argument's cells are the caller's and arrive as one port per element
+  /// `layout.registers` (a complete partition) asks for: unlimited
+  /// combinational ports, where an addressed port serves one element per cycle.
+  /// A top-level argument's cells are the caller's and arrive as one port per
+  /// element
   /// (`elemPorts`); an internal array's are registers here, read by a
   /// combinational select. A callee's array argument is neither: the storage is
   /// the parent's and the child masters an ordinary addressed port on it.
   bool scattered = false;
   /// Whether `bindMemoryPorts` split the writes across ports, done only where
   /// two enabled in one cycle provably address different words. A consumer may
-  /// then place each port in its own `always` block; false puts them all in one,
-  /// whose priority order resolves the collision.
+  /// then place each port in its own `always` block; false puts them all in
+  /// one, whose priority order resolves the collision.
   bool writesIndependent = false;
   /// The module ports holding one element of a `scattered` argument: the input
   /// it arrives on, and the output plus write-enable it leaves on. An unused
@@ -267,11 +268,11 @@ struct MemUnit {
   /// colours by what may share an address bus, so `readPortsBuilt` may be many
   /// times it.
   StoragePorts ports;
-  /// Ports one bank is built with: the distinct ports `bindMemoryPorts` assigned
-  /// to the accesses reaching a bank, maximized over the banks. The third is not
-  /// the sum of the first two, a pooled-storage port may carry both a read and a
-  /// write. A skewed bank serves a whole lane from one port. Zero for a
-  /// scattered memory and a ROM, neither addressed.
+  /// Ports one bank is built with: the distinct ports `bindMemoryPorts`
+  /// assigned to the accesses reaching a bank, maximized over the banks. The
+  /// third is not the sum of the first two, a pooled-storage port may carry
+  /// both a read and a write. A skewed bank serves a whole lane from one port.
+  /// Zero for a scattered memory and a ROM, neither addressed.
   unsigned readPortsBuilt = 0, writePortsBuilt = 0, portsBuilt = 0;
 
   /// Accesses of one bank the model cannot separate in time, per direction: a
@@ -285,10 +286,10 @@ struct MemUnit {
   /// scattered argument. Zero for an internal array.
   unsigned boundaryPorts = 0;
 
-  /// Whether `storage` can hold \p writes write ports and \p total ports in all,
-  /// over as many copies as that takes. Only the writes decide it, every copy
-  /// needing them; a further read is a further copy. Takes a candidate rather
-  /// than the committed counts.
+  /// Whether `storage` can hold \p writes write ports and \p total ports in
+  /// all, over as many copies as that takes. Only the writes decide it, every
+  /// copy needing them; a further read is a further copy. Takes a candidate
+  /// rather than the committed counts.
   bool fitsStorage(unsigned writes, unsigned total) const {
     return ports.holds(writes, total);
   }
@@ -297,8 +298,8 @@ struct MemUnit {
 
   /// Instances of `storage` this bank is held in, decided by `bindMemoryPorts`.
   /// Reads past one instance's are served by another copy of the whole array,
-  /// each copy taking every write; a write cannot be served that way, so the two
-  /// directions are not symmetric.
+  /// each copy taking every write; a write cannot be served that way, so the
+  /// two directions are not symmetric.
   unsigned instances = 1;
 
   /// Which instance of a bank serves each read port, by `instanceKey`. A port
@@ -322,7 +323,8 @@ struct MemUnit {
     Scatter,
     /// An addressed array, held in as many copies of its `storage` row as its
     /// read ports take. The only realization an internal addressed array has; a
-    /// binding that overruns the row is reported rather than realized otherwise.
+    /// binding that overruns the row is reported rather than realized
+    /// otherwise.
     Ram,
   };
   /// An argument is a boundary whatever shape its cells have upstream: this
@@ -335,16 +337,16 @@ struct MemUnit {
   }
 
   // Access latency of `storage`, the numbers the scheduler stamped onto this
-  // memref's `dcp.load`/`dcp.store`. The consumer's register depth was solved as
-  // `tY - (start + readLatency)`, so ports must be built at exactly these.
+  // memref's `dcp.load`/`dcp.store`. The consumer's register depth was solved
+  // as `tY - (start + readLatency)`, so ports must be built at exactly these.
   unsigned readLatency = 0;
   unsigned writeLatency = 1;
 
   // `romInit` is the `initial_value` (a DenseElementsAttr) of the
   // `memref.global` this memref reads through, when it has one. `isRom` is the
   // narrower realizable property, initialized and never written, becoming a
-  // combinational `hw.aggregate_constant` with no writable hlmem. Read-only is a
-  // property of the use: a mutable global with a power-on value
+  // combinational `hw.aggregate_constant` with no writable hlmem. Read-only is
+  // a property of the use: a mutable global with a power-on value
   // (`allo.lang.Stateful`) has `romInit` and is not a ROM.
   bool isRom = false;
   Attribute romInit;
@@ -363,9 +365,9 @@ struct MemUnit {
     double inDelay = 0.0;
     double portDelay = 0.0;
     /// The port of its bank this access drives, assigned by `bindMemoryPorts`.
-    /// Two accesses share a port only where the model proves they never issue in
-    /// the same cycle, so it carries a select rather than an arbiter. Under a
-    /// skewed layout it is the access's `lane`.
+    /// Two accesses share a port only where the model proves they never issue
+    /// in the same cycle, so it carries a select rather than an arbiter. Under
+    /// a skewed layout it is the access's `lane`.
     unsigned port = 0;
     /// How this access reaches the storage, and so which emit path it takes.
     PortPlan plan = PortPlan::Coloured;
@@ -417,8 +419,8 @@ struct MemUnit {
     struct Reduced {
       llvm::SmallVector<ScaledTerm, 3> terms;
       /// The expression's constant, zero whenever a term exists: the first term
-      /// that does not wrap absorbs it (`AddrStride::init`) rather than an adder
-      /// carrying it.
+      /// that does not wrap absorbs it (`AddrStride::init`) rather than an
+      /// adder carrying it.
       int64_t base = 0;
       AffineExpr residual; // null when the whole expression reduced
       /// Registers the residual reads (`SplitAddress::reads`), in the order it
@@ -491,9 +493,9 @@ struct CallUnit {
   /// declared `determinacy`, not `latency.has_value()`: a dynamic-trip callee
   /// publishes a latency bound and stays indeterminate.
   bool determinate = false;
-  /// An `await` spawn rather than a scheduled call: it starts with its container
-  /// and is ordered thereafter by FIFO back-pressure alone, so it has no offset
-  /// to place at and offers a consumer nothing to time-trigger off.
+  /// An `await` spawn rather than a scheduled call: it starts with its
+  /// container and is ordered thereafter by FIFO back-pressure alone, so it has
+  /// no offset to place at and offers a consumer nothing to time-trigger off.
   bool async = false;
 
   /// One memory port the child drives for a mastered memref operand. A callee
@@ -501,9 +503,9 @@ struct CallUnit {
   /// two read ports, a read-modify-write accumulator a read and a write), so
   /// there is one MemArg per child port rather than per operand.
   struct MemArg {
-    unsigned calleeArg;  // operand position == callee argument index
-    MemId mem;           // caller MemUnit backing this array
-    bool isBoundary;     // a func BlockArgument vs an internal alloc
+    unsigned calleeArg; // operand position == callee argument index
+    MemId mem;          // caller MemUnit backing this array
+    bool isBoundary;    // a func BlockArgument vs an internal alloc
     bool isWrite;
     unsigned bank = 0;   // cyclic bank this port serves (0 unbanked)
     unsigned factor = 1; // partition factor (1 unbanked)
@@ -560,10 +562,11 @@ struct CallUnit {
   /// Source::Survivor{region, k}.
   llvm::SmallVector<std::string, 1> resultPorts;
 
-  /// An earlier sibling call this one must start after: composition predecessors
-  /// at call granularity. `recordCallDeps` derives them by how the owning region
-  /// composes, a scheduled composition ordering its children by their placed
-  /// `start` while a concurrent one reads the hazard directions instead.
+  /// An earlier sibling call this one must start after: composition
+  /// predecessors at call granularity. `recordCallDeps` derives them by how the
+  /// owning region composes, a scheduled composition ordering its children by
+  /// their placed `start` while a concurrent one reads the hazard directions
+  /// instead.
   struct Pred {
     CallId call;
     /// The edge is a scalar result hand-off rather than a shared array, and can
@@ -606,10 +609,10 @@ struct StreamChannel {
   unsigned depth = 2;   // FIFO depth (from the stream type)
   bool isInput = false; // input (get) vs output (put)
   // A channel this kernel owns: defined by an `allo.stream.create` in its own
-  // body rather than passed in, so both ends sit inside this module. It takes no
-  // boundary port (a `seq.fifo` in the module body carries it) and is the one
-  // channel that may be both read and written (a loop-carried delay line), which
-  // leaves `isInput` meaningless for it.
+  // body rather than passed in, so both ends sit inside this module. It takes
+  // no boundary port (a `seq.fifo` in the module body carries it) and is the
+  // one channel that may be both read and written (a loop-carried delay line),
+  // which leaves `isInput` meaningless for it.
   bool internal = false;
   /// Initial tokens (a `stream.create` initializer): the channel's history is
   /// `[init] ++ [produced]`, breaking a feedback cycle's start dependence.
@@ -791,9 +794,9 @@ struct RegionBlock {
   bool singlePass() const { return kind == Kind::Acyclic; }
 
   // Counted-loop induction: the IV runs `lb, lb+step, ...` up to (excluding)
-  // `ub`. Each bound is a datapath `Source`, a data-dependent value or a literal
-  // `ConstCell` synthesized by `recordRegionBounds`. Set for a Cyclic region,
-  // None for an Acyclic one (no counter).
+  // `ub`. Each bound is a datapath `Source`, a data-dependent value or a
+  // literal `ConstCell` synthesized by `recordRegionBounds`. Set for a Cyclic
+  // region, None for an Acyclic one (no counter).
   //
   // `ubSource` is the one exception: a constant trip over a runtime lb or step
   // (the `for j in range(i, i+K)` window) has `ub = lb + K*step`, derived
@@ -966,8 +969,8 @@ struct RegionBlock {
   // Source::Unit); a guard's is that same combinational unit over the enclosing
   // counter (an affine guard `i > j`) or a scheduled prologue region's survivor
   // (a data-dependent `flag[j] > 0`). Either way it is held for the run it
-  // gates: a guard start-gates its children by it, so the not-taken arm's stores
-  // never fire structurally, with no per-store gate.
+  // gates: a guard start-gates its children by it, so the not-taken arm's
+  // stores never fire structurally, with no per-store gate.
   Source condition;
 };
 
@@ -1009,7 +1012,8 @@ struct Datapath {
   llvm::DenseMap<Operation *, UnitId> opToUnit;
 
   /// Set when the builder hit a schedule it cannot realize and has already
-  /// reported it, namely a consumer placed before its producer's result is ready
+  /// reported it, namely a consumer placed before its producer's result is
+  /// ready
   /// (`resolveOperand`). The build finishes with placeholder values so it stays
   /// bounded, and `validateDatapath` turns this into a failure before any
   /// hardware is emitted.

@@ -18,8 +18,11 @@ def build():
         for i0 in range(N - 2):
             for j0 in range(N - 2):
                 B0[i0 + 1, j0 + 1] = 0.2 * (
-                    A0[i0, j0 + 1] + A0[i0 + 1, j0] + A0[i0 + 1, j0 + 1]
-                    + A0[i0 + 1, j0 + 2] + A0[i0 + 2, j0 + 1]
+                    A0[i0, j0 + 1]
+                    + A0[i0 + 1, j0]
+                    + A0[i0 + 1, j0 + 1]
+                    + A0[i0 + 1, j0 + 2]
+                    + A0[i0 + 2, j0 + 1]
                 )
 
     @kernel
@@ -27,8 +30,11 @@ def build():
         for i1 in range(N - 2):
             for j1 in range(N - 2):
                 A1[i1 + 1, j1 + 1] = 0.2 * (
-                    B1[i1, j1 + 1] + B1[i1 + 1, j1] + B1[i1 + 1, j1 + 1]
-                    + B1[i1 + 1, j1 + 2] + B1[i1 + 2, j1 + 1]
+                    B1[i1, j1 + 1]
+                    + B1[i1 + 1, j1]
+                    + B1[i1 + 1, j1 + 1]
+                    + B1[i1 + 1, j1 + 2]
+                    + B1[i1 + 2, j1 + 1]
                 )
 
     @kernel

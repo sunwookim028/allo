@@ -190,9 +190,9 @@ def build():
 
         m5: f32 = a_x[5]
         a_x[5] = cm_fl_mul_x(
-            cmplx_mul_x(a_x[5], a_y[5], exp_1_8_x, exp_1_8_y), M_SQRT1_2)
-        a_y[5] = cm_fl_mul_y(
-            cmplx_mul_y(m5, a_y[5], exp_1_8_x, exp_1_8_y), M_SQRT1_2)
+            cmplx_mul_x(a_x[5], a_y[5], exp_1_8_x, exp_1_8_y), M_SQRT1_2
+        )
+        a_y[5] = cm_fl_mul_y(cmplx_mul_y(m5, a_y[5], exp_1_8_x, exp_1_8_y), M_SQRT1_2)
 
         m6: f32 = a_x[6]
         a_x[6] = cmplx_mul_x(a_x[6], a_y[6], exp_1_4_x, exp_1_4_y)
@@ -200,9 +200,9 @@ def build():
 
         m7: f32 = a_x[7]
         a_x[7] = cm_fl_mul_x(
-            cmplx_mul_x(a_x[7], a_y[7], exp_3_8_x, exp_3_8_y), M_SQRT1_2)
-        a_y[7] = cm_fl_mul_y(
-            cmplx_mul_y(m7, a_y[7], exp_3_8_x, exp_3_8_y), M_SQRT1_2)
+            cmplx_mul_x(a_x[7], a_y[7], exp_3_8_x, exp_3_8_y), M_SQRT1_2
+        )
+        a_y[7] = cm_fl_mul_y(cmplx_mul_y(m7, a_y[7], exp_3_8_x, exp_3_8_y), M_SQRT1_2)
 
         FFT4_1(a_x, a_y)
         FFT4_2(a_x, a_y)

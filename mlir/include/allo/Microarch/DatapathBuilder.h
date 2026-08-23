@@ -36,7 +36,8 @@ struct Resolved {
   unsigned ready = 0; // cycle `base` lands at within its iteration
   // Reduction identities of the loop-carried iter_arg this edge reads, one per
   // iteration: `inits[n]` re-injected at iteration n, `base` carrying the edge
-  // from `inits.size()` on (that size the recurrence distance). Empty otherwise.
+  // from `inits.size()` on (that size the recurrence distance). Empty
+  // otherwise.
   llvm::SmallVector<Source, 1> inits = {};
 };
 

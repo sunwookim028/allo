@@ -100,7 +100,8 @@ bool spanFormsRegion(ArrayRef<Operation *> ops);
 
 /// A declaration: an op that names storage or a literal and binds no hardware.
 /// A region of nothing but these carries no datapath, so the reifier leaves it
-/// in place, and a level of only these plus child loops has no work to schedule.
+/// in place, and a level of only these plus child loops has no work to
+/// schedule.
 bool isDeclarationOp(Operation *op);
 
 /// A synchronous sub-kernel call: a plain (non-async) `func.call`, scheduled as
@@ -154,14 +155,14 @@ bool callLowerable(func::CallOp call);
 /// asked of one reified child.
 bool composesOnStructuralTop(func::FuncOp func);
 
-/// Whether \p invoke is a concurrent child: an `await` spawn, or a call wired to
-/// a sibling through a `Stream`. Either way completion is ordered by
-/// back-pressure rather than a schedule, making its container a process network.
-/// The reified counterpart of `composesOnStructuralTop`.
+/// Whether \p invoke is a concurrent child: an `await` spawn, or a call wired
+/// to a sibling through a `Stream`. Either way completion is ordered by
+/// back-pressure rather than a schedule, making its container a process
+/// network. The reified counterpart of `composesOnStructuralTop`.
 bool spawnsConcurrently(Operation *invoke);
 
-/// Whether \p op is part of a concurrent container's own structure: the calls it
-/// composes, the channels / buffers / constant tables it declares, and the
+/// Whether \p op is part of a concurrent container's own structure: the calls
+/// it composes, the channels / buffers / constant tables it declares, and the
 /// constants feeding them. Everything else in such a container is loose
 /// datapath, which `outline-loose-processes` lifts into its own process.
 bool isContainerStructure(Operation &op);
@@ -174,15 +175,15 @@ bool isContainerStructure(Operation &op);
 bool loopBodyDecomposes(LoopLikeOpInterface loop);
 
 /// Topologically sort the synchronous call graph, as callsites. Fails on a
-/// cycle, diagnosed on the callsites that form it. For a consumer that binds per
-/// callsite: two calls to one kernel may pass different arrays.
+/// cycle, diagnosed on the callsites that form it. For a consumer that binds
+/// per callsite: two calls to one kernel may pass different arrays.
 llvm::FailureOr<SmallVector<Operation *>>
 buildAndSortCallsiteGraph(func::FuncOp root);
 
 /// The kernels reachable from \p root, callees before callers, with \p root
-/// last. One entry per function; external callees are dropped, having no body to
-/// work on. This order lets a caller read a fact its callee already published,
-/// e.g. the callee latency `isIndeterminateCall` depends on.
+/// last. One entry per function; external callees are dropped, having no body
+/// to work on. This order lets a caller read a fact its callee already
+/// published, e.g. the callee latency `isIndeterminateCall` depends on.
 llvm::FailureOr<SmallVector<func::FuncOp>>
 callGraphPostOrder(func::FuncOp root);
 } // namespace mlir::allo

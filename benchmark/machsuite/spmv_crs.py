@@ -15,8 +15,7 @@ NNZ = 96
 
 def build():
     @kernel
-    def crs(val: f64[NNZ], cols: i32[NNZ], row: i32[N + 1], vec: f64[N],
-            out: f64[N]):
+    def crs(val: f64[NNZ], cols: i32[NNZ], row: i32[N + 1], vec: f64[N], out: f64[N]):
         for i in range(N):
             tmp_begin: i32 = row[i]
             tmp_end: i32 = row[i + 1]

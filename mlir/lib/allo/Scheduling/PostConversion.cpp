@@ -123,20 +123,20 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
   // non-affine one the identity map over its indices.
   auto addrMap = [&]() { return asMemAccess(&op)->map; };
   if (auto l = dyn_cast<AffineLoadOp>(&op)) {
-    auto nw = DCPathLoadOp::create(
-        b, loc, l.getType(), rm(l.getMemRef()), remap(l.getMapOperands()),
-        addrMap(), (uint64_t)start, memLatency(), bank, IntegerAttr(),
-        DenseI64ArrayAttr());
+    auto nw = DCPathLoadOp::create(b, loc, l.getType(), rm(l.getMemRef()),
+                                   remap(l.getMapOperands()), addrMap(),
+                                   (uint64_t)start, memLatency(), bank,
+                                   IntegerAttr(), DenseI64ArrayAttr());
     setAccessTiming(nw);
     accessMap[&op] = nw;
     map.map(l.getResult(), nw.getResult());
     return;
   }
   if (auto l = dyn_cast<memref::LoadOp>(&op)) {
-    auto nw = DCPathLoadOp::create(
-        b, loc, l.getType(), rm(l.getMemRef()), remap(l.getIndices()),
-        addrMap(), (uint64_t)start, memLatency(), bank, IntegerAttr(),
-        DenseI64ArrayAttr());
+    auto nw = DCPathLoadOp::create(b, loc, l.getType(), rm(l.getMemRef()),
+                                   remap(l.getIndices()), addrMap(),
+                                   (uint64_t)start, memLatency(), bank,
+                                   IntegerAttr(), DenseI64ArrayAttr());
     setAccessTiming(nw);
     accessMap[&op] = nw;
     map.map(l.getResult(), nw.getResult());

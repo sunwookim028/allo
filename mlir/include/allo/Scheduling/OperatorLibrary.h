@@ -119,16 +119,16 @@ bool isZeroDelay(Operation *op);
 struct NodeTiming {
   std::string typeName;
   uint32_t latency = 0;
-  double inDelay = 0.0;  // ns, from an operand to this node
-  double outDelay = 0.0; // ns, from this node to its consumer
+  double inDelay = 0.0;   // ns, from an operand to this node
+  double outDelay = 0.0;  // ns, from this node to its consumer
   double minPeriod = 0.0; // ns, least period the unit behind it holds
 };
 
 /// The least period one row or node needs for a cycle of its own.
 inline float periodNeed(float regFloor, double inDelay, double outDelay,
                         double minPeriod) {
-  return std::max({regFloor + (float)inDelay, (float)outDelay,
-                   (float)minPeriod});
+  return std::max(
+      {regFloor + (float)inDelay, (float)outDelay, (float)minPeriod});
 }
 
 /// What a lookup resolves for one operation: the timing row it is scheduled
@@ -232,8 +232,7 @@ public:
 
   /// The narrowest integer width of at least \p width an advanced row
   /// declares for the raw mnemonic \p mnem, or 0 when no row reaches it.
-  unsigned smallestAdvancedRowWidth(llvm::StringRef mnem,
-                                    unsigned width) const;
+  unsigned smallestAdvancedRowWidth(llvm::StringRef mnem, unsigned width) const;
 
   /// Whether an advanced row declares mnemonic \p mnem at exactly \p args ->
   /// \p results.

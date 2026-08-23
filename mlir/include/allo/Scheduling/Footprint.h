@@ -41,8 +41,8 @@ void summarizeOp(Operation *op, Summary &s);
 enum class Conflict { None, RAW, WAR, WAW };
 
 /// Fold a synchronous sub-kernel call's footprint into \p s, keyed by the
-/// caller's operand roots: per parameter, the access direction plus the callee's
-/// own affine access ops, recursing through nested calls.
+/// caller's operand roots: per parameter, the access direction plus the
+/// callee's own affine access ops, recursing through nested calls.
 ///
 /// Returns false when a construct defeats the summary (an unresolvable or
 /// external callee, a call cycle, a view operand offset from its root's index
@@ -51,9 +51,9 @@ enum class Conflict { None, RAW, WAR, WAW };
 bool summarizeCall(func::CallOp call, Summary &s);
 
 /// The ordering hazard between accesses recorded by `summarizeCall`. Their
-/// affine ops live in the callees, each naming its own parameter rather than one
-/// common memref Value, so disjointness compares polyhedral regions over the
-/// index space the parameters share with the array.
+/// affine ops live in the callees, each naming its own parameter rather than
+/// one common memref Value, so disjointness compares polyhedral regions over
+/// the index space the parameters share with the array.
 Conflict callFootprintConflict(const Access &a, const Access &b);
 
 } // namespace mlir::allo

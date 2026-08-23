@@ -19,9 +19,15 @@ def build():
             for i in range(1, N - 1):
                 for j in range(1, N - 1):
                     A[i, j] = (
-                        A[i - 1, j - 1] + A[i - 1, j] + A[i - 1, j + 1]
-                        + A[i, j - 1] + A[i, j] + A[i, j + 1]
-                        + A[i + 1, j - 1] + A[i + 1, j] + A[i + 1, j + 1]
+                        A[i - 1, j - 1]
+                        + A[i - 1, j]
+                        + A[i - 1, j + 1]
+                        + A[i, j - 1]
+                        + A[i, j]
+                        + A[i, j + 1]
+                        + A[i + 1, j - 1]
+                        + A[i + 1, j]
+                        + A[i + 1, j + 1]
                     ) / 9.0
 
     return {"top": seidel_2d}
@@ -47,9 +53,15 @@ def reference(A):
         for i in range(1, N - 1):
             for j in range(1, N - 1):
                 a[i, j] = (
-                    a[i - 1, j - 1] + a[i - 1, j] + a[i - 1, j + 1]
-                    + a[i, j - 1] + a[i, j] + a[i, j + 1]
-                    + a[i + 1, j - 1] + a[i + 1, j] + a[i + 1, j + 1]
+                    a[i - 1, j - 1]
+                    + a[i - 1, j]
+                    + a[i - 1, j + 1]
+                    + a[i, j - 1]
+                    + a[i, j]
+                    + a[i, j + 1]
+                    + a[i + 1, j - 1]
+                    + a[i + 1, j]
+                    + a[i + 1, j + 1]
                 ) / np.float32(9.0)
     return (a,)
 

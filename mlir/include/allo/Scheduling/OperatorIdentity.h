@@ -35,8 +35,8 @@ struct OperatorIdentity {
   Type resultType;
   Attribute predicate; // a compare's `predicate`; null otherwise
   Attribute map;       // an `affine.apply`'s `map`; null otherwise
-  /// A bit rename (a shift by a literal, a width-kept resize): wiring, priced at
-  /// nothing. In the identity so a rename never shares a class with the real
+  /// A bit rename (a shift by a literal, a width-kept resize): wiring, priced
+  /// at nothing. In the identity so a rename never shares a class with the real
   /// operator its mnemonic spells.
   bool rename = false;
 

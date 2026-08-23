@@ -24,8 +24,7 @@ def build():
                     Cout[i0, j0] = Cin[i0, j0]
 
     @kernel
-    def compute_sum(A: f32[N, M], A_copy: f32[N, M], Cin: f32[N, N],
-                    Cout: f32[N, N]):
+    def compute_sum(A: f32[N, M], A_copy: f32[N, M], Cin: f32[N, N], Cout: f32[N, N]):
         buffer: f32[N, N] = 0.0
         for i0 in range(N):
             for j0 in range(N):

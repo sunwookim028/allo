@@ -18,8 +18,13 @@ MAX_LEVEL = 999999
 
 def build():
     @kernel
-    def bfs_bulk(nodes: i32[N_NODES_2], edges: i32[N_EDGES], starting_node: i32,
-                 level: i32[N_NODES], level_counts: i32[N_LEVELS]):
+    def bfs_bulk(
+        nodes: i32[N_NODES_2],
+        edges: i32[N_EDGES],
+        starting_node: i32,
+        level: i32[N_NODES],
+        level_counts: i32[N_LEVELS],
+    ):
         for init in range(N_NODES):
             level[init] = MAX_LEVEL
         for init2 in range(N_LEVELS):
@@ -66,8 +71,13 @@ def _graph(rng):
 
 def inputs(rng):
     nodes, edges = _graph(rng)
-    return (nodes, edges, np.int32(0), np.zeros(N_NODES, np.int32),
-            np.zeros(N_LEVELS, np.int32))
+    return (
+        nodes,
+        edges,
+        np.int32(0),
+        np.zeros(N_NODES, np.int32),
+        np.zeros(N_LEVELS, np.int32),
+    )
 
 
 def reference(nodes, edges, starting_node, level, level_counts):

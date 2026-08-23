@@ -153,8 +153,7 @@ std::optional<Step> stepOf(Value v, Value arg, unsigned depth) {
   if (auto tr = dyn_cast<arith::TruncIOp>(op)) {
     std::optional<Step> s = stepOf(tr.getIn(), arg, depth);
     if (s)
-      s->trunc = std::min(
-          s->trunc, cast<IntegerType>(tr.getType()).getWidth());
+      s->trunc = std::min(s->trunc, cast<IntegerType>(tr.getType()).getWidth());
     return s;
   }
   // A translated step shifts the reset hulls too: a reset deeper in the cone
@@ -218,9 +217,7 @@ std::optional<Step> stepOf(Value v, Value arg, unsigned depth) {
         return alternate(sel.getTrueValue(), sel.getFalseValue());
       })
       .Case<arith::MinSIOp, arith::MaxSIOp, arith::MinUIOp, arith::MaxUIOp>(
-          [&](auto) {
-            return alternate(op->getOperand(0), op->getOperand(1));
-          })
+          [&](auto) { return alternate(op->getOperand(0), op->getOperand(1)); })
       .Default([](auto) { return std::nullopt; });
 }
 
@@ -245,9 +242,8 @@ std::optional<Hull> recurrenceHull(affine::AffineForOp fo, unsigned idx,
   std::optional<Hull> init = hullOf(fo.getInits()[idx], depth);
   if (!init)
     return std::nullopt;
-  Value yielded =
-      cast<affine::AffineYieldOp>(fo.getBody()->getTerminator()).getOperand(
-          idx);
+  Value yielded = cast<affine::AffineYieldOp>(fo.getBody()->getTerminator())
+                      .getOperand(idx);
   std::optional<Step> st = stepOf(yielded, fo.getRegionIterArgs()[idx], depth);
   if (!st) {
     // A transfer that never reads its own iter-arg is a plain reset.
@@ -335,8 +331,8 @@ std::optional<Hull> hullOf(Value v, unsigned depth) {
           })
           .Case<arith::MulIOp>([&](auto) {
             return binary([](int64_t a, int64_t b, int64_t c, int64_t d) {
-              __int128 p[] = {(__int128)a * c, (__int128)a * d,
-                              (__int128)b * c, (__int128)b * d};
+              __int128 p[] = {(__int128)a * c, (__int128)a * d, (__int128)b * c,
+                              (__int128)b * d};
               return mkHull(*std::min_element(p, p + 4),
                             *std::max_element(p, p + 4));
             });
@@ -356,8 +352,7 @@ std::optional<Hull> hullOf(Value v, unsigned depth) {
             unsigned k = std::max(APInt(64, x->second).getActiveBits(),
                                   APInt(64, y->second).getActiveBits());
             return k > 62 ? std::nullopt
-                          : std::optional<Hull>(
-                                Hull{0, (int64_t(1) << k) - 1});
+                          : std::optional<Hull>(Hull{0, (int64_t(1) << k) - 1});
           })
           .Case<arith::RemUIOp>([&](auto) -> std::optional<Hull> {
             auto c = rhsConst();
@@ -486,8 +481,8 @@ struct SinkTruncThroughRingOp : OpRewritePattern<arith::TruncIOp> {
           arith::TruncIOp::create(rewriter, loc, narrow, sel.getTrueValue());
       Value f =
           arith::TruncIOp::create(rewriter, loc, narrow, sel.getFalseValue());
-      rewriter.replaceOpWithNewOp<arith::SelectOp>(trunc, sel.getCondition(),
-                                                   t, f);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(trunc, sel.getCondition(), t,
+                                                   f);
       return success();
     }
     if (!isRingOp(op))
@@ -539,8 +534,7 @@ struct NarrowFromHull : RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!isRingOp(op) &&
-        !isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp>(op))
+    if (!isRingOp(op) && !isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp>(op))
       return failure();
     Type ty = op->getResult(0).getType();
     unsigned width = carrierWidth(ty);
@@ -565,11 +559,10 @@ struct NarrowFromHull : RewritePattern {
     state.addTypes(nty);
     Value narrow = rewriter.create(state)->getResult(0);
     rewriter.replaceOp(
-        op, index
-                ? arith::IndexCastOp::create(rewriter, loc, ty, narrow)
-                      .getResult()
-                : arith::ExtSIOp::create(rewriter, loc, ty, narrow)
-                      .getResult());
+        op,
+        index
+            ? arith::IndexCastOp::create(rewriter, loc, ty, narrow).getResult()
+            : arith::ExtSIOp::create(rewriter, loc, ty, narrow).getResult());
     return success();
   }
 };

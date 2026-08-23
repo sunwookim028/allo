@@ -35,8 +35,9 @@ def build():
                 output[i2, j2] = out_ABC[i2, j2] * BETA + D[i2, j2] * ALPHA
 
     @kernel
-    def two_mm(A: f32[P, Q], B: f32[Q, R], C: f32[R, S], D: f32[P, S],
-               output: f32[P, S]):
+    def two_mm(
+        A: f32[P, Q], B: f32[Q, R], C: f32[R, S], D: f32[P, S], output: f32[P, S]
+    ):
         out_AB: f32[P, R] = 0.0
         out_ABC: f32[P, S] = 0.0
         mm1(A, B, out_AB)

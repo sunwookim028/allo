@@ -35,8 +35,9 @@ def build():
                     out_ABC[i2, j2] += out_AB[i2, k2] * out_CD[k2, j2]
 
     @kernel
-    def three_mm(A: f32[P, Q], B: f32[Q, R], C: f32[R, S], D: f32[S, T],
-                 output: f32[P, T]):
+    def three_mm(
+        A: f32[P, Q], B: f32[Q, R], C: f32[R, S], D: f32[S, T], output: f32[P, T]
+    ):
         out_AB: f32[P, R] = 0.0
         out_CD: f32[R, T] = 0.0
         mm1(A, B, out_AB)

@@ -590,13 +590,11 @@ LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
 /// directive's II ceiling, honored by the exact area objective alone. \p opts
 /// selects the resource solver; both paths go through the same `check` and
 /// `verify`.
-inline LogicalResult solveSchedulingProblem(ChainingModuloProblem &problem,
-                                            Operation *anchor, float cycleTime,
-                                            unsigned minII,
-                                            const SchedulerOptions &opts,
-                                            const SpanObjective &span,
-                                            unsigned maxII = 0,
-                                            int64_t slackGrant = 0) {
+inline LogicalResult
+solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
+                       float cycleTime, unsigned minII,
+                       const SchedulerOptions &opts, const SpanObjective &span,
+                       unsigned maxII = 0, int64_t slackGrant = 0) {
   if (failed(problem.check()))
     return failure();
   if (usesExactScheduler(opts.kind)) {

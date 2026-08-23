@@ -17,11 +17,11 @@ namespace mlir::allo {
 struct BankLayout;
 
 /// The address expressions an access's hardware computes, and the width they
-/// carry at. Not the flat row-major index: a banked access addresses one bank at
-/// the in-bank offset, usually cheaper (`A[2*i]` under cyclic-2 has offset `i`,
-/// no hardware, against flat address `2*i`, a shift-add). An access whose bank
-/// varies at runtime builds a second cone for the digit, a real divider whenever
-/// the factor is not a power of two.
+/// carry at. Not the flat row-major index: a banked access addresses one bank
+/// at the in-bank offset, usually cheaper (`A[2*i]` under cyclic-2 has offset
+/// `i`, no hardware, against flat address `2*i`, a shift-add). An access whose
+/// bank varies at runtime builds a second cone for the digit, a real divider
+/// whenever the factor is not a power of two.
 struct AddressExprs {
   AffineExpr offset;  // the element index inside the bank this access reaches
   AffineExpr bank;    // which bank, or null when it is decided at compile time
@@ -112,15 +112,17 @@ AddressCost addressCost(AffineExpr e, const AddressDelays &delays,
                         unsigned width);
 
 /// The cost of \p map composed with \p shape's row-major strides, i.e. the flat
-/// element index (not what a banked access builds; see `addressExprsOf`). A null
+/// element index (not what a banked access builds; see `addressExprsOf`). A
+/// null
 /// \p map prices as zero, the stream / non-access case.
 AddressCost addressCost(AffineMap map, llvm::ArrayRef<int64_t> shape,
                         const AddressDelays &delays, unsigned width);
 
-/// Whether a register can follow an operand, and its per-iteration step when one
-/// can. A digit of a counter is maintained by wrapping a register once per
-/// iteration, so a step that could carry it past two multiples of the divisor is
-/// not maintainable, and the pricing and the build must refuse the same ones.
+/// Whether a register can follow an operand, and its per-iteration step when
+/// one can. A digit of a counter is maintained by wrapping a register once per
+/// iteration, so a step that could carry it past two multiples of the divisor
+/// is not maintainable, and the pricing and the build must refuse the same
+/// ones.
 using CarriedFn = llvm::function_ref<std::optional<int64_t>(unsigned)>;
 
 /// An address as `base + sum(coeff * digit-of-operand) + residual`, where
@@ -129,14 +131,14 @@ using CarriedFn = llvm::function_ref<std::optional<int64_t>(unsigned)>;
 /// A term is what a register can carry: either a scaled counter (constant
 /// per-iteration difference, advanced rather than rebuilt) or a digit of one,
 /// `(x floordiv D) mod K`, which advances by a comparator/wrap rather than a
-/// constant but is just as cheap a register. The residual is everything else, in
-/// the operands' own numbering, null when nothing is left.
+/// constant but is just as cheap a register. The residual is everything else,
+/// in the operands' own numbering, null when nothing is left.
 ///
 /// The split is partial by design: `A[i,j]` with `i` a counter and `j`
-/// data-dependent has a row stride a register can follow and a column it cannot,
-/// so reducing both together would rebuild `i*N` every cycle just to add `j`. A
-/// `floordiv`/`mod` over anything but a counter lands in the residual for the
-/// same reason.
+/// data-dependent has a row stride a register can follow and a column it
+/// cannot, so reducing both together would rebuild `i*N` every cycle just to
+/// add `j`. A `floordiv`/`mod` over anything but a counter lands in the
+/// residual for the same reason.
 struct SplitAddress {
   /// One term a register can carry: `coeff * digit(scale * operand + offset)`,
   /// where `digit(x)` is `(x floordiv divisor) mod modulus`.
@@ -161,12 +163,12 @@ struct SplitAddress {
   /// Digits the residual reads rather than the address sums: an operator cheap
   /// on a register but expensive on a counter belongs on top of one.
   /// `(x mod 5) floordiv 2` is the shape: the residue is a register and the
-  /// `floordiv 2` over it a shift, where evaluated together the pair is two real
-  /// dividers.
+  /// `floordiv 2` over it a shift, where evaluated together the pair is two
+  /// real dividers.
   ///
   /// Named as symbols numbered from the map's own `numSymbols`, so no existing
-  /// leaf is renumbered and the emitter appends their values to the operand list
-  /// it already passes.
+  /// leaf is renumbered and the emitter appends their values to the operand
+  /// list it already passes.
   llvm::SmallVector<Term, 2> reads;
 };
 
@@ -180,8 +182,9 @@ struct SplitAddress {
 SplitAddress splitAddress(AffineExpr e, unsigned numDims, unsigned numSymbols,
                           CarriedFn carried);
 
-/// What \p addr costs once every term arrives from a register that advances with
-/// its operand: only the network summing the terms with the residual is left.
+/// What \p addr costs once every term arrives from a register that advances
+/// with its operand: only the network summing the terms with the residual is
+/// left.
 ///
 /// Priced in the order `buildAddr` writes it, one input per term and the
 /// residual last, so the count is the emitter's actual chain, not an optimal
@@ -192,9 +195,10 @@ AddressCost splitAddressCost(const SplitAddress &addr,
                              const AddressDelays &delays, unsigned width);
 
 /// The width an address over \p shape is carried at: enough bits to index it,
-/// what `DatapathEmitter::addrWidth` narrows to. Stated once here so the pricing
-/// and the emitted datapath, decided in different passes, agree. `addressExprsOf`
-/// applies it to the per-bank shape, one bank's address port width.
+/// what `DatapathEmitter::addrWidth` narrows to. Stated once here so the
+/// pricing and the emitted datapath, decided in different passes, agree.
+/// `addressExprsOf` applies it to the per-bank shape, one bank's address port
+/// width.
 unsigned addressWidthOf(llvm::ArrayRef<int64_t> shape);
 
 /// The cost of \p op's address as the emitter will build it. Zero for a stream
@@ -210,15 +214,15 @@ unsigned addressWidthOf(llvm::ArrayRef<int64_t> shape);
 /// same cycle, so it may send more terms to the residual: this pricing is
 /// optimistic on that gap, not pessimistic.
 ///
-/// A banked access is priced on its `AddressExprs`, not the flat index: a runtime
-/// bank digit is a second cone off the same operands, so delay is the max of the
-/// two cones while operator counts add.
+/// A banked access is priced on its `AddressExprs`, not the flat index: a
+/// runtime bank digit is a second cone off the same operands, so delay is the
+/// max of the two cones while operator counts add.
 AddressCost addressCostOf(Operation *op, const OperatorLibrary &lib);
 
-/// `addressCostOf`'s delay, quantized to a hundredth of a nanosecond: the caller
-/// names an operator type after this number, so two sites whose names agree must
-/// carry the same delay or whichever registers last silently redefines the
-/// other.
+/// `addressCostOf`'s delay, quantized to a hundredth of a nanosecond: the
+/// caller names an operator type after this number, so two sites whose names
+/// agree must carry the same delay or whichever registers last silently
+/// redefines the other.
 double addressDelayOf(Operation *op, const OperatorLibrary &lib);
 
 } // namespace mlir::allo

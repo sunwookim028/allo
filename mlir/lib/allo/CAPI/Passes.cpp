@@ -105,10 +105,15 @@ MlirLogicalResult alloRunSDCSchedulingPipeline(
   // the option, else the default, resolved once here so no second copy exists
   // downstream. A seed of zero is itself the default and passes through.
   float cycleTimeNs = cycleTime > 0.0f ? cycleTime : 5.0f;
-  allo::SchedulerOptions opts{
-      *kind, *obj, budget > 0.0 ? budget : allo::kDefaultSolveBudget, allocate,
-      workers > 0 ? workers : allo::kDefaultSolveWorkers, seed, deterministic,
-      areaSlack > 0.0 ? areaSlack : 0.0};
+  allo::SchedulerOptions opts{*kind,
+                              *obj,
+                              budget > 0.0 ? budget : allo::kDefaultSolveBudget,
+                              allocate,
+                              workers > 0 ? workers
+                                          : allo::kDefaultSolveWorkers,
+                              seed,
+                              deterministic,
+                              areaSlack > 0.0 ? areaSlack : 0.0};
   // The storage decision, taken once and recorded on every array before any
   // layer below reads it.
   allo::recordArrayStorage(mod, allo::MemoryLibrary::fromModule(mod));

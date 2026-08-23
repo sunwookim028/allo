@@ -29,9 +29,9 @@ struct AssumedRange {
 struct LoopTrip {
   /// Iterations, or empty when nothing bounds them.
   std::optional<int64_t> count;
-  /// `count` is a worst case from an `allo.assume.ssa` range, not a compile-time
-  /// constant, so every span composed from it is a bound, not an exact cycle
-  /// count.
+  /// `count` is a worst case from an `allo.assume.ssa` range, not a
+  /// compile-time constant, so every span composed from it is a bound, not an
+  /// exact cycle count.
   bool bounded = false;
 };
 

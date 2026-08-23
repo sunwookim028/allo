@@ -97,7 +97,8 @@ unsigned bankCount(Value memref) {
 // widest array's accesses per bank per iteration. The modulo scheduler cannot
 // beat that floor, so a preload leaving it in place buys no II and only spends
 // registers holding the values across the region boundary.
-bool lowersPortFloor(affine::AffineForOp loop, ArrayRef<Operation *> hoistable) {
+bool lowersPortFloor(affine::AffineForOp loop,
+                     ArrayRef<Operation *> hoistable) {
   DenseSet<Operation *> moved(hoistable.begin(), hoistable.end());
   DenseMap<Value, std::pair<unsigned, unsigned>> traffic; // total, hoistable
   loop.getBody()->walk([&](Operation *op) {
@@ -143,9 +144,8 @@ SmallVector<Operation *> invariantReads(affine::AffineForOp loop) {
   for (Operation &op : *loop.getBody()) {
     if (!isa<affine::AffineLoadOp, memref::LoadOp>(op))
       continue;
-    if (!llvm::all_of(op.getOperands(), [&](Value v) {
-          return loop.isDefinedOutsideOfLoop(v);
-        }))
+    if (!llvm::all_of(op.getOperands(),
+                      [&](Value v) { return loop.isDefinedOutsideOfLoop(v); }))
       continue;
     if (!arrayAllows(accessedMemref(&op)))
       continue;

@@ -14,9 +14,13 @@ N_OBS, N_STATES, N_TOKENS = 16, 8, 8
 
 def build():
     @kernel
-    def viterbi(obs: i32[N_OBS], init: f32[N_STATES],
-                transition: f32[N_STATES, N_STATES],
-                emission: f32[N_STATES, N_TOKENS], path: i32[N_OBS]):
+    def viterbi(
+        obs: i32[N_OBS],
+        init: f32[N_STATES],
+        transition: f32[N_STATES, N_STATES],
+        emission: f32[N_STATES, N_TOKENS],
+        path: i32[N_OBS],
+    ):
         llike: f32[N_OBS, N_STATES]
 
         for s0 in range(N_STATES):
@@ -24,11 +28,15 @@ def build():
 
         for t in range(1, N_OBS):
             for curr in range(N_STATES):
-                min_p: f32 = (llike[t - 1, 0] + transition[0, curr]
-                              + emission[curr, obs[t]])
+                min_p: f32 = (
+                    llike[t - 1, 0] + transition[0, curr] + emission[curr, obs[t]]
+                )
                 for prev in range(1, N_STATES):
-                    p: f32 = (llike[t - 1, prev] + transition[prev, curr]
-                              + emission[curr, obs[t]])
+                    p: f32 = (
+                        llike[t - 1, prev]
+                        + transition[prev, curr]
+                        + emission[curr, obs[t]]
+                    )
                     if p < min_p:
                         min_p = p
                 llike[t, curr] = min_p

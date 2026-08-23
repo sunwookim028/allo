@@ -67,8 +67,4 @@ BENCHMARK = Benchmark(
     reference=reference,
     outputs=(0,),
     tolerance=(5e-3, 5e-3),
-    skip={
-        "none": "math.sqrt has no RTL lowering on the default device",
-        "v1": "math.sqrt has no RTL lowering on the default device",
-    },
 )

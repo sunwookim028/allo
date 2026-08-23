@@ -236,7 +236,7 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             min_period_ns=2.47,
         ),  # 439
         IPRow(3, {"lut": 385, "ff": 152, "carry8": 17}, min_period_ns=2.04),  # 425
-        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=4.09),  # 326
+        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=3.05),  # 326
         IPRow(1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.51),  # 203
     ),
     ip.fsub: (
@@ -245,7 +245,8 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
         ),  # 432
         IPRow(5, {"lut": 370, "slicem_lut": 13, "ff": 242, "carry8": 17}),  # 439
         IPRow(3, {"lut": 385, "ff": 152, "carry8": 17}, min_period_ns=2.79),  # 425
-        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=4.09),  # 326
+        # See fadd l2: in-context 328/342 MHz, holds 300 (prior 4.09 locked out).
+        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=3.05),  # 326
         IPRow(1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.51),  # 203
     ),
     # The 2-cycle multiply measures 376 MHz standalone but routes below 300 MHz
@@ -264,6 +265,19 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             2, {"lut": 81, "ff": 51, "dsp": 2, "carry8": 8}, min_period_ns=3.55
         ),  # 376
         IPRow(1, {"lut": 79, "ff": 33, "dsp": 2, "carry8": 8}, in_delay_ns=3.37),  # 264
+        # Max-DSP builds (C_Mult_Usage=Max_Usage)
+        IPRow(
+            4,
+            {"lut": 87, "slicem_lut": 1, "ff": 73, "dsp": 3, "carry8": 4},
+            mnemonic="maxdsp",
+            min_period_ns=1.89,
+        ),  # 528
+        IPRow(
+            3,
+            {"lut": 87, "ff": 59, "dsp": 3, "carry8": 4},
+            mnemonic="maxdsp",
+            min_period_ns=1.89,
+        ),  # 530
     ),
     # The 10-cycle divide matches the 12-cycle row's frequency at no more area.
     # The deeper row stays declared for clocks the shorter one cannot hold.
@@ -274,8 +288,16 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             min_period_ns=2.39,
         ),  # 374
         IPRow(10, {"lut": 771, "slicem_lut": 34, "ff": 478, "carry8": 109}),  # 371
+        IPRow(
+            8,
+            {"lut": 774, "slicem_lut": 33, "ff": 375, "carry8": 109},
+            min_period_ns=3.28,
+        ),  # 307
     ),
     ip.fcmp: IPRow(1, {"lut": 63, "ff": 2, "carry8": 7}, min_period_ns=1.87),  # 610
+    ip.fsqrt: IPRow(
+        8, {"lut": 432, "slicem_lut": 13, "ff": 291, "carry8": 67}, min_period_ns=3.25
+    ),  # 321
     ip.dadd: (
         IPRow(
             14, {"lut": 721, "slicem_lut": 90, "ff": 872, "dsp": 3, "carry8": 30}
@@ -287,6 +309,7 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             min_period_ns=2.12,
         ),  # 430
         IPRow(3, {"lut": 726, "ff": 282, "carry8": 38}, min_period_ns=3.71),  # 360
+        IPRow(2, {"lut": 762, "ff": 139, "carry8": 38}, min_period_ns=3.30),  # 302
         IPRow(1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.02),  # 155
     ),
     ip.dsub: (
@@ -300,6 +323,7 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             min_period_ns=2.90,
         ),  # 430
         IPRow(3, {"lut": 726, "ff": 282, "carry8": 38}, min_period_ns=3.71),  # 360
+        IPRow(2, {"lut": 762, "ff": 139, "carry8": 38}, min_period_ns=3.30),  # 302
         IPRow(1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.02),  # 155
     ),
     ip.dmul: (
@@ -319,14 +343,36 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
         IPRow(
             1, {"lut": 137, "ff": 65, "dsp": 7, "carry8": 15}, in_delay_ns=6.65
         ),  # 141
+        # Max-DSP builds
+        IPRow(
+            9,
+            {"lut": 165, "slicem_lut": 63, "ff": 372, "dsp": 8, "carry8": 12},
+            mnemonic="maxdsp",
+            min_period_ns=1.79,
+        ),  # 560
+        IPRow(
+            5,
+            {"lut": 109, "slicem_lut": 19, "ff": 214, "dsp": 8, "carry8": 12},
+            mnemonic="maxdsp",
+            min_period_ns=2.71,
+        ),  # 369
     ),
     ip.ddiv: IPRow(
         32, {"lut": 3195, "slicem_lut": 72, "ff": 3027, "carry8": 398}
     ),  # 398
     ip.dcmp: IPRow(1, {"lut": 117, "ff": 2, "carry8": 12}, min_period_ns=2.90),  # 564
+    ip.dsqrt: IPRow(
+        20, {"lut": 1696, "slicem_lut": 51, "ff": 1280, "carry8": 243}
+    ),  # 329
     ip.bfadd: IPRow(4, {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 537
     ip.bfsub: IPRow(4, {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 537
     ip.bfmul: IPRow(2, {"lut": 60, "ff": 34, "dsp": 1, "carry8": 6}),  # 521
+    # IEEE fp16
+    ip.hadd: IPRow(2, {"lut": 199, "ff": 43, "carry8": 12}),  # 385
+    ip.hsub: IPRow(2, {"lut": 199, "ff": 43, "carry8": 12}),  # 385
+    ip.hmul: IPRow(2, {"lut": 48, "ff": 31, "dsp": 1, "carry8": 6}),  # 501
+    ip.hdiv: IPRow(6, {"lut": 223, "slicem_lut": 19, "ff": 150, "carry8": 29}),  # 468
+    ip.hcmp: IPRow(1, {"lut": 35, "ff": 2, "carry8": 5}),  # 782
     ip.i2f: IPRow(3, {"lut": 168, "slicem_lut": 1, "ff": 99, "carry8": 11}),  # 490
     ip.f2i: IPRow(3, {"lut": 183, "ff": 127, "carry8": 6}),  # 678
     ip.fcvt: IPRow(2, {"lut": 50, "ff": 99, "carry8": 1}),  # 1032

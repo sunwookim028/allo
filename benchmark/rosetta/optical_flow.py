@@ -12,14 +12,19 @@ from ..spec import Benchmark
 HEIGHT, WIDTH = 32, 32
 
 GRAD_WEIGHTS = np.array([1, -8, 0, 8, -1], np.float32)
-GRAD_FILTER = np.array([0.0755, 0.133, 0.1869, 0.2903, 0.1869, 0.133, 0.0755], np.float32)
+GRAD_FILTER = np.array(
+    [0.0755, 0.133, 0.1869, 0.2903, 0.1869, 0.133, 0.0755], np.float32
+)
 TENSOR_FILTER = np.array([0.3243, 0.3513, 0.3243], np.float32)
 
 
 def build():
     @kernel
-    def gradient_xy_calc(frame: f32[HEIGHT, WIDTH], gradient_x: f32[HEIGHT, WIDTH],
-                         gradient_y: f32[HEIGHT, WIDTH]):
+    def gradient_xy_calc(
+        frame: f32[HEIGHT, WIDTH],
+        gradient_x: f32[HEIGHT, WIDTH],
+        gradient_y: f32[HEIGHT, WIDTH],
+    ):
         weights: f32[5] = GRAD_WEIGHTS
         for r in range(HEIGHT + 2):
             for c in range(WIDTH + 2):
@@ -36,20 +41,33 @@ def build():
                     gradient_y[r - 2, c - 2] = 0.0
 
     @kernel
-    def gradient_z_calc(frame0: f32[HEIGHT, WIDTH], frame1: f32[HEIGHT, WIDTH],
-                        frame2: f32[HEIGHT, WIDTH], frame3: f32[HEIGHT, WIDTH],
-                        frame4: f32[HEIGHT, WIDTH], gradient_z: f32[HEIGHT, WIDTH]):
+    def gradient_z_calc(
+        frame0: f32[HEIGHT, WIDTH],
+        frame1: f32[HEIGHT, WIDTH],
+        frame2: f32[HEIGHT, WIDTH],
+        frame3: f32[HEIGHT, WIDTH],
+        frame4: f32[HEIGHT, WIDTH],
+        gradient_z: f32[HEIGHT, WIDTH],
+    ):
         weights: f32[5] = GRAD_WEIGHTS
         for rz in range(HEIGHT):
             for cz in range(WIDTH):
-                acc_z: f32 = (frame0[rz, cz] * weights[0] + frame1[rz, cz] * weights[1]
-                              + frame2[rz, cz] * weights[2] + frame3[rz, cz] * weights[3]
-                              + frame4[rz, cz] * weights[4])
+                acc_z: f32 = (
+                    frame0[rz, cz] * weights[0]
+                    + frame1[rz, cz] * weights[1]
+                    + frame2[rz, cz] * weights[2]
+                    + frame3[rz, cz] * weights[3]
+                    + frame4[rz, cz] * weights[4]
+                )
                 gradient_z[rz, cz] = acc_z / 12.0
 
     @kernel
-    def gradient_weight_y(gradient_x: f32[HEIGHT, WIDTH], gradient_y: f32[HEIGHT, WIDTH],
-                          gradient_z: f32[HEIGHT, WIDTH], filt_grad: f32[HEIGHT, WIDTH, 3]):
+    def gradient_weight_y(
+        gradient_x: f32[HEIGHT, WIDTH],
+        gradient_y: f32[HEIGHT, WIDTH],
+        gradient_z: f32[HEIGHT, WIDTH],
+        filt_grad: f32[HEIGHT, WIDTH, 3],
+    ):
         gfilter: f32[7] = GRAD_FILTER
         for ry in range(HEIGHT + 3):
             for cy in range(WIDTH):
@@ -70,7 +88,9 @@ def build():
                     filt_grad[ry - 3, cy, 2] = 0.0
 
     @kernel
-    def gradient_weight_x(y_filt: f32[HEIGHT, WIDTH, 3], filt_grad: f32[HEIGHT, WIDTH, 3]):
+    def gradient_weight_x(
+        y_filt: f32[HEIGHT, WIDTH, 3], filt_grad: f32[HEIGHT, WIDTH, 3]
+    ):
         gfilter: f32[7] = GRAD_FILTER
         for rx in range(HEIGHT):
             for cx in range(WIDTH + 3):
@@ -84,7 +104,9 @@ def build():
                         filt_grad[rx, cx - 3, k] = 0.0
 
     @kernel
-    def outer_product(gradient: f32[HEIGHT, WIDTH, 3], out_product: f32[HEIGHT, WIDTH, 6]):
+    def outer_product(
+        gradient: f32[HEIGHT, WIDTH, 3], out_product: f32[HEIGHT, WIDTH, 6]
+    ):
         for ro in range(HEIGHT):
             for co in range(WIDTH):
                 gx: f32 = gradient[ro, co, 0]
@@ -128,20 +150,31 @@ def build():
         for rf in range(HEIGHT):
             for cf in range(WIDTH):
                 if rf >= 2 and rf < HEIGHT - 2 and cf >= 2 and cf < WIDTH - 2:
-                    denom: f32 = (tensors[rf, cf, 0] * tensors[rf, cf, 1]
-                                  - tensors[rf, cf, 3] * tensors[rf, cf, 3])
-                    output[rf, cf, 0] = (tensors[rf, cf, 5] * tensors[rf, cf, 3]
-                                         - tensors[rf, cf, 4] * tensors[rf, cf, 1]) / denom
-                    output[rf, cf, 1] = (tensors[rf, cf, 4] * tensors[rf, cf, 3]
-                                         - tensors[rf, cf, 5] * tensors[rf, cf, 0]) / denom
+                    denom: f32 = (
+                        tensors[rf, cf, 0] * tensors[rf, cf, 1]
+                        - tensors[rf, cf, 3] * tensors[rf, cf, 3]
+                    )
+                    output[rf, cf, 0] = (
+                        tensors[rf, cf, 5] * tensors[rf, cf, 3]
+                        - tensors[rf, cf, 4] * tensors[rf, cf, 1]
+                    ) / denom
+                    output[rf, cf, 1] = (
+                        tensors[rf, cf, 4] * tensors[rf, cf, 3]
+                        - tensors[rf, cf, 5] * tensors[rf, cf, 0]
+                    ) / denom
                 else:
                     output[rf, cf, 0] = 0.0
                     output[rf, cf, 1] = 0.0
 
     @kernel
-    def optical_flow(frame0: f32[HEIGHT, WIDTH], frame1: f32[HEIGHT, WIDTH],
-                     frame2: f32[HEIGHT, WIDTH], frame3: f32[HEIGHT, WIDTH],
-                     frame4: f32[HEIGHT, WIDTH], outputs: f32[HEIGHT, WIDTH, 2]):
+    def optical_flow(
+        frame0: f32[HEIGHT, WIDTH],
+        frame1: f32[HEIGHT, WIDTH],
+        frame2: f32[HEIGHT, WIDTH],
+        frame3: f32[HEIGHT, WIDTH],
+        frame4: f32[HEIGHT, WIDTH],
+        outputs: f32[HEIGHT, WIDTH, 2],
+    ):
         gradient_x: f32[HEIGHT, WIDTH] = 0.0
         gradient_y: f32[HEIGHT, WIDTH] = 0.0
         gradient_z: f32[HEIGHT, WIDTH] = 0.0
@@ -160,11 +193,17 @@ def build():
         tensor_weight_x(tensor_y, tensor)
         flow_calc(tensor, outputs)
 
-    return {"top": optical_flow, "gradient_xy_calc": gradient_xy_calc,
-            "gradient_z_calc": gradient_z_calc, "gradient_weight_y": gradient_weight_y,
-            "gradient_weight_x": gradient_weight_x, "outer_product": outer_product,
-            "tensor_weight_y": tensor_weight_y, "tensor_weight_x": tensor_weight_x,
-            "flow_calc": flow_calc}
+    return {
+        "top": optical_flow,
+        "gradient_xy_calc": gradient_xy_calc,
+        "gradient_z_calc": gradient_z_calc,
+        "gradient_weight_y": gradient_weight_y,
+        "gradient_weight_x": gradient_weight_x,
+        "outer_product": outer_product,
+        "tensor_weight_y": tensor_weight_y,
+        "tensor_weight_x": tensor_weight_x,
+        "flow_calc": flow_calc,
+    }
 
 
 def _none(parts):
@@ -173,9 +212,13 @@ def _none(parts):
 
 def _v1(parts):
     stages = []
-    for name, loop in (("gradient_z_calc", "cz"), ("outer_product", "co"),
-                       ("tensor_weight_y", "cty"), ("tensor_weight_x", "ctx"),
-                       ("flow_calc", "cf")):
+    for name, loop in (
+        ("gradient_z_calc", "cz"),
+        ("outer_product", "co"),
+        ("tensor_weight_y", "cty"),
+        ("tensor_weight_x", "ctx"),
+        ("flow_calc", "cf"),
+    ):
         s = parts[name].schedule()
         s.pipeline(s.loop(loop), ii=1)
         stages.append(s)
@@ -203,10 +246,14 @@ def reference(frame0, frame1, frame2, frame3, frame4, outputs):
     for r in range(HEIGHT + 2):
         for c in range(WIDTH + 2):
             if 4 <= r < HEIGHT and 4 <= c < WIDTH:
-                gx[r - 2, c - 2] = sum(
-                    frame2[r - 2, c - i] * GRAD_WEIGHTS[4 - i] for i in range(5)) / 12.0
-                gy[r - 2, c - 2] = sum(
-                    frame2[r - i, c - 2] * GRAD_WEIGHTS[4 - i] for i in range(5)) / 12.0
+                gx[r - 2, c - 2] = (
+                    sum(frame2[r - 2, c - i] * GRAD_WEIGHTS[4 - i] for i in range(5))
+                    / 12.0
+                )
+                gy[r - 2, c - 2] = (
+                    sum(frame2[r - i, c - 2] * GRAD_WEIGHTS[4 - i] for i in range(5))
+                    / 12.0
+                )
     gz = sum(frames[i] * GRAD_WEIGHTS[i] for i in range(5)) / 12.0
 
     y_filt = np.zeros((HEIGHT, WIDTH, 3), np.float32)
@@ -218,9 +265,17 @@ def reference(frame0, frame1, frame2, frame3, frame4, outputs):
     for c in range(6, WIDTH):
         filt[:, c - 3, :] = sum(y_filt[:, c - i, :] * GRAD_FILTER[i] for i in range(7))
 
-    outer = np.stack([filt[:, :, 0] ** 2, filt[:, :, 1] ** 2, filt[:, :, 2] ** 2,
-                      filt[:, :, 0] * filt[:, :, 1], filt[:, :, 0] * filt[:, :, 2],
-                      filt[:, :, 1] * filt[:, :, 2]], axis=2)
+    outer = np.stack(
+        [
+            filt[:, :, 0] ** 2,
+            filt[:, :, 1] ** 2,
+            filt[:, :, 2] ** 2,
+            filt[:, :, 0] * filt[:, :, 1],
+            filt[:, :, 0] * filt[:, :, 2],
+            filt[:, :, 1] * filt[:, :, 2],
+        ],
+        axis=2,
+    )
 
     ten_y = np.zeros((HEIGHT, WIDTH, 6), np.float32)
     for r in range(2, HEIGHT):
@@ -230,12 +285,14 @@ def reference(frame0, frame1, frame2, frame3, frame4, outputs):
         ten[:, c - 1] = sum(ten_y[:, c - i] * TENSOR_FILTER[i] for i in range(3))
 
     out = np.zeros((HEIGHT, WIDTH, 2), np.float32)
-    t = ten[2:HEIGHT - 2, 2:WIDTH - 2]
+    t = ten[2 : HEIGHT - 2, 2 : WIDTH - 2]
     denom = t[:, :, 0] * t[:, :, 1] - t[:, :, 3] ** 2
-    out[2:HEIGHT - 2, 2:WIDTH - 2, 0] = (
-        t[:, :, 5] * t[:, :, 3] - t[:, :, 4] * t[:, :, 1]) / denom
-    out[2:HEIGHT - 2, 2:WIDTH - 2, 1] = (
-        t[:, :, 4] * t[:, :, 3] - t[:, :, 5] * t[:, :, 0]) / denom
+    out[2 : HEIGHT - 2, 2 : WIDTH - 2, 0] = (
+        t[:, :, 5] * t[:, :, 3] - t[:, :, 4] * t[:, :, 1]
+    ) / denom
+    out[2 : HEIGHT - 2, 2 : WIDTH - 2, 1] = (
+        t[:, :, 4] * t[:, :, 3] - t[:, :, 5] * t[:, :, 0]
+    ) / denom
     return (out,)
 
 

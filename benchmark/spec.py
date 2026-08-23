@@ -95,7 +95,9 @@ def discover(suites: tuple[str, ...] = _SUITES) -> list[Benchmark]:
         pkg_path = root / suite
         if not pkg_path.is_dir():
             continue
-        for mod in sorted(pkgutil.walk_packages([str(pkg_path)], f"benchmark.{suite}.")):
+        for mod in sorted(
+            pkgutil.walk_packages([str(pkg_path)], f"benchmark.{suite}.")
+        ):
             module = importlib.import_module(mod.name)
             bench = getattr(module, "BENCHMARK", None)
             if bench is not None:

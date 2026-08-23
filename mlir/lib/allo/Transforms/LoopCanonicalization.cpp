@@ -440,8 +440,8 @@ bool coalescingCostsADivider(MutableArrayRef<affine::AffineForOp> band) {
           return asMemAccess(user).has_value();
         });
     if (escapes) {
-      AddressCost c = addressCost(recovered[k], AddressDelays{},
-                                  AddressDelays::refWidth);
+      AddressCost c =
+          addressCost(recovered[k], AddressDelays{}, AddressDelays::refWidth);
       if (c.dividers || c.reciprocals)
         return true;
     }

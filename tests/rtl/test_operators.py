@@ -2746,9 +2746,7 @@ def test_a_weight_moves_a_multiply_onto_the_comb_row():
     assert any("mul" in s for s in _impls(rtl.schedule()))
 
     rtl = _to_rtl(mulk, device=dev)
-    rtl.set_scheduler_opt(
-        scheduler="exact", O="area", resource_weights={"dsp": 8.0}
-    )
+    rtl.set_scheduler_opt(scheduler="exact", O="area", resource_weights={"dsp": 8.0})
     assert "weight = 8" in rtl.dcp
     assert not _impls(rtl.schedule())
     rng = np.random.default_rng(3)

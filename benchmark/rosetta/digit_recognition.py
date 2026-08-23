@@ -30,9 +30,15 @@ def build():
         return v & 0x3F
 
     @kernel
-    def update_knn(training_set: u32[NUM_TRAINING, DIGIT_WIDTH],
-                   test_set: u32[NUM_TEST, DIGIT_WIDTH], t: i32, n: i32,
-                   dists: i32[K_CONST], labels: i32[K_CONST], label: i32):
+    def update_knn(
+        training_set: u32[NUM_TRAINING, DIGIT_WIDTH],
+        test_set: u32[NUM_TEST, DIGIT_WIDTH],
+        t: i32,
+        n: i32,
+        dists: i32[K_CONST],
+        labels: i32[K_CONST],
+        label: i32,
+    ):
         dist: i32 = 0
         for i in range(DIGIT_WIDTH):
             diff: u32 = test_set[t, i] ^ training_set[n, i]
@@ -63,8 +69,11 @@ def build():
         return max_label
 
     @kernel
-    def digit_recognition(training_set: u32[NUM_TRAINING, DIGIT_WIDTH],
-                          test_set: u32[NUM_TEST, DIGIT_WIDTH], results: i32[NUM_TEST]):
+    def digit_recognition(
+        training_set: u32[NUM_TRAINING, DIGIT_WIDTH],
+        test_set: u32[NUM_TEST, DIGIT_WIDTH],
+        results: i32[NUM_TEST],
+    ):
         dists: i32[K_CONST] = 0
         labels: i32[K_CONST] = 0
         for t in range(NUM_TEST):
@@ -75,8 +84,12 @@ def build():
                 update_knn(training_set, test_set, t, n, dists, labels, n // CLASS_SIZE)
             results[t] = knn_vote(labels)
 
-    return {"top": digit_recognition, "update_knn": update_knn, "knn_vote": knn_vote,
-            "popcount": popcount}
+    return {
+        "top": digit_recognition,
+        "update_knn": update_knn,
+        "knn_vote": knn_vote,
+        "popcount": popcount,
+    }
 
 
 def _none(parts):
@@ -112,8 +125,12 @@ def reference(training_set, test_set, results):
         dists = [MAX_DIST] * K_CONST
         labels = [0] * K_CONST
         for n in range(NUM_TRAINING):
-            dist = int(sum(int(x).bit_count()
-                           for x in (test_set[t] ^ training_set[n]).astype(np.uint32)))
+            dist = int(
+                sum(
+                    int(x).bit_count()
+                    for x in (test_set[t] ^ training_set[n]).astype(np.uint32)
+                )
+            )
             max_dist, max_id = 0, K_CONST
             for k in range(K_CONST):
                 if dists[k] > max_dist:

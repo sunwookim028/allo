@@ -37,8 +37,7 @@ def build():
                     for i_h in range(4):
                         a_indx = blockID * ELEMENTSPERBLOCK + i_h
                         bucket_indx = (
-                            ((a[a_indx] >> (exp * 2)) & 0x3) * NUMOFBLOCKS
-                            + blockID + 1
+                            ((a[a_indx] >> (exp * 2)) & 0x3) * NUMOFBLOCKS + blockID + 1
                         )
                         bucket[bucket_indx] = bucket[bucket_indx] + 1
             else:
@@ -47,7 +46,8 @@ def build():
                         a_indx = blockID2 * ELEMENTSPERBLOCK + i_h2
                         bucket_indx = (
                             ((b[a_indx] >> (exp * 2)) & 0x3) * NUMOFBLOCKS
-                            + blockID2 + 1
+                            + blockID2
+                            + 1
                         )
                         bucket[bucket_indx] = bucket[bucket_indx] + 1
 

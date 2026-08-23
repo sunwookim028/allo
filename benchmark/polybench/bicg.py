@@ -27,8 +27,9 @@ def build():
                 q[i1] += A[i1, j1] * p[j1]
 
     @kernel
-    def bicg(A: f32[N, M], A_copy: f32[N, M], p: f32[M], r: f32[N], q: f32[N],
-             s: f32[M]):
+    def bicg(
+        A: f32[N, M], A_copy: f32[N, M], p: f32[M], r: f32[N], q: f32[N], s: f32[M]
+    ):
         stageS(A, r, s)
         stageQ(A_copy, p, q)
 

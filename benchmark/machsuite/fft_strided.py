@@ -17,8 +17,12 @@ FFT_SIZE_HALF = FFT_SIZE // 2
 
 def build():
     @kernel
-    def fft(real: f64[FFT_SIZE], img: f64[FFT_SIZE], real_twid: f64[FFT_SIZE_HALF],
-            img_twid: f64[FFT_SIZE_HALF]):
+    def fft(
+        real: f64[FFT_SIZE],
+        img: f64[FFT_SIZE],
+        real_twid: f64[FFT_SIZE_HALF],
+        img_twid: f64[FFT_SIZE_HALF],
+    ):
         span: i32 = FFT_SIZE >> 1
         log: i32 = 0
         even: i32 = 0
@@ -39,10 +43,14 @@ def build():
                 img[even] = temp
                 rootindex = (even << log) & (FFT_SIZE - 1)
                 if rootindex > 0:
-                    temp = (real_twid[rootindex] * real[odd]
-                            - img_twid[rootindex] * img[odd])
-                    img[odd] = (real_twid[rootindex] * img[odd]
-                                + img_twid[rootindex] * real[odd])
+                    temp = (
+                        real_twid[rootindex] * real[odd]
+                        - img_twid[rootindex] * img[odd]
+                    )
+                    img[odd] = (
+                        real_twid[rootindex] * img[odd]
+                        + img_twid[rootindex] * real[odd]
+                    )
                     real[odd] = temp
                 odd += 1
             span >>= 1
@@ -58,10 +66,14 @@ def _none(parts):
 def inputs(rng):
     real = rng.uniform(0.01, 0.25, FFT_SIZE).astype(np.float64)
     img = rng.uniform(0.01, 0.25, FFT_SIZE).astype(np.float64)
-    real_twid = np.array([math.cos(2.0 * math.pi * i / FFT_SIZE)
-                          for i in range(FFT_SIZE_HALF)], np.float64)
-    img_twid = np.array([math.sin(2.0 * math.pi * i / FFT_SIZE)
-                         for i in range(FFT_SIZE_HALF)], np.float64)
+    real_twid = np.array(
+        [math.cos(2.0 * math.pi * i / FFT_SIZE) for i in range(FFT_SIZE_HALF)],
+        np.float64,
+    )
+    img_twid = np.array(
+        [math.sin(2.0 * math.pi * i / FFT_SIZE) for i in range(FFT_SIZE_HALF)],
+        np.float64,
+    )
     return real, img, real_twid, img_twid
 
 
@@ -83,8 +95,7 @@ def reference(real, img, real_twid, img_twid):
             rootindex = (even << log) & (FFT_SIZE - 1)
             if rootindex > 0:
                 temp = real_twid[rootindex] * re[odd] - img_twid[rootindex] * im[odd]
-                im[odd] = (real_twid[rootindex] * im[odd]
-                           + img_twid[rootindex] * re[odd])
+                im[odd] = real_twid[rootindex] * im[odd] + img_twid[rootindex] * re[odd]
                 re[odd] = temp
             odd += 1
         span >>= 1

@@ -15,8 +15,9 @@ ALPHA, BETA = 0.1, 0.1
 
 def build():
     @kernel
-    def compute_tmp(y_in: f32[N], y_out: f32[N], A: f32[N, N], B: f32[N, N],
-                    x: f32[N], tmp: f32[N]):
+    def compute_tmp(
+        y_in: f32[N], y_out: f32[N], A: f32[N, N], B: f32[N, N], x: f32[N], tmp: f32[N]
+    ):
         tt: f32[N] = 0.0
         yy: f32[N]
         for i0 in range(N):

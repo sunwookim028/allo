@@ -15,7 +15,9 @@ WEIGHTS = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], np.int32)
 
 def build():
     @kernel
-    def video_2dfilter(pixel_in: i32[HEIGHT, WIDTH, 3], pixel_out: i32[HEIGHT, WIDTH, 3]):
+    def video_2dfilter(
+        pixel_in: i32[HEIGHT, WIDTH, 3], pixel_out: i32[HEIGHT, WIDTH, 3]
+    ):
         h: i32[3, 3] = WEIGHTS
         for row in range(HEIGHT):
             for col in range(WIDTH):

@@ -106,8 +106,12 @@ def _v1(parts):
 
 def inputs(rng):
     imgIn = rng.uniform(0.01, 0.25, (W, H)).astype(np.float32)
-    return (imgIn, np.zeros((W, H), np.float32), np.zeros((W, H), np.float32),
-            np.zeros((W, H), np.float32))
+    return (
+        imgIn,
+        np.zeros((W, H), np.float32),
+        np.zeros((W, H), np.float32),
+        np.zeros((W, H), np.float32),
+    )
 
 
 def reference(imgIn, imgOut, y1, y2):

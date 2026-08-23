@@ -397,9 +397,7 @@ def _run_child(item, knobs: Knobs, timeout: int) -> dict:
     # The II-vs-bound warnings, which no field of the schedule result carries:
     # the bound is settled inside the simplex and reported only as a diagnostic.
     d["ii_gaps"] = [{"ii": int(a), "bound": int(b)} for a, b in _II_GAP.findall(text)]
-    d["budget_exhausted"] = sum(
-        1 for s in d.get("solves", []) if s.get("exhausted")
-    )
+    d["budget_exhausted"] = sum(1 for s in d.get("solves", []) if s.get("exhausted"))
     d["probes"] = _PROBE.findall(text)
     d["raised"] = [sum(int(m[i]) for m in _RAISED.findall(text)) for i in (0, 1)]
     d["warnings"] = [l.strip()[:300] for l in text.splitlines() if "WARN" in l][:20]

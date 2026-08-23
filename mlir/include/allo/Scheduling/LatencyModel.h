@@ -20,10 +20,10 @@
 
 namespace mlir::allo {
 
-/// The cycles a controller family spends at its region's boundaries, outside the
-/// region's own schedule. Only structural constants live here; a datapath-derived
-/// delay (a condition cone's `tCond`, a region's `drainStage`) is passed in as a
-/// parameter.
+/// The cycles a controller family spends at its region's boundaries, outside
+/// the region's own schedule. Only structural constants live here; a
+/// datapath-derived delay (a condition cone's `tCond`, a region's `drainStage`)
+/// is passed in as a parameter.
 struct BoundaryCost {
   /// `start` -> the first body pass issues.
   unsigned arm;
@@ -75,10 +75,10 @@ inline constexpr BoundaryCost kAcyclicBoundary{/*arm=*/0, /*reArm=*/0};
 /// static span, so this constant never describes them.
 inline constexpr BoundaryCost kPipelinedBoundary{/*arm=*/0, /*reArm=*/0};
 
-/// An empty region, a runtime zero trip or a static `lb >= ub`, never launches a
-/// pass at all: `gateStart` masks the start launch and a register on
-/// `start && isEmpty` feeds the `done` latch. Two cycles, whichever family drives
-/// the region. A separate constant, not the arithmetic below at trip zero, which
+/// An empty region, a runtime zero trip or a static `lb >= ub`, never launches
+/// a pass at all: `gateStart` masks the start launch and a register on `start
+/// && isEmpty` feeds the `done` latch. Two cycles, whichever family drives the
+/// region. A separate constant, not the arithmetic below at trip zero, which
 /// describes the steady state and is written for `trip >= 1`.
 inline constexpr int64_t kEmptyRegionCycles = 2;
 
@@ -96,9 +96,9 @@ inline int64_t containerSpan(const BoundaryCost &boundary, int64_t trip,
 /// A leaf's whole span: it arms, issues \p trip iterations at its solved \p ii,
 /// then drains.
 ///
-/// \p drain is the terminal quantity, the cycles from the last issue pulse to the
-/// deepest output committing, so `done` rises `drain + 1` cycles after that pulse.
-/// It is not the schedule depth, above which the solver may leave slack.
+/// \p drain is the terminal quantity, the cycles from the last issue pulse to
+/// the deepest output committing, so `done` rises `drain + 1` cycles after that
+/// pulse. It is not the schedule depth, above which the solver may leave slack.
 inline int64_t leafSpan(const BoundaryCost &boundary, int64_t trip, int64_t ii,
                         int64_t drain) {
   if (trip == 0)
@@ -116,10 +116,10 @@ struct SpanNode {
   /// dynamic bound), which leaves every enclosing span unknown rather than
   /// guessed.
   std::optional<int64_t> trip;
-  /// A leaf's own solved schedule: its issue cadence and its terminal cycle, the
-  /// delay from the last issue pulse to the deepest output committing. `ii` stays
-  /// empty for an acyclic leaf, which issues once. `drain`, not the schedule
-  /// depth, since the solver may leave slack above the last commit.
+  /// A leaf's own solved schedule: its issue cadence and its terminal cycle,
+  /// the delay from the last issue pulse to the deepest output committing. `ii`
+  /// stays empty for an acyclic leaf, which issues once. `drain`, not the
+  /// schedule depth, since the solver may leave slack above the last commit.
   std::optional<int64_t> drain, ii;
   /// An instance element's whole start->done contract (see `instance`).
   std::optional<int64_t> contract;
@@ -171,10 +171,10 @@ std::optional<int64_t> composeSpan(const SpanNode &n);
 bool spanHoldsBound(const SpanNode &n);
 
 /// A run of nodes composed in program order, hence the sum of their spans: each
-/// starts on its predecessor's `done` edge, which costs nothing (`startFor` is a
-/// rising edge, not a register). Both compositions in the compiler are this one
-/// function: a done-paced region's body pass, and a func's top-level regions
-/// along one path of their DAG.
+/// starts on its predecessor's `done` edge, which costs nothing (`startFor` is
+/// a rising edge, not a register). Both compositions in the compiler are this
+/// one function: a done-paced region's body pass, and a func's top-level
+/// regions along one path of their DAG.
 std::optional<int64_t> composeSequence(llvm::ArrayRef<SpanNode> nodes);
 
 /// For each top-level node, in program order, the earlier nodes it must run
@@ -225,8 +225,8 @@ composeDag(llvm::ArrayRef<SpanNode> nodes,
            llvm::ArrayRef<llvm::SmallVector<unsigned, 2>> preds);
 
 /// One materialized dcp region as the latency model sees it: the reify-side
-/// structural walk, over `dcp.pipeline` / `dcp.sequential` / `dcp.select` and the
-/// `dcp.instance` elements they hold. `SDC.cpp` has the other, over the
+/// structural walk, over `dcp.pipeline` / `dcp.sequential` / `dcp.select` and
+/// the `dcp.instance` elements they hold. `SDC.cpp` has the other, over the
 /// affine/scf loops these were built from.
 ///
 /// A region's span and its composition class are derived where they are used,
@@ -238,12 +238,12 @@ SpanNode dcpSpanNode(Operation *regionOp, bool topLevel);
 /// The two scopes differ in what a span is for. \p topLevel is a func's entry
 /// block, which composes an exported contract, so an assume-bounded region
 /// contributes its bound, which a caller then waits out. A region body composes
-/// one pass of a counter, where a bound cannot pace anything, so a bounded child
-/// leaves the container done-paced instead.
+/// one pass of a counter, where a bound cannot pace anything, so a bounded
+/// child leaves the container done-paced instead.
 std::vector<SpanNode> dcpSpanNodes(Block &block, bool topLevel);
 
-/// How a materialized region is paced: which controller family drives it, and the
-/// single-run span a container may time-trigger it against.
+/// How a materialized region is paced: which controller family drives it, and
+/// the single-run span a container may time-trigger it against.
 struct RegionTiming {
   DeterminacyEnum determinacy = DeterminacyEnum::Indeterminate;
   /// Present only for `counted_static`, and then it is exact.
@@ -266,10 +266,10 @@ struct RegionTiming {
 RegionTiming dcpRegionTiming(Operation *regionOp);
 
 /// Func-level: whole-kernel latency in cycles, the top-level regions composed
-/// over their dependence DAG (`publishKernelLatency`). Set only when every region
-/// has a composable span. Whether it is an exact count or an assume-bounded worst
-/// case is not recorded: a bound is an upper one, so it times a caller safely
-/// either way.
+/// over their dependence DAG (`publishKernelLatency`). Set only when every
+/// region has a composable span. Whether it is an exact count or an
+/// assume-bounded worst case is not recorded: a bound is an upper one, so it
+/// times a caller safely either way.
 constexpr llvm::StringLiteral kLatencyAttr = "allo.sched.latency";
 
 } // namespace mlir::allo

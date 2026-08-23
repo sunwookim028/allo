@@ -12,7 +12,9 @@ from ..spec import Benchmark
 NUM_ITERATIONS = 16
 N = 32
 
-PHASE = np.arctan(2.0 ** -np.arange(NUM_ITERATIONS, dtype=np.float64)).astype(np.float32)
+PHASE = np.arctan(2.0 ** -np.arange(NUM_ITERATIONS, dtype=np.float64)).astype(
+    np.float32
+)
 GAIN = float(np.prod(1.0 / np.sqrt(1.0 + 4.0 ** -np.arange(NUM_ITERATIONS))))
 
 

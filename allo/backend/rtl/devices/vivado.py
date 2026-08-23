@@ -72,6 +72,12 @@ _BF16 = (
     "Result_Precision_Type=Custom,C_Result_Exponent_Width=8,"
     "C_Result_Fraction_Width=8"
 )
+# IEEE half is a native precision (exponent 5, fraction 11 with the hidden bit).
+_HALF = (
+    "A_Precision_Type=Half,C_A_Exponent_Width=5,C_A_Fraction_Width=11,"
+    "Result_Precision_Type=Half,C_Result_Exponent_Width=5,"
+    "C_Result_Fraction_Width=11"
+)
 
 # One Programmable compare core serves every predicate, which the instantiating
 # wrapper drives as a constant on the core's operation channel.
@@ -87,15 +93,22 @@ RECIPES: dict[OperatorIP, VivadoCore] = {
     ip.fsub: VivadoCore(_FP, "Operation_Type=Add_Subtract", _NO_DSP, _SUB),
     ip.fmul: VivadoCore(_FP, "Operation_Type=Multiply", _NO_DSP),
     ip.fdiv: VivadoCore(_FP, "Operation_Type=Divide"),
+    ip.fsqrt: VivadoCore(_FP, "Operation_Type=Square_root"),
     ip.fcmp: VivadoCore(_FP, _CMP),
     ip.dadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_DOUBLE}", _NO_DSP, _ADD),
     ip.dsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_DOUBLE}", _NO_DSP, _SUB),
     ip.dmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_DOUBLE}", _NO_DSP),
     ip.ddiv: VivadoCore(_FP, f"Operation_Type=Divide,{_DOUBLE}"),
+    ip.dsqrt: VivadoCore(_FP, f"Operation_Type=Square_root,{_DOUBLE}"),
     ip.dcmp: VivadoCore(_FP, f"{_CMP},{_DOUBLE}"),
     ip.bfadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", "", _ADD),
     ip.bfsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", "", _SUB),
     ip.bfmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_BF16}", _NO_DSP),
+    ip.hadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_HALF}", _NO_DSP, _ADD),
+    ip.hsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_HALF}", _NO_DSP, _SUB),
+    ip.hmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_HALF}", _NO_DSP),
+    ip.hdiv: VivadoCore(_FP, f"Operation_Type=Divide,{_HALF}"),
+    ip.hcmp: VivadoCore(_FP, f"{_CMP},{_HALF}"),
     ip.i2f: VivadoCore(
         _FP,
         "Operation_Type=Fixed_to_float,A_Precision_Type=Int32,"

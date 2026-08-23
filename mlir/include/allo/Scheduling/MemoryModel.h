@@ -89,9 +89,10 @@ struct StoragePorts {
   /// two ends, neither leaving room for an added copy.
   bool stated = false;
 
-  /// Instances an array may be spread over in a cycle, what the scheduler issues
-  /// against. Not a bound on the copies built: the port binding colours by what
-  /// may share an address bus, so two issued reads can still need three buses.
+  /// Instances an array may be spread over in a cycle, what the scheduler
+  /// issues against. Not a bound on the copies built: the port binding colours
+  /// by what may share an address bus, so two issued reads can still need three
+  /// buses.
   unsigned copies() const { return stated ? 1 : kStorageCopies; }
 
   /// The tighter of the two budgets on every axis. A nullopt is no limit and
@@ -102,10 +103,11 @@ struct StoragePorts {
   /// address buses, given as many copies as it takes. Buses are not writes plus
   /// reads: one bus may carry a read and a write that never issue together.
   ///
-  /// Reads never disqualify a row (a further read is a further copy); writes do,
-  /// since every copy needs every write, so one instance's write ports are the
-  /// ceiling at any copy count. A pooled row's writes also spend a port of every
-  /// copy. Where the ports are `stated` the whole array fits one instance.
+  /// Reads never disqualify a row (a further read is a further copy); writes
+  /// do, since every copy needs every write, so one instance's write ports are
+  /// the ceiling at any copy count. A pooled row's writes also spend a port of
+  /// every copy. Where the ports are `stated` the whole array fits one
+  /// instance.
   bool holds(unsigned writes, unsigned ports) const;
 
   /// Whether it can serve the topology \p want names, asked of ports a
@@ -123,8 +125,9 @@ struct StorageRealization {
   std::string name;
   MemKindTiming timing;
   StoragePorts ports;
-  /// Vendor attribute pinning an array to this structure, stamped on the emitted
-  /// declaration. Empty where the part has none, and the synthesizer chooses.
+  /// Vendor attribute pinning an array to this structure, stamped on the
+  /// emitted declaration. Empty where the part has none, and the synthesizer
+  /// chooses.
   std::string ramStyle;
   /// Whether the structure comes up holding contents. False for one that powers
   /// up undefined, as an UltraRAM does.
@@ -132,15 +135,15 @@ struct StorageRealization {
   /// The row that is not a memory: one cell per element, no address, where a
   /// complete partition goes.
   bool scatter = false;
-  /// The row that is a constant lookup built from logic: no address bus, no port
-  /// limit, where a read-only initialized array goes.
+  /// The row that is a constant lookup built from logic: no address bus, no
+  /// port limit, where a read-only initialized array goes.
   bool table = false;
   /// What one instance spends over `(depth, width)`, the row's `uses` verbatim,
   /// held as the attribute since the price is only meaningful at an array's own
   /// shape. Null where the device left the row unpriced.
   mlir::ArrayAttr uses;
-  /// Read delay curve over the array's depth, and the factor its width scales it
-  /// by. Null where delay is the same at every shape and `timing.delay.read`
+  /// Read delay curve over the array's depth, and the factor its width scales
+  /// it by. Null where delay is the same at every shape and `timing.delay.read`
   /// stands alone.
   CostAttr rdDelayDepth, rdDelayWidth;
 };
@@ -208,13 +211,14 @@ public:
   /// The row an unbound array of \p words x \p width takes: cheapest by
   /// `fractionOfPart` among the pinnable rows at the least access latency.
   /// Latency ranks first without exception, being the contract the schedule is
-  /// built on. \p needsInit excludes a row that powers up undefined. Empty where
-  /// the device can neither pin nor price a row, and `defaultStorage` stands.
+  /// built on. \p needsInit excludes a row that powers up undefined. Empty
+  /// where the device can neither pin nor price a row, and `defaultStorage`
+  /// stands.
   ///
-  /// \p canTable admits the `table` row, which only an initialized array nothing
-  /// writes may take. Cheapest at every shape, so kept only while its read is no
-  /// slower than the memory it displaces; its read delay bounds how deep it is
-  /// worth building.
+  /// \p canTable admits the `table` row, which only an initialized array
+  /// nothing writes may take. Cheapest at every shape, so kept only while its
+  /// read is no slower than the memory it displaces; its read delay bounds how
+  /// deep it is worth building.
   std::string rowFor(int64_t words, unsigned width, bool needsInit,
                      bool canTable) const;
 
@@ -251,10 +255,10 @@ std::optional<Attribute> globalInitOf(Value memRef);
 /// Eligibility only; whether the table is built is `recordArrayStorage`'s
 /// decision, read through `MemoryChar::constantTable`.
 ///
-/// A constant table lowers to `hw.aggregate_constant` read by one `hw.array_get`
-/// per access: combinational, no handshake, unlimited-port. A child that only
-/// reads one is served off the parent's table; a child that writes disqualifies
-/// the array.
+/// A constant table lowers to `hw.aggregate_constant` read by one
+/// `hw.array_get` per access: combinational, no handshake, unlimited-port. A
+/// child that only reads one is served off the parent's table; a child that
+/// writes disqualifies the array.
 bool isConstantTable(Value memRef);
 
 /// The `allo.bind.storage impl=` written on \p memref: what was asked for,
@@ -274,9 +278,9 @@ std::string resolvedStorageOf(Value memref);
 /// RAM/ROM half of a `type` spelling is not an axis; read-only is a property of
 /// the use, decided by `isConstantTable`.
 struct BindStorage {
-  /// The topology asked for, empty where the directive names none. Absent is not
-  /// the dual-port default: an array that asked for nothing takes whatever its
-  /// realization has, and only an explicit topology narrows it.
+  /// The topology asked for, empty where the directive names none. Absent is
+  /// not the dual-port default: an array that asked for nothing takes whatever
+  /// its realization has, and only an explicit topology narrows it.
   std::optional<MemoryPortEnum> port;
   llvm::StringRef storage; // empty: no explicit choice, not "no storage"
 };
@@ -301,18 +305,19 @@ bool topologyCovers(MemoryPortEnum a, MemoryPortEnum b);
 ///
 /// A cyclic axis of factor F puts element `i_d` in bank `i_d mod F` at local
 /// coordinate `i_d floordiv F`. A block axis puts it in bank
-/// `i_d floordiv extent` at `i_d mod extent`, `extent = ceil(S_d / F)`. A skewed
-/// axis puts it in bank `(sum over all k of i_k) mod F`, keeping
-/// `i_d floordiv F` on its distribution dimension `d` and every other subscript
+/// `i_d floordiv extent` at `i_d mod extent`, `extent = ceil(S_d / F)`. A
+/// skewed axis puts it in bank `(sum over all k of i_k) mod F`, keeping `i_d
+/// floordiv F` on its distribution dimension `d` and every other subscript
 /// whole. Axes compose in mixed radix, in `allo.part` order:
 /// `((b_1 * F_2) + b_2) * F_3 + ...`. An axis with `dim == 0` means every
 /// dimension, contributing one `Axis` each (`numBanks` is `F^rank`, not `F`); a
 /// skew is never spelled that way, its bank already reading every subscript.
 ///
-/// A skew buys conflict freedom, not a compile-time bank, where block and cyclic
-/// (functions of one subscript) serve an array read only one way: `A[i][Fj+k]`
-/// and `A[Fj+k][i]` each reach F distinct banks as `k` runs over the factor, so
-/// an unrolled group takes one port per bank instead of F (see `skewSlotOf`).
+/// A skew buys conflict freedom, not a compile-time bank, where block and
+/// cyclic (functions of one subscript) serve an array read only one way:
+/// `A[i][Fj+k]` and `A[Fj+k][i]` each reach F distinct banks as `k` runs over
+/// the factor, so an unrolled group takes one port per bank instead of F (see
+/// `skewSlotOf`).
 struct BankLayout {
   /// How an axis maps a subscript onto banks. `Cyclic` interleaves, `Block`
   /// chunks, `Skew` reads every subscript (see the type comment).
@@ -347,8 +352,8 @@ llvm::StringRef bankKindName(BankLayout::Kind kind);
 BankLayout bankLayoutOf(Value memRef);
 
 /// One array's storage shape: how it banks, what ports one bank has, and which
-/// `dcp.storage` realization it resolves to. The one characterization, billed by
-/// the scheduler's port model (`MemoryBankModel`) and built by the microarch
+/// `dcp.storage` realization it resolves to. The one characterization, billed
+/// by the scheduler's port model (`MemoryBankModel`) and built by the microarch
 /// datapath (`MemUnit`), so a schedule's reservation and the emitter's wiring
 /// cannot drift apart.
 struct MemoryChar {
@@ -374,10 +379,10 @@ struct MemoryChar {
 };
 
 /// Where an array carries the `dcp.storage` realization it resolved to. On the
-/// array's carrier, so `dcp-resolve-banking` copies it onto every bank alloc and
-/// a per-bank array answers what the whole one did. Empty names the array with
-/// nowhere to go, a complete partition on a device marking no `scatter` row,
-/// which `PreVerification` reports.
+/// array's carrier, so `dcp-resolve-banking` copies it onto every bank alloc
+/// and a per-bank array answers what the whole one did. Empty names the array
+/// with nowhere to go, a complete partition on a device marking no `scatter`
+/// row, which `PreVerification` reports.
 constexpr llvm::StringLiteral kStorageAttr = "allo.storage";
 
 /// Resolve every array of \p module to a `dcp.storage` realization and record
@@ -400,31 +405,32 @@ MemoryChar characterize(Value memref, const MemoryLibrary &lib);
 std::optional<StoragePorts> requestedPortsOf(Value memref);
 
 /// The canonical spelling of \p part for a memref of \p type: a complete
-/// partition collapses to its one whole-array axis, a `dim == 0` block or cyclic
-/// axis expands into one axis per dimension, and the axes are sorted by
+/// partition collapses to its one whole-array axis, a `dim == 0` block or
+/// cyclic axis expands into one axis per dimension, and the axes are sorted by
 /// dimension. Null canonicalizes to null.
 ///
 /// `bankLayoutOf` folds the axes in order into a mixed-radix bank index, so a
-/// spelling is part of the bank index function, not presentation: two attributes
-/// describing the same banking must be spelled identically before a caller and
-/// callee agree (a sub-kernel masters port group `k` of exactly the caller's
-/// bank `k`).
+/// spelling is part of the bank index function, not presentation: two
+/// attributes describing the same banking must be spelled identically before a
+/// caller and callee agree (a sub-kernel masters port group `k` of exactly the
+/// caller's bank `k`).
 PartitionAttr canonicalizePartition(PartitionAttr part, MemRefType type);
 
 /// The coarsest banking of a memref of \p type that satisfies both \p a and
 /// \p b, canonical; failure with \p why set when the two cannot be reconciled.
 ///
 /// The order is refinement: `a` is below `b` when every pair of elements `a`
-/// places in distinct banks `b` does too. A partition directive is a lower bound
-/// on the bank distinctness its kernel needs, so a kernel scheduled against the
-/// join still sees every access group it asked to be conflict-free. A complete
-/// partition is the top, an absent attribute the bottom (one bank).
+/// places in distinct banks `b` does too. A partition directive is a lower
+/// bound on the bank distinctness its kernel needs, so a kernel scheduled
+/// against the join still sees every access group it asked to be conflict-free.
+/// A complete partition is the top, an absent attribute the bottom (one bank).
 ///
 /// Axes on different dimensions compose in mixed radix with no reconciling. On
 /// one dimension the join must remain a single axis (`allo.part` admits no
 /// duplicate dimension), so it exists only when one factor divides the other
-/// (and, for a block axis, the finer chunk boundaries fall on the coarser ones).
-/// A block axis against a cyclic axis has no common single-axis refinement.
+/// (and, for a block axis, the finer chunk boundaries fall on the coarser
+/// ones). A block axis against a cyclic axis has no common single-axis
+/// refinement.
 llvm::FailureOr<PartitionAttr> joinPartitions(PartitionAttr a, PartitionAttr b,
                                               MemRefType type,
                                               std::string &why);
@@ -436,7 +442,8 @@ llvm::FailureOr<PartitionAttr> joinPartitions(PartitionAttr a, PartitionAttr b,
 /// memref dimension; linearizing happens at the point of use, never in the IR.
 ///
 /// Deriving this on the expression rather than on emitted values makes common
-/// banked idioms free: `A[2*i]` under cyclic-2 has bank `(2*i) mod 2` and offset
+/// banked idioms free: `A[2*i]` under cyclic-2 has bank `(2*i) mod 2` and
+/// offset
 /// `(2*i) floordiv 2`, which fold to `0` and `i` (no hardware), where the same
 /// derivation on emitted values leaves a multiply/mask/shift nothing downstream
 /// can fold away.
@@ -468,8 +475,8 @@ struct DimRange {
 /// subscript vanishes modulo the factor.
 ///
 /// \p ranges bounds the dims (the map's own numbering), which a block digit
-/// needs: `A[i]` under block-2 of an `i32[16]` is `i floordiv 8`, which folds for
-/// no `i` but is constant over every `i` a loop on `[0,8)` produces, so the
+/// needs: `A[i]` under block-2 of an `i32[16]` is `i floordiv 8`, which folds
+/// for no `i` but is constant over every `i` a loop on `[0,8)` produces, so the
 /// standard idiom (a loop per block) resolves nothing without it. An empty
 /// \p ranges asks the folding question alone.
 std::optional<int64_t> staticBankOf(const BankLayout &layout, AffineMap map,
@@ -515,15 +522,15 @@ constexpr llvm::StringLiteral kBankAttr = "allo.bank";
 /// route and address through all banks).
 std::optional<unsigned> assignedBankOf(Operation *op);
 
-/// \p map, in element space, rewritten as the single simplified row-major linear
-/// element index it addresses. Applied at the point of use by everything needing
-/// a flat address, so pricing, strength reduction and the emitter cannot
-/// disagree.
+/// \p map, in element space, rewritten as the single simplified row-major
+/// linear element index it addresses. Applied at the point of use by everything
+/// needing a flat address, so pricing, strength reduction and the emitter
+/// cannot disagree.
 ///
 /// Nothing rewrites the IR with it, deliberately: element space carries
 /// per-dimension structure the linear form cannot be simplified back into
-/// (`(6i+j) floordiv 6` does not fold to `i` without knowing `j < 6`), which the
-/// bank split needs.
+/// (`(6i+j) floordiv 6` does not fold to `i` without knowing `j < 6`), which
+/// the bank split needs.
 ///
 /// Working on the expression cancels the delinearize/linearize pair of a
 /// coalesced nest: `iv -> (iv floordiv N, iv mod N)` composed with
@@ -536,9 +543,9 @@ AffineMap linearizeAccessMap(AffineMap map, llvm::ArrayRef<int64_t> shape);
 namespace mlir::allo {
 
 /// Per-bank memory-port model. `observe` every memory access in a scheduling
-/// region, `finalize` to `characterize` the arrays behind them, then `resources`
-/// gives the port resources one access holds. Each `allo.part` bank is a
-/// separate limited resource carrying the array's ports.
+/// region, `finalize` to `characterize` the arrays behind them, then
+/// `resources` gives the port resources one access holds. Each `allo.part` bank
+/// is a separate limited resource carrying the array's ports.
 ///
 /// An access holds one port on every bank it can reach: the bank `assign-banks`
 /// assigned it, or all of them when assigned none. The latter is not a

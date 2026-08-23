@@ -586,8 +586,9 @@ static unsigned recurrenceMinII(
   return static_cast<unsigned>(graph.smallestFeasibleII(graph.latSum));
 }
 
-// The resource-min II of \p problem: `ModuloSimplexScheduler::computeResMinII`'s
-// arithmetic, asked before any scheduler exists.
+// The resource-min II of \p problem:
+// `ModuloSimplexScheduler::computeResMinII`'s arithmetic, asked before any
+// scheduler exists.
 static unsigned resourceMinII(ChainingModuloProblem &problem) {
   using P = circt::scheduling::Problem;
   unsigned resMinII = 1;
@@ -690,9 +691,10 @@ selectCriticalPairs(ChainingModuloProblem &problem,
 // carries the data mux (the RAM datum plus one arm per paired store); the
 // compare ends in the select register and touches no port path, so nothing
 // else is re-priced. Returns the relaxed edges, empty when there are none.
-static ForwardRelaxation
-relaxForwardableEdges(ChainingModuloProblem &problem, const DeviceModel &dev,
-                      float cycleTime, float regFloor, unsigned minII) {
+static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
+                                               const DeviceModel &dev,
+                                               float cycleTime, float regFloor,
+                                               unsigned minII) {
   using Dependence = circt::scheduling::Problem::Dependence;
   SmallVector<Dependence> cands =
       forwardableEdges(problem, dev, cycleTime, regFloor);
@@ -866,8 +868,8 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
   // depth, not II, and a shadow would buy latency a mux is not worth.
   ForwardRelaxation relax;
   if (pipelined)
-    relax = relaxForwardableEdges(problem, dev, cycleTime, opts.regFloor,
-                                  minII);
+    relax =
+        relaxForwardableEdges(problem, dev, cycleTime, opts.regFloor, minII);
   Operation *anchor = bodyBlock->getTerminator();
   // The trip this solution records is the INNERMOST loop's, the one its solved
   // `length`/`ii` describe. Every level above drives its child as a container,
@@ -1320,8 +1322,7 @@ void FuncScheduler::collectSiblingSlack(
 // callee's own regions after the pass.
 void FuncScheduler::collectCallSlack(ChainingSharedOperatorsProblem &problem,
                                      ArrayRef<Operation *> ops) {
-  if (llvm::none_of(ops,
-                    [](Operation *op) { return isSyncSubKernelCall(op); }))
+  if (llvm::none_of(ops, [](Operation *op) { return isSyncSubKernelCall(op); }))
     return;
   auto latOf = [&](Operation *op) -> int64_t {
     return *problem.getLatency(*problem.getLinkedOperatorType(op));
@@ -1580,12 +1581,10 @@ static float minSchedulablePeriod(ArrayRef<func::FuncOp> funcs,
 // longest path. What it proves free widens the real pass's leashes; the
 // composed kernel span stays within the heuristic's by construction, since
 // every float is charged once.
-static DenseMap<Operation *, int64_t>
-collectCompositionSlack(ModuleOp module, func::FuncOp topFunc,
-                        ArrayRef<func::FuncOp> order,
-                        ArrayRef<std::unique_ptr<DependenceAnalysis>> depsFor,
-                        const DeviceModel &dev, float cycleTime,
-                        const SchedulerOptions &opts) {
+static DenseMap<Operation *, int64_t> collectCompositionSlack(
+    ModuleOp module, func::FuncOp topFunc, ArrayRef<func::FuncOp> order,
+    ArrayRef<std::unique_ptr<DependenceAnalysis>> depsFor,
+    const DeviceModel &dev, float cycleTime, const SchedulerOptions &opts) {
   DenseMap<Operation *, int64_t> grants;
   SlackLedger ledger;
   module.walk([&](Operation *op) {
@@ -1633,8 +1632,7 @@ collectCompositionSlack(ModuleOp module, func::FuncOp topFunc,
         granted += g;
       info(Stage::Sched, topFunc)
           << "Composition slack: " << grants.size()
-          << " region leash(es) widened by " << granted
-          << " cycle(s) in total";
+          << " region leash(es) widened by " << granted << " cycle(s) in total";
     }
   } else {
     info(Stage::Sched, topFunc)
@@ -1714,8 +1712,8 @@ LogicalResult mlir::allo::runSDCScheduler(ModuleOp module, StringRef top,
 
   if (usesExactScheduler(opts.kind))
     info(Stage::Sched, module)
-        << "Exact scheduler: " << opts.workers << " workers, seed "
-        << opts.seed << ", budget " << format("%g", opts.budget)
+        << "Exact scheduler: " << opts.workers << " workers, seed " << opts.seed
+        << ", budget " << format("%g", opts.budget)
         << " deterministic units per region"
         << (opts.deterministic || opts.workers == 1 ? "" : ", workers racing");
 

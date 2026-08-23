@@ -53,7 +53,9 @@ def build():
         return out
 
     @kernel
-    def compute_gradient(grad: i32[NUM_FEATURES], feature: i32[NUM_FEATURES], scale: i32):
+    def compute_gradient(
+        grad: i32[NUM_FEATURES], feature: i32[NUM_FEATURES], scale: i32
+    ):
         for g in range(NUM_FEATURES):
             prod: i64 = scale * feature[g]
             grad[g] = prod >> FRAC
@@ -65,8 +67,12 @@ def build():
             param[u] += prod >> FRAC
 
     @kernel
-    def spam_filter(data: i32[NUM_TRAINING, NUM_FEATURES], label: i32[NUM_TRAINING],
-                    lut: i32[LUT_SIZE], theta: i32[NUM_FEATURES]):
+    def spam_filter(
+        data: i32[NUM_TRAINING, NUM_FEATURES],
+        label: i32[NUM_TRAINING],
+        lut: i32[LUT_SIZE],
+        theta: i32[NUM_FEATURES],
+    ):
         feature: i32[NUM_FEATURES]
         gradient: i32[NUM_FEATURES]
         for e in range(NUM_EPOCHS):
@@ -78,8 +84,13 @@ def build():
                 compute_gradient(gradient, feature, prob - label[tid])
                 update_parameter(theta, gradient, -STEP_SIZE)
 
-    return {"top": spam_filter, "dot_product": dot_product, "sigmoid": sigmoid,
-            "compute_gradient": compute_gradient, "update_parameter": update_parameter}
+    return {
+        "top": spam_filter,
+        "dot_product": dot_product,
+        "sigmoid": sigmoid,
+        "compute_gradient": compute_gradient,
+        "update_parameter": update_parameter,
+    }
 
 
 def _none(parts):
@@ -88,8 +99,11 @@ def _none(parts):
 
 def _v1(parts):
     stages = []
-    for name, loop in (("dot_product", "d"), ("compute_gradient", "g"),
-                       ("update_parameter", "u")):
+    for name, loop in (
+        ("dot_product", "d"),
+        ("compute_gradient", "g"),
+        ("update_parameter", "u"),
+    ):
         s = parts[name].schedule()
         s.unroll(s.loop(loop), factor=4)
         stages.append(s)
@@ -100,9 +114,11 @@ def _v1(parts):
 
 def _v2(parts):
     stages = []
-    for name, loop, buffers in (("dot_product", "d", ("param", "feature")),
-                                ("compute_gradient", "g", ("grad", "feature")),
-                                ("update_parameter", "u", ("param", "grad"))):
+    for name, loop, buffers in (
+        ("dot_product", "d", ("param", "feature")),
+        ("compute_gradient", "g", ("grad", "feature")),
+        ("update_parameter", "u", ("param", "grad")),
+    ):
         s = parts[name].schedule()
         for buf in buffers:
             s.partition(s.buffer(buf), dim=1, kind=s.Cyclic, factor=4)

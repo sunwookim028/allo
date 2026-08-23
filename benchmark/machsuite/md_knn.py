@@ -18,9 +18,13 @@ DOMAIN_EDGE = 20.0
 
 def build():
     @kernel
-    def md_x(position_x: f64[N_ATOMS], position_y: f64[N_ATOMS],
-             position_z: f64[N_ATOMS], NL: i32[N_ATOMS * MAX_NEIGHBORS],
-             force_x: f64[N_ATOMS]):
+    def md_x(
+        position_x: f64[N_ATOMS],
+        position_y: f64[N_ATOMS],
+        position_z: f64[N_ATOMS],
+        NL: i32[N_ATOMS * MAX_NEIGHBORS],
+        force_x: f64[N_ATOMS],
+    ):
         i_x: f64 = 0.0
         i_y: f64 = 0.0
         i_z: f64 = 0.0
