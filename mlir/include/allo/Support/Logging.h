@@ -70,7 +70,7 @@ enum class Code {
   ChannelMultiProducer,        // several writers on one channel
   StreamArgumentBidirectional, // a stream argument read and written
   // ALLO-N0010 is retired and is not reused.
-  BindingMuxOverPeriod, // a mux over the slack the schedule left
+  // ALLO-N0011 is retired and is not reused.
   // ALLO-N0012 is retired and is not reused.
   PlacementFailed, // no feasible cycle for an operation
   // ALLO-N0014 is retired and is not reused.
@@ -139,8 +139,6 @@ constexpr const char *codeTag(Code code) {
     return "ALLO-N0008";
   case Code::StreamArgumentBidirectional:
     return "ALLO-N0009";
-  case Code::BindingMuxOverPeriod:
-    return "ALLO-N0011";
   case Code::PlacementFailed:
     return "ALLO-N0013";
   case Code::PartitionedInitializedArray:

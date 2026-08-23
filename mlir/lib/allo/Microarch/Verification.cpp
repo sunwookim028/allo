@@ -409,19 +409,19 @@ llvm::DenseMap<Operation *, Tail> accessTails(const Datapath &dp,
   return tails;
 }
 
-/// The two arrival models checked against each other, and the refusal when a
+/// The two arrival models checked against each other, and a warning when a
 /// shared binding grew a multiplexer past the period the schedule was cut
-/// against. Binding is a choice the user can withdraw, so this is the only part
-/// that can fail.
-LogicalResult checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
-                                      const OperatorLibrary &lib,
-                                      bool plannedBinding, PathTrace &trace) {
+/// against. The emitted RTL is functionally correct; only the target period is
+/// at risk, and the binding is a choice the user can withdraw, so this reports
+/// rather than refusing.
+void checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
+                             const OperatorLibrary &lib, bool plannedBinding,
+                             PathTrace &trace) {
   // One picosecond of slop, the resolution the scheduler's own model carries.
   constexpr double kSlop = 1e-3;
   AddedDelay added(dp, lib);
   llvm::DenseMap<Operation *, double> sinks = sinkTails(dp);
 
-  bool ok = true;
   for (const FuncUnit &u : dp.units) {
     // Cross-check of the two arrival models: with the cones grown after the cut
     // excluded, an input recomposed from the device rows arrives no later than
@@ -460,15 +460,15 @@ LogicalResult checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
       continue;
     // A planned fold realizes the solve's own allocation, which held
     // `z + inDelay + headroom(N) <= period` for every operation it folded, so
-    // an overrun on a priced unit breaks that contract rather than earning a
-    // refusal. An unpriced unit the solve never placed stays a refusal.
+    // an overrun on a priced unit breaks that contract and stays an assert. An
+    // unpriced unit the solve never placed only warns, below.
     assert(!(plannedBinding && slack) &&
            "a planned binding grew a select cone past the period the schedule "
            "solve reserved headroom for; the allocation headroom model "
            "(`addAllocationHeadroom`) and the emitted cone disagree");
     // `mux` covers the whole input cone, so it may come from a shared
     // predecessor rather than from a multiplexer on this unit.
-    unsupported(Stage::Emit, Code::BindingMuxOverPeriod, worst->op)
+    warn(Stage::Emit, worst->op)
         << "Binding put " << llvm::format("%.2f", mux)
         << " ns of multiplexer on the path reaching this operation (its unit "
            "is shared between "
@@ -479,9 +479,7 @@ LogicalResult checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
         << " ns clock. The schedule was cut before the multiplexer existed, so "
            "this would miss timing in silicon. Use binding='trivial' for this "
            "kernel, or raise the target period";
-    ok = false;
   }
-  return success(ok);
 }
 
 /// Every capture point, appended to \p paths. Prefix-free by construction, so
@@ -586,34 +584,30 @@ void appendStridePaths(const Datapath &dp, float cycleTime,
 
 /// Every combinational path built after the cut still settles within the
 /// period: the multiplexers a shared binding grew in front of the units, and
-/// the select the port colouring grew in front of an access's bus. A unit
-/// overrun is refused, binding being a choice the user can withdraw; every
-/// other slot has no such choice and is reported through \p paths instead.
-LogicalResult checkCombPathsMeetPeriod(const Datapath &dp, float cycleTime,
-                                       const OperatorLibrary &lib,
-                                       bool plannedBinding,
-                                       std::vector<TimingPath> &paths) {
+/// the select the port colouring grew in front of an access's bus. An overrun
+/// is a quality-of-result finding, not a refusal: a unit overrun warns (the
+/// binding is withdrawable) and every other slot is reported through \p paths.
+void checkCombPathsMeetPeriod(const Datapath &dp, float cycleTime,
+                              const OperatorLibrary &lib, bool plannedBinding,
+                              std::vector<TimingPath> &paths) {
   PathTrace trace(dp, lib);
-  // A refusal still publishes the paths, so the verdict is taken first and
-  // returned last.
-  LogicalResult ok =
-      checkBindingMuxHeadroom(dp, cycleTime, lib, plannedBinding, trace);
+  checkBindingMuxHeadroom(dp, cycleTime, lib, plannedBinding, trace);
   llvm::DenseMap<Operation *, Tail> tails = accessTails(dp, lib);
   appendCapturePaths(dp, cycleTime, tails, trace, paths);
   appendStridePaths(dp, cycleTime, lib, paths);
-  return ok;
 }
 
 /// Shapes this backend does not lower yet, including the one the clock rules
 /// out: the schedule was cut against \p cycleTime (ns) over a datapath with no
 /// sharing muxes and no port selects, so what grows them is measured here, at
 /// every capture point `forEachSource` enumerates, and appended to \p paths.
-/// \p lib prices the muxes and the units they feed. `logging::unsupported`
-/// where a binding can be withdrawn; elsewhere the path is reported and not
-/// refused, missing a target period being a quality-of-result finding rather
-/// than an illegal design. \p plannedBinding says the folds realize the
+/// \p lib prices the muxes and the units they feed. A binding-grown unit
+/// overrun warns, the binding being withdrawable; every other path is reported
+/// and not refused, missing a target period being a quality-of-result finding
+/// rather than an illegal design. \p plannedBinding says the folds realize the
 /// schedule solve's own allocation, which reserved headroom for every select it
-/// bought, so a unit overrun there is a broken invariant, not a refusal.
+/// bought, so a priced unit overrun there is a broken invariant (an assert),
+/// not a warning.
 LogicalResult checkEmitterSubset(dcp::DCPathModuleOp func, const Datapath &dp,
                                  float cycleTime, const OperatorLibrary &lib,
                                  bool plannedBinding,
@@ -690,7 +684,8 @@ LogicalResult checkEmitterSubset(dcp::DCPathModuleOp func, const Datapath &dp,
   // store's write-enable by `issue & cond`, so a doomed exit iteration commits
   // nothing.
 
-  return checkCombPathsMeetPeriod(dp, cycleTime, lib, plannedBinding, paths);
+  checkCombPathsMeetPeriod(dp, cycleTime, lib, plannedBinding, paths);
+  return success();
 }
 
 } // namespace
