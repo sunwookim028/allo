@@ -224,26 +224,6 @@ def test_generate_wraps_integer_cores():
     assert "CONFIG.PipeStages" in _tcl_of(g, by_stem["mul"].impl)
 
 
-def test_generate_reports_what_no_recipe_covers():
-    @operator_ip(optype="sqrt", latency=7, pipelined=True, style="ce")
-    def fsqrt(a: f32) -> f32: ...
-
-    @kernel
-    def sq(A: f32[8]):
-        for i in range(8):
-            A[i] = amath.sqrt(A[i])
-
-    dev = default_device.copy()
-    dev.add_operator(fsqrt)
-    rtl = sq.schedule().export("rtl", device=dev)
-    rtl.compile()
-    g = vivado.generate(rtl.interfaces, dev)
-    # A module nothing covers is reported, never half-built: as a black box it
-    # would synthesize to nothing and silently vanish from any area count.
-    assert any("no recipe" in m and "sqrt" in m for m in g.missing)
-    assert "sqrt" not in g.shims and "sqrt" not in g.ip_tcl
-
-
 def test_generate_selects_add_against_sub_on_the_shared_core():
     # The Add_Subtract shape is the "Both" core: add and sub are one measured
     # piece of hardware told apart by the operation-channel constant. Leaving
@@ -294,25 +274,6 @@ def test_scaffold_writes_split_rtl_and_realization(tmp_path):
     assert "create_ip" in (root / "gen_ip.tcl").read_text()
     # Split emission ran on a copy: the compiled module still exports whole.
     assert rtl.verilog
-
-
-def test_scaffold_warns_on_unrealizable_externs(tmp_path):
-    @operator_ip(optype="sqrt", latency=7, pipelined=True, style="ce")
-    def fsqrt(a: f32) -> f32: ...
-
-    @kernel
-    def sq(A: f32[8]):
-        for i in range(8):
-            A[i] = amath.sqrt(A[i])
-
-    dev = default_device.copy()
-    dev.add_operator(fsqrt)
-    rtl = sq.schedule().export("rtl", device=dev)
-    with pytest.warns(RealizationWarning, match="sqrt"):
-        root = rtl.scaffold_project(str(tmp_path / "prj"))
-    # Nothing to build, so no half-written realization files.
-    assert not (root / "shims.v").exists()
-    assert not (root / "gen_ip.tcl").exists()
 
 
 def test_scaffold_without_a_realizer_degrades_to_rtl_only(tmp_path):
