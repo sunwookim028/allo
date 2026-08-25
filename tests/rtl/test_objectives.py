@@ -65,7 +65,9 @@ def test_area_objective_pins_an_explicit_pipeline_ii():
 
 
 def test_heuristic_ignores_the_objective():
-    # The heuristic solves spans only; O passes through without effect.
+    # The heuristic solves spans only, so the region order passes through
+    # without effect. The period a policy chooses is the driver's, not the
+    # solver's, so O="area" still sweeps here.
     rtl = _to_rtl(_mixed_kernel()).set_scheduler_opt(O="area")
     assert rtl.schedule().compiler.options.O == "area"
     _run(rtl)
@@ -207,13 +209,132 @@ def test_wall_objective_refuses_a_kernel_with_no_composed_span():
         rtl.schedule()
 
 
+def _accumulate_kernel():
+    @kernel
+    def acc(A: f32[64], out: f32[1]):
+        s: f32 = 0.0
+        for i in range(64):
+            s = s + A[i]
+        out[0] = s
+
+    return acc
+
+
+def _run_acc(rtl):
+    A = np.ones(64, dtype=np.float32)
+    out = np.zeros(1, dtype=np.float32)
+    rtl.cosim(A, out)
+    assert out[0] == 64.0
+
+
+def test_area_objective_takes_the_period_dimension():
+    # O="area" chooses the clock as well as the schedule. A float accumulation
+    # is II-bound by the adder's depth at the default clock; the latency-1 row
+    # needs a slower one, and the shorter schedule it buys spends fewer delay
+    # registers than the depth-2 row's. The trade is one-sided against the
+    # requested clock, so nothing faster than it is even probed.
+    base = _to_rtl(_accumulate_kernel()).set_scheduler_opt(scheduler="exact")
+    asked_ns = 1000.0 / base.freq_mhz
+    base_area = base.schedule().area
+
+    rtl = _to_rtl(_accumulate_kernel()).set_scheduler_opt(scheduler="exact", O="area")
+    result = rtl.schedule()
+    assert len(result.sweep) > 2
+    assert all(p.cycle_ns >= asked_ns - 1e-9 for p in result.sweep)
+    assert 1000.0 / rtl.freq_mhz > asked_ns
+    assert result.area < base_area
+    assert "add_f32_f32_f32_l1" in _impls(result)
+    _run_acc(rtl)
+
+
+def test_area_objective_spends_a_wall_deadline_on_area():
+    # A deadline replaces the requested clock as the contract: the sweep reaches
+    # any period and returns the smallest area that still finishes in time, so a
+    # looser deadline buys a smaller design.
+    rtl = _to_rtl(_accumulate_kernel()).set_scheduler_opt(scheduler="exact", O="area")
+    result = rtl.schedule()
+    wall = result.func("acc").latency * (1000.0 / rtl.freq_mhz)
+
+    slack = _to_rtl(_accumulate_kernel()).set_scheduler_opt(
+        scheduler="exact", O="area", wall_ns=wall * 1.3
+    )
+    loose = slack.schedule()
+    assert loose.area < result.area
+    assert loose.func("acc").latency * (1000.0 / slack.freq_mhz) <= wall * 1.3
+    _run_acc(slack)
+
+
+def test_area_objective_refuses_an_unreachable_deadline():
+    # No period meets the deadline, so the sweep says so with the best it found
+    # rather than shipping a design that misses it.
+    rtl = _to_rtl(_accumulate_kernel()).set_scheduler_opt(
+        scheduler="exact", O="area", wall_ns=1.0
+    )
+    with pytest.raises(RuntimeError, match="no clock at which"):
+        rtl.schedule()
+
+
+def _search_kernel():
+    @kernel
+    def find(A: i32[64], out: i32[1]):
+        i: i32 = 0
+        while A[i] < 100:
+            i += 1
+        out[0] = i
+
+    return find
+
+
+def test_area_objective_takes_only_free_clocks_without_a_span():
+    # With no composed span there is no wall to price an area saving against,
+    # so a slower clock is taken only where no region pays time for it. The
+    # requested clock qualifies against itself, so the kernel still compiles.
+    base = _to_rtl(_search_kernel()).set_scheduler_opt(scheduler="exact")
+    asked_ns = 1000.0 / base.freq_mhz
+    regions = base.schedule().regions(wrappers=True)
+
+    rtl = _to_rtl(_search_kernel()).set_scheduler_opt(scheduler="exact", O="area")
+    result = rtl.schedule()
+    assert result.func("find").latency is None
+    assert len(result.sweep) > 2
+    period = 1000.0 / rtl.freq_mhz
+    assert all(p.cycle_ns >= asked_ns - 1e-9 for p in result.sweep)
+    for new, old in zip(result.regions(wrappers=True), regions):
+        if new.iteration_latency is not None:
+            assert new.iteration_latency * period <= (
+                old.iteration_latency * asked_ns + 1e-9
+            )
+    A = np.arange(64, dtype=np.int32) * 4
+    out = np.zeros(1, dtype=np.int32)
+    rtl.cosim(A, out)
+    assert out[0] == 25
+
+
+def test_area_objective_refuses_a_deadline_it_cannot_check():
+    # wall_ns is held against span times period, and a data-dependent trip
+    # publishes no span; refuse rather than ship a design that may miss it.
+    rtl = _to_rtl(_search_kernel()).set_scheduler_opt(
+        scheduler="exact", O="area", wall_ns=100.0
+    )
+    with pytest.raises(RuntimeError, match="publishes no span"):
+        rtl.schedule()
+
+
 def test_tighten_clock_moves_the_operating_clock_to_the_realized_path():
     # Any compiled design may be reclocked at its realized critical path
-    # without recompiling; the report's clock follows.
-    rtl = _to_rtl(_mixed_kernel())
-    fmax = rtl.estimation.fmax
+    # without recompiling; the report's clock follows. A bound row's warranted
+    # period caps the move, since its internal stages are not paths the
+    # estimator sees, so the target is the slower of the two.
+    rtl = _to_rtl(_mixed_kernel(), freq_mhz=200.0)
+    bound = {op.impl for m in rtl.interfaces.values() for op in m.operators}
+    cap = max(
+        (o.timing.min_period_ns for o in default_device.operators if o.symbol in bound),
+        default=0.0,
+    )
+    want = 1000.0 / max(1000.0 / rtl.estimation.fmax, cap)
     mhz = rtl.tighten_clock()
-    assert mhz == pytest.approx(fmax) and rtl.freq_mhz == pytest.approx(fmax)
+    assert mhz == pytest.approx(want) and rtl.freq_mhz == pytest.approx(want)
+    assert mhz > 200.0  # the clock did move
     assert rtl.estimation.clock_mhz == pytest.approx(mhz)
     _run(rtl)
 

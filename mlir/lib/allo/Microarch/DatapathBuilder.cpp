@@ -427,6 +427,8 @@ void DatapathBuilder::bindMemory(Operation *op, Value memref, RegionBlock &rb) {
     acc.inDelay = attr.getValueAsDouble();
   if (auto attr = op->getAttrOfType<FloatAttr>("port_delay"))
     acc.portDelay = attr.getValueAsDouble();
+  if (auto attr = op->getAttrOfType<FloatAttr>("select_delay"))
+    acc.selectDelay = attr.getValueAsDouble();
   SmallVector<Value> operands;
   dcpAddressing(op, acc.addrMap, operands);
   // One empty slot per index operand, positional and never resized later: the
@@ -1565,9 +1567,12 @@ void DatapathBuilder::planAddressGenerators() {
       // With the term sum landing in the delay register, only the residual
       // built after that register sits on the setup path. Both cones run
       // beside each other, so the delay is the max.
-      assert(acc.inDelay >= acc.portDelay &&
-             "an access's priced setup is its port's delay plus its address");
-      double priced = acc.inDelay - acc.portDelay;
+      assert(acc.inDelay + kStampedDelayEpsilon >=
+                 acc.portDelay + acc.selectDelay &&
+             "an access's priced setup is its port's delay plus its select and "
+             "its address");
+      double priced =
+          std::max(0.0, acc.inDelay - acc.portDelay - acc.selectDelay);
       acc.addrSetup =
           acc.addrDelay
               ? std::max(postRegisterDelay(acc.offset, delays, e.width),

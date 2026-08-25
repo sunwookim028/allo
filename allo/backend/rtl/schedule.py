@@ -5,14 +5,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 
 from ..base import run_pipeline
 from ..._mlir.ir import Module
 from ..._mlir.dialects.allo import run_sdc_scheduling
 
-from .options import PERIOD_POLICIES, PrepassOptions, SchedulerOptions
+from .options import REGION_ORDERS, PrepassOptions, SchedulerOptions
 from .reports.schedule import ScheduleResult, SweepPoint
 
 RTL_PREPARE_PIPELINE = """
@@ -89,9 +89,9 @@ def run_schedule(
             top,
             model_ns,
             options.scheduler,
-            # "freq" and "wall" are period policies this driver sweeps; their
-            # region solves run under the cycles order.
-            "cycles" if options.O in PERIOD_POLICIES else options.O,
+            # A period policy that ranks clocks by time leaves its regions on
+            # the cycles order; "area" keeps its own (see `REGION_ORDERS`).
+            REGION_ORDERS.get(options.O, options.O),
             options.budget,
             allocate,
             options.workers,
@@ -108,9 +108,31 @@ def run_schedule(
     return ScheduleResult.from_json(result, options)
 
 
-# The period sweep's ladder: this many geometric rungs between the discovered
-# device floor and the requested period, beyond the two endpoint probes.
+# `sweep_freq`'s ladder: this many geometric rungs between the discovered device
+# floor and the requested period, beyond the two endpoint probes.
 _SWEEP_RUNGS = 8
+
+# `_descending`'s ladder: this many geometric rungs between the aggressive
+# anchor and the slowest period any device row is built for.
+_DESCENDING_RUNGS = 10
+
+
+def _anchor_ns(options: SchedulerOptions, floor_ns: float) -> float:
+    """The aggressive end of a ladder: twice the device's register floor, or an
+    8x faster clock where the device declares none. A derate lifts an unholdable
+    ask, so what a probe there achieves is the tightest clock on offer."""
+    if floor_ns <= 0:
+        return options.cycle_ns / 8.0
+    return 2.0 * floor_ns / (1.0 - options.clock_margin)
+
+
+def _descending(lo: float, hi: float, probed: float) -> Iterator[float]:
+    """The periods a sweep walks from ``hi`` down to ``lo``, skipping the clock
+    it has already probed."""
+    for k in range(_DESCENDING_RUNGS):
+        period = hi * (lo / hi) ** (k / (_DESCENDING_RUNGS - 1))
+        if abs(period - probed) >= 1e-9:
+            yield period
 
 
 def _region_vector(result) -> dict:
@@ -147,6 +169,7 @@ def _probe(
         achieved_ns=result.cycle_ns / (1.0 - options.clock_margin),
         latency=fn.latency,
         latency_is_bound=fn.latency_is_bound,
+        area=result.area,
     )
     return point, _region_vector(result)
 
@@ -204,7 +227,6 @@ def sweep_freq(
         raise ValueError(
             f"span_tolerance must be non-negative; got {options.span_tolerance}"
         )
-    margin = 1.0 - options.clock_margin
     vectors: dict[float, dict] = {}
 
     def probe(period: float) -> SweepPoint:
@@ -214,10 +236,7 @@ def sweep_freq(
         return point
 
     asked = probe(options.cycle_ns)
-    # The aggressive probe: twice the device's register floor, or an 8x faster
-    # clock where the device declares none. A derate lifts an unholdable ask,
-    # so what this probe achieves is the tightest clock on offer.
-    anchor = 2.0 * floor_ns / margin if floor_ns > 0 else options.cycle_ns / 8.0
+    anchor = _anchor_ns(options, floor_ns)
     points = [asked]
     lo = options.cycle_ns
     if anchor < options.cycle_ns:
@@ -252,11 +271,6 @@ def sweep_freq(
     )
 
 
-# The wall sweep's ladder: this many geometric rungs between the aggressive
-# anchor and the slowest period any device row is built for.
-_WALL_RUNGS = 10
-
-
 def sweep_wall(
     top,
     make_module: Callable[[], Module],
@@ -276,7 +290,6 @@ def sweep_wall(
     composed span has no wall time to compare and is refused. Returns the
     scheduled module and its result, with the probed curve published as
     ``ScheduleResult.sweep``."""
-    margin = 1.0 - options.clock_margin
 
     def probe(period: float) -> SweepPoint:
         return _probe(top, make_module, options, prepass, allocate, period)[0]
@@ -290,16 +303,13 @@ def sweep_wall(
         )
     points = [asked]
     best = asked.latency * asked.achieved_ns
-    lo = 2.0 * floor_ns / margin if floor_ns > 0 else options.cycle_ns / 8.0
+    lo = _anchor_ns(options, floor_ns)
     hi = max(cap_ns, options.cycle_ns, lo)
-    # Descending walk with the incumbent: the laxest candidate's span bounds
-    # every candidate's from below (feasible sets only grow with the period),
-    # so a period that laxest span cannot win at is skipped unprobed.
+    # Walked with the incumbent: the laxest candidate's span bounds every
+    # candidate's from below (feasible sets only grow with the period), so a
+    # period that laxest span cannot win at is skipped unprobed.
     floor_span = None
-    for k in range(_WALL_RUNGS):
-        period = hi * (lo / hi) ** (k / (_WALL_RUNGS - 1))
-        if abs(period - options.cycle_ns) < 1e-9:
-            continue
+    for period in _descending(lo, hi, options.cycle_ns):
         if floor_span is not None and floor_span * period >= best:
             continue
         p = probe(period)
@@ -317,3 +327,163 @@ def sweep_wall(
     return _solve_at(
         top, make_module, options, prepass, allocate, winner.cycle_ns, curve
     )
+
+
+def sweep_area(
+    top,
+    make_module: Callable[[], Module],
+    options: SchedulerOptions,
+    prepass: PrepassOptions,
+    allocate: bool,
+    floor_ns: float,
+    cap_ns: float,
+) -> tuple[Module, ScheduleResult]:
+    """Minimize area under ``O="area"`` with the period as the free dimension:
+    probe candidate clocks with the heuristic scheduler, rank them by what they
+    cost, and solve once at the winner under the caller's own scheduler
+    settings, which is where the area objective proper runs. A slower clock
+    chains deeper, so it breaks fewer chains, spends fewer delay registers and
+    realizes on shallower rows; the rank is what stops it paying unbounded time
+    for that.
+
+    Three ranks, by what there is to weigh area against.
+
+    ``wall_ns`` set is the whole contract: a candidate is eligible while its
+    span times achieved period holds the deadline, whatever clock that takes,
+    and the least-area eligible one wins. No eligible candidate is a refusal
+    rather than a silent overrun, and a kernel with no composed span has no wall
+    to hold to a deadline and is refused too.
+
+    With no deadline the requested clock is the reference the trade is measured
+    against: only clocks no faster than it are probed, and only those costing no
+    more than it does, so this direction never comes back with more area than it
+    was asked for. Among them the winner minimizes area times wall, which needs
+    no constant of its own, since extra time is only taken where the area it
+    buys pays for it. Buying area back for frequency is ``O="freq"``, and
+    balancing the two with no reference clock is ``O="wall"``.
+
+    With no composed span there is no wall to price an area saving against, so
+    nothing may be traded: a candidate qualifies only while every solved
+    per-region quantity costs no more time than at the requested clock (its
+    cycles times its achieved period), which is that rank restricted to the free
+    wins. The requested clock qualifies against itself, so this degrades to
+    scheduling at the clock asked for.
+
+    Without a deadline the winner is then confirmed by the solver that decides
+    it. The probes rank the heuristic's schedule at each clock, while what ships
+    is the objective's own solve there, a different schedule whose distance from
+    the probe is not uniform in the period. So a winning clock other than the
+    one asked for is solved beside it and the cheaper of the two ships, which
+    costs one extra solve and makes the direction monotone: it can never build
+    more than it would have without the sweep.
+
+    ``cap_ns`` tops the ladder at the slowest period any device row is built
+    for; ``floor_ns`` is the register floor the aggressive anchor stands on,
+    which only a deadline reaches down to. Returns the scheduled module and its
+    result, with the probed curve published as ``ScheduleResult.sweep``."""
+    if options.wall_ns < 0.0:
+        raise ValueError(f"wall_ns must be non-negative; got {options.wall_ns}")
+    vectors: dict[float, dict] = {}
+
+    def probe(period: float) -> SweepPoint:
+        point, vectors[period] = _probe(
+            top, make_module, options, prepass, allocate, period
+        )
+        return point
+
+    asked = probe(options.cycle_ns)
+    if options.wall_ns and asked.latency is None:
+        raise RuntimeError(
+            f"O='area' holds wall_ns against span times period, and '{top}' "
+            "publishes no span at the requested clock; add allo.assume trip "
+            "bounds, or leave wall_ns unset to trade against the requested "
+            "clock instead"
+        )
+    points = [asked]
+    # A deadline reaches the whole ladder: the least area meeting it may sit at
+    # any clock. Without one the requested clock floors the walk, since a faster
+    # rung is a frequency purchase this direction does not make.
+    lo = _anchor_ns(options, floor_ns) if options.wall_ns else options.cycle_ns
+    hi = max(cap_ns, options.cycle_ns, lo)
+    # Under a deadline the laxest candidate's span bounds every candidate's from
+    # below (feasible sets only grow with the period), so a period no schedule
+    # can meet the deadline at is skipped unprobed.
+    floor_span = None
+    for period in _descending(lo, hi, options.cycle_ns):
+        if options.wall_ns and floor_span and floor_span * period > options.wall_ns:
+            continue
+        p = probe(period)
+        if floor_span is None:
+            floor_span = p.latency
+        points.append(p)
+    curve = _dedup(points)
+    assert all(
+        p.area is not None for p in curve
+    ), "every schedule carries a modeled area, whatever solved it"
+
+    def wall(p: SweepPoint) -> float:
+        return p.latency * p.achieved_ns
+
+    if options.wall_ns:
+        eligible = [p for p in curve if p.latency and wall(p) <= options.wall_ns]
+        if not eligible:
+            best = min((p for p in curve if p.latency), key=wall, default=None)
+            raise RuntimeError(
+                f"O='area' found no clock at which '{top}' finishes within "
+                f"{options.wall_ns:g} ns: the best of {len(curve)} probed "
+                f"periods runs {best.latency} cycles at {best.achieved_ns:g} ns "
+                f"= {wall(best):g} ns; raise wall_ns, or leave it unset to trade "
+                "against the requested clock instead"
+            )
+        return _solve_at(
+            top,
+            make_module,
+            options,
+            prepass,
+            allocate,
+            min(eligible, key=lambda p: (p.area, wall(p))).cycle_ns,
+            curve,
+        )
+    # Nothing faster than asked was probed; a candidate must also cost no more
+    # than asked, so the rank never proposes a bigger design than the one the
+    # requested clock would have built.
+    slower = [
+        p
+        for p in curve
+        if p.achieved_ns >= asked.achieved_ns - 1e-9 and p.area <= asked.area
+    ]
+    if asked.latency is not None:
+        # Area times wall, not area times span: a span alone does not compare
+        # across periods. Wall breaks the tie, so an equal-area slower clock is
+        # never taken.
+        winner = min(slower, key=lambda p: (p.area * wall(p), wall(p)))
+    else:
+        # No span, so no wall to price an area saving against: take only the
+        # clocks that cost no region any time either.
+        ref = vectors[asked.cycle_ns]
+        free = [
+            p
+            for p in slower
+            if vectors[p.cycle_ns].keys() == ref.keys()
+            and all(
+                vectors[p.cycle_ns][k] * p.achieved_ns <= v * asked.achieved_ns
+                for k, v in ref.items()
+            )
+        ]
+        winner = min(free, key=lambda p: (p.area, p.achieved_ns))
+    solved = _solve_at(
+        top, make_module, options, prepass, allocate, winner.cycle_ns, curve
+    )
+    if abs(winner.cycle_ns - options.cycle_ns) < 1e-9:
+        return solved
+
+    def cost(outcome: tuple[Module, ScheduleResult]) -> tuple[int, float]:
+        """What the solver says the schedule costs, wall breaking a tie."""
+        result = outcome[1]
+        span = result.func(top).latency
+        return (result.area, span * result.cycle_ns if span else 0.0)
+
+    asked_solve = _solve_at(
+        top, make_module, options, prepass, allocate, options.cycle_ns, curve
+    )
+    return min(solved, asked_solve, key=cost)

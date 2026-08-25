@@ -182,6 +182,9 @@ class SweepPoint:
     achieved_ns: float  # the operating period the probe came back holding
     latency: int | None  # the top kernel's composed span at this period
     latency_is_bound: bool
+    #: what the probed schedule costs in the device's currency; see
+    #: :attr:`ScheduleResult.area`.
+    area: int | None = None
 
 
 @dataclass(frozen=True)
@@ -199,8 +202,13 @@ class ScheduleResult:
     #: QoR price against this.
     cycle_ns: float | None = None
     #: the ``(period, span)`` curve the period sweep probed before settling on
-    #: this schedule, tightest last. Empty outside ``O="freq"`` and ``O="wall"``.
+    #: this schedule, tightest last. Empty outside the period policies.
     sweep: tuple[SweepPoint, ...] = ()
+    #: what the whole module's schedule costs in the device's own currency: the
+    #: quantity ``O="area"`` minimizes, summed over every region and evaluated
+    #: on the settled schedule. A model figure, not a synthesis estimate: it
+    #: compares two schedules of one kernel, not two kernels.
+    area: int | None = None
 
     @classmethod
     def from_json(
@@ -218,6 +226,7 @@ class ScheduleResult:
             ],
             compiler=CompilerReport.from_json(d, options),
             cycle_ns=d.get("cycle_ns"),
+            area=d.get("area"),
         )
 
     def func(self, suffix: str) -> FuncSchedule:

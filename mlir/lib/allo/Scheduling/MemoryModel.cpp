@@ -13,6 +13,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h" // memref::GlobalOp / GetGlobalOp
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/SymbolTable.h"
@@ -385,6 +386,69 @@ void allo::recordArrayStorage(ModuleOp module, const MemoryLibrary &lib) {
         work.emplace_back(param, bind.empty() ? row : bind.str());
       }
   }
+}
+
+void allo::recordPortSelectArms(ModuleOp module, const MemoryLibrary &lib) {
+  // One port bus, keyed by the array it serves, the bank it addresses and the
+  // direction it runs in: what `bindMemoryPorts` colours accesses onto.
+  using Bus = std::tuple<Value, unsigned, unsigned>;
+  llvm::DenseMap<Value, MemoryChar> chars;
+  llvm::DenseMap<Bus, unsigned> holders;
+  llvm::SmallVector<std::pair<Operation *, Bus>> accesses;
+  auto charOf = [&](Value root) {
+    auto [it, fresh] = chars.try_emplace(root);
+    if (fresh)
+      it->second = characterize(root, lib);
+    return it->second;
+  };
+
+  module.walk([&](Operation *op) {
+    // A child holds ports of its own on each array it is handed, and drives
+    // them as one more arm of the caller's bus. It may master several groups
+    // per direction, which this counts as one.
+    if (auto call = dyn_cast<func::CallOp>(op)) {
+      llvm::SmallVector<std::pair<Value, Value>> params;
+      calleeParams(call, params);
+      for (Value actual : llvm::make_first_range(params)) {
+        MemoryChar mc = charOf(actual);
+        if (mc.unlimited() || mc.layout.skew())
+          continue;
+        for (unsigned b = 0; b < mc.layout.numBanks; ++b)
+          for (unsigned write : {0u, 1u})
+            ++holders[{actual, b, write}];
+      }
+      return;
+    }
+    std::optional<MemAccess> a = asMemAccess(op);
+    if (!a || a->kind != AccessKind::Array)
+      return;
+    MemoryChar mc = charOf(a->root);
+    // A scattered array and a constant table hold no port to share, and a
+    // skewed one is read through lanes whose slots already separate its
+    // accesses.
+    if (mc.unlimited() || mc.layout.skew())
+      return;
+    std::optional<unsigned> bank = mc.layout.numBanks > 1
+                                       ? assignedBankOf(op)
+                                       : std::optional<unsigned>(0);
+    // An access with no bank of its own reaches every one through the
+    // crossbar, which shares its bus with nothing.
+    if (!bank)
+      return;
+    Bus bus{a->root, *bank, static_cast<unsigned>(a->isWrite)};
+    ++holders[bus];
+    accesses.emplace_back(op, bus);
+  });
+
+  Builder builder(module.getContext());
+  for (auto [op, bus] : accesses)
+    if (unsigned arms = holders.lookup(bus); arms > 1)
+      op->setAttr(kSelectArmsAttr, builder.getI32IntegerAttr(arms));
+}
+
+unsigned allo::portSelectArmsOf(Operation *op) {
+  auto arms = op->getAttrOfType<IntegerAttr>(kSelectArmsAttr);
+  return arms ? static_cast<unsigned>(arms.getInt()) : 1;
 }
 
 StringRef allo::boundStorageOf(Value memRef) {

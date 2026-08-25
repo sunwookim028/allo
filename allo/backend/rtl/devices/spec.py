@@ -190,13 +190,20 @@ class IPRow(NamedTuple):
     latency: int
     area: Mapping[str, int]  # resource name -> count, in the fabric's vocabulary
     mnemonic: str | None = None
-    #: Measured input cone (ns), overriding the archetype's default. A
-    #: single-cycle core is combinational up to its output register, so its cone
-    #: is nearly the whole measured period.
+    #: Measured input cone (ns), overriding the archetype's default: the arc
+    #: from the core's data ports to its first internal register, less the
+    #: register floor the model charges once per cycle. A single-cycle core is
+    #: combinational up to its output register, so its cone is nearly the whole
+    #: measured period.
     in_delay_ns: float | None = None
     #: Least clock period (ns) the row's internal stages are warranted at.
     #: ``None`` takes the grade's characterization period.
     min_period_ns: float | None = None
+    #: Measured output cone (ns): the arc from the core's last internal register
+    #: to its data ports, clock-to-out included, so it compares directly against
+    #: the register floor a chain would otherwise start at. ``None`` takes the
+    #: archetype's default.
+    out_delay_ns: float | None = None
 
 
 def add_ip_rows(
@@ -218,6 +225,7 @@ def add_ip_rows(
                     if row.min_period_ns is not None
                     else 1000.0 / default_freq_mhz
                 ),
+                row.out_delay_ns,
             )
             if row.mnemonic is not None:
                 operator.mnemonic = row.mnemonic

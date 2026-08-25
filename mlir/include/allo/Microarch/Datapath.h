@@ -214,6 +214,11 @@ enum class PortPlan {
   Crossbar,
 };
 
+/// How far two doubles naming one delay may sit apart and still be the same
+/// number: a delay the scheduler reserved travels to the datapath on an f32
+/// attribute, and comes back a round trip wider.
+constexpr double kStampedDelayEpsilon = 1e-4;
+
 /// A memref-backed memory with banks and ports. The memory model resolves which
 /// `dcp.storage` realizes it; this records the name, leaving physical selection
 /// (address decode, per-primitive ports) to lowering.
@@ -444,10 +449,16 @@ struct MemUnit {
     /// The residual's operands arrive already delayed and are not covered.
     unsigned addrDelay = 0;
     /// What the address costs on this access's setup path, in ns, `portDelay`
-    /// excluded. Without a delay register that is the whole cone (`inDelay`
-    /// less the port's own share); with one it is only what `buildAddr` builds
-    /// after that register, the term sum having landed in it a cycle earlier.
+    /// and `selectDelay` excluded. Without a delay register that is the whole
+    /// cone (`inDelay` less the two shares that are not the address); with one
+    /// it is only what `buildAddr` builds after that register, the term sum
+    /// having landed in it a cycle earlier.
     double addrSetup = 0.0;
+    /// The port select the schedule reserved for this access
+    /// (`portSelectDelay`), its share of `inDelay`. The colouring runs after
+    /// the cut, so what gets built is measured against this rather than
+    /// derived from it.
+    double selectDelay = 0.0;
   };
   llvm::SmallVector<Access, 2> accesses;
 

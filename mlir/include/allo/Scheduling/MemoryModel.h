@@ -391,6 +391,28 @@ constexpr llvm::StringLiteral kStorageAttr = "allo.storage";
 /// answer.
 void recordArrayStorage(ModuleOp module, const MemoryLibrary &lib);
 
+/// Where an array access carries the holders its port bus may end up shared
+/// with (`recordPortSelectArms`), one arm of the select the emitter grows in
+/// front of the port. Absent where nothing shares that bus.
+constexpr llvm::StringLiteral kSelectArmsAttr = "allo.selarms";
+
+/// Record on every array access of \p module how many holders may be coloured
+/// onto the one port bus it drives: the accesses of its own direction that
+/// reach its bank, plus one for each direction a child masters ports on the
+/// same array in.
+///
+/// `bindMemoryPorts` decides the real class after the schedule, merging as far
+/// as the conflict graph allows, so this is that colouring's ceiling: what one
+/// bus carries when nothing separates the accesses in time. An access that
+/// reaches every bank through a crossbar is alone on its bus and records
+/// nothing. Runs once, beside `recordArrayStorage`, so the select the schedule
+/// reserves for and the select the emitter builds come from one count.
+void recordPortSelectArms(ModuleOp module, const MemoryLibrary &lib);
+
+/// The holders `recordPortSelectArms` recorded for \p op, or 1 where it
+/// recorded none, which selects nothing.
+unsigned portSelectArmsOf(Operation *op);
+
 /// Characterize a memref's storage shape from its partition attributes and the
 /// realization `recordArrayStorage` resolved for it, independent of any
 /// scheduling region. \p lib supplies what the device states about that

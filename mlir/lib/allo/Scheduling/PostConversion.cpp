@@ -89,8 +89,9 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
       dst->setAttr("z", b.getF32FloatAttr(*at->startInCycle));
   };
   // An access also carries the setup delay the solve priced it against
-  // (`accessCharacterization`: the port's own delay plus the address cone) and
-  // the port delay alone, both read off the original op.
+  // (`accessCharacterization`: the port's own delay, the address cone and the
+  // port select) and the two shares of it that are not the address cone, all
+  // read off the original op.
   auto setAccessTiming = [&](Operation *dst) {
     setZ(dst);
     dst->setAttr(
@@ -98,6 +99,8 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
         b.getF32FloatAttr(
             accessCharacterization(&op, dev.operators, dev.memory).inDelay));
     dst->setAttr("port_delay", b.getF32FloatAttr(dev.memory.timing(&op).delay));
+    if (double sel = portSelectDelay(&op, dev.operators))
+      dst->setAttr("select_delay", b.getF32FloatAttr(sel));
   };
   // Keep an op verbatim inside the region, preserving its scheduled start so
   // the schedule export can still report it.
@@ -566,8 +569,15 @@ static void materializeSequential(const RegionAttrs &r,
   };
   SmallVector<Operation *> work, hoisted;
   for (Operation *op : body) {
-    if (container && isa<memref::AllocOp, memref::AllocaOp>(op) &&
-        op->getNumOperands() == 0 && escapesBody(op))
+    // A literal is not a value to hand across a region boundary: yielded, its
+    // consumers read the region's result and the emitter latches it into a
+    // survivor register, so a shift by it becomes a barrel shifter where the
+    // schedule priced wiring. Left at func level it stays a literal to every
+    // consumer, inside the region and out.
+    if (isa<arith::ConstantOp>(op) && escapesBody(op))
+      hoisted.push_back(op);
+    else if (container && isa<memref::AllocOp, memref::AllocaOp>(op) &&
+             op->getNumOperands() == 0 && escapesBody(op))
       hoisted.push_back(op); // leave at func level, do not wrap or erase
     else
       work.push_back(op);
@@ -578,7 +588,7 @@ static void materializeSequential(const RegionAttrs &r,
   if (!spanFormsRegion(work))
     return;
 
-  // Move the hoisted allocs above the region so they dominate the wrapped uses.
+  // Move the hoisted ops above the region so they dominate the wrapped uses.
   for (Operation *op : hoisted)
     op->moveBefore(work.front());
 

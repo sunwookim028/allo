@@ -28,6 +28,7 @@
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/MathExtras.h"
 
 #include <chrono>
 
@@ -223,11 +224,16 @@ static bool hasCarriedRecurrence(circt::scheduling::CyclicProblem &problem) {
 static SmallVector<Value> spanEscapingValues(ArrayRef<Operation *> ops) {
   llvm::SmallPtrSet<Operation *, 16> inSpan(ops.begin(), ops.end());
   SmallVector<Value> escaping;
-  for (Operation *op : ops)
+  for (Operation *op : ops) {
+    // A literal is hoisted out rather than yielded, so the span waits for
+    // nothing on its account.
+    if (isa<arith::ConstantOp>(op))
+      continue;
     for (Value res : op->getResults())
       if (llvm::any_of(res.getUsers(),
                        [&](Operation *user) { return !inSpan.contains(user); }))
         escaping.push_back(res);
+  }
   return escaping;
 }
 
@@ -326,6 +332,8 @@ private:
   // decided, and one path decides none (see `scheduleAcyclic`).
   void annotateStarts(circt::scheduling::ChainingProblem &problem);
   void annotateAllocation(OccupancyProblem &problem);
+  int64_t regionArea(OccupancyProblem &problem, const SpanObjective &span,
+                     int64_t ii);
   void recordSolve(OccupancyProblem &problem, StringRef kind,
                    std::optional<unsigned> ii, Stopwatch since);
 
@@ -408,6 +416,71 @@ void FuncScheduler::annotateAllocation(OccupancyProblem &problem) {
     for (Operation *op : users)
       model.setUnit(op, base + *problem.getAssignedUnit(op));
   }
+}
+
+// What one solved region costs in the device's currency: the area objective's
+// own terms (`areaTerms`) evaluated on a settled schedule instead of built as
+// an expression, plus the rows that objective drops as a within-period
+// constant. Two probes of one kernel at different periods legalize to
+// different operations on different rows, so every realized operation is
+// priced here, not only the ones an allocation decides.
+//
+// \p ii is the interval the region runs at, which is what the emitter folds a
+// delay chain onto; zero for a straight-line span.
+int64_t FuncScheduler::regionArea(OccupancyProblem &problem,
+                                  const SpanObjective &span, int64_t ii) {
+  using circt::scheduling::Problem;
+  const OperatorLibrary &lib = dev.operators;
+  unsigned interval = static_cast<unsigned>(std::max<int64_t>(ii, 0));
+  int64_t area = 0;
+  // Instances and the muxes in front of them, at the count the solve decided.
+  // A solve that decided none leaves the schedule's own demand: the busiest
+  // congruence class, the floor sharing could reach at this interval.
+  llvm::SmallPtrSet<Operation *, 32> shared;
+  for (Problem::ResourceType rsrc : problem.getResourceTypes()) {
+    std::optional<OccupancyProblem::AllocatableUnit> unit =
+        problem.getAllocatable(rsrc);
+    if (!unit)
+      continue;
+    SmallVector<Operation *> users = problem.usersOf(rsrc);
+    shared.insert(users.begin(), users.end());
+    unsigned units =
+        problem.getAllocation(rsrc).value_or(problem.demandFor(rsrc, interval));
+    assert(units <= unit->ceiling && "an allocation builds no more than one "
+                                     "instance per operation");
+    area += unit->price[units];
+  }
+  // Everything else costs one instance of the row it was realized on.
+  for (Operation *op : problem.getOperations()) {
+    if (shared.contains(op) || isSyncSubKernelCall(op) || asMemAccess(op))
+      continue;
+    const OpSchedule *at = model.scheduleOf(op);
+    area += (at && !at->selectedImpl.empty() ? lib.lookup(op, at->selectedImpl)
+                                             : lib.lookup(op))
+                .price;
+  }
+  // The delay chain each value crosses its slack on, folded onto the region's
+  // phase at II > 1 exactly as the emitter builds it.
+  int64_t fold = std::max<int64_t>(ii, 1);
+  for (const RegisterTerm &term : span.regs) {
+    int64_t end = static_cast<int64_t>(*problem.getStartTime(term.def)) +
+                  problem.latencyOf(term.def);
+    int64_t depth = 0;
+    for (auto [reader, distance] : term.reads)
+      depth =
+          std::max(depth, static_cast<int64_t>(*problem.getStartTime(reader)) +
+                              distance * ii - end);
+    area += lib.chainPrice(llvm::divideCeil(depth, fold), term.width);
+  }
+  // One activation pulse chain, as deep as the deepest start rides it.
+  if (int64_t pulse = lib.pulsePrice()) {
+    int64_t deepest = 0;
+    for (Operation *op : problem.getOperations())
+      if (std::optional<unsigned> t = problem.getStartTime(op))
+        deepest = std::max(deepest, static_cast<int64_t>(*t));
+    area += deepest * pulse;
+  }
+  return area;
 }
 
 // The pipeline directive on the loop (or an enclosing loop up to the region
@@ -958,6 +1031,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
   sol.trip = trip.count;
   sol.tripIsBound = trip.bounded;
   annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, ii);
   return success();
 }
 
@@ -1007,6 +1081,7 @@ LogicalResult FuncScheduler::scheduleWhile(scf::WhileOp w,
   sol.length = problem.scheduleDepth();
   sol.drain = span.drainOf(problem);
   annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, *ii);
   return success();
 }
 
@@ -1113,6 +1188,7 @@ LogicalResult FuncScheduler::scheduleAcyclic(ArrayRef<Operation *> ops,
     sol.drain = span.drainOf(problem);
   }
   annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, /*ii=*/0);
   return success();
 }
 
@@ -1549,7 +1625,8 @@ static float minSchedulablePeriod(ArrayRef<func::FuncOp> funcs,
     fn.walk([&](Operation *op) {
       if (op->getNumRegions() || isa<func::CallOp>(op))
         return;
-      NodeTiming t = asMemAccess(op)
+      bool access = asMemAccess(op).has_value();
+      NodeTiming t = access
                          ? accessCharacterization(op, dev.operators, dev.memory)
                          : dev.operators.lookup(op).timing;
       float need = periodNeed(regFloor, t.inDelay, t.outDelay, t.minPeriod);
@@ -1558,17 +1635,23 @@ static float minSchedulablePeriod(ArrayRef<func::FuncOp> funcs,
       least = std::max(least, need);
       if (!named.insert(t.typeName).second)
         return;
+      // An access is named by whichever of its two cones is the larger, since
+      // that is the one worth shortening.
       const char *advice =
           isa<AffineApplyOp>(op)
               ? "Its whole map is one combinational cone; compute the "
                 "expression in arithmetic ops so each step can be scheduled "
                 "and registered"
-          : asMemAccess(op)
-              ? "The address cone ahead of the port is what costs; compute "
+          : !access ? "It is one operator, so no register can split it"
+          : portSelectDelay(op, dev.operators) >
+                  addressDelayOf(op, dev.operators)
+              ? "The select over the accesses sharing this array's port is "
+                "what costs; partition the array, or move accesses out of it, "
+                "so fewer of them drive one bus"
+              : "The address cone ahead of the port is what costs; compute "
                 "the subscript into a variable so it becomes a schedulable "
                 "value, or partition by a power of two so the bank digit is "
-                "a mask rather than a divider"
-              : "It is one operator, so no register can split it";
+                "a mask rather than a divider";
       warn(Stage::Sched, op)
           << "'" << t.typeName << "' needs " << format("%.2f", need)
           << " ns for a cycle of its own, over the " << format("%.2f", target)

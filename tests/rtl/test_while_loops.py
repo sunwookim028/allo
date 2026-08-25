@@ -283,7 +283,10 @@ def test_while_pipeline_operators_are_allocated():
             out[c] = (A[c] * A[c + 1]) * (A[c + 2] * A[c + 3])
             c = c + 1
 
-    mod = _to_rtl(wmul).set_scheduler_opt(scheduler="exact")
+    # At a slower clock, because an allocation has to be legal to be made: the
+    # operands arrive from array ports, and a port's read cone plus a select
+    # cone plus the multiply's own input cone do not fit the default period.
+    mod = _to_rtl(wmul, freq_mhz=150.0).set_scheduler_opt(scheduler="exact")
     assert mod.schedule().cyclic()[0].conditional  # a flushing while, not a for
     mod.compile()
     (region,) = [r for f in mod.microarch.funcs for r in f.regions]

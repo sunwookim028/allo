@@ -756,9 +756,13 @@ def test_a_reversed_subscript_keeps_a_real_recurrence():
 
     # `A[j + 1]` is what the PREVIOUS iteration wrote, so the raise must land on
     # a proven distance-1 recurrence rather than on no edge at all. The write's
-    # commit is shadowed by store->load forwarding, so the II is read + mul.
+    # commit is shadowed by store->load forwarding, so the II is the read plus
+    # the multiply, and one cycle more wherever the read's cone and the
+    # multiply's input cone do not fit a period together. Which of the two a
+    # given device table gives is not what this test is about.
     mod = _to_rtl(sweep)
-    assert _iis(mod.schedule().cyclic()) == [MEM + FMUL]
+    (ii,) = _iis(mod.schedule().cyclic())
+    assert MEM + FMUL <= ii <= MEM + FMUL + 1
 
     A = _f32(N)
     exp = A.copy()

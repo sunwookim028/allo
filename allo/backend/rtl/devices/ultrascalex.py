@@ -229,25 +229,65 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             7,
             {"lut": 257, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10},
             min_period_ns=3.11,
+            in_delay_ns=0.81,
+            out_delay_ns=0.5,
         ),  # 432
         IPRow(
             5,
             {"lut": 370, "slicem_lut": 13, "ff": 242, "carry8": 17},
             min_period_ns=2.47,
+            in_delay_ns=1.9,
+            out_delay_ns=0.52,
         ),  # 439
-        IPRow(3, {"lut": 385, "ff": 152, "carry8": 17}, min_period_ns=2.04),  # 425
-        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=3.05),  # 326
-        IPRow(1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.51),  # 203
+        IPRow(
+            3,
+            {"lut": 385, "ff": 152, "carry8": 17},
+            min_period_ns=2.04,
+            in_delay_ns=2.07,
+            out_delay_ns=0.73,
+        ),  # 425
+        IPRow(
+            2,
+            {"lut": 382, "ff": 75, "carry8": 17},
+            min_period_ns=3.05,
+            in_delay_ns=2.46,
+            out_delay_ns=0.58,
+        ),  # 326
+        IPRow(
+            1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.81, out_delay_ns=1.26
+        ),  # 203
     ),
     ip.fsub: (
         IPRow(
-            7, {"lut": 257, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10}
+            7,
+            {"lut": 257, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10},
+            in_delay_ns=0.86,
+            out_delay_ns=0.56,
         ),  # 432
-        IPRow(5, {"lut": 370, "slicem_lut": 13, "ff": 242, "carry8": 17}),  # 439
-        IPRow(3, {"lut": 385, "ff": 152, "carry8": 17}, min_period_ns=2.79),  # 425
+        IPRow(
+            5,
+            {"lut": 370, "slicem_lut": 13, "ff": 242, "carry8": 17},
+            in_delay_ns=1.9,
+            out_delay_ns=0.52,
+        ),  # 439
+        IPRow(
+            3,
+            {"lut": 385, "ff": 152, "carry8": 17},
+            min_period_ns=2.79,
+            in_delay_ns=2.07,
+            out_delay_ns=0.73,
+        ),  # 425
         # See fadd l2: in-context 328/342 MHz, holds 300 (prior 4.09 locked out).
-        IPRow(2, {"lut": 382, "ff": 75, "carry8": 17}, min_period_ns=3.05),  # 326
-        IPRow(1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.51),  # 203
+        IPRow(
+            2,
+            {"lut": 382, "ff": 75, "carry8": 17},
+            min_period_ns=3.05,
+            in_delay_ns=2.46,
+            out_delay_ns=0.58,
+        ),  # 326
+        IPRow(
+            1, {"lut": 392, "ff": 33, "carry8": 17}, in_delay_ns=4.81, out_delay_ns=1.26
+        ),  # 203
     ),
     # The 2-cycle multiply measures 376 MHz standalone but routes below 300 MHz
     # inside a module, so its floor derates the wrapper number and admits the
@@ -257,26 +297,45 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             4,
             {"lut": 114, "slicem_lut": 1, "ff": 109, "dsp": 2, "carry8": 9},
             min_period_ns=2.65,
+            in_delay_ns=1.06,
+            out_delay_ns=0.56,
         ),  # 570
         IPRow(
-            3, {"lut": 80, "ff": 94, "dsp": 2, "carry8": 8}, min_period_ns=2.06
+            3,
+            {"lut": 80, "ff": 94, "dsp": 2, "carry8": 8},
+            min_period_ns=2.06,
+            in_delay_ns=1.6,
+            out_delay_ns=0.52,
         ),  # 473
         IPRow(
-            2, {"lut": 81, "ff": 51, "dsp": 2, "carry8": 8}, min_period_ns=3.55
+            2,
+            {"lut": 81, "ff": 51, "dsp": 2, "carry8": 8},
+            min_period_ns=3.55,
+            in_delay_ns=2.12,
+            out_delay_ns=0.53,
         ),  # 376
-        IPRow(1, {"lut": 79, "ff": 33, "dsp": 2, "carry8": 8}, in_delay_ns=3.37),  # 264
+        IPRow(
+            1,
+            {"lut": 79, "ff": 33, "dsp": 2, "carry8": 8},
+            in_delay_ns=3.41,
+            out_delay_ns=0.6,
+        ),  # 264
         # Max-DSP builds (C_Mult_Usage=Max_Usage)
         IPRow(
             4,
             {"lut": 87, "slicem_lut": 1, "ff": 73, "dsp": 3, "carry8": 4},
             mnemonic="maxdsp",
             min_period_ns=1.89,
+            in_delay_ns=1.06,
+            out_delay_ns=0.56,
         ),  # 528
         IPRow(
             3,
             {"lut": 87, "ff": 59, "dsp": 3, "carry8": 4},
             mnemonic="maxdsp",
             min_period_ns=1.89,
+            in_delay_ns=1.6,
+            out_delay_ns=0.52,
         ),  # 530
     ),
     # The 10-cycle divide matches the 12-cycle row's frequency at no more area.
@@ -286,62 +345,140 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             12,
             {"lut": 771, "slicem_lut": 39, "ff": 477, "carry8": 109},
             min_period_ns=2.39,
+            in_delay_ns=2.0,
+            out_delay_ns=0.51,
         ),  # 374
-        IPRow(10, {"lut": 771, "slicem_lut": 34, "ff": 478, "carry8": 109}),  # 371
+        IPRow(
+            10,
+            {"lut": 771, "slicem_lut": 34, "ff": 478, "carry8": 109},
+            in_delay_ns=2.07,
+            out_delay_ns=0.41,
+        ),  # 371
         IPRow(
             8,
             {"lut": 774, "slicem_lut": 33, "ff": 375, "carry8": 109},
             min_period_ns=3.28,
+            in_delay_ns=2.69,
+            out_delay_ns=0.42,
         ),  # 307
     ),
-    ip.fcmp: IPRow(1, {"lut": 63, "ff": 2, "carry8": 7}, min_period_ns=1.87),  # 610
+    ip.fcmp: IPRow(
+        1,
+        {"lut": 63, "ff": 2, "carry8": 7},
+        min_period_ns=1.87,
+        in_delay_ns=0.57,
+        out_delay_ns=0.33,
+    ),  # 610
     ip.fsqrt: IPRow(
-        8, {"lut": 432, "slicem_lut": 13, "ff": 291, "carry8": 67}, min_period_ns=3.25
+        8,
+        {"lut": 432, "slicem_lut": 13, "ff": 291, "carry8": 67},
+        min_period_ns=3.25,
+        in_delay_ns=1.74,
+        out_delay_ns=0.46,
     ),  # 321
     ip.dadd: (
         IPRow(
-            14, {"lut": 721, "slicem_lut": 90, "ff": 872, "dsp": 3, "carry8": 30}
+            14,
+            {"lut": 721, "slicem_lut": 90, "ff": 872, "dsp": 3, "carry8": 30},
+            in_delay_ns=0.76,
+            out_delay_ns=0.46,
         ),  # 575
-        IPRow(6, {"lut": 719, "slicem_lut": 16, "ff": 542, "carry8": 40}),  # 519
+        IPRow(
+            6,
+            {"lut": 719, "slicem_lut": 16, "ff": 542, "carry8": 40},
+            in_delay_ns=1.44,
+            out_delay_ns=0.67,
+        ),  # 519
         IPRow(
             4,
             {"lut": 722, "slicem_lut": 13, "ff": 355, "carry8": 38},
             min_period_ns=2.12,
+            in_delay_ns=1.89,
+            out_delay_ns=0.69,
         ),  # 430
-        IPRow(3, {"lut": 726, "ff": 282, "carry8": 38}, min_period_ns=3.71),  # 360
-        IPRow(2, {"lut": 762, "ff": 139, "carry8": 38}, min_period_ns=3.30),  # 302
-        IPRow(1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.02),  # 155
+        IPRow(
+            3,
+            {"lut": 726, "ff": 282, "carry8": 38},
+            min_period_ns=3.71,
+            in_delay_ns=2.4,
+            out_delay_ns=0.54,
+        ),  # 360
+        IPRow(
+            2,
+            {"lut": 762, "ff": 139, "carry8": 38},
+            min_period_ns=3.30,
+            in_delay_ns=2.8,
+            out_delay_ns=0.58,
+        ),  # 302
+        IPRow(
+            1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.16, out_delay_ns=0.8
+        ),  # 155
     ),
     ip.dsub: (
         IPRow(
-            14, {"lut": 721, "slicem_lut": 90, "ff": 872, "dsp": 3, "carry8": 30}
+            14,
+            {"lut": 721, "slicem_lut": 90, "ff": 872, "dsp": 3, "carry8": 30},
+            in_delay_ns=1.05,
+            out_delay_ns=0.52,
         ),  # 575
-        IPRow(6, {"lut": 719, "slicem_lut": 16, "ff": 542, "carry8": 40}),  # 519
+        IPRow(
+            6,
+            {"lut": 719, "slicem_lut": 16, "ff": 542, "carry8": 40},
+            in_delay_ns=1.44,
+            out_delay_ns=0.67,
+        ),  # 519
         IPRow(
             4,
             {"lut": 722, "slicem_lut": 13, "ff": 355, "carry8": 38},
             min_period_ns=2.90,
+            in_delay_ns=1.89,
+            out_delay_ns=0.69,
         ),  # 430
-        IPRow(3, {"lut": 726, "ff": 282, "carry8": 38}, min_period_ns=3.71),  # 360
-        IPRow(2, {"lut": 762, "ff": 139, "carry8": 38}, min_period_ns=3.30),  # 302
-        IPRow(1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.02),  # 155
+        IPRow(
+            3,
+            {"lut": 726, "ff": 282, "carry8": 38},
+            min_period_ns=3.71,
+            in_delay_ns=2.4,
+            out_delay_ns=0.54,
+        ),  # 360
+        IPRow(
+            2,
+            {"lut": 762, "ff": 139, "carry8": 38},
+            min_period_ns=3.30,
+            in_delay_ns=2.8,
+            out_delay_ns=0.58,
+        ),  # 302
+        IPRow(
+            1, {"lut": 822, "ff": 65, "carry8": 38}, in_delay_ns=6.16, out_delay_ns=0.8
+        ),  # 155
     ),
     ip.dmul: (
         IPRow(
             9,
             {"lut": 200, "slicem_lut": 62, "ff": 397, "dsp": 7, "carry8": 15},
             min_period_ns=2.12,
+            in_delay_ns=1.16,
+            out_delay_ns=0.46,
         ),  # 498
         IPRow(
             5,
             {"lut": 136, "slicem_lut": 19, "ff": 184, "dsp": 7, "carry8": 15},
             min_period_ns=2.12,
+            in_delay_ns=2.23,
+            out_delay_ns=0.55,
         ),  # 389
         IPRow(
-            3, {"lut": 135, "ff": 133, "dsp": 7, "carry8": 15}, min_period_ns=3.85
+            3,
+            {"lut": 135, "ff": 133, "dsp": 7, "carry8": 15},
+            min_period_ns=3.85,
+            in_delay_ns=2.27,
+            out_delay_ns=0.51,
         ),  # 347
         IPRow(
-            1, {"lut": 137, "ff": 65, "dsp": 7, "carry8": 15}, in_delay_ns=6.65
+            1,
+            {"lut": 137, "ff": 65, "dsp": 7, "carry8": 15},
+            in_delay_ns=6.49,
+            out_delay_ns=0.65,
         ),  # 141
         # Max-DSP builds
         IPRow(
@@ -349,104 +486,244 @@ IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
             {"lut": 165, "slicem_lut": 63, "ff": 372, "dsp": 8, "carry8": 12},
             mnemonic="maxdsp",
             min_period_ns=1.79,
+            in_delay_ns=1.16,
+            out_delay_ns=0.46,
         ),  # 560
         IPRow(
             5,
             {"lut": 109, "slicem_lut": 19, "ff": 214, "dsp": 8, "carry8": 12},
             mnemonic="maxdsp",
             min_period_ns=2.71,
+            in_delay_ns=2.23,
+            out_delay_ns=0.55,
         ),  # 369
     ),
     ip.ddiv: IPRow(
-        32, {"lut": 3195, "slicem_lut": 72, "ff": 3027, "carry8": 398}
+        32,
+        {"lut": 3195, "slicem_lut": 72, "ff": 3027, "carry8": 398},
+        in_delay_ns=1.73,
+        out_delay_ns=0.59,
     ),  # 398
-    ip.dcmp: IPRow(1, {"lut": 117, "ff": 2, "carry8": 12}, min_period_ns=2.90),  # 564
+    ip.dcmp: IPRow(
+        1,
+        {"lut": 117, "ff": 2, "carry8": 12},
+        min_period_ns=2.90,
+        in_delay_ns=0.84,
+        out_delay_ns=0.34,
+    ),  # 564
     ip.dsqrt: IPRow(
-        20, {"lut": 1696, "slicem_lut": 51, "ff": 1280, "carry8": 243}
+        20,
+        {"lut": 1696, "slicem_lut": 51, "ff": 1280, "carry8": 243},
+        in_delay_ns=1.81,
+        out_delay_ns=0.55,
     ),  # 329
-    ip.bfadd: IPRow(4, {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 537
-    ip.bfsub: IPRow(4, {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 537
-    ip.bfmul: IPRow(2, {"lut": 60, "ff": 34, "dsp": 1, "carry8": 6}),  # 521
+    ip.bfadd: IPRow(
+        4,
+        {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12},
+        in_delay_ns=1.07,
+        out_delay_ns=0.84,
+    ),  # 537
+    ip.bfsub: IPRow(
+        4,
+        {"lut": 198, "slicem_lut": 1, "ff": 118, "carry8": 12},
+        in_delay_ns=1.07,
+        out_delay_ns=0.84,
+    ),  # 537
+    ip.bfmul: IPRow(
+        2,
+        {"lut": 60, "ff": 34, "dsp": 1, "carry8": 6},
+        in_delay_ns=2.05,
+        out_delay_ns=0.71,
+    ),  # 521
     # IEEE fp16
-    ip.hadd: IPRow(2, {"lut": 199, "ff": 43, "carry8": 12}),  # 385
-    ip.hsub: IPRow(2, {"lut": 199, "ff": 43, "carry8": 12}),  # 385
-    ip.hmul: IPRow(2, {"lut": 48, "ff": 31, "dsp": 1, "carry8": 6}),  # 501
-    ip.hdiv: IPRow(6, {"lut": 223, "slicem_lut": 19, "ff": 150, "carry8": 29}),  # 468
-    ip.hcmp: IPRow(1, {"lut": 35, "ff": 2, "carry8": 5}),  # 782
-    ip.i2f: IPRow(3, {"lut": 168, "slicem_lut": 1, "ff": 99, "carry8": 11}),  # 490
-    ip.f2i: IPRow(3, {"lut": 183, "ff": 127, "carry8": 6}),  # 678
-    ip.fcvt: IPRow(2, {"lut": 50, "ff": 99, "carry8": 1}),  # 1032
-    ip.bf2f: IPRow(2, {"lut": 34, "ff": 53, "carry8": 1}),  # 1181
+    ip.hadd: IPRow(
+        2, {"lut": 199, "ff": 43, "carry8": 12}, in_delay_ns=2.12, out_delay_ns=1.04
+    ),  # 385
+    ip.hsub: IPRow(
+        2, {"lut": 199, "ff": 43, "carry8": 12}, in_delay_ns=2.12, out_delay_ns=1.04
+    ),  # 385
+    ip.hmul: IPRow(
+        2,
+        {"lut": 48, "ff": 31, "dsp": 1, "carry8": 6},
+        in_delay_ns=1.38,
+        out_delay_ns=0.77,
+    ),  # 501
+    ip.hdiv: IPRow(
+        6,
+        {"lut": 223, "slicem_lut": 19, "ff": 150, "carry8": 29},
+        in_delay_ns=1.57,
+        out_delay_ns=0.38,
+    ),  # 468
+    ip.hcmp: IPRow(
+        1, {"lut": 35, "ff": 2, "carry8": 5}, in_delay_ns=0.84, out_delay_ns=0.33
+    ),  # 782
+    ip.i2f: IPRow(
+        3,
+        {"lut": 168, "slicem_lut": 1, "ff": 99, "carry8": 11},
+        in_delay_ns=0.61,
+        out_delay_ns=0.4,
+    ),  # 490
+    ip.f2i: IPRow(
+        3, {"lut": 183, "ff": 127, "carry8": 6}, in_delay_ns=0.76, out_delay_ns=0.43
+    ),  # 678
+    ip.fcvt: IPRow(
+        2, {"lut": 50, "ff": 99, "carry8": 1}, in_delay_ns=0.4, out_delay_ns=0.57
+    ),  # 1032
+    ip.bf2f: IPRow(
+        2, {"lut": 34, "ff": 53, "carry8": 1}, in_delay_ns=0.26, out_delay_ns=0.43
+    ),  # 1181
     # Each multiply also carries a `mullut` row: the same core built in fabric
     # instead of DSP columns, declared at the depth of the DSP row it competes
     # with. Selection ranks depth before price, so a shorter fabric row would
     # take every multiply; at equal depth a `dsp` resource weight picks between
     # them by what each spends.
     ip.imul16: (
-        IPRow(3, {"dsp": 1}),  # 1073
-        IPRow(1, {"dsp": 1}),  # 544
+        IPRow(3, {"dsp": 1}, in_delay_ns=0.08, out_delay_ns=0.74),  # 1073
+        IPRow(1, {"dsp": 1}, in_delay_ns=1.41, out_delay_ns=1.11),  # 544
         IPRow(
             1,
             {"lut": 192, "ff": 16, "carry8": 22},
             mnemonic="mullut",
-            in_delay_ns=2.10,
+            in_delay_ns=2.01,
+            out_delay_ns=0.46,
         ),  # 398
     ),
     ip.imul32: (
-        IPRow(2, {"ff": 32, "dsp": 3}, min_period_ns=2.94),  # 341
+        IPRow(
+            2,
+            {"ff": 32, "dsp": 3},
+            min_period_ns=2.94,
+            in_delay_ns=0.31,
+            out_delay_ns=0.67,
+        ),  # 341
         IPRow(
             2,
             {"lut": 768, "ff": 112, "carry8": 76},
             mnemonic="mullut",
             min_period_ns=2.50,
+            in_delay_ns=2.06,
+            out_delay_ns=0.35,
         ),  # 401
         # A combinational 3-DSP cascade up to its output register: routed in
         # context the cone runs 3.0 ns (2.9 ns of DSP logic plus route), which
         # rules the row out at 300 MHz and leaves it to lower targets.
-        IPRow(1, {"ff": 32, "dsp": 3}, in_delay_ns=3.0),  # 320
+        IPRow(1, {"ff": 32, "dsp": 3}, in_delay_ns=2.7, out_delay_ns=0.74),  # 320
     ),
     ip.imul64: (
-        IPRow(6, {"slicem_lut": 64, "ff": 81, "dsp": 10}),  # 333
+        IPRow(
+            6,
+            {"slicem_lut": 64, "ff": 81, "dsp": 10},
+            in_delay_ns=0.52,
+            out_delay_ns=0.52,
+        ),  # 333
         IPRow(
             6,
             {"lut": 3072, "slicem_lut": 16, "ff": 2168, "carry8": 280},
             mnemonic="mullut",
             min_period_ns=1.77,
+            in_delay_ns=1.27,
+            out_delay_ns=0.52,
         ),  # 568
     ),
-    ip.imulw33: IPRow(3, {"ff": 34, "dsp": 4}),  # 431
+    ip.imulw33: IPRow(
+        3, {"ff": 34, "dsp": 4}, in_delay_ns=0.12, out_delay_ns=0.98
+    ),  # 431
     ip.imuladd32: IPRow(3, {"lut": 47, "ff": 113, "dsp": 3, "carry8": 6}),  # 448
-    ip.idiv8: IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-    ip.udiv8: IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-    ip.irem8: IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-    ip.urem8: IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-    ip.idiv16: IPRow(8, {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55}),  # 319
-    ip.udiv16: IPRow(8, {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55}),  # 319
-    ip.irem16: IPRow(8, {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55}),  # 319
-    ip.urem16: IPRow(8, {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55}),  # 319
+    ip.idiv8: IPRow(
+        4,
+        {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+        in_delay_ns=0.34,
+        out_delay_ns=0.38,
+    ),  # 311
+    ip.udiv8: IPRow(
+        4,
+        {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+        in_delay_ns=0.03,
+        out_delay_ns=0.83,
+    ),  # 311
+    ip.irem8: IPRow(
+        4,
+        {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+        in_delay_ns=0.34,
+        out_delay_ns=0.38,
+    ),  # 311
+    ip.urem8: IPRow(
+        4,
+        {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+        in_delay_ns=0.03,
+        out_delay_ns=0.83,
+    ),  # 311
+    ip.idiv16: IPRow(
+        8,
+        {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55},
+        in_delay_ns=0.58,
+        out_delay_ns=0.44,
+    ),  # 319
+    ip.udiv16: IPRow(
+        8,
+        {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55},
+        in_delay_ns=0.0,
+        out_delay_ns=0.83,
+    ),  # 319
+    ip.irem16: IPRow(
+        8,
+        {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55},
+        in_delay_ns=0.58,
+        out_delay_ns=0.44,
+    ),  # 319
+    ip.urem16: IPRow(
+        8,
+        {"lut": 376, "slicem_lut": 2, "ff": 578, "carry8": 55},
+        in_delay_ns=0.0,
+        out_delay_ns=0.83,
+    ),  # 319
     ip.idiv32: IPRow(
-        16, {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173}
+        16,
+        {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173},
+        in_delay_ns=0.46,
+        out_delay_ns=0.63,
     ),  # 345
     ip.udiv32: IPRow(
-        16, {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173}
+        16,
+        {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173},
+        in_delay_ns=0.3,
+        out_delay_ns=1.11,
     ),  # 345
     ip.irem32: IPRow(
-        16, {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173}
+        16,
+        {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173},
+        in_delay_ns=0.46,
+        out_delay_ns=0.63,
     ),  # 345
     ip.urem32: IPRow(
-        16, {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173}
+        16,
+        {"lut": 1264, "slicem_lut": 2, "ff": 2170, "carry8": 173},
+        in_delay_ns=0.3,
+        out_delay_ns=1.11,
     ),  # 345
     ip.idiv64: IPRow(
-        68, {"lut": 4608, "slicem_lut": 6, "ff": 12808, "carry8": 601}
+        68,
+        {"lut": 4608, "slicem_lut": 6, "ff": 12808, "carry8": 601},
+        in_delay_ns=1.2,
+        out_delay_ns=0.78,
     ),  # 579
     ip.udiv64: IPRow(
-        32, {"lut": 4481, "slicem_lut": 1, "ff": 8422, "carry8": 585}
+        32,
+        {"lut": 4481, "slicem_lut": 1, "ff": 8422, "carry8": 585},
+        in_delay_ns=0.27,
+        out_delay_ns=1.33,
     ),  # 305
     ip.irem64: IPRow(
-        68, {"lut": 4608, "slicem_lut": 6, "ff": 12808, "carry8": 601}
+        68,
+        {"lut": 4608, "slicem_lut": 6, "ff": 12808, "carry8": 601},
+        in_delay_ns=1.2,
+        out_delay_ns=0.78,
     ),  # 579
     ip.urem64: IPRow(
-        32, {"lut": 4481, "slicem_lut": 1, "ff": 8422, "carry8": 585}
+        32,
+        {"lut": 4481, "slicem_lut": 1, "ff": 8422, "carry8": 585},
+        in_delay_ns=0.27,
+        out_delay_ns=1.33,
     ),  # 305
 }
 
@@ -459,21 +736,46 @@ IP_BY_GRADE: Mapping[Grade, Mapping[OperatorIP, IPRow | tuple[IPRow, ...]]] = {
     # clock on -2LV, so each is a candidate at this grade only.
     GRADE_2L: {
         ip.udiv8: (
-            IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-            IPRow(2, {"lut": 110, "ff": 132, "carry8": 18}),  # 311
+            IPRow(
+                4,
+                {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+                in_delay_ns=0.03,
+                out_delay_ns=0.83,
+            ),  # 311
+            IPRow(
+                2,
+                {"lut": 110, "ff": 132, "carry8": 18},
+                in_delay_ns=0.06,
+                out_delay_ns=2.6,
+            ),  # 311
         ),
         ip.urem8: (
-            IPRow(4, {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18}),  # 311
-            IPRow(2, {"lut": 110, "ff": 132, "carry8": 18}),  # 311
+            IPRow(
+                4,
+                {"lut": 126, "slicem_lut": 1, "ff": 166, "carry8": 18},
+                in_delay_ns=0.03,
+                out_delay_ns=0.83,
+            ),  # 311
+            IPRow(
+                2,
+                {"lut": 110, "ff": 132, "carry8": 18},
+                in_delay_ns=0.06,
+                out_delay_ns=2.6,
+            ),  # 311
         ),
         ip.ddiv: (
             IPRow(
-                32, {"lut": 3195, "slicem_lut": 72, "ff": 3027, "carry8": 398}
+                32,
+                {"lut": 3195, "slicem_lut": 72, "ff": 3027, "carry8": 398},
+                in_delay_ns=1.73,
+                out_delay_ns=0.59,
             ),  # 398
             IPRow(
                 24,
                 {"lut": 3198, "slicem_lut": 72, "ff": 2064, "carry8": 398},
                 min_period_ns=2.90,
+                in_delay_ns=2.7,
+                out_delay_ns=0.51,
             ),  # 308
         ),
     },

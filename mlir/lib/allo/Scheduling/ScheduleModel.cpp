@@ -239,7 +239,8 @@ std::string mlir::allo::ScheduleModel::toJSON() const {
   Value root = Object{{"funcs", std::move(funcs)},
                       {"solves", std::move(solveEntries)},
                       {"unhonored_directives", std::move(unhonoredEntries)},
-                      {"cycle_ns", (double)cycleTimeNs}};
+                      {"cycle_ns", (double)cycleTimeNs},
+                      {"area", modeledArea}};
   std::string s;
   llvm::raw_string_ostream os(s);
   os << root;

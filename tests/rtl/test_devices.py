@@ -10,7 +10,7 @@ import pytest
 
 from allo import kernel
 from allo.backend.rtl.core import RealizationWarning
-from allo.lang import f32, i32
+from allo.lang import f32, i32, i64
 from allo.lang.ip import operator_ip
 from allo.operators import arith as allo_arith
 from allo.operators import math as amath
@@ -178,8 +178,12 @@ def test_generate_builds_the_fabric_multiply_out_of_luts():
     # The multiply's fabric row spends no DSPs, so it rebuilds with the recipe's
     # DSP-free fragment, which repeats a key the shape sets and must land after
     # it; a `set_property -dict` list resolves the order.
+    #
+    # i64, because rank is latency before price: a fabric row only competes with
+    # the DSP row declared at its own depth, and at 32 bits the DSP row that
+    # holds this clock is a cycle shallower than the fabric one.
     @kernel
-    def mk(x: i32[8], y: i32[8], out: i32[8]):
+    def mk(x: i64[8], y: i64[8], out: i64[8]):
         for i in range(8):
             out[i] = x[i] * y[i]
 

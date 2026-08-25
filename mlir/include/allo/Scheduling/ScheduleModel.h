@@ -302,6 +302,12 @@ public:
   /// derates it). What emission prices and checks against.
   float cycleTimeNs = 0.0f;
 
+  /// What the solved schedule costs in the device's own currency, summed over
+  /// every region (`regionArea`). The quantity the area objective minimizes,
+  /// evaluated on the settled schedule, so two compiles of one kernel at
+  /// different periods compare. Filled by the solver, like `solves`.
+  int64_t modeledArea = 0;
+
 private:
   llvm::DenseMap<Operation *, OpSchedule> ops;
   std::vector<AllocatedUnit> units;

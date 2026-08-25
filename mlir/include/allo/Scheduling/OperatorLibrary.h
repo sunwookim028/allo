@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <map>
@@ -393,14 +394,34 @@ scheduledCallLatency(Operation *op) {
 // Operator model: apply a library to a scheduling problem.
 //===----------------------------------------------------------------------===//
 
+/// The precision a cone delay is stated in, in ns. A cone is no operation of
+/// its own, so it reaches a schedule inside its consumer's operator type, whose
+/// name is what the problem registers timing under. Naming a delay to this
+/// precision means quantizing it to the same, or two cones printing alike would
+/// cost differently depending on which was registered last.
+constexpr double kConeDelayQuantum = 0.01;
+
+/// \p delay on that grid.
+inline double quantizeCone(double delay) {
+  return std::round(delay / kConeDelayQuantum) * kConeDelayQuantum;
+}
+
+/// The select an array access drives its port bus through, in ns: a one-hot
+/// cone over the holders `recordPortSelectArms` recorded, at the wider of the
+/// address and (for a write) the data path. Zero where nothing shares the bus.
+///
+/// Charged into the access's setup delay, so the cut leaves room for the cone
+/// `bindMemoryPorts` grows in front of the port after it.
+double portSelectDelay(Operation *op, const OperatorLibrary &lib);
+
 /// What one memory or stream access is worth to a schedule. A NodeTiming and
 /// not an `OperatorChar`: an access builds no functional unit, so there is no
 /// identity to name, nothing to price and nothing to share.
 ///
 /// Both libraries answer for it: its length and port delay are the storage's
 /// (\p memLib); the address cone feeding that port is arithmetic, priced
-/// against \p opLib's combinational rows. They meet here because a scheduling
-/// problem is the only thing that adds them up.
+/// against \p opLib's combinational rows, as is the port select above. They
+/// meet here because a scheduling problem is the only thing that adds them up.
 NodeTiming accessCharacterization(Operation *op, const OperatorLibrary &opLib,
                                   const MemoryLibrary &memLib);
 

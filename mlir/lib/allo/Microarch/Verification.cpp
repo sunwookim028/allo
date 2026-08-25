@@ -396,6 +396,17 @@ llvm::DenseMap<Operation *, Tail> accessTails(const Datapath &dp,
           t.data.push_back(
               {("a shared-port data select, " + llvm::Twine(k) + ":1").str(),
                dsel});
+        // The colouring against the ceiling the cut reserved for it
+        // (`recordPortSelectArms`). It counts a child's port groups as one, so
+        // an overrun is possible; the path report carries what it costs.
+        if (double built = std::max(sel, dsel);
+            built > acc.selectDelay + kConeDelayQuantum)
+          debug(Stage::Emit, acc.op)
+              << "the port colouring put " << k
+              << " holders on this bus, worth " << llvm::format("%.2f", built)
+              << " ns of select against the "
+              << llvm::format("%.2f", acc.selectDelay)
+              << " ns the schedule reserved";
       }
       TimingStep port{"the " + m.storage + " port of " + owner, acc.portDelay};
       t.addr.push_back(port);

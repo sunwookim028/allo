@@ -237,15 +237,19 @@ class OperatorIP(IP[P, R]):
         latency: int,
         in_delay_ns: float | None = None,
         min_period_ns: float | None = None,
+        out_delay_ns: float | None = None,
     ) -> "OperatorIP[P, R]":
         """A copy of this core pipelined to ``latency``. The symbol follows the
         new latency, so the same core at two depths gets two names.
-        ``in_delay_ns`` overrides the archetype's input cone for this depth;
-        ``min_period_ns`` states the clock the depth's internal stages hold."""
+        ``in_delay_ns`` and ``out_delay_ns`` override the archetype's boundary
+        cones for this depth; ``min_period_ns`` states the clock the depth's
+        internal stages hold."""
         core = copy.copy(self)
         overrides = {"latency": latency}
         if in_delay_ns is not None:
             overrides["in_delay_ns"] = in_delay_ns
+        if out_delay_ns is not None:
+            overrides["out_delay_ns"] = out_delay_ns
         if min_period_ns is not None:
             overrides["min_period_ns"] = min_period_ns
         core.timing = replace(self.timing, **overrides)

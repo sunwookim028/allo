@@ -35,12 +35,19 @@ class PrepassOptions:
     scalarize_threshold: int = 16
 
 
-#: `O` values the driver sweeps a period for, rather than passing to the solver.
-PERIOD_POLICIES = frozenset({"freq", "wall"})
+#: `O` values the driver sweeps a period for, deciding the clock rather than
+#: taking it as given.
+PERIOD_POLICIES = frozenset({"freq", "wall", "area"})
+
+#: The region objective a period policy solves each rung under, where it differs
+#: from the knob's own name: `freq` and `wall` rank clocks by time and leave
+#: every region minimizing span. `area` ranks on what its regions minimize, so
+#: it keeps its own order.
+REGION_ORDERS = {"freq": "cycles", "wall": "cycles"}
 
 
 @dataclass(frozen=True)
-class SchedulerOptions:
+class SchedulerOptions:  # pylint: disable=too-many-instance-attributes
     """What the scheduler itself was asked for.
 
     Every field is the effective value the solve ran under, the knob list
@@ -51,15 +58,20 @@ class SchedulerOptions:
             ``"heuristic"`` is the SDC simplex plus greedy placement; ``"exact"``
             is CP-SAT over the same problem.
         O: the optimization direction. ``"cycles"`` minimizes span, tie-breaking
-            on area; ``"area"`` minimizes area under a span leash no slower than
-            the heuristic schedule (an explicit ``pipeline(ii=n)`` also caps II
-            at ``n``). Both need ``scheduler="exact"``, the heuristic solving
-            spans only. ``"freq"`` makes the clock an output: periods below the
-            requested one are probed, the tightest within ``span_tolerance``
-            solved, then the clock tightened to the realized critical path.
-            ``"wall"`` minimizes span times period, probing both sides of the
-            requested clock, which may come back slower than asked. Under both
-            ``freq`` and ``wall`` the handle's ``freq_mhz`` follows the result.
+            on area; ``"area"`` minimizes area, over the period as well as the
+            schedule: candidate clocks are probed and the winner solved under a
+            span leash no slower than that clock's own heuristic schedule (an
+            explicit ``pipeline(ii=n)`` also caps II at ``n``). The requested
+            clock is the reference that trade is measured against, so the
+            winner is never faster than it nor larger than it costs; a
+            ``wall_ns`` deadline replaces that reference. Both need
+            ``scheduler="exact"``, the heuristic solving spans only. ``"freq"``
+            makes the clock an output: periods below the requested one are
+            probed, the tightest within ``span_tolerance`` solved, then the
+            clock tightened to the realized critical path. ``"wall"`` minimizes
+            span times period, probing both sides of the requested clock, which
+            may come back slower than asked. Under all three the handle's
+            ``freq_mhz`` follows the result.
         cycle_ns: the operating clock period in ns, from the handle's
             ``freq_mhz``; chains are cut to it less ``clock_margin``.
         clock_margin: fraction of the period withheld as timing headroom; chains
@@ -68,6 +80,11 @@ class SchedulerOptions:
         area_slack: span the area objective may pay beyond its leash, as a
             fraction of the heuristic schedule's span. Zero ships no slower than
             the heuristic.
+        wall_ns: the deadline ``O="area"`` holds its period sweep to, in ns: a
+            candidate clock is eligible only while span times achieved period
+            stays within it, and the smallest eligible area wins. Zero leaves
+            the sweep ranking on area times wall, which needs no deadline. Read
+            only under ``O="area"``.
         span_tolerance: the cycle-count regression ``O="freq"`` may trade for a
             faster clock; a candidate is kept only while span stays within
             ``(1 + span_tolerance)`` of the span at the requested clock (or, with
@@ -94,6 +111,7 @@ class SchedulerOptions:
     cycle_ns: float = 5.0
     clock_margin: float = 0.0
     area_slack: float = 0.0
+    wall_ns: float = 0.0
     span_tolerance: float = 0.1
     budget: float = 30.0
     workers: int = 8

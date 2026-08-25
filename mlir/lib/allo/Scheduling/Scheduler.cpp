@@ -1871,40 +1871,53 @@ void OccupancyProblem::assignUnits(unsigned ii) {
     if (!units)
       continue;
     SmallVector<Operation *> users = usersOf(rsrc);
-    // Both rules round-robin over all the instances rather than packing into
-    // the fewest that fit, so the count decided is the count built.
-    unsigned cursor = 0;
+    // Both rules take the least loaded instance that is free, which spreads
+    // over all the instances rather than packing into the fewest that fit (the
+    // count decided is the count built) and aims the fullest instance at
+    // `ceil(k / units)`, the class size `AllocatableUnit::headroomNs` reserved
+    // a select for.
+    SmallVector<unsigned> load(*units, 0);
+    auto leastLoaded = [&](auto free) {
+      std::optional<unsigned> pick;
+      for (unsigned k = 0; k < *units; ++k)
+        if (free(k) && (!pick || load[k] < load[*pick]))
+          pick = k;
+      assert(pick && "the busiest congruence class or cycle needs more "
+                     "instances than the allocation decided");
+      ++load[*pick];
+      return *pick;
+    };
     if (ii) {
       // Occupancy is one cycle here, so an instance is available iff it is
-      // free in the operation's congruence class.
+      // free in the operation's congruence class. A class of c members needs c
+      // distinct instances, so the fullest classes are placed first, while
+      // every instance is still free to take them; leaving one for last can
+      // force it onto an instance the balance has already filled.
+      llvm::SmallDenseMap<unsigned, unsigned> members;
+      for (Operation *op : users)
+        ++members[*getStartTime(op) % ii];
+      llvm::stable_sort(users, [&](Operation *a, Operation *b) {
+        return members.lookup(*getStartTime(a) % ii) >
+               members.lookup(*getStartTime(b) % ii);
+      });
       llvm::DenseSet<std::pair<unsigned, unsigned>> taken;
       for (Operation *op : users) {
         unsigned cls = *getStartTime(op) % ii;
-        unsigned k = cursor % *units;
-        for (unsigned tried = 1; taken.count({k, cls}) && tried < *units;
-             ++tried)
-          k = (k + 1) % *units;
-        assert(!taken.count({k, cls}) &&
-               "the busiest congruence class needs more instances than the "
-               "allocation decided");
+        unsigned k =
+            leastLoaded([&](unsigned u) { return !taken.count({u, cls}); });
         taken.insert({k, cls});
         assignedUnit[op] = k;
-        cursor = k + 1;
       }
     } else {
-      // First fit over occupancy windows in start order, rotating the instance
-      // scanned first so the load spreads.
+      // An instance is available iff its occupancy window has closed by the
+      // operation's start.
       SmallVector<unsigned> freeAt(*units, 0);
       for (Operation *op : users) {
         unsigned start = *getStartTime(op);
-        unsigned k = cursor % *units;
-        for (unsigned tried = 1; freeAt[k] > start && tried < *units; ++tried)
-          k = (k + 1) % *units;
-        assert(freeAt[k] <= start && "the busiest cycle needs more instances "
-                                     "than the allocation decided");
+        unsigned k =
+            leastLoaded([&](unsigned u) { return freeAt[u] <= start; });
         assignedUnit[op] = k;
         freeAt[k] = start + getResourceCycles(op);
-        cursor = k + 1;
       }
     }
   }

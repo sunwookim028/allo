@@ -37,6 +37,7 @@ from _common import (
     Dcp,
     _sched,
     _to_rtl,
+    period_need,
     _impls,
     _iis,
     _latency,
@@ -941,10 +942,11 @@ def test_selection_honors_a_rows_warranted_period():
         for k in range(8):
             y[k] = x[k] / y[k]
 
-    # 450 MHz is past both dividers' warranties: the clock derates to the
-    # 12-cycle row's floor, where that row wins back over the 10-cycle one.
+    # 450 MHz is past both dividers' warranties: the clock derates to what the
+    # 12-cycle row needs for a cycle of its own, where that row wins back over
+    # the 10-cycle one.
     derated = _to_rtl(ratio, freq_mhz=450).schedule()
-    assert derated.cycle_ns == pytest.approx(2.39)
+    assert derated.cycle_ns == pytest.approx(period_need("div", "float32", 12))
     assert "div_f32_f32_f32_l12" in _impls(derated)
 
 
@@ -1341,10 +1343,13 @@ def test_exact_share_folds_profitable_ip():
     def chain(A: f32[1], B: f32[1], C: f32[1], o: f32[1]):
         o[0] = A[0] * B[0] * C[0]
 
+    # At a slower clock, because the trade has to be legal to be taken: the
+    # operands arrive from array ports, and a port's read cone plus a select
+    # cone plus the multiply's own input cone do not fit the default period.
     a, b, c = (np.array([v], np.float32) for v in (7, 6, 5))
-    shared = _to_rtl(chain)
+    shared = _to_rtl(chain, freq_mhz=150.0)
     assert shared.mlir.count("hw.instance") < _to_rtl(
-        chain
+        chain, freq_mhz=150.0
     ).use_trivial_binding().mlir.count("hw.instance")
     o = np.zeros(1, np.float32)
     shared.cosim(a, b, c, o)
@@ -2727,9 +2732,13 @@ def test_the_area_objective_gates_the_muladd_fusion_by_price():
 # Each multiply is declared twice at one depth, as DSP and as fabric; the rows
 # differ only in spend, so a DSP weight moves the design onto LUTs without
 # changing its schedule.
+# i64, not i32: rank is latency before price, so a fabric row only competes
+# with the DSP row declared at its own depth. At 32 bits the DSP row that holds
+# this clock is a cycle shallower than the fabric one, and no weight can move a
+# multiply onto a longer row.
 def test_a_dsp_weight_moves_a_multiply_onto_the_fabric_row():
     @kernel
-    def mulk(x: i32[8], y: i32[8], out: i32[8]):
+    def mulk(x: i64[8], y: i64[8], out: i64[8]):
         for i in range(8):
             out[i] = x[i] * y[i]
 
@@ -2744,16 +2753,16 @@ def test_a_dsp_weight_moves_a_multiply_onto_the_fabric_row():
     for scheduler in ("heuristic", "exact"):
         _, dsp, dsp_lat = built(scheduler)
         rtl, lut, lut_lat = built(scheduler, dsp=8.0)
-        assert dsp == {"mul_i32_i32_i32_l2"}
-        assert lut == {"mullut_i32_i32_i32_l2"}
+        assert dsp == {"mul_i64_i64_i64_l6"}
+        assert lut == {"mullut_i64_i64_i64_l6"}
         assert dsp_lat == lut_lat
 
     rng = np.random.default_rng(5)
-    x = rng.integers(-(2**31), 2**31, 8, dtype=np.int32)
-    y = rng.integers(-(2**31), 2**31, 8, dtype=np.int32)
-    out = np.zeros(8, np.int32)
+    x = rng.integers(-(2**31), 2**31, 8, dtype=np.int64)
+    y = rng.integers(-(2**31), 2**31, 8, dtype=np.int64)
+    out = np.zeros(8, np.int64)
     rtl.cosim(x, y, out)
-    assert np.array_equal(out, (x.astype(np.int64) * y).astype(np.int32))
+    assert np.array_equal(out, x * y)
 
 
 # The i16 fabric product is combinational up to its consumer's register, so

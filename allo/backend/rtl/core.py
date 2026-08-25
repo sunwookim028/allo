@@ -32,7 +32,7 @@ from .interface import Interfaces
 from .options import PERIOD_POLICIES, PrepassOptions, SchedulerOptions
 from .qor import QoR, estimate
 from .reports import CompileReport, MicroarchReport, ScheduleResult
-from .schedule import run_schedule, sweep_freq, sweep_wall
+from .schedule import run_schedule, sweep_area, sweep_freq, sweep_wall
 from .sim import shell
 from ...lang.core import ShapedType
 from ...lang.kernel import Kernel
@@ -225,7 +225,8 @@ class RTL(Backend[P, R]):
                         self._device.reg_delay_ns,
                     )
                 else:
-                    self._dcp_ir, self._schedule_result = sweep_wall(
+                    sweep = sweep_wall if self._sched_opts.O == "wall" else sweep_area
+                    self._dcp_ir, self._schedule_result = sweep(
                         self.top,
                         make_module,
                         self._sched_opts,
@@ -375,8 +376,8 @@ class RTL(Backend[P, R]):
         the target speeds up, one that missed it slows down. A bound operator
         row's warranted period caps the move, since its internal pipeline
         stages are not paths the estimator sees. Returns the new ``freq_mhz``,
-        which ``cosim`` then drives. Runs by itself at compile under
-        ``O="freq"`` and ``O="wall"``."""
+        which ``cosim`` then drives. Runs by itself at compile under every
+        period policy."""
         period = 1000.0 / self.estimation.fmax
         floors = {o.symbol: o.timing.min_period_ns for o in self._device.operators}
         bound = {op.impl for m in self.interfaces.values() for op in m.operators}

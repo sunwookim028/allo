@@ -622,6 +622,23 @@ int64_t OperatorLibrary::pulsePrice() const {
   return chainPrice(2, 1) - chainPrice(1, 1);
 }
 
+double mlir::allo::portSelectDelay(Operation *op, const OperatorLibrary &lib) {
+  unsigned arms = portSelectArmsOf(op);
+  if (arms < 2)
+    return 0.0;
+  std::optional<MemAccess> a = asMemAccess(op);
+  assert(a && a->kind == AccessKind::Array &&
+         "only an array access is coloured onto a port bus");
+  auto type = cast<MemRefType>(a->root.getType());
+  // The address bus is as wide as one bank's word count; a write also selects
+  // the datum, and one delay covers the wider of the two.
+  unsigned width = llvm::Log2_64_Ceil(
+      std::max<int64_t>(2, bankLayoutOf(a->root).bankWords()));
+  if (a->isWrite)
+    width = std::max(width, datapathWidth(type.getElementType()));
+  return quantizeCone(muxCone(lib, arms, width));
+}
+
 NodeTiming mlir::allo::accessCharacterization(Operation *op,
                                               const OperatorLibrary &opLib,
                                               const MemoryLibrary &memLib) {
@@ -643,7 +660,7 @@ NodeTiming mlir::allo::accessCharacterization(Operation *op,
   // The address cone is no operation of its own, so no dependence carries its
   // delay: charge it to the port it feeds. The type NAME carries it too, or
   // two sites costing differently would share one characterization.
-  if (double addr = addressDelayOf(op, opLib)) {
+  if (double addr = quantizeCone(addressDelayOf(op, opLib))) {
     // A registered port takes the cone on its input side alone, ending at its
     // own address register. A zero-latency port has none, and CIRCT requires
     // its two delays to agree, so there the cone lands on both.
@@ -651,6 +668,16 @@ NodeTiming mlir::allo::accessCharacterization(Operation *op,
     if (c.latency == 0)
       c.outDelay += addr;
     c.typeName += "@" + llvm::formatv("{0:F2}", addr).str();
+  }
+  // The select the port colouring will grow in front of the bus, reserved
+  // here so the cut leaves room for it. Carried in the type name for the same
+  // reason the address cone is.
+  if (double sel = portSelectDelay(op, opLib)) {
+    c.inDelay += sel;
+    if (c.latency == 0)
+      c.outDelay += sel;
+    c.typeName +=
+        llvm::formatv("/{0}:1@{1:F2}", portSelectArmsOf(op), sel).str();
   }
   return c;
 }
@@ -680,7 +707,7 @@ OperatorChar OperatorLibrary::lookup(Operation *op) const {
       AddressCost cost =
           addressCost(applyExprOf(apply.getAffineMap()), addressDelaysOf(*this),
                       AddressDelays::refWidth);
-      double delay = std::round(cost.delay * 100.0) / 100.0;
+      double delay = quantizeCone(cost.delay);
       auto combPrice = [&](OpKind kind) -> int64_t {
         const OperatorEntry *row = combEntry(kind);
         if (!row)

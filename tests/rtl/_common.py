@@ -30,19 +30,33 @@ PERIOD_NS = 1000.0 / default_device.default_freq_mhz
 REG_NS = default_device.reg_delay_ns
 
 
+def _row_need(timing) -> float:
+    """What one operator row needs for a cycle of its own, the same max the
+    compiler's derate walk takes: its input cone above the register floor, its
+    output cone, and the period its internal stages are warranted at."""
+    return max(REG_NS + timing.in_delay_ns, timing.out_delay_ns, timing.min_period_ns)
+
+
+def _op_row(kind: str, dtype: str, latency: int):
+    """The device's operator row for one kind, signature and depth."""
+    return next(
+        o
+        for o in default_device.operators
+        if _key(o) == (kind, dtype) and o.timing.latency == latency
+    )
+
+
+def period_need(kind: str, dtype: str, latency: int) -> float:
+    """What one row needs for a cycle of its own; see :func:`_row_need`."""
+    return _row_need(_op_row(kind, dtype, latency).timing)
+
+
 # The library binds the shortest candidate of a kind and signature that fits the
 # clock, so that is the latency a test predicts a schedule against. A row whose
 # cone or warranted period exceeds the period is not a candidate.
 _LAT: dict[tuple[str, str], int] = {}
 for _o in default_device.operators:
-    if (
-        max(
-            REG_NS + _o.timing.in_delay_ns,
-            _o.timing.out_delay_ns,
-            _o.timing.min_period_ns,
-        )
-        > PERIOD_NS
-    ):
+    if _row_need(_o.timing) > PERIOD_NS:
         continue
     _k = _key(_o)
     _LAT[_k] = min(_LAT.get(_k, _o.timing.latency), _o.timing.latency)
@@ -74,9 +88,19 @@ def comb_step_ns(kind: str, width: int = 32) -> float:
 # A memory-carried accumulate (`M[x] += ...`) closes a distance-1 recurrence
 # read -> add -> write, but store->load forwarding hands the next read the
 # store's datum on an address match, so the II is read + add rather than the
-# full round trip. A scalar-carried accumulate keeps the partial in a register,
-# so its II is just the add latency.
-MEM_REDUCE_II = MEM + FADD
+# full round trip. The read's datum reaches the adder inside the read's own
+# cycle only where the read's cone and the adder's input cone fit the period
+# together; where they do not the chain breaks and the recurrence pays one more
+# cycle. A scalar-carried accumulate keeps the partial in a register, so its II
+# is just the add latency.
+def mem_reduce_ii(storage: str = "lutram") -> int:
+    """The II of a float accumulate carried through one storage row."""
+    row = default_device.storage[storage]
+    arrival = row.read_delay_ns + _op_row("add", "float32", FADD).timing.in_delay_ns
+    return row.read_latency + FADD + (0 if arrival <= PERIOD_NS else 1)
+
+
+MEM_REDUCE_II = mem_reduce_ii()
 
 
 def _to_rtl(kernel, **kw) -> RTL:

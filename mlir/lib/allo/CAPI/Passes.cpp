@@ -114,9 +114,11 @@ MlirLogicalResult alloRunSDCSchedulingPipeline(
                               seed,
                               deterministic,
                               areaSlack > 0.0 ? areaSlack : 0.0};
-  // The storage decision, taken once and recorded on every array before any
-  // layer below reads it.
-  allo::recordArrayStorage(mod, allo::MemoryLibrary::fromModule(mod));
+  // The storage decisions, taken once and recorded on every array and access
+  // before any layer below reads them.
+  allo::MemoryLibrary memLib = allo::MemoryLibrary::fromModule(mod);
+  allo::recordArrayStorage(mod, memLib);
+  allo::recordPortSelectArms(mod, memLib);
   if (failed(allo::runPreScheduleVerification(mod, topName)))
     return mlirLogicalResultFailure();
   // The solved schedule travels between the two halves in memory, not as IR

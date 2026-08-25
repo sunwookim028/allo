@@ -22,7 +22,17 @@ from allo.backend.rtl.devices import default_device
 from allo.backend.rtl.schedule import RTL_PREPARE_PIPELINE
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _common import Dcp, _walk, _sched, _to_rtl, _iis, FADD, MEM, MEM_URAM  # noqa: E402
+from _common import (  # noqa: E402
+    Dcp,
+    _walk,
+    _sched,
+    _to_rtl,
+    _iis,
+    FADD,
+    MEM,
+    MEM_URAM,
+    mem_reduce_ii,
+)
 
 pytestmark = pytest.mark.skipif(
     shutil.which("verilator") is None, reason="verilator not available"
@@ -1948,8 +1958,8 @@ def test_storage_impl_shifts_recurrence_ii():
     # recurrence II is read + FADD. Default LUTRAM (read 1) gives FADD + 1;
     # binding the accumulator to URAM (read 2) adds a cycle.
     lutram_ii = _matvec_recurrence_ii()
-    assert lutram_ii == FADD + 1
-    assert _matvec_recurrence_ii(bind=Schedule.URAM) == FADD + 2
+    assert lutram_ii == mem_reduce_ii("lutram")
+    assert _matvec_recurrence_ii(bind=Schedule.URAM) == mem_reduce_ii("uram")
     # A complete partition scatters `y` into FFs, which no shadow serves: the
     # read is combinational (0) and the FF write costs its cycle, so the
     # recurrence is FADD + 1, level with the forwarded LUTRAM.
