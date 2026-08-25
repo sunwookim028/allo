@@ -221,15 +221,20 @@ def _unmeasured(uses: Spend, params: Sequence[int]) -> str:
     return "a cost is not measured"
 
 
-def Tiled(bits_per_tile: int) -> Cost:
-    """``ceil(depth * width / bits_per_tile)``: the shape of a tiled memory.
+def Tiled(bits_per_tile: int, offset: float = 0.0) -> Cost:
+    """``ceil((depth * width + offset) / bits_per_tile)``: the shape of a tiled
+    memory.
 
     Standing alone it reads the whole parameter tuple: a block-RAM tile holds so
     many bits however the array is cut, which puts the product inside the
     ceiling and does not separate. As one of a full set of factors it tiles its
-    own parameter instead, ``ceil(p / bits_per_tile)``."""
+    own parameter instead, ``ceil((p + offset) / bits_per_tile)``.
+
+    ``offset`` is how many of the parameter's items the tiles do not hold."""
     if bits_per_tile <= 0:
         raise ValueError("a tile holds a positive number of bits")
+    if offset:
+        return Cost("tiled", (float(bits_per_tile), float(offset)))
     return Cost("tiled", (float(bits_per_tile),))
 
 
@@ -349,6 +354,9 @@ class Device:
         self.resources: dict[str, Resource] = {}
         self.comb_uses: dict[str, Spend] = {}  # comb kind -> what it spends
         self.operator_uses: dict[str, Spend] = {}  # IP symbol -> what it spends
+        # IP symbol -> which of the realizer's alternative builds of that core
+        # this row was measured on, absent where it is the default one.
+        self.operator_variant: dict[str, str] = {}
         # What a multiplexer spends. This and the chain rows are unnamed
         # structures the emitter builds, one row each.
         self.mux_uses: Spend = ()
@@ -686,6 +694,16 @@ class Device:
         )
         return self
 
+    def set_operator_variant(self, operator: OperatorIP, variant: str) -> Device:
+        """Which of the realizer's alternative builds of this core the row was
+        measured on. The realizer names the builds."""
+        if operator not in self.operators:
+            raise ValueError(
+                f"{operator.symbol!r} is not an operator of device {self.name!r}"
+            )
+        self.operator_variant[operator.symbol] = variant
+        return self
+
     def set_mux_uses(self, uses: dict[Resource, Sequence]) -> Device:
         """What one select over ``k`` sources of ``width`` bits spends."""
         self.mux_uses = self._spend("a multiplexer", "fan-in, width", uses)
@@ -776,6 +794,7 @@ class Device:
             raise ValueError(f"{symbol!r} is not an operator of device {self.name!r}")
         self.operators.remove(found)
         self.operator_uses.pop(symbol, None)
+        self.operator_variant.pop(symbol, None)
         return self
 
     def validate(self) -> Device:
@@ -825,6 +844,7 @@ class Device:
         d.resources = dict(self.resources)
         d.comb_uses = dict(self.comb_uses)
         d.operator_uses = dict(self.operator_uses)
+        d.operator_variant = dict(self.operator_variant)
         d.mux_uses = self.mux_uses
         d.chain_uses = self.chain_uses
         d.chain_uses_norst = self.chain_uses_norst

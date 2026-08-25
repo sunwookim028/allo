@@ -23,10 +23,11 @@ from ....lang import (
 from ....lang.ip import operator_ip, OperatorType
 
 # An `@operator_ip` body is `...`: the parameters only declare the signature.
-# The declared latency is a placeholder each fabric's table replaces.
+# The declared latency is a placeholder each fabric's table replaces, as is the
+# timing it leaves at zero: every `IPRow` states its own depth's cones.
 # pylint: disable=unused-argument
 
-_ARCHETYPE = {"latency": 1, "in_delay_ns": 0.5, "pipelined": True, "style": "ce"}
+_ARCHETYPE = {"latency": 1, "pipelined": True, "style": "ce"}
 
 
 @operator_ip(optype=OperatorType.ADD, **_ARCHETYPE)

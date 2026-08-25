@@ -1357,8 +1357,10 @@ CostAttr::verify(llvm::function_ref<InFlightDiagnostic()> emitError,
   case CostFormEnum::Quadratic:
     return need(1);
   case CostFormEnum::Tiled:
-    if (failed(need(1)))
-      return failure();
+    // The offset is optional, so one coefficient or two.
+    if (coeffs.size() != 1 && coeffs.size() != 2)
+      return emitError() << "tiled takes 1 or 2 coefficient(s), got "
+                         << coeffs.size();
     // The tile is a divisor, so a non-positive one is a division by zero
     // dressed as a declaration.
     if (coeffs[0] <= 0.0)
@@ -1444,9 +1446,9 @@ std::optional<double> CostAttr::evaluate(int64_t param) const {
                (p - c[i - 2]) / (c[i] - c[i - 2]) * (c[i + 1] - c[i - 1]);
     return c[1]; // a single measured point, read at that point
   case CostFormEnum::Tiled:
-    // One parameter's worth of tiles. The whole-tuple reading, where the
-    // product sits inside the ceiling, is `evaluateResourceUse`'s.
-    return std::ceil(p / c[0]);
+    // One parameter's worth of tiles, over however many items the offset
+    // leaves. Clamped at zero: a tile count is a count.
+    return std::max(0.0, std::ceil((p + (c.size() > 1 ? c[1] : 0.0)) / c[0]));
   case CostFormEnum::Piecewise:
     return getArms()[p < c[0] ? 0 : 1].evaluate(param);
   }
@@ -1496,7 +1498,9 @@ mlir::allo::evaluateResourceUse(ArrayAttr uses,
         double bits = 1.0;
         for (int64_t p : params)
           bits *= static_cast<double>(p);
-        term = std::ceil(bits / factors.front().getCoeffs().asArrayRef()[0]);
+        llvm::ArrayRef<double> tc = factors.front().getCoeffs().asArrayRef();
+        term = std::max(0.0, std::ceil((bits + (tc.size() > 1 ? tc[1] : 0.0)) /
+                                       tc[0]));
       } else {
         assert(factors.size() == params.size() &&
                "a resource cost carries one factor per parameter of its kind");

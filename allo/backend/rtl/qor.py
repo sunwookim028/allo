@@ -68,6 +68,9 @@ class Utilization:
     ff: int = 0
     dsp: int = 0
     carry8: int = 0
+    #: Slice muxes (`muxf`): the F7/F8 pair a wide function folds through.
+    #: Operator cores and constant tables spend them.
+    muxf: int = 0
     bram36: int = 0
     uram288: int = 0
 
@@ -82,6 +85,7 @@ class Utilization:
             ff=spent.get("ff", 0),
             dsp=spent.get("dsp", 0),
             carry8=spent.get("carry8", 0),
+            muxf=spent.get("muxf", 0),
             bram36=spent.get("bram36", 0),
             uram288=spent.get("uram288", 0),
         )
@@ -102,6 +106,7 @@ class Utilization:
             "ff": self.ff,
             "dsp": self.dsp,
             "carry8": self.carry8,
+            "muxf": self.muxf,
             "bram36": self.bram36,
             "uram288": self.uram288,
         }

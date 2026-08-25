@@ -189,16 +189,42 @@ core that quietly built deeper than asked would be sampled early by every
 consumer the scheduler placed.
 
 The area is the core's own cells, excluding anything the measurement harness
-puts around it.
+puts around it, counted from the same routed netlist the arcs are timed on. Two
+things follow from taking it there rather than from a run of its own. It is the
+core as a design gets it, with the operation channel tied to the constant the
+emitter ties it to, so the modes a row never uses are optimized away in the
+measurement exactly as they are in a build: a double compare counts 23 LUTs, not
+the 117 the general core holds. And the count is in the same resource vocabulary
+as every fabric number, so a slice mux is `muxf` rather than folded into `lut`.
 
-The maximum frequency decides whether the row is legitimate at all. A core that
-does not close at the part's target clock is not a slower option, it is not an
-option, and it must not appear in the device table.
+The timing is three arcs, not one number. The path is again register to
+register through the core, for the same reason as the fabric sweep: that is how
+the emitter instantiates it, between real registers, and the routing on both
+sides is part of what the schedule has to fit. But the compiler charges the
+three segments of that path in three different places, so they are timed apart:
 
-The path is again register to register through the core, for the same reason as
-the fabric sweep: that is how the emitter instantiates it, between real
-registers, and the routing on both sides is part of what the schedule has to
-fit. Since an IP cannot be generated in that shape, the shape has to be built
+| arc | from | to | declared as |
+| --- | --- | --- | --- |
+| in | the wrapper's register | the core's first internal register | `in_delay_ns`, less the register floor |
+| int | the core's internal registers | each other | `min_period_ns` |
+| out | the core's last internal register | the wrapper's register | `out_delay_ns` |
+
+The in arc is what a chain in front of the core has to share a cycle with, the
+out arc is what a chain behind it starts from, and the int arc is a path no
+schedule can split, so it is a floor on the clock rather than a term in a
+chain. Their max is the period the row needs for a cycle of its own, which is
+the whole register-to-register path -- so measuring the three separately loses
+nothing and tells the scheduler where the time goes.
+
+One number for all three is the failure this replaced. A single worst-path
+query answers only "does the row hold this clock", and a row that has to answer
+it at some clock ends up warranted at whatever clock the campaign happened to
+run at. That number then reads as a physical limit later. It is not one: it is
+a record of the campaign, and a core measured at 300 MHz whose internal arc is
+0.9 ns will refuse a 500 MHz design for no reason anyone can see. Time the arcs,
+declare the arcs, and let the model take the max.
+
+Since an IP cannot be generated between registers, the shape has to be built
 around it.
 
 ### 2.2 TCL and Vivado commands
@@ -367,6 +393,14 @@ bits counting the hidden one.
 Clock port names vary with the interface. An AXI stream core calls it `aclk`, a
 plain one `clk` or `CLK`, so the harness should look for any of them rather than
 assume.
+
+`get_timing_paths` ranks by SLACK, and every arc here wants the longest DELAY.
+The two orders agree only when every endpoint carries the same clock skew and
+setup requirement, which across a core's internal registers they do not, so
+`-max_paths 1` can return a path shorter than the worst one. The check that
+catches it is arithmetic: the three arcs of one core must have the same maximum
+as the whole register-to-register path, and taking each over a deep path list
+is what makes them.
 
 Finally, the failure that motivated the wrapper in the first place. If the
 design is constrained with a clock and nothing else, `get_timing_paths` returns

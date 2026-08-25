@@ -62,6 +62,23 @@ def test_every_declared_row_resolves():
             assert "{lat}" in vivado.LATENCY[recipe.core]
 
 
+def test_a_characterized_row_carries_its_own_measurement():
+    # `IPRow` has no defaults left, so a row cannot omit a delay; what it can
+    # still do is repeat the triple an uncharacterized fabric states on every
+    # row (`_UNMEASURED`: an archetype cone, no output cone, and the grade's
+    # characterization clock). On a fabric a cone campaign has run over, that
+    # combination is a copy-paste rather than a measurement.
+    for table in (ultrascalex.IP, *ultrascalex.IP_BY_GRADE.values()):
+        for arche, rows in _rows(table):
+            for row in rows:
+                triple = (row.in_delay_ns, row.min_period_ns, row.out_delay_ns)
+                assert triple != (
+                    0.5,
+                    1000.0 / ultrascalex.GRADE_2L.default_freq_mhz,
+                    0.0,
+                ), f"{arche.func_name} l{row.latency} repeats the placeholder triple"
+
+
 def test_config_fragments_are_key_value_pairs():
     for recipe in vivado.RECIPES.values():
         if recipe.core == "rtl":
@@ -69,7 +86,7 @@ def test_config_fragments_are_key_value_pairs():
         fragments = (
             vivado.CE_BASE[recipe.core],
             recipe.shape,
-            recipe.no_dsp,
+            *recipe.variants.values(),
             vivado.LATENCY[recipe.core].format(lat=1),
         )
         for fragment in fragments:
@@ -77,14 +94,26 @@ def test_config_fragments_are_key_value_pairs():
                 assert kv.count("=") == 1, kv
 
 
-def test_dsp_free_candidates_have_the_fragment():
-    # An archetype with one row spending DSPs and another spending none needs
-    # the DSP-free fragment, or both rows would build the same core and the
-    # table would price one piece of hardware under two names.
+def test_a_row_states_the_build_its_area_was_measured_on():
+    # A row names its build, and the name and the area have to agree: a
+    # DSP-free build spends no DSP, and anything else on a core offering one
+    # would emit hardware the row does not describe.
     for table in _tables():
         for arche, rows in _rows(table):
-            if len({"dsp" in r.area for r in rows}) == 2:
-                assert vivado.RECIPES[arche].no_dsp, arche.func_name
+            recipe = vivado.RECIPES[arche]
+            for row in rows:
+                if row.variant is not None:
+                    assert row.variant in recipe.variants, (
+                        f"{arche.func_name} l{row.latency} asks for a "
+                        f"{row.variant!r} build the recipe does not offer"
+                    )
+                spends_dsp = "dsp" in row.area
+                if "nodsp" in recipe.variants:
+                    assert spends_dsp == (row.variant != "nodsp"), (
+                        f"{arche.func_name} l{row.latency} declares "
+                        f"variant={row.variant!r} and area {dict(row.area)}"
+                    )
+                assert row.variant != "maxdsp" or spends_dsp
 
 
 def test_divider_sign_follows_mnemonic():
@@ -160,8 +189,8 @@ def test_generate_drives_the_predicate_on_the_operation_channel():
 
 
 def test_generate_builds_the_row_the_area_measured():
-    # A row whose area spends no DSPs is rebuilt with the DSP-free fragment,
-    # and one whose area spends them is not.
+    # A row declaring the DSP-free build is generated with that fragment, and
+    # its area spends no DSPs; a row declaring no build is generated without.
     @kernel
     def fk(a: f32, b: f32) -> f32:
         return a * b + a

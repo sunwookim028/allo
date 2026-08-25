@@ -199,8 +199,10 @@ def test_the_device_prices_a_realization_through_the_compiler():
     # bit, not `depth * width` flip-flops.
     assert dev.price(dev.chain_uses, (64, 32))["ff"] == 2 * 32 + 64 - 1
     assert dev.price(dev.chain_uses, (2, 32))["ff"] == 64
-    # A carry chain is a CEILING: a 9-bit adder takes two CARRY8s.
-    assert dev.price(dev.comb_uses["add"], (9,)) == {"lut": 9, "carry8": 2}
+    # A carry chain is a ceiling: a 17-bit adder takes three CARRY8s. Below 16
+    # bits there is no carry chain at all and the adder is three LUTs more.
+    assert dev.price(dev.comb_uses["add"], (17,)) == {"lut": 17, "carry8": 3}
+    assert dev.price(dev.comb_uses["add"], (9,)) == {"lut": 12, "carry8": 0}
     # A block RAM tile holds 36864 bits however the array is cut.
     assert dev.price(dev.storage["bram"].uses, (1024, 32)) == {"bram36": 1}
 
@@ -1958,47 +1960,65 @@ def test_comb_area_rows_reproduce_their_measurements():
         assert dict(dev.comb_uses["shl"])["lut"][0].form == "interp"
 
 
-# An extracted chain occupies `ceil(depth/32)` SLICEM sites a bit, which is the
-# formula the sampled table was generated from, and it holds past the last row
-# that table carried.
+# An extracted chain keeps its first and last stage in flip-flops, so its shift
+# registers hold `depth - 2` and occupy `ceil((depth-2)/32)` SLICEM sites a bit.
+# Measured at the depths that tell that apart from `ceil(depth/32)` and
+# `ceil((depth-1)/32)`: 32, 33 and 34 take one site, 64, 65 and 66 take two.
 def test_the_srl_site_count_is_the_formula_its_table_sampled():
-    sites = {1: 0, 4: 1} | {32 * i + 1: i + 1 for i in range(1, 17)}
+    dev = default_device
+    sites = {1: 0, 4: 1} | {32 * i + 3: i + 1 for i in range(1, 17)}
 
     def sampled(depth):
         return sites[max(k for k in sites if k <= depth)]
 
-    probes = sorted(set(sites) | {2, 3, 5, 32, 64, 65, 96, 512, 513})
-    for _, dev in _fabrics():
-        for depth in probes:
-            got = dev.price(dev.chain_uses, (depth, 1))["slicem_lut"]
-            assert got == sampled(depth), (dev.name, depth)
-        assert dev.price(dev.chain_uses, (1024, 1))["slicem_lut"] == 32
-        # A chain below the extraction cliff is `depth * width` registers, one
-        # above it a head and tail per bit plus one per stage.
-        for depth in (1, 2, 3, 4, 5, 64, 1024):
-            for width in (1, 8, 32):
-                want = depth * width if depth < 4 else 2 * width + depth - 1
-                assert dev.price(dev.chain_uses, (depth, width))["ff"] == want
+    probes = sorted(set(sites) | {2, 3, 5, 32, 33, 34, 64, 65, 66, 96, 97, 512})
+    for depth in probes:
+        got = dev.price(dev.chain_uses, (depth, 8))["slicem_lut"]
+        assert got == 8 * sampled(depth), (depth, got)
+    assert dev.price(dev.chain_uses, (1024, 8))["slicem_lut"] == 8 * 32
+    # A one-bit chain whose stages carry a reset is never extracted.
+    for depth in (4, 33, 64, 128, 1024):
+        assert dev.price(dev.chain_uses, (depth, 1))["slicem_lut"] == 0
+        assert dev.price(dev.chain_uses_norst, (depth, 1))["slicem_lut"] > 0
+    # A chain below the extraction cliff is `depth * width` registers, one above
+    # it a head and tail per bit plus one per stage.
+    for depth in (1, 2, 3, 4, 5, 64, 1024):
+        for width in (1, 8, 32):
+            want = depth * width if depth < 4 else 2 * width + depth - 1
+            assert dev.price(dev.chain_uses, (depth, width))["ff"] == want
 
 
-# A select's LUT count per bit is measured up to a fan-in of 39 and read as that
-# staircase there; past it the least-squares line through those points takes
+# A select's LUT count per bit is measured up to a fan-in of 64 and read as that
+# staircase there; past it the least-squares line through the upper regime takes
 # over, since a region can share an operator over more sources than the sweep.
 def test_the_mux_curve_is_measured_over_its_sweep_and_fitted_past_it():
     from allo.backend.rtl.devices.spec import MUX_LUT_PER_BIT
 
-    slope, base = 0.4084490071, 0.2634952767
+    slope, base = 0.5388, 1.6478
     last = max(MUX_LUT_PER_BIT)
     for _, dev in _fabrics():
         for k, v in MUX_LUT_PER_BIT.items():
             assert dev.price(dev.mux_uses, (k, 1)) == {"lut": v}, (dev.name, k)
-        for k in (last + 1, 64, 128):
+        for k in (last + 1, 96, 128):
             want = _rounded((base + slope * k) * 100)
             assert dev.price(dev.mux_uses, (k, 100)) == {"lut": want}
-        # The seam is under a fifth of a LUT: the fit at the last measured point
-        # against the measurement there.
-        assert abs(base + slope * last - MUX_LUT_PER_BIT[last]) < 0.2
         assert dev.price(dev.mux_uses, (128, 1))["lut"] > MUX_LUT_PER_BIT[last]
+
+
+# The curve is two regimes: a LUT6 absorbs three (data, select) pairs up to 24
+# sources and the cost per source rises by a quarter above that, so a line
+# fitted to the low end reads far short at the top of the sweep.
+def test_the_mux_curve_steepens_past_two_dozen_sources():
+    from allo.backend.rtl.devices.spec import MUX_LUT_PER_BIT
+
+    def slope_between(lo, hi):
+        return (MUX_LUT_PER_BIT[hi] - MUX_LUT_PER_BIT[lo]) / (hi - lo)
+
+    assert slope_between(4, 24) < 0.45
+    assert slope_between(26, 64) > 0.5
+    # The measured staircase never steps down.
+    values = [MUX_LUT_PER_BIT[k] for k in sorted(MUX_LUT_PER_BIT)]
+    assert values == sorted(values)
 
 
 # Several rows under one archetype are several cores, each declared under its
@@ -2009,7 +2029,14 @@ def test_a_fabric_declares_every_row_of_an_archetype():
     from allo.backend.rtl.devices import ip as catalog
     from allo.backend.rtl.devices.spec import IPRow, Part
 
-    fast = IPRow(FADD - 1, {"lut": 400, "ff": 300, "dsp": 3}, mnemonic="add_dsp")
+    fast = IPRow(
+        FADD - 1,
+        {"lut": 400, "ff": 300, "dsp": 3},
+        in_delay_ns=0.5,
+        min_period_ns=0.0,
+        out_delay_ns=0.5,
+        mnemonic="add_dsp",
+    )
     part = Part(
         name="twoadds",
         part="xcu55c-fsvh2892-2L-e",

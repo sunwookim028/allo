@@ -38,9 +38,12 @@ from .spec import (
 
 NAME = "versal"
 
+#: A slice mux combines LUT outputs and is counted apart from them: a CLB holds
+#: four MUXF7 to its eight LUT6, so a die has half as many as it has LUTs.
 DERIVED = {
     "carry8": Derived("lut", 8),
     "slicem_lut": Derived("lut", 2),
+    "muxf": Derived("lut", 2),
 }
 
 GRADE_2MP = Grade("-2MP", default_freq_mhz=375.0)
@@ -137,100 +140,185 @@ TIMING: Mapping[Grade, FabricTiming] = {
 
 SCATTER_STORAGE = "register"
 
+#: No cone campaign has run on this fabric, so every row below carries these
+#: three numbers rather than its own: an unmeasured entry cone, no output cone,
+#: and the grade's characterization clock as the warranted period. They are
+#: stated on each row rather than defaulted so a reader sees which rows are
+#: measurements and which are placeholders. Replace them per row with
+#: `drafts/char/measure_cones.py` run against a Versal part.
+_UNMEASURED = {
+    "in_delay_ns": 0.5,
+    "min_period_ns": 1000.0 / GRADE_2MP.default_freq_mhz,
+    "out_delay_ns": 0.0,
+}
+
 #: Operator cores measured on this fabric, each inside a registered wrapper so
-#: the number covers the whole path a caller sees. The trailing comment on each
-#: row is that core's achieved Fmax in MHz, a record of the characterization run
-#: and not an input to the cost model. Several rows under one archetype declare
-#: several cores for the library to choose between; every row closes at the
-#: part's default frequency. ``lut`` is logic sites only: the shift registers a
-#: core holds internally are split out as ``slicem_lut``.
+#: the number covers the whole path a caller sees. Several rows under one
+#: archetype declare several cores for the library to choose between. ``lut`` is
+#: logic sites only: the shift registers a core holds internally are split out
+#: as ``slicem_lut``.
+#:
+#: The trailing comment on each row is that core's achieved Fmax in MHz from an
+#: older campaign that recorded one worst-path number per core. It is the only
+#: timing evidence this fabric has, and it is NOT what the rows declare: their
+#: three delays are the `_UNMEASURED` placeholder above, which is why the two
+#: disagree. Nothing reads the comment; a cone campaign against this fabric
+#: replaces both.
 IP: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]] = {
     ip.fadd: IPRow(
-        7, {"lut": 317, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10}
+        7,
+        {"lut": 317, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10},
+        **_UNMEASURED,
     ),  # 436
     ip.fsub: IPRow(
-        7, {"lut": 317, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10}
+        7,
+        {"lut": 317, "slicem_lut": 13, "ff": 238, "dsp": 2, "carry8": 10},
+        **_UNMEASURED,
     ),  # 436
     ip.fmul: IPRow(
-        4, {"lut": 167, "slicem_lut": 1, "ff": 109, "dsp": 2, "carry8": 9}
+        4,
+        {"lut": 167, "slicem_lut": 1, "ff": 109, "dsp": 2, "carry8": 9},
+        **_UNMEASURED,
     ),  # 502
     ip.fdiv: IPRow(
-        16, {"lut": 1451, "slicem_lut": 39, "ff": 699, "carry8": 111}
+        16, {"lut": 1451, "slicem_lut": 39, "ff": 699, "carry8": 111}, **_UNMEASURED
     ),  # 452
-    ip.fcmp: IPRow(1, {"lut": 105, "ff": 2, "carry8": 7}),  # 502
+    ip.fcmp: IPRow(1, {"lut": 105, "ff": 2, "carry8": 7}, **_UNMEASURED),  # 502
     ip.dadd: IPRow(
-        14, {"lut": 864, "slicem_lut": 90, "ff": 861, "dsp": 3, "carry8": 26}
+        14,
+        {"lut": 864, "slicem_lut": 90, "ff": 861, "dsp": 3, "carry8": 26},
+        **_UNMEASURED,
     ),  # 502
     ip.dsub: IPRow(
-        14, {"lut": 864, "slicem_lut": 90, "ff": 861, "dsp": 3, "carry8": 26}
+        14,
+        {"lut": 864, "slicem_lut": 90, "ff": 861, "dsp": 3, "carry8": 26},
+        **_UNMEASURED,
     ),  # 502
     ip.dmul: IPRow(
-        9, {"lut": 298, "slicem_lut": 62, "ff": 397, "dsp": 7, "carry8": 15}
+        9,
+        {"lut": 298, "slicem_lut": 62, "ff": 397, "dsp": 7, "carry8": 15},
+        **_UNMEASURED,
     ),  # 531
     ip.ddiv: IPRow(
-        32, {"lut": 6216, "slicem_lut": 72, "ff": 3027, "carry8": 396}
+        32, {"lut": 6216, "slicem_lut": 72, "ff": 3027, "carry8": 396}, **_UNMEASURED
     ),  # 388
-    ip.dcmp: IPRow(1, {"lut": 197, "ff": 2, "carry8": 12}),  # 456
-    ip.bfadd: IPRow(4, {"lut": 250, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 440
-    ip.bfsub: IPRow(4, {"lut": 250, "slicem_lut": 1, "ff": 118, "carry8": 12}),  # 440
-    ip.bfmul: IPRow(2, {"lut": 91, "ff": 34, "dsp": 1, "carry8": 6}),  # 482
-    ip.i2f: IPRow(3, {"lut": 243, "slicem_lut": 1, "ff": 99, "carry8": 11}),  # 478
-    ip.f2i: IPRow(3, {"lut": 222, "ff": 127, "carry8": 6}),  # 612
-    ip.fcvt: IPRow(2, {"lut": 54, "ff": 99, "carry8": 1}),  # 787
-    ip.bf2f: IPRow(2, {"lut": 36, "ff": 53, "carry8": 1}),  # 792
+    ip.dcmp: IPRow(1, {"lut": 197, "ff": 2, "carry8": 12}, **_UNMEASURED),  # 456
+    ip.bfadd: IPRow(
+        4, {"lut": 250, "slicem_lut": 1, "ff": 118, "carry8": 12}, **_UNMEASURED
+    ),  # 440
+    ip.bfsub: IPRow(
+        4, {"lut": 250, "slicem_lut": 1, "ff": 118, "carry8": 12}, **_UNMEASURED
+    ),  # 440
+    ip.bfmul: IPRow(
+        2, {"lut": 91, "ff": 34, "dsp": 1, "carry8": 6}, **_UNMEASURED
+    ),  # 482
+    ip.i2f: IPRow(
+        3, {"lut": 243, "slicem_lut": 1, "ff": 99, "carry8": 11}, **_UNMEASURED
+    ),  # 478
+    ip.f2i: IPRow(3, {"lut": 222, "ff": 127, "carry8": 6}, **_UNMEASURED),  # 612
+    ip.fcvt: IPRow(2, {"lut": 54, "ff": 99, "carry8": 1}, **_UNMEASURED),  # 787
+    ip.bf2f: IPRow(2, {"lut": 36, "ff": 53, "carry8": 1}, **_UNMEASURED),  # 792
     ip.imul16: (
-        IPRow(3, {"dsp": 1}),  # 990
-        IPRow(1, {"dsp": 1}),  # 470
+        IPRow(3, {"dsp": 1}, **_UNMEASURED),  # 990
+        IPRow(1, {"dsp": 1}, **_UNMEASURED),  # 470
     ),
-    ip.imul32: IPRow(2, {"ff": 32, "dsp": 3}),  # 407
-    ip.imul64: IPRow(3, {"slicem_lut": 23, "ff": 64, "dsp": 6}),  # 409
-    ip.idiv8: IPRow(12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}),  # 737
+    ip.imul32: IPRow(2, {"ff": 32, "dsp": 3}, **_UNMEASURED),  # 407
+    ip.imul64: IPRow(3, {"slicem_lut": 23, "ff": 64, "dsp": 6}, **_UNMEASURED),  # 409
+    ip.idiv8: IPRow(
+        12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}, **_UNMEASURED
+    ),  # 737
     ip.udiv8: (
-        IPRow(12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}),  # 737
-        IPRow(10, {"lut": 194, "slicem_lut": 1, "ff": 245, "carry8": 18}),  # 737
+        IPRow(
+            12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}, **_UNMEASURED
+        ),  # 737
+        IPRow(
+            10, {"lut": 194, "slicem_lut": 1, "ff": 245, "carry8": 18}, **_UNMEASURED
+        ),  # 737
     ),
-    ip.irem8: IPRow(12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}),  # 737
+    ip.irem8: IPRow(
+        12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}, **_UNMEASURED
+    ),  # 737
     ip.urem8: (
-        IPRow(12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}),  # 737
-        IPRow(10, {"lut": 194, "slicem_lut": 1, "ff": 245, "carry8": 18}),  # 737
+        IPRow(
+            12, {"lut": 210, "slicem_lut": 2, "ff": 264, "carry8": 18}, **_UNMEASURED
+        ),  # 737
+        IPRow(
+            10, {"lut": 194, "slicem_lut": 1, "ff": 245, "carry8": 18}, **_UNMEASURED
+        ),  # 737
     ),
-    ip.idiv16: IPRow(20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}),  # 672
+    ip.idiv16: IPRow(
+        20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}, **_UNMEASURED
+    ),  # 672
     ip.udiv16: (
-        IPRow(20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}),  # 672
-        IPRow(8, {"lut": 642, "slicem_lut": 1, "ff": 574, "carry8": 51}),  # 378
+        IPRow(
+            20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}, **_UNMEASURED
+        ),  # 672
+        IPRow(
+            8, {"lut": 642, "slicem_lut": 1, "ff": 574, "carry8": 51}, **_UNMEASURED
+        ),  # 378
     ),
-    ip.irem16: IPRow(20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}),  # 672
+    ip.irem16: IPRow(
+        20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}, **_UNMEASURED
+    ),  # 672
     ip.urem16: (
-        IPRow(20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}),  # 672
-        IPRow(8, {"lut": 642, "slicem_lut": 1, "ff": 574, "carry8": 51}),  # 378
+        IPRow(
+            20, {"lut": 673, "slicem_lut": 2, "ff": 904, "carry8": 55}, **_UNMEASURED
+        ),  # 672
+        IPRow(
+            8, {"lut": 642, "slicem_lut": 1, "ff": 574, "carry8": 51}, **_UNMEASURED
+        ),  # 378
     ),
     ip.idiv32: IPRow(
-        36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}
+        36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}, **_UNMEASURED
     ),  # 650
     ip.udiv32: (
-        IPRow(36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}),  # 650
-        IPRow(16, {"lut": 2306, "slicem_lut": 1, "ff": 2166, "carry8": 165}),  # 380
+        IPRow(
+            36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}, **_UNMEASURED
+        ),  # 650
+        IPRow(
+            16, {"lut": 2306, "slicem_lut": 1, "ff": 2166, "carry8": 165}, **_UNMEASURED
+        ),  # 380
     ),
     ip.irem32: IPRow(
-        36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}
+        36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}, **_UNMEASURED
     ),  # 650
     ip.urem32: (
-        IPRow(36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}),  # 650
-        IPRow(16, {"lut": 2306, "slicem_lut": 1, "ff": 2166, "carry8": 165}),  # 380
+        IPRow(
+            36, {"lut": 2368, "slicem_lut": 4, "ff": 3336, "carry8": 173}, **_UNMEASURED
+        ),  # 650
+        IPRow(
+            16, {"lut": 2306, "slicem_lut": 1, "ff": 2166, "carry8": 165}, **_UNMEASURED
+        ),  # 380
     ),
     ip.idiv64: IPRow(
-        68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}
+        68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}, **_UNMEASURED
     ),  # 528
     ip.udiv64: (
-        IPRow(68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}),  # 528
-        IPRow(66, {"lut": 8706, "slicem_lut": 2, "ff": 12677, "carry8": 585}),  # 550
+        IPRow(
+            68,
+            {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601},
+            **_UNMEASURED,
+        ),  # 528
+        IPRow(
+            66,
+            {"lut": 8706, "slicem_lut": 2, "ff": 12677, "carry8": 585},
+            **_UNMEASURED,
+        ),  # 550
     ),
     ip.irem64: IPRow(
-        68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}
+        68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}, **_UNMEASURED
     ),  # 528
     ip.urem64: (
-        IPRow(68, {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601}),  # 528
-        IPRow(66, {"lut": 8706, "slicem_lut": 2, "ff": 12677, "carry8": 585}),  # 550
+        IPRow(
+            68,
+            {"lut": 8832, "slicem_lut": 6, "ff": 12808, "carry8": 601},
+            **_UNMEASURED,
+        ),  # 528
+        IPRow(
+            66,
+            {"lut": 8706, "slicem_lut": 2, "ff": 12677, "carry8": 585},
+            **_UNMEASURED,
+        ),  # 550
     ),
 }
 
@@ -341,8 +429,10 @@ def _chain_uses(r: Mapping[str, Resource]) -> dict:
     return {
         r["ff"]: [(Step(SRL_MIN_DEPTH, 1.0, 2.0), Linear(1.0))] + per_stage,
         r["lut"]: (Step(SRL_MIN_DEPTH, 0.0, 1.0), Linear(1.0)),
-        # An SRL32E holds 32 stages, so an extracted chain takes ceil(depth/32)
-        # sites a bit and a shallower one takes none.
+        # An SRL32E holds 32 stages. `ceil(depth/32)` is a derivation, not a
+        # measurement, and the UltraScale+ sweep contradicts it: the chain's
+        # first and last stage stay in flip-flops, so the shift registers hold
+        # `depth - 2`. Left as it stands until this fabric is swept.
         r["slicem_lut"]: (
             Piecewise(SRL_MIN_DEPTH, Const(0.0), Tiled(32)),
             Linear(1.0),
@@ -408,7 +498,7 @@ def build(part: Part) -> Device:
     for kind, delay in timing.comb.items():
         d.set_comb_delay(kind, delay, uses=comb[kind])
 
-    add_ip_rows(d, IP, res, part.grade.default_freq_mhz)
+    add_ip_rows(d, IP, res)
 
     d.set_mux_uses({res["lut"]: (MUX_LUT_COST, Linear(1.0))})
     if timing.mux:

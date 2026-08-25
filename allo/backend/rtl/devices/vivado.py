@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import NamedTuple
 
 from ....lang.ip import OperatorIP
@@ -17,13 +18,13 @@ from . import ip
 class VivadoCore(NamedTuple):
     """The Vivado build of one operator archetype.
 
-    ``shape`` is the config fragment the archetype's signature fixes. ``no_dsp``
-    is the DSP-free fragment, non-empty exactly where the default build spends
-    DSPs; a row whose area carries no ``dsp`` count is built with it. A full
-    configuration applies ``CE_BASE[core]``, ``shape``, ``no_dsp`` if asked, then
-    ``LATENCY[core]``, in that order. ``operation`` is the constant driven on the
-    core's operation channel where the shape leaves one; a compare's comes from
-    the predicate instead.
+    ``shape`` is the config fragment the archetype's signature fixes.
+    ``variants`` are the alternative builds it offers, keyed by the name an
+    ``IPRow`` states in its ``variant``; a row naming none takes the shape
+    alone. A full configuration applies ``CE_BASE[core]``, ``shape``, the named
+    variant's fragment, then ``LATENCY[core]``, in that order. ``operation`` is
+    the constant driven on the core's operation channel where the shape leaves
+    one; a compare's comes from the predicate instead.
     """
 
     # `create_ip -name`: floating_point / mult_gen / div_gen; or `rtl`, which
@@ -31,7 +32,7 @@ class VivadoCore(NamedTuple):
     # data ports) behind the row's latency and synthesis infers the DSPs.
     core: str
     shape: str  # `Key=Value` pairs, comma separated
-    no_dsp: str = ""  # DSP-free fragment, empty where the core has no such knob
+    variants: Mapping[str, str] = {}
     operation: str = ""  # operation-channel constant, as binary tdata bits
 
 
@@ -57,7 +58,16 @@ LATENCY = {
 
 _FP = "floating_point"
 
-_NO_DSP = "C_Mult_Usage=No_Usage"
+#: How a floating-point core's multiplier is built. The default mixes DSP
+#: columns and fabric; these two builds are the ends of that range.
+_DSP_CHOICE = {
+    "nodsp": "C_Mult_Usage=No_Usage",
+    "maxdsp": "C_Mult_Usage=Max_Usage",
+}
+
+#: An adder or subtracter spends DSPs only on the mantissa alignment, so it has
+#: no maximum-usage build to ask for.
+_NO_DSP = {"nodsp": "C_Mult_Usage=No_Usage"}
 
 # The floating_point core offers Half/Single/Double/Custom and no bfloat16, so
 # bfloat16 is spelled as a custom format: 8 exponent bits and 8 fraction (7
@@ -91,22 +101,22 @@ _SUB = "00000001"
 RECIPES: dict[OperatorIP, VivadoCore] = {
     ip.fadd: VivadoCore(_FP, "Operation_Type=Add_Subtract", _NO_DSP, _ADD),
     ip.fsub: VivadoCore(_FP, "Operation_Type=Add_Subtract", _NO_DSP, _SUB),
-    ip.fmul: VivadoCore(_FP, "Operation_Type=Multiply", _NO_DSP),
+    ip.fmul: VivadoCore(_FP, "Operation_Type=Multiply", _DSP_CHOICE),
     ip.fdiv: VivadoCore(_FP, "Operation_Type=Divide"),
     ip.fsqrt: VivadoCore(_FP, "Operation_Type=Square_root"),
     ip.fcmp: VivadoCore(_FP, _CMP),
     ip.dadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_DOUBLE}", _NO_DSP, _ADD),
     ip.dsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_DOUBLE}", _NO_DSP, _SUB),
-    ip.dmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_DOUBLE}", _NO_DSP),
+    ip.dmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_DOUBLE}", _DSP_CHOICE),
     ip.ddiv: VivadoCore(_FP, f"Operation_Type=Divide,{_DOUBLE}"),
     ip.dsqrt: VivadoCore(_FP, f"Operation_Type=Square_root,{_DOUBLE}"),
     ip.dcmp: VivadoCore(_FP, f"{_CMP},{_DOUBLE}"),
-    ip.bfadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", "", _ADD),
-    ip.bfsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", "", _SUB),
-    ip.bfmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_BF16}", _NO_DSP),
+    ip.bfadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", {}, _ADD),
+    ip.bfsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_BF16}", {}, _SUB),
+    ip.bfmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_BF16}", _DSP_CHOICE),
     ip.hadd: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_HALF}", _NO_DSP, _ADD),
     ip.hsub: VivadoCore(_FP, f"Operation_Type=Add_Subtract,{_HALF}", _NO_DSP, _SUB),
-    ip.hmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_HALF}", _NO_DSP),
+    ip.hmul: VivadoCore(_FP, f"Operation_Type=Multiply,{_HALF}", _DSP_CHOICE),
     ip.hdiv: VivadoCore(_FP, f"Operation_Type=Divide,{_HALF}"),
     ip.hcmp: VivadoCore(_FP, f"{_CMP},{_HALF}"),
     ip.i2f: VivadoCore(
@@ -153,7 +163,7 @@ def _mult(width: int) -> VivadoCore:
         "Multiplier_Construction=Use_Mults,OptGoal=Speed,"
         f"Use_Custom_Output_Width=true,OutputWidthHigh={width - 1},"
         "OutputWidthLow=0",
-        _LUT_MULT,
+        {"nodsp": _LUT_MULT},
     )
 
 
@@ -229,15 +239,18 @@ class Generated(NamedTuple):
     missing: tuple[str, ...]  # `module: reason` for what cannot be built
 
 
-def _config(recipe: VivadoCore, latency: int, no_dsp: bool = False) -> str:
+def _config(recipe: VivadoCore, latency: int, variant: str | None = None) -> str:
     """The full core configuration, `Key=Value` comma separated, in apply
-    order: clock-enable base, shape, the DSP-free fragment if the row was
-    measured without DSPs, the pipeline depth last."""
+    order: clock-enable base, shape, the named variant's fragment, the pipeline
+    depth last."""
     assert latency >= 1, "a zero-latency core is not an instanced IP"
     parts = [CE_BASE[recipe.core], recipe.shape]
-    if no_dsp:
-        assert recipe.no_dsp, "this core has no DSP-free build"
-        parts.append(recipe.no_dsp)
+    if variant is not None:
+        assert variant in recipe.variants, (
+            f"the {recipe.core} recipe has no {variant!r} build; it offers "
+            f"{sorted(recipe.variants) or 'none'}"
+        )
+        parts.append(recipe.variants[variant])
     parts.append(LATENCY[recipe.core].format(lat=latency))
     return ",".join(parts)
 
@@ -424,12 +437,13 @@ def generate(interfaces: Interfaces, device: Device) -> Generated:
             if recipe.core == "rtl":
                 shims[op.module] = _rtl_shim(op, arche, recipe.shape)
                 continue
-            no_dsp = bool(recipe.no_dsp) and not any(
-                n == "dsp" for n, _ in device.operator_uses.get(op.impl, ())
-            )
             cores[op.impl] = (
                 recipe.core,
-                _config(recipe, arche.timing.latency, no_dsp),
+                _config(
+                    recipe,
+                    arche.timing.latency,
+                    device.operator_variant.get(op.impl),
+                ),
             )
             if recipe.core == "floating_point":
                 shims[op.module] = _fp_shim(op, recipe, opcode)

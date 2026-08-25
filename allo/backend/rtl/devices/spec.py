@@ -24,13 +24,18 @@ from ..device import (
 
 #: Below this depth a delay chain stays in flip-flops; at or above it Vivado
 #: extracts a shift register even with every stage reset. An SRL32E holds 32
-#: stages, so an extracted chain takes ``ceil(depth/32)`` SLICEM sites a bit.
+#: stages, and the chain's first and last stay in flip-flops, so an extracted
+#: chain takes ``ceil((depth - 2) / 32)`` SLICEM sites a bit.
 SRL_MIN_DEPTH = 4
 
-#: LUTs per bit of a ``k``-source one-hot AND-OR select, measured k = 2..40 and
-#: listed where the staircase steps. A LUT6 absorbs three (data, select) pairs
-#: and ~2.5 more per level, so the curve is linear in k. One source is a wire,
-#: costing nothing.
+#: LUTs per bit of a ``k``-source one-hot AND-OR select, measured k = 1..64 on
+#: UltraScale+ and listed where the staircase steps. One source is a wire,
+#: costing nothing: the k=1 DUT measures an AND gate the emitter never builds.
+#:
+#: The curve is two regimes: up to 24 sources a LUT6 absorbs three (data,
+#: select) pairs, at 0.42 LUT per source per bit, and from 26 up it costs 0.54
+#: and starts 4 higher. Sampled densely because the cost is read as a staircase,
+#: taking the last point at or under the fan-in.
 MUX_LUT_PER_BIT = {
     1: 0,
     2: 1,
@@ -40,25 +45,26 @@ MUX_LUT_PER_BIT = {
     11: 5,
     14: 6,
     16: 7,
-    19: 8,
-    21: 9,
+    20: 8,
+    22: 9,
     24: 10,
-    26: 11,
-    29: 12,
-    31: 13,
-    34: 14,
-    36: 15,
-    39: 16,
+    26: 14,
+    28: 16,
+    30: 17,
+    32: 19,
+    36: 22,
+    40: 25,
+    48: 31,
+    64: 34,
 }
 
 #: LUTs per bit of a select, as a cost over its fan-in: the measured staircase
-#: across the swept range, and past it the least-squares line through those
-#: points (slope 0.408449, intercept 0.263495, within 0.20 LUT of the last
-#: measurement).
+#: across the swept range, and past it the least-squares line through the upper
+#: regime's points (slope 0.5388, intercept 1.6478).
 MUX_LUT_COST = Piecewise(
     max(MUX_LUT_PER_BIT) + 1,
     Table(MUX_LUT_PER_BIT),
-    Linear(0.4084490071, base=0.2634952767),
+    Linear(0.5388, base=1.6478),
 )
 
 #: Fabric LUTs per bit of an array that failed RAM inference: every word needs a
@@ -83,10 +89,19 @@ ROM_LUT_COST = [
     ),
 ]
 
+#: Slice muxes a table spends: the F7/F8 tree over its LUT6 lookups, about four
+#: sevenths of them. Measured 4 / 9 / 19 / 36 / 153 a bit at 512 / 1024 / 2048 /
+#: 4096 / 16384 deep, and none at 256, where one LUT selects between the four
+#: lookups instead.
+ROM_MUXF_COST = [
+    (Piecewise(512, Const(0.0), Linear(4.0 / 7.0 / ROM_ENTRIES_PER_LUT)), Linear(1.0))
+]
+
 
 class Grade(NamedTuple):
     """A speed grade: which of a fabric's timing tables a part reads, and the
-    clock that table was characterized at."""
+    clock a design targets there unless the caller asks for another. Operator
+    rows do not read it: each states the period its own measurement warrants."""
 
     name: str  # "-2L", as the part number spells it
     default_freq_mhz: float
@@ -176,10 +191,16 @@ class StorageSpec(NamedTuple):
 
 
 class IPRow(NamedTuple):
-    """Latency and area of one operator core on one fabric, from a single
-    measurement. A core pipelined to another latency is a separate row with its
-    own symbol and area, and several rows of one archetype are candidates the
+    """Latency, area and the three measured arcs of one operator core on one
+    fabric. A core pipelined to another latency is a separate row with its own
+    symbol and area, and several rows of one archetype are candidates the
     library chooses between.
+
+    The three delays have no defaults: a row that does not state one cannot be
+    written, so no core silently inherits an archetype's or a grade's number.
+    Together they are the row's whole timing, and the period it needs for a
+    cycle of its own is ``max(reg_floor + in_delay_ns, out_delay_ns,
+    min_period_ns)``, the worst of the three arcs measured on it.
 
     ``mnemonic`` overrides the symbol stem so two rows at one latency are named
     apart (``None`` takes the archetype's). ``area`` splits state-holding LUT
@@ -189,43 +210,37 @@ class IPRow(NamedTuple):
 
     latency: int
     area: Mapping[str, int]  # resource name -> count, in the fabric's vocabulary
-    mnemonic: str | None = None
-    #: Measured input cone (ns), overriding the archetype's default: the arc
-    #: from the core's data ports to its first internal register, less the
-    #: register floor the model charges once per cycle. A single-cycle core is
-    #: combinational up to its output register, so its cone is nearly the whole
-    #: measured period.
-    in_delay_ns: float | None = None
-    #: Least clock period (ns) the row's internal stages are warranted at.
-    #: ``None`` takes the grade's characterization period.
-    min_period_ns: float | None = None
+    #: Measured input cone (ns): the arc from the core's data ports to its first
+    #: internal register, less the register floor the model charges once per
+    #: cycle. A single-cycle core is combinational up to its output register, so
+    #: its cone is nearly the whole measured period.
+    in_delay_ns: float
+    #: Measured internal arc (ns): the worst register-to-register path inside
+    #: the core, which is the least period its stages hold. Zero on a core with
+    #: no internal register, whose boundary cones are then the only gate.
+    min_period_ns: float
     #: Measured output cone (ns): the arc from the core's last internal register
     #: to its data ports, clock-to-out included, so it compares directly against
-    #: the register floor a chain would otherwise start at. ``None`` takes the
-    #: archetype's default.
-    out_delay_ns: float | None = None
+    #: the register floor a chain would otherwise start at.
+    out_delay_ns: float
+    mnemonic: str | None = None
+    #: Which of the realizer's alternative builds of this core the row was
+    #: measured on, ``None`` for the default one. A core offering a choice
+    #: (fabric multipliers against DSP columns) is several rows, one per build.
+    variant: str | None = None
 
 
 def add_ip_rows(
     device: Device,
     rows_by_core: Mapping[OperatorIP, IPRow | tuple[IPRow, ...]],
     res: Mapping[str, Resource],
-    default_freq_mhz: float,
 ) -> None:
     """Declare one operator per IP row, retimed to the row's depth and priced
     from its area."""
     for core, rows in rows_by_core.items():
         for row in (rows,) if isinstance(rows, IPRow) else rows:
             operator = core.retimed(
-                row.latency,
-                row.in_delay_ns,
-                # A row defaults to the clock it was characterized at.
-                (
-                    row.min_period_ns
-                    if row.min_period_ns is not None
-                    else 1000.0 / default_freq_mhz
-                ),
-                row.out_delay_ns,
+                row.latency, row.in_delay_ns, row.min_period_ns, row.out_delay_ns
             )
             if row.mnemonic is not None:
                 operator.mnemonic = row.mnemonic
@@ -233,3 +248,5 @@ def add_ip_rows(
             device.set_operator_uses(
                 operator, {res[n]: Const(v) for n, v in row.area.items()}
             )
+            if row.variant is not None:
+                device.set_operator_variant(operator, row.variant)

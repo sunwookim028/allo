@@ -358,9 +358,10 @@ def ResourceUseAttr : Allo_Attr<"ResourceUse"> {
     else, since the forms, the arity rule and the evaluator are unchanged.
 
     A single `tiled` factor at arity greater than one is the exception to the
-    arity rule: it consumes the whole tuple at once, `ceil(product/c0)`. A
+    arity rule: it consumes the whole tuple at once, `ceil((product+c1)/c0)`. A
     `tiled` among a full set of factors reads its own parameter like any other,
-    `ceil(p_i/c0)`.
+    `ceil((p_i+c1)/c0)`. The offset `c1` is optional and defaults to zero: it
+    is how many of the parameter's items the tiles do not hold.
   }];
   let parameters = (ins
     "mlir::SymbolRefAttr":$resource,

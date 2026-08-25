@@ -235,24 +235,23 @@ class OperatorIP(IP[P, R]):
     def retimed(
         self,
         latency: int,
-        in_delay_ns: float | None = None,
-        min_period_ns: float | None = None,
-        out_delay_ns: float | None = None,
+        in_delay_ns: float,
+        min_period_ns: float,
+        out_delay_ns: float,
     ) -> "OperatorIP[P, R]":
-        """A copy of this core pipelined to ``latency``. The symbol follows the
-        new latency, so the same core at two depths gets two names.
-        ``in_delay_ns`` and ``out_delay_ns`` override the archetype's boundary
-        cones for this depth; ``min_period_ns`` states the clock the depth's
-        internal stages hold."""
+        """A copy of this core pipelined to ``latency``, carrying the timing
+        measured at that depth. The symbol follows the new latency, so the same
+        core at two depths gets two names. All three delays are required: an
+        archetype declares a signature, and every number describing silicon
+        belongs to the depth it was measured at."""
         core = copy.copy(self)
-        overrides = {"latency": latency}
-        if in_delay_ns is not None:
-            overrides["in_delay_ns"] = in_delay_ns
-        if out_delay_ns is not None:
-            overrides["out_delay_ns"] = out_delay_ns
-        if min_period_ns is not None:
-            overrides["min_period_ns"] = min_period_ns
-        core.timing = replace(self.timing, **overrides)
+        core.timing = replace(
+            self.timing,
+            latency=latency,
+            in_delay_ns=in_delay_ns,
+            min_period_ns=min_period_ns,
+            out_delay_ns=out_delay_ns,
+        )
         verify_timing(core.timing)
         return core
 
