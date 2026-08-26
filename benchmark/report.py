@@ -76,6 +76,9 @@ class Knobs:
     workers: int | None
     deterministic: bool
     area_slack: float
+    #: Multipliers on the device's per-resource scarcity prices, as sorted
+    #: (name, factor) pairs. A per-run scheduling parameter, not device data.
+    weights: tuple[tuple[str, float], ...] = ()
 
 
 # --- what the emitter built --------------------------------------------------
@@ -261,6 +264,8 @@ def measure_one(item, knobs: Knobs) -> dict:
             solver["budget"] = knobs.budget
         if knobs.workers is not None:
             solver["workers"] = knobs.workers
+        if knobs.weights:
+            solver["resource_weights"] = dict(knobs.weights)
         rtl = sched.export("rtl", **opts).set_scheduler_opt(**solver)
         if knobs.binding == "trivial":
             rtl.use_trivial_binding()
@@ -394,6 +399,8 @@ def _run_child(item, knobs: Knobs, timeout: int) -> dict:
         argv += ["--nondeterministic"]
     if knobs.area_slack:
         argv += ["--area-slack", str(knobs.area_slack)]
+    for _n, _v in knobs.weights:
+        argv += ["--weight", f"{_n}={_v}"]
     t0 = time.time()
     base = {"key": key, "variant": variant, "scheduler": scheduler}
     d, text = run_child("benchmark.report", MARK, argv, timeout, base)
@@ -690,6 +697,16 @@ def compare_table(base: list[dict], new: list[dict]) -> str:
 # --- driver ------------------------------------------------------------------
 
 
+def _weights(spec: list[str]) -> tuple[tuple[str, float], ...]:
+    """`["lut=2"]` as sorted (name, factor) pairs. Sorted so two runs asking for
+    the same reweighting build the same knobs whatever order they were typed."""
+    pairs = []
+    for s in spec:
+        name, _, value = s.partition("=")
+        pairs.append((name.strip(), float(value)))
+    return tuple(sorted(pairs))
+
+
 def main():
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--one", help=argparse.SUPPRESS)  # the child entry point
@@ -756,6 +773,14 @@ def main():
         help="fraction the area solve's span leash is widened by (the "
         "area_slack knob); 0 keeps the strict leash",
     )
+    ap.add_argument(
+        "--weight",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="multiply one resource's scarcity price, e.g. --weight lut=2. "
+        "Repeatable; the axis the area currency is swept over",
+    )
     ap.add_argument("--timeout", type=int, default=900, help="wall seconds per run")
     ap.add_argument("-o", "--out", default="qor.json")
     ap.add_argument("--per-region", action="store_true")
@@ -783,6 +808,7 @@ def main():
         workers=args.workers,
         deterministic=not args.nondeterministic,
         area_slack=args.area_slack,
+        weights=_weights(args.weight),
     )
 
     if args.one:

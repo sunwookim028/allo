@@ -68,6 +68,9 @@ class Knobs:
     cycles: int
     objective: str
     budget: float | None
+    #: Multipliers on the device's per-resource scarcity prices, as sorted
+    #: (name, factor) pairs. A per-run scheduling parameter, not device data.
+    weights: tuple[tuple[str, float], ...] = ()
 
 
 # What one cosim may run for, derived from the model rather than fixed: a design
@@ -150,6 +153,8 @@ def verify_one(item, knobs: Knobs) -> dict:
         solver = {"scheduler": knobs.scheduler, "O": knobs.objective}
         if knobs.budget is not None:
             solver["budget"] = knobs.budget
+        if knobs.weights:
+            solver["resource_weights"] = dict(knobs.weights)
         rtl = sched.export("rtl").set_scheduler_opt(**solver)
         if binding == "trivial":
             rtl.use_trivial_binding()
@@ -219,6 +224,8 @@ def _run_child(item, knobs: Knobs, timeout: int) -> dict:
     ]
     if knobs.budget is not None:
         argv += ["--budget", str(knobs.budget)]
+    for _n, _v in knobs.weights:
+        argv += ["--weight", f"{_n}={_v}"]
     t0 = time.time()
     base = {
         "key": key,
@@ -334,6 +341,16 @@ def failure_report(results: list[dict]) -> str:
 # --- driver ------------------------------------------------------------------
 
 
+def _weights(spec: list[str]) -> tuple[tuple[str, float], ...]:
+    """`["lut=2"]` as sorted (name, factor) pairs. Sorted so two runs asking for
+    the same reweighting build the same knobs whatever order they were typed."""
+    pairs = []
+    for s in spec:
+        name, _, value = s.partition("=")
+        pairs.append((name.strip(), float(value)))
+    return tuple(sorted(pairs))
+
+
 def main():
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--one", help=argparse.SUPPRESS)  # the child entry point
@@ -371,6 +388,14 @@ def main():
         help="what one exact solve may spend, in the solver's deterministic "
         "time units; unset keeps the compiler default",
     )
+    ap.add_argument(
+        "--weight",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="multiply one resource's scarcity price, e.g. --weight lut=2. "
+        "Repeatable; the axis the area currency is swept over",
+    )
     ap.add_argument("--timeout", type=int, default=1800, help="wall seconds per run")
     ap.add_argument("-o", "--out", default="verify.json")
     args = ap.parse_args()
@@ -380,6 +405,7 @@ def main():
         cycles=args.cycles,
         objective=args.objective,
         budget=args.budget,
+        weights=_weights(args.weight),
     )
 
     if args.one:

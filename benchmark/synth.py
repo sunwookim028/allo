@@ -46,6 +46,9 @@ class Knobs:
     freq: float | None
     area_slack: float
     budget: float | None
+    #: Multipliers on the device's per-resource scarcity prices, as sorted
+    #: (name, factor) pairs. A per-run scheduling parameter, not device data.
+    weights: tuple[tuple[str, float], ...] = ()
 
 
 def _tag(key: str, variant: str, scheduler: str) -> str:
@@ -87,6 +90,8 @@ def emit_one(item, knobs: Knobs, work: Path) -> dict:
         }
         if knobs.budget is not None:
             solver["budget"] = knobs.budget
+        if knobs.weights:
+            solver["resource_weights"] = dict(knobs.weights)
         rtl = sched.export("rtl", **opts).set_scheduler_opt(**solver)
         assert knobs.binding in ("trivial", "auto"), knobs.binding
         if knobs.binding == "trivial":
@@ -135,6 +140,8 @@ def _run_child(item, knobs: Knobs, work: Path, timeout: int) -> dict:
         argv += ["--area-slack", str(knobs.area_slack)]
     if knobs.budget is not None:
         argv += ["--budget", str(knobs.budget)]
+    for _n, _v in knobs.weights:
+        argv += ["--weight", f"{_n}={_v}"]
     base = {
         "tag": _tag(key, variant, scheduler),
         "key": key,
@@ -361,6 +368,16 @@ def print_table(rows: list[dict], impl: bool) -> None:
 # --- main --------------------------------------------------------------------
 
 
+def _weights(spec: list[str]) -> tuple[tuple[str, float], ...]:
+    """`["lut=2"]` as sorted (name, factor) pairs. Sorted so two runs asking for
+    the same reweighting build the same knobs whatever order they were typed."""
+    pairs = []
+    for s in spec:
+        name, _, value = s.partition("=")
+        pairs.append((name.strip(), float(value)))
+    return tuple(sorted(pairs))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--one", help=argparse.SUPPRESS)  # the child entry point
@@ -406,6 +423,14 @@ def main() -> None:
     ap.add_argument(
         "--skip-synth", action="store_true", help="scaffold and predict only"
     )
+    ap.add_argument(
+        "--weight",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="multiply one resource's scarcity price, e.g. --weight lut=2. "
+        "Repeatable; the axis the area currency is swept over",
+    )
     ap.add_argument("-j", "--jobs", type=int, default=8, help="emit children in flight")
     ap.add_argument(
         "--synth-jobs",
@@ -434,6 +459,7 @@ def main() -> None:
         freq=args.freq,
         area_slack=args.area_slack,
         budget=args.budget,
+        weights=_weights(args.weight),
     )
 
     if args.one:
