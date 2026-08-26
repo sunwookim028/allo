@@ -325,6 +325,11 @@ private:
   static constexpr unsigned kMaxCommitAttempts = 16;
   static constexpr unsigned kMaxDepRounds = 6;
   static constexpr unsigned kMaxSpanRepairMoves = 64;
+  /// The sigma/lap oracle's engagement gate (contending ops times the
+  /// interval, the sigma model's boolean count) and its probe budgets.
+  static constexpr int64_t kOracleSizeGate = 50000;
+  static constexpr double kOracleProbeBudget = 2.0;
+  static constexpr unsigned kOracleMaxProbes = 6;
 
 protected:
   Problem &getProblem() override { return prob; }
@@ -1775,9 +1780,95 @@ LogicalResult ModuloSimplexScheduler::schedule() {
   repairSpan();
 
   // Resource placement is greedy, so an II above the LP's bound may be the
-  // problem's real minimum or just what the heuristic cost; nothing here can
-  // tell the two apart.
-  if (parameterT > static_cast<int>(lowerBoundII))
+  // problem's real minimum or just what the heuristic cost. On a bounded
+  // budget the sigma/lap oracle can tell the two apart per interval: probe
+  // the bound itself, then binary-search the gap downward, shipping the
+  // lowest certified witness. Unknown keeps the heuristic schedule and the
+  // honest warning below.
+  DenseMap<Operation *, unsigned> oracleStarts;
+  bool floorRefuted = false, gapProven = false;
+  if (parameterT > static_cast<int>(lowerBoundII) &&
+      static_cast<int64_t>(scheduled.size()) * parameterT <= kOracleSizeGate) {
+    using mlir::allo::ModuloFeasibility;
+    auto probe = [&](unsigned t) {
+      mlir::allo::ModuloOracleResult r = mlir::allo::decideModuloFeasibility(
+          prob, additionalConstraints, t, kOracleProbeBudget);
+      info(Stage::Sched, prob.getContainingOp())
+          << "Oracle probe at II=" << t << ": "
+          << (r.verdict == ModuloFeasibility::Feasible     ? "feasible"
+              : r.verdict == ModuloFeasibility::Infeasible ? "infeasible"
+                                                           : "unknown")
+          << " after " << r.rounds << " round(s), "
+          << format("%.2f", r.spent) << " deterministic units ("
+          << r.literals << " slot literals, " << r.windowed
+          << " ops windowed)";
+      return r;
+    };
+    unsigned lo = lowerBoundII, hi = parameterT, probes = 0;
+    if (hi - lo < kOracleMaxProbes) {
+      // A small gap scans linearly: every refuted interval extends the proven
+      // floor, so full coverage upgrades the warning into an optimality
+      // proof, with no monotonicity assumed.
+      unsigned provenTo = lo;
+      for (unsigned t = lo; t < hi && probes < kOracleMaxProbes; ++t) {
+        mlir::allo::ModuloOracleResult r = probe(t);
+        ++probes;
+        if (r.verdict == ModuloFeasibility::Feasible) {
+          oracleStarts = std::move(r.starts);
+          hi = t;
+          break;
+        }
+        if (r.verdict != ModuloFeasibility::Infeasible)
+          break;
+        floorRefuted = true;
+        provenTo = t + 1;
+      }
+      gapProven =
+          oracleStarts.empty() && provenTo == static_cast<unsigned>(parameterT);
+    } else {
+      mlir::allo::ModuloOracleResult first = probe(lo);
+      ++probes;
+      if (first.verdict == ModuloFeasibility::Feasible) {
+        oracleStarts = std::move(first.starts);
+        hi = lo;
+      } else if (first.verdict == ModuloFeasibility::Infeasible) {
+        floorRefuted = true;
+        while (hi - lo > 1 && probes < kOracleMaxProbes) {
+          unsigned mid = lo + (hi - lo) / 2;
+          mlir::allo::ModuloOracleResult r = probe(mid);
+          ++probes;
+          if (r.verdict == ModuloFeasibility::Feasible) {
+            oracleStarts = std::move(r.starts);
+            hi = mid;
+          } else if (r.verdict == ModuloFeasibility::Infeasible) {
+            lo = mid;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+    if (!oracleStarts.empty()) {
+      info(Stage::Sched, prob.getContainingOp())
+          << "The placement gap was the heuristic's: a certified schedule "
+             "exists at II="
+          << hi << " (was II=" << parameterT << ", bound II=" << lowerBoundII
+          << "); shipping it";
+      parameterT = hi;
+    } else if (gapProven) {
+      info(Stage::Sched, prob.getContainingOp())
+          << "II=" << parameterT
+          << " is proven optimal: every interval down to the bound II="
+          << lowerBoundII << " is infeasible";
+    } else if (floorRefuted) {
+      info(Stage::Sched, prob.getContainingOp())
+          << "II=" << lo
+          << " is proven infeasible at this interval, so at least part of "
+             "the placement gap is the problem's";
+    }
+  }
+  if (oracleStarts.empty() && !gapProven &&
+      parameterT > static_cast<int>(lowerBoundII))
     warn(Stage::Sched, prob.getContainingOp())
         << "Scheduled at II=" << parameterT
         << " against a lower bound of II=" << lowerBoundII
@@ -1787,7 +1878,9 @@ LogicalResult ModuloSimplexScheduler::schedule() {
 
   prob.setInitiationInterval(parameterT);
   for (auto *op : ops)
-    prob.setStartTime(op, getStartTime(startTimeVariables[op]));
+    prob.setStartTime(op, oracleStarts.empty()
+                              ? getStartTime(startTimeVariables[op])
+                              : oracleStarts.at(op));
 
   return success();
 }

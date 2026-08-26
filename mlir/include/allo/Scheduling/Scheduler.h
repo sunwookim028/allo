@@ -593,6 +593,30 @@ LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
                             const SchedulerOptions &opts,
                             int64_t slackGrant = 0);
 
+/// The sigma/lap modulo feasibility oracle: at the FIXED interval \p ii and
+/// with \p breaks the chain-breaking edges, decide whether any schedule
+/// exists. Starts decompose as `T * lap + sigma`; capacity lives in sigma
+/// space (a small CP-SAT model over contending slots), dependences in lap
+/// space (one Bellman sweep per proposal), and a positive lap cycle comes
+/// back as a region cut. Feasible carries an ASAP witness for every
+/// operation; Infeasible is an unconditional, horizon-free proof; Unknown is
+/// a spent \p budget (deterministic units). Deterministic by construction.
+enum class ModuloFeasibility { Feasible, Infeasible, Unknown };
+struct ModuloOracleResult {
+  ModuloFeasibility verdict = ModuloFeasibility::Unknown;
+  DenseMap<Operation *, unsigned> starts;
+  /// How the loop ran: propose-check rounds taken, deterministic time spent,
+  /// and the sigma model's slot-literal count, for the caller's telemetry.
+  unsigned rounds = 0;
+  double spent = 0.0;
+  unsigned literals = 0;
+  unsigned windowed = 0;
+};
+ModuloOracleResult decideModuloFeasibility(
+    ModuloOccupancyProblem &prob,
+    ArrayRef<circt::scheduling::Problem::Dependence> breaks, unsigned ii,
+    double budget);
+
 /// Post-schedule register-lifetime repair: re-place starts within the solved
 /// structure to spend schedule slack on shorter delay chains and a shallower
 /// pulse chain. The cyclic variant keeps every start's congruence slot, so
