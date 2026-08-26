@@ -1062,8 +1062,9 @@ void FuncScheduler::recordSolve(OccupancyProblem &problem, StringRef kind,
     s.interval = (int64_t)*ii;
   s.millis = std::chrono::duration<double, std::milli>(now() - since).count();
   // Config from the options, outcome from the solver's telemetry, so a reader
-  // can judge the result without re-solving.
-  if (usesExactScheduler(opts.kind)) {
+  // can judge the result without re-solving. An escalated heuristic solve
+  // (`SchedulerOptions::escalate`) reports as the CP-SAT solve it ran.
+  if (usesExactScheduler(opts.kind) || problem.telemetry.cpsatRan) {
     s.solver = "cpsat";
     s.workers = opts.workers;
     s.seed = opts.seed;

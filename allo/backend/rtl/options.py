@@ -104,6 +104,12 @@ class SchedulerOptions:  # pylint: disable=too-many-instance-attributes
         resource_weights: multipliers on the per-resource scarcity prices, by
             name (``{"dsp": 0.25}`` prices DSPs at a quarter). Composes with the
             weight a device declares; unnamed resources keep 1.0.
+        escalate: whether the heuristic scheduler hands a region to the exact
+            solver when its own schedule is provably off (a placement gap the
+            oracle could not retire, or a drain above the region's floor).
+            Spends exact-solve time only where the compile-time certificate
+            fails; most regions certify optimal and pay nothing. Read by the
+            heuristic scheduler alone.
     """
 
     scheduler: str = "heuristic"
@@ -118,3 +124,4 @@ class SchedulerOptions:  # pylint: disable=too-many-instance-attributes
     seed: int = 0
     deterministic: bool = True
     resource_weights: dict[str, float] = field(default_factory=dict)
+    escalate: bool = True

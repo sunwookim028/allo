@@ -53,13 +53,15 @@ alloEmitSplitVerilog(MlirModule module, MlirStringRef directory);
 /// non-reproducible. `deterministic` off lets the workers race instead of
 /// interleaving, each under `budget / workers` wall seconds, so no exact solve
 /// is then reproducible. `areaSlack` is the span an area solve may pay beyond
-/// its leash, as a fraction of the reference span. Returns failure (callback
-/// not invoked) on any failed phase.
+/// its leash, as a fraction of the reference span. `escalate` lets the
+/// heuristic scheduler hand a region to the exact solver when its schedule is
+/// provably off its floor. Returns failure (callback not invoked) on any
+/// failed phase.
 MLIR_CAPI_EXPORTED MlirLogicalResult alloRunSDCSchedulingPipeline(
     MlirModule module, MlirStringRef top, float cycleTime,
     MlirStringRef scheduler, MlirStringRef objective, double budget,
     bool allocate, int workers, int seed, bool deterministic, double areaSlack,
-    MlirStringCallback callback, void *userData);
+    bool escalate, MlirStringCallback callback, void *userData);
 
 #ifdef __cplusplus
 }

@@ -1897,13 +1897,15 @@ LogicalResult ModuloSimplexScheduler::schedule() {
     }
   }
   if (oracleStarts.empty() && !gapProven &&
-      parameterT > static_cast<int>(lowerBoundII))
+      parameterT > static_cast<int>(lowerBoundII)) {
+    prob.telemetry.heuristicIIGap = true;
     warn(Stage::Sched, prob.getContainingOp())
         << "Scheduled at II=" << parameterT
         << " against a lower bound of II=" << lowerBoundII
         << " (resource-min II=" << resMinII
         << "): resource placement is a greedy heuristic, so this gap is not "
            "known to be necessary";
+  }
 
   prob.setInitiationInterval(parameterT);
   for (auto *op : ops)

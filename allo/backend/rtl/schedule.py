@@ -98,6 +98,7 @@ def run_schedule(
             options.seed,
             options.deterministic,
             options.area_slack,
+            options.escalate,
         )
     finally:
         handler.detach()

@@ -1591,6 +1591,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
                                         Operation *lastOp, float cycleTime,
                                         const SpanObjective &span,
                                         const SchedulerOptions &opts) {
+  prob.telemetry.cpsatRan = true;
   // First-fit placement here cannot fail (a cycle with room always exists),
   // so a failure is the resource-free LP declaring infeasibility, which no
   // exact solver repairs either.
@@ -2448,6 +2449,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
                                         const SpanObjective &span,
                                         const SchedulerOptions &opts,
                                         int64_t slackGrant) {
+  prob.telemetry.cpsatRan = true;
   SimplexWarmStart warm;
   if (failed(mlir::allo::scheduleSimplex(prob, lastOp, cycleTime, opts.regFloor,
                                          minII, &warm)))
@@ -3202,4 +3204,49 @@ void mlir::allo::repairRegisterLifetimes(ChainingSharedOperatorsProblem &prob,
                                          const SpanObjective &span,
                                          float cycleTime, float regFloor) {
   repairLifetimes(prob, anchor, span, cycleTime, regFloor);
+}
+
+namespace {
+
+// The compile-time escalation oracle (`SchedulerOptions::escalate`): whether
+// the heuristic's solved schedule provably leaves cycles behind. Either the
+// modulo placement's gap warn survived the sigma/lap oracle, or the solved
+// drain sits above the region's intra-iteration floor (a true lower bound,
+// measured empirically exact bed-wide).
+template <typename ProblemT>
+bool scheduleGap(ProblemT &prob, const SpanObjective &span, float cycleTime,
+                 float regFloor) {
+  if (prob.telemetry.heuristicIIGap) {
+    info(Stage::Sched, prob.getContainingOp())
+        << "Escalating this region to the exact solver: the placement gap is "
+           "not known to be necessary";
+    return true;
+  }
+  if (span.drain.empty())
+    return false;
+  SmallVector<Problem::Dependence> breaks =
+      chainBreaksFor(prob, cycleTime, regFloor);
+  int64_t floor = drainFloor(prob, breaks, span.drain,
+                             [&](Operation *op) { return prob.latencyOf(op); });
+  int64_t have = span.drainOf(prob);
+  if (have <= floor)
+    return false;
+  info(Stage::Sched, prob.getContainingOp())
+      << "Escalating this region to the exact solver: the heuristic's drain "
+      << have << " sits above the region's floor " << floor;
+  return true;
+}
+
+} // namespace
+
+bool mlir::allo::heuristicScheduleGap(ChainingModuloProblem &prob,
+                                      const SpanObjective &span,
+                                      float cycleTime, float regFloor) {
+  return scheduleGap(prob, span, cycleTime, regFloor);
+}
+
+bool mlir::allo::heuristicScheduleGap(ChainingSharedOperatorsProblem &prob,
+                                      const SpanObjective &span,
+                                      float cycleTime, float regFloor) {
+  return scheduleGap(prob, span, cycleTime, regFloor);
 }

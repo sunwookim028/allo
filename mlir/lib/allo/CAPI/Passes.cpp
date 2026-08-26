@@ -78,7 +78,7 @@ MlirLogicalResult alloRunSDCSchedulingPipeline(
     MlirModule module, MlirStringRef top, float cycleTime,
     MlirStringRef scheduler, MlirStringRef objective, double budget,
     bool allocate, int workers, int seed, bool deterministic, double areaSlack,
-    MlirStringCallback callback, void *userData) {
+    bool escalate, MlirStringCallback callback, void *userData) {
   ModuleOp mod = unwrap(module);
   StringRef topName = unwrap(top);
   StringRef schedulerName = unwrap(scheduler);
@@ -114,6 +114,7 @@ MlirLogicalResult alloRunSDCSchedulingPipeline(
                               seed,
                               deterministic,
                               areaSlack > 0.0 ? areaSlack : 0.0};
+  opts.escalate = escalate;
   // The storage decisions, taken once and recorded on every array and access
   // before any layer below reads them.
   allo::MemoryLibrary memLib = allo::MemoryLibrary::fromModule(mod);

@@ -35,6 +35,13 @@ struct SolveTelemetry {
   bool spanProven = false;
   bool budgetExhausted = false;
   bool fallback = false; // shipped the heuristic's schedule instead
+  /// The greedy modulo placement's II exceeded its lower bound and the
+  /// sigma/lap oracle neither certified a better schedule nor proved the gap
+  /// necessary. One trigger of the heuristic path's escalation.
+  bool heuristicIIGap = false;
+  /// A CP-SAT solve ran on this problem (the exact scheduler, or the
+  /// heuristic path escalating); the solve report reads the cpsat fields.
+  bool cpsatRan = false;
   /// The interval whose solve exhausted the budget, ending the cyclic search.
   std::optional<int64_t> exhaustedAtII;
   /// The area minimization's incumbent and dual bound when its solve last
@@ -546,6 +553,13 @@ struct SchedulerOptions {
   /// take. Combinational rows carry their measured delay less the floor, so a
   /// cycle pays it once however many operators chain.
   float regFloor = 0.0f;
+  /// Whether the heuristic scheduler hands a region to the exact solver when
+  /// its own schedule is provably off (`heuristicScheduleGap`): a surviving
+  /// placement-gap warn, or a drain above the intra-iteration floor. Spends
+  /// exact-solve time only where the compile-time oracle certifies a loss;
+  /// most regions certify optimal and pay nothing. Read by the heuristic
+  /// kind alone, under the cycles objective without allocation.
+  bool escalate = true;
 };
 
 /// \p name ("heuristic" / "exact") as a kind, or nullopt when it names
@@ -631,6 +645,18 @@ LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
                             const SchedulerOptions &opts,
                             int64_t slackGrant = 0);
 
+/// Whether the heuristic's solved schedule provably leaves cycles behind: a
+/// placement-gap warn that survived the sigma/lap oracle
+/// (`telemetry.heuristicIIGap`), or a drain above the intra-iteration floor
+/// (the floor Track B measured empirically exact). The compile-time oracle
+/// `SchedulerOptions::escalate` hands such a region to the exact solver on.
+bool heuristicScheduleGap(ChainingModuloProblem &prob,
+                          const SpanObjective &span, float cycleTime,
+                          float regFloor);
+bool heuristicScheduleGap(ChainingSharedOperatorsProblem &prob,
+                          const SpanObjective &span, float cycleTime,
+                          float regFloor);
+
 /// The sigma/lap modulo feasibility oracle: at the FIXED interval \p ii and
 /// with \p breaks the chain-breaking edges, decide whether any schedule
 /// exists. Starts decompose as `T * lap + sigma`; capacity lives in sigma
@@ -692,9 +718,19 @@ solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
     if (failed(scheduleCPSAT(problem, anchor, cycleTime, minII, maxII, span,
                              opts, slackGrant)))
       return failure();
-  } else if (failed(mlir::allo::scheduleSimplex(problem, anchor, cycleTime,
-                                                opts.regFloor, minII))) {
-    return failure();
+  } else {
+    if (failed(mlir::allo::scheduleSimplex(problem, anchor, cycleTime,
+                                           opts.regFloor, minII)))
+      return failure();
+    // The compile-time oracle: a region the heuristic provably lost goes to
+    // the exact solver, which starts from the heuristic's own placement and
+    // never ships worse.
+    if (opts.escalate && !opts.allocate &&
+        opts.objective == ScheduleObjective::Cycles &&
+        heuristicScheduleGap(problem, span, cycleTime, opts.regFloor) &&
+        failed(scheduleCPSAT(problem, anchor, cycleTime, minII, maxII, span,
+                             opts, slackGrant)))
+      return failure();
   }
   repairRegisterLifetimes(problem, anchor, span, cycleTime, opts.regFloor);
   if (failed(problem.verify()))
@@ -712,9 +748,16 @@ inline LogicalResult solveSchedulingProblem(
   if (usesExactScheduler(opts.kind)) {
     if (failed(scheduleCPSAT(problem, anchor, cycleTime, span, opts)))
       return failure();
-  } else if (failed(mlir::allo::scheduleSimplex(problem, anchor, cycleTime,
-                                                opts.regFloor))) {
-    return failure();
+  } else {
+    if (failed(mlir::allo::scheduleSimplex(problem, anchor, cycleTime,
+                                           opts.regFloor)))
+      return failure();
+    // The compile-time oracle, as in the cyclic variant above.
+    if (opts.escalate && !opts.allocate &&
+        opts.objective == ScheduleObjective::Cycles &&
+        heuristicScheduleGap(problem, span, cycleTime, opts.regFloor) &&
+        failed(scheduleCPSAT(problem, anchor, cycleTime, span, opts)))
+      return failure();
   }
   repairRegisterLifetimes(problem, anchor, span, cycleTime, opts.regFloor);
   if (failed(problem.verify()))
