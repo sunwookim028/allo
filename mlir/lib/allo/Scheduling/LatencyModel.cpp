@@ -5,7 +5,8 @@
 
 //===----------------------------------------------------------------------===//
 // The latency arithmetic. Every cycle a region costs is charged here; the two
-// structural walks that feed it (`SDC.cpp`, `PostConversion.cpp`) report shape.
+// structural walks that feed it (`Scheduler.cpp`, `PostConversion.cpp`) report
+// shape.
 //===----------------------------------------------------------------------===//
 
 #include "allo/Scheduling/LatencyModel.h"

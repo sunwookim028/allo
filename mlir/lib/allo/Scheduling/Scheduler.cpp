@@ -4,2179 +4,1989 @@
  */
 
 //===----------------------------------------------------------------------===//
-// The SDC scheduling engine for the chaining modulo and chaining
-// shared-operators problems. The difference constraints are solved on their
-// constraint graph (longest-path potentials, incremental under pins); the
-// greedy resource placement around it (the MRT, the II growth) is derived from
-// CIRCT's SimplexSchedulers. The Problem data model and the chaining utilities
-// stay CIRCT's.
-//
-// Portions derived from LLVM/CIRCT, Apache-2.0 WITH LLVM-exception.
+// The scheduling pass driver. Walks a function's regions, builds and solves a
+// scheduling problem per region against the SDC engine (SDC.cpp), repairs
+// register lifetimes, and publishes the region and kernel latencies the emitter
+// reads.
 //===----------------------------------------------------------------------===//
 
 #include "allo/Scheduling/Scheduler.h"
+#include "allo-c/Schedule.h" // kPipelineIIAttr
+#include "allo/IR/AlloOps.h"
+#include "allo/Scheduling/AddressModel.h" // addressDelayOf
+#include "allo/Scheduling/DependenceAnalysis.h"
+#include "allo/Scheduling/LatencyModel.h"
+#include "allo/Scheduling/MemoryAccess.h" // asMemAccess
+#include "allo/Scheduling/MemoryModel.h"  // kIndexWidth
+#include "allo/Scheduling/OperatorLibrary.h"
+#include "allo/Scheduling/ProblemBuilder.h"
+#include "allo/Scheduling/RegionGraph.h"
+#include "allo/Scheduling/ScheduleModel.h"
 #include "allo/Support/Logging.h"
 
-#include "circt/Scheduling/Utilities.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#include "mlir/IR/Operation.h"
-
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/MathExtras.h"
 
-#include <algorithm>
-#include <limits>
+#include <chrono>
 
-#define DEBUG_TYPE "allo-simplex-schedulers"
-
-using namespace mlir;
-using namespace circt;
-using namespace circt::scheduling;
-using namespace mlir::allo::logging;
-using mlir::allo::ChainingModuloProblem;
-using mlir::allo::ChainingSharedOperatorsProblem;
-using mlir::allo::ModuloOccupancyProblem;
-using mlir::allo::OccupancyProblem;
-
-using llvm::dbgs;
 using llvm::format;
+using namespace mlir;
+using namespace mlir::affine;
+using namespace mlir::allo;
+using namespace mlir::allo::dcp;
+using namespace mlir::allo::logging;
+
+// The maximal perfect band of counted loops (affine.for / scf.for) rooted at
+// \p root: descend while a level's body is exactly { inner counted loop,
+// terminator }. Returns [root, ..., innermost].
+//
+// Must run after `expand-region-bounds`, which places an inner loop's runtime
+// bound arithmetic beside it; the `allo.volatile` marker carrying that bound is
+// stepped over, so a loop with a trivial bound map keeps its band.
+static SmallVector<LoopLikeOpInterface> perfectNest(LoopLikeOpInterface root) {
+  SmallVector<LoopLikeOpInterface> nest{root};
+  while (true) {
+    Block &body = nest.back().getLoopRegions().front()->front();
+    Operation *first = &body.front();
+    while (isa<VolatileOp>(first))
+      first = first->getNextNode();
+    if (first->getNextNode() != body.getTerminator())
+      break; // the body holds more than just the inner loop
+    auto inner = dyn_cast<LoopLikeOpInterface>(first);
+    if (!inner || !isa<AffineForOp, scf::ForOp>(first))
+      break;
+    nest.push_back(inner);
+  }
+  return nest;
+}
+
+// The region's outputs, as the terms whose max is its terminal cycle. Kept as
+// separate terms so the exact scheduler can bound a variable by each and
+// minimize the charged quantity; `drainOf` takes the max after the solve.
+//
+// Each output is charged at its commit cycle: a store or sync sub-kernel call
+// commits `writeLatency`/contract cycles after its start, a stream put commits
+// at its stage, and a value handed onward is latched the cycle it lands, one
+// cycle above a store at the same depth. A result only forwarded (a block
+// argument, an earlier region's survivor, or a declaration) charges nothing.
+//
+// An indeterminate call is charged a floor of one cycle: with no contract to
+// place its `done` against the operator model gives it latency zero, and the
+// static fact left is that it occupies the cycle it issues in.
+static SmallVector<DrainTerm> drainTerms(OccupancyProblem &problem,
+                                         ValueRange results) {
+  SmallVector<DrainTerm> terms;
+  for (Operation *op : problem.getOperations()) {
+    if (isa<AffineStoreOp, memref::StoreOp>(op) || isSyncSubKernelCall(op))
+      terms.push_back({op, std::max<int64_t>(problem.latencyOf(op), 1) - 1});
+    else if (isa<StreamPutOp>(op))
+      terms.push_back({op, 0});
+  }
+  for (Value v : results) {
+    Operation *def = v.getDefiningOp();
+    // A call's result is the one escaping value not read through a capture
+    // register of this region: the region's `done` is the child's, charged by
+    // the loop above, and the consumer's own arming cycle pays the latch.
+    if (!def || isDeclarationOp(def) || isSyncSubKernelCall(def) ||
+        !problem.hasOperation(def))
+      continue;
+    // The definer's latency is read live (`plusLatency`): which row realizes
+    // it may itself be an exact solve's decision.
+    terms.push_back({def, 0, /*plusLatency=*/true});
+  }
+  return terms;
+}
+
+// The cycle count one iteration paces by when iterations do not overlap: the
+// schedule depth, with the anchor's cycle re-derived so a stream put commits at
+// its stage (the rule `drainTerms` applies), since a put's write latency lands
+// in the FIFO's own register. Every other anchor charge stands: a store's write
+// must land, and a call's `done` needs its re-arm cycle.
+static int64_t pacedDepth(ChainingModuloProblem &problem, Operation *anchor) {
+  int64_t depth = 1;
+  for (Operation *op : problem.getOperations()) {
+    if (op == anchor)
+      continue;
+    if (std::optional<unsigned> start = problem.getStartTime(op))
+      depth = std::max(depth, static_cast<int64_t>(*start) +
+                                  std::max<int64_t>(1, problem.latencyOf(op)));
+  }
+  int64_t anchorAt = 0;
+  for (auto &dep : problem.getDependences(anchor)) {
+    if (problem.getDistance(dep).value_or(0) != 0)
+      continue;
+    Operation *src = dep.getSource();
+    int64_t commit = isa<StreamPutOp>(src) ? 0 : problem.latencyOf(src);
+    anchorAt = std::max(
+        anchorAt, static_cast<int64_t>(*problem.getStartTime(src)) + commit);
+  }
+  return std::max(depth, anchorAt + 1);
+}
+
+// The flip-flops one cycle of delay on \p type costs, or 0 for a value not
+// carried in a register at all (a memref, a stream). An index is charged at
+// `kIndexWidth`, an upper bound since the emitter may build that address
+// register narrower; charging it zero would let the solver lengthen an address
+// chain for free.
+static int64_t registerWidth(Type type) {
+  if (auto i = dyn_cast<IntegerType>(type))
+    return i.getWidth();
+  if (auto f = dyn_cast<FloatType>(type))
+    return f.getWidth();
+  if (isa<IndexType>(type))
+    return kIndexWidth;
+  return 0;
+}
+
+// The values a region spends a delay register on, and what each one charges:
+// mirrors `DatapathBuilder::resolveOperand` + `insertRegister`, so a solve
+// minimizes the same quantity the emitter spends.
+//
+// Two kinds are charged: a scheduled producer read in the same region (a
+// def-use edge), and a loop-carried read of an iter_arg (the same edge
+// `distance` iterations back). A value held longer than the region (a
+// survivor, an IO port, a literal) is defined by no op in the problem and is
+// free. An enclosing loop's counter and the activation-pulse chain are not
+// charged here, both left to the objective's sum-of-starts tie-break.
+//
+// \p carried is the counted-loop body whose block arguments after the
+// induction variable are its iter_args, or null where there is no such
+// recurrence to price (a straight-line span, a `while`).
+static SmallVector<RegisterTerm> registerTerms(OccupancyProblem &problem,
+                                               Block *carried) {
+  SmallVector<RegisterTerm> terms;
+  DenseMap<Value, unsigned> slotOf;
+  auto readBy = [&](Value v, Operation *def, Operation *reader,
+                    int64_t distance) {
+    int64_t width = registerWidth(v.getType());
+    if (width == 0)
+      return;
+    auto [slot, isNew] = slotOf.try_emplace(v, terms.size());
+    if (isNew)
+      terms.push_back({def, width, {}});
+    terms[slot->second].reads.push_back({reader, distance});
+  };
+
+  for (Operation *reader : problem.getOperations()) {
+    // A terminator takes no input register: the values it hands on are latched
+    // by the region's completion, not delayed into it.
+    if (reader->hasTrait<OpTrait::IsTerminator>())
+      continue;
+    for (auto &dep : problem.getDependences(reader))
+      if (dep.isDefUse())
+        readBy(dep.getSource()->getResult(*dep.getSourceIndex()),
+               dep.getSource(), reader, /*distance=*/0);
+  }
+
+  if (!carried)
+    return terms;
+  Operation *yield = carried->getTerminator();
+  for (unsigned i = 0, n = yield->getNumOperands(); i < n; ++i) {
+    auto [def, distance] = iterArgSource(carried, yield, i);
+    if (!def || !problem.hasOperation(def))
+      continue;
+    for (Operation *reader : carried->getArgument(i + 1).getUsers())
+      if (problem.hasOperation(reader))
+        readBy(def->getResult(0), def, reader, distance);
+  }
+  return terms;
+}
+
+SpanObjective::SpanObjective(OccupancyProblem &problem, ValueRange results,
+                             Block *carried, std::optional<int64_t> trip,
+                             const OperatorLibrary &device)
+    : drain(drainTerms(problem, results)),
+      regs(registerTerms(problem, carried)), trip(trip), device(device) {}
+
+// Whether the problem carries a loop-carried recurrence (a dependence spanning
+// >= 1 iteration), which can hold the modulo II above the resource bound.
+static bool hasCarriedRecurrence(circt::scheduling::CyclicProblem &problem) {
+  for (Operation *op : problem.getOperations())
+    for (auto dep : problem.getDependences(op))
+      if (problem.getDistance(dep).value_or(0) > 0)
+        return true;
+  return false;
+}
+
+// The values a straight-line span hands to something outside itself. Must match
+// what the reify treats as escaping, so the two agree on what the region's
+// completion waits to capture. A boundary value is one of them, its `volatile`
+// marker sitting beside the anchor rather than in the span.
+static SmallVector<Value> spanEscapingValues(ArrayRef<Operation *> ops) {
+  llvm::SmallPtrSet<Operation *, 16> inSpan(ops.begin(), ops.end());
+  SmallVector<Value> escaping;
+  for (Operation *op : ops) {
+    // A literal is hoisted out rather than yielded, so the span waits for
+    // nothing on its account.
+    if (isa<arith::ConstantOp>(op))
+      continue;
+    for (Value res : op->getResults())
+      if (llvm::any_of(res.getUsers(),
+                       [&](Operation *user) { return !inSpan.contains(user); }))
+        escaping.push_back(res);
+  }
+  return escaping;
+}
+
+// A steady-clock stopwatch for timing one solve.
+using Stopwatch = std::chrono::steady_clock::time_point;
+static Stopwatch now() { return std::chrono::steady_clock::now(); }
 
 namespace {
 
-/// A dependence circuit that binds the initiation interval. `latency` sums each
-/// edge's source latency plus the extra cycle a chain-breaking constraint adds;
-/// `distance` sums the iterations the edges span.
-struct Recurrence {
-  SmallVector<Operation *> ops; // the circuit, in dependence order
-  SmallVector<std::pair<int64_t, int64_t>> hops; // (latency, distance) per edge
-  int64_t latency = 0;
-  int64_t distance = 0;
-  explicit operator bool() const { return !ops.empty(); }
+/// What the area objective's slack pass collects from the heuristic
+/// pre-schedule: leash widenings for regions the kernel's composition proved
+/// off its longest path (`grants`, keyed by the region's solve key), and
+/// in-region float on a sync call, banked for the callee's own regions
+/// (`calleeBudget`, single-site callees only).
+struct SlackLedger {
+  DenseMap<Operation *, int64_t> grants;
+  DenseMap<Operation *, int64_t> calleeBudget;
+  /// Sync call sites per callee, module-wide: a budget is only safe when one
+  /// site holds the whole float.
+  DenseMap<Operation *, unsigned> callSites;
 };
 
-/// One-line rendering: the circuit as an arrow chain closing on itself,
-/// followed by its two sums. The II it forces is `ceil(latency / distance)`.
-static std::string render(const Recurrence &rec) {
-  std::string s;
-  llvm::raw_string_ostream os(s);
-  for (auto [i, op] : llvm::enumerate(rec.ops)) {
-    os << op->getName().getStringRef();
-    if (Attribute map = op->getAttr("map"))
-      os << map;
-    if (i < rec.hops.size())
-      os << " -(" << rec.hops[i].first << ",d" << rec.hops[i].second << ")-> ";
-    else if (i + 1 < rec.ops.size())
-      os << " -> ";
-  }
-  os << " (total latency " << rec.latency << " over distance " << rec.distance
-     << ")";
-  return s;
-}
-
-/// Solves the difference-constraint core of a scheduling problem on its
-/// constraint graph. Every constraint is
-/// `start(dst) - start(src) >= lat + extra - II*dist`, so the feasible set is a
-/// lattice whose component-wise least solution is the longest-path potential
-/// from a virtual origin; it minimizes the last operation's start and every
-/// other start at once. The tie-break matters: the emitter builds a start pulse
-/// as `delayValid(regionStart, t)`, one flip-flop per cycle of `t`, so a
-/// slack-bearing node placed late costs registers for no latency.
-///
-/// Feasibility is the absence of a positive cycle. The initial solve grows the
-/// II to the smallest feasible value (feasibility is monotone in the II); a
-/// positive cycle found on the way names the recurrence and the least II it
-/// admits. A pin (`scheduleAt`) becomes a virtual edge pair through the origin,
-/// applied by an incremental relaxation with an undo log, so a failed pin rolls
-/// back in O(touched nodes).
-class SDCSchedulerBase {
-protected:
-  /// The last operation, whose start time the least solution minimizes first.
-  Operation *lastOp;
-
-  /// The initiation interval the constraint weights are taken at. The initial
-  /// solve grows it to the smallest feasible value; placement grows it more.
-  int parameterT = 0;
-
-  /// One difference constraint:
-  /// `start(dst) >= start(src) + lat + extra - parameterT * dist`.
-  /// `extra` is 1 on a chain-breaking constraint. The weight is derived at
-  /// relaxation time, so growing the II rebuilds nothing.
-  struct Edge {
-    unsigned src, dst;
-    int64_t lat;
-    unsigned dist;
-    int extra;
-  };
-  /// Dependence and chain-break edges. A pin is a virtual edge pair through
-  /// the origin (`frozenVariables`), added and removed without touching this.
-  SmallVector<Edge> edges;
-  /// Out-adjacency into `edges` by variable. The origin's outgoing edges are
-  /// the pins' lower bounds and the implicit `start >= 0`, which seeding every
-  /// potential at zero already applies.
-  SmallVector<SmallVector<unsigned, 4>> staticOut;
-
-  /// The virtual origin variable (index == number of operations): the zero
-  /// every bound is stated against.
-  unsigned origin = 0;
-
-  /// The least solution: longest path from the origin, kept current across
-  /// pins.
-  SmallVector<int64_t> potentials;
-  /// Whether `potentials` reflect the current constraints; only a frozen
-  /// variable may be read while this is false.
-  bool potentialsCurrent = false;
-
-  /// Pinned start times, in insertion order so a diagnostic's cycle is
-  /// deterministic. A pin is the edge pair origin->v (weight t) and v->origin
-  /// (weight -t).
-  llvm::MapVector<unsigned, unsigned> frozenVariables;
-
-  /// An operation's start time variable id, in problem order.
-  DenseMap<Operation *, unsigned> startTimeVariables;
-  /// The inverse, for naming a cycle's operations.
-  SmallVector<Operation *> varOps;
-
-  /// Allow subclasses to collect additional constraints that are not part of
-  /// the input problem (the chain breaks), each one time step stronger than a
-  /// plain dependence.
-  SmallVector<Problem::Dependence> additionalConstraints;
-
-  virtual Problem &getProblem() = 0;
-  /// The problem as the resource layer sees it, where the forwarded-edge set
-  /// lives; set by the concrete schedulers.
-  OccupancyProblem *occupancy = nullptr;
-  /// The latency a dependence separates its endpoints by: its source's, or
-  /// zero for a forwarded store->load edge.
-  int64_t sourceLatencyOf(Problem::Dependence dep);
-  /// Iteration distance a dependence spans. The base answers 0 (the acyclic
-  /// `distance == 0` special case); the cyclic subclass overrides.
-  virtual unsigned distanceOf(Problem::Dependence dep);
-  /// The dependence circuit that binds the II at \p ii: the constraints are
-  /// `t_dst - t_src >= latency(src) + extra - ii*distance`, so a schedule
-  /// exists iff no circuit's weights sum positive. A positive circuit forces
-  /// `ii >= ceil(latency / distance)`, and one with `distance == 0` can never
-  /// be satisfied. Empty when no circuit binds. O(|ops| * |deps|) Bellman-Ford.
-  Recurrence bindingRecurrence(unsigned ii);
-  /// Report a failed initial solve, naming the recurrence responsible.
-  void reportInfeasible();
-  virtual LogicalResult checkLastOp();
-
-  /// Build the variables and edges off the problem + `additionalConstraints`.
-  void buildGraph();
-
-  /// Recompute the least solution from scratch. With \p allowRaise, a
-  /// positive cycle carrying iteration distance raises the II to the least
-  /// value it admits and retries (the parametric-T bump of the simplex);
-  /// without it, or on a zero-distance cycle, the system is infeasible.
-  LogicalResult solveGraph(bool allowRaise);
-
-  /// Pin \p startTimeVariable to \p timeStep, updating the least solution by
-  /// an incremental relaxation. Failure (a positive cycle through the pin)
-  /// rolls everything back, leaving the previous solution standing.
-  /// \p conflictPins, non-null, receives the other pins on the certifying
-  /// cycle: the ones a placement repair would evict.
-  LogicalResult scheduleAt(unsigned startTimeVariable, unsigned timeStep,
-                           SmallVectorImpl<unsigned> *conflictPins = nullptr);
-
-  unsigned getStartTime(unsigned startTimeVariable);
-
-  /// ASAP is the maintained least solution; ALAP is the greatest solution with
-  /// the last operation held at its already-minimal start. Both lattice
-  /// extremes are unique. The greatest solution is a longest path to the origin
-  /// over the same edges (a path i -> origin of weight W states
-  /// `start(i) <= -W`), a temporary pin on the last operation supplying every
-  /// unpinned chain's upper bound through the anchor.
-  void computeMargins(SmallVectorImpl<unsigned> &asap,
-                      SmallVectorImpl<unsigned> &alap);
-
-  /// A restorable copy of the engine's mutable state for a speculative
-  /// transform (the targeted II growth): the static edges never change, so
-  /// the pins, the potentials and the interval are the whole of it.
-  struct GraphState {
-    llvm::MapVector<unsigned, unsigned> frozenVariables;
-    SmallVector<int64_t> potentials;
-    int parameterT;
-    bool potentialsCurrent;
-  };
-  GraphState saveState();
-  void restoreState(GraphState &saved);
-
-private:
-  /// A positive cycle: its constraint sums, and its operation nodes for the
-  /// diagnostic (the origin, where a pin closes it, is skipped).
-  struct FoundCycle {
-    int64_t lat = 0;
-    int64_t dist = 0;
-    SmallVector<unsigned> nodes;
-  };
-  /// Monotone longest-path relaxation from the queued seeds over the static
-  /// edges plus the pins' virtual edges. Returns the cycle that certifies the
-  /// system infeasible at the current interval, or nullopt at the fixpoint.
-  /// \p undo, non-null, records each first-touched potential for rollback.
-  /// `resetScratch` must run first; a caller may seed pred entries after it.
-  std::optional<FoundCycle>
-  relaxCore(SmallVector<unsigned> queue,
-            SmallVectorImpl<std::pair<unsigned, int64_t>> *undo);
-  /// The cycle in the pred bookkeeping reachable from \p v: a proper cycle,
-  /// or a walk off the origin that closes through an implicit zero edge.
-  FoundCycle extractCycle(unsigned v);
-  void resetScratch();
-
-  /// Relaxation scratch: the last relaxing edge per node (source, `lat +
-  /// extra`, distance), the provenance chain length whose overflow past the
-  /// node count certifies a positive cycle (a longer chain repeats a node, and
-  /// the repeated segment sums positive), the queue membership, and the
-  /// first-touch marks feeding an undo log.
-  SmallVector<int> predNode;
-  SmallVector<int64_t> predLat;
-  SmallVector<unsigned> predDist;
-  SmallVector<unsigned> chainLen;
-  SmallVector<uint8_t> inQueue;
-  SmallVector<uint8_t> touchedFlag;
-
-public:
-  explicit SDCSchedulerBase(Operation *lastOp) : lastOp(lastOp) {}
-  virtual ~SDCSchedulerBase() = default;
-  virtual LogicalResult schedule() = 0;
-};
-
-// This class solves acyclic, resource-constrained `OccupancyProblem` with
-// LP-guided first-fit placement, after de Dinechin.
-class SharedOperatorsSimplexScheduler : public SDCSchedulerBase {
-private:
-  OccupancyProblem &prob;
-
-protected:
-  Problem &getProblem() override { return prob; }
-
-public:
-  SharedOperatorsSimplexScheduler(OccupancyProblem &prob, Operation *lastOp)
-      : SDCSchedulerBase(lastOp), prob(prob) {
-    occupancy = &prob;
-  }
-  LogicalResult schedule() override;
-};
-
-/// What set the resource-min II: the pool that needed the most cycles, its
-/// demand against its per-cycle limit, and one operation holding it, so a
-/// diagnostic can point at source rather than at an internal resource key.
-struct BindingResource {
-  circt::scheduling::Problem::ResourceType rsrc;
-  unsigned demand = 0, limit = 0;
-  Operation *witness = nullptr;
-};
-
-// This class solves the `ModuloOccupancyProblem` with the iterative modulo
-// heuristic of de Dinechin, "Fast Modulo Scheduling Under the Simplex
-// Scheduling Framework", PRISM 1995.01, plus budgeted eviction after Rau's
-// iterative modulo scheduling, which repairs a failed placement at the
-// current II before any growth.
-class ModuloSimplexScheduler : public SDCSchedulerBase {
-private:
-  struct MRT {
-    ModuloSimplexScheduler &sched;
-
-    // Modulo slot -> number of resource instances occupied there. A count (not
-    // a set of ops) so a non-pipelined window wider than the II, which wraps
-    // and lands in a slot more than once, contributes its true multiplicity.
-    using TableType = SmallDenseMap<unsigned, unsigned>;
-    using ReverseTableType = SmallDenseMap<Operation *, unsigned>;
-    SmallDenseMap<Problem::ResourceType, TableType> tables;
-    SmallDenseMap<Problem::ResourceType, ReverseTableType> reverseTables;
-
-    explicit MRT(ModuloSimplexScheduler &sched) : sched(sched) {}
-    LogicalResult enter(Operation *op, unsigned timeStep);
-    void release(Operation *op);
-    void clear() {
-      tables.clear();
-      reverseTables.clear();
-    }
-  };
-
-  ModuloOccupancyProblem &prob;
-  SmallVector<unsigned> asapTimes, alapTimes;
-  SmallVector<Operation *> unscheduled, scheduled;
-  MRT mrt;
-  // Lower bound on the II from a pipeline directive. The search only ever grows
-  // the II, so the achieved II is max(this, the natural minimum).
-  unsigned minII = 1;
-  // Sum of occupancies over limited ops; the II growth must converge within
-  // this bound (all ops fit in disjoint windows by then).
-  unsigned totalResourceCycles = 0;
-  // The largest II any bound justifies before resources are placed: the
-  // resource-min II, a loop-carried recurrence, and the pipeline directive's
-  // floor, whichever is largest. Greedy placement can only grow the II past it.
-  unsigned lowerBoundII = 1;
-  // Whether the resource-free solve that settles `lowerBoundII` got that far.
-  bool boundSettled = false;
-  // Whether a caller places this region itself if the greedy cannot (see
-  // `SimplexWarmStart`). It changes only what a placement failure is reported
-  // as, never what the placement does.
-  bool placementAdvisory = false;
-  // Placement repair bookkeeping: how often each operation was evicted, and
-  // the evictions the region may still spend. Both caps keep the repair
-  // finite; exhaustion falls back to growing the II.
-  DenseMap<Operation *, unsigned> evictCount;
-  unsigned evictionBudget = 0;
-  static constexpr unsigned kMaxEvictionsPerOp = 6;
-  static constexpr unsigned kMaxCommitAttempts = 16;
-  static constexpr unsigned kMaxDepRounds = 6;
-  static constexpr unsigned kMaxSpanRepairMoves = 64;
-  /// The sigma/lap oracle's engagement gate (contending ops times the
-  /// interval, the sigma model's boolean count) and its probe budgets.
-  static constexpr int64_t kOracleSizeGate = 50000;
-  static constexpr double kOracleProbeBudget = 2.0;
-  static constexpr unsigned kOracleMaxProbes = 6;
-
-protected:
-  Problem &getProblem() override { return prob; }
-  unsigned distanceOf(Problem::Dependence dep) override {
-    return prob.getDistance(dep).value_or(0);
-  }
-  LogicalResult checkLastOp() override;
-  void updateMargins();
-  LogicalResult scheduleOperation(Operation *n);
-  LogicalResult scheduleWithEviction(Operation *n);
-  LogicalResult growIIAndRestart(Operation *n);
-  /// After placement, lower the region's span: relocate critical limited ops
-  /// first fit seated at a free-but-high slot down to a lower class, evicting
-  /// the holders in the way, committing only strictly-improving moves.
-  void repairSpan();
-  /// Try to reseat the pinned op \p stvX below \p oldPin by evicting the
-  /// holders of a lower class; victims are re-placed by first fit. Returns true
-  /// if the op ended up below oldPin with every victim replaced (the caller
-  /// checks the span).
-  bool trySeatLower(unsigned stvX, unsigned oldPin, unsigned &budget);
-  /// The least start \p stv could take from its dependences alone, given the
-  /// other pins: a pin above this was pushed up by first fit's slot choice.
-  int64_t depAsapOf(unsigned stv);
-  /// The fewest cycles one iteration's resource demand can be issued in.
-  /// \p binding receives what set it, untouched where nothing does.
-  unsigned computeResMinII(BindingResource &binding);
-  /// Decide whether the gap between the greedily achieved `parameterT` and the
-  /// LP bound `lowerBoundII` is the heuristic's or the problem's, on a bounded
-  /// sigma/lap oracle budget. Lowers `parameterT` to a certified witness where
-  /// one is found and returns its start times; otherwise keeps the heuristic
-  /// schedule and warns. \p resMinII feeds the diagnostics only.
-  DenseMap<Operation *, unsigned> adjudicateIIGap(unsigned resMinII);
-
-public:
-  ModuloSimplexScheduler(ModuloOccupancyProblem &prob, Operation *lastOp,
-                         unsigned minII = 1)
-      : SDCSchedulerBase(lastOp), prob(prob), mrt(*this), minII(minII) {
-    occupancy = &prob;
-  }
-  LogicalResult schedule() override;
-  /// See `lowerBoundII`. Settled before placement, so it is meaningful even
-  /// after `schedule` fails, but only once `hasLowerBound` holds.
-  unsigned getLowerBoundII() const { return lowerBoundII; }
-  bool hasLowerBound() const { return boundSettled; }
-  void setPlacementAdvisory() { placementAdvisory = true; }
-};
-
-// This class solves the resource-constrained, cyclic, chaining-enabled
-// `ChainingModuloProblem` on top of the `ModuloSimplexScheduler`: a pre-pass
-// fills the chain-breaking dependences (consumed by `buildGraph`), and a
-// post-pass fills the sub-cycle start times.
-class ChainingModuloSimplexScheduler : public ModuloSimplexScheduler {
-private:
-  ChainingModuloProblem &prob;
-  float cycleTime;
-  float regFloor;
-
-protected:
-  Problem &getProblem() override { return prob; }
-
-public:
-  ChainingModuloSimplexScheduler(ChainingModuloProblem &prob, Operation *lastOp,
-                                 float cycleTime, float regFloor,
-                                 unsigned minII = 1)
-      : ModuloSimplexScheduler(prob, lastOp, minII), prob(prob),
-        cycleTime(cycleTime), regFloor(regFloor) {}
-  LogicalResult schedule() override {
-    if (failed(mlir::allo::computeChainBreaks(prob, cycleTime, regFloor,
-                                              additionalConstraints)))
-      return failure();
-    if (!additionalConstraints.empty())
-      info(Stage::Sched, prob.getContainingOp())
-          << "Split " << additionalConstraints.size()
-          << " combinational chain(s) to meet the " << format("%g", cycleTime)
-          << " ns clock period (adds pipeline register stages / latency)";
-    if (failed(ModuloSimplexScheduler::schedule()))
-      return failure();
-    return mlir::allo::computeStartTimesInCycle(prob, regFloor);
-  }
-};
-
-// This class solves the resource-constrained, acyclic, chaining-enabled
-// `ChainingSharedOperatorsProblem` on top of the
-// `SharedOperatorsSimplexScheduler`. The acyclic mirror of
-// `ChainingModuloSimplexScheduler`.
-class ChainingSharedOperatorsSimplexScheduler
-    : public SharedOperatorsSimplexScheduler {
-private:
-  ChainingSharedOperatorsProblem &prob;
-  float cycleTime;
-  float regFloor;
-
-protected:
-  Problem &getProblem() override { return prob; }
-
-public:
-  ChainingSharedOperatorsSimplexScheduler(ChainingSharedOperatorsProblem &prob,
-                                          Operation *lastOp, float cycleTime,
-                                          float regFloor)
-      : SharedOperatorsSimplexScheduler(prob, lastOp), prob(prob),
-        cycleTime(cycleTime), regFloor(regFloor) {}
-  LogicalResult schedule() override {
-    if (failed(mlir::allo::computeChainBreaks(prob, cycleTime, regFloor,
-                                              additionalConstraints)))
-      return failure();
-    if (!additionalConstraints.empty())
-      info(Stage::Sched, prob.getContainingOp())
-          << "Split " << additionalConstraints.size()
-          << " combinational chain(s) to meet the " << format("%g", cycleTime)
-          << " ns clock period (adds pipeline register stages / latency)";
-    if (failed(SharedOperatorsSimplexScheduler::schedule()))
-      return failure();
-    return mlir::allo::computeStartTimesInCycle(prob, regFloor);
-  }
-};
-
-} // anonymous namespace
-
-//===----------------------------------------------------------------------===//
-// Chain breaking
-//===----------------------------------------------------------------------===//
-
-LogicalResult mlir::allo::computeStartTimesInCycle(ChainingProblem &prob,
-                                                   float regFloor) {
-  prob.clearStartTimeInCycle();
-  return handleOperationsInTopologicalOrder(prob, [&](Operation *op) {
-    // The floor, not zero: an operand reaches `op` no earlier than its own
-    // register can drive it.
-    float startTimeInCycle = regFloor;
-    unsigned startTime = *prob.getStartTime(op);
-
-    for (auto dep : prob.getDependences(op)) {
-      if (dep.isAuxiliary()) // carries no value
-        continue;
-      Operation *pred = dep.getSource();
-      auto predStartTimeInCycle = prob.getStartTimeInCycle(pred);
-      if (!predStartTimeInCycle)
-        return failure(); // a predecessor is still pending
-
-      auto predOpr = *prob.getLinkedOperatorType(pred);
-      unsigned predEnd = *prob.getStartTime(pred) + *prob.getLatency(predOpr);
-      if (predEnd < startTime)
-        continue; // registered a whole step earlier
-
-      // `pred` ends in the cycle `op` starts in. A multi-cycle producer
-      // contributes only its outgoing delay, its last register stage being
-      // what the cycle starts from.
-      float predEndInCycle =
-          (*prob.getStartTime(pred) == predEnd ? *predStartTimeInCycle : 0.0f) +
-          *prob.getOutgoingDelay(predOpr);
-      startTimeInCycle = std::max(predEndInCycle, startTimeInCycle);
-    }
-
-    prob.setStartTimeInCycle(op, startTimeInCycle);
-    return success();
-  });
-}
-
-LogicalResult
-mlir::allo::computeChainBreaks(ChainingProblem &prob, float cycleTime,
-                               float regFloor,
-                               SmallVectorImpl<Problem::Dependence> &result) {
-  // Every operator fits a cycle of its own: `runSDCScheduler` raises the
-  // period to the least every row does before any problem is built, so a
-  // violation here is an operation the derate walk did not price.
-  assert(llvm::all_of(prob.getOperatorTypes(),
-                      [&](Problem::OperatorType opr) {
-                        return regFloor + *prob.getIncomingDelay(opr) <=
-                                   cycleTime &&
-                               *prob.getOutgoingDelay(opr) <= cycleTime;
-                      }) &&
-         "an operator exceeds the derated period; `minSchedulablePeriod` "
-         "prices every operation a problem registers");
-
-  // chains[v][u]: the delay arriving at `v` along the longest combinational
-  // chain starting at `u`. A key is also the "handled" marker, so nothing is
-  // written for an operation until every predecessor of it is complete.
-  DenseMap<Operation *, SmallDenseMap<Operation *, float>> chains;
-
-  // Problem order, which is the IR's. `chains` is keyed by pointer, so its
-  // iteration order is one of addresses, and the edges below would otherwise
-  // vary between two compiles of one kernel.
-  DenseMap<Operation *, unsigned> order;
-  for (Operation *op : prob.getOperations())
-    order.try_emplace(op, order.size());
-
-  return handleOperationsInTopologicalOrder(prob, [&](Operation *op) {
-    for (auto dep : prob.getDependences(op))
-      if (dep.isDefUse() && !chains.count(dep.getSource()))
-        return failure(); // a predecessor is still pending; retry `op` later
-
-    // `op` is the origin of its own chain, and every chain arriving at it is
-    // one of its combinational predecessors' extended by that predecessor. A
-    // chain starts at the floor, not at zero: its operands leave a register.
-    chains[op][op] = regFloor;
-    for (auto dep : prob.getDependences(op)) {
-      if (!dep.isDefUse()) // an auxiliary edge transports no value
-        continue;
-      Operation *pred = dep.getSource();
-      auto predOpr = *prob.getLinkedOperatorType(pred);
-      float outgoing = *prob.getOutgoingDelay(predOpr);
-      if (*prob.getLatency(predOpr) > 0) {
-        // Registered: the chain restarts at `pred` carrying its output delay,
-        // maxed against any longer chain that also reaches here through `pred`,
-        // and against the floor, which is `pred`'s own clock-to-out.
-        chains[op][pred] =
-            std::max(chains[op][pred], std::max(regFloor, outgoing));
-        continue;
-      }
-      for (auto [origin, delay] : chains[pred])
-        chains[op][origin] = std::max(delay + outgoing, chains[op][origin]);
-    }
-
-    // Break every chain `op` cannot be appended to within the period. Erasing
-    // it here is what keeps `op`'s successors from inheriting a chain the edge
-    // has just cut.
-    float incoming = *prob.getIncomingDelay(*prob.getLinkedOperatorType(op));
-    SmallVector<Operation *, 4> tooLong;
-    for (auto [origin, delay] : chains[op])
-      if (delay + incoming > cycleTime)
-        tooLong.push_back(origin);
-    llvm::sort(tooLong, [&](Operation *a, Operation *b) {
-      return order.at(a) < order.at(b);
-    });
-    for (Operation *origin : tooLong) {
-      result.emplace_back(origin, op);
-      chains[op].erase(origin);
-    }
-    return success();
-  });
-}
-
-//===----------------------------------------------------------------------===//
-// SDCSchedulerBase
-//===----------------------------------------------------------------------===//
-
-unsigned SDCSchedulerBase::distanceOf(Problem::Dependence) { return 0; }
-
-int64_t SDCSchedulerBase::sourceLatencyOf(Problem::Dependence dep) {
-  if (occupancy)
-    return occupancy->separationOf(dep);
-  auto &prob = getProblem();
-  return *prob.getLatency(*prob.getLinkedOperatorType(dep.getSource()));
-}
-
-Recurrence SDCSchedulerBase::bindingRecurrence(unsigned ii) {
-  auto &prob = getProblem();
-  DenseMap<Operation *, unsigned> index;
-  SmallVector<Operation *> nodes;
-  for (auto *op : prob.getOperations()) {
-    index[op] = nodes.size();
-    nodes.push_back(op);
-  }
-
-  // One edge per constraint the engine builds, carrying the same
-  // latency / distance / chain-break terms.
-  struct Edge {
-    unsigned src, dst;
-    int64_t latency, distance;
-  };
-  SmallVector<Edge> edges;
-  auto weightOf = [&](const Edge &e) {
-    return e.latency - static_cast<int64_t>(ii) * e.distance;
-  };
-  auto addEdge = [&](Problem::Dependence dep, int extra) {
-    auto srcIt = index.find(dep.getSource());
-    auto dstIt = index.find(dep.getDestination());
-    if (srcIt == index.end() || dstIt == index.end())
-      return;
-    int64_t latency = sourceLatencyOf(dep) + extra;
-    edges.push_back({srcIt->second, dstIt->second, latency, distanceOf(dep)});
-  };
-  for (auto *op : prob.getOperations())
-    for (auto &dep : prob.getDependences(op))
-      addEdge(dep, /*extra=*/0);
-  // A chain-breaking constraint costs one extra time step.
-  for (auto &dep : additionalConstraints)
-    addEdge(dep, /*extra=*/1);
-
-  // Bellman-Ford for a positive circuit, every node a source (`dist` starts at
-  // zero) so a circuit anywhere in the graph is found. Settling early means
-  // there is none.
-  SmallVector<int64_t> dist(nodes.size(), 0);
-  SmallVector<int> pred(nodes.size(), -1), predEdge(nodes.size(), -1);
-  int relaxed = -1;
-  for (unsigned round = 0; round < nodes.size(); ++round) {
-    relaxed = -1;
-    for (auto [e, edge] : llvm::enumerate(edges))
-      if (dist[edge.src] + weightOf(edge) > dist[edge.dst]) {
-        dist[edge.dst] = dist[edge.src] + weightOf(edge);
-        pred[edge.dst] = edge.src;
-        predEdge[edge.dst] = e;
-        relaxed = edge.dst;
-      }
-    if (relaxed < 0)
-      return {}; // settled: every circuit's weights sum non-positive
-  }
-
-  // A node still relaxing after |ops| rounds is reachable from a positive
-  // circuit; |ops| predecessor steps land inside the circuit itself.
-  unsigned v = relaxed;
-  for (unsigned i = 0; i < nodes.size(); ++i) {
-    if (pred[v] < 0)
-      return {};
-    v = pred[v];
-  }
-  Recurrence rec;
-  for (unsigned u = v;;) {
-    rec.ops.push_back(nodes[u]);
-    const Edge &in = edges[predEdge[u]];
-    rec.hops.push_back({in.latency, in.distance});
-    rec.latency += in.latency;
-    rec.distance += in.distance;
-    u = pred[u];
-    if (u == v)
-      break;
-  }
-  std::reverse(rec.ops.begin(), rec.ops.end());
-  // Recorded per node as its incoming edge; after the reversal, rotate so
-  // hops[i] is the edge ops[i] -> ops[i+1] (wrapping).
-  std::reverse(rec.hops.begin(), rec.hops.end());
-  std::rotate(rec.hops.begin(), rec.hops.begin() + 1, rec.hops.end());
-  return rec;
-}
-
-void SDCSchedulerBase::reportInfeasible() {
-  auto &prob = getProblem();
-  // The initial solve grows the II freely, so failing it means no II works:
-  // some circuit carries positive latency over zero distance. Search at an II
-  // large enough that any distance-carrying circuit is comfortably negative.
-  unsigned bigII = 1 + additionalConstraints.size();
-  for (auto *op : prob.getOperations())
-    if (auto opr = prob.getLinkedOperatorType(op))
-      bigII += prob.getLatency(*opr).value_or(0);
-  Recurrence rec = bindingRecurrence(bigII);
-  auto diag =
-      error(Stage::Sched, Code::DependenceInfeasible, prob.getContainingOp());
-  if (!rec) {
-    // No circuit binds, so the infeasibility comes from the constraints layered
-    // on top of the dependences (a fixed start time, a resource reservation).
-    diag << "Problem is infeasible: no dependence recurrence explains it, so a "
-            "fixed start time or a resource reservation does";
-    return;
-  }
-  diag << "Problem is infeasible: the dependence cycle " << render(rec)
-       << " must complete within one iteration, but takes " << rec.latency
-       << " cycle(s); break it with a loop-carried value (an iter-arg), a "
-          "faster operator, or an allo.assume.nodep hint if the dependence is "
-          "spurious";
-}
-
-LogicalResult SDCSchedulerBase::checkLastOp() {
-  auto &prob = getProblem();
-  if (!prob.hasOperation(lastOp)) {
-    assert(false && "the scheduling problem does not include its last "
-                    "operation; ProblemBuilder constructs both, so no input "
-                    "can reach this");
-    return failure();
-  }
-  return success();
-}
-
-void SDCSchedulerBase::buildGraph() {
-  auto &prob = getProblem();
-  for (auto *op : prob.getOperations()) {
-    startTimeVariables[op] = varOps.size();
-    varOps.push_back(op);
-  }
-  origin = varOps.size();
-  auto addEdge = [&](Problem::Dependence dep, int extra) {
-    // A self-arc stays: its row constrains no start, but a positive weight is
-    // a one-node circuit forcing `II >= ceil(lat / dist)` like any other.
-    edges.push_back({startTimeVariables[dep.getSource()],
-                     startTimeVariables[dep.getDestination()],
-                     sourceLatencyOf(dep), distanceOf(dep), extra});
-  };
-  for (auto *op : prob.getOperations())
-    for (auto &dep : prob.getDependences(op))
-      addEdge(dep, 0);
-  for (auto &dep : additionalConstraints)
-    addEdge(dep, 1);
-  staticOut.assign(origin + 1, {});
-  for (auto [i, e] : llvm::enumerate(edges))
-    staticOut[e.src].push_back(i);
-  potentials.assign(origin + 1, 0);
-}
-
-void SDCSchedulerBase::resetScratch() {
-  unsigned nNodes = origin + 1;
-  predNode.assign(nNodes, -1);
-  predLat.assign(nNodes, 0);
-  predDist.assign(nNodes, 0);
-  chainLen.assign(nNodes, 0);
-  inQueue.assign(nNodes, 0);
-  touchedFlag.assign(nNodes, 0);
-}
-
-SDCSchedulerBase::FoundCycle SDCSchedulerBase::extractCycle(unsigned v) {
-  SmallVector<uint8_t> stamp(origin + 1, 0);
-  unsigned x = v;
-  while (predNode[x] >= 0 && !stamp[x]) {
-    stamp[x] = 1;
-    x = unsigned(predNode[x]);
-  }
-  FoundCycle cyc;
-  if (predNode[x] < 0) {
-    // The chain runs off a zero-seeded node: only a walk started at the
-    // origin closes that way, through the implicit `start >= 0` edge. Sum
-    // every walked node's incoming edge; the implicit closure adds nothing.
-    assert(v == origin && "a chain-length trip walks into a proper cycle");
-    for (unsigned y = v; predNode[y] >= 0; y = unsigned(predNode[y])) {
-      cyc.lat += predLat[y];
-      cyc.dist += predDist[y];
-      if (y != origin)
-        cyc.nodes.push_back(y);
-    }
-    if (x != origin)
-      cyc.nodes.push_back(x);
-    return cyc;
-  }
-  for (unsigned y = x;;) {
-    cyc.lat += predLat[y];
-    cyc.dist += predDist[y];
-    if (y != origin)
-      cyc.nodes.push_back(y);
-    y = unsigned(predNode[y]);
-    if (y == x)
-      break;
-  }
-  return cyc;
-}
-
-std::optional<SDCSchedulerBase::FoundCycle> SDCSchedulerBase::relaxCore(
-    SmallVector<unsigned> queue,
-    SmallVectorImpl<std::pair<unsigned, int64_t>> *undo) {
-  unsigned nNodes = origin + 1;
-  std::optional<unsigned> trip;
-  for (unsigned head = 0; head < queue.size() && !trip; ++head) {
-    unsigned u = queue[head];
-    inQueue[u] = 0;
-    auto relax = [&](unsigned dst, int64_t lat, unsigned dist) {
-      int64_t np = potentials[u] + lat - int64_t(parameterT) * dist;
-      if (np <= potentials[dst])
-        return;
-      if (undo && !touchedFlag[dst]) {
-        touchedFlag[dst] = 1;
-        undo->push_back({dst, potentials[dst]});
-      }
-      potentials[dst] = np;
-      predNode[dst] = int(u);
-      predLat[dst] = lat;
-      predDist[dst] = dist;
-      chainLen[dst] = chainLen[u] + 1;
-      // The origin is the zero every bound is stated against: raising it
-      // closes a positive cycle through a pin. A provenance chain longer than
-      // the node count certifies one anywhere else.
-      if ((dst == origin && np > 0) || chainLen[dst] > nNodes) {
-        trip = dst;
-        return;
-      }
-      if (!inQueue[dst]) {
-        inQueue[dst] = 1;
-        queue.push_back(dst);
-      }
-    };
-    for (unsigned ei : staticOut[u]) {
-      const Edge &e = edges[ei];
-      relax(e.dst, e.lat + e.extra, e.dist);
-      if (trip)
-        break;
-    }
-    if (trip)
-      break;
-    if (u == origin) {
-      for (auto &[v, t] : frozenVariables) {
-        relax(v, int64_t(t), 0);
-        if (trip)
-          break;
-      }
-    } else if (const auto *it = frozenVariables.find(u);
-               it != frozenVariables.end()) {
-      relax(origin, -int64_t(it->second), 0);
-    }
-  }
-  if (!trip)
+/// Where a composition-slack grant on \p region lands, and what one granted
+/// cycle costs there: the solve key of the region's own schedule, and the trip
+/// product of the counted wrappers between the region's span and that schedule
+/// (a container re-runs its body per iteration, so widening the body by one
+/// widens the region by the product). nullopt where the region holds no
+/// interval a grant could widen: a straight-line span, a container decomposed
+/// into sub-regions, a call node, a while.
+std::optional<std::pair<Operation *, int64_t>>
+grantTarget(const SchedRegion &region, DependenceAnalysis &deps) {
+  if (region.kind != allo::RegionKind::Loop)
     return std::nullopt;
-  return extractCycle(*trip);
-}
-
-LogicalResult SDCSchedulerBase::solveGraph(bool allowRaise) {
-  potentialsCurrent = false;
-  unsigned nNodes = origin + 1;
-  // Past this interval every distance-carrying circuit sums negative, so a
-  // still-infeasible system is a zero-distance circuit no interval fixes.
-  int64_t latBound = 1;
-  for (const Edge &e : edges)
-    latBound += (e.lat < 0 ? -e.lat : e.lat) + e.extra;
-  for (auto &[v, t] : frozenVariables)
-    latBound += t;
-  while (true) {
-    potentials.assign(nNodes, 0);
-    resetScratch();
-    SmallVector<unsigned> queue;
-    queue.reserve(nNodes);
-    for (unsigned v = 0; v < nNodes; ++v) {
-      queue.push_back(v);
-      inQueue[v] = 1;
-    }
-    std::optional<FoundCycle> cyc = relaxCore(std::move(queue), nullptr);
-    if (!cyc) {
-      potentialsCurrent = true;
-      return success();
-    }
-    int64_t cw = cyc->lat - int64_t(parameterT) * cyc->dist;
-    if (!allowRaise || (cyc->dist == 0 && cw > 0) || parameterT > latBound)
-      return failure();
-    // Never past the least feasible interval: the trip certifies the current
-    // one infeasible, and every real circuit independently requires
-    // `ceil(lat / dist)`, so the climb lands exactly on the minimum.
-    int64_t newT = parameterT + 1;
-    if (cyc->dist > 0 && cyc->lat > 0)
-      newT = std::max(newT, (cyc->lat + cyc->dist - 1) / cyc->dist);
-    {
-      auto diag = info(Stage::Sched, getProblem().getContainingOp());
-      diag << "II=" << parameterT
-           << " is not achievable: a loop-carried recurrence requires II>="
-           << newT << ", increasing II to " << newT;
-      if (!cyc->nodes.empty()) {
-        Recurrence rec;
-        for (unsigned v : llvm::reverse(cyc->nodes))
-          rec.ops.push_back(varOps[v]);
-        rec.latency = cyc->lat;
-        rec.distance = cyc->dist;
-        // Annotate each hop with the strongest parallel edge's (lat, dist).
-        for (unsigned i = 0, n = rec.ops.size(); i < n; ++i) {
-          unsigned a = startTimeVariables[rec.ops[i]];
-          unsigned b = startTimeVariables[rec.ops[(i + 1) % n]];
-          std::pair<int64_t, int64_t> best{0, 0};
-          bool found = false;
-          for (unsigned e : staticOut[a])
-            if (edges[e].dst == b) {
-              int64_t w = edges[e].lat + edges[e].extra -
-                          int64_t(parameterT) * edges[e].dist;
-              if (!found || w > best.first - int64_t(parameterT) * best.second)
-                best = {edges[e].lat + edges[e].extra, edges[e].dist};
-              found = true;
-            }
-          rec.hops.push_back(best);
-        }
-        diag << "; the binding recurrence is " << render(rec);
-      }
-    }
-    parameterT = int(newT);
+  if (!isa<AffineForOp, scf::ForOp>(region.anchor()))
+    return std::nullopt;
+  SmallVector<LoopLikeOpInterface> band =
+      perfectNest(cast<LoopLikeOpInterface>(region.anchor()));
+  LoopLikeOpInterface innermost = band.back();
+  if (countedLoopShape(innermost) != RegionShape::Leaf)
+    return std::nullopt;
+  int64_t divisor = 1;
+  for (LoopLikeOpInterface level : ArrayRef(band).drop_back()) {
+    std::optional<int64_t> t = deps.tripOf(level.getOperation()).count;
+    if (!t || *t <= 0)
+      return std::nullopt;
+    divisor *= *t;
   }
+  return std::pair{innermost.getOperation(), divisor};
 }
 
-LogicalResult
-SDCSchedulerBase::scheduleAt(unsigned startTimeVariable, unsigned timeStep,
-                             SmallVectorImpl<unsigned> *conflictPins) {
-  assert(startTimeVariable < origin);
-  assert(!frozenVariables.count(startTimeVariable));
-  assert(potentialsCurrent && "a pin lands on a solved system");
-  int64_t t = timeStep;
-  if (potentials[startTimeVariable] > t)
-    return failure(); // already forced later than the pin allows
-  frozenVariables.insert({startTimeVariable, timeStep});
-  if (potentials[startTimeVariable] == t)
-    return success(); // the solution already sits on the pin
-  SmallVector<std::pair<unsigned, int64_t>> undo;
-  undo.push_back({startTimeVariable, potentials[startTimeVariable]});
-  potentials[startTimeVariable] = t;
-  resetScratch();
-  touchedFlag[startTimeVariable] = 1;
-  predNode[startTimeVariable] = int(origin);
-  predLat[startTimeVariable] = t;
-  predDist[startTimeVariable] = 0;
-  chainLen[startTimeVariable] = 1;
-  inQueue[startTimeVariable] = 1;
-  if (auto cyc = relaxCore({startTimeVariable}, &undo)) {
-    for (auto &[node, old] : llvm::reverse(undo))
-      potentials[node] = old;
-    frozenVariables.pop_back();
-    if (conflictPins)
-      for (unsigned v : cyc->nodes)
-        if (frozenVariables.count(v))
-          conflictPins->push_back(v);
-    return failure();
-  }
-  return success();
-}
-
-unsigned SDCSchedulerBase::getStartTime(unsigned startTimeVariable) {
-  assert(startTimeVariable < origin);
-  if (const auto *it = frozenVariables.find(startTimeVariable);
-      it != frozenVariables.end())
-    return it->second;
-  assert(potentialsCurrent && "an unpinned start is read off a solved system");
-  return unsigned(potentials[startTimeVariable]);
-}
-
-SDCSchedulerBase::GraphState SDCSchedulerBase::saveState() {
-  return {frozenVariables, potentials, parameterT, potentialsCurrent};
-}
-
-void SDCSchedulerBase::restoreState(GraphState &saved) {
-  frozenVariables = std::move(saved.frozenVariables);
-  potentials = std::move(saved.potentials);
-  parameterT = saved.parameterT;
-  potentialsCurrent = saved.potentialsCurrent;
-}
-
-void SDCSchedulerBase::computeMargins(SmallVectorImpl<unsigned> &asap,
-                                      SmallVectorImpl<unsigned> &alap) {
-  assert(potentialsCurrent && "margins are read off a solved system");
-  unsigned nNodes = origin + 1;
-  for (unsigned stv = 0; stv < origin; ++stv)
-    asap[stv] = unsigned(potentials[stv]);
-
-  // g[i] = longest path i -> origin, i.e. `start(i) <= -g[i]`. Only upper
-  // bounds shape the greatest element: an edge u -> v of weight w relaxes
-  // g[u] against w + g[v], a pin's own upper edge starts its chain, and the
-  // temporary pin holds the last operation at its minimal start.
-  unsigned lastVar = startTimeVariables[lastOp];
-  constexpr int64_t kUnreached = std::numeric_limits<int64_t>::min();
-  SmallVector<int64_t> g(nNodes, kUnreached);
-  SmallVector<SmallVector<std::pair<unsigned, int64_t>, 4>> gOut(nNodes);
-  for (const Edge &e : edges)
-    gOut[e.dst].push_back(
-        {e.src, e.lat + e.extra - int64_t(parameterT) * e.dist});
-  for (auto &[v, t] : frozenVariables)
-    gOut[origin].push_back({v, -int64_t(t)});
-  gOut[origin].push_back({lastVar, -potentials[lastVar]});
-
-  g[origin] = 0;
-  chainLen.assign(nNodes, 0);
-  inQueue.assign(nNodes, 0);
-  SmallVector<unsigned> queue{origin};
-  inQueue[origin] = 1;
-  for (unsigned head = 0; head < queue.size(); ++head) {
-    unsigned u = queue[head];
-    inQueue[u] = 0;
-    for (auto [dst, w] : gOut[u]) {
-      int64_t ng = g[u] + w;
-      if (ng <= g[dst])
-        continue;
-      g[dst] = ng;
-      chainLen[dst] = chainLen[u] + 1;
-      assert(chainLen[dst] <= nNodes &&
-             "the solved system has no positive circuit, so no chain repeats");
-      if (!inQueue[dst]) {
-        inQueue[dst] = 1;
-        queue.push_back(dst);
-      }
-    }
-  }
-  for (unsigned stv = 0; stv < origin; ++stv) {
-    assert(g[stv] != kUnreached &&
-           "every operation is bounded above through the anchor");
-    assert(-g[stv] >= potentials[stv] &&
-           "the two lattice extremes are ordered");
-    alap[stv] = unsigned(-g[stv]);
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// SharedOperatorsSimplexScheduler
-//===----------------------------------------------------------------------===//
-
-/// The limited units \p op holds, in link order. An operation takes all of them
-/// at its start time and releases them together, so a cycle is feasible for it
-/// only if every one has room. An unlimited link is dropped: it constrains
-/// nothing, so no reservation table tracks it.
-static SmallVector<Problem::ResourceType>
-limitedUnits(SharedOperatorsProblem &prob, Operation *op) {
-  auto maybeRsrcs = prob.getLinkedResourceTypes(op);
-  assert(maybeRsrcs && "operation must have linked resource types");
-  SmallVector<Problem::ResourceType> units;
-  for (Problem::ResourceType rsrc : *maybeRsrcs)
-    if (prob.getLimit(rsrc).value_or(0) > 0)
-      units.push_back(rsrc);
-  return units;
-}
-
-LogicalResult SharedOperatorsSimplexScheduler::schedule() {
-  if (failed(checkLastOp()))
-    return failure();
-
-  parameterT = 0;
-  buildGraph();
-
-  if (failed(solveGraph(/*allowRaise=*/false))) {
-    reportInfeasible();
-    return failure();
+/// Solves one function's schedule. Holds the analysis, device, model and
+/// options every method needs, instead of threading them through each
+/// signature.
+///
+/// One instance per function, no longer lived than the `DependenceAnalysis` it
+/// is handed: the span composition reads that analysis after the solve.
+class FuncScheduler {
+public:
+  FuncScheduler(DependenceAnalysis &deps, const DeviceModel &dev,
+                ScheduleModel &model, float cycleTime,
+                const SchedulerOptions &opts, SlackLedger *ledger = nullptr,
+                const DenseMap<Operation *, int64_t> *grants = nullptr)
+      : deps(deps), dev(dev), model(model), cycleTime(cycleTime), opts(opts),
+        ledger(ledger), grants(grants) {
+    assert(!(ledger && grants) &&
+           "one pass collects slack, the other consumes it");
   }
 
-  // Heuristic phase: greedily fix start times for shared-operator ops within
-  // allocation limits, the least solution updated with each pin. Each state
-  // is optimal given prior fixes; overall optimality is not guaranteed.
+  /// Consume this function's assumption hints, solve its regions, and publish
+  /// what the whole kernel costs.
+  LogicalResult run(func::FuncOp funcOp);
 
-  auto &ops = prob.getOperations();
-  SmallVector<Operation *> limitedOps;
-  for (auto *op : ops)
-    if (prob.holdsLimitedUnit(op))
-      limitedOps.push_back(op);
+private:
+  // The hints the analysis has already distilled, erased before any problem is
+  // built.
+  void eraseHint(RewriterBase &b, Operation *op);
+  void consumeHints(func::FuncOp funcOp);
 
-  // Placement order: earliest first, then the largest reservation first among
-  // operations starting at the same time. Earliest-first is a topological
-  // order, which keeps the acyclic problem feasible under pinning; the scan
-  // below is first fit over rectangles, which needs largest-first to behave.
-  // Slack cannot break the tie further: with dependences the only constraints,
-  // an operation without an outgoing one (any store) is unbounded above.
-  auto rectangle = [&](Operation *op) {
-    return prob.getResourceCycles(op) * prob.getResourceDemand(op);
-  };
-  llvm::stable_sort(limitedOps, [&](Operation *a, Operation *b) {
-    unsigned ta = getStartTime(startTimeVariables[a]);
-    unsigned tb = getStartTime(startTimeVariables[b]);
-    if (ta != tb)
-      return ta < tb;
-    return rectangle(a) > rectangle(b);
-  });
+  // The IR walk: a block into regions, a region onto the problem that fits it.
+  LogicalResult scheduleBlock(Block &block);
+  LogicalResult scheduleRegion(const SchedRegion &region);
 
-  // Store the number of operations using a resource type in a particular time
-  // step.
-  SmallDenseMap<Problem::ResourceType, SmallDenseMap<unsigned, unsigned>>
-      reservationTable;
+  // One region, one solve.
+  LogicalResult scheduleCyclic(LoopLikeOpInterface body,
+                               const SchedRegion &region, unsigned minII,
+                               unsigned maxII, bool pipelined);
+  LogicalResult scheduleWhile(scf::WhileOp w, const SchedRegion &region);
+  LogicalResult scheduleWhileCondition(scf::WhileOp w);
+  LogicalResult scheduleAcyclic(ArrayRef<Operation *> ops, bool ownsRegion);
 
-  for (auto *op : limitedOps) {
-    SmallVector<Problem::ResourceType> units = limitedUnits(prob, op);
-    assert(!units.empty() && "a limited operation holds a limited unit");
+  // What a solve leaves behind: the schedule, the allocation, the measurement.
+  // A region's own `RegionSolution` is the caller's: it is what that path
+  // decided, and one path decides none (see `scheduleAcyclic`).
+  void annotateStarts(circt::scheduling::ChainingProblem &problem);
+  void annotateAllocation(OccupancyProblem &problem);
+  int64_t regionArea(OccupancyProblem &problem, const SpanObjective &span,
+                     int64_t ii);
+  void recordSolve(OccupancyProblem &problem, StringRef kind,
+                   std::optional<unsigned> ii, Stopwatch since);
 
-    // Find the first time step (from the current start time) where every unit
-    // the op holds is free for its whole occupancy window (occ consecutive
-    // cycles; occ == 1 when pipelined).
-    unsigned occ = prob.getResourceCycles(op);
-    unsigned slots = prob.getResourceDemand(op);
-    unsigned startTimeVar = startTimeVariables[op];
-    unsigned candTime = getStartTime(startTimeVar);
-    auto hasRoom = [&](unsigned t) {
-      for (Problem::ResourceType rsrc : units) {
-        unsigned limit = *prob.getLimit(rsrc);
-        for (unsigned i = 0; i < occ; ++i)
-          if (reservationTable[rsrc].lookup(t + i) + slots > limit)
-            return false;
-      }
-      return true;
-    };
-    while (!hasRoom(candTime))
-      ++candTime;
+  // The second walk: the solved tree composed into one kernel span.
+  std::optional<SpanNode> buildSpanNode(const SchedRegion &region);
+  std::vector<SpanNode> buildSpanNodes(Block &body);
+  void recordTripBounds(func::FuncOp funcOp);
+  void publishKernelLatency(func::FuncOp funcOp);
 
-    // Fix the start time. As explained above, this cannot make the problem
-    // infeasible.
-    auto fixed = scheduleAt(startTimeVar, candTime);
-    assert(succeeded(fixed));
-    (void)fixed;
+  // The slack pass (area objective, pass 1 of two): what this func's
+  // composition leaves free, banked into `ledger`.
+  void collectCallSlack(ChainingSharedOperatorsProblem &problem,
+                        ArrayRef<Operation *> ops);
+  void collectSiblingSlack(ArrayRef<SpanNode> nodes,
+                           ArrayRef<SchedRegion> regions,
+                           ArrayRef<SmallVector<unsigned, 2>> preds);
 
-    // Record the use of every unit across the occupancy window.
-    for (Problem::ResourceType rsrc : units)
-      for (unsigned i = 0; i < occ; ++i)
-        reservationTable[rsrc][candTime + i] += slots;
-  }
+  DependenceAnalysis &deps;
+  const DeviceModel &dev;
+  ScheduleModel &model;
+  float cycleTime;
+  const SchedulerOptions &opts;
+  /// Pass 1: collect slack here. Pass 2: consume `grants`. Never both.
+  SlackLedger *ledger;
+  const DenseMap<Operation *, int64_t> *grants;
+};
 
-  assert(parameterT == 0);
+} // namespace
 
-  for (auto *op : ops)
-    prob.setStartTime(op, getStartTime(startTimeVariables[op]));
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// ModuloSimplexScheduler
-//===----------------------------------------------------------------------===//
-
-LogicalResult ModuloSimplexScheduler::checkLastOp() {
-  if (failed(SDCSchedulerBase::checkLastOp()))
-    return failure();
-
-  // Determine which operations have no outgoing *intra*-iteration dependences.
-  auto &ops = prob.getOperations();
-  DenseSet<Operation *> sinks(ops.begin(), ops.end());
-  for (auto *op : ops)
-    for (auto &dep : prob.getDependences(op))
-      if (prob.getDistance(dep).value_or(0) == 0)
-        sinks.erase(dep.getSource());
-
-  if (!sinks.contains(lastOp)) {
-    assert(false && "the problem's last operation is not a sink; "
-                    "ProblemBuilder anchors it, so no input can reach this");
-    return failure();
-  }
-  if (sinks.size() > 1) {
-    assert(false && "the problem has several sinks; ProblemBuilder anchors "
-                    "exactly one, so no input can reach this");
-    return failure();
-  }
-
-  return success();
-}
-
-LogicalResult ModuloSimplexScheduler::MRT::enter(Operation *op,
-                                                 unsigned timeStep) {
-  SmallVector<Problem::ResourceType> units = limitedUnits(sched.prob, op);
-  assert(!units.empty() && "a limited operation holds a limited unit");
-
-  // A non-pipelined op occupies `occ` consecutive modulo slots; a window wider
-  // than II wraps, hitting one slot twice, which a per-slot set would hide. The
-  // window is the same on every unit, all taken at the op's start time.
-  unsigned occ = sched.prob.getResourceCycles(op);
-  unsigned slots = sched.prob.getResourceDemand(op);
-  unsigned base = timeStep % sched.parameterT;
-  SmallDenseMap<unsigned, unsigned> want;
-  for (unsigned i = 0; i < occ; ++i)
-    want[(base + i) % sched.parameterT] += slots;
-
-  // Admit only if every touched slot of every unit fits, then commit to all of
-  // them: an op that fits in one unit but not another must leave no partial
-  // reservation behind.
-  for (Problem::ResourceType rsrc : units) {
-    auto &table = tables[rsrc];
-    for (const auto &[slot, cnt] : want)
-      if (table.lookup(slot) + cnt > *sched.prob.getLimit(rsrc))
-        return failure();
-  }
-  for (Problem::ResourceType rsrc : units) {
-    auto &table = tables[rsrc];
-    for (const auto &[slot, cnt] : want)
-      table[slot] += cnt;
-    auto &revTab = reverseTables[rsrc];
-    assert(!revTab.count(op));
-    revTab[op] = base;
-  }
-  return success();
-}
-
-void ModuloSimplexScheduler::MRT::release(Operation *op) {
-  unsigned occ = sched.prob.getResourceCycles(op);
-  unsigned slots = sched.prob.getResourceDemand(op);
-  // Undo enter's per-slot increments on every unit it reserved, recomputed from
-  // the stored base + occ so a wrapped slot is decremented once per lap. The
-  // reverse tables record exactly the units entered, unlimited links skipped.
-  bool held = false;
-  for (auto &[rsrc, revTab] : reverseTables) {
-    auto it = revTab.find(op);
-    if (it == revTab.end())
+/// Record the solved schedule in \p model: every registered op's start cycle
+/// and sub-cycle start, and any realization an exact solve moved off the
+/// library's own pick. The decision travels as the op's linked operator type
+/// (an IP row's type name is its symbol), so a linked name that differs from
+/// what `lookup` resolves is the solver's selection.
+void FuncScheduler::annotateStarts(
+    circt::scheduling::ChainingProblem &problem) {
+  for (Operation *op : problem.getOperations()) {
+    std::optional<unsigned> start = problem.getStartTime(op);
+    if (!start)
       continue;
-    auto &table = tables[rsrc];
-    for (unsigned i = 0; i < occ; ++i) {
-      unsigned &cnt = table[(it->second + i) % sched.parameterT];
-      assert(cnt >= slots && "releasing an MRT slot that was never reserved");
-      cnt -= slots;
-    }
-    revTab.erase(it);
-    held = true;
-  }
-  assert(held && "releasing an operation that holds no unit");
-  (void)held;
-}
-
-void ModuloSimplexScheduler::updateMargins() {
-  computeMargins(asapTimes, alapTimes);
-}
-
-/// Tries `n` at its current time step and the II-1 slots after it. When none
-/// admits it, repairs the placement by evicting blockers
-/// (`scheduleWithEviction`); failure past that is the caller's cue to grow
-/// the II and restart placement.
-LogicalResult ModuloSimplexScheduler::scheduleOperation(Operation *n) {
-  unsigned stvN = startTimeVariables[n];
-
-  // Try the op's current time step in the partial solution and the II-1
-  // following ones. A later step may increase the overall latency, but that is
-  // preferred over incrementing the II to resolve resource conflicts.
-  unsigned stN = getStartTime(stvN);
-  unsigned ubN = stN + parameterT - 1;
-
-  LLVM_DEBUG(dbgs() << "Attempting to schedule in [" << stN << ", " << ubN
-                    << "]: " << *n << '\n');
-
-  for (unsigned ct = stN; ct <= ubN; ++ct)
-    if (succeeded(mrt.enter(n, ct))) {
-      auto fixedN = scheduleAt(stvN, ct);
-      if (succeeded(fixedN)) {
-        LLVM_DEBUG(dbgs() << "Success at t=" << ct << " " << *n << '\n');
-        return success();
-      }
-      // Problem became infeasible with `n` at `ct`, roll back the MRT
-      // assignment. Also, no later time can be feasible, so stop the search
-      // here.
-      mrt.release(n);
-      break;
-    }
-
-  // `n` does not fit at this II: repair the placement by evicting blockers.
-  // Failure here means the repair budget could not buy a slot either.
-  return scheduleWithEviction(n);
-}
-
-/// How often `slot` falls inside a reservation window of `occ` cycles starting
-/// at `base`, modulo `ii`: a window wider than the II wraps and can hold one
-/// slot more than once.
-static unsigned slotCoverage(unsigned base, unsigned occ, unsigned slot,
-                             unsigned ii) {
-  unsigned m = 0;
-  for (unsigned i = 0; i < occ; ++i)
-    if ((base + i) % ii == slot)
-      ++m;
-  return m;
-}
-
-/// Repairs a failed placement at the current II: choose a start in the same
-/// window first fit scanned, evict the placed operations blocking it (their
-/// reservations first, then the pins a certifying cycle names), and pin `n`
-/// there. Victims return to `unscheduled` to be placed again. The
-/// per-operation cap and the region budget keep the repair finite; once they
-/// are spent the caller grows the II exactly as without repair.
-LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
-  if (evictionBudget == 0)
-    return failure();
-  unsigned stvN = startTimeVariables[n];
-  unsigned stN = getStartTime(stvN);
-  SmallVector<Problem::ResourceType> unitsN = limitedUnits(prob, n);
-  unsigned occN = prob.getResourceCycles(n);
-  unsigned slotsN = prob.getResourceDemand(n);
-  unsigned ii = parameterT;
-
-  auto evictable = [&](Operation *op) {
-    return evictCount.lookup(op) < kMaxEvictionsPerOp;
-  };
-
-  // The holders of each unit `n` needs, least-evicted first with problem
-  // order breaking ties, so victim choice is deterministic and a contested
-  // pair runs out of budget instead of cycling.
-  SmallDenseMap<Problem::ResourceType,
-                SmallVector<std::pair<Operation *, unsigned>>>
-      holders;
-  for (Problem::ResourceType rsrc : unitsN) {
-    auto &hs = holders[rsrc];
-    hs.assign(mrt.reverseTables[rsrc].begin(), mrt.reverseTables[rsrc].end());
-    llvm::sort(hs, [&](auto &a, auto &b) {
-      unsigned ea = evictCount.lookup(a.first);
-      unsigned eb = evictCount.lookup(b.first);
-      if (ea != eb)
-        return ea < eb;
-      return startTimeVariables[a.first] < startTimeVariables[b.first];
-    });
-  }
-
-  // For every start in the window, the placed operations whose reservations
-  // must leave for `n`'s whole occupancy window to fit there. A start whose
-  // deficit the evictable holders cannot cover is skipped.
-  struct Candidate {
-    unsigned ct;
-    unsigned cost;
-    SmallVector<Operation *> victims;
-  };
-  SmallVector<Candidate> cands;
-  for (unsigned ct = stN; ct < stN + ii; ++ct) {
-    SmallDenseMap<unsigned, unsigned> want;
-    for (unsigned i = 0; i < occN; ++i)
-      want[(ct + i) % ii] += slotsN;
-
-    SmallVector<Operation *> victims;
-    SmallPtrSet<Operation *, 8> taken;
-    unsigned cost = 0;
-    bool feasible = true;
-    for (Problem::ResourceType rsrc : unitsN) {
-      unsigned limit = *prob.getLimit(rsrc);
-      auto &table = mrt.tables[rsrc];
-      auto &revTab = mrt.reverseTables[rsrc];
-      for (auto [slot, need] : want) {
-        // What already-chosen victims free in this slot counts against the
-        // deficit; a victim may hold several of `n`'s units at once.
-        unsigned freed = 0;
-        for (Operation *v : victims)
-          if (auto it = revTab.find(v); it != revTab.end())
-            freed +=
-                slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
-                prob.getResourceDemand(v);
-        while (table.lookup(slot) + need > limit + freed) {
-          Operation *pick = nullptr;
-          unsigned mult = 0;
-          for (auto &[op, base] : holders[rsrc]) {
-            if (taken.count(op) || !evictable(op))
-              continue;
-            mult = slotCoverage(base, prob.getResourceCycles(op), slot, ii);
-            if (mult) {
-              pick = op;
-              break;
-            }
-          }
-          if (!pick) {
-            feasible = false;
-            break;
-          }
-          taken.insert(pick);
-          victims.push_back(pick);
-          freed += mult * prob.getResourceDemand(pick);
-          cost += 1 + evictCount.lookup(pick);
-        }
-        if (!feasible)
-          break;
-      }
-      if (!feasible)
-        break;
-    }
-    if (feasible && victims.size() <= evictionBudget)
-      cands.push_back({ct, cost, std::move(victims)});
-  }
-
-  // Cheapest victim set first, earliest start breaking ties.
-  llvm::stable_sort(cands, [](const Candidate &a, const Candidate &b) {
-    return std::tie(a.cost, a.ct) < std::tie(b.cost, b.ct);
-  });
-
-  unsigned attempts = std::min<size_t>(cands.size(), kMaxCommitAttempts);
-  for (unsigned c = 0; c < attempts; ++c) {
-    Candidate &cand = cands[c];
-    GraphState saved = saveState();
-    auto savedTables = mrt.tables;
-    auto savedReverse = mrt.reverseTables;
-    SmallVector<Operation *> evicted;
-    auto evict = [&](Operation *v) {
-      mrt.release(v);
-      frozenVariables.erase(startTimeVariables[v]);
-      evicted.push_back(v);
-    };
-    auto resolve = [&] {
-      LogicalResult r = solveGraph(/*allowRaise=*/false);
-      assert(succeeded(r) && "removing pins keeps the system feasible");
-      (void)r;
-    };
-    for (Operation *v : cand.victims)
-      evict(v);
-    if (!evicted.empty())
-      resolve();
-    LogicalResult entered = mrt.enter(n, cand.ct);
-    assert(succeeded(entered) && "the victim set frees the whole window");
-    (void)entered;
-
-    // A pin failure certifies a cycle through other pins; evict those too and
-    // retry, a bounded number of rounds.
-    bool placed = false;
-    for (unsigned round = 0; round < kMaxDepRounds; ++round) {
-      SmallVector<unsigned> conflicts;
-      if (succeeded(scheduleAt(stvN, cand.ct, &conflicts))) {
-        placed = true;
-        break;
-      }
-      if (conflicts.empty() ||
-          evicted.size() + conflicts.size() > evictionBudget ||
-          !llvm::all_of(conflicts,
-                        [&](unsigned v) { return evictable(varOps[v]); }))
-        break;
-      for (unsigned v : conflicts)
-        evict(varOps[v]);
-      resolve();
-    }
-    if (placed) {
-      for (Operation *v : evicted) {
-        llvm::erase(scheduled, v);
-        unscheduled.push_back(v);
-        ++evictCount[v];
-      }
-      evictionBudget -= evicted.size();
-      info(Stage::Sched, n)
-          << "Placement repair at II=" << ii << ": evicted " << evicted.size()
-          << " operation(s) so " << n->getName().getStringRef()
-          << " can start at t=" << cand.ct;
-      return success();
-    }
-    restoreState(saved);
-    mrt.tables = std::move(savedTables);
-    mrt.reverseTables = std::move(savedReverse);
-  }
-  return failure();
-}
-
-/// Grows the II by one and restarts placement from scratch at the larger
-/// interval, after Rau: pins made at the smaller II would otherwise strand
-/// evicted victims on late slots in the new one. The caller's worklist loop
-/// re-places every limited operation with a fresh reservation table and repair
-/// budget.
-LogicalResult ModuloSimplexScheduler::growIIAndRestart(Operation *n) {
-  ++parameterT;
-  // Every op fits in a disjoint window by II=totalResourceCycles; 2x+2 leaves
-  // slack for cross-window fragmentation. Past that, growth is not
-  // converging: a scheduler limit, not a fact about the kernel.
-  if (parameterT > 2 * static_cast<int>(totalResourceCycles) + 2) {
-    // Where the compile stops on the default path, and only advice when an
-    // exact solver is going to place the region itself.
-    auto d = placementAdvisory
-                 ? warn(Stage::Sched, n)
-                 : unsupported(Stage::Sched, Code::PlacementFailed, n);
-    d << "The modulo scheduler could not place " << n->getName().getStringRef()
-      << " at any initiation interval tried (up to II=" << parameterT
-      << "): resource placement is greedy with a budgeted eviction repair, "
-         "and neither found this operation a feasible cycle";
-    if (placementAdvisory)
-      d << "; the exact scheduler places the region instead";
-    else
-      d << ". Partitioning the array it contends for, or reducing how many "
-           "times one iteration accesses that array, gives the placement "
-           "room";
-    return failure();
-  }
-  info(Stage::Sched, n) << "II=" << parameterT - 1 << " is not achievable for "
-                        << n->getName().getStringRef()
-                        << "; restarting placement at II=" << parameterT;
-  frozenVariables.clear();
-  mrt.clear();
-  scheduled.clear();
-  unscheduled.clear();
-  for (auto *op : prob.getOperations())
-    if (prob.holdsLimitedUnit(op))
-      unscheduled.push_back(op);
-  evictCount.clear();
-  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
-  LogicalResult solved = solveGraph(/*allowRaise=*/true);
-  assert(succeeded(solved) &&
-         "the pin-free system was feasible at a smaller II");
-  return solved;
-}
-
-int64_t ModuloSimplexScheduler::depAsapOf(unsigned stv) {
-  // The longest path from the origin to `stv` over the dependence edges alone
-  // (its own pin excluded), read off the current potentials. A pin above this
-  // was not forced by dependences but by first fit taking a free-but-high slot.
-  int64_t d = 0;
-  for (const Edge &e : edges)
-    if (e.dst == stv) {
-      int64_t c =
-          potentials[e.src] + e.lat + e.extra - int64_t(parameterT) * e.dist;
-      d = std::max(d, c);
-    }
-  return d;
-}
-
-bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
-                                          unsigned &budget) {
-  Operation *crit = varOps[stvX];
-  SmallVector<Problem::ResourceType> unitsX = limitedUnits(prob, crit);
-  unsigned occX = prob.getResourceCycles(crit);
-  unsigned slotsX = prob.getResourceDemand(crit);
-  unsigned ii = parameterT;
-
-  // Release crit and let its start fall to the dependence bound.
-  mrt.release(crit);
-  frozenVariables.erase(stvX);
-  {
-    LogicalResult r = solveGraph(/*allowRaise=*/false);
-    assert(succeeded(r) && "removing a pin keeps the system feasible");
-    (void)r;
-  }
-  auto repin = [&] {
-    LogicalResult e = mrt.enter(crit, oldPin);
-    assert(succeeded(e) && "the slot crit just vacated still fits it");
-    (void)e;
-    LogicalResult p = scheduleAt(stvX, oldPin);
-    assert(succeeded(p) && "crit's old pin is still feasible");
-    (void)p;
-  };
-  unsigned lo = getStartTime(stvX);
-  if (lo >= oldPin) {
-    repin();
-    return false;
-  }
-
-  // The lowest class in [lo, oldPin) crit fits after evicting the holders that
-  // stand in its way.
-  SmallVector<Operation *> victims;
-  unsigned chosen = oldPin;
-  for (unsigned ct = lo; ct < oldPin && chosen == oldPin; ++ct) {
-    SmallDenseMap<unsigned, unsigned> want;
-    for (unsigned i = 0; i < occX; ++i)
-      want[(ct + i) % ii] += slotsX;
-    SmallVector<Operation *> vic;
-    SmallPtrSet<Operation *, 8> taken;
-    bool feasible = true;
-    for (Problem::ResourceType rsrc : unitsX) {
-      unsigned limit = *prob.getLimit(rsrc);
-      auto &table = mrt.tables[rsrc];
-      auto &revTab = mrt.reverseTables[rsrc];
-      // Victim order must be deterministic: the reverse table is keyed by
-      // pointer, so problem order sorts the holders the way
-      // scheduleWithEviction does before a scan.
-      SmallVector<std::pair<Operation *, unsigned>> sortedHolders(
-          revTab.begin(), revTab.end());
-      llvm::sort(sortedHolders, [&](auto &a, auto &b) {
-        return startTimeVariables[a.first] < startTimeVariables[b.first];
-      });
-      for (auto [slot, need] : want) {
-        unsigned freed = 0;
-        for (Operation *v : vic)
-          if (auto it = revTab.find(v); it != revTab.end())
-            freed +=
-                slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
-                prob.getResourceDemand(v);
-        while (table.lookup(slot) + need > limit + freed) {
-          Operation *pick = nullptr;
-          unsigned mult = 0;
-          for (auto &[op, base] : sortedHolders) {
-            // Any evictable holder is a candidate victim; re-placing it may
-            // land it in another low class at the same time (a swap), so the
-            // final span check, not a slack pre-filter, is what rejects a move
-            // that would raise the span.
-            if (taken.count(op) || evictCount.lookup(op) >= kMaxEvictionsPerOp)
-              continue;
-            mult = slotCoverage(base, prob.getResourceCycles(op), slot, ii);
-            if (mult) {
-              pick = op;
-              break;
-            }
-          }
-          if (!pick) {
-            feasible = false;
-            break;
-          }
-          taken.insert(pick);
-          vic.push_back(pick);
-          freed += mult * prob.getResourceDemand(pick);
-        }
-        if (!feasible)
-          break;
-      }
-      if (!feasible)
-        break;
-    }
-    if (feasible && vic.size() <= budget) {
-      chosen = ct;
-      victims = std::move(vic);
+    // A child loop is scheduled as its own region and a terminator carries no
+    // compute. Neither is recorded, though both count toward the length.
+    if (isa<AffineForOp, scf::ForOp, scf::WhileOp>(op) ||
+        op->hasTrait<OpTrait::IsTerminator>())
+      continue;
+    model.setStart(op, *start);
+    if (std::optional<float> z = problem.getStartTimeInCycle(op))
+      model.setStartInCycle(op, *z);
+    if (usesExactScheduler(opts.kind) && !isSyncSubKernelCall(op) &&
+        !asMemAccess(op)) {
+      StringRef linked = problem.getLinkedOperatorType(op)->getValue();
+      if (linked != dev.operators.lookup(op).timing.typeName)
+        model.setSelectedImpl(op, linked);
     }
   }
-  if (chosen == oldPin) {
-    repin();
-    return false;
-  }
-
-  // Commit: evict the victims, seat crit low, then re-place the victims by
-  // first fit. Any failure leaves the state dirty for the caller to roll back.
-  for (Operation *v : victims) {
-    mrt.release(v);
-    frozenVariables.erase(startTimeVariables[v]);
-  }
-  {
-    LogicalResult r = solveGraph(/*allowRaise=*/false);
-    assert(succeeded(r) && "removing pins keeps the system feasible");
-    (void)r;
-  }
-  if (failed(mrt.enter(crit, chosen)))
-    return false;
-  if (failed(scheduleAt(stvX, chosen))) {
-    mrt.release(crit);
-    return false;
-  }
-  llvm::sort(victims, [&](Operation *a, Operation *b) {
-    unsigned va = startTimeVariables[a], vb = startTimeVariables[b];
-    return std::make_pair(getStartTime(va), va) <
-           std::make_pair(getStartTime(vb), vb);
-  });
-  for (Operation *v : victims) {
-    unsigned sv = getStartTime(startTimeVariables[v]);
-    bool placed = false;
-    for (unsigned cv = sv; cv < sv + ii; ++cv)
-      if (succeeded(mrt.enter(v, cv))) {
-        if (succeeded(scheduleAt(startTimeVariables[v], cv))) {
-          placed = true;
-          break;
-        }
-        mrt.release(v);
-      }
-    if (!placed)
-      return false;
-  }
-  budget -= victims.size();
-  ++evictCount[crit];
-  return true;
 }
 
-/// Hill-climbs the region span down after the placement loop: each pass lowers
-/// the highest critical op that first fit pushed above its dependence bound,
-/// keeping the move only when the last operation's start strictly drops. An
-/// already-span-optimal region has no such op, so the pass is a no-op and its
-/// schedule is left byte-identical.
-void ModuloSimplexScheduler::repairSpan() {
-  unsigned lastVar = startTimeVariables[lastOp];
-  unsigned budget = kMaxEvictionsPerOp * scheduled.size();
-  for (unsigned moves = 0; moves < kMaxSpanRepairMoves && budget > 0; ++moves) {
-    updateMargins();
-    int64_t span = potentials[lastVar];
+// Publish the solved allocation into \p model: one entry per instance the
+// region builds, and the instance each operation runs on. Every operation on an
+// allocated resource carries one: `applyAllocation` derives them alongside the
+// counts it sets, and `verifyAllocation` has already failed the solve where one
+// is missing.
+void FuncScheduler::annotateAllocation(OccupancyProblem &problem) {
+  for (circt::scheduling::Problem::ResourceType rsrc :
+       problem.getResourceTypes()) {
+    std::optional<unsigned> units = problem.getAllocation(rsrc);
+    if (!units)
+      continue;
+    SmallVector<Operation *> users = problem.usersOf(rsrc);
+    assert(!users.empty() && "an allocated resource nothing runs on");
+    // One resource is one operator identity, so every operation on it names
+    // the same `dcp.operator`. A member whose row the solve decided names it
+    // through the recorded selection, not the library's own pick.
+    Operation *first = users.front();
+    const OpSchedule *at = model.scheduleOf(first);
+    OperatorChar oc = at && !at->selectedImpl.empty()
+                          ? dev.operators.lookup(first, at->selectedImpl)
+                          : dev.operators.lookup(first);
+    unsigned base = model.addUnits(oc.identity.ipSymbol, *units);
+    for (Operation *op : users)
+      model.setUnit(op, base + *problem.getAssignedUnit(op));
+  }
+}
 
-    // Critical pinned ops sitting above their dependence bound, highest first:
-    // lowering the top of the critical path frees the most.
-    SmallVector<std::pair<unsigned, unsigned>> cand; // (pin, stv)
-    for (auto &[stv, pin] : frozenVariables) {
-      if (alapTimes[stv] != asapTimes[stv])
+// What one solved region costs in the device's currency: the area objective's
+// own terms (`areaTerms`) evaluated on a settled schedule instead of built as
+// an expression, plus the rows that objective drops as a within-period
+// constant. Two probes of one kernel at different periods legalize to
+// different operations on different rows, so every realized operation is
+// priced here, not only the ones an allocation decides.
+//
+// \p ii is the interval the region runs at, which is what the emitter folds a
+// delay chain onto; zero for a straight-line span.
+int64_t FuncScheduler::regionArea(OccupancyProblem &problem,
+                                  const SpanObjective &span, int64_t ii) {
+  using circt::scheduling::Problem;
+  const OperatorLibrary &lib = dev.operators;
+  unsigned interval = static_cast<unsigned>(std::max<int64_t>(ii, 0));
+  int64_t area = 0;
+  // Instances and the muxes in front of them, at the count the solve decided.
+  // A solve that decided none leaves the schedule's own demand: the busiest
+  // congruence class, the floor sharing could reach at this interval.
+  llvm::SmallPtrSet<Operation *, 32> shared;
+  for (Problem::ResourceType rsrc : problem.getResourceTypes()) {
+    std::optional<OccupancyProblem::AllocatableUnit> unit =
+        problem.getAllocatable(rsrc);
+    if (!unit)
+      continue;
+    SmallVector<Operation *> users = problem.usersOf(rsrc);
+    shared.insert(users.begin(), users.end());
+    unsigned units =
+        problem.getAllocation(rsrc).value_or(problem.demandFor(rsrc, interval));
+    assert(units <= unit->ceiling && "an allocation builds no more than one "
+                                     "instance per operation");
+    area += unit->price[units];
+  }
+  // Everything else costs one instance of the row it was realized on.
+  for (Operation *op : problem.getOperations()) {
+    if (shared.contains(op) || isSyncSubKernelCall(op) || asMemAccess(op))
+      continue;
+    const OpSchedule *at = model.scheduleOf(op);
+    area += (at && !at->selectedImpl.empty() ? lib.lookup(op, at->selectedImpl)
+                                             : lib.lookup(op))
+                .price;
+  }
+  // The delay chain each value crosses its slack on, folded onto the region's
+  // phase at II > 1 exactly as the emitter builds it.
+  int64_t fold = std::max<int64_t>(ii, 1);
+  for (const RegisterTerm &term : span.regs) {
+    int64_t end = static_cast<int64_t>(*problem.getStartTime(term.def)) +
+                  problem.latencyOf(term.def);
+    int64_t depth = 0;
+    for (auto [reader, distance] : term.reads)
+      depth =
+          std::max(depth, static_cast<int64_t>(*problem.getStartTime(reader)) +
+                              distance * ii - end);
+    area += lib.chainPrice(llvm::divideCeil(depth, fold), term.width);
+  }
+  // One activation pulse chain, as deep as the deepest start rides it.
+  if (int64_t pulse = lib.pulsePrice()) {
+    int64_t deepest = 0;
+    for (Operation *op : problem.getOperations())
+      if (std::optional<unsigned> t = problem.getStartTime(op))
+        deepest = std::max(deepest, static_cast<int64_t>(*t));
+    area += deepest * pulse;
+  }
+  return area;
+}
+
+// The pipeline directive on the loop (or an enclosing loop up to the region
+// anchor), from `s.pipeline(ii=N)` -> `allo.pipeline.ii`:
+//   >= 1  requested target II: a lower bound on the achieved II
+//    0    auto: minimize the II (same as no directive)
+//   -1    pipelining disabled: schedule the loop non-pipelined
+// Absent => 0 (auto). The directive may sit on any level of a perfect nest.
+static int64_t pipelineDirective(Operation *loop, Operation *anchor) {
+  for (Operation *op = loop;; op = op->getParentOp()) {
+    if (auto attr = op->getAttrOfType<IntegerAttr>(kPipelineIIAttr))
+      return attr.getInt();
+    if (op == anchor || !op->getParentOp())
+      return 0;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Store->load forwarding: relaxing the RAW round trip through storage.
+//
+// A store commits `writeLatency` cycles after it issues, so a RAW edge holds a
+// dependent load that far behind it and a memory recurrence pins the II at the
+// full storage round trip. A shadow register pair (the store's address compared
+// against the load's at issue, the select and the store's datum registered to
+// the read latency, a 2:1 mux at the load's data out) serves the one case the
+// RAM cannot: the two issuing in the same cycle. The RAW edge then needs only
+// issue order, latency zero; the WAR/WAW edges stay, and they exclude every
+// collision the shadow must not serve.
+//===----------------------------------------------------------------------===//
+
+// The compare of the forward select: the two element addresses, at the
+// address width the array carries. Marginal over the register floor, like
+// every comb row.
+static double forwardCmpDelay(const OperatorLibrary &lib, Value root) {
+  auto shape = cast<MemRefType>(root.getType()).getShape();
+  int64_t words = 1;
+  for (int64_t s : shape)
+    words *= std::max<int64_t>(1, s);
+  int64_t width = std::max<int64_t>(1, llvm::Log2_64_Ceil(words));
+  if (std::optional<double> d = lib.measuredCombDelay(OpKind::Cmp, width))
+    return *d;
+  return lib.measuredCombDelay(OpKind::Cmp, 32).value_or(0.0);
+}
+
+// The auxiliary store->load edges of \p problem a forwarding network could
+// serve: both endpoints access one addressed, unskewed array whose write
+// commits in one cycle and whose read is registered (the shadow select and
+// datum ride that register), and both sit in one block, so they share a region
+// and its stall shell. The select's compare (each address cone plus one
+// equality, into the select register) must fit the period; the data mux is
+// priced in `relaxForwardableEdges`, where the arm count is known.
+static SmallVector<circt::scheduling::Problem::Dependence>
+forwardableEdges(ChainingModuloProblem &problem, const DeviceModel &dev,
+                 float cycleTime, float regFloor) {
+  using Dependence = circt::scheduling::Problem::Dependence;
+  SmallVector<Dependence> out;
+  for (Operation *op : problem.getOperations()) {
+    std::optional<MemAccess> load = asMemAccess(op);
+    if (!load || load->isWrite || load->kind != AccessKind::Array)
+      continue;
+    MemoryChar ch = characterize(load->root, dev.memory);
+    if (ch.unlimited() || ch.layout.skew())
+      continue;
+    MemKindTiming timing = dev.memory.timing(ch.storage);
+    if (timing.latency.read < 1 || timing.latency.write != 1)
+      continue;
+    double cmp = forwardCmpDelay(dev.operators, load->root);
+    if (regFloor + addressDelayOf(op, dev.operators) + cmp > cycleTime)
+      continue;
+    for (auto &dep : problem.getDependences(op)) {
+      if (!dep.isAuxiliary())
         continue;
-      if (depAsapOf(stv) < int64_t(pin))
-        cand.push_back({pin, stv});
+      Operation *src = dep.getSource();
+      std::optional<MemAccess> store = asMemAccess(src);
+      if (!store || !store->isWrite || store->root != load->root ||
+          src->getBlock() != op->getBlock())
+        continue;
+      if (regFloor + addressDelayOf(src, dev.operators) + cmp > cycleTime)
+        continue;
+      out.push_back(dep);
     }
-    llvm::sort(cand, [](auto &a, auto &b) {
-      return std::tie(b.first, a.second) < std::tie(a.first, b.second);
-    });
-
-    bool improved = false;
-    for (auto [pin, stv] : cand) {
-      GraphState saved = saveState();
-      auto savedTables = mrt.tables;
-      auto savedReverse = mrt.reverseTables;
-      unsigned tryBudget = budget;
-      if (trySeatLower(stv, pin, tryBudget) && potentials[lastVar] < span) {
-        info(Stage::Sched, varOps[stv])
-            << "Span repair at II=" << parameterT << ": moved "
-            << varOps[stv]->getName().getStringRef() << " from t=" << pin
-            << " to t=" << getStartTime(stv) << ", region span " << span
-            << " -> " << potentials[lastVar];
-        budget = tryBudget;
-        improved = true;
-        break;
-      }
-      restoreState(saved);
-      mrt.tables = std::move(savedTables);
-      mrt.reverseTables = std::move(savedReverse);
-    }
-    if (!improved)
-      break;
   }
+  return out;
 }
 
-unsigned ModuloSimplexScheduler::computeResMinII(BindingResource &binding) {
+// The recurrence graph of a modulo problem: one node per operation, one edge
+// per dependence, weighted by its source's latency and its iteration distance.
+// Both II questions below are positive-circuit searches over it, and both
+// weigh a forwarded edge at zero, so they share the weights by construction.
+namespace {
+struct RecurrenceGraph {
+  using Dependence = circt::scheduling::Problem::Dependence;
+  struct Edge {
+    unsigned src, dst;
+    int64_t lat, dist;
+    Dependence dep;
+  };
+
+  DenseMap<Operation *, unsigned> index;
+  SmallVector<Edge> edges;
+  /// Edges weighed at `-window` latency (0 when no window map names them);
+  /// `latSum` is taken over the set this was built with, and the walk below
+  /// reads it as it stands.
+  llvm::DenseSet<Dependence> zeroed;
+  const llvm::DenseMap<Dependence, unsigned> *windows = nullptr;
+  /// An II no circuit can exceed: the entry cut of every search below.
+  int64_t latSum = 1;
+  // The last relaxation's state, which the circuit walk reads.
+  SmallVector<int64_t> dist;
+  SmallVector<int> pred;
+  int lastMoved = -1;
+
+  RecurrenceGraph(ChainingModuloProblem &problem,
+                  const llvm::DenseSet<Dependence> &relaxed,
+                  const llvm::DenseMap<Dependence, unsigned> *windows = nullptr)
+      : zeroed(relaxed), windows(windows) {
+    for (Operation *op : problem.getOperations())
+      index.try_emplace(op, index.size());
+    for (Operation *op : problem.getOperations())
+      for (auto &dep : problem.getDependences(op)) {
+        int64_t lat = problem.separationOf(dep);
+        edges.push_back(
+            {index[dep.getSource()], index[op], lat,
+             static_cast<int64_t>(problem.getDistance(dep).value_or(0)), dep});
+        latSum += zeroed.contains(dep) ? 0 : std::max<int64_t>(lat, 0);
+      }
+  }
+
+  int64_t weightOf(const Edge &e) const {
+    if (!zeroed.contains(e.dep))
+      return e.lat;
+    return windows ? -static_cast<int64_t>(windows->lookup(e.dep)) : 0;
+  }
+
+  /// Whether the longest-path relaxation quiesces at \p ii, i.e. no positive
+  /// circuit survives it.
+  bool feasible(int64_t ii) {
+    dist.assign(index.size(), 0);
+    pred.assign(index.size(), -1);
+    lastMoved = -1;
+    for (unsigned round = 0; round <= index.size(); ++round) {
+      bool moved = false;
+      for (auto [i, e] : llvm::enumerate(edges)) {
+        int64_t w = dist[e.src] + weightOf(e) - ii * e.dist;
+        if (w > dist[e.dst]) {
+          dist[e.dst] = w;
+          pred[e.dst] = static_cast<int>(i);
+          lastMoved = static_cast<int>(e.dst);
+          moved = true;
+        }
+      }
+      if (!moved)
+        return true;
+    }
+    return false;
+  }
+
+  /// The smallest feasible II in [1, \p hi], binary searched.
+  int64_t smallestFeasibleII(int64_t hi) {
+    int64_t lo = 1;
+    while (lo < hi) {
+      int64_t mid = (lo + hi) / 2;
+      if (feasible(mid))
+        hi = mid;
+      else
+        lo = mid + 1;
+    }
+    return lo;
+  }
+};
+} // namespace
+
+// The smallest II no dependence circuit of \p problem excludes, with the edges
+// in \p relaxed weighed at zero latency. Chain breaks are not built yet, so
+// this is a floor, which is all the gate below compares.
+static unsigned recurrenceMinII(
+    ChainingModuloProblem &problem,
+    const llvm::DenseSet<circt::scheduling::Problem::Dependence> &relaxed,
+    const llvm::DenseMap<circt::scheduling::Problem::Dependence, unsigned>
+        *windows = nullptr) {
+  RecurrenceGraph graph(problem, relaxed, windows);
+  // A zero-distance positive circuit is infeasible at every II; the solve will
+  // fail and report it, so any answer here is moot.
+  if (!graph.feasible(graph.latSum))
+    return static_cast<unsigned>(graph.latSum);
+  return static_cast<unsigned>(graph.smallestFeasibleII(graph.latSum));
+}
+
+// The resource-min II of \p problem:
+// `ModuloSimplexScheduler::computeResMinII`'s arithmetic, asked before any
+// scheduler exists.
+static unsigned resourceMinII(ChainingModuloProblem &problem) {
+  using P = circt::scheduling::Problem;
   unsigned resMinII = 1;
-  SmallDenseMap<Problem::ResourceType, unsigned> uses;
-  SmallDenseMap<Problem::ResourceType, Operation *> witness;
-  for (auto *op : prob.getOperations()) {
-    auto maybeRsrcs = prob.getLinkedResourceTypes(op);
-    if (!maybeRsrcs)
+  DenseMap<P::ResourceType, unsigned> uses;
+  for (Operation *op : problem.getOperations()) {
+    auto rsrcs = problem.getLinkedResourceTypes(op);
+    if (!rsrcs)
       continue;
-
-    for (auto rsrc : *maybeRsrcs) {
-      if (prob.getLimit(rsrc).value_or(0) > 0) {
-        // occupancy: the whole window a non-pipelined unit is held for, times
-        // the units the operation holds at once
-        uses[rsrc] += prob.getResourceCycles(op) * prob.getResourceDemand(op);
-        // The operation list is in a stable order, so the witness a diagnostic
-        // points at is deterministic.
-        witness.try_emplace(rsrc, op);
-      }
-    }
+    for (P::ResourceType rsrc : *rsrcs)
+      if (problem.getLimit(rsrc).value_or(0) > 0)
+        uses[rsrc] +=
+            problem.getResourceCycles(op) * problem.getResourceDemand(op);
   }
-
-  // Integer ceil: enough parallel units to cover total occupancy in one II.
-  // (unsigned `a / b` floors, so an explicit integer ceil is needed once
-  // limit >= 2.)
-  for (auto pair : uses) {
-    unsigned limit = *prob.getLimit(pair.first);
-    unsigned need = (pair.second + limit - 1) / limit;
-    if (need <= resMinII)
-      continue;
-    resMinII = need;
-    binding = {pair.first, pair.second, limit, witness.lookup(pair.first)};
+  for (auto &[rsrc, demand] : uses) {
+    unsigned limit = *problem.getLimit(rsrc);
+    resMinII = std::max(resMinII, (demand + limit - 1) / limit);
   }
-
   return resMinII;
 }
 
-// Resource placement is greedy, so an II above the LP's bound may be the
-// problem's real minimum or just what the heuristic cost. On a bounded
-// budget the sigma/lap oracle can tell the two apart per interval: probe
-// the bound itself, then binary-search the gap downward, shipping the
-// lowest certified witness. Unknown keeps the heuristic schedule and the
-// honest warning below.
-DenseMap<Operation *, unsigned>
-ModuloSimplexScheduler::adjudicateIIGap(unsigned resMinII) {
-  DenseMap<Operation *, unsigned> oracleStarts;
-  bool floorRefuted = false, gapProven = false;
-  if (parameterT > static_cast<int>(lowerBoundII) &&
-      static_cast<int64_t>(scheduled.size()) * parameterT <= kOracleSizeGate) {
-    using mlir::allo::ModuloFeasibility;
-    auto probe = [&](unsigned t) {
-      mlir::allo::ModuloOracleResult r = mlir::allo::decideModuloFeasibility(
-          prob, additionalConstraints, t, kOracleProbeBudget);
-      info(Stage::Sched, prob.getContainingOp())
-          << "Oracle probe at II=" << t << ": "
-          << (r.verdict == ModuloFeasibility::Feasible     ? "feasible"
-              : r.verdict == ModuloFeasibility::Infeasible ? "infeasible"
-                                                           : "unknown")
-          << " after " << r.rounds << " round(s), " << format("%.2f", r.spent)
-          << " deterministic units (" << r.literals << " slot literals, "
-          << r.windowed << " ops windowed)";
-      return r;
-    };
-    unsigned lo = lowerBoundII, hi = parameterT, probes = 0;
-    if (hi - lo < kOracleMaxProbes) {
-      // A small gap scans linearly: every refuted interval extends the proven
-      // floor, so full coverage upgrades the warning into an optimality
-      // proof, with no monotonicity assumed.
-      unsigned provenTo = lo;
-      for (unsigned t = lo; t < hi && probes < kOracleMaxProbes; ++t) {
-        mlir::allo::ModuloOracleResult r = probe(t);
-        ++probes;
-        if (r.verdict == ModuloFeasibility::Feasible) {
-          oracleStarts = std::move(r.starts);
-          hi = t;
-          break;
-        }
-        if (r.verdict != ModuloFeasibility::Infeasible)
-          break;
-        floorRefuted = true;
-        provenTo = t + 1;
-      }
-      gapProven =
-          oracleStarts.empty() && provenTo == static_cast<unsigned>(parameterT);
-    } else {
-      mlir::allo::ModuloOracleResult first = probe(lo);
-      ++probes;
-      if (first.verdict == ModuloFeasibility::Feasible) {
-        oracleStarts = std::move(first.starts);
-        hi = lo;
-      } else if (first.verdict == ModuloFeasibility::Infeasible) {
-        floorRefuted = true;
-        while (hi - lo > 1 && probes < kOracleMaxProbes) {
-          unsigned mid = lo + (hi - lo) / 2;
-          mlir::allo::ModuloOracleResult r = probe(mid);
-          ++probes;
-          if (r.verdict == ModuloFeasibility::Feasible) {
-            oracleStarts = std::move(r.starts);
-            hi = mid;
-          } else if (r.verdict == ModuloFeasibility::Infeasible) {
-            lo = mid;
-          } else {
-            break;
-          }
-        }
-      }
+// One relaxation: the edges it forwarded, and each re-linked load's original
+// operator type, so a failed solve can put everything back and run unrelaxed.
+struct ForwardRelaxation {
+  SmallVector<circt::scheduling::Problem::Dependence> edges;
+  SmallVector<std::pair<Operation *, circt::scheduling::Problem::OperatorType>>
+      originalTypes;
+};
+
+// The most pairs one problem relaxes outright. Every pair costs a compare, a
+// select chain and a datum chain, and relaxing hundreds floods the modulo
+// placement with same-cycle freedom the greedy search cannot place.
+constexpr size_t kMaxForwardPairs = 16;
+
+// The budget a body with more may-alias pairs than that spends on the circuits
+// binding the II (`selectCriticalPairs`). The walk stops by itself once the
+// recurrence no longer binds, so this is a backstop sized for an unrolled
+// read-modify-write rather than a target.
+constexpr size_t kMaxTargetedPairs = 64;
+
+// The candidate pairs worth the budget: walk the circuit that binds the II,
+// relax the candidate edges it carries, and repeat until the recurrence no
+// longer binds, a binding circuit carries none (the bound cannot drop past
+// that circuit whatever is forwarded), or the budget is spent.
+static SmallVector<circt::scheduling::Problem::Dependence>
+selectCriticalPairs(ChainingModuloProblem &problem,
+                    ArrayRef<circt::scheduling::Problem::Dependence> cands,
+                    unsigned floorII, size_t budget) {
+  using Dependence = circt::scheduling::Problem::Dependence;
+  RecurrenceGraph graph(problem, {});
+  llvm::DenseSet<Dependence> candSet(cands.begin(), cands.end());
+  if (!graph.feasible(graph.latSum))
+    return {}; // a zero-distance positive circuit; the solve will report it
+  int64_t hi = graph.latSum;
+  while (graph.zeroed.size() < budget) {
+    int64_t lo = graph.smallestFeasibleII(hi);
+    if (lo <= floorII)
+      break; // the recurrence no longer binds
+    // One positive circuit at lo - 1: every node reached backward from the
+    // last update has been updated itself, so the predecessor walk cannot
+    // fall off and must revisit a node, closing the circuit.
+    bool quiesced = graph.feasible(lo - 1);
+    assert(!quiesced && graph.lastMoved >= 0 &&
+           "the bound's own circuit is positive one step below it");
+    (void)quiesced;
+    SmallVector<unsigned> stamp(graph.index.size(), 0);
+    int x = graph.lastMoved;
+    while (!stamp[x]) {
+      stamp[x] = 1;
+      x = static_cast<int>(graph.edges[graph.pred[x]].src);
     }
-    if (!oracleStarts.empty()) {
-      info(Stage::Sched, prob.getContainingOp())
-          << "The placement gap was the heuristic's: a certified schedule "
-             "exists at II="
-          << hi << " (was II=" << parameterT << ", bound II=" << lowerBoundII
-          << "); shipping it";
-      parameterT = hi;
-    } else if (gapProven) {
-      info(Stage::Sched, prob.getContainingOp())
-          << "II=" << parameterT
-          << " is proven optimal: every interval down to the bound II="
-          << lowerBoundII << " is infeasible";
-    } else if (floorRefuted) {
-      info(Stage::Sched, prob.getContainingOp())
-          << "II=" << lo
-          << " is proven infeasible at this interval, so at least part of "
-             "the placement gap is the problem's";
+    SmallVector<Dependence> take;
+    int y = x;
+    do {
+      const RecurrenceGraph::Edge &e = graph.edges[graph.pred[y]];
+      if (candSet.contains(e.dep) && !graph.zeroed.contains(e.dep))
+        take.push_back(e.dep);
+      y = static_cast<int>(e.src);
+    } while (y != x);
+    if (take.empty())
+      break; // the bound runs through edges forwarding cannot serve
+    for (Dependence dep : take) {
+      if (graph.zeroed.size() >= budget)
+        break;
+      graph.zeroed.insert(dep);
     }
+    hi = lo;
   }
-  if (oracleStarts.empty() && !gapProven &&
-      parameterT > static_cast<int>(lowerBoundII)) {
-    prob.telemetry.heuristicIIGap = true;
-    warn(Stage::Sched, prob.getContainingOp())
-        << "Scheduled at II=" << parameterT
-        << " against a lower bound of II=" << lowerBoundII
-        << " (resource-min II=" << resMinII
-        << "): resource placement is a greedy heuristic, so this gap is not "
-           "known to be necessary";
-  }
-  return oracleStarts;
+  // In the candidates' own (deterministic) order.
+  SmallVector<Dependence> out;
+  for (Dependence dep : cands)
+    if (graph.zeroed.contains(dep))
+      out.push_back(dep);
+  return out;
 }
 
-/// Seeds the II at the larger of the resource-min II and the pipeline
-/// directive's floor, then iteratively fixes limited operations to time steps
-/// in earliest-first, least-slack-breaks-ties order. That order matters:
-/// pinning a consumer caps how late its operands may issue, and once a
-/// resource saturates at this II there is no cycle left for the last of them.
-LogicalResult ModuloSimplexScheduler::schedule() {
-  if (failed(checkLastOp()))
-    return failure();
-
-  // Seed the II at the resource-min II, but never below the pipeline
-  // directive's target; the search only grows it from there.
-  BindingResource binding;
-  unsigned resMinII = computeResMinII(binding);
-  parameterT = std::max(resMinII, minII);
-  info(Stage::Sched, prob.getContainingOp())
-      << "Initiation interval search seeded at II=" << parameterT
-      << " (resource-min II=" << resMinII
-      << ", pipeline-directive floor minII=" << minII << ")";
-  LLVM_DEBUG(dbgs() << "ResMinII = " << parameterT << " (minII=" << minII
-                    << ")\n");
-  buildGraph();
-  asapTimes.resize(startTimeVariables.size());
-  alapTimes.resize(startTimeVariables.size());
-
-  if (failed(solveGraph(/*allowRaise=*/true))) {
-    reportInfeasible();
-    return failure();
-  }
-  // The resource-free solve already raises the II to any loop-carried
-  // recurrence's minimum, so `parameterT` here is the best lower bound anything
-  // downstream can justify.
-  lowerBoundII = parameterT;
-  boundSettled = true;
-
-  // Report what set the bound, so it can be acted on: banking or replicating an
-  // array lowers a port-bound interval, reassociating a reduction lowers a
-  // recurrence-bound one.
-  if (lowerBoundII > 1) {
-    if (lowerBoundII > std::max(resMinII, minII))
-      info(Stage::Sched, prob.getContainingOp())
-          << "II cannot go below " << lowerBoundII
-          << " here: a loop-carried recurrence takes that long to come round";
-    else if (resMinII >= minII && binding.witness)
-      info(Stage::Sched, binding.witness)
-          << "II cannot go below " << resMinII << " here: one iteration takes "
-          << binding.demand << " slots of a resource serving " << binding.limit
-          << " per cycle. Banking or replicating what this access reaches is "
-             "what lowers that bound";
-  }
-
-  // Determine which operations are subject to resource constraints, and whether
-  // any of them is non-pipelined (occupies its unit for more than one cycle).
-  auto &ops = prob.getOperations();
-  for (auto *op : ops)
-    if (prob.holdsLimitedUnit(op)) {
-      unscheduled.push_back(op);
-      totalResourceCycles += prob.getResourceCycles(op);
-    }
-  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
-
-  // Main loop: iteratively fix limited operations to time steps. An operation
-  // that fits nowhere even after eviction repair grows the II and restarts
-  // the placement from scratch at the larger interval.
-  while (!unscheduled.empty()) {
-    // ASAP/ALAP margins, refreshed against the operations pinned so far.
-    updateMargins();
-
-    // Earliest-first, least slack breaking the tie (see the doc comment above).
-    auto priority = [&](Operation *op) {
-      unsigned stv = startTimeVariables[op];
-      return std::make_pair(asapTimes[stv], alapTimes[stv] - asapTimes[stv]);
-    };
-    auto *opIt = std::min_element(unscheduled.begin(), unscheduled.end(),
-                                  [&](Operation *opA, Operation *opB) {
-                                    return priority(opA) < priority(opB);
-                                  });
-    Operation *op = *opIt;
-    unscheduled.erase(opIt);
-
-    if (succeeded(scheduleOperation(op))) {
-      scheduled.push_back(op);
+// Relax the write-after-read (WAR) ordering edges of \p problem where the
+// storage permits: a write ordered after a read of the same array need only
+// miss the cycle the storage samples the array in, which is read latency - 1
+// after the read issues. Sound only on a row marked `read_first` (a LUT
+// RAM's asynchronous read returns old contents under a same-cycle write, in
+// hardware); a block RAM's cross-port same-address collision is undefined in
+// silicon, so its WAR edges keep the full read latency. Exact pairs only: on
+// a conservative pair a program-later store instance admitted into the
+// read's cycle could alias and be wrongly served by a forwarding arm.
+static void relaxWarEdges(ChainingModuloProblem &problem,
+                          DependenceAnalysis &deps, const DeviceModel &dev) {
+  for (Operation *op : problem.getOperations()) {
+    std::optional<MemAccess> sa = asMemAccess(op);
+    if (!sa || !sa->isWrite || sa->kind != AccessKind::Array)
       continue;
-    }
-    if (failed(growIIAndRestart(op)))
-      return failure();
-  }
-
-  // Lower the span where first fit left a critical op above its dependence
-  // bound. Only strictly-improving moves commit, so this never grows the II
-  // or the latency, and a span-optimal region is untouched.
-  repairSpan();
-
-  DenseMap<Operation *, unsigned> oracleStarts = adjudicateIIGap(resMinII);
-
-  prob.setInitiationInterval(parameterT);
-  for (auto *op : ops)
-    prob.setStartTime(op, oracleStarts.empty()
-                              ? getStartTime(startTimeVariables[op])
-                              : oracleStarts.at(op));
-
-  return success();
-}
-
-namespace mlir::allo {
-
-//===----------------------------------------------------------------------===//
-// OccupancyProblem / ModuloOccupancyProblem (declared in Scheduler.h): CIRCT's
-// resource problems with a per-operation occupancy window.
-//===----------------------------------------------------------------------===//
-
-LogicalResult OccupancyProblem::checkLatency(Operation *op) {
-  // Deliberately not SharedOperatorsProblem::checkLatency, which rejects a
-  // zero-latency operation on a limited resource. A combinational access holds
-  // its port for the cycle it issues in and contends like any other.
-  return Problem::checkLatency(op);
-}
-
-int64_t OccupancyProblem::latencyOf(Operation *op) {
-  std::optional<OperatorType> opr = getLinkedOperatorType(op);
-  assert(opr && "an operation the operator model never characterized");
-  std::optional<unsigned> latency = getLatency(*opr);
-  assert(latency && "an operator type with no latency");
-  return *latency;
-}
-
-int64_t OccupancyProblem::scheduleDepth() {
-  int64_t depth = 1;
-  for (Operation *op : getOperations())
-    if (std::optional<unsigned> start = getStartTime(op))
-      depth = std::max(depth, static_cast<int64_t>(*start) +
-                                  std::max<int64_t>(1, latencyOf(op)));
-  return depth;
-}
-
-bool OccupancyProblem::holdsLimitedUnit(Operation *op) {
-  auto linked = getLinkedResourceTypes(op);
-  return linked && llvm::any_of(*linked, [&](ResourceType rsrc) {
-           return getLimit(rsrc).value_or(0) > 0;
-         });
-}
-
-bool OccupancyProblem::holdsAllocatableUnit(Operation *op) {
-  auto linked = getLinkedResourceTypes(op);
-  return linked && llvm::any_of(*linked, [&](ResourceType rsrc) {
-           return getAllocatable(rsrc).has_value();
-         });
-}
-
-SmallVector<Operation *> OccupancyProblem::usersOf(ResourceType rsrc) {
-  SmallVector<Operation *> users;
-  for (Operation *op : getOperations())
-    if (usesResource(op, rsrc))
-      users.push_back(op);
-  llvm::stable_sort(users, [&](Operation *a, Operation *b) {
-    return *getStartTime(a) < *getStartTime(b);
-  });
-  return users;
-}
-
-unsigned OccupancyProblem::demandFor(ResourceType rsrc, unsigned ii) {
-  SmallDenseMap<unsigned, unsigned> used;
-  unsigned peak = 0;
-  for (Operation *op : getOperations()) {
-    if (!usesResource(op, rsrc))
-      continue;
-    unsigned start = *getStartTime(op);
-    unsigned slots = getResourceDemand(op);
-    for (unsigned k = 0, occ = getResourceCycles(op); k < occ; ++k) {
-      unsigned &cnt = used[ii ? (start + k) % ii : start + k];
-      cnt += slots;
-      peak = std::max(peak, cnt);
-    }
-  }
-  return peak;
-}
-
-void OccupancyProblem::assignUnits(unsigned ii) {
-  for (ResourceType rsrc : getResourceTypes()) {
-    std::optional<unsigned> units = getAllocation(rsrc);
-    if (!units)
-      continue;
-    SmallVector<Operation *> users = usersOf(rsrc);
-    // Both rules take the least loaded instance that is free, which spreads
-    // over all the instances rather than packing into the fewest that fit (the
-    // count decided is the count built) and aims the fullest instance at
-    // `ceil(k / units)`, the class size `AllocatableUnit::headroomNs` reserved
-    // a select for.
-    SmallVector<unsigned> load(*units, 0);
-    auto leastLoaded = [&](auto free) {
-      std::optional<unsigned> pick;
-      for (unsigned k = 0; k < *units; ++k)
-        if (free(k) && (!pick || load[k] < load[*pick]))
-          pick = k;
-      assert(pick && "the busiest congruence class or cycle needs more "
-                     "instances than the allocation decided");
-      ++load[*pick];
-      return *pick;
-    };
-    if (ii) {
-      // Occupancy is one cycle here, so an instance is available iff it is
-      // free in the operation's congruence class. A class of c members needs c
-      // distinct instances, so the fullest classes are placed first, while
-      // every instance is still free to take them; leaving one for last can
-      // force it onto an instance the balance has already filled.
-      llvm::SmallDenseMap<unsigned, unsigned> members;
-      for (Operation *op : users)
-        ++members[*getStartTime(op) % ii];
-      llvm::stable_sort(users, [&](Operation *a, Operation *b) {
-        return members.lookup(*getStartTime(a) % ii) >
-               members.lookup(*getStartTime(b) % ii);
-      });
-      llvm::DenseSet<std::pair<unsigned, unsigned>> taken;
-      for (Operation *op : users) {
-        unsigned cls = *getStartTime(op) % ii;
-        unsigned k =
-            leastLoaded([&](unsigned u) { return !taken.count({u, cls}); });
-        taken.insert({k, cls});
-        assignedUnit[op] = k;
-      }
-    } else {
-      // An instance is available iff its occupancy window has closed by the
-      // operation's start.
-      SmallVector<unsigned> freeAt(*units, 0);
-      for (Operation *op : users) {
-        unsigned start = *getStartTime(op);
-        unsigned k =
-            leastLoaded([&](unsigned u) { return freeAt[u] <= start; });
-        assignedUnit[op] = k;
-        freeAt[k] = start + getResourceCycles(op);
-      }
-    }
-  }
-}
-
-LogicalResult OccupancyProblem::verifyAllocation(unsigned ii) {
-  for (ResourceType rsrc : getResourceTypes()) {
-    std::optional<unsigned> units = getAllocation(rsrc);
-    if (!units)
-      continue; // no solve decided one, so the trivial allocation stands
-    // (instance, cycle) pairs already taken.
-    llvm::DenseSet<std::pair<unsigned, unsigned>> busy;
-    for (Operation *op : getOperations()) {
-      if (!usesResource(op, rsrc))
+    for (auto &dep : problem.getDependences(op)) {
+      if (!dep.isAuxiliary())
         continue;
-      std::optional<unsigned> unit = getAssignedUnit(op);
-      if (!unit || *unit >= *units) {
-        assert(false && "an operation on an allocated operator has no instance "
-                        "to run on, or one past the count decided");
-        return failure();
-      }
-      unsigned start = *getStartTime(op);
-      for (unsigned k = 0, occ = getResourceCycles(op); k < occ; ++k)
-        if (!busy.insert({*unit, ii ? (start + k) % ii : start + k}).second) {
-          assert(false && "two operations share one operator instance in the "
-                          "same cycle");
-          return failure();
-        }
+      std::optional<MemAccess> la = asMemAccess(dep.getSource());
+      if (!la || la->isWrite || la->kind != AccessKind::Array ||
+          la->root != sa->root)
+        continue;
+      if (!deps.isExactPair(dep.getSource(), op))
+        continue;
+      MemoryChar ch = characterize(la->root, dev.memory);
+      const StorageRealization *row = dev.memory.row(ch.storage);
+      if (!row || !row->readFirst)
+        continue;
+      unsigned rL = row->timing.latency.read;
+      if (rL)
+        problem.setSeparation(dep, static_cast<int64_t>(rL) - 1);
     }
   }
+}
+
+// The arrival delay of \p v within the cycle it is consumed in, by the chain
+// model's rules: a block argument, region-external def, constant, or
+// registered producer restarts the cone (its output leaves a register); a
+// combinational producer accumulates its outgoing delay over its operands'.
+// This is what the youngest window arm taps straight into the load's data
+// mux, so the load's outgoing delay must carry it (the caller caps it at what
+// the chain breaks let arrive at the store, then prices it into the `.fwd`
+// twin).
+static double armDatumDelay(ChainingModuloProblem &problem, Value v,
+                            Block *block, float regFloor,
+                            DenseMap<Value, double> &memo) {
+  if (auto it = memo.find(v); it != memo.end())
+    return it->second;
+  double d = regFloor;
+  Operation *def = v.getDefiningOp();
+  if (def && def->getBlock() == block &&
+      !def->hasTrait<OpTrait::ConstantLike>()) {
+    if (auto opr = problem.getLinkedOperatorType(def)) {
+      if (*problem.getLatency(*opr) >= 1) {
+        d = std::max<double>(regFloor, *problem.getOutgoingDelay(*opr));
+      } else {
+        for (Value operand : def->getOperands())
+          d = std::max(d,
+                       armDatumDelay(problem, operand, block, regFloor, memo));
+        d += *problem.getOutgoingDelay(*opr);
+      }
+    }
+  }
+  memo[v] = d;
+  return d;
+}
+
+// Relax the forwardable RAW edges of \p problem when, and only when, a storage
+// recurrence binds the II and relaxing moves that bound; otherwise the
+// schedule is unchanged and no shadow is built. Each forwarded load is
+// re-linked onto a `.fwd` twin of its operator type whose outgoing delay
+// carries the data mux (the RAM datum plus one arm per paired store); the
+// compare ends in the select register and touches no port path, so nothing
+// else is re-priced.
+//
+// A pair whose dependence distances are exact (polyhedral) is granted a
+// window of the read latency on top of the relaxation: the store may issue
+// while the read is in flight, served by deeper shadow arms, taking the RAM
+// round trip out of the recurrence entirely. Sound only when the solved II
+// clears every window (an instance one iteration past the paired one must
+// fall outside it), which the guard loop below enforces against the II
+// floor. The youngest arm taps the store's datum combinationally, so its
+// cone rides the load's outgoing delay (`armDatumDelay`, capped at what the
+// chain breaks let arrive at the store); a window whose cone pushes the load
+// past the period is refused, not the pair. Returns the relaxed edges, empty
+// when there are none.
+static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
+                                               DependenceAnalysis &deps,
+                                               const DeviceModel &dev,
+                                               float cycleTime, float regFloor,
+                                               unsigned minII) {
+  using Dependence = circt::scheduling::Problem::Dependence;
+  SmallVector<Dependence> cands =
+      forwardableEdges(problem, dev, cycleTime, regFloor);
+  if (cands.empty())
+    return {};
+  unsigned floorII = std::max(resourceMinII(problem), minII);
+  unsigned recOrig = recurrenceMinII(problem, {});
+  if (recOrig <= floorII)
+    return {}; // the recurrence is not what binds the II
+  if (cands.size() > kMaxForwardPairs) {
+    cands = selectCriticalPairs(problem, cands, floorII, kMaxTargetedPairs);
+    if (cands.empty())
+      return {};
+  }
+  // The data-mux price per load, over its real arm count; a load whose bumped
+  // output no longer fits the period drops its pairs (an operator must fit a
+  // cycle of its own).
+  llvm::MapVector<Operation *, unsigned> armsOf;
+  for (Dependence dep : cands)
+    ++armsOf[dep.getDestination()];
+  // {mux cone, the load's own outgoing delay} per load.
+  llvm::DenseMap<Operation *, std::pair<double, double>> muxOf;
+  for (auto &[load, arms] : armsOf) {
+    double mux = muxCone(dev.operators, 1 + arms,
+                         datapathWidth(load->getResult(0).getType()));
+    NodeTiming t = accessCharacterization(load, dev.operators, dev.memory);
+    if (t.outDelay + mux <= cycleTime)
+      muxOf[load] = {mux, t.outDelay};
+  }
+  llvm::erase_if(cands, [&](Dependence dep) {
+    return !muxOf.count(dep.getDestination());
+  });
+  if (cands.empty())
+    return {};
+  llvm::DenseSet<Dependence> relaxed(cands.begin(), cands.end());
+  // Window grants: exact distances (see the doc comment above). The store's
+  // datum cone is priced, not gated on: a window survives only if the load's
+  // output still fits the period with the cone folded in.
+  llvm::DenseMap<Dependence, unsigned> windows;
+  llvm::DenseMap<Dependence, double> armOf;
+  DenseMap<Value, double> coneMemo;
+  for (Dependence dep : cands) {
+    Operation *store = dep.getSource(), *load = dep.getDestination();
+    if (!deps.isExactPair(store, load))
+      continue;
+    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
+    unsigned rL = dev.memory.timing(ch.storage).latency.read;
+    if (!rL)
+      continue;
+    Value data;
+    if (auto st = dyn_cast<affine::AffineWriteOpInterface>(store))
+      data = st.getValueToStore();
+    else
+      data = cast<memref::StoreOp>(store).getValueToStore();
+    // The chain breaks guarantee the datum settles early enough for the
+    // store to sample it, which caps what the arm can tap.
+    double arm =
+        armDatumDelay(problem, data, store->getBlock(), regFloor, coneMemo);
+    auto storeOpr = *problem.getLinkedOperatorType(store);
+    arm =
+        std::min<double>(arm, cycleTime - *problem.getIncomingDelay(storeOpr));
+    auto [mux, outBase] = muxOf.lookup(load);
+    if (std::max(arm, outBase) + mux > cycleTime)
+      continue; // the cone does not fit the period; keep the plain relaxation
+    windows[dep] = rL;
+    armOf[dep] = arm;
+  }
+  unsigned recRelaxed = recurrenceMinII(problem, relaxed, &windows);
+  // A window is sound only when the solved II strictly clears it: an instance
+  // one iteration past the paired one must fall outside it. The solver never
+  // goes below max(floorII, the windowed recurrence floor), so shrink any
+  // window that bound does not clear to the widest it does and re-settle.
+  // Every step strictly shrinks a window, so this converges; shrinking only
+  // raises the floor, which can only admit what already stands.
+  while (!windows.empty()) {
+    unsigned bound = std::max(floorII, recRelaxed);
+    SmallVector<std::pair<Dependence, unsigned>> shrink;
+    for (const auto &[dep, w] : windows)
+      if (bound < w + 1)
+        shrink.push_back({dep, bound - 1});
+    if (shrink.empty())
+      break;
+    for (auto &[dep, w] : shrink) {
+      if (w)
+        windows[dep] = w;
+      else
+        windows.erase(dep);
+    }
+    recRelaxed = recurrenceMinII(problem, relaxed, &windows);
+  }
+  if (recRelaxed >= recOrig)
+    return {}; // the bound runs through edges forwarding cannot serve
+  info(Stage::Sched, problem.getContainingOp())
+      << "Relaxing " << cands.size() << " store->load RAW edge(s) through a "
+      << "forwarding shadow (" << windows.size()
+      << " with an in-flight window): the recurrence floor drops from II="
+      << recOrig << " to II=" << recRelaxed;
+  ForwardRelaxation out;
+  out.edges = std::move(cands);
+  for (Dependence dep : out.edges)
+    problem.setForwarded(dep, windows.lookup(dep));
+  // The youngest arm is combinational only at the full read latency, so only
+  // a window still that wide carries its datum cone onto the load's output.
+  llvm::DenseMap<Operation *, double> bumpOf;
+  for (Dependence dep : out.edges) {
+    auto it = windows.find(dep);
+    if (it == windows.end())
+      continue;
+    Operation *load = dep.getDestination();
+    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
+    if (it->second != dev.memory.timing(ch.storage).latency.read)
+      continue;
+    double over = armOf.lookup(dep) - muxOf.lookup(load).second;
+    if (over > 0)
+      bumpOf[load] = std::max(bumpOf[load], over);
+  }
+  // In `armsOf`'s (insertion) order, so the operator types the twins mint are
+  // created in a deterministic order.
+  for (auto &[load, arms] : armsOf) {
+    auto it = muxOf.find(load);
+    if (it == muxOf.end())
+      continue;
+    auto opr = *problem.getLinkedOperatorType(load);
+    double bump = quantizeCone(bumpOf.lookup(load));
+    // Keyed by the arm count and datum cone too: two loads of one storage may
+    // fan differently or tap differently deep cones.
+    std::string name = (opr.getValue() + ".fwd" + Twine(arms)).str();
+    if (bump > 0.0)
+      name +=
+          "c" + std::to_string((int64_t)std::lround(bump / kConeDelayQuantum));
+    auto nw = problem.getOrInsertOperatorType(name);
+    problem.setLatency(nw, *problem.getLatency(opr));
+    problem.setIncomingDelay(nw, *problem.getIncomingDelay(opr));
+    problem.setOutgoingDelay(nw, *problem.getOutgoingDelay(opr) + bump +
+                                     it->second.first);
+    problem.setLinkedOperatorType(load, nw);
+    out.originalTypes.push_back({load, opr});
+  }
+  return out;
+}
+
+// Put a relaxation back: the forwarded set cleared and every re-linked load
+// returned to its original operator type, so a re-solve runs the unrelaxed
+// problem.
+static void undoForwardRelaxation(ChainingModuloProblem &problem,
+                                  ForwardRelaxation &relax) {
+  problem.clearForwarded();
+  for (auto &[load, opr] : relax.originalTypes)
+    problem.setLinkedOperatorType(load, opr);
+  relax.edges.clear();
+  relax.originalTypes.clear();
+}
+
+// Record the relaxed pairs the solved schedule collides on: the paired store
+// instance issues inside the load's shadow window `[0, forwardWindow]`
+// relative to the read issue, so the RAM alone would hand the load stale
+// data. A pair whose instance lands before the read issue needs no shadow
+// and none is built; nearer instances (below the pair's distance) never
+// alias, which is what makes the offset of the paired instance the only one
+// to arm.
+static void
+recordForwards(ChainingModuloProblem &problem,
+               ArrayRef<circt::scheduling::Problem::Dependence> edges,
+               unsigned ii, ScheduleModel &model) {
+  for (auto dep : edges) {
+    Operation *store = dep.getSource(), *load = dep.getDestination();
+    int64_t delta = static_cast<int64_t>(*problem.getStartTime(store)) -
+                    static_cast<int64_t>(*problem.getStartTime(load));
+    unsigned dist = problem.getDistance(dep).value_or(0);
+    int64_t off = delta - static_cast<int64_t>(dist) * ii;
+    assert(off <= static_cast<int64_t>(problem.forwardWindow(dep)) &&
+           "a solved schedule respects the forwarded edge's window");
+    if (off < 0)
+      continue;
+    model.addForward(load, store, off);
+    info(Stage::Sched, load)
+        << "Forwarding a store issued " << delta
+        << " cycle(s) later into this load's data path (distance " << dist
+        << ", II=" << ii << ", window offset " << off << ")";
+  }
+}
+
+// Record what one region's solve cost, timed from \p since. Keyed by where the
+// region is rather than by the op that owned it: the schedule report is built
+// later off the reified dcp ops, by which time this problem's loop is gone.
+//
+// \p ii is what the solve decided, which for a non-pipelined loop is not the
+// interval the region is reported to run at (that is `annotateRegion`'s).
+void FuncScheduler::recordSolve(OccupancyProblem &problem, StringRef kind,
+                                std::optional<unsigned> ii, Stopwatch since) {
+  SolveReport s;
+  Operation *containing = problem.getContainingOp();
+  if (auto fn = containing->getParentOfType<func::FuncOp>())
+    s.func = fn.getSymName().str();
+  s.where = logging::detail::describe(containing);
+  s.kind = kind.str();
+  s.ops = (int64_t)problem.getOperations().size();
+  for (Operation *op : problem.getOperations())
+    if (problem.holdsLimitedUnit(op))
+      ++s.limitedOps;
+  if (ii)
+    s.interval = (int64_t)*ii;
+  s.millis = std::chrono::duration<double, std::milli>(now() - since).count();
+  // Config from the options, outcome from the solver's telemetry, so a reader
+  // can judge the result without re-solving. An escalated heuristic solve
+  // (`SchedulerOptions::escalate`) reports as the CP-SAT solve it ran.
+  if (usesExactScheduler(opts.kind) || problem.telemetry.cpsatRan) {
+    s.solver = "cpsat";
+    s.workers = opts.workers;
+    s.seed = opts.seed;
+    s.budgetSeconds = opts.budget;
+    s.proven = problem.telemetry.proven;
+    s.spanProven = problem.telemetry.spanProven;
+    s.budgetExhausted = problem.telemetry.budgetExhausted;
+    s.fallback = problem.telemetry.fallback;
+    s.exhaustedAtII = problem.telemetry.exhaustedAtII;
+    s.modelArea = problem.telemetry.modelArea;
+    s.modelAreaBound = problem.telemetry.modelAreaBound;
+    // One worker has nobody to race, so it stays reproducible under a held
+    // budget regardless of the knob.
+    s.deterministic = (opts.deterministic || opts.workers == 1) &&
+                      !problem.telemetry.budgetExhausted;
+  } else {
+    s.solver = "simplex";
+  }
+  model.solves.push_back(std::move(s));
+}
+
+// Schedule one counted loop body (affine.for or scf.for) as a
+// `ChainingModuloProblem` and annotate the result (start times, II, sub-cycle
+// times). \p minII lower-bounds the II; \p maxII, nonzero, is an explicit
+// directive's ceiling, honored by the exact area objective alone. When
+// \p pipelined is false iterations do not overlap: the II is reported as the
+// body length, so the region latency folds to `trip * depth`, and it still
+// reifies to a dcp.pipeline.
+LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
+                                            const SchedRegion &region,
+                                            unsigned minII, unsigned maxII,
+                                            bool pipelined) {
+  auto problem = buildCyclicProblem<ChainingModuloProblem>(body, deps);
+  Block *bodyBlock = &body.getLoopRegions().front()->front();
+  populateOperatorTypes(problem, dev.operators, dev.memory);
+  // What contends, then how many of it to build: an occupancy window is a
+  // physical property of the region and holds however the units are allocated.
+  populateMemoryResources(problem, dev.memory);
+  populateOperatorOccupancy(problem, dev.operators);
+  populateCallOccupancy(problem);
+  if (opts.allocate)
+    populateOperatorAllocation(problem, dev.operators,
+                               usesExactScheduler(opts.kind)
+                                   ? AllocationScope::Static
+                                   : AllocationScope::All,
+                               opts.objective == ScheduleObjective::Area);
+  // Overlapping iterations only: without overlap the RAW round trip costs
+  // depth, not II, and a shadow would buy latency a mux is not worth.
+  relaxWarEdges(problem, deps, dev);
+  ForwardRelaxation relax;
+  if (pipelined)
+    relax = relaxForwardableEdges(problem, deps, dev, cycleTime, opts.regFloor,
+                                  minII);
+  Operation *anchor = bodyBlock->getTerminator();
+  // The trip this solution records is the innermost loop's, the one its solved
+  // `length`/`ii` describe. Every level above drives its child as a container,
+  // composed in `buildSpanNode`.
+  LoopTrip trip = deps.tripOf(body.getOperation());
+  // A counted loop hands its carried next-values on: the terminator's operands.
+  // The trip is withheld where iterations do not overlap: `ii` is the body
+  // depth there, so depth, not drain, is what the trip multiplies.
+  SpanObjective span(problem, anchor->getOperands(), bodyBlock,
+                     pipelined ? trip.count : std::nullopt, dev.operators);
+  int64_t grant = grants ? grants->lookup(body.getOperation()) : 0;
+  Stopwatch solveStart = now();
+  if (failed(solveSchedulingProblem(problem, anchor, cycleTime, minII, opts,
+                                    span, maxII, grant))) {
+    if (relax.edges.empty())
+      return failure();
+    // The relaxed problem starts its II search lower, which can strand the
+    // greedy placement where the unrelaxed search would not have gone. The
+    // relaxation is an optimization, so put it back and solve without it.
+    info(Stage::Sched, problem.getContainingOp())
+        << "The relaxed problem did not place; retrying without the "
+           "store->load forwarding relaxation";
+    undoForwardRelaxation(problem, relax);
+    if (failed(solveSchedulingProblem(problem, anchor, cycleTime, minII, opts,
+                                      span, maxII, grant)))
+      return failure();
+  }
+  std::optional<unsigned> solvedII = problem.getInitiationInterval();
+  assert(solvedII && "a modulo problem that solved carries an interval");
+  recordForwards(problem, relax.edges, *solvedII, model);
+  recordSolve(problem, "cyclic", solvedII, solveStart);
+  int64_t depth = pacedDepth(problem, anchor);
+  // Iterations that do not overlap issue one body length apart, which is the
+  // interval the region runs at whatever the solve settled on.
+  unsigned ii = pipelined ? *solvedII : static_cast<unsigned>(depth);
+  int64_t drain = span.drainOf(problem);
+  // For the report only, through the arithmetic that composes it for real.
+  SpanNode node;
+  node.trip = trip.count;
+  node.drain = drain;
+  node.ii = ii;
+  std::optional<int64_t> latency = composeSpan(node);
+
+  {
+    auto d = info(Stage::Sched, region.anchor());
+    d << "Scheduled: II=" << ii;
+    if (!pipelined)
+      d << " (pipelining off, iterations run back-to-back)";
+    else if (ii == 1)
+      d << " (fully pipelined)";
+    else if (hasCarriedRecurrence(problem))
+      d << " (>1: a loop-carried recurrence and/or shared-resource limit)";
+    else
+      d << " (>1: a shared-resource limit, e.g. memory ports)";
+    if (latency)
+      d << ", latency = " << *latency
+        << (trip.bounded ? " (assume-bounded worst case)" : "");
+    else
+      d << ", latency dynamic (trip not statically known)";
+  }
+
+  // A non-pipelined multi-cycle operator holds its unit for its whole latency,
+  // so it caps iteration overlap. Name the dominant one to explain II > 1.
+  if (pipelined && ii > 1) {
+    Operation *blocking = nullptr;
+    unsigned maxOcc = 1;
+    for (Operation *op : problem.getOperations())
+      if (unsigned occ = problem.getResourceCycles(op); occ > maxOcc) {
+        maxOcc = occ;
+        blocking = op;
+      }
+    if (blocking)
+      info(Stage::Sched, blocking)
+          << blocking->getName().getStringRef()
+          << " is non-pipelined and holds its unit for " << maxOcc
+          << " cycle(s), so no iteration may issue sooner";
+  }
+
+  annotateStarts(problem);
+  // Every field is per-invocation: no composed total is stored.
+  RegionSolution &sol = model.addRegion(body.getOperation());
+  sol.ii = ii;
+  sol.length = depth;
+  sol.drain = drain;
+  sol.trip = trip.count;
+  sol.tripIsBound = trip.bounded;
+  annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, ii);
   return success();
 }
 
-LogicalResult OccupancyProblem::verifyOccupancy(unsigned ii) {
-  for (ResourceType rsrc : getResourceTypes()) {
-    unsigned limit = getLimit(rsrc).value_or(0);
-    if (limit && demandFor(rsrc, ii) > limit) {
-      assert(false && "a resource is oversubscribed across its occupancy "
-                      "windows; the reservation table admits an operation "
-                      "only when every slot it touches fits, so a solved "
-                      "schedule cannot reach this");
+// Schedule an uncounted `scf.while` (before + after as one iteration) as a
+// `ChainingModuloProblem`, the flushing-pipeline scheduling view. Its trip
+// count is data-dependent, so no latency is reported.
+LogicalResult FuncScheduler::scheduleWhile(scf::WhileOp w,
+                                           const SchedRegion &region) {
+  auto problem = buildWhileProblem<ChainingModuloProblem>(w, deps);
+  populateOperatorTypes(problem, dev.operators, dev.memory);
+  populateMemoryResources(problem, dev.memory);
+  // A flushing while issues an iteration per II like a pipeline: a
+  // non-pipelined operator bounds its interval the same way. No call occupancy
+  // is needed, since `whileFlushingPipelines` rejects a body with a sync call.
+  populateOperatorOccupancy(problem, dev.operators);
+  if (opts.allocate)
+    populateOperatorAllocation(problem, dev.operators,
+                               usesExactScheduler(opts.kind)
+                                   ? AllocationScope::Static
+                                   : AllocationScope::All,
+                               opts.objective == ScheduleObjective::Area);
+  Operation *anchor = w.getYieldOp().getOperation();
+  // Honor a requested target II (>=1) as a lower bound. `ii=-1` (pipelining
+  // off) is not modeled for while loops.
+  int64_t dir = pipelineDirective(w, region.anchor());
+  unsigned minII = dir >= 1 ? static_cast<unsigned>(dir) : 1;
+  // A while's carried state is not priced as a register: its values are not a
+  // counted loop's iter_args, so no body is passed in to read them. No trip
+  // either, so the objective is just the anchor's start time.
+  SpanObjective span(problem, anchor->getOperands(), /*carried=*/nullptr,
+                     /*trip=*/std::nullopt, dev.operators);
+  Stopwatch solveStart = now();
+  if (failed(solveSchedulingProblem(problem, anchor, cycleTime, minII, opts,
+                                    span)))
+    return failure();
+  std::optional<unsigned> ii = problem.getInitiationInterval();
+  assert(ii && "a modulo problem that solved carries an interval");
+  recordSolve(problem, "while", ii, solveStart);
+  info(Stage::Sched, w.getOperation())
+      << "  -> While loop scheduled as a flushing pipeline: II=" << *ii
+      << " (trip is data-dependent, so whole-loop latency is unknown)";
+  annotateStarts(problem);
+  // The trip is data-dependent, so it stays empty and no span composes off this
+  // drain: both are recorded, like `ii`, as what the solve decided.
+  RegionSolution &sol = model.addRegion(w.getOperation());
+  sol.ii = *ii;
+  sol.length = problem.scheduleDepth();
+  sol.drain = span.drainOf(problem);
+  annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, *ii);
+  return success();
+}
+
+// The operations a sequential while's continue-condition reads, in program
+// order. The CHECK region emits arithmetic and loads only, so any other
+// producer fails here, reported against the op itself; leaving the cone
+// unscheduled would only move the report to the emitter.
+//
+// An empty cone is normal: the condition is settled before the loop starts,
+// so there is nothing to time. A value defined outside the before block
+// bounds the walk (an iter-arg survivor, an enclosing counter, or a literal).
+static FailureOr<SmallVector<Operation *>> conditionCone(scf::WhileOp w) {
+  Block &before = w.getBefore().front();
+  llvm::SmallPtrSet<Operation *, 8> reads;
+  SmallVector<Value> work{w.getConditionOp().getCondition()};
+  while (!work.empty()) {
+    Operation *def = work.pop_back_val().getDefiningOp();
+    if (!def || def->getBlock() != &before || isa<arith::ConstantOp>(def))
+      continue;
+    if (!reads.insert(def).second)
+      continue;
+    if (!isa<AffineLoadOp, memref::LoadOp>(def) &&
+        !isa<arith::ArithDialect>(def->getDialect())) {
+      unsupported(Stage::Sched, Code::PredicateNotCombinational, def)
+          << "The continue-condition of this while reads '"
+          << def->getName().getStringRef()
+          << "', which the sequential CHECK region cannot evaluate; it emits "
+             "arithmetic and array reads only. Compute the value in the loop "
+             "body and test a carried variable instead";
       return failure();
     }
+    for (Value o : def->getOperands())
+      if (!isa<MemRefType>(
+              o.getType())) // the memref names storage, not a value
+        work.push_back(o);
   }
-  return success();
+  SmallVector<Operation *> cone;
+  for (Operation &op : before.without_terminator())
+    if (reads.contains(&op))
+      cone.push_back(&op);
+  return cone;
 }
 
-LogicalResult ModuloOccupancyProblem::verifyPrecedence(Dependence dep) {
-  if (!isForwarded(dep) && !hasSeparationOverride(dep))
-    return CyclicProblem::verifyPrecedence(dep);
-  int64_t stI = *getStartTime(dep.getSource());
-  int64_t stJ = *getStartTime(dep.getDestination());
-  int64_t dist = getDistance(dep).value_or(0);
-  if (stI + separationOf(dep) <= stJ + dist * (int64_t)*getInitiationInterval())
+// A sequential (CHECK/RUN) while's own condition cone, solved as its own
+// straight-line span. Its depth is the `tCond` the controller waits out before
+// deciding, which the emitter reads back off these start times
+// (`emitConditionRegion`), so cutting it here is what holds it to the clock.
+//
+// The body is a separate problem: `scheduleRegion` decomposes the after block
+// into sub-regions, and the two never overlap, CHECK deciding before RUN
+// issues.
+LogicalResult FuncScheduler::scheduleWhileCondition(scf::WhileOp w) {
+  FailureOr<SmallVector<Operation *>> cone = conditionCone(w);
+  if (failed(cone))
+    return failure();
+  if (cone->empty()) // settled before the loop: the check waits out nothing
     return success();
-  return getContainingOp()->emitError()
-         << "Precedence violated for a relaxed memory-ordering dependence: "
-            "the schedule separates the pair by less than its shadow window "
-            "or read sampling allows";
+  info(Stage::Sched, w.getOperation())
+      << "Scheduling the while's own condition cone of " << cone->size()
+      << " op(s): the CHECK controller waits out its depth each iteration";
+  return scheduleAcyclic(*cone, /*ownsRegion=*/false);
 }
 
-LogicalResult ModuloOccupancyProblem::verify() {
-  if (failed(ModuloProblem::verify()))
+// Schedule one straight-line region as a `ChainingSharedOperatorsProblem` and
+// annotate the result.
+//
+// \p ownsRegion is false for a span that is timed but is no region of its own:
+// a sequential while's condition cone, whose op start times the emitter reads
+// back (`emitConditionRegion`) while the while's controller paces it. Its
+// `RegionSolution` would be read by nobody, and `publishKernelLatency` counts
+// the ones that exist.
+LogicalResult FuncScheduler::scheduleAcyclic(ArrayRef<Operation *> ops,
+                                             bool ownsRegion) {
+  ChainingSharedOperatorsProblem problem =
+      buildAcyclicProblem<ChainingSharedOperatorsProblem>(ops, deps);
+  populateOperatorTypes(problem, dev.operators, dev.memory);
+  populateMemoryResources(problem, dev.memory);
+  if (opts.allocate)
+    populateOperatorAllocation(problem, dev.operators,
+                               usesExactScheduler(opts.kind)
+                                   ? AllocationScope::Static
+                                   : AllocationScope::All,
+                               opts.objective == ScheduleObjective::Area);
+  // A straight-line region runs once, so its whole cost is its drain, and it
+  // carries nothing between iterations it does not have.
+  SpanObjective span(problem, spanEscapingValues(ops),
+                     /*carried=*/nullptr, /*trip=*/1, dev.operators);
+  Stopwatch solveStart = now();
+  if (failed(
+          solveSchedulingProblem(problem, ops.back(), cycleTime, opts, span)))
     return failure();
-  unsigned ii = *getInitiationInterval();
-  if (failed(verifyOccupancy(ii)))
-    return failure();
-  return verifyAllocation(ii);
-}
-
-//===----------------------------------------------------------------------===//
-// ChainingModuloProblem (declared in Scheduler.h): the composition of CIRCT's
-// ChainingProblem and ModuloOccupancyProblem.
-//===----------------------------------------------------------------------===//
-
-LogicalResult ChainingModuloProblem::checkDefUse(Dependence dep) {
-  if (!dep.isAuxiliary() && (getDistance(dep).value_or(0) != 0)) {
-    assert(false && "a def-use dependence carries a non-zero distance; the "
-                    "edges are ours to insert, so no input can reach this");
-    return failure();
+  recordSolve(problem, "acyclic", /*ii=*/std::nullopt, solveStart);
+  if (ledger && ownsRegion)
+    collectCallSlack(problem, ops);
+  int64_t depth = problem.scheduleDepth();
+  info(Stage::Sched, ops.front())
+      << "Scheduled: depth = " << depth << " cycles";
+  annotateStarts(problem);
+  if (ownsRegion) {
+    // A straight-line span issues once, so it carries no II and no trip. How
+    // often its enclosing loops re-run it is charged where they are composed.
+    RegionSolution &sol = model.addRegion(ops.front());
+    sol.length = depth;
+    sol.drain = span.drainOf(problem);
   }
+  annotateAllocation(problem);
+  model.modeledArea += regionArea(problem, span, /*ii=*/0);
   return success();
 }
 
-LogicalResult ChainingModuloProblem::check() {
-  for (auto *op : getOperations())
-    for (auto &dep : getDependences(op))
-      if (failed(checkDefUse(dep)))
+// The body elements of a container, in program order.
+std::vector<SpanNode> FuncScheduler::buildSpanNodes(Block &body) {
+  std::vector<SpanNode> nodes;
+  for (const SchedRegion &child : enumerateRegions(body))
+    if (std::optional<SpanNode> n = buildSpanNode(child))
+      nodes.push_back(std::move(*n));
+  return nodes;
+}
+
+// One scheduling region as the latency model sees it, walked over the
+// affine/scf loops; `PostConversion.cpp` walks the dcp regions built from those
+// same loops, and both feed `composeSpan`.
+//
+// Descends the loop nest, not the solution list: one solution covers a whole
+// perfect band, while the emitter drives every loop above the innermost as a
+// container with its own boundary cycles, which a flat walk of solutions has
+// nowhere to charge.
+//
+// nullopt means the region occupies no cycles and forms no node (a
+// straight-line span of nothing but declarations). A data-dependent region
+// still forms a node, with the unknown left in its own fields.
+std::optional<SpanNode>
+FuncScheduler::buildSpanNode(const SchedRegion &region) {
+  SpanNode n;
+  // Driven by an enclosing region rather than by the func's own sequencer, the
+  // same question the reify side asks of a dcp op's parents.
+  n.elastic =
+      llvm::any_of(region.ops, [](Operation *o) { return isElastic(o); });
+  if (region.kind == allo::RegionKind::StraightLine) {
+    if (!spanFormsRegion(region.ops))
+      return std::nullopt;
+    n.acyclic = true;
+    n.trip = 1;
+    if (RegionSolution *sol = model.regionOf(region.ops.front()))
+      n.drain = sol->drain;
+    return n;
+  }
+  Operation *anchor = region.anchor();
+  // An `if` if-conversion left opaque runs under a predicate, which becomes a
+  // `dcp.select` the reify side reads back as a Guard. Its branches hold the
+  // arms' scheduled sub-regions, composed by `composeSpan`'s ceiling rule.
+  if (isa<AffineIfOp, scf::IfOp>(anchor)) {
+    n.shape = RegionShape::Guard;
+    n.children = buildSpanNodes(anchor->getRegion(0).front());
+    if (!anchor->getRegion(1).empty())
+      n.elseChildren = buildSpanNodes(anchor->getRegion(1).front());
+    return n;
+  }
+  if (!isa<AffineForOp, scf::ForOp>(anchor))
+    return n; // a while: a data-dependent trip, so no static span
+  auto loop = cast<LoopLikeOpInterface>(anchor);
+  n.trip = deps.tripOf(anchor).count;
+  n.shape = countedLoopShape(loop);
+  Block &body = loop.getLoopRegions().front()->front();
+
+  if (n.shape == RegionShape::CallNode) {
+    // The body is one instance the controller re-fires per iteration, so a pass
+    // costs the callee's own start to done contract and nothing else.
+    for (Operation &op : body) {
+      if (!isSyncSubKernelCall(&op))
+        continue;
+      Operation *callee = calleeOf(&op);
+      SpanNode child;
+      child.instance = true;
+      child.contract = callee ? calleeStaticLatency(callee) : std::nullopt;
+      n.children.push_back(std::move(child));
+    }
+    return n;
+  }
+  // A container owns no solution: it sequences the regions its body decomposed
+  // into, and its span is composed from theirs.
+  if (n.shape == RegionShape::Container) {
+    n.children = buildSpanNodes(body);
+    return n;
+  }
+  // A leaf nests no loop, so it is the op the solve was keyed by.
+  if (RegionSolution *sol = model.regionOf(anchor)) {
+    n.drain = sol->drain;
+    n.ii = sol->ii;
+  }
+  return n;
+}
+
+// Record every counted loop whose iteration count only an `allo.assume.ssa`
+// range bounds, for the reify to stamp as `trip_bound` and the emitter to size
+// its counter by. This is the one fact reification cannot re-derive: the hint
+// that bounded a symbolic trip is already consumed and erased by the time reify
+// runs, unlike a loop's lb/step/constant trip, which stay on the loop.
+void FuncScheduler::recordTripBounds(func::FuncOp funcOp) {
+  funcOp.walk([&](Operation *op) {
+    if (!isa<AffineForOp, scf::ForOp>(op))
+      return;
+    LoopTrip trip = deps.tripOf(op);
+    if (trip.bounded && trip.count)
+      model.setTripBound(op, *trip.count);
+  });
+}
+
+// Compose the solved region tree into one whole-kernel span, and publish it.
+// The only thing the scheduler writes to the IR, and the only thing a caller of
+// this kernel sees. Sets the attribute only when every region has a known span.
+//
+// The span is the top-level regions composed over their dependence DAG, and
+// must equal what the reify's `setDcpLatencies` composes off the dcp regions
+// built from these. Independent siblings overlap, so it is the longest path and
+// not the sum.
+void FuncScheduler::publishKernelLatency(func::FuncOp funcOp) {
+  Builder b(funcOp.getContext());
+
+  // A callee whose own length is data-dependent leaves this kernel's unknown.
+  // Must be asked here: the operator library prices an uncharacterized call at
+  // zero, so the composition alone would omit it.
+  bool callsKnown = true;
+  funcOp.walk([&](func::CallOp call) {
+    if (call->hasAttr(kAlloAsyncAttr))
+      return;
+    Operation *callee = calleeOf(call);
+    if (!callee || !calleeStaticLatency(callee))
+      callsKnown = false;
+  });
+  if (!callsKnown)
+    return;
+
+  std::vector<SpanNode> top;
+  SmallVector<SmallVector<Operation *>> topOps;
+  SmallVector<SchedRegion> topRegions;
+  for (const SchedRegion &region : enumerateRegions(funcOp))
+    if (std::optional<SpanNode> n = buildSpanNode(region)) {
+      top.push_back(std::move(*n));
+      topOps.emplace_back(region.ops.begin(), region.ops.end());
+      topRegions.push_back(region);
+    }
+  // A func with no node to compose (an empty body, or nothing but declarations)
+  // publishes nothing: composing over none reports zero, which a caller would
+  // read as an exact zero-cycle contract.
+  if (top.empty())
+    return;
+  std::vector<SmallVector<unsigned, 2>> preds = siblingPredecessors(topOps);
+  std::optional<int64_t> total = composeDag(top, preds);
+  if (!total)
+    return; // a data-dependent region leaves the kernel total unknown
+  if (ledger)
+    collectSiblingSlack(top, topRegions, preds);
+
+  // Only the number is published, not whether it is a bound: a bound is an
+  // upper one, so a caller placing consumers against it is safe either way.
+  funcOp->setAttr(kLatencyAttr, b.getI64IntegerAttr(*total));
+}
+
+// The sibling half of the slack pass: total float over the func's top-level
+// DAG, spent whole on one region at a time (a thin slice cannot buy an II
+// step). Reserving a node's full float re-times the DAG, so each round
+// recomputes before granting the next; a node grants once.
+void FuncScheduler::collectSiblingSlack(
+    ArrayRef<SpanNode> nodes, ArrayRef<SchedRegion> regions,
+    ArrayRef<SmallVector<unsigned, 2>> preds) {
+  unsigned n = nodes.size();
+  SmallVector<int64_t> spans(n);
+  for (auto [i, node] : llvm::enumerate(nodes)) {
+    std::optional<int64_t> s = composeSpan(node);
+    assert(s && "the composed total exists, so every node span does");
+    spans[i] = *s;
+  }
+  SmallVector<SmallVector<unsigned, 2>> succs(n);
+  for (unsigned i = 0; i < n; ++i)
+    for (unsigned p : preds[i])
+      succs[p].push_back(i);
+  SmallVector<std::optional<std::pair<Operation *, int64_t>>> targets(n);
+  for (unsigned i = 0; i < n; ++i)
+    targets[i] = grantTarget(regions[i], deps);
+  for (unsigned round = 0; round < n; ++round) {
+    // Program order is topological: a node's predecessors are earlier nodes.
+    SmallVector<int64_t> est(n, 0), down(n, 0);
+    for (unsigned i = 0; i < n; ++i)
+      for (unsigned p : preds[i])
+        est[i] = std::max(est[i], est[p] + spans[p]);
+    int64_t total = 0;
+    for (unsigned i = n; i-- > 0;) {
+      down[i] = spans[i];
+      for (unsigned s : succs[i])
+        down[i] = std::max(down[i], spans[i] + down[s]);
+      total = std::max(total, est[i] + down[i]);
+    }
+    int64_t bestFloat = 0;
+    int best = -1;
+    for (unsigned i = 0; i < n; ++i)
+      if (targets[i])
+        if (int64_t f = total - est[i] - down[i]; f > bestFloat) {
+          bestFloat = f;
+          best = static_cast<int>(i);
+        }
+    if (best < 0)
+      break;
+    auto [key, divisor] = *targets[best];
+    if (int64_t g = bestFloat / divisor)
+      ledger->grants[key] += g;
+    spans[best] += bestFloat;
+    targets[best].reset();
+  }
+}
+
+// The call half: total float of a single-site sync call within its region's
+// latency DAG. The callee may run that much longer without moving this
+// region's span, whatever loop re-runs the region; the budget lands on the
+// callee's own regions after the pass.
+void FuncScheduler::collectCallSlack(ChainingSharedOperatorsProblem &problem,
+                                     ArrayRef<Operation *> ops) {
+  if (llvm::none_of(ops, [](Operation *op) { return isSyncSubKernelCall(op); }))
+    return;
+  auto latOf = [&](Operation *op) -> int64_t {
+    return *problem.getLatency(*problem.getLinkedOperatorType(op));
+  };
+  DenseMap<Operation *, int64_t> asap, down;
+  DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
+  for (Operation *op : ops) { // block order is topological over the deps
+    int64_t t = 0;
+    for (auto &dep : problem.getDependences(op)) {
+      Operation *src = dep.getSource();
+      t = std::max(t, asap.lookup(src) + latOf(src));
+      succs[src].push_back(op);
+    }
+    asap[op] = t;
+  }
+  int64_t total = 0;
+  for (Operation *op : llvm::reverse(ops)) {
+    int64_t d = latOf(op);
+    for (Operation *s : succs.lookup(op))
+      d = std::max(d, latOf(op) + down.lookup(s));
+    down[op] = d;
+    total = std::max(total, asap.lookup(op) + d);
+  }
+  for (Operation *op : ops) {
+    if (!isSyncSubKernelCall(op))
+      continue;
+    Operation *callee = calleeOf(op);
+    if (!callee || ledger->callSites.lookup(callee) != 1)
+      continue;
+    if (int64_t f = total - asap.lookup(op) - down.lookup(op); f > 0)
+      ledger->calleeBudget[callee] = f;
+  }
+}
+
+// Schedule one region: a straight-line span as an acyclic problem, a counted
+// loop as a cyclic problem. An imperfect counted nest, whose innermost band
+// body still holds loops, is decomposed into per-body sub-regions, the band
+// loops staying as wrapper loops that drive those sub-regions as containers.
+LogicalResult FuncScheduler::scheduleRegion(const SchedRegion &region) {
+  if (region.kind != allo::RegionKind::Loop) {
+    // A span of nothing but declarations is a tie-off the reify leaves in
+    // place; scheduling it would spuriously let a func with nothing else
+    // publish a zero-cycle latency. Shared predicate with the reify.
+    if (!spanFormsRegion(region.ops))
+      return success();
+    info(Stage::Sched, region.anchor())
+        << "A straight-line span of " << region.ops.size()
+        << " op(s), using acyclic scheduling";
+    return scheduleAcyclic(region.ops, /*ownsRegion=*/true);
+  }
+  if (isa<AffineForOp, scf::ForOp>(region.anchor())) {
+    SmallVector<LoopLikeOpInterface> band =
+        perfectNest(cast<LoopLikeOpInterface>(region.anchor()));
+    LoopLikeOpInterface innermost = band.back();
+    int64_t dir = pipelineDirective(innermost.getOperation(), region.anchor());
+    // The same shape query `buildSpanNode` composes through, so solving and
+    // costing agree on which level drives children. Only a Container
+    // decomposes; a CallNode and a Leaf run one flat cyclic problem.
+    if (countedLoopShape(innermost) == RegionShape::Container) {
+      // Fusing the level over its inner loops into one modulo problem is not
+      // implemented: the container sequences its children and runs no schedule
+      // of its own.
+      if (dir >= 1) {
+        model.unhonored.push_back(
+            {"pipeline", logging::detail::describe(innermost.getLoc()),
+             "imperfect_nest"});
+        warn(Stage::Sched, innermost.getOperation())
+            << "A pipeline directive on an imperfect nest is not honored yet; "
+               "scheduling its body as sequential sub-regions. Leave "
+               "`unroll_under_pipeline` at its default, which unrolls the "
+               "inner loops into the pipelined level instead";
+      }
+      info(Stage::Sched, innermost.getOperation())
+          << "Detected imperfect nest, decomposing into sub-regions "
+             "scheduled in program order.";
+      Block &body = innermost.getLoopRegions().front()->front();
+      return scheduleBlock(body);
+    }
+    {
+      auto d = info(Stage::Sched, innermost.getOperation());
+      d << "Detected as a for-loop";
+      if (band.size() > 1)
+        d << " (perfect band of " << band.size() << " levels)";
+      if (dir == -1)
+        d << ", pipelining disabled";
+      else if (dir >= 1)
+        d << ", target II=" << dir;
+      d << ", using modulo-scheduling in the innermost body";
+    }
+    unsigned target = dir >= 1 ? static_cast<unsigned>(dir) : 0;
+    return scheduleCyclic(innermost, region, std::max(target, 1u),
+                          /*maxII=*/target, /*pipelined=*/dir != -1);
+  }
+  // An uncounted while; counted ones are already scf.for.
+  if (auto whileOp = dyn_cast<scf::WhileOp>(region.anchor())) {
+    // A nested loop (data-dependent per-iteration length) or a condition not
+    // settled at issue forces the sequential CHECK/RUN controller. The
+    // reifier's routing shares `conditionIsCombinational`, so the two agree.
+    if (!whileFlushingPipelines(whileOp, dev)) {
+      info(Stage::Sched, whileOp)
+          << "While loop cannot flushing-pipeline (nested loop, sub-kernel "
+             "call, or non-combinational condition); decomposing its body "
+             "into sub-regions scheduled in program order (the outer while "
+             "runs sequentially, latency data-dependent)";
+      if (failed(scheduleWhileCondition(whileOp)))
         return failure();
-
-  if (ChainingProblem::check().succeeded() &&
-      ModuloProblem::check().succeeded())
+      return scheduleBlock(whileOp.getAfter().front());
+    }
+    // `verify-rtl-legality` rejects a flushing while that does not forward
+    // 1:1, so `buildWhileProblem`'s slot alignment holds here.
+    assert(whileHasIdentityForwarding(whileOp) &&
+           "a flushing while reached scheduling without identity forwarding");
+    info(Stage::Sched, whileOp.getOperation())
+        << "Detected as a while-loop, using flushing-pipeline schedule";
+    return scheduleWhile(whileOp, region);
+  }
+  // An `if` that `fold-if-statements` could not predicate stays a control
+  // construct: decompose each branch into sub-regions and leave the `if` raw
+  // around them.
+  if (isa<AffineIfOp, scf::IfOp>(region.anchor())) {
+    Operation *ifOp = region.anchor();
+    info(Stage::Sched, ifOp)
+        << "Detected a conditional left opaque by if-conversion; decomposing "
+           "each branch into sub-regions and keeping the `if` as a guard";
+    for (Region &branch : ifOp->getRegions())
+      if (!branch.empty())
+        if (failed(scheduleBlock(branch.front())))
+          return failure();
     return success();
+  }
+  error(Stage::Sched, Code::RegionShapeNotScheduled, region.anchor())
+      << "Loop not scheduled";
   return failure();
 }
 
-LogicalResult ChainingModuloProblem::verify() {
-  if (ChainingProblem::verify().succeeded() &&
-      ModuloOccupancyProblem::verify().succeeded())
-    return success();
-  return failure();
+LogicalResult FuncScheduler::scheduleBlock(Block &block) {
+  for (const SchedRegion &region : enumerateRegions(block))
+    if (failed(scheduleRegion(region)))
+      return failure();
+  return success();
 }
 
-//===----------------------------------------------------------------------===//
-// ChainingSharedOperatorsProblem (declared in Scheduler.h): the composition of
-// CIRCT's ChainingProblem and OccupancyProblem. The acyclic twin of
-// ChainingModuloProblem (no distance, so no def-use distance check).
-//===----------------------------------------------------------------------===//
-
-LogicalResult ChainingSharedOperatorsProblem::check() {
-  if (ChainingProblem::check().succeeded() &&
-      SharedOperatorsProblem::check().succeeded())
-    return success();
-  return failure();
+// Erase one consumed hint along with any operand-producing ops it leaves
+// trivially dead. The assert guards against a freed op's address being reused
+// by the next `create`, which would alias a stale key in the analysis's range
+// map.
+void FuncScheduler::eraseHint(RewriterBase &b, Operation *op) {
+  SmallVector<Value, 4> operands(op->getOperands());
+  b.eraseOp(op);
+  for (Value v : operands)
+    if (Operation *def = v.getDefiningOp())
+      if (isOpTriviallyDead(def)) {
+        assert(llvm::none_of(
+                   def->getResults(),
+                   [&](Value r) { return deps.getAssumedRanges().count(r); }) &&
+               "erasing a value the assumed-range map is keyed by");
+        eraseHint(b, def);
+      }
 }
 
-LogicalResult ChainingSharedOperatorsProblem::verify() {
-  if (ChainingProblem::verify().succeeded() &&
-      SharedOperatorsProblem::verify().succeeded() &&
-      verifyOccupancy(/*ii=*/0).succeeded() &&
-      verifyAllocation(/*ii=*/0).succeeded())
-    return success();
-  return failure();
+// Erase the hints `deps` has already consumed: they carry no schedulable
+// computation and would perturb the problem. Erasing them before the analysis
+// was built would have dropped every assumption instead.
+void FuncScheduler::consumeHints(func::FuncOp funcOp) {
+  SmallVector<Operation *, 4> hints;
+  funcOp.walk([&](Operation *op) {
+    if (isa<AssumeNoDepOp, AssumeSSAOp>(op))
+      hints.push_back(op);
+  });
+  IRRewriter rewriter(funcOp.getContext());
+  for (Operation *op : hints)
+    eraseHint(rewriter, op);
 }
 
-//===----------------------------------------------------------------------===//
-// Public API
-//===----------------------------------------------------------------------===//
+// Solve one function's schedule into `model`. The only IR this writes is the
+// hints it consumes and the kernel latency it publishes; the schedule itself is
+// materialized by a later pass off the model.
+LogicalResult FuncScheduler::run(func::FuncOp funcOp) {
+  consumeHints(funcOp);
 
-LogicalResult scheduleSimplex(ChainingModuloProblem &prob, Operation *lastOp,
-                              float cycleTime, float regFloor, unsigned minII,
-                              SimplexWarmStart *warm) {
-  ChainingModuloSimplexScheduler simplex(prob, lastOp, cycleTime, regFloor,
-                                         minII);
-  if (warm)
-    simplex.setPlacementAdvisory();
-  LogicalResult scheduled = simplex.schedule();
-  if (!warm)
-    return scheduled;
-  warm->lowerBoundII = simplex.getLowerBoundII();
-  warm->placed = succeeded(scheduled);
-  // A placement failure is the caller's to recover from; a resource-free one
-  // means no II admits a schedule, and nothing downstream can repair that.
-  return success(simplex.hasLowerBound());
+  std::string infoStr = "-- Start scheduling for " + funcOp.getSymName().str();
+  info(Stage::Sched) << std::string(infoStr.size() * 2, '-');
+  info(Stage::Sched) << infoStr;
+  info(Stage::Sched) << std::string(infoStr.size() * 2, '-');
+
+  // Schedule the function body's regions, recursing into imperfect nests.
+  if (failed(scheduleBlock(funcOp.getBody().front())))
+    return failure();
+  recordTripBounds(funcOp);
+  publishKernelLatency(funcOp);
+  return success();
 }
 
-LogicalResult scheduleSimplex(ChainingSharedOperatorsProblem &prob,
-                              Operation *lastOp, float cycleTime,
-                              float regFloor) {
-  ChainingSharedOperatorsSimplexScheduler simplex(prob, lastOp, cycleTime,
-                                                  regFloor);
-  return simplex.schedule();
+static void loadDependentDialects(MLIRContext &context) {
+  context.getOrLoadDialect<allo::AlloDialect>();
+  context.getOrLoadDialect<arith::ArithDialect>();
+  context.getOrLoadDialect<func::FuncDialect>();
+  context.getOrLoadDialect<math::MathDialect>();
+  context.getOrLoadDialect<affine::AffineDialect>();
+  context.getOrLoadDialect<scf::SCFDialect>();
+  context.getOrLoadDialect<memref::MemRefDialect>();
 }
 
-} // namespace mlir::allo
+// The least clock period the solve can hold: every operation must fit a cycle
+// of its own, `regFloor + inDelay` to reach its first register, `outDelay` to
+// leave its last, and `minPeriod` for the internal stages the row is
+// warranted at. A target below the result is raised rather than refused, so an
+// over-period operator lowers the achieved frequency instead of failing the
+// compile. Each offending row is named once, with what would shorten it.
+//
+// The walk prices through the same characterization `populateOperatorTypes`
+// registers, over every op a problem can hold: a region op, a call and a
+// declaration contribute no operator row. Selection ranks fit-first against
+// the target here, so an op with any candidate inside the target derates
+// nothing, and one with none is priced at its least-need candidate, the row
+// the raised period re-selects.
+static float minSchedulablePeriod(ArrayRef<func::FuncOp> funcs,
+                                  const DeviceModel &dev, float target,
+                                  float regFloor) {
+  float least = target;
+  llvm::StringSet<> named;
+  for (func::FuncOp fn : funcs)
+    fn.walk([&](Operation *op) {
+      if (op->getNumRegions() || isa<func::CallOp>(op))
+        return;
+      bool access = asMemAccess(op).has_value();
+      NodeTiming t = access
+                         ? accessCharacterization(op, dev.operators, dev.memory)
+                         : dev.operators.lookup(op).timing;
+      float need = periodNeed(regFloor, t.inDelay, t.outDelay, t.minPeriod);
+      if (need <= target)
+        return;
+      least = std::max(least, need);
+      if (!named.insert(t.typeName).second)
+        return;
+      // An access is named by whichever of its two cones is the larger, since
+      // that is the one worth shortening.
+      const char *advice =
+          isa<AffineApplyOp>(op)
+              ? "Its whole map is one combinational cone; compute the "
+                "expression in arithmetic ops so each step can be scheduled "
+                "and registered"
+          : !access ? "It is one operator, so no register can split it"
+          : portSelectDelay(op, dev.operators) >
+                  addressDelayOf(op, dev.operators)
+              ? "The select over the accesses sharing this array's port is "
+                "what costs; partition the array, or move accesses out of it, "
+                "so fewer of them drive one bus"
+              : "The address cone ahead of the port is what costs; compute "
+                "the subscript into a variable so it becomes a schedulable "
+                "value, or partition by a power of two so the bank digit is "
+                "a mask rather than a divider";
+      warn(Stage::Sched, op)
+          << "'" << t.typeName << "' needs " << format("%.2f", need)
+          << " ns for a cycle of its own, over the " << format("%.2f", target)
+          << " ns clock period. " << advice;
+    });
+  return least;
+}
+
+// The area objective's slack pass: a cheap heuristic pre-schedule of the whole
+// module, whose composition prices each region's float off the sibling DAG's
+// longest path. What it proves free widens the real pass's leashes; the
+// composed kernel span stays within the heuristic's by construction, since
+// every float is charged once.
+static DenseMap<Operation *, int64_t> collectCompositionSlack(
+    ModuleOp module, func::FuncOp topFunc, ArrayRef<func::FuncOp> order,
+    ArrayRef<std::unique_ptr<DependenceAnalysis>> depsFor,
+    const DeviceModel &dev, float cycleTime, const SchedulerOptions &opts) {
+  DenseMap<Operation *, int64_t> grants;
+  SlackLedger ledger;
+  module.walk([&](Operation *op) {
+    if (isSyncSubKernelCall(op))
+      if (Operation *callee = calleeOf(op))
+        ++ledger.callSites[callee];
+  });
+  ScheduleModel probe;
+  probe.cycleTimeNs = cycleTime;
+  SchedulerOptions heur = opts;
+  heur.kind = SchedulerKind::Heuristic;
+  bool preScheduled = true;
+  for (auto [fn, deps] : llvm::zip(order, depsFor)) {
+    FuncScheduler sched(*deps, dev, probe, cycleTime, heur, &ledger);
+    if (failed(sched.run(fn))) {
+      preScheduled = false;
+      break;
+    }
+  }
+  if (preScheduled) {
+    // A single-site callee's banked float lands on its one grantable top
+    // region, divided by the wrappers between the callee's span and it.
+    for (auto [calleeOp, budget] : ledger.calleeBudget) {
+      auto fn = cast<func::FuncOp>(calleeOp);
+      const auto *at = llvm::find(order, fn);
+      assert(at != order.end() && "a called func is in the order");
+      DependenceAnalysis &calleeDeps = *depsFor[at - order.begin()];
+      std::optional<std::pair<Operation *, int64_t>> target;
+      unsigned grantable = 0;
+      for (const SchedRegion &r : enumerateRegions(fn))
+        if (auto t = grantTarget(r, calleeDeps)) {
+          ++grantable;
+          target = t;
+        }
+      if (grantable != 1)
+        continue;
+      if (int64_t g = budget / target->second)
+        grants[target->first] += g;
+    }
+    for (auto [key, g] : ledger.grants)
+      grants[key] += g;
+    if (!grants.empty()) {
+      int64_t granted = 0;
+      for (auto [key, g] : grants)
+        granted += g;
+      info(Stage::Sched, topFunc)
+          << "Composition slack: " << grants.size()
+          << " region leash(es) widened by " << granted << " cycle(s) in total";
+    }
+  } else {
+    info(Stage::Sched, topFunc)
+        << "The slack pre-schedule did not place; area leashes stay "
+           "region-local";
+  }
+  return grants;
+}
+
+LogicalResult mlir::allo::runSDCScheduler(ModuleOp module, StringRef top,
+                                          float cycleTime,
+                                          const SchedulerOptions &opts,
+                                          ScheduleModel &model) {
+  loadDependentDialects(*module->getContext());
+  // Timing characterization for every op (latency + delays), built from the
+  // injected `dcp.device` + `dcp.operator` IR, once for scheduling and reify.
+  auto loadedDev = DeviceModel::fromModule(module);
+
+  // Callees before callers: a caller's own region partition asks whether each
+  // call is indeterminate, which reads the callee's published latency.
+  auto topFunc = module.lookupSymbol<func::FuncOp>(top);
+  if (!topFunc) {
+    error(Stage::Prep, Code::TopFunctionMissing, module)
+        << "Top function '" << top << "' not found";
+    return failure();
+  }
+  auto orderOr = callGraphPostOrder(topFunc);
+  if (failed(orderOr))
+    return failure();
+
+  // The fabric floor: a source flip-flop's clock-to-out plus routing, what a
+  // path with no operator in it already costs. It reaches the solve as the
+  // earliest sub-cycle time any operation may start at, not as a per-row delay
+  // (which would cost an N-deep chain N floors) and not off the period (which
+  // would leave `unitSlack` disagreeing with the solve by one floor).
+  float regFloor = loadedDev.operators.registerFloor();
+
+  // Derate rather than refuse: a target no single operator fits is raised to
+  // the least period every row does, once for the whole module (one clock
+  // domain), and everything downstream holds the raised period. The miss is a
+  // report; the schedule stays valid at the frequency actually achieved.
+  loadedDev.operators.setSelectionPeriod(cycleTime);
+  float scheduled =
+      minSchedulablePeriod(*orderOr, loadedDev, cycleTime, regFloor);
+  if (scheduled > cycleTime) {
+    warn(Stage::Sched, topFunc)
+        << "The requested " << format("%.2f", cycleTime) << " ns clock period ("
+        << format("%.0f", 1000.0f / cycleTime)
+        << " MHz) is not schedulable on this device; scheduling at "
+        << format("%.2f", scheduled) << " ns ("
+        << format("%.0f", 1000.0f / scheduled)
+        << " MHz). The QoR report prices the design at the achieved period";
+    // Re-rank at the achieved period: a row that missed the target may fit
+    // the raised period and win back a shorter latency. Every op keeps a row
+    // that fits, since the walk raised the period to its least need.
+    loadedDev.operators.setSelectionPeriod(scheduled);
+  }
+  model.cycleTimeNs = scheduled;
+
+  if (scheduled <= regFloor) {
+    error(Stage::Sched, Code::OperatorOverPeriod, module)
+        << "The requested clock period of " << scheduled
+        << " ns is at or below this device's register-to-register floor of "
+        << regFloor << " ns, so no cycle has room for any logic at all";
+    return failure();
+  }
+  SchedulerOptions optsWithFloor = opts;
+  optsWithFloor.regFloor = regFloor;
+
+  // Whole-func memory + stream dependence analysis, refined by the
+  // `allo.assume.*` hints. Built before any solve since the first run consumes
+  // the hints from the IR, and outliving the solves: the span composition
+  // reads its value ranges to bound a symbolic trip.
+  SmallVector<std::unique_ptr<DependenceAnalysis>> depsFor;
+  for (func::FuncOp fn : *orderOr)
+    depsFor.push_back(std::make_unique<DependenceAnalysis>(fn));
+
+  if (usesExactScheduler(opts.kind))
+    info(Stage::Sched, module)
+        << "Exact scheduler: " << opts.workers << " workers, seed " << opts.seed
+        << ", budget " << format("%g", opts.budget)
+        << " deterministic units per region"
+        << (opts.deterministic || opts.workers == 1 ? "" : ", workers racing");
+
+  DenseMap<Operation *, int64_t> grants;
+  if (opts.objective == ScheduleObjective::Area &&
+      usesExactScheduler(opts.kind))
+    grants = collectCompositionSlack(module, topFunc, *orderOr, depsFor,
+                                     loadedDev, scheduled, optsWithFloor);
+
+  for (auto [fn, deps] : llvm::zip(*orderOr, depsFor)) {
+    model.dependence.push_back({fn.getSymName().str(),
+                                (int64_t)deps->conservativeAccesses(),
+                                (int64_t)deps->undecidedPairs()});
+    FuncScheduler sched(*deps, loadedDev, model, scheduled, optsWithFloor,
+                        /*ledger=*/nullptr, &grants);
+    if (failed(sched.run(fn)))
+      return failure();
+  }
+  return success();
+}

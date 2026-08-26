@@ -210,8 +210,8 @@ composeDag(llvm::ArrayRef<SpanNode> nodes,
 
 /// One materialized dcp region as the latency model sees it: the reify-side
 /// structural walk over `dcp.pipeline` / `dcp.sequential` / `dcp.select` and
-/// the `dcp.instance` elements they hold. `SDC.cpp` has the other, over the
-/// affine/scf loops these were built from. A region's span and composition
+/// the `dcp.instance` elements they hold. `Scheduler.cpp` has the other, over
+/// the affine/scf loops these were built from. A region's span and composition
 /// class are derived where used, never read back off an attribute. For
 /// \p topLevel see `dcpSpanNodes`.
 SpanNode dcpSpanNode(Operation *regionOp, bool topLevel);

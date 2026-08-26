@@ -350,7 +350,7 @@ LogicalResult computeStartTimesInCycle(circt::scheduling::ChainingProblem &prob,
 //===----------------------------------------------------------------------===//
 // SDC simplex schedulers.
 //
-// Fork of CIRCT's `scheduleSimplex` family (implementation in Scheduler.cpp).
+// Fork of CIRCT's `scheduleSimplex` family (implementation in SDC.cpp).
 // Call these via `solveSchedulingProblem` below or by fully-qualified name
 // (`mlir::allo::scheduleSimplex`) to avoid ambiguity with the CIRCT overloads.
 //
