@@ -52,6 +52,7 @@ namespace {
 /// `distance` sums the iterations the edges span.
 struct Recurrence {
   SmallVector<Operation *> ops; // the circuit, in dependence order
+  SmallVector<std::pair<int64_t, int64_t>> hops; // (latency, distance) per edge
   int64_t latency = 0;
   int64_t distance = 0;
   explicit operator bool() const { return !ops.empty(); }
@@ -62,10 +63,17 @@ struct Recurrence {
 static std::string render(const Recurrence &rec) {
   std::string s;
   llvm::raw_string_ostream os(s);
-  for (Operation *op : rec.ops)
-    os << op->getName().getStringRef() << " -> ";
-  os << rec.ops.front()->getName().getStringRef() << " (total latency "
-     << rec.latency << " over distance " << rec.distance << ")";
+  for (auto [i, op] : llvm::enumerate(rec.ops)) {
+    os << op->getName().getStringRef();
+    if (Attribute map = op->getAttr("map"))
+      os << map;
+    if (i < rec.hops.size())
+      os << " -(" << rec.hops[i].first << ",d" << rec.hops[i].second << ")-> ";
+    else if (i + 1 < rec.ops.size())
+      os << " -> ";
+  }
+  os << " (total latency " << rec.latency << " over distance " << rec.distance
+     << ")";
   return s;
 }
 
@@ -632,6 +640,7 @@ Recurrence SDCSchedulerBase::bindingRecurrence(unsigned ii) {
   for (unsigned u = v;;) {
     rec.ops.push_back(nodes[u]);
     const Edge &in = edges[predEdge[u]];
+    rec.hops.push_back({in.latency, in.distance});
     rec.latency += in.latency;
     rec.distance += in.distance;
     u = pred[u];
@@ -639,6 +648,10 @@ Recurrence SDCSchedulerBase::bindingRecurrence(unsigned ii) {
       break;
   }
   std::reverse(rec.ops.begin(), rec.ops.end());
+  // Recorded per node as its incoming edge; after the reversal, rotate so
+  // hops[i] is the edge ops[i] -> ops[i+1] (wrapping).
+  std::reverse(rec.hops.begin(), rec.hops.end());
+  std::rotate(rec.hops.begin(), rec.hops.begin() + 1, rec.hops.end());
   return rec;
 }
 
@@ -850,6 +863,22 @@ LogicalResult SDCSchedulerBase::solveGraph(bool allowRaise) {
           rec.ops.push_back(varOps[v]);
         rec.latency = cyc->lat;
         rec.distance = cyc->dist;
+        // Annotate each hop with the strongest parallel edge's (lat, dist).
+        for (unsigned i = 0, n = rec.ops.size(); i < n; ++i) {
+          unsigned a = startTimeVariables[rec.ops[i]];
+          unsigned b = startTimeVariables[rec.ops[(i + 1) % n]];
+          std::pair<int64_t, int64_t> best{0, 0};
+          bool found = false;
+          for (unsigned e : staticOut[a])
+            if (edges[e].dst == b) {
+              int64_t w = edges[e].lat + edges[e].extra -
+                          int64_t(parameterT) * edges[e].dist;
+              if (!found || w > best.first - int64_t(parameterT) * best.second)
+                best = {edges[e].lat + edges[e].extra, edges[e].dist};
+              found = true;
+            }
+          rec.hops.push_back(best);
+        }
         diag << "; the binding recurrence is " << render(rec);
       }
     }

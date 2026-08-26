@@ -172,11 +172,10 @@ rescaleOnLoopStep(SmallVectorImpl<affine::DependenceComponent> &comps) {
 // `checkMemrefAccessDependence` is queried at each loop depth from 1 to
 // numCommonLoops (a dependence carried by the d-th common surrounding loop)
 // and at numCommonLoops + 1, the loop-independent (intra-iteration) case with
-// all common loops pinned to the same iteration. At that top depth,
-// `allowRAR = false` orients the otherwise-symmetric dist-0 dependence by
-// program order and drops read-read pairs, which never conflict. Aliasing
-// between distinct memrefs is not modeled: distinct SSA memrefs are ASSUMED
-// disjoint.
+// all common loops pinned to the same iteration. At the top depth,
+// `allowRAR = false` also orients the otherwise-symmetric dist-0 dependence
+// by program order. Aliasing between distinct memrefs is not modeled:
+// distinct SSA memrefs are ASSUMED disjoint.
 //
 // A pair with either endpoint the test cannot model (`nonPolyhedral`) is
 // skipped entirely and left to the conservative path, so each pair is owned
@@ -200,13 +199,17 @@ checkMemrefDependence(ArrayRef<Operation *> memoryOps,
       affine::MemRefAccess srcAccess(src);
       unsigned numCommon = affine::getInnermostCommonLoopDepth({src, dst});
       for (unsigned depth = 1; depth <= numCommon + 1; ++depth) {
-        // Carried depths keep read-after-read reuse edges; the loop-independent
-        // depth does not.
-        bool allowRAR = depth <= numCommon;
+        // Read-read pairs get no edge at any depth (allowRAR = false): reads
+        // commute, and port contention is the resource model's job. A carried
+        // RAR edge is not harmless slack: composed with intra-iteration
+        // chains it closes false recurrence circuits that inflate the II
+        // floor. At the loop-independent depth allowRAR = false also orients
+        // the dist-0 dependence by program order.
         affine::FlatAffineValueConstraints constraints;
         SmallVector<affine::DependenceComponent, 2> comps;
         auto result = affine::checkMemrefAccessDependence(
-            srcAccess, dstAccess, depth, &constraints, &comps, allowRAR);
+            srcAccess, dstAccess, depth, &constraints, &comps,
+            /*allowRAR=*/false);
         if (result.value == affine::DependenceResult::Failure)
           undecided.insert(unorderedPair(src, dst));
         if (hasDependence(result.value)) {
