@@ -168,14 +168,76 @@ rescaleOnLoopStep(SmallVectorImpl<affine::DependenceComponent> &comps) {
   }
 }
 
+// Bound the symbols of \p rel that an `assume.ssa` range constrains, found
+// by identifier. Returns whether any bound landed.
+static bool boundSymbols(presburger::IntegerRelation &rel,
+                         const llvm::DenseMap<Value, AssumedRange> &ranges) {
+  using presburger::Identifier;
+  using presburger::VarKind;
+  if (!rel.getSpace().isUsingIds())
+    return false;
+  bool tightened = false;
+  ArrayRef<Identifier> ids = rel.getIds(VarKind::Symbol);
+  unsigned off = rel.getVarKindOffset(VarKind::Symbol);
+  for (const auto &[v, r] : ranges) {
+    const auto *it = std::find(ids.begin(), ids.end(), Identifier(v));
+    if (it == ids.end())
+      continue;
+    unsigned pos = off + std::distance(ids.begin(), it);
+    if (r.lb) {
+      rel.addBound(presburger::BoundType::LB, pos, *r.lb);
+      tightened = true;
+    }
+    if (r.ub) {
+      rel.addBound(presburger::BoundType::UB, pos, *r.ub);
+      tightened = true;
+    }
+  }
+  return tightened;
+}
+
+// Whether the `assume.ssa` value ranges prove \p srcAccess and \p dstAccess
+// element-disjoint over their WHOLE iteration domains: the access relations
+// (domains included), tightened by the ranges on their symbols, compose to an
+// empty iteration-to-iteration relation. Built from the same public pieces
+// the upstream test composes, minus its ordering constraints, so emptiness
+// here is a strictly stronger fact and dropping every depth's result on it is
+// sound (`A[i+n]` vs `A[i]` under `assume(n >= 64)` on a 64-trip loop).
+// The upstream polyhedron cannot answer this: its composition eliminates the
+// symbol and its returned system carries no value identities to bound.
+static bool rangesDisjoint(const affine::MemRefAccess &srcAccess,
+                           const affine::MemRefAccess &dstAccess,
+                           const llvm::DenseMap<Value, AssumedRange> &ranges) {
+  using presburger::IntegerRelation;
+  using presburger::PresburgerSpace;
+  IntegerRelation srcRel(PresburgerSpace::getRelationSpace());
+  IntegerRelation dstRel(PresburgerSpace::getRelationSpace());
+  if (failed(srcAccess.getAccessRelation(srcRel)) ||
+      failed(dstAccess.getAccessRelation(dstRel)))
+    return false;
+  bool tightened = boundSymbols(srcRel, ranges);
+  tightened |= boundSymbols(dstRel, ranges);
+  if (!tightened)
+    return false;
+  dstRel.inverse();
+  if (!dstRel.getSpace().isUsingIds())
+    dstRel.resetIds();
+  if (!srcRel.getSpace().isUsingIds())
+    srcRel.resetIds();
+  dstRel.mergeAndCompose(srcRel);
+  return dstRel.isEmpty();
+}
+
 // Records the affine memref dependences of every ordered pair of accesses.
 // `checkMemrefAccessDependence` is queried at each loop depth from 1 to
 // numCommonLoops (a dependence carried by the d-th common surrounding loop)
 // and at numCommonLoops + 1, the loop-independent (intra-iteration) case with
 // all common loops pinned to the same iteration. At the top depth,
 // `allowRAR = false` also orients the otherwise-symmetric dist-0 dependence
-// by program order. Aliasing between distinct memrefs is not modeled:
-// distinct SSA memrefs are ASSUMED disjoint.
+// by program order. A result whose polyhedron the `assume.ssa` value ranges
+// empty out is dropped (see rangesEmptyDependence). Aliasing between
+// distinct memrefs is not modeled: distinct SSA memrefs are ASSUMED
+// disjoint.
 //
 // A pair with either endpoint the test cannot model (`nonPolyhedral`) is
 // skipped entirely and left to the conservative path, so each pair is owned
@@ -186,8 +248,10 @@ rescaleOnLoopStep(SmallVectorImpl<affine::DependenceComponent> &comps) {
 static void
 checkMemrefDependence(ArrayRef<Operation *> memoryOps,
                       const llvm::SmallDenseSet<Operation *> &nonPolyhedral,
+                      const llvm::DenseMap<Value, AssumedRange> &ranges,
                       llvm::DenseSet<OpPair> &undecided,
-                      MemoryDependenceResult &results) {
+                      MemoryDependenceResult &results,
+                      unsigned &prunedByRange) {
   for (Operation *dst : memoryOps) {
     results.try_emplace(dst); // every access gets a (possibly empty) entry
     if (nonPolyhedral.contains(dst))
@@ -198,6 +262,9 @@ checkMemrefDependence(ArrayRef<Operation *> memoryOps,
         continue;
       affine::MemRefAccess srcAccess(src);
       unsigned numCommon = affine::getInnermostCommonLoopDepth({src, dst});
+      // This pair's results, committed below unless the assumed ranges prove
+      // the pair element-disjoint outright.
+      SmallVector<circt::analysis::MemoryDependence, 2> found;
       for (unsigned depth = 1; depth <= numCommon + 1; ++depth) {
         // Read-read pairs get no edge at any depth (allowRAR = false): reads
         // commute, and port contention is the resource model's job. A carried
@@ -214,9 +281,16 @@ checkMemrefDependence(ArrayRef<Operation *> memoryOps,
           undecided.insert(unorderedPair(src, dst));
         if (hasDependence(result.value)) {
           rescaleOnLoopStep(comps);
-          results[dst].emplace_back(src, result.value, comps);
+          found.emplace_back(src, result.value, comps);
         }
       }
+      if (!found.empty() && !ranges.empty() &&
+          rangesDisjoint(srcAccess, dstAccess, ranges)) {
+        prunedByRange += found.size();
+        continue;
+      }
+      for (circt::analysis::MemoryDependence &dep : found)
+        results[dst].push_back(std::move(dep));
     }
   }
 }
@@ -803,9 +877,20 @@ DependenceAnalysis::DependenceAnalysis(func::FuncOp funcOp) : func(funcOp) {
            "an unmodeled memory access reached the dependence analysis");
   });
 
+  // Distill the assume.ssa value facts into per-value constant ranges first:
+  // the polyhedral test below reads them as symbol bounds.
+  buildAssumedRanges(assumptions, assumedRanges);
+
   // Affine memref dependences over all carried depths plus the
   // loop-independent one.
-  checkMemrefDependence(memoryOps, nonPolyhedral, undecided, results);
+  unsigned prunedByRange = 0;
+  checkMemrefDependence(memoryOps, nonPolyhedral, assumedRanges, undecided,
+                        results, prunedByRange);
+  if (prunedByRange)
+    info(Stage::Sched, funcOp)
+        << "Value-range disambiguation pruned " << prunedByRange
+        << " dependence result(s): the assumed ranges empty the pair's "
+           "polyhedron";
 
   // Conservative ordering for the pairs the polyhedral test skips or cannot
   // decide.
@@ -824,10 +909,6 @@ DependenceAnalysis::DependenceAnalysis(func::FuncOp funcOp) : func(funcOp) {
   // User hints: prune conservative edges the programmer proves absent. Applied
   // last, over the fully-built edge set.
   applyNoDepHints(noDepHints, nonPolyhedral, results);
-
-  // Distill the assume.ssa value facts into per-value constant ranges. Does not
-  // affect dependence edges.
-  buildAssumedRanges(assumptions, assumedRanges);
 
   // Surface the distilled ranges, one line per constrained value.
   if (!assumedRanges.empty()) {

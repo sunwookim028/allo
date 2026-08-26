@@ -885,6 +885,24 @@ def test_assume_hints():
     # the recurrence.
     assert _iis(_sched(seq_scatter).cyclic()) == [mem_reduce_ii(exact=False)]
 
+    # A value range reaches the polyhedral test itself: under `assume(n >= 64)`
+    # the write `A[i + n]` clears everything a 64-trip loop reads, the pair's
+    # dependence polyhedron empties at every depth, and the loop fully
+    # pipelines. Without the fact the symbolic offset keeps a carried edge at
+    # the conservative distance and the recurrence binds the II.
+    def shifted(hint):
+        @kernel
+        def sh(A: f32[192], n: index):
+            if hint:
+                allo.assume(n >= 64)
+            for i in range(64):
+                A[i + n] = A[i] * 2.0
+
+        return sh
+
+    assert _iis(_sched(shifted(True)).cyclic()) == [1]
+    assert _iis(_sched(shifted(False)).cyclic())[0] > 1
+
 
 # A hint that bounds a runtime trip is also a hint about WIDTH. The scheduler
 # distils `assume(n <= K)` into a worst-case count; reification carries it as
