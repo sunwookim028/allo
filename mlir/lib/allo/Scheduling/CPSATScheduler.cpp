@@ -896,22 +896,19 @@ void addAllocationHeadroom(CpModelBuilder &model, ProblemT &prob,
 /// `max(size - b, 0)`; every variable this adds is determined by the size
 /// through a propagator, and every weight is nonnegative. A non-convex table
 /// cannot ride that form (its negative weights void the objective's LP bound):
-/// its value is a sum over the table's increase points, one threshold literal
-/// `b_d <=> size >= d` charged that point's jump, with one supporting line per
-/// lower-convex-hull segment holding the LP bound at the table's convex
-/// envelope. An element lookup would state the same value in one constraint,
-/// but or-tools 9.15's presolve crashes crushing hints through an expanded
-/// element (`TryToReplaceVariableByItsEncoding`).
-/// \p sizeHint, when the caller hints the size, completes the hints here.
+/// it is charged at its lower convex envelope, one supporting line per hull
+/// segment on a minimized cost variable. The staircase above the envelope is
+/// deliberately not modeled: stating it exactly (threshold literals per jump)
+/// doubled the solve time for no measured area, and the register-lifetime
+/// repair re-prices the shipped schedule at the real table. An element lookup
+/// is also out: or-tools 9.15's presolve crashes crushing hints through an
+/// expanded element (`TryToReplaceVariableByItsEncoding`).
 void addPiecewiseCost(CpModelBuilder &model, IntVar size,
                       ArrayRef<int64_t> price, SmallVectorImpl<IntVar> &vars,
-                      SmallVectorImpl<int64_t> &weights,
-                      std::optional<int64_t> sizeHint = std::nullopt) {
+                      SmallVectorImpl<int64_t> &weights) {
   auto hi = static_cast<int64_t>(price.size()) - 1;
   if (hi < 1)
     return;
-  assert((!sizeHint || (*sizeHint >= 0 && *sizeHint <= hi)) &&
-         "a size hint outside the table");
   bool convex = true;
   for (int64_t d = 2; d <= hi && convex; ++d)
     convex = price[d] - price[d - 1] >= price[d - 1] - price[d - 2];
@@ -937,21 +934,6 @@ void addPiecewiseCost(CpModelBuilder &model, IntVar size,
     table.push_back(p - price[0]);
   IntVar cost = model.NewIntVar(operations_research::Domain(
       *llvm::min_element(table), *llvm::max_element(table)));
-  LinearExpr sum;
-  for (int64_t d = 1; d <= hi; ++d) {
-    int64_t jump = table[d] - table[d - 1];
-    if (!jump)
-      continue;
-    BoolVar b = model.NewBoolVar();
-    model.AddGreaterOrEqual(size, d).OnlyEnforceIf(b);
-    model.AddLessOrEqual(size, d - 1).OnlyEnforceIf(b.Not());
-    if (sizeHint)
-      model.AddHint(b, *sizeHint >= d);
-    sum += LinearExpr::Term(b, jump);
-  }
-  model.AddEquality(cost, sum);
-  if (sizeHint)
-    model.AddHint(cost, table[*sizeHint]);
   vars.push_back(cost);
   weights.push_back(1);
   SmallVector<int64_t> hull;
@@ -1036,7 +1018,6 @@ LinearExpr areaTerms(CpModelBuilder &model, ArrayRef<IntVar> starts,
       model.AddLessOrEqual(startVars.at(reader) + distance * ii,
                            def + latencyOf(term.def) +
                                LinearExpr::Term(built, fold));
-    std::optional<int64_t> builtHint;
     if (hintFrom) {
       int64_t end = static_cast<int64_t>(*hintFrom->getStartTime(term.def)) +
                     hintFrom->latencyOf(term.def);
@@ -1045,10 +1026,9 @@ LinearExpr areaTerms(CpModelBuilder &model, ArrayRef<IntVar> starts,
         depth = std::max(depth,
                          static_cast<int64_t>(*hintFrom->getStartTime(reader)) +
                              distance * ii - end);
-      builtHint = (depth + fold - 1) / fold;
-      model.AddHint(built, *builtHint);
+      model.AddHint(built, (depth + fold - 1) / fold);
     }
-    addPiecewiseCost(model, built, table, vars, weights, builtHint);
+    addPiecewiseCost(model, built, table, vars, weights);
   }
   LinearExpr structural;
   for (const AllocationVar &alloc : allocs)
