@@ -1388,10 +1388,16 @@ void reportUnsolved(Problem &prob, const CpSolverResponse &response,
 /// \p latencyOf must under-approximate every latency the model can decide
 /// (the least candidate of a decided realization), or the floor cuts the
 /// optimum.
+///
+/// \p opFloors, non-null, receives a per-operation start floor: the longest
+/// path in for every operation, raised by the same threshold-set bound for
+/// operations holding a capped unit. True lower bounds on any schedule, fed
+/// to the model as variable domains.
 template <typename ProblemT>
 int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
                    ArrayRef<DrainTerm> terms,
-                   llvm::function_ref<int64_t(Operation *)> latencyOf) {
+                   llvm::function_ref<int64_t(Operation *)> latencyOf,
+                   DenseMap<Operation *, int64_t> *opFloors = nullptr) {
   auto offsetOf = [&](const DrainTerm &term) {
     return term.offset + (term.plusLatency ? latencyOf(term.op) : 0);
   };
@@ -1443,6 +1449,11 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
   for (const DrainTerm &term : terms)
     bound = std::max(bound, heads.lookup(term.op) + offsetOf(term));
 
+  if (opFloors)
+    for (Operation *op : prob.getOperations())
+      if (int64_t head = heads.lookup(op))
+        (*opFloors)[op] = head;
+
   SmallVector<std::pair<Problem::ResourceType, int64_t>> capped;
   for (Problem::ResourceType rsrc : prob.getResourceTypes())
     if (unsigned limit = prob.getLimit(rsrc).value_or(0))
@@ -1474,16 +1485,15 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
     return best;
   };
 
-  DenseSet<Operation *> feeding;
-  for (const DrainTerm &term : terms) {
-    // Longest path on to this output by the reverse relaxation, absent for an
-    // operation that cannot reach it. A carried path can weigh negative,
-    // which stays a valid (if weak) tail.
+  // Longest path on to \p sink by the reverse relaxation, absent for an
+  // operation that cannot reach it. A carried path can weigh negative, which
+  // stays a valid (if weak) tail.
+  auto tailsTo = [&](Operation *sink) {
     DenseMap<Operation *, int64_t> tails;
-    tails[term.op] = 0;
-    changed = true;
-    for (unsigned round = 0; changed && round <= nOps; ++round) {
-      changed = false;
+    tails[sink] = 0;
+    bool grew = true;
+    for (unsigned round = 0; grew && round <= nOps; ++round) {
+      grew = false;
       for (const FloorEdge &e : edges) {
         auto to = tails.find(e.dst);
         if (to == tails.end())
@@ -1492,14 +1502,20 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
         auto from = tails.find(e.src);
         if (from == tails.end()) {
           tails[e.src] = reach;
-          changed = true;
+          grew = true;
         } else if (reach > from->second) {
           from->second = reach;
-          changed = true;
+          grew = true;
         }
       }
     }
-    assert(!changed && "a positive cycle at the floor's interval");
+    assert(!grew && "a positive cycle at the floor's interval");
+    return tails;
+  };
+
+  DenseSet<Operation *> feeding;
+  for (const DrainTerm &term : terms) {
+    DenseMap<Operation *, int64_t> tails = tailsTo(term.op);
     for (auto [rsrc, limit] : capped) {
       SmallVector<Contender> group;
       for (Operation *op : prob.getOperations()) {
@@ -1528,6 +1544,32 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
     if (!group.empty())
       bound = std::max(bound, strongest(group, limit));
   }
+
+  // The same threshold-set bound per contending operation: a set that must
+  // all pass a capped resource before \p v starts pushes v's start the way it
+  // pushes an output's commit, with v itself in the set at tail zero.
+  if (opFloors)
+    for (Operation *v : prob.getOperations()) {
+      if (llvm::none_of(capped,
+                        [&](auto &c) { return prob.usesResource(v, c.first); }))
+        continue;
+      DenseMap<Operation *, int64_t> tails = tailsTo(v);
+      int64_t &floor = (*opFloors)[v];
+      for (auto [rsrc, limit] : capped) {
+        SmallVector<Contender> group;
+        for (Operation *op : prob.getOperations()) {
+          if (!prob.usesResource(op, rsrc))
+            continue;
+          auto it = tails.find(op);
+          if (it == tails.end())
+            continue;
+          group.push_back({heads.lookup(op), it->second,
+                           static_cast<int64_t>(prob.getResourceDemand(op))});
+        }
+        if (!group.empty())
+          floor = std::max(floor, strongest(group, limit));
+      }
+    }
   return bound;
 }
 
@@ -1596,7 +1638,8 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
   // `scheduleSimplex` has written the start times and their sub-cycle offsets,
   // so its schedule ships as is. An allocation or a realization still to
   // decide is worth the solve anyway.
-  int64_t floorDrain = drainFloor(prob, breaks, span.drain, minLat);
+  DenseMap<Operation *, int64_t> opFloors;
+  int64_t floorDrain = drainFloor(prob, breaks, span.drain, minLat, &opFloors);
   bool allocates = false;
   for (Problem::ResourceType rsrc : prob.getResourceTypes())
     allocates |= prob.getAllocatable(rsrc).has_value();
@@ -1628,7 +1671,8 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
   SmallVector<IntVar> orderedStarts;
   orderedStarts.reserve(ops.size());
   for (Operation *op : ops) {
-    IntVar var = model.NewIntVar(operations_research::Domain(0, horizon));
+    IntVar var = model.NewIntVar(
+        operations_research::Domain(opFloors.lookup(op), horizon));
     model.AddHint(var, *prob.getStartTime(op));
     startVars.try_emplace(op, var);
     orderedStarts.push_back(var);
@@ -1941,6 +1985,7 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
                         SharedClasses &sharedMeta, float cycleTime,
                         const SpanObjective &span, const SchedulerOptions &opts,
                         std::optional<int64_t> drainBound, int64_t floorDrain,
+                        const DenseMap<Operation *, int64_t> &opFloors,
                         std::optional<int64_t> areaBound, bool areaMode,
                         unsigned ii, unsigned horizon, bool hint,
                         ModuloAttempt &out) {
@@ -1954,7 +1999,8 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   unsigned anchorIndex = 0;
   orderedStarts.reserve(ops.size());
   for (Operation *op : ops) {
-    IntVar var = model.NewIntVar(operations_research::Domain(0, horizon));
+    IntVar var = model.NewIntVar(
+        operations_research::Domain(opFloors.lookup(op), horizon));
     if (hint)
       model.AddHint(var, *prob.getStartTime(op));
     startVars.try_emplace(op, var);
@@ -2438,8 +2484,9 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
   if (bySpan && warm.placed)
     heuristicSpan = iiWeight * greedyII + span.drainOf(prob);
   std::optional<int64_t> best = heuristicSpan;
+  DenseMap<Operation *, int64_t> opFloors;
   int64_t floorDrain =
-      bySpan ? drainFloor(prob, breaks, span.drain, minLat) : 0;
+      bySpan ? drainFloor(prob, breaks, span.drain, minLat, &opFloors) : 0;
 
   // Whether this region has an allocation to decide at all, which the cut
   // below admits a span tie for.
@@ -2528,8 +2575,8 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
     ModuloAttempt attempt;
     ModuloOutcome outcome =
         solveAtII(prob, lastOp, breaks, choices, sharedMeta, cycleTime, span,
-                  opts, drainBound, bySpan ? floorDrain : 0, areaBound,
-                  areaMode, ii, window + ii * contending,
+                  opts, drainBound, bySpan ? floorDrain : 0, opFloors,
+                  areaBound, areaMode, ii, window + ii * contending,
                   /*hint=*/warm.placed && ii == greedyII, attempt);
     if (outcome == ModuloOutcome::Infeasible) {
       // INFEASIBLE is a proof only where nothing bounded the solve; under the
@@ -2644,7 +2691,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
     ModuloAttempt folded;
     ModuloOutcome outcome = solveAtII(
         prob, lastOp, breaks, choices, sharedMeta, cycleTime, span, opts,
-        /*drainBound=*/*best - iiWeight * bestII, floorDrain,
+        /*drainBound=*/*best - iiWeight * bestII, floorDrain, opFloors,
         /*areaBound=*/std::nullopt, /*areaMode=*/true, bestII,
         window + bestII * contending, /*hint=*/warm.placed, folded);
     if (outcome == ModuloOutcome::Scheduled &&
