@@ -1099,14 +1099,18 @@ def DCPathLoadOp : DCPath_Op<"dcp.load",
     OptionalAttr<I64Attr>:$bank,
     OptionalAttr<I64Attr>:$port,
     // The `fwd_id`s of the same-array stores whose data a shadow forwards into
-    // this read on a same-cycle, same-element collision. The emitter builds one
-    // compare and mux arm per entry.
-    OptionalAttr<DenseI64ArrayAttr>:$fwd);
+    // this read on a same-element collision. The emitter builds one compare
+    // and mux arm per entry.
+    OptionalAttr<DenseI64ArrayAttr>:$fwd,
+    // Per `fwd` entry, the cycle the paired store issues at relative to this
+    // read's issue: 0 is the same cycle, up to `latency` while the read is in
+    // flight. A younger (larger-offset) arm wins over an older one.
+    OptionalAttr<DenseI64ArrayAttr>:$fwdOff);
   let results = (outs AnyType:$result);
   let assemblyFormat = [{
     $memref `[` $indices `]` `map` $map `at` $start `lat` $latency
-    (`bank` $bank^)? (`port` $port^)? (`fwd` $fwd^)? attr-dict
-    `:` type($memref) `->` type($result)
+    (`bank` $bank^)? (`port` $port^)? (`fwd` $fwd^)? (`fwd_off` $fwdOff^)?
+    attr-dict `:` type($memref) `->` type($result)
   }];
 }
 

@@ -465,14 +465,19 @@ void DatapathBuilder::bindMemory(Operation *op, Value memref, RegionBlock &rb) {
     if (std::optional<int64_t> id = s.getFwdId())
       fwdStoreOf[*id] = {mid, aidx};
   } else if (auto l = dyn_cast<dcp::DCPathLoadOp>(op)) {
-    if (std::optional<ArrayRef<int64_t>> ids = l.getFwd())
+    if (std::optional<ArrayRef<int64_t>> ids = l.getFwd()) {
+      ArrayRef<int64_t> offs = l.getFwdOff().value_or(ArrayRef<int64_t>{});
+      assert(offs.size() == ids->size() &&
+             "a forwarded load's offsets parallel its store ids");
       fwdLoads.push_back(
-          {mid, aidx, llvm::SmallVector<int64_t, 1>(ids->begin(), ids->end())});
+          {mid, aidx, llvm::SmallVector<int64_t, 1>(ids->begin(), ids->end()),
+           llvm::SmallVector<int64_t, 1>(offs.begin(), offs.end())});
+    }
   }
 }
 
 void DatapathBuilder::recordForwards() {
-  for (auto &[mid, load, ids] : fwdLoads) {
+  for (auto &[mid, load, ids, offs] : fwdLoads) {
     MemUnit &m = dp.mems[mid];
     // The scheduler's eligibility gate, restated as build invariants.
     assert(!m.scattered && !m.isRom && !m.skewed &&
@@ -481,13 +486,16 @@ void DatapathBuilder::recordForwards() {
     assert(m.readLatency >= 1 && m.writeLatency == 1 &&
            "forwarding shadows exactly the one-cycle write window of a "
            "registered read");
-    for (int64_t id : ids) {
+    for (auto [id, off] : llvm::zip_equal(ids, offs)) {
       auto it = fwdStoreOf.find(id);
       assert(it != fwdStoreOf.end() && it->second.first == mid &&
              "a load's fwd list names a store of its own array");
       assert(m.accesses[it->second.second].region == m.accesses[load].region &&
              "a forwarded pair shares one region");
-      m.forwards.push_back({load, it->second.second});
+      assert(off >= 0 && off <= static_cast<int64_t>(m.readLatency) &&
+             "a window offset lies within the read's flight");
+      m.forwards.push_back(
+          {load, it->second.second, static_cast<unsigned>(off)});
     }
   }
 }

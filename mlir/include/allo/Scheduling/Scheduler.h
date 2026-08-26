@@ -93,13 +93,28 @@ public:
   /// Store->load dependences a forwarding network relaxes: the load may issue
   /// in the store's cycle, a shadow register supplying the datum on an address
   /// match. Set before solving; every solver and verifier weighs such an edge
-  /// at latency zero instead of the store's write latency.
-  void setForwarded(Dependence dep) { forwardedEdges.insert(dep); }
+  /// at `-window` instead of the store's write latency. A nonzero window lets
+  /// the store issue up to that many cycles AFTER the load while the read is
+  /// in flight, served by deeper shadow arms; window 0 is the same-cycle
+  /// shadow alone.
+  void setForwarded(Dependence dep, unsigned window = 0) {
+    forwardedEdges.insert(dep);
+    if (window)
+      forwardWindows[dep] = window;
+  }
   bool isForwarded(Dependence dep) const {
     return forwardedEdges.contains(dep);
   }
+  /// The forwarded edge's window (0 for a plain same-cycle shadow, and for an
+  /// edge that is not forwarded at all).
+  unsigned forwardWindow(Dependence dep) const {
+    return forwardWindows.lookup(dep);
+  }
   /// Forget every forwarded edge, for a re-solve of the unrelaxed problem.
-  void clearForwarded() { forwardedEdges.clear(); }
+  void clearForwarded() {
+    forwardedEdges.clear();
+    forwardWindows.clear();
+  }
 
   /// Schedule depth of a solved problem: the cycle by which every op has
   /// completed. Report only; a span composes from the drain instead, which may
@@ -215,6 +230,7 @@ private:
   ResourceTypeProperty<unsigned> allocation;
   OperationProperty<unsigned> assignedUnit;
   llvm::DenseSet<Dependence> forwardedEdges;
+  llvm::DenseMap<Dependence, unsigned> forwardWindows;
 };
 
 /// The cyclic twin: CIRCT's `ModuloProblem` with occupancy windows, i.e.

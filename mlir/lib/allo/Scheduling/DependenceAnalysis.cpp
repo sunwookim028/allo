@@ -762,7 +762,6 @@ DependenceAnalysis::DependenceAnalysis(func::FuncOp funcOp) : func(funcOp) {
 
   // Affine memref dependences over all carried depths plus the
   // loop-independent one.
-  llvm::DenseSet<OpPair> undecided;
   checkMemrefDependence(memoryOps, nonPolyhedral, undecided, results);
 
   // Conservative ordering for the pairs the polyhedral test skips or cannot

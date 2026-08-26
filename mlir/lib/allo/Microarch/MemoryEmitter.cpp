@@ -838,11 +838,13 @@ void DatapathEmitter::finalizeScatteredPorts() {
 }
 
 // Resolve every pending forward: per paired store, a same-element compare at
-// the shared issue cycle gated by the store's commit pulse, the select and the
-// store's datum registered to the read latency on the load's shell, muxed over
-// the RAM datum. At most one select fires per cycle (a WAW pair holding one
-// address is kept a cycle apart, and same-cycle stores are element-disjoint),
-// so the arms stack in any order.
+// the store's issue cycle (against the load's address delayed by the pair's
+// window offset), the select and the store's datum registered out to the
+// read's data cycle on the load's shell, muxed over the RAM datum. Arms stack
+// oldest first: within one offset at most one select fires per cycle (a WAW
+// pair holding one address is kept a cycle apart, and same-cycle stores are
+// element-disjoint), and across offsets the younger (larger-offset) write is
+// muxed outermost and wins.
 void DatapathEmitter::finalizeForwards() {
   for (PendingForward &p : pendingForwards) {
     const uarch::MemUnit &m = dp.mems[p.mem];
@@ -858,18 +860,39 @@ void DatapathEmitter::finalizeForwards() {
     };
     // The load's bank digit is one cone for every paired store.
     Value loadBank = m.numBanks > 1 ? bankOf(load, p.bank) : Value();
+    // The load's issue-time address, delayed to each armed offset's store
+    // cycle; one chain per offset however many stores share it.
+    llvm::SmallDenseMap<unsigned, std::pair<Value, Value>> addrAt;
+    auto loadAddrAt = [&](unsigned off) {
+      auto [it, fresh] = addrAt.try_emplace(off);
+      if (fresh) {
+        it->second.first =
+            off ? c.shiftChain(p.offset, off, sh).last() : p.offset;
+        it->second.second =
+            loadBank && off ? c.shiftChain(loadBank, off, sh).last() : loadBank;
+      }
+      return it->second;
+    };
+    SmallVector<const uarch::MemUnit::Forward *> arms;
+    for (const uarch::MemUnit::Forward &f : m.forwards)
+      if (f.load == p.load)
+        arms.push_back(&f);
+    llvm::stable_sort(arms, [](const auto *a, const auto *b) {
+      return a->offset < b->offset;
+    });
     Value muxed = p.raw;
-    for (const uarch::MemUnit::Forward &f : m.forwards) {
-      if (f.load != p.load)
-        continue;
-      ForwardStore st = fwdStores.lookup(accKey(p.mem, f.store));
+    for (const uarch::MemUnit::Forward *f : arms) {
+      ForwardStore st = fwdStores.lookup(accKey(p.mem, f->store));
       assert(st.we && "a forwarded store recorded no issue terms");
-      const uarch::MemUnit::Access &store = m.accesses[f.store];
-      Value match = c.icmpEqV(p.offset, st.offset);
+      assert(f->offset <= m.readLatency && "an arm lies in the read's flight");
+      const uarch::MemUnit::Access &store = m.accesses[f->store];
+      auto [lOff, lBank] = loadAddrAt(f->offset);
+      Value match = c.icmpEqV(lOff, st.offset);
       if (m.numBanks > 1)
-        match = c.andBits(match, c.icmpEqV(loadBank, bankOf(store, st.bank)));
-      Value sel = c.delayValid(c.andBits(match, st.we), m.readLatency, sh);
-      Value data = c.shiftChain(st.data, m.readLatency, sh).last();
+        match = c.andBits(match, c.icmpEqV(lBank, bankOf(store, st.bank)));
+      unsigned toData = m.readLatency - f->offset;
+      Value sel = c.delayValid(c.andBits(match, st.we), toData, sh);
+      Value data = c.shiftChain(st.data, toData, sh).last();
       c.muxLedger.add(MuxRole::Crossbar, 2, m.width);
       muxed = c.mux(sel, data, muxed);
     }

@@ -75,6 +75,16 @@ public:
     return nonPolyhedral.contains(op);
   }
 
+  /// Whether the dependences between \p a and \p b come from the polyhedral
+  /// test alone: both accesses are in its reach and it decided the pair. A
+  /// pair on the conservative path carries blanket distances no consumer may
+  /// treat as exact.
+  bool isExactPair(Operation *a, Operation *b) const {
+    return !nonPolyhedral.contains(a) && !nonPolyhedral.contains(b) &&
+           !undecided.contains(a < b ? std::make_pair(a, b)
+                                     : std::make_pair(b, a));
+  }
+
   /// What \p loop (an `affine.for` or `scf.for`) runs: its exact count where
   /// that is compile-time, else the worst case its symbolic bounds admit under
   /// the `allo.assume.ssa` ranges, else empty. Memoized.
@@ -85,6 +95,8 @@ private:
   circt::analysis::MemoryDependenceResult results;
   llvm::DenseMap<Value, AssumedRange> assumedRanges;
   llvm::SmallDenseSet<Operation *> nonPolyhedral;
+  /// Pairs the polyhedral test accepted but could not decide (see isExactPair).
+  llvm::DenseSet<std::pair<Operation *, Operation *>> undecided;
   mutable llvm::DenseMap<Operation *, LoopTrip> trips;
 };
 

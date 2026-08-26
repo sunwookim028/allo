@@ -468,6 +468,10 @@ struct MemUnit {
   /// load's data out, delayed to the read latency.
   struct Forward {
     unsigned load = 0, store = 0; // indices into `accesses`
+    // Cycles the store issues after the read (0 = same cycle, up to
+    // `readLatency` while the read is in flight). A larger offset is a
+    // younger write and wins the shadow mux.
+    unsigned offset = 0;
   };
   llvm::SmallVector<Forward, 1> forwards;
 };

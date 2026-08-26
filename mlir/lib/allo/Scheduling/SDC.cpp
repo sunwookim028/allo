@@ -581,9 +581,11 @@ struct RecurrenceGraph {
 
   DenseMap<Operation *, unsigned> index;
   SmallVector<Edge> edges;
-  /// Edges weighed at zero latency; `latSum` is taken over the set this was
-  /// built with, and the walk below reads it as it stands.
+  /// Edges weighed at `-window` latency (0 when no window map names them);
+  /// `latSum` is taken over the set this was built with, and the walk below
+  /// reads it as it stands.
   llvm::DenseSet<Dependence> zeroed;
+  const llvm::DenseMap<Dependence, unsigned> *windows = nullptr;
   /// An II no circuit can exceed: the entry cut of every search below.
   int64_t latSum = 1;
   // The last relaxation's state, which the circuit walk reads.
@@ -592,8 +594,9 @@ struct RecurrenceGraph {
   int lastMoved = -1;
 
   RecurrenceGraph(ChainingModuloProblem &problem,
-                  const llvm::DenseSet<Dependence> &relaxed)
-      : zeroed(relaxed) {
+                  const llvm::DenseSet<Dependence> &relaxed,
+                  const llvm::DenseMap<Dependence, unsigned> *windows = nullptr)
+      : zeroed(relaxed), windows(windows) {
     for (Operation *op : problem.getOperations())
       index.try_emplace(op, index.size());
     for (Operation *op : problem.getOperations())
@@ -606,6 +609,12 @@ struct RecurrenceGraph {
       }
   }
 
+  int64_t weightOf(const Edge &e) const {
+    if (!zeroed.contains(e.dep))
+      return e.lat;
+    return windows ? -static_cast<int64_t>(windows->lookup(e.dep)) : 0;
+  }
+
   /// Whether the longest-path relaxation quiesces at \p ii, i.e. no positive
   /// circuit survives it.
   bool feasible(int64_t ii) {
@@ -615,8 +624,7 @@ struct RecurrenceGraph {
     for (unsigned round = 0; round <= index.size(); ++round) {
       bool moved = false;
       for (auto [i, e] : llvm::enumerate(edges)) {
-        int64_t w =
-            dist[e.src] + (zeroed.contains(e.dep) ? 0 : e.lat) - ii * e.dist;
+        int64_t w = dist[e.src] + weightOf(e) - ii * e.dist;
         if (w > dist[e.dst]) {
           dist[e.dst] = w;
           pred[e.dst] = static_cast<int>(i);
@@ -650,8 +658,10 @@ struct RecurrenceGraph {
 // this is a floor, which is all the gate below compares.
 static unsigned recurrenceMinII(
     ChainingModuloProblem &problem,
-    const llvm::DenseSet<circt::scheduling::Problem::Dependence> &relaxed) {
-  RecurrenceGraph graph(problem, relaxed);
+    const llvm::DenseSet<circt::scheduling::Problem::Dependence> &relaxed,
+    const llvm::DenseMap<circt::scheduling::Problem::Dependence, unsigned>
+        *windows = nullptr) {
+  RecurrenceGraph graph(problem, relaxed, windows);
   // A zero-distance positive circuit is infeasible at every II; the solve will
   // fail and report it, so any answer here is moot.
   if (!graph.feasible(graph.latSum))
@@ -757,14 +767,40 @@ selectCriticalPairs(ChainingModuloProblem &problem,
   return out;
 }
 
+// Whether \p v is settled when a store issues: a loop-carried block argument,
+// a region-invariant def, a constant, or a registered producer (latency >= 1).
+// A value combinational in its issue cycle would chain its whole cone through
+// a window arm's data mux into the load's consumers, a path the chain model
+// does not price.
+static bool registeredAtIssue(ChainingModuloProblem &problem, Value v,
+                              Block *block) {
+  if (isa<BlockArgument>(v))
+    return true;
+  Operation *def = v.getDefiningOp();
+  if (!def || def->getBlock() != block || def->hasTrait<OpTrait::ConstantLike>())
+    return true;
+  auto opr = problem.getLinkedOperatorType(def);
+  return opr && *problem.getLatency(*opr) >= 1;
+}
+
 // Relax the forwardable RAW edges of \p problem when, and only when, a storage
 // recurrence binds the II and relaxing moves that bound; otherwise the
 // schedule is unchanged and no shadow is built. Each forwarded load is
 // re-linked onto a `.fwd` twin of its operator type whose outgoing delay
 // carries the data mux (the RAM datum plus one arm per paired store); the
 // compare ends in the select register and touches no port path, so nothing
-// else is re-priced. Returns the relaxed edges, empty when there are none.
+// else is re-priced.
+//
+// A pair whose dependence distances are exact (polyhedral) and whose store
+// data is settled at issue is granted a WINDOW of the read latency on top of
+// the relaxation: the store may issue while the read is in flight, served by
+// deeper shadow arms, taking the RAM round trip out of the recurrence
+// entirely. Sound only when the solved II clears every window (an instance
+// one iteration past the paired one must fall outside it), which the guard
+// loop below enforces against the II floor. Returns the relaxed edges, empty
+// when there are none.
 static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
+                                               DependenceAnalysis &deps,
                                                const DeviceModel &dev,
                                                float cycleTime, float regFloor,
                                                unsigned minII) {
@@ -802,17 +838,59 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
   if (cands.empty())
     return {};
   llvm::DenseSet<Dependence> relaxed(cands.begin(), cands.end());
-  unsigned recRelaxed = recurrenceMinII(problem, relaxed);
+  // Window grants: exact distances and settled store data (see the doc
+  // comment above).
+  llvm::DenseMap<Dependence, unsigned> windows;
+  for (Dependence dep : cands) {
+    Operation *store = dep.getSource(), *load = dep.getDestination();
+    if (!deps.isExactPair(store, load))
+      continue;
+    Value data;
+    if (auto st = dyn_cast<affine::AffineWriteOpInterface>(store))
+      data = st.getValueToStore();
+    else
+      data = cast<memref::StoreOp>(store).getValueToStore();
+    if (!registeredAtIssue(problem, data, store->getBlock()))
+      continue;
+    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
+    unsigned rL = dev.memory.timing(ch.storage).latency.read;
+    if (rL)
+      windows[dep] = rL;
+  }
+  unsigned recRelaxed = recurrenceMinII(problem, relaxed, &windows);
+  // A window is sound only when the solved II strictly clears it: an instance
+  // one iteration past the paired one must fall outside it. The solver never
+  // goes below max(floorII, the windowed recurrence floor), so shrink any
+  // window that bound does not clear to the widest it does and re-settle.
+  // Every step strictly shrinks a window, so this converges; shrinking only
+  // raises the floor, which can only admit what already stands.
+  while (!windows.empty()) {
+    unsigned bound = std::max(floorII, recRelaxed);
+    SmallVector<std::pair<Dependence, unsigned>> shrink;
+    for (const auto &[dep, w] : windows)
+      if (bound < w + 1)
+        shrink.push_back({dep, bound - 1});
+    if (shrink.empty())
+      break;
+    for (auto &[dep, w] : shrink) {
+      if (w)
+        windows[dep] = w;
+      else
+        windows.erase(dep);
+    }
+    recRelaxed = recurrenceMinII(problem, relaxed, &windows);
+  }
   if (recRelaxed >= recOrig)
     return {}; // the bound runs through edges forwarding cannot serve
   info(Stage::Sched, problem.getContainingOp())
       << "Relaxing " << cands.size() << " store->load RAW edge(s) through a "
-      << "forwarding shadow: the recurrence floor drops from II=" << recOrig
-      << " to II=" << recRelaxed;
+      << "forwarding shadow (" << windows.size()
+      << " with an in-flight window): the recurrence floor drops from II="
+      << recOrig << " to II=" << recRelaxed;
   ForwardRelaxation out;
   out.edges = std::move(cands);
   for (Dependence dep : out.edges)
-    problem.setForwarded(dep);
+    problem.setForwarded(dep, windows.lookup(dep));
   // In `armsOf`'s (insertion) order, so the operator types the twins mint are
   // created in a deterministic order.
   for (auto &[load, arms] : armsOf) {
@@ -844,13 +922,13 @@ static void undoForwardRelaxation(ChainingModuloProblem &problem,
   relax.originalTypes.clear();
 }
 
-// Record the relaxed pairs the solved schedule collides on: the store issues a
-// whole number of intervals after the load, so some iteration pair shares a
-// cycle and the RAM alone would hand the load stale data. A pair the schedule
-// leaves separated needs no shadow and none is built. `delta == 0` is a
-// collision only for a distance-0 (same-iteration) edge; at carried-only
-// distances the same cycle holds a load that precedes the store, a pair the
-// analysis proved address-disjoint.
+// Record the relaxed pairs the solved schedule collides on: the paired store
+// instance issues inside the load's shadow window `[0, forwardWindow]`
+// relative to the read issue, so the RAM alone would hand the load stale
+// data. A pair whose instance lands before the read issue needs no shadow
+// and none is built; nearer instances (below the pair's distance) never
+// alias, which is what makes the offset of the PAIRED instance the only one
+// to arm.
 static void
 recordForwards(ChainingModuloProblem &problem,
                ArrayRef<circt::scheduling::Problem::Dependence> edges,
@@ -860,13 +938,16 @@ recordForwards(ChainingModuloProblem &problem,
     int64_t delta = static_cast<int64_t>(*problem.getStartTime(store)) -
                     static_cast<int64_t>(*problem.getStartTime(load));
     unsigned dist = problem.getDistance(dep).value_or(0);
-    if (delta < 0 || delta % ii != 0 || (delta == 0 && dist != 0))
+    int64_t off = delta - static_cast<int64_t>(dist) * ii;
+    assert(off <= static_cast<int64_t>(problem.forwardWindow(dep)) &&
+           "a solved schedule respects the forwarded edge's window");
+    if (off < 0)
       continue;
-    model.addForward(load, store);
+    model.addForward(load, store, off);
     info(Stage::Sched, load)
         << "Forwarding a store issued " << delta
         << " cycle(s) later into this load's data path (distance " << dist
-        << ", II=" << ii << ")";
+        << ", II=" << ii << ", window offset " << off << ")";
   }
 }
 
@@ -944,8 +1025,8 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
   // depth, not II, and a shadow would buy latency a mux is not worth.
   ForwardRelaxation relax;
   if (pipelined)
-    relax =
-        relaxForwardableEdges(problem, dev, cycleTime, opts.regFloor, minII);
+    relax = relaxForwardableEdges(problem, deps, dev, cycleTime, opts.regFloor,
+                                  minII);
   Operation *anchor = bodyBlock->getTerminator();
   // The trip this solution records is the INNERMOST loop's, the one its solved
   // `length`/`ii` describe. Every level above drives its child as a container,

@@ -570,7 +570,7 @@ unsigned SDCSchedulerBase::distanceOf(Problem::Dependence) { return 0; }
 
 int64_t SDCSchedulerBase::sourceLatencyOf(Problem::Dependence dep) {
   if (occupancy && occupancy->isForwarded(dep))
-    return 0;
+    return -static_cast<int64_t>(occupancy->forwardWindow(dep));
   auto &prob = getProblem();
   return *prob.getLatency(*prob.getLinkedOperatorType(dep.getSource()));
 }
@@ -2093,11 +2093,11 @@ LogicalResult ModuloOccupancyProblem::verifyPrecedence(Dependence dep) {
   unsigned stI = *getStartTime(dep.getSource());
   unsigned stJ = *getStartTime(dep.getDestination());
   unsigned dist = getDistance(dep).value_or(0);
-  if (stI <= stJ + dist * *getInitiationInterval())
+  if (stI <= stJ + dist * *getInitiationInterval() + forwardWindow(dep))
     return success();
   return getContainingOp()->emitError()
          << "Precedence violated for a forwarded store->load dependence: the "
-            "store issues after the load it forwards to";
+            "store issues after the window the load's shadow covers";
 }
 
 LogicalResult ModuloOccupancyProblem::verify() {

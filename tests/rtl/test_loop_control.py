@@ -28,6 +28,7 @@ from _common import (  # noqa: E402
     MEM,
     FMUL,
     MEM_REDUCE_II,
+    mem_reduce_ii,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -879,7 +880,10 @@ def test_assume_hints():
                 out[i * j] = out[i * j] + val[i, j]
 
     assert _iis(_sched(par_scatter).cyclic()) == [1]
-    assert _iis(_sched(seq_scatter).cyclic()) == [MEM_REDUCE_II]
+    # The non-affine subscript keeps the pair on the conservative path, where
+    # the shadow gets no in-flight window and the read round trip stays in
+    # the recurrence.
+    assert _iis(_sched(seq_scatter).cyclic()) == [mem_reduce_ii(exact=False)]
 
 
 # A hint that bounds a runtime trip is also a hint about WIDTH. The scheduler

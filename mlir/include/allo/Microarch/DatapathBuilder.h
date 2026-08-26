@@ -59,9 +59,10 @@ struct DatapathBuilder {
   llvm::DenseMap<Operation *, unsigned> regionIdxOf;
 
   // Forwarding facts off the dcp attributes: `fwd_id` -> (mem, access), and
-  // each forwarded load's (mem, access, ids).
+  // each forwarded load's (mem, access, ids, per-id window offsets).
   llvm::DenseMap<int64_t, std::pair<MemId, unsigned>> fwdStoreOf;
-  llvm::SmallVector<std::tuple<MemId, unsigned, llvm::SmallVector<int64_t, 1>>>
+  llvm::SmallVector<std::tuple<MemId, unsigned, llvm::SmallVector<int64_t, 1>,
+                               llvm::SmallVector<int64_t, 1>>>
       fwdLoads;
 
   // Interconnect-derivation scratch (transient; see resolveEdges).

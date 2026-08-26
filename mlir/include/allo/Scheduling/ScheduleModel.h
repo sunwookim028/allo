@@ -244,13 +244,17 @@ public:
   }
 
   /// Record that the schedule satisfies the RAW dependence from \p store to
-  /// \p load only through store->load forwarding: the two may issue in one
-  /// cycle, and the reify stamps the pair onto the dcp accesses.
-  void addForward(Operation *load, Operation *store) {
-    forwards[load].push_back(store);
+  /// \p load only through store->load forwarding: the paired store instance
+  /// issues \p offset cycles after the read (0 = same cycle, up to the read
+  /// latency while the read is in flight), and the reify stamps the pair
+  /// onto the dcp accesses.
+  void addForward(Operation *load, Operation *store, int64_t offset) {
+    forwards[load].push_back({store, offset});
   }
-  /// Every recorded (load -> stores) forwarding, for the reify to stamp.
-  const llvm::DenseMap<Operation *, llvm::SmallVector<Operation *, 1>> &
+  /// Every recorded (load -> (store, offset)) forwarding, for the reify to
+  /// stamp.
+  const llvm::DenseMap<Operation *,
+                       llvm::SmallVector<std::pair<Operation *, int64_t>, 1>> &
   allForwards() const {
     return forwards;
   }
@@ -316,7 +320,9 @@ private:
   std::vector<AllocatedUnit> units;
   llvm::DenseMap<Operation *, RegionSolution> regions;
   llvm::DenseMap<Operation *, int64_t> tripBounds;
-  llvm::DenseMap<Operation *, llvm::SmallVector<Operation *, 1>> forwards;
+  llvm::DenseMap<Operation *,
+                 llvm::SmallVector<std::pair<Operation *, int64_t>, 1>>
+      forwards;
 };
 
 } // namespace mlir::allo

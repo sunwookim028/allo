@@ -126,20 +126,20 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
   // non-affine one the identity map over its indices.
   auto addrMap = [&]() { return asMemAccess(&op)->map; };
   if (auto l = dyn_cast<AffineLoadOp>(&op)) {
-    auto nw = DCPathLoadOp::create(b, loc, l.getType(), rm(l.getMemRef()),
-                                   remap(l.getMapOperands()), addrMap(),
-                                   (uint64_t)start, memLatency(), bank,
-                                   IntegerAttr(), DenseI64ArrayAttr());
+    auto nw = DCPathLoadOp::create(
+        b, loc, l.getType(), rm(l.getMemRef()), remap(l.getMapOperands()),
+        addrMap(), (uint64_t)start, memLatency(), bank, IntegerAttr(),
+        DenseI64ArrayAttr(), DenseI64ArrayAttr());
     setAccessTiming(nw);
     accessMap[&op] = nw;
     map.map(l.getResult(), nw.getResult());
     return;
   }
   if (auto l = dyn_cast<memref::LoadOp>(&op)) {
-    auto nw = DCPathLoadOp::create(b, loc, l.getType(), rm(l.getMemRef()),
-                                   remap(l.getIndices()), addrMap(),
-                                   (uint64_t)start, memLatency(), bank,
-                                   IntegerAttr(), DenseI64ArrayAttr());
+    auto nw = DCPathLoadOp::create(
+        b, loc, l.getType(), rm(l.getMemRef()), remap(l.getIndices()),
+        addrMap(), (uint64_t)start, memLatency(), bank, IntegerAttr(),
+        DenseI64ArrayAttr(), DenseI64ArrayAttr());
     setAccessTiming(nw);
     accessMap[&op] = nw;
     map.map(l.getResult(), nw.getResult());
@@ -240,7 +240,9 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
 static void stampForwards(ScheduleModel &model,
                           DenseMap<Operation *, Operation *> &accessMap,
                           int64_t &nextFwdId) {
-  SmallVector<std::pair<Operation *, ArrayRef<Operation *>>> pairs;
+  SmallVector<
+      std::pair<Operation *, ArrayRef<std::pair<Operation *, int64_t>>>>
+      pairs;
   for (auto &[load, stores] : model.allForwards())
     if (accessMap.contains(load))
       pairs.push_back({load, stores});
@@ -252,8 +254,8 @@ static void stampForwards(ScheduleModel &model,
   });
   Builder ab(pairs.front().first->getContext());
   for (auto [load, stores] : pairs) {
-    SmallVector<int64_t> ids;
-    for (Operation *store : stores) {
+    SmallVector<int64_t> ids, offs;
+    for (auto [store, offset] : stores) {
       Operation *reifiedStore = accessMap.lookup(store);
       assert(reifiedStore && "a forwarded pair reifies within one block, so "
                              "its store is in the same access map as its load");
@@ -261,9 +263,11 @@ static void stampForwards(ScheduleModel &model,
       if (!nw.getFwdId())
         nw.setFwdIdAttr(ab.getI64IntegerAttr(nextFwdId++));
       ids.push_back(*nw.getFwdId());
+      offs.push_back(offset);
     }
-    cast<DCPathLoadOp>(accessMap.lookup(load))
-        .setFwdAttr(ab.getDenseI64ArrayAttr(ids));
+    auto ld = cast<DCPathLoadOp>(accessMap.lookup(load));
+    ld.setFwdAttr(ab.getDenseI64ArrayAttr(ids));
+    ld.setFwdOffAttr(ab.getDenseI64ArrayAttr(offs));
   }
 }
 

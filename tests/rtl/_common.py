@@ -86,18 +86,29 @@ def comb_step_ns(kind: str, width: int = 32) -> float:
 
 
 # A memory-carried accumulate (`M[x] += ...`) closes a distance-1 recurrence
-# read -> add -> write, but store->load forwarding hands the next read the
-# store's datum on an address match, so the II is read + add rather than the
-# full round trip. The read's datum reaches the adder inside the read's own
-# cycle only where the read's cone and the adder's input cone fit the period
-# together; where they do not the chain breaks and the recurrence pays one more
-# cycle. A scalar-carried accumulate keeps the partial in a register, so its II
-# is just the add latency.
-def mem_reduce_ii(storage: str = "lutram") -> int:
-    """The II of a float accumulate carried through one storage row."""
+# read -> add -> write. Store->load forwarding serves the next read from the
+# store's datum on an address match, with an in-flight window: the paired
+# store may issue up to `w` cycles after the read, so `w` of the read latency
+# leaves the recurrence. The window shrinks until the recurrence floor clears
+# it (an instance one iteration past the paired one must fall outside it).
+# The read's datum reaches the adder inside the read's own cycle only where
+# the read's cone and the adder's input cone fit the period together; where
+# they do not the chain breaks and the recurrence pays one more cycle. A
+# scalar-carried accumulate keeps the partial in a register, so its II is
+# just the add latency.
+def mem_reduce_ii(storage: str = "lutram", exact: bool = True) -> int:
+    """The II of a float accumulate carried through one storage row.
+
+    ``exact=False`` models a pair on the conservative dependence path (a
+    non-affine subscript): its distances are blanket, so no window is granted
+    and the recurrence keeps the full read round trip.
+    """
     row = default_device.storage[storage]
     arrival = row.read_delay_ns + _op_row("add", "float32", FADD).timing.in_delay_ns
-    return row.read_latency + FADD + (0 if arrival <= PERIOD_NS else 1)
+    w = row.read_latency if exact else 0
+    while w and row.read_latency + FADD - w < w + 1:
+        w = max(1, row.read_latency + FADD - w) - 1
+    return row.read_latency - w + FADD + (0 if arrival <= PERIOD_NS else 1)
 
 
 MEM_REDUCE_II = mem_reduce_ii()
