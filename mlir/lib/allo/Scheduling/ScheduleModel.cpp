@@ -228,6 +228,10 @@ std::string mlir::allo::ScheduleModel::toJSON() const {
       entry["deterministic"] = s.deterministic;
       if (s.exhaustedAtII)
         entry["exhausted_at_ii"] = *s.exhaustedAtII;
+      if (s.modelArea)
+        entry["model_area"] = *s.modelArea;
+      if (s.modelAreaBound)
+        entry["model_area_bound"] = *s.modelAreaBound;
     }
     solveEntries.push_back(std::move(entry));
   }

@@ -47,6 +47,11 @@ class SolveReport:
     fallback: bool = False
     #: the interval whose solve exhausted the budget, ending the cyclic search.
     exhausted_at_ii: int | None = None
+    #: the area minimization's incumbent and dual bound when its solve last
+    #: returned; the bound is absent where no area solve ran at all (under the
+    #: area objective, the structural bootstrap spent the budget).
+    model_area: int | None = None
+    model_area_bound: float | None = None
     #: whether re-running this compile reproduces the same schedule: a simplex
     #: solve always does, a cpsat one unless its budget ran out or its workers
     #: raced (``SchedulerOptions.deterministic`` off).
@@ -71,6 +76,8 @@ class SolveReport:
             budget_exhausted=d.get("budget_exhausted", False),
             fallback=d.get("fallback", False),
             exhausted_at_ii=d.get("exhausted_at_ii"),
+            model_area=d.get("model_area"),
+            model_area_bound=d.get("model_area_bound"),
             deterministic=d.get("deterministic", True),
         )
 

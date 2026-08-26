@@ -306,6 +306,8 @@ def measure_one(item, knobs: Knobs) -> dict:
                 "span_proven": s.span_proven,
                 "exhausted": s.budget_exhausted,
                 "fallback": s.fallback,
+                "area": s.model_area,
+                "area_bound": s.model_area_bound,
             }
             for s in res.compiler.solves
         ]

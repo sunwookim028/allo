@@ -37,6 +37,11 @@ struct SolveTelemetry {
   bool fallback = false; // shipped the heuristic's schedule instead
   /// The interval whose solve exhausted the budget, ending the cyclic search.
   std::optional<int64_t> exhaustedAtII;
+  /// The area minimization's incumbent and dual bound when its solve last
+  /// returned. The bound is absent where no area solve ran at all; under the
+  /// area objective that means the structural bootstrap spent the budget.
+  std::optional<int64_t> modelArea;
+  std::optional<double> modelAreaBound;
 };
 
 /// A resource-constrained problem with per-operation occupancy windows, so a

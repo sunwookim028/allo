@@ -890,29 +890,87 @@ void addAllocationHeadroom(CpModelBuilder &model, ProblemT &prob,
 }
 
 /// Add \p price at \p size to a weighted sum, for a price tabulated at every
-/// value the size can take. A piecewise-linear price is its first slope on the
-/// size, plus at every change of slope that change charged on how far the size
-/// runs past the point it changes at: `max(size - b, 0)`. Every variable this
-/// adds is determined by the size through a propagator, avoiding a per-segment
-/// disjunction for the search to branch on.
+/// value the size can take, charged relative to `price[0]`. A convex table is
+/// its first slope on the size, plus at every change of slope that change
+/// charged on how far the size runs past the point it changes at:
+/// `max(size - b, 0)`; every variable this adds is determined by the size
+/// through a propagator, and every weight is nonnegative. A non-convex table
+/// cannot ride that form (its negative weights void the objective's LP bound):
+/// its value is a sum over the table's increase points, one threshold literal
+/// `b_d <=> size >= d` charged that point's jump, with one supporting line per
+/// lower-convex-hull segment holding the LP bound at the table's convex
+/// envelope. An element lookup would state the same value in one constraint,
+/// but or-tools 9.15's presolve crashes crushing hints through an expanded
+/// element (`TryToReplaceVariableByItsEncoding`).
+/// \p sizeHint, when the caller hints the size, completes the hints here.
 void addPiecewiseCost(CpModelBuilder &model, IntVar size,
                       ArrayRef<int64_t> price, SmallVectorImpl<IntVar> &vars,
-                      SmallVectorImpl<int64_t> &weights) {
+                      SmallVectorImpl<int64_t> &weights,
+                      std::optional<int64_t> sizeHint = std::nullopt) {
   auto hi = static_cast<int64_t>(price.size()) - 1;
   if (hi < 1)
     return;
-  int64_t slope = price[1] - price[0];
-  vars.push_back(size);
-  weights.push_back(slope);
-  for (int64_t d = 2; d <= hi; ++d) {
-    int64_t next = price[d] - price[d - 1];
-    if (next == slope)
+  assert((!sizeHint || (*sizeHint >= 0 && *sizeHint <= hi)) &&
+         "a size hint outside the table");
+  bool convex = true;
+  for (int64_t d = 2; d <= hi && convex; ++d)
+    convex = price[d] - price[d - 1] >= price[d - 1] - price[d - 2];
+  if (convex) {
+    int64_t slope = price[1] - price[0];
+    vars.push_back(size);
+    weights.push_back(slope);
+    for (int64_t d = 2; d <= hi; ++d) {
+      int64_t next = price[d] - price[d - 1];
+      if (next == slope)
+        continue;
+      IntVar over = model.NewIntVar(operations_research::Domain(0, hi - d + 1));
+      model.AddMaxEquality(over, {LinearExpr(size) - (d - 1), LinearExpr(0)});
+      vars.push_back(over);
+      weights.push_back(next - slope);
+      slope = next;
+    }
+    return;
+  }
+  std::vector<int64_t> table;
+  table.reserve(price.size());
+  for (int64_t p : price)
+    table.push_back(p - price[0]);
+  IntVar cost = model.NewIntVar(operations_research::Domain(
+      *llvm::min_element(table), *llvm::max_element(table)));
+  LinearExpr sum;
+  for (int64_t d = 1; d <= hi; ++d) {
+    int64_t jump = table[d] - table[d - 1];
+    if (!jump)
       continue;
-    IntVar over = model.NewIntVar(operations_research::Domain(0, hi - d + 1));
-    model.AddMaxEquality(over, {LinearExpr(size) - (d - 1), LinearExpr(0)});
-    vars.push_back(over);
-    weights.push_back(next - slope);
-    slope = next;
+    BoolVar b = model.NewBoolVar();
+    model.AddGreaterOrEqual(size, d).OnlyEnforceIf(b);
+    model.AddLessOrEqual(size, d - 1).OnlyEnforceIf(b.Not());
+    if (sizeHint)
+      model.AddHint(b, *sizeHint >= d);
+    sum += LinearExpr::Term(b, jump);
+  }
+  model.AddEquality(cost, sum);
+  if (sizeHint)
+    model.AddHint(cost, table[*sizeHint]);
+  vars.push_back(cost);
+  weights.push_back(1);
+  SmallVector<int64_t> hull;
+  for (int64_t d = 0; d <= hi; ++d) {
+    while (hull.size() >= 2) {
+      int64_t a = hull[hull.size() - 2], b = hull.back();
+      if ((d - a) * (table[b] - table[a]) >= (b - a) * (table[d] - table[a]))
+        hull.pop_back();
+      else
+        break;
+    }
+    hull.push_back(d);
+  }
+  for (size_t i = 0; i + 1 < hull.size(); ++i) {
+    int64_t d1 = hull[i], d2 = hull[i + 1];
+    int64_t p1 = table[d1], p2 = table[d2];
+    model.AddGreaterOrEqual(LinearExpr::Term(cost, d2 - d1) -
+                                LinearExpr::Term(size, p2 - p1),
+                            (d2 - d1) * p1 - (p2 - p1) * d1);
   }
 }
 
@@ -942,8 +1000,8 @@ void addPiecewiseCost(CpModelBuilder &model, IntVar size,
 ///
 /// \p structuralOut, non-null, receives the structural part alone (instances,
 /// their selects, the decided rows; no chains, no pulse), which an area solve
-/// bootstraps on: the piecewise chain terms leave the full expression's
-/// relaxation too weak to search on.
+/// bootstraps on: the chain terms relax only to their convex envelope, so the
+/// full expression still searches worse than structure alone.
 LinearExpr areaTerms(CpModelBuilder &model, ArrayRef<IntVar> starts,
                      const SpanObjective &span,
                      DenseMap<Operation *, IntVar> &startVars,
@@ -978,6 +1036,7 @@ LinearExpr areaTerms(CpModelBuilder &model, ArrayRef<IntVar> starts,
       model.AddLessOrEqual(startVars.at(reader) + distance * ii,
                            def + latencyOf(term.def) +
                                LinearExpr::Term(built, fold));
+    std::optional<int64_t> builtHint;
     if (hintFrom) {
       int64_t end = static_cast<int64_t>(*hintFrom->getStartTime(term.def)) +
                     hintFrom->latencyOf(term.def);
@@ -986,9 +1045,10 @@ LinearExpr areaTerms(CpModelBuilder &model, ArrayRef<IntVar> starts,
         depth = std::max(depth,
                          static_cast<int64_t>(*hintFrom->getStartTime(reader)) +
                              distance * ii - end);
-      model.AddHint(built, (depth + fold - 1) / fold);
+      builtHint = (depth + fold - 1) / fold;
+      model.AddHint(built, *builtHint);
     }
-    addPiecewiseCost(model, built, table, vars, weights);
+    addPiecewiseCost(model, built, table, vars, weights, builtHint);
   }
   LinearExpr structural;
   for (const AllocationVar &alloc : allocs)
@@ -1170,14 +1230,20 @@ constexpr double kAreaTieBreakShare = 0.3;
 
 /// The area fold minimizes in deterministic-time slices and releases the rest
 /// of its budget once the area has stopped improving. The bound the solver
-/// proves on this objective is too weak to read an optimality gap from (its
-/// register-chain terms relax poorly), so the stop reads the incumbent curve
+/// proves on this objective can sit at the chain terms' convex envelope, well
+/// under the true staircase, so the stop reads the incumbent curve
 /// instead: a slice improving the modeled area by less than `kFoldPlateauEps`
 /// is a stall, and `kFoldPatience` consecutive stalls end the fold. A region
 /// still paying for its budget runs the whole of it; a plateaued one does not.
 constexpr double kFoldChunkShare = 0.25;
 constexpr double kFoldPlateauEps = 0.01;
 constexpr unsigned kFoldPatience = 2;
+
+/// The structural bootstrap runs on a capped share of the budget: it is
+/// hinted and structure-only, so it searches well, and an uncapped run can
+/// spend the whole budget proving structure while the area solve it exists to
+/// seed never runs at all.
+constexpr double kBootstrapShare = 0.25;
 
 /// What \p decided costs the device: every resource, at the price of the count
 /// it settled on.
@@ -1672,16 +1738,30 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
         areaTerms(model, orderedStarts, span, startVars, allocs,
                   /*ii=*/0, horizon, latExpr, sels, shared, &prob, &structural);
     model.Minimize(structural);
-    CpSolverResponse boot = solveBuilt(model, solverParameters(opts));
+    SchedulerOptions bootOpts = opts;
+    bootOpts.budget = opts.budget * kBootstrapShare;
+    CpSolverResponse boot = solveBuilt(model, solverParameters(bootOpts));
+    SchedulerOptions restArea = lessBudget(opts, boot);
+    // A capped bootstrap that found nothing gets the rest of the budget;
+    // only a spent budget gives up.
+    if (!solved(boot)) {
+      boot = solveBuilt(model, solverParameters(restArea));
+      restArea = lessBudget(restArea, boot);
+    }
     if (!solved(boot))
       return giveUp(boot);
     rehintAll(model, boot);
     model.Minimize(area);
-    SchedulerOptions restArea = lessBudget(opts, boot);
     CpSolverResponse first = solveBuilt(model, solverParameters(restArea));
     assert(first.status() != CpSolverStatus::INFEASIBLE &&
            "the bootstrap's schedule satisfies the same model");
     bool areaProven = first.status() == CpSolverStatus::OPTIMAL;
+    if (solved(first)) {
+      prob.telemetry.modelArea = SolutionIntegerValue(first, area);
+      prob.telemetry.modelAreaBound = first.best_objective_bound();
+    } else {
+      prob.telemetry.modelArea = SolutionIntegerValue(boot, area);
+    }
     const CpSolverResponse *pick = solved(first) ? &first : &boot;
     CpSolverResponse second;
     if (solved(first)) {
@@ -1706,11 +1786,16 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
           << "Exact scheduling settled this region's area but ran out of "
              "budget shortening the span under it, so leash slack may remain "
              "unclaimed";
-    info(Stage::Sched, prob.getContainingOp())
-        << "Exact scheduling minimized the region's area under a span leash "
+    {
+      auto d = info(Stage::Sched, prob.getContainingOp());
+      d << "Exact scheduling minimized the region's area under a span leash "
            "of "
         << heuristicDrain << ": area " << SolutionIntegerValue(*pick, area)
         << ", drain " << SolutionIntegerValue(*pick, drain);
+      if (solved(first))
+        d << ", area bound "
+          << llvm::format("%.0f", first.best_objective_bound());
+    }
     prob.telemetry.proven =
         areaProven && second.status() == CpSolverStatus::OPTIMAL;
     prob.telemetry.spanProven = second.status() == CpSolverStatus::OPTIMAL;
@@ -1753,6 +1838,10 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
          "the span solve's schedule satisfies the pinned model");
   if (!solved(second) && !ranFirst)
     return giveUp(second);
+  if (solved(second)) {
+    prob.telemetry.modelArea = SolutionIntegerValue(second, area);
+    prob.telemetry.modelAreaBound = second.best_objective_bound();
+  }
   const CpSolverResponse &pick = solved(second) ? second : first;
 
   if (!spanProven)
@@ -1801,6 +1890,9 @@ struct ModuloAttempt {
   /// The shipped schedule's modeled area, chains included. Absent where the
   /// cycles order's area solve found nothing under the settled span.
   std::optional<int64_t> modelArea;
+  /// The area minimization's dual bound when its solve last returned; absent
+  /// where no area solve ran (the structural bootstrap spent the budget).
+  std::optional<double> modelAreaBound;
 };
 
 /// Solve \p prob at the FIXED initiation interval \p ii, writing what it
@@ -2033,7 +2125,16 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
         areaTerms(model, orderedStarts, span, startVars, allocs, ii, horizon,
                   latExpr, sels, shared, hint ? &prob : nullptr, &structural);
     model.Minimize(structural);
-    CpSolverResponse boot = solveBuilt(model, solverParameters(opts));
+    SchedulerOptions bootOpts = opts;
+    bootOpts.budget = opts.budget * kBootstrapShare;
+    CpSolverResponse boot = solveBuilt(model, solverParameters(bootOpts));
+    SchedulerOptions restArea = lessBudget(opts, boot);
+    // A capped bootstrap that decided nothing gets the rest of the budget;
+    // only a proof or a spent budget may end the solve.
+    if (!solved(boot) && boot.status() != CpSolverStatus::INFEASIBLE) {
+      boot = solveBuilt(model, solverParameters(restArea));
+      restArea = lessBudget(restArea, boot);
+    }
     if (boot.status() == CpSolverStatus::INFEASIBLE)
       return ModuloOutcome::Infeasible;
     if (!solved(boot)) {
@@ -2064,14 +2165,15 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
     if (areaBound)
       model.AddLessOrEqual(area, *areaBound);
     model.Minimize(area);
-    SchedulerOptions restArea = lessBudget(opts, boot);
     // The area minimization runs in deterministic-time slices, each warm
     // started from the last incumbent, and stops once the area plateaus so the
     // rest of the budget (a proven span still reclaims its slack below) is
-    // released instead of burned on a solve that no longer improves.
+    // released instead of burned on a solve that no longer improves. What
+    // ships is the best slice, not the last one: a restarted slice can return
+    // a worse incumbent than its predecessor's.
     CpSolverResponse first;
     double areaSpent = 0.0;
-    int64_t bestArea = 0;
+    int64_t bestArea = 0, plateauRef = 0;
     bool haveBest = false;
     unsigned stalls = 0;
     while (areaSpent < restArea.budget) {
@@ -2088,10 +2190,13 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       if (!solved(r))
         break; // this slice found nothing; the bootstrap stands
       int64_t a = SolutionIntegerValue(r, area);
-      bool improved = !haveBest || bestArea - a > bestArea * kFoldPlateauEps;
-      first = r;
-      if (improved) {
+      bool improved = !haveBest || plateauRef - a > plateauRef * kFoldPlateauEps;
+      if (!haveBest || a <= bestArea) {
+        first = r;
         bestArea = a;
+      }
+      if (improved) {
+        plateauRef = a;
         haveBest = true;
         stalls = 0;
       } else if (++stalls >= kFoldPatience) {
@@ -2107,6 +2212,8 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       rehintAll(model, r); // warm start the next slice from the incumbent
     }
     out.areaProven = first.status() == CpSolverStatus::OPTIMAL;
+    if (solved(first))
+      out.modelAreaBound = first.best_objective_bound();
     const CpSolverResponse *pick = solved(first) ? &first : &boot;
     CpSolverResponse second;
     if (solved(first)) {
@@ -2193,8 +2300,10 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   out.chosen = readSelection(pick, sels);
   out.classUnits = readSharedUnits(pick, shared);
   out.drain = drainVar ? SolutionIntegerValue(pick, *drainVar) : 0;
-  if (solved(second))
+  if (solved(second)) {
     out.modelArea = SolutionIntegerValue(pick, area);
+    out.modelAreaBound = second.best_objective_bound();
+  }
   return ModuloOutcome::Scheduled;
 }
 
@@ -2624,6 +2733,8 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
   prob.telemetry.budgetExhausted = !prob.telemetry.proven;
   if (exhaustedAt)
     prob.telemetry.exhaustedAtII = (int64_t)*exhaustedAt;
+  prob.telemetry.modelArea = bestAttempt.modelArea;
+  prob.telemetry.modelAreaBound = bestAttempt.modelAreaBound;
   return finishSchedule(prob, cycleTime, opts.regFloor);
 }
 

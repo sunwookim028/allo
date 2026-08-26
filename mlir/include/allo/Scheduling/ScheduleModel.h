@@ -126,6 +126,9 @@ struct SolveReport {
   bool proven = false, spanProven = false, budgetExhausted = false,
        fallback = false;
   std::optional<int64_t> exhaustedAtII;
+  /// The area minimization's incumbent and dual bound; see `SolveTelemetry`.
+  std::optional<int64_t> modelArea;
+  std::optional<double> modelAreaBound;
   /// Whether re-running the compile reproduces this schedule: workers
   /// interleaved and budget held.
   bool deterministic = true;

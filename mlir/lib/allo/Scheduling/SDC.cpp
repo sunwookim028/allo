@@ -903,6 +903,8 @@ void FuncScheduler::recordSolve(OccupancyProblem &problem, StringRef kind,
     s.budgetExhausted = problem.telemetry.budgetExhausted;
     s.fallback = problem.telemetry.fallback;
     s.exhaustedAtII = problem.telemetry.exhaustedAtII;
+    s.modelArea = problem.telemetry.modelArea;
+    s.modelAreaBound = problem.telemetry.modelAreaBound;
     // One worker has nobody to race, so it stays reproducible under a held
     // budget regardless of the knob.
     s.deterministic = (opts.deterministic || opts.workers == 1) &&
