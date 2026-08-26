@@ -132,6 +132,12 @@ struct StorageRealization {
   /// Whether the structure comes up holding contents. False for one that powers
   /// up undefined, as an UltraRAM does.
   bool canInit = true;
+  /// Whether a read returns the OLD contents under a same-cycle write to the
+  /// same element, in hardware and not merely in RTL simulation (a LUT RAM's
+  /// asynchronous read). A block RAM's cross-port same-address collision is
+  /// undefined in silicon, so it stays false there. Write-after-read ordering
+  /// relaxes to the read's sampling cycle only on a marked row.
+  bool readFirst = false;
   /// The row that is not a memory: one cell per element, no address, where a
   /// complete partition goes.
   bool scatter = false;

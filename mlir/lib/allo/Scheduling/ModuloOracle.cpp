@@ -78,9 +78,7 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
       auto src = index.find(dep.getSource());
       if (src == index.end())
         continue;
-      int64_t w = prob.isForwarded(dep)
-                      ? -static_cast<int64_t>(prob.forwardWindow(dep))
-                      : prob.latencyOf(dep.getSource());
+      int64_t w = prob.separationOf(dep);
       int64_t dist = prob.getDistance(dep).value_or(0);
       raw.push_back({src->second, index.at(op), w - T * dist});
     }

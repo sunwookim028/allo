@@ -666,6 +666,13 @@ def DCPathStorageOp : DCPath_Op<"dcp.storage",
     `no_init` marks a structure that powers up undefined, as an UltraRAM does.
     An array declared with compile-time contents is refused there.
 
+    `read_first` marks a structure whose read returns the OLD contents under a
+    same-cycle write to the same element, in hardware and not merely in RTL
+    simulation (a LUT RAM's asynchronous read). A block RAM's cross-port
+    same-address collision is undefined in silicon and must not carry the
+    mark. The scheduler relaxes write-after-read ordering to the read's
+    sampling cycle only on a marked row.
+
     `uses` carries one `#allo.res_use` per term, and what a resource costs is
     the sum of the terms naming it. Storage carries TWO parameters,
     `(depth, width)`, so a term is either two factors or the single `tiled`
@@ -685,10 +692,11 @@ def DCPathStorageOp : DCPath_Op<"dcp.storage",
     OptionalAttr<I64Attr>:$inst_ports,
     OptionalAttr<StrAttr>:$ram_style,
     UnitAttr:$no_init,
+    UnitAttr:$read_first,
     OptionalAttr<ArrayAttr>:$uses);
   let assemblyFormat = [{
     $sym_name (`default` $is_default^)? (`scatter` $is_scatter^)?
-    (`table` $is_table^)? (`no_init` $no_init^)?
+    (`table` $is_table^)? (`no_init` $no_init^)? (`read_first` $read_first^)?
     `rd` `=` $rd_latency `,` $rd_delay
     `wr` `=` $wr_latency `,` $wr_delay
     (`rd_depth` `=` $rd_delay_depth^)? (`rd_width` `=` $rd_delay_width^)?

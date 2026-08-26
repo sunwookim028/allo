@@ -278,6 +278,11 @@ class Storage:  # pylint: disable=too-many-instance-attributes
     # up undefined (an UltraRAM); a compile-time-initialized array cannot bind
     # there.
     can_init: bool = True
+    # Whether a read returns the OLD contents under a same-cycle write to the
+    # same element, in hardware and not merely in RTL simulation (a LUT RAM's
+    # asynchronous read). A block RAM's cross-port same-address collision is
+    # undefined in silicon and must not carry this.
+    read_first: bool = False
     # What it spends, over `(depth, width)`: each term is two cost factors or
     # one `Tiled`.
     uses: Spend = ()
@@ -491,6 +496,7 @@ class Device:
         inst_ports: int | None = None,
         ram_style: str | None = None,
         can_init: bool = True,
+        read_first: bool = False,
         uses: dict[Resource, Cost | Sequence] | None = None,
         read_delay_depth: Cost | None = None,
         read_delay_width: Cost | None = None,
@@ -529,6 +535,13 @@ class Device:
         ``can_init`` is whether the structure comes up holding contents. Clear
         it for one that powers up undefined, as an UltraRAM does; an array
         declared with compile-time contents is then refused there.
+
+        ``read_first`` marks a structure whose read returns the OLD contents
+        under a same-cycle write to the same element, in hardware and not
+        merely in RTL simulation (a LUT RAM's asynchronous read). The
+        scheduler relaxes write-after-read ordering to the read's sampling
+        cycle only on a marked row; a block RAM's cross-port same-address
+        collision is undefined in silicon, so leave it unmarked.
 
         Storage carries two parameters, ``(depth, width)``, so a ``uses`` term
         is a pair of costs, or the single :func:`Tiled` that reads them
@@ -594,6 +607,7 @@ class Device:
             inst_ports=None if inst_ports is None else int(inst_ports),
             ram_style=ram_style,
             can_init=bool(can_init),
+            read_first=bool(read_first),
             uses=self._spend(f"storage {name!r}", "depth, width", uses),
             read_delay_depth=read_delay_depth,
             read_delay_width=read_delay_width,
@@ -1042,6 +1056,7 @@ def inject_device(module, device: Device, weights: dict[str, float] | None = Non
                     inst_ports=_port_limit(i64, s.inst_ports),
                     ram_style=s.ram_style,
                     no_init=not s.can_init,
+                    read_first=s.read_first,
                     uses=_uses_attr(s.uses),
                     rd_delay_depth=(
                         s.read_delay_depth._attr() if s.read_delay_depth else None

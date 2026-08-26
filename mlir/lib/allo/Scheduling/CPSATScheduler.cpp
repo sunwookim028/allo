@@ -1403,9 +1403,7 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
         dist = prob.getDistance(dep).value_or(0);
       if (dist != 0)
         continue;
-      int64_t weight = prob.isForwarded(dep)
-                           ? -static_cast<int64_t>(prob.forwardWindow(dep))
-                           : latencyOf(dep.getSource());
+      int64_t weight = prob.separationOf(dep);
       edges.push_back({dep.getSource(), op, weight});
     }
   // A chain break is intra-iteration whichever problem this is.
@@ -2019,10 +2017,9 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   for (Operation *op : ops)
     for (auto &dep : prob.getDependences(op)) {
       Operation *src = dep.getSource();
-      LinearExpr sep =
-          prob.isForwarded(dep)
-              ? LinearExpr(-static_cast<int64_t>(prob.forwardWindow(dep)))
-              : latExpr(src);
+      LinearExpr sep = (prob.isForwarded(dep) || prob.hasSeparationOverride(dep))
+                           ? LinearExpr(prob.separationOf(dep))
+                           : latExpr(src);
       model.AddLessOrEqual(startVars.at(src) + sep -
                                static_cast<int64_t>(ii) *
                                    prob.getDistance(dep).value_or(0),
@@ -3088,9 +3085,7 @@ void repairLifetimes(ProblemT &prob, Operation *anchor,
       int64_t dist = 0;
       if constexpr (cyclic)
         dist = prob.getDistance(dep).value_or(0);
-      int64_t w = prob.isForwarded(dep)
-                      ? -static_cast<int64_t>(prob.forwardWindow(dep))
-                      : prob.latencyOf(src);
+      int64_t w = prob.separationOf(dep);
       model.AddGreaterOrEqual(tOf(op) - tOf(src), w - modulus * dist);
     }
   for (const Problem::Dependence &dep :

@@ -978,6 +978,7 @@ MemoryLibrary MemoryLibrary::fromModule(ModuleOp module) {
                           limit(s.getInstPorts())},
                          s.getRamStyle().value_or("").str(),
                          !s.getNoInit(),
+                         s.getReadFirst(),
                          s.getIsScatter(),
                          s.getIsTable(),
                          s.getUsesAttr(),

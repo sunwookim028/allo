@@ -569,8 +569,8 @@ mlir::allo::computeChainBreaks(ChainingProblem &prob, float cycleTime,
 unsigned SDCSchedulerBase::distanceOf(Problem::Dependence) { return 0; }
 
 int64_t SDCSchedulerBase::sourceLatencyOf(Problem::Dependence dep) {
-  if (occupancy && occupancy->isForwarded(dep))
-    return -static_cast<int64_t>(occupancy->forwardWindow(dep));
+  if (occupancy)
+    return occupancy->separationOf(dep);
   auto &prob = getProblem();
   return *prob.getLatency(*prob.getLinkedOperatorType(dep.getSource()));
 }
@@ -2088,16 +2088,18 @@ LogicalResult OccupancyProblem::verifyOccupancy(unsigned ii) {
 }
 
 LogicalResult ModuloOccupancyProblem::verifyPrecedence(Dependence dep) {
-  if (!isForwarded(dep))
+  if (!isForwarded(dep) && !hasSeparationOverride(dep))
     return CyclicProblem::verifyPrecedence(dep);
-  unsigned stI = *getStartTime(dep.getSource());
-  unsigned stJ = *getStartTime(dep.getDestination());
-  unsigned dist = getDistance(dep).value_or(0);
-  if (stI <= stJ + dist * *getInitiationInterval() + forwardWindow(dep))
+  int64_t stI = *getStartTime(dep.getSource());
+  int64_t stJ = *getStartTime(dep.getDestination());
+  int64_t dist = getDistance(dep).value_or(0);
+  if (stI + separationOf(dep) <=
+      stJ + dist * (int64_t)*getInitiationInterval())
     return success();
   return getContainingOp()->emitError()
-         << "Precedence violated for a forwarded store->load dependence: the "
-            "store issues after the window the load's shadow covers";
+         << "Precedence violated for a relaxed memory-ordering dependence: "
+            "the schedule separates the pair by less than its shadow window "
+            "or read sampling allows";
 }
 
 LogicalResult ModuloOccupancyProblem::verify() {

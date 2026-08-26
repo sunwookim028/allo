@@ -601,11 +601,11 @@ struct RecurrenceGraph {
       index.try_emplace(op, index.size());
     for (Operation *op : problem.getOperations())
       for (auto &dep : problem.getDependences(op)) {
-        int64_t lat = problem.latencyOf(dep.getSource());
+        int64_t lat = problem.separationOf(dep);
         edges.push_back(
             {index[dep.getSource()], index[op], lat,
              static_cast<int64_t>(problem.getDistance(dep).value_or(0)), dep});
-        latSum += zeroed.contains(dep) ? 0 : lat;
+        latSum += zeroed.contains(dep) ? 0 : std::max<int64_t>(lat, 0);
       }
   }
 
@@ -765,6 +765,41 @@ selectCriticalPairs(ChainingModuloProblem &problem,
     if (graph.zeroed.contains(dep))
       out.push_back(dep);
   return out;
+}
+
+// Relax the write-after-read (WAR) ordering edges of \p problem where the
+// storage permits: a write ordered after a read of the same array need only
+// miss the cycle the storage samples the array in, which is read latency - 1
+// after the read issues. Sound only on a row marked `read_first` (a LUT
+// RAM's asynchronous read returns old contents under a same-cycle write, in
+// hardware); a block RAM's cross-port same-address collision is undefined in
+// silicon, so its WAR edges keep the full read latency. Exact pairs only: on
+// a conservative pair a program-later store instance admitted into the
+// read's cycle could alias and be wrongly served by a forwarding arm.
+static void relaxWarEdges(ChainingModuloProblem &problem,
+                          DependenceAnalysis &deps, const DeviceModel &dev) {
+  for (Operation *op : problem.getOperations()) {
+    std::optional<MemAccess> sa = asMemAccess(op);
+    if (!sa || !sa->isWrite || sa->kind != AccessKind::Array)
+      continue;
+    for (auto &dep : problem.getDependences(op)) {
+      if (!dep.isAuxiliary())
+        continue;
+      std::optional<MemAccess> la = asMemAccess(dep.getSource());
+      if (!la || la->isWrite || la->kind != AccessKind::Array ||
+          la->root != sa->root)
+        continue;
+      if (!deps.isExactPair(dep.getSource(), op))
+        continue;
+      MemoryChar ch = characterize(la->root, dev.memory);
+      const StorageRealization *row = dev.memory.row(ch.storage);
+      if (!row || !row->readFirst)
+        continue;
+      unsigned rL = row->timing.latency.read;
+      if (rL)
+        problem.setSeparation(dep, static_cast<int64_t>(rL) - 1);
+    }
+  }
 }
 
 // Whether \p v is settled when a store issues: a loop-carried block argument,
@@ -1023,6 +1058,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
                                opts.objective == ScheduleObjective::Area);
   // Overlapping iterations only: without overlap the RAW round trip costs
   // depth, not II, and a shadow would buy latency a mux is not worth.
+  relaxWarEdges(problem, deps, dev);
   ForwardRelaxation relax;
   if (pipelined)
     relax = relaxForwardableEdges(problem, deps, dev, cycleTime, opts.regFloor,

@@ -188,6 +188,11 @@ class StorageSpec(NamedTuple):
     #: Whether this is the constant table: a logic lookup, no address bus, no
     #: port limit, priced and timed over the array's shape.
     is_table: bool = False
+    #: Whether a read returns the OLD contents under a same-cycle write to the
+    #: same element, in hardware and not merely in RTL simulation (a LUT RAM's
+    #: asynchronous read). A block RAM's cross-port same-address collision is
+    #: undefined in silicon and must not carry this.
+    read_first: bool = False
 
 
 class IPRow(NamedTuple):

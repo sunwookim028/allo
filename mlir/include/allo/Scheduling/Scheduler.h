@@ -116,6 +116,27 @@ public:
     forwardWindows.clear();
   }
 
+  /// Record that the ordering across \p dep needs only \p cycles of start
+  /// separation rather than the source's latency: a write-after-read edge on
+  /// a read-first storage need only miss the read's array-sampling cycle.
+  void setSeparation(Dependence dep, int64_t cycles) {
+    separations[dep] = cycles;
+  }
+  bool hasSeparationOverride(Dependence dep) const {
+    return separations.contains(dep);
+  }
+  /// The least start separation the schedule owes across \p dep: an explicit
+  /// ordering override where one is recorded, else the forwarding relaxation
+  /// (`-window`), else the source's latency. Every solver and verifier weighs
+  /// an edge through this one accessor.
+  int64_t separationOf(Dependence dep) {
+    if (auto it = separations.find(dep); it != separations.end())
+      return it->second;
+    if (isForwarded(dep))
+      return -static_cast<int64_t>(forwardWindow(dep));
+    return latencyOf(dep.getSource());
+  }
+
   /// Schedule depth of a solved problem: the cycle by which every op has
   /// completed. Report only; a span composes from the drain instead, which may
   /// sit below the depth. A combinational op still occupies its issue cycle,
@@ -231,6 +252,7 @@ private:
   OperationProperty<unsigned> assignedUnit;
   llvm::DenseSet<Dependence> forwardedEdges;
   llvm::DenseMap<Dependence, unsigned> forwardWindows;
+  llvm::DenseMap<Dependence, int64_t> separations;
 };
 
 /// The cyclic twin: CIRCT's `ModuloProblem` with occupancy windows, i.e.

@@ -357,6 +357,7 @@ _STORAGE = {
         inst_reads=1,
         inst_writes=1,
         ram_style="distributed",
+        read_first=True,
     ),
     # A read-only table is logic, not storage: one LUT6 is a 64-entry one-bit
     # lookup, so it costs `width * ceil(depth/64)` of them and has no address
@@ -499,6 +500,7 @@ def build(part: Part) -> Device:
             inst_ports=spec.inst_ports,
             ram_style=spec.ram_style,
             can_init=spec.can_init,
+            read_first=spec.read_first,
             uses=spec.uses(res),
             read_delay_depth=timing.rom if spec.is_table else None,
             read_delay_width=timing.rom_w if spec.is_table else None,
