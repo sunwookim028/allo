@@ -1239,6 +1239,12 @@ constexpr double kFoldChunkShare = 0.25;
 constexpr double kFoldPlateauEps = 0.01;
 constexpr unsigned kFoldPatience = 2;
 
+/// The fold also stops once the solver's bound certifies the incumbent within
+/// this fraction of the model's optimum; further slices could recover at most
+/// that. The plateau above stays the fallback where the bound lags the
+/// incumbent.
+constexpr double kFoldGapEps = 0.01;
+
 /// The structural bootstrap runs on a capped share of the budget: it is
 /// hinted and structure-only, so it searches well, and an uncapped run can
 /// spend the whole budget proving structure while the area solve it exists to
@@ -2226,7 +2232,9 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       SchedulerOptions slice = restArea;
       slice.budget = std::min(restArea.budget - areaSpent,
                               opts.budget * kFoldChunkShare);
-      CpSolverResponse r = solveBuilt(model, solverParameters(slice));
+      SatParameters sliceParams = solverParameters(slice);
+      sliceParams.set_relative_gap_limit(kFoldGapEps);
+      CpSolverResponse r = solveBuilt(model, sliceParams);
       areaSpent += r.deterministic_time();
       if (r.status() == CpSolverStatus::INFEASIBLE) {
         if (!haveBest)
@@ -2255,6 +2263,15 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       }
       if (r.status() == CpSolverStatus::OPTIMAL)
         break; // proven minimal
+      if (double(a) - r.best_objective_bound() <= kFoldGapEps * double(a)) {
+        info(Stage::Sched, prob.getContainingOp())
+            << "Area fold at II=" << ii << " stopped certified: incumbent "
+            << bestArea << " is within "
+            << llvm::format("%.1f%%", kFoldGapEps * 100)
+            << " of the model's optimum after "
+            << llvm::format("%.1f", areaSpent) << " deterministic units";
+        break;
+      }
       rehintAll(model, r); // warm start the next slice from the incumbent
     }
     out.areaProven = first.status() == CpSolverStatus::OPTIMAL;
