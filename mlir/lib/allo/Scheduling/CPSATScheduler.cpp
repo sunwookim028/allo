@@ -1231,6 +1231,15 @@ constexpr double kFoldGapEps = 0.01;
 /// seed never runs at all.
 constexpr double kBootstrapShare = 0.25;
 
+/// A span solve that finds a schedule but not the proof earns one retry at
+/// this multiple of the budget: an unproven span ships a possibly far-off
+/// incumbent (floyd v1's default-budget spans sat 4-5x over its optimum), so
+/// the retry buys latency exactly where the certificate failed. The retry's
+/// incumbent converges well before its certificate (which stays flaky under
+/// the worker portfolio), so the multiple is sized for the former. The rest
+/// of that solve's pipeline then runs on the escalated budget.
+constexpr double kSpanEscalation = 10.0;
+
 /// What \p decided costs the device: every resource, at the price of the count
 /// it settled on.
 int64_t areaOf(OccupancyProblem &prob, const Allocated &decided) {
@@ -1843,6 +1852,7 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
   int64_t solvedDrain = heuristicDrain;
   CpSolverResponse first;
   bool ranFirst = false;
+  SchedulerOptions live = opts;
   if (!spanProven) {
     model.Minimize(drain);
     first = solveBuilt(model, solverParameters(opts));
@@ -1850,6 +1860,18 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
       return giveUp(first);
     ranFirst = true;
     spanProven = first.status() == CpSolverStatus::OPTIMAL;
+    if (!spanProven) {
+      // One escalated retry for the missing certificate (kSpanEscalation).
+      live.budget = opts.budget * kSpanEscalation;
+      CpSolverResponse retry = solveBuilt(model, solverParameters(live));
+      if (solved(retry) &&
+          (retry.status() == CpSolverStatus::OPTIMAL ||
+           SolutionIntegerValue(retry, drain) <=
+               SolutionIntegerValue(first, drain))) {
+        first = retry;
+        spanProven = retry.status() == CpSolverStatus::OPTIMAL;
+      }
+    }
     solvedDrain = SolutionIntegerValue(first, drain);
     assert(solvedDrain <= heuristicDrain &&
            "the model bounds the drain by the heuristic's own");
@@ -1861,11 +1883,11 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
   LinearExpr area = areaTerms(model, orderedStarts, span, startVars, allocs,
                               /*ii=*/0, horizon, latExpr, sels, shared);
   model.Minimize(area);
-  SchedulerOptions rest = opts;
+  SchedulerOptions rest = live;
   if (ranFirst) {
     rehintFrom(model, ops.getArrayRef(), startVars, allocs, sels, shared,
                first);
-    rest = lessBudget(opts, first);
+    rest = lessBudget(live, first);
   }
   // Certified stop, as the fold's slices: within kFoldGapEps of the model's
   // optimum is close enough to end the solve with a certificate.
@@ -2304,6 +2326,7 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   bool skipSpan =
       hint && drainVar && floorDrain >= span.drainOf(prob);
   CpSolverResponse first;
+  SchedulerOptions live = opts;
   if (skipSpan) {
     out.spanProven = true;
   } else {
@@ -2317,6 +2340,18 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       return ModuloOutcome::Exhausted;
     }
     out.spanProven = first.status() == CpSolverStatus::OPTIMAL;
+    if (!out.spanProven) {
+      // One escalated retry for the missing certificate (kSpanEscalation).
+      live.budget = opts.budget * kSpanEscalation;
+      CpSolverResponse retry = solveBuilt(model, solverParameters(live));
+      if (solved(retry) &&
+          (retry.status() == CpSolverStatus::OPTIMAL ||
+           SolutionIntegerValue(retry, primary) <=
+               SolutionIntegerValue(first, primary))) {
+        first = retry;
+        out.spanProven = retry.status() == CpSolverStatus::OPTIMAL;
+      }
+    }
   }
 
   // The area solve, under the span the first settled (or the floor proved),
@@ -2327,11 +2362,11 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   LinearExpr area = areaTerms(model, orderedStarts, span, startVars, allocs, ii,
                               horizon, latExpr, sels, shared);
   model.Minimize(area);
-  SchedulerOptions rest = opts;
+  SchedulerOptions rest = live;
   if (!skipSpan) {
     rehintFrom(model, ops.getArrayRef(), startVars, allocs, sels, shared,
                first);
-    rest = lessBudget(opts, first);
+    rest = lessBudget(live, first);
   }
   if (span.trip)
     rest.budget = std::min(rest.budget, opts.budget * kAreaTieBreakShare);
