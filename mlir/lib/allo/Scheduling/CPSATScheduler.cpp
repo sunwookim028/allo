@@ -1782,7 +1782,11 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
       return giveUp(boot);
     rehintAll(model, boot);
     model.Minimize(area);
-    CpSolverResponse first = solveBuilt(model, solverParameters(restArea));
+    // Certified stop, as the fold's slices: within kFoldGapEps of the
+    // model's optimum is close enough to end the solve with a certificate.
+    SatParameters areaParams = solverParameters(restArea);
+    areaParams.set_relative_gap_limit(kFoldGapEps);
+    CpSolverResponse first = solveBuilt(model, areaParams);
     assert(first.status() != CpSolverStatus::INFEASIBLE &&
            "the bootstrap's schedule satisfies the same model");
     bool areaProven = first.status() == CpSolverStatus::OPTIMAL;
@@ -1863,7 +1867,11 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
                first);
     rest = lessBudget(opts, first);
   }
-  CpSolverResponse second = solveBuilt(model, solverParameters(rest));
+  // Certified stop, as the fold's slices: within kFoldGapEps of the model's
+  // optimum is close enough to end the solve with a certificate.
+  SatParameters areaParams = solverParameters(rest);
+  areaParams.set_relative_gap_limit(kFoldGapEps);
+  CpSolverResponse second = solveBuilt(model, areaParams);
   assert(second.status() != CpSolverStatus::INFEASIBLE &&
          "the span solve's schedule satisfies the pinned model");
   if (!solved(second) && !ranFirst)
@@ -2325,7 +2333,12 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   }
   if (span.trip)
     rest.budget = std::min(rest.budget, opts.budget * kAreaTieBreakShare);
-  CpSolverResponse second = solveBuilt(model, solverParameters(rest));
+  // Certified stop, as the fold's slices: a tie-break certified within
+  // kFoldGapEps reads areaProven, which also skips the fold re-solve — the
+  // fold cannot beat a certificate by more than the certificate.
+  SatParameters tieParams = solverParameters(rest);
+  tieParams.set_relative_gap_limit(kFoldGapEps);
+  CpSolverResponse second = solveBuilt(model, tieParams);
   assert(second.status() != CpSolverStatus::INFEASIBLE &&
          "the span solve's (or the hinted heuristic's) schedule satisfies the "
          "pinned model");
