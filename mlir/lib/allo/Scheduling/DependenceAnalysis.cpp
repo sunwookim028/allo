@@ -404,18 +404,57 @@ memDepComponents(Operation *op, int64_t distance) {
   return comps;
 }
 
+// The compile-time value of \p a's subscript in dimension \p k, when it has
+// one every execution: a constant map result, or a dim/symbol result whose
+// operand is a constant.
+static std::optional<int64_t> constantSubscript(const MemAccess &a,
+                                                unsigned k) {
+  if (!a.map || k >= a.map.getNumResults())
+    return std::nullopt;
+  AffineExpr e = a.map.getResult(k);
+  if (auto c = dyn_cast<AffineConstantExpr>(e))
+    return c.getValue();
+  unsigned pos;
+  if (auto d = dyn_cast<AffineDimExpr>(e))
+    pos = d.getPosition();
+  else if (auto s = dyn_cast<AffineSymbolExpr>(e))
+    pos = a.map.getNumDims() + s.getPosition();
+  else
+    return std::nullopt;
+  if (pos >= a.indices.size())
+    return std::nullopt;
+  return getConstantIntValue(a.indices[pos]);
+}
+
+// Whether some dimension holds unequal compile-time subscripts on both sides:
+// the accessed elements then differ on every execution pair, whatever the
+// other (arbitrarily dynamic) dimensions do.
+static bool constantDimsDistinct(const MemAccess &a, const MemAccess &b) {
+  unsigned n = std::min(a.map.getNumResults(), b.map.getNumResults());
+  for (unsigned k = 0; k < n; ++k) {
+    std::optional<int64_t> ca = constantSubscript(a, k);
+    std::optional<int64_t> cb = constantSubscript(b, k);
+    if (ca && cb && *ca != *cb)
+      return true;
+  }
+  return false;
+}
+
 // Conservative memory dependences for pairs the polyhedral test cannot model
 // (`nonPolyhedral`: a plain memref.load/store such as an indirect A[idx[i]], or
 // an affine access whose loop nest is not all-affine; see inAffineNest). Any
 // two accesses to the same array with at least one write are serialized in
 // program order (a distance-0 forward edge), plus a distance-1 loop-carried
 // back edge when they share an innermost loop (closing the recurrence that
-// bounds II). Read-read pairs commute and are left independent. An
-// `allo.assume.nodep` hint can prune a proven-false edge to recover II.
+// bounds II). Read-read pairs commute and are left independent, and so is a
+// pair some dimension proves element-disjoint by unequal constant subscripts
+// (`result[0][x]` vs `result[1][y]`). An `allo.assume.nodep` hint can prune a
+// proven-false edge to recover II.
 static void checkConservativeDependence(
     ArrayRef<Operation *> accessOps,
     const llvm::SmallDenseSet<Operation *> &nonPolyhedral,
-    const llvm::DenseSet<OpPair> &undecided, MemoryDependenceResult &results) {
+    const llvm::DenseSet<OpPair> &undecided, MemoryDependenceResult &results,
+    unsigned &prunedConstDim) {
   for (unsigned i = 0, e = accessOps.size(); i < e; ++i) {
     for (unsigned j = i + 1; j < e; ++j) {
       Operation *earlier = accessOps[i];
@@ -434,6 +473,10 @@ static void checkConservativeDependence(
         continue;
       if (!ea->isWrite && !la->isWrite)
         continue;
+      if (constantDimsDistinct(*ea, *la)) {
+        ++prunedConstDim;
+        continue;
+      }
 
       // Forward intra-iteration edge (preserve program order).
       results[later].emplace_back(earlier,
@@ -766,7 +809,14 @@ DependenceAnalysis::DependenceAnalysis(func::FuncOp funcOp) : func(funcOp) {
 
   // Conservative ordering for the pairs the polyhedral test skips or cannot
   // decide.
-  checkConservativeDependence(accessOps, nonPolyhedral, undecided, results);
+  unsigned prunedConstDim = 0;
+  checkConservativeDependence(accessOps, nonPolyhedral, undecided, results,
+                              prunedConstDim);
+  if (prunedConstDim)
+    info(Stage::Sched, funcOp)
+        << "Constant-subscript disambiguation pruned " << prunedConstDim
+        << " conservative pair(s): a dimension's unequal constants keep the "
+           "elements disjoint";
 
   AffineValueMapBuilder builder(funcOp.getContext());
   checkStreamDependence(streamOps, builder, results);
