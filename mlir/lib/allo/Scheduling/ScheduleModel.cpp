@@ -240,9 +240,15 @@ std::string mlir::allo::ScheduleModel::toJSON() const {
   for (const UnhonoredDirective &u : unhonored)
     unhonoredEntries.push_back(Object{
         {"directive", u.directive}, {"where", u.where}, {"reason", u.reason}});
+  Array depEntries;
+  for (const DependenceReport &d : dependence)
+    depEntries.push_back(Object{{"func", d.func},
+                                {"conservative_accesses", d.conservativeAccesses},
+                                {"undecided_pairs", d.undecidedPairs}});
   Value root = Object{{"funcs", std::move(funcs)},
                       {"solves", std::move(solveEntries)},
                       {"unhonored_directives", std::move(unhonoredEntries)},
+                      {"dependence", std::move(depEntries)},
                       {"cycle_ns", (double)cycleTimeNs},
                       {"area", modeledArea}};
   std::string s;

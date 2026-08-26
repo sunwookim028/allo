@@ -90,6 +90,12 @@ public:
   /// the `allo.assume.ssa` ranges, else empty. Memoized.
   LoopTrip tripOf(Operation *loop) const;
 
+  /// How many accesses sit outside the polyhedral test's reach and how many
+  /// pairs it accepted but could not decide: the population the conservative
+  /// path owns, reported so it is watched rather than rediscovered.
+  unsigned conservativeAccesses() const { return nonPolyhedral.size(); }
+  unsigned undecidedPairs() const { return undecided.size(); }
+
 private:
   func::FuncOp func;
   circt::analysis::MemoryDependenceResult results;

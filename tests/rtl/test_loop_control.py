@@ -882,8 +882,11 @@ def test_assume_hints():
     assert _iis(_sched(par_scatter).cyclic()) == [1]
     # The non-affine subscript keeps the pair on the conservative path, where
     # the shadow gets no in-flight window and the read round trip stays in
-    # the recurrence.
-    assert _iis(_sched(seq_scatter).cyclic()) == [mem_reduce_ii(exact=False)]
+    # the recurrence. The residue is reported: the two `out[i * j]` accesses
+    # sit outside the polyhedral test.
+    res = _sched(seq_scatter)
+    assert _iis(res.cyclic()) == [mem_reduce_ii(exact=False)]
+    assert sum(x.conservative_accesses for x in res.compiler.dependence) == 2
 
     # A value range reaches the polyhedral test itself: under `assume(n >= 64)`
     # the write `A[i + n]` clears everything a 64-trip loop reads, the pair's

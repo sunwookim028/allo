@@ -145,6 +145,18 @@ struct FuncReport {
   std::vector<RegionReport> regions;
 };
 
+/// One kernel's dependence-analysis residue: what stayed outside the
+/// polyhedral test and fell to the conservative path. Filled by the
+/// scheduler, like `solves`.
+struct DependenceReport {
+  std::string func;
+  /// Accesses the polyhedral test cannot model (non-affine op, or a nest
+  /// that is not all-affine).
+  int64_t conservativeAccesses = 0;
+  /// Pairs the test accepted but could not decide.
+  int64_t undecidedPairs = 0;
+};
+
 /// A schedule directive the scheduler did not apply. Only refusals are listed:
 /// a directive that lands marks the region it shaped, one that does not is
 /// otherwise invisible, its region decomposed by report time.
@@ -303,6 +315,10 @@ public:
   /// Directives the scheduler could not apply, in encounter order. Filled by
   /// the solver, like `solves`.
   std::vector<UnhonoredDirective> unhonored;
+
+  /// Each kernel's dependence-analysis residue, in schedule order. Filled by
+  /// the solver, like `solves`.
+  std::vector<DependenceReport> dependence;
 
   /// The clock period the schedule holds (ns): the target, or the least period
   /// every device row fits when the target is unreachable (`runSDCScheduler`

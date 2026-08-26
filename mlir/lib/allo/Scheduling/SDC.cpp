@@ -1981,6 +1981,9 @@ LogicalResult mlir::allo::runSDCScheduler(ModuleOp module, StringRef top,
                                      loadedDev, scheduled, optsWithFloor);
 
   for (auto [fn, deps] : llvm::zip(*orderOr, depsFor)) {
+    model.dependence.push_back({fn.getSymName().str(),
+                                (int64_t)deps->conservativeAccesses(),
+                                (int64_t)deps->undecidedPairs()});
     FuncScheduler sched(*deps, loadedDev, model, scheduled, optsWithFloor,
                         /*ledger=*/nullptr, &grants);
     if (failed(sched.run(fn)))

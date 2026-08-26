@@ -316,6 +316,12 @@ def measure_one(item, knobs: Knobs) -> dict:
             max((s.ms for s in res.compiler.solves), default=0.0), 1
         )
         out["ops_max"] = max((s.ops for s in res.compiler.solves), default=0)
+        # The dependence analysis's residue: accesses outside the polyhedral
+        # test's reach, and pairs it accepted but could not decide.
+        out["dep_residual"] = [
+            sum(x.conservative_accesses for x in res.compiler.dependence),
+            sum(x.undecided_pairs for x in res.compiler.dependence),
+        ]
 
         if knobs.stage != "schedule":
             out["stage"] = "compile"

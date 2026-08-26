@@ -83,6 +83,27 @@ class SolveReport:
 
 
 @dataclass(frozen=True)
+class DependenceReport:
+    """One kernel's dependence-analysis residue: what stayed outside the
+    polyhedral test and fell to the conservative path."""
+
+    func: str
+    #: accesses the polyhedral test cannot model (non-affine op, or a nest
+    #: that is not all-affine).
+    conservative_accesses: int = 0
+    #: pairs the test accepted but could not decide.
+    undecided_pairs: int = 0
+
+    @classmethod
+    def from_json(cls, d: dict) -> DependenceReport:
+        return cls(
+            func=d["func"],
+            conservative_accesses=d.get("conservative_accesses", 0),
+            undecided_pairs=d.get("undecided_pairs", 0),
+        )
+
+
+@dataclass(frozen=True)
 class CompilerReport:
     """Everything about the compile that is not about the hardware."""
 
@@ -92,6 +113,8 @@ class CompilerReport:
     #: callees-first, and within a func its solving regions in program order.
     #: Not one entry per region (see :class:`SolveReport`).
     solves: list[SolveReport] = field(default_factory=list)
+    #: each kernel's dependence residue, in schedule order.
+    dependence: list[DependenceReport] = field(default_factory=list)
 
     @property
     def deterministic(self) -> bool:
@@ -110,4 +133,7 @@ class CompilerReport:
         return cls(
             options=options,
             solves=[SolveReport.from_json(s) for s in d.get("solves", [])],
+            dependence=[
+                DependenceReport.from_json(x) for x in d.get("dependence", [])
+            ],
         )
