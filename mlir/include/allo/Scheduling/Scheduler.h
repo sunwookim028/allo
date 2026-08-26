@@ -593,13 +593,32 @@ LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
                             const SchedulerOptions &opts,
                             int64_t slackGrant = 0);
 
+/// Post-schedule register-lifetime repair: re-place starts within the solved
+/// structure to spend schedule slack on shorter delay chains and a shallower
+/// pulse chain. The cyclic variant keeps every start's congruence slot, so
+/// the interval, the slot capacities and the unit assignments are untouched
+/// by construction; the acyclic variant pins every operation holding a
+/// limited unit. Both pin operations on allocatable operators (their select
+/// cone was timed at the solved placement), pin the anchor, and leash the
+/// drain and the schedule depth. The system is pure difference constraints
+/// under a linear objective; the move commits only where the device's real
+/// chain and pulse prices say it is strictly cheaper, re-deriving the
+/// sub-cycle starts.
+void repairRegisterLifetimes(ChainingModuloProblem &prob, Operation *anchor,
+                             const SpanObjective &span, float cycleTime,
+                             float regFloor);
+void repairRegisterLifetimes(ChainingSharedOperatorsProblem &prob,
+                             Operation *anchor, const SpanObjective &span,
+                             float cycleTime, float regFloor);
+
 /// Check, solve, and verify \p problem, minimizing the span \p span charges.
 /// The chaining modulo variant, with a target-II lower bound (from a pipeline
 /// directive): the achieved II is max(\p minII, the natural minimum). \p minII
 /// == 1 imposes no additional bound. \p maxII, nonzero, is an explicit
 /// directive's II ceiling, honored by the exact area objective alone. \p opts
 /// selects the resource solver; both paths go through the same `check` and
-/// `verify`.
+/// `verify`, and the lifetime repair runs before the verify so what ships is
+/// what was verified.
 inline LogicalResult
 solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
                        float cycleTime, unsigned minII,
@@ -615,6 +634,7 @@ solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
                                                 opts.regFloor, minII))) {
     return failure();
   }
+  repairRegisterLifetimes(problem, anchor, span, cycleTime, opts.regFloor);
   if (failed(problem.verify()))
     return failure();
   return success();
@@ -634,6 +654,7 @@ inline LogicalResult solveSchedulingProblem(
                                                 opts.regFloor))) {
     return failure();
   }
+  repairRegisterLifetimes(problem, anchor, span, cycleTime, opts.regFloor);
   if (failed(problem.verify()))
     return failure();
   return success();

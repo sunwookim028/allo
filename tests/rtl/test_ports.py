@@ -338,12 +338,13 @@ def test_internal_signal_names():
     @kernel
     def sx(a: i32, X: i32[16], Y: i32[16], Z: i32[16]):
         for i in range(16):
-            # `buf` is combinational and the multiply beside it is a DSP core,
-            # so `buf` waits for it. That wait is the delay tap named below.
-            # A subtract keeps the pair a core plus an adder; an add would
-            # fuse onto the muladd row and leave no wait to name.
+            # `buf` feeds the first multiply and then the multiply of its
+            # result, so it stays live across the first core's latency
+            # wherever the schedule places it (a single late read would be
+            # re-placed next to its producer, and a mul-add pair would fuse).
+            # That wait is the delay tap named below.
             buf: i32 = X[i] + a
-            Z[i] = buf - Y[i] * a
+            Z[i] = (buf * Y[i]) * buf
 
     v = _to_rtl(sx).verilog
     assert re.search(r"\bbuf_d1\b", v), "a delay tap keeps its value + delay"

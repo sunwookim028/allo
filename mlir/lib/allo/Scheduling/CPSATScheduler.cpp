@@ -2996,3 +2996,180 @@ mlir::allo::solveSharing(SharingProblem &problem, ArrayRef<unsigned> hint,
       << llvm::format("%g", opts.budget) << " deterministic time units)";
   return assign;
 }
+
+//===----------------------------------------------------------------------===//
+// Post-schedule register-lifetime repair.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Shared core of `repairRegisterLifetimes` (see Scheduler.h). Starts are
+/// written as `sigma + M * lap` with `sigma` the solved start modulo \p M and
+/// only the laps free, so a cyclic move can never change a congruence slot;
+/// the acyclic case runs at M = 1 with sigma = 0. The system is dependences,
+/// chain breaks, the drain and depth leashes, and the pins - all difference
+/// constraints - under the linear width-weighted lifetime objective, which
+/// CP-SAT settles at its LP root.
+template <typename ProblemT>
+void repairLifetimes(ProblemT &prob, Operation *anchor,
+                     const SpanObjective &span, float cycleTime,
+                     float regFloor) {
+  int64_t pulse = span.device.pulsePrice();
+  if (span.regs.empty() && !pulse)
+    return;
+  constexpr bool cyclic = std::is_same_v<ProblemT, ChainingModuloProblem>;
+  int64_t modulus = 1;
+  if constexpr (cyclic)
+    modulus = static_cast<int64_t>(*prob.getInitiationInterval());
+
+  const auto &ops = prob.getOperations();
+  DenseMap<Operation *, int64_t> cur;
+  int64_t depthCap = 1;
+  for (Operation *op : ops) {
+    int64_t t = static_cast<int64_t>(*prob.getStartTime(op));
+    cur[op] = t;
+    depthCap = std::max(depthCap, t + std::max<int64_t>(1, prob.latencyOf(op)));
+  }
+  int64_t curDrain = span.drainOf(prob);
+
+  // The commit criterion: what a placement costs at the device's real chain
+  // and pulse prices, folded onto the interval as the emitter builds it.
+  auto price = [&](DenseMap<Operation *, int64_t> &at) {
+    int64_t total = 0;
+    for (const RegisterTerm &term : span.regs) {
+      if (term.reads.empty())
+        continue;
+      int64_t end = at.lookup(term.def) + prob.latencyOf(term.def);
+      int64_t depth = 0;
+      for (auto [reader, dist] : term.reads)
+        depth = std::max(depth, at.lookup(reader) + dist * modulus - end);
+      total +=
+          span.device.chainPrice((depth + modulus - 1) / modulus, term.width);
+    }
+    if (pulse) {
+      int64_t deepest = 0;
+      for (Operation *op : ops)
+        deepest = std::max(deepest, at.lookup(op));
+      total += pulse * deepest;
+    }
+    return total;
+  };
+  int64_t curPrice = price(cur);
+  if (!curPrice)
+    return;
+
+  auto onAllocatable = [&](Operation *op) {
+    auto linked = prob.getLinkedResourceTypes(op);
+    if (!linked)
+      return false;
+    return llvm::any_of(*linked, [&](Problem::ResourceType rsrc) {
+      return prob.getAllocatable(rsrc).has_value();
+    });
+  };
+
+  CpModelBuilder model;
+  DenseMap<Operation *, IntVar> laps;
+  DenseMap<Operation *, int64_t> sigma;
+  int64_t lapCap = depthCap / modulus + 1;
+  for (Operation *op : ops) {
+    int64_t s = cyclic ? cur[op] % modulus : 0;
+    sigma[op] = s;
+    bool pinned = op == anchor || onAllocatable(op) ||
+                  (!cyclic && prob.holdsLimitedUnit(op));
+    int64_t k0 = (cur[op] - s) / modulus;
+    laps.try_emplace(op, model.NewIntVar(operations_research::Domain(
+                             pinned ? k0 : 0, pinned ? k0 : lapCap)));
+  }
+  auto tOf = [&](Operation *op) {
+    return LinearExpr::Term(laps.at(op), modulus) + sigma.lookup(op);
+  };
+
+  for (Operation *op : ops)
+    for (auto &dep : prob.getDependences(op)) {
+      Operation *src = dep.getSource();
+      int64_t dist = 0;
+      if constexpr (cyclic)
+        dist = prob.getDistance(dep).value_or(0);
+      int64_t w = prob.isForwarded(dep) ? 0 : prob.latencyOf(src);
+      model.AddGreaterOrEqual(tOf(op) - tOf(src), w - modulus * dist);
+    }
+  for (const Problem::Dependence &dep :
+       chainBreaksFor(prob, cycleTime, regFloor))
+    model.AddGreaterOrEqual(tOf(dep.getDestination()) - tOf(dep.getSource()),
+                            prob.latencyOf(dep.getSource()) + 1);
+  for (const DrainTerm &term : span.drain) {
+    int64_t off =
+        term.offset + (term.plusLatency ? prob.latencyOf(term.op) : 0);
+    model.AddLessOrEqual(tOf(term.op), curDrain - off);
+  }
+  for (Operation *op : ops)
+    model.AddLessOrEqual(tOf(op),
+                         depthCap - std::max<int64_t>(1, prob.latencyOf(op)));
+
+  LinearExpr cost;
+  for (const RegisterTerm &term : span.regs) {
+    if (term.reads.empty())
+      continue;
+    int64_t maxDist = 0;
+    for (auto [reader, dist] : term.reads)
+      maxDist = std::max(maxDist, dist);
+    IntVar last = model.NewIntVar(
+        operations_research::Domain(0, depthCap + maxDist * modulus));
+    for (auto [reader, dist] : term.reads)
+      model.AddGreaterOrEqual(last, tOf(reader) + dist * modulus);
+    cost += LinearExpr::Term(last, term.width) -
+            LinearExpr::Term(laps.at(term.def), term.width * modulus);
+  }
+  if (pulse) {
+    IntVar deepest =
+        model.NewIntVar(operations_research::Domain(0, depthCap));
+    for (Operation *op : ops)
+      model.AddLessOrEqual(tOf(op), deepest);
+    cost += LinearExpr::Term(deepest, pulse);
+  }
+  model.Minimize(cost);
+
+  SatParameters params;
+  params.set_num_workers(1);
+  params.set_random_seed(0);
+  params.set_max_deterministic_time(5.0);
+  CpSolverResponse r = solveBuilt(model, params);
+  if (r.status() != CpSolverStatus::OPTIMAL)
+    return;
+
+  DenseMap<Operation *, int64_t> moved;
+  for (Operation *op : ops)
+    moved[op] =
+        sigma.lookup(op) + modulus * SolutionIntegerValue(r, laps.at(op));
+  int64_t newPrice = price(moved);
+  if (newPrice >= curPrice)
+    return;
+  for (Operation *op : ops)
+    prob.setStartTime(op, static_cast<unsigned>(moved[op]));
+  if (failed(finishSchedule(prob, cycleTime, regFloor))) {
+    for (Operation *op : ops)
+      prob.setStartTime(op, static_cast<unsigned>(cur[op]));
+    (void)finishSchedule(prob, cycleTime, regFloor);
+    return;
+  }
+  info(Stage::Sched, prob.getContainingOp())
+      << "Lifetime repair re-placed the schedule's slack: modeled chain and "
+         "pulse cost "
+      << curPrice << " -> " << newPrice;
+}
+
+} // namespace
+
+void mlir::allo::repairRegisterLifetimes(ChainingModuloProblem &prob,
+                                         Operation *anchor,
+                                         const SpanObjective &span,
+                                         float cycleTime, float regFloor) {
+  repairLifetimes(prob, anchor, span, cycleTime, regFloor);
+}
+
+void mlir::allo::repairRegisterLifetimes(ChainingSharedOperatorsProblem &prob,
+                                         Operation *anchor,
+                                         const SpanObjective &span,
+                                         float cycleTime, float regFloor) {
+  repairLifetimes(prob, anchor, span, cycleTime, regFloor);
+}
