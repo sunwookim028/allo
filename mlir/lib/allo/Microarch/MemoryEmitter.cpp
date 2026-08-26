@@ -878,19 +878,20 @@ void DatapathEmitter::finalizeForwards() {
       if (f.load == p.load)
         arms.push_back(&f);
     llvm::stable_sort(arms, [](const auto *a, const auto *b) {
-      return a->offset < b->offset;
+      return a->windowOffset < b->windowOffset;
     });
     Value muxed = p.raw;
     for (const uarch::MemUnit::Forward *f : arms) {
       ForwardStore st = fwdStores.lookup(accKey(p.mem, f->store));
       assert(st.we && "a forwarded store recorded no issue terms");
-      assert(f->offset <= m.readLatency && "an arm lies in the read's flight");
+      assert(f->windowOffset <= m.readLatency &&
+             "an arm lies in the read's flight");
       const uarch::MemUnit::Access &store = m.accesses[f->store];
-      auto [lOff, lBank] = loadAddrAt(f->offset);
+      auto [lOff, lBank] = loadAddrAt(f->windowOffset);
       Value match = c.icmpEqV(lOff, st.offset);
       if (m.numBanks > 1)
         match = c.andBits(match, c.icmpEqV(lBank, bankOf(store, st.bank)));
-      unsigned toData = m.readLatency - f->offset;
+      unsigned toData = m.readLatency - f->windowOffset;
       Value sel = c.delayValid(c.andBits(match, st.we), toData, sh);
       Value data = c.shiftChain(st.data, toData, sh).last();
       c.muxLedger.add(MuxRole::Crossbar, 2, m.width);

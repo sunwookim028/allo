@@ -67,7 +67,7 @@ _DSP_CHOICE = {
 
 #: An adder or subtracter spends DSPs only on the mantissa alignment, so it has
 #: no maximum-usage build to ask for.
-_NO_DSP = {"nodsp": "C_Mult_Usage=No_Usage"}
+_NO_DSP = {"nodsp": _DSP_CHOICE["nodsp"]}
 
 # The floating_point core offers Half/Single/Double/Custom and no bfloat16, so
 # bfloat16 is spelled as a custom format: 8 exponent bits and 8 fraction (7

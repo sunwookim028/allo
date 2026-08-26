@@ -1509,20 +1509,30 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
   };
 
   DenseSet<Operation *> feeding;
+  // The capped-`rsrc` contenders reaching a sink along \p tails, each with its
+  // head, tail and demand. Marks the members as feeding when asked: the
+  // per-output pass does, the per-op floor pass does not.
+  auto groupFor = [&](DenseMap<Operation *, int64_t> &tails,
+                      Problem::ResourceType rsrc, bool markFeeding) {
+    SmallVector<Contender> group;
+    for (Operation *op : prob.getOperations()) {
+      if (!prob.usesResource(op, rsrc))
+        continue;
+      auto it = tails.find(op);
+      if (it == tails.end())
+        continue;
+      if (markFeeding)
+        feeding.insert(op);
+      group.push_back({heads.lookup(op), it->second,
+                       static_cast<int64_t>(prob.getResourceDemand(op))});
+    }
+    return group;
+  };
+
   for (const DrainTerm &term : terms) {
     DenseMap<Operation *, int64_t> tails = tailsTo(term.op);
     for (auto [rsrc, limit] : capped) {
-      SmallVector<Contender> group;
-      for (Operation *op : prob.getOperations()) {
-        if (!prob.usesResource(op, rsrc))
-          continue;
-        auto it = tails.find(op);
-        if (it == tails.end())
-          continue;
-        feeding.insert(op);
-        group.push_back({heads.lookup(op), it->second,
-                         static_cast<int64_t>(prob.getResourceDemand(op))});
-      }
+      SmallVector<Contender> group = groupFor(tails, rsrc, /*markFeeding=*/true);
       if (!group.empty())
         bound = std::max(bound, strongest(group, limit) + offsetOf(term));
     }
@@ -1551,16 +1561,8 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
       DenseMap<Operation *, int64_t> tails = tailsTo(v);
       int64_t &floor = (*opFloors)[v];
       for (auto [rsrc, limit] : capped) {
-        SmallVector<Contender> group;
-        for (Operation *op : prob.getOperations()) {
-          if (!prob.usesResource(op, rsrc))
-            continue;
-          auto it = tails.find(op);
-          if (it == tails.end())
-            continue;
-          group.push_back({heads.lookup(op), it->second,
-                           static_cast<int64_t>(prob.getResourceDemand(op))});
-        }
+        SmallVector<Contender> group =
+            groupFor(tails, rsrc, /*markFeeding=*/false);
         if (!group.empty())
           floor = std::max(floor, strongest(group, limit));
       }

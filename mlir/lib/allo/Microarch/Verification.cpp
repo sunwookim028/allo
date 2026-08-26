@@ -443,7 +443,7 @@ void checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
     // assert.
     //
     // The tightest bound op is both the arrival to check against and the anchor
-    // of the refusal below.
+    // of the warning below.
     const FuncUnit::BoundOp *worst = &u.boundOps.front();
     for (const FuncUnit::BoundOp &bo : u.boundOps)
       if (bo.z && (!worst->z || *bo.z > *worst->z))

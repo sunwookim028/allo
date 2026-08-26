@@ -657,28 +657,25 @@ NodeTiming mlir::allo::accessCharacterization(Operation *op,
   }
   c.latency = t.latency;
   c.inDelay = c.outDelay = t.delay;
-  // The address cone is no operation of its own, so no dependence carries its
-  // delay: charge it to the port it feeds. The type NAME carries it too, or
-  // two sites costing differently would share one characterization.
-  if (double addr = quantizeCone(addressDelayOf(op, opLib))) {
-    // A registered port takes the cone on its input side alone, ending at its
-    // own address register. A zero-latency port has none, and CIRCT requires
-    // its two delays to agree, so there the cone lands on both.
-    c.inDelay += addr;
+  // A cone is no operation of its own, so no dependence carries its delay:
+  // charge it to the port it feeds, and to the type NAME too, or two sites
+  // costing differently would share one characterization. A registered port
+  // takes the cone on its input side alone, ending at its address register; a
+  // zero-latency port has none, and CIRCT requires its two delays to agree, so
+  // there the cone lands on both.
+  auto addCone = [&](double d, std::string suffix) {
+    c.inDelay += d;
     if (c.latency == 0)
-      c.outDelay += addr;
-    c.typeName += "@" + llvm::formatv("{0:F2}", addr).str();
-  }
-  // The select the port colouring will grow in front of the bus, reserved
-  // here so the cut leaves room for it. Carried in the type name for the same
-  // reason the address cone is.
-  if (double sel = portSelectDelay(op, opLib)) {
-    c.inDelay += sel;
-    if (c.latency == 0)
-      c.outDelay += sel;
-    c.typeName +=
-        llvm::formatv("/{0}:1@{1:F2}", portSelectArmsOf(op), sel).str();
-  }
+      c.outDelay += d;
+    c.typeName += suffix;
+  };
+  // The address cone in front of the port.
+  if (double addr = quantizeCone(addressDelayOf(op, opLib)))
+    addCone(addr, "@" + llvm::formatv("{0:F2}", addr).str());
+  // The select the port colouring will grow in front of the bus, reserved here
+  // so the cut leaves room for it.
+  if (double sel = portSelectDelay(op, opLib))
+    addCone(sel, llvm::formatv("/{0}:1@{1:F2}", portSelectArmsOf(op), sel).str());
   return c;
 }
 

@@ -113,11 +113,12 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
   // everything and record the best free-intermediate arrival.
   auto compose = [&](std::optional<unsigned> source,
                      std::vector<int64_t> &dist) -> bool {
-    dist.assign(n, INT64_MIN);
-    if (source)
+    if (source) {
+      dist.assign(n, INT64_MIN);
       dist[*source] = 0;
-    else
+    } else {
       dist.assign(n, 0);
+    }
     bool changed = true;
     for (unsigned round = 0; changed && round <= n; ++round) {
       changed = false;

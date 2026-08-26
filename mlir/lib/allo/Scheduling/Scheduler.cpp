@@ -250,7 +250,6 @@ public:
   virtual LogicalResult schedule() = 0;
 };
 
-
 // This class solves acyclic, resource-constrained `OccupancyProblem` with
 // LP-guided first-fit placement, after de Dinechin.
 class SharedOperatorsSimplexScheduler : public SDCSchedulerBase {
@@ -364,6 +363,12 @@ protected:
   /// The fewest cycles one iteration's resource demand can be issued in.
   /// \p binding receives what set it, untouched where nothing does.
   unsigned computeResMinII(BindingResource &binding);
+  /// Decide whether the gap between the greedily achieved `parameterT` and the
+  /// LP bound `lowerBoundII` is the heuristic's or the problem's, on a bounded
+  /// sigma/lap oracle budget. Lowers `parameterT` to a certified witness where
+  /// one is found and returns its start times; otherwise keeps the heuristic
+  /// schedule and warns. \p resMinII feeds the diagnostics only.
+  DenseMap<Operation *, unsigned> adjudicateIIGap(unsigned resMinII);
 
 public:
   ModuloSimplexScheduler(ModuloOccupancyProblem &prob, Operation *lastOp,
@@ -405,7 +410,7 @@ public:
       info(Stage::Sched, prob.getContainingOp())
           << "Split " << additionalConstraints.size()
           << " combinational chain(s) to meet the " << format("%g", cycleTime)
-          << " ns clock period (adding pipeline register stages / latency)";
+          << " ns clock period (adds pipeline register stages / latency)";
     if (failed(ModuloSimplexScheduler::schedule()))
       return failure();
     return mlir::allo::computeStartTimesInCycle(prob, regFloor);
@@ -993,19 +998,9 @@ void SDCSchedulerBase::computeMargins(SmallVectorImpl<unsigned> &asap,
   }
 }
 
-
 //===----------------------------------------------------------------------===//
 // SharedOperatorsSimplexScheduler
 //===----------------------------------------------------------------------===//
-
-static bool isLimited(Operation *op, SharedOperatorsProblem &prob) {
-  auto maybeRsrcs = prob.getLinkedResourceTypes(op);
-  if (!maybeRsrcs)
-    return false;
-  return llvm::any_of(*maybeRsrcs, [&](Problem::ResourceType rsrc) {
-    return prob.getLimit(rsrc).value_or(0) > 0;
-  });
-}
 
 /// The limited units \p op holds, in link order. An operation takes all of them
 /// at its start time and releases them together, so a cycle is feasible for it
@@ -1041,7 +1036,7 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
   auto &ops = prob.getOperations();
   SmallVector<Operation *> limitedOps;
   for (auto *op : ops)
-    if (isLimited(op, prob))
+    if (prob.holdsLimitedUnit(op))
       limitedOps.push_back(op);
 
   // Placement order: earliest first, then the largest reservation first among
@@ -1117,12 +1112,8 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ModuloSimplexScheduler::checkLastOp() {
-  if (!prob.hasOperation(lastOp)) {
-    assert(false && "the scheduling problem does not include its last "
-                    "operation; ProblemBuilder constructs both, so no input "
-                    "can reach this");
+  if (failed(SDCSchedulerBase::checkLastOp()))
     return failure();
-  }
 
   // Determine which operations have no outgoing *intra*-iteration dependences.
   auto &ops = prob.getOperations();
@@ -1244,6 +1235,18 @@ LogicalResult ModuloSimplexScheduler::scheduleOperation(Operation *n) {
   return scheduleWithEviction(n);
 }
 
+/// How often `slot` falls inside a reservation window of `occ` cycles starting
+/// at `base`, modulo `ii`: a window wider than the II wraps and can hold one
+/// slot more than once.
+static unsigned slotCoverage(unsigned base, unsigned occ, unsigned slot,
+                             unsigned ii) {
+  unsigned m = 0;
+  for (unsigned i = 0; i < occ; ++i)
+    if ((base + i) % ii == slot)
+      ++m;
+  return m;
+}
+
 /// Repairs a failed placement at the current II: choose a start in the same
 /// window first fit scanned, evict the placed operations blocking it (their
 /// reservations first, then the pins a certifying cycle names), and pin `n`
@@ -1262,15 +1265,6 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
 
   auto evictable = [&](Operation *op) {
     return evictCount.lookup(op) < kMaxEvictionsPerOp;
-  };
-  // How often `slot` falls inside a reservation window starting at `base`: a
-  // window wider than the II wraps and can hold one slot more than once.
-  auto covers = [&](unsigned base, unsigned occ, unsigned slot) {
-    unsigned m = 0;
-    for (unsigned i = 0; i < occ; ++i)
-      if ((base + i) % ii == slot)
-        ++m;
-    return m;
   };
 
   // The holders of each unit `n` needs, least-evicted first with problem
@@ -1319,7 +1313,7 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
         unsigned freed = 0;
         for (Operation *v : victims)
           if (auto it = revTab.find(v); it != revTab.end())
-            freed += covers(it->second, prob.getResourceCycles(v), slot) *
+            freed += slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
                      prob.getResourceDemand(v);
         while (table.lookup(slot) + need > limit + freed) {
           Operation *pick = nullptr;
@@ -1327,7 +1321,7 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
           for (auto &[op, base] : holders[rsrc]) {
             if (taken.count(op) || !evictable(op))
               continue;
-            mult = covers(base, prob.getResourceCycles(op), slot);
+            mult = slotCoverage(base, prob.getResourceCycles(op), slot, ii);
             if (mult) {
               pick = op;
               break;
@@ -1420,7 +1414,6 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
   return failure();
 }
 
-
 /// Grows the II by one and restarts placement from scratch at the larger
 /// interval, after Rau: pins made at the smaller II would otherwise carry
 /// their scars (evicted victims stranded on late slots) into the new one. The
@@ -1457,7 +1450,7 @@ LogicalResult ModuloSimplexScheduler::growIIAndRestart(Operation *n) {
   scheduled.clear();
   unscheduled.clear();
   for (auto *op : prob.getOperations())
-    if (isLimited(op, prob))
+    if (prob.holdsLimitedUnit(op))
       unscheduled.push_back(op);
   evictCount.clear();
   evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
@@ -1511,14 +1504,6 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
     return false;
   }
 
-  auto covers = [&](unsigned base, unsigned occ, unsigned slot) {
-    unsigned m = 0;
-    for (unsigned i = 0; i < occ; ++i)
-      if ((base + i) % ii == slot)
-        ++m;
-    return m;
-  };
-
   // The lowest class in [lo, oldPin) crit fits after evicting the holders that
   // stand in its way.
   SmallVector<Operation *> victims;
@@ -1546,7 +1531,7 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
         unsigned freed = 0;
         for (Operation *v : vic)
           if (auto it = revTab.find(v); it != revTab.end())
-            freed += covers(it->second, prob.getResourceCycles(v), slot) *
+            freed += slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
                      prob.getResourceDemand(v);
         while (table.lookup(slot) + need > limit + freed) {
           Operation *pick = nullptr;
@@ -1559,7 +1544,7 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
             if (taken.count(op) ||
                 evictCount.lookup(op) >= kMaxEvictionsPerOp)
               continue;
-            mult = covers(base, prob.getResourceCycles(op), slot);
+            mult = slotCoverage(base, prob.getResourceCycles(op), slot, ii);
             if (mult) {
               pick = op;
               break;
@@ -1716,104 +1701,14 @@ unsigned ModuloSimplexScheduler::computeResMinII(BindingResource &binding) {
   return resMinII;
 }
 
-/// Seeds the II at the larger of the resource-min II and the pipeline
-/// directive's floor, then iteratively fixes limited operations to time steps
-/// in earliest-first, least-slack-breaks-ties order. That order matters:
-/// pinning a consumer caps how late its operands may issue, and once a
-/// resource saturates at this II there is no cycle left for the last of them.
-LogicalResult ModuloSimplexScheduler::schedule() {
-  if (failed(checkLastOp()))
-    return failure();
-
-  // Seed the II at the resource-min II, but never below the pipeline
-  // directive's target; the search only grows it from there.
-  BindingResource binding;
-  unsigned resMinII = computeResMinII(binding);
-  parameterT = std::max(resMinII, minII);
-  info(Stage::Sched, prob.getContainingOp())
-      << "Initiation interval search seeded at II=" << parameterT
-      << " (resource-min II=" << resMinII
-      << ", pipeline-directive floor minII=" << minII << ")";
-  LLVM_DEBUG(dbgs() << "ResMinII = " << parameterT << " (minII=" << minII
-                    << ")\n");
-  buildGraph();
-  asapTimes.resize(startTimeVariables.size());
-  alapTimes.resize(startTimeVariables.size());
-
-  if (failed(solveGraph(/*allowRaise=*/true))) {
-    reportInfeasible();
-    return failure();
-  }
-  // The resource-free solve already raises the II to any loop-carried
-  // recurrence's minimum, so `parameterT` here is the best lower bound anything
-  // downstream can justify.
-  lowerBoundII = parameterT;
-  boundSettled = true;
-
-  // Report what set the bound, so it can be acted on: banking or replicating an
-  // array lowers a port-bound interval, reassociating a reduction lowers a
-  // recurrence-bound one.
-  if (lowerBoundII > 1) {
-    if (lowerBoundII > std::max(resMinII, minII))
-      info(Stage::Sched, prob.getContainingOp())
-          << "II cannot go below " << lowerBoundII
-          << " here: a loop-carried recurrence takes that long to come round";
-    else if (resMinII >= minII && binding.witness)
-      info(Stage::Sched, binding.witness)
-          << "II cannot go below " << resMinII << " here: one iteration takes "
-          << binding.demand << " slots of a resource serving " << binding.limit
-          << " per cycle. Banking or replicating what this access reaches is "
-             "what lowers that bound";
-  }
-
-  // Determine which operations are subject to resource constraints, and whether
-  // any of them is non-pipelined (occupies its unit for more than one cycle).
-  auto &ops = prob.getOperations();
-  for (auto *op : ops)
-    if (isLimited(op, prob)) {
-      unscheduled.push_back(op);
-      totalResourceCycles += prob.getResourceCycles(op);
-    }
-  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
-
-  // Main loop: iteratively fix limited operations to time steps. An operation
-  // that fits nowhere even after eviction repair grows the II and restarts
-  // the placement from scratch at the larger interval.
-  while (!unscheduled.empty()) {
-    // ASAP/ALAP margins, refreshed against the operations pinned so far.
-    updateMargins();
-
-    // Earliest-first, least slack breaking the tie (see the doc comment above).
-    auto priority = [&](Operation *op) {
-      unsigned stv = startTimeVariables[op];
-      return std::make_pair(asapTimes[stv], alapTimes[stv] - asapTimes[stv]);
-    };
-    auto *opIt = std::min_element(unscheduled.begin(), unscheduled.end(),
-                                  [&](Operation *opA, Operation *opB) {
-                                    return priority(opA) < priority(opB);
-                                  });
-    Operation *op = *opIt;
-    unscheduled.erase(opIt);
-
-    if (succeeded(scheduleOperation(op))) {
-      scheduled.push_back(op);
-      continue;
-    }
-    if (failed(growIIAndRestart(op)))
-      return failure();
-  }
-
-  // Lower the span where first fit left a critical op above its dependence
-  // bound. Only strictly-improving moves commit, so this never grows the II
-  // or the latency, and a span-optimal region is untouched.
-  repairSpan();
-
-  // Resource placement is greedy, so an II above the LP's bound may be the
-  // problem's real minimum or just what the heuristic cost. On a bounded
-  // budget the sigma/lap oracle can tell the two apart per interval: probe
-  // the bound itself, then binary-search the gap downward, shipping the
-  // lowest certified witness. Unknown keeps the heuristic schedule and the
-  // honest warning below.
+// Resource placement is greedy, so an II above the LP's bound may be the
+// problem's real minimum or just what the heuristic cost. On a bounded
+// budget the sigma/lap oracle can tell the two apart per interval: probe
+// the bound itself, then binary-search the gap downward, shipping the
+// lowest certified witness. Unknown keeps the heuristic schedule and the
+// honest warning below.
+DenseMap<Operation *, unsigned>
+ModuloSimplexScheduler::adjudicateIIGap(unsigned resMinII) {
   DenseMap<Operation *, unsigned> oracleStarts;
   bool floorRefuted = false, gapProven = false;
   if (parameterT > static_cast<int>(lowerBoundII) &&
@@ -1906,6 +1801,102 @@ LogicalResult ModuloSimplexScheduler::schedule() {
         << "): resource placement is a greedy heuristic, so this gap is not "
            "known to be necessary";
   }
+  return oracleStarts;
+}
+
+/// Seeds the II at the larger of the resource-min II and the pipeline
+/// directive's floor, then iteratively fixes limited operations to time steps
+/// in earliest-first, least-slack-breaks-ties order. That order matters:
+/// pinning a consumer caps how late its operands may issue, and once a
+/// resource saturates at this II there is no cycle left for the last of them.
+LogicalResult ModuloSimplexScheduler::schedule() {
+  if (failed(checkLastOp()))
+    return failure();
+
+  // Seed the II at the resource-min II, but never below the pipeline
+  // directive's target; the search only grows it from there.
+  BindingResource binding;
+  unsigned resMinII = computeResMinII(binding);
+  parameterT = std::max(resMinII, minII);
+  info(Stage::Sched, prob.getContainingOp())
+      << "Initiation interval search seeded at II=" << parameterT
+      << " (resource-min II=" << resMinII
+      << ", pipeline-directive floor minII=" << minII << ")";
+  LLVM_DEBUG(dbgs() << "ResMinII = " << parameterT << " (minII=" << minII
+                    << ")\n");
+  buildGraph();
+  asapTimes.resize(startTimeVariables.size());
+  alapTimes.resize(startTimeVariables.size());
+
+  if (failed(solveGraph(/*allowRaise=*/true))) {
+    reportInfeasible();
+    return failure();
+  }
+  // The resource-free solve already raises the II to any loop-carried
+  // recurrence's minimum, so `parameterT` here is the best lower bound anything
+  // downstream can justify.
+  lowerBoundII = parameterT;
+  boundSettled = true;
+
+  // Report what set the bound, so it can be acted on: banking or replicating an
+  // array lowers a port-bound interval, reassociating a reduction lowers a
+  // recurrence-bound one.
+  if (lowerBoundII > 1) {
+    if (lowerBoundII > std::max(resMinII, minII))
+      info(Stage::Sched, prob.getContainingOp())
+          << "II cannot go below " << lowerBoundII
+          << " here: a loop-carried recurrence takes that long to come round";
+    else if (resMinII >= minII && binding.witness)
+      info(Stage::Sched, binding.witness)
+          << "II cannot go below " << resMinII << " here: one iteration takes "
+          << binding.demand << " slots of a resource serving " << binding.limit
+          << " per cycle. Banking or replicating what this access reaches is "
+             "what lowers that bound";
+  }
+
+  // Determine which operations are subject to resource constraints, and whether
+  // any of them is non-pipelined (occupies its unit for more than one cycle).
+  auto &ops = prob.getOperations();
+  for (auto *op : ops)
+    if (prob.holdsLimitedUnit(op)) {
+      unscheduled.push_back(op);
+      totalResourceCycles += prob.getResourceCycles(op);
+    }
+  evictionBudget = kMaxEvictionsPerOp * unscheduled.size();
+
+  // Main loop: iteratively fix limited operations to time steps. An operation
+  // that fits nowhere even after eviction repair grows the II and restarts
+  // the placement from scratch at the larger interval.
+  while (!unscheduled.empty()) {
+    // ASAP/ALAP margins, refreshed against the operations pinned so far.
+    updateMargins();
+
+    // Earliest-first, least slack breaking the tie (see the doc comment above).
+    auto priority = [&](Operation *op) {
+      unsigned stv = startTimeVariables[op];
+      return std::make_pair(asapTimes[stv], alapTimes[stv] - asapTimes[stv]);
+    };
+    auto *opIt = std::min_element(unscheduled.begin(), unscheduled.end(),
+                                  [&](Operation *opA, Operation *opB) {
+                                    return priority(opA) < priority(opB);
+                                  });
+    Operation *op = *opIt;
+    unscheduled.erase(opIt);
+
+    if (succeeded(scheduleOperation(op))) {
+      scheduled.push_back(op);
+      continue;
+    }
+    if (failed(growIIAndRestart(op)))
+      return failure();
+  }
+
+  // Lower the span where first fit left a critical op above its dependence
+  // bound. Only strictly-improving moves commit, so this never grows the II
+  // or the latency, and a span-optimal region is untouched.
+  repairSpan();
+
+  DenseMap<Operation *, unsigned> oracleStarts = adjudicateIIGap(resMinII);
 
   prob.setInitiationInterval(parameterT);
   for (auto *op : ops)

@@ -1413,6 +1413,14 @@ std::pair<int64_t, int64_t> CostAttr::measuredDomain() const {
   return {static_cast<int64_t>(c[0]), static_cast<int64_t>(c[c.size() - 2])};
 }
 
+/// One parameter's worth of tiles over `value`: `ceil((value + offset) / size)`
+/// with the optional offset (coefficient 1) defaulting to zero. Clamped at
+/// zero, a tile count being a count.
+static double tiledCount(llvm::ArrayRef<double> coeffs, double value) {
+  double offset = coeffs.size() > 1 ? coeffs[1] : 0.0;
+  return std::max(0.0, std::ceil((value + offset) / coeffs[0]));
+}
+
 std::optional<double> CostAttr::evaluate(int64_t param) const {
   llvm::ArrayRef<double> c = getCoeffs().asArrayRef();
   double p = static_cast<double>(param);
@@ -1446,9 +1454,7 @@ std::optional<double> CostAttr::evaluate(int64_t param) const {
                (p - c[i - 2]) / (c[i] - c[i - 2]) * (c[i + 1] - c[i - 1]);
     return c[1]; // a single measured point, read at that point
   case CostFormEnum::Tiled:
-    // One parameter's worth of tiles, over however many items the offset
-    // leaves. Clamped at zero: a tile count is a count.
-    return std::max(0.0, std::ceil((p + (c.size() > 1 ? c[1] : 0.0)) / c[0]));
+    return tiledCount(c, p);
   case CostFormEnum::Piecewise:
     return getArms()[p < c[0] ? 0 : 1].evaluate(param);
   }
@@ -1498,9 +1504,7 @@ mlir::allo::evaluateResourceUse(ArrayAttr uses,
         double bits = 1.0;
         for (int64_t p : params)
           bits *= static_cast<double>(p);
-        llvm::ArrayRef<double> tc = factors.front().getCoeffs().asArrayRef();
-        term = std::max(0.0, std::ceil((bits + (tc.size() > 1 ? tc[1] : 0.0)) /
-                                       tc[0]));
+        term = tiledCount(factors.front().getCoeffs().asArrayRef(), bits);
       } else {
         assert(factors.size() == params.size() &&
                "a resource cost carries one factor per parameter of its kind");

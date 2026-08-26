@@ -471,7 +471,7 @@ struct MemUnit {
     // Cycles the store issues after the read (0 = same cycle, up to
     // `readLatency` while the read is in flight). A larger offset is a
     // younger write and wins the shadow mux.
-    unsigned offset = 0;
+    unsigned windowOffset = 0;
   };
   llvm::SmallVector<Forward, 1> forwards;
 };

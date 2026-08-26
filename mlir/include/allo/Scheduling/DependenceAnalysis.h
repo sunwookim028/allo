@@ -45,6 +45,14 @@ int64_t
 carriedDistanceAtLevel(llvm::ArrayRef<affine::DependenceComponent> comps,
                        unsigned level, bool &drop, bool &valid);
 
+/// The orientation-independent key for the access pair {a, b}. The polyhedral
+/// test visits a pair in both orders, so its `undecided` set and every query of
+/// it agree on this one canonical ordering.
+inline std::pair<Operation *, Operation *> unorderedPair(Operation *a,
+                                                         Operation *b) {
+  return a < b ? std::make_pair(a, b) : std::make_pair(b, a);
+}
+
 /// Memory + stream dependence analysis over a `func.func`. Affine memref
 /// accesses and Allo stream get/put ops are recorded into one
 /// MemoryDependenceResult that scheduling problem construction consumes.
@@ -81,8 +89,7 @@ public:
   /// treat as exact.
   bool isExactPair(Operation *a, Operation *b) const {
     return !nonPolyhedral.contains(a) && !nonPolyhedral.contains(b) &&
-           !undecided.contains(a < b ? std::make_pair(a, b)
-                                     : std::make_pair(b, a));
+           !undecided.contains(unorderedPair(a, b));
   }
 
   /// What \p loop (an `affine.for` or `scf.for`) runs: its exact count where

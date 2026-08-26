@@ -54,10 +54,6 @@ struct Assumption {
 using OpPair = std::pair<Operation *, Operation *>;
 } // namespace
 
-static OpPair unorderedPair(Operation *a, Operation *b) {
-  return a < b ? OpPair{a, b} : OpPair{b, a};
-}
-
 // Parse a comparison of one SSA value against a constant into `c*v + k
 // (>=|==) 0`. Returns nullopt for shapes not modeled (a `ne`, or both
 // operands constant or both symbolic).
