@@ -1415,7 +1415,7 @@ std::pair<int64_t, int64_t> CostAttr::measuredDomain() const {
 
 /// One parameter's worth of tiles over `value`: `ceil((value + offset) / size)`
 /// with the optional offset (coefficient 1) defaulting to zero. Clamped at
-/// zero, a tile count being a count.
+/// zero.
 static double tiledCount(llvm::ArrayRef<double> coeffs, double value) {
   double offset = coeffs.size() > 1 ? coeffs[1] : 0.0;
   return std::max(0.0, std::ceil((value + offset) / coeffs[0]));

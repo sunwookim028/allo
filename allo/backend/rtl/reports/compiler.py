@@ -133,7 +133,5 @@ class CompilerReport:
         return cls(
             options=options,
             solves=[SolveReport.from_json(s) for s in d.get("solves", [])],
-            dependence=[
-                DependenceReport.from_json(x) for x in d.get("dependence", [])
-            ],
+            dependence=[DependenceReport.from_json(x) for x in d.get("dependence", [])],
         )

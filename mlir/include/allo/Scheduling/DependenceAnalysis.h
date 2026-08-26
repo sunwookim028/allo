@@ -45,9 +45,8 @@ int64_t
 carriedDistanceAtLevel(llvm::ArrayRef<affine::DependenceComponent> comps,
                        unsigned level, bool &drop, bool &valid);
 
-/// The orientation-independent key for the access pair {a, b}. The polyhedral
-/// test visits a pair in both orders, so its `undecided` set and every query of
-/// it agree on this one canonical ordering.
+/// Orientation-independent key for the access pair {a, b}, so the `undecided`
+/// set and every query of it agree on one canonical ordering.
 inline std::pair<Operation *, Operation *> unorderedPair(Operation *a,
                                                          Operation *b) {
   return a < b ? std::make_pair(a, b) : std::make_pair(b, a);
@@ -83,10 +82,9 @@ public:
     return nonPolyhedral.contains(op);
   }
 
-  /// Whether the dependences between \p a and \p b come from the polyhedral
-  /// test alone: both accesses are in its reach and it decided the pair. A
-  /// pair on the conservative path carries blanket distances no consumer may
-  /// treat as exact.
+  /// Whether \p a and \p b were both decided by the polyhedral test. A pair on
+  /// the conservative path carries blanket distances no consumer may treat as
+  /// exact.
   bool isExactPair(Operation *a, Operation *b) const {
     return !nonPolyhedral.contains(a) && !nonPolyhedral.contains(b) &&
            !undecided.contains(unorderedPair(a, b));
@@ -97,9 +95,8 @@ public:
   /// the `allo.assume.ssa` ranges, else empty. Memoized.
   LoopTrip tripOf(Operation *loop) const;
 
-  /// How many accesses sit outside the polyhedral test's reach and how many
-  /// pairs it accepted but could not decide: the population the conservative
-  /// path owns, reported so it is watched rather than rediscovered.
+  /// Counts of accesses outside the polyhedral test's reach, and of pairs it
+  /// accepted but could not decide: the population the conservative path owns.
   unsigned conservativeAccesses() const { return nonPolyhedral.size(); }
   unsigned undecidedPairs() const { return undecided.size(); }
 

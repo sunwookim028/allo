@@ -255,11 +255,10 @@ public:
     return it == regions.end() ? nullptr : &it->second;
   }
 
-  /// Record that the schedule satisfies the RAW dependence from \p store to
-  /// \p load only through store->load forwarding: the paired store instance
-  /// issues \p offset cycles after the read (0 = same cycle, up to the read
-  /// latency while the read is in flight), and the reify stamps the pair
-  /// onto the dcp accesses.
+  /// Record that the RAW from \p store to \p load is satisfied only through
+  /// store->load forwarding: the paired store instance issues \p offset cycles
+  /// after the read (0 = same cycle, up to the read latency while the read is
+  /// in flight). The reify stamps the pair onto the dcp accesses.
   void addForward(Operation *load, Operation *store, int64_t offset) {
     forwards[load].push_back({store, offset});
   }
@@ -326,9 +325,9 @@ public:
   float cycleTimeNs = 0.0f;
 
   /// What the solved schedule costs in the device's own currency, summed over
-  /// every region (`regionArea`). The quantity the area objective minimizes,
-  /// evaluated on the settled schedule, so two compiles of one kernel at
-  /// different periods compare. Filled by the solver, like `solves`.
+  /// every region (`regionArea`). Evaluated on the settled schedule so two
+  /// compiles of one kernel at different periods compare. Filled by the solver,
+  /// like `solves`.
   int64_t modeledArea = 0;
 
 private:

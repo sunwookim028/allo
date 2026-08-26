@@ -169,7 +169,7 @@ selectionChoices(ProblemT &prob, const OperatorLibrary &lib, bool withComb) {
   return choices;
 }
 
-/// The one-hot decision per choice on ONE model, hinted at the library's own
+/// The one-hot decision per choice on one model, hinted at the library's own
 /// pick. Aligned with the choices it was built from.
 struct SelectionVars {
   ArrayRef<SelectionChoice> choices;
@@ -279,7 +279,7 @@ void applySelection(circt::scheduling::ChainingProblem &prob,
 //===----------------------------------------------------------------------===//
 // Shared classes: the composition of selection and allocation on one model.
 // One class per candidate row several operations could run on, its instance
-// count decided WITH which operations select it. Membership is collected once
+// count decided with which operations select it. Membership is collected once
 // per region; an acyclic model states the capacity as a cumulative over
 // occupancy intervals, a modulo model as a per-slot sum of slot-and-selection
 // products.
@@ -287,13 +287,13 @@ void applySelection(circt::scheduling::ChainingProblem &prob,
 
 /// One shared class. A static member (an operation whose realization is not a
 /// solver decision) is always on it; a conditional member joins on its `sel`
-/// literal, so the class prices what folding a CONVERGED selection saves.
+/// literal, so the class prices what folding a converged selection saves.
 struct SharedClassVar {
   Problem::ResourceType rsrc;
   /// One instance's price and its select shape, the inputs of the (members,
   /// units) tables below.
   int64_t unitPrice = 0, ports = 0, width = 1;
-  /// Members reading a loop-carried operand, counted over everyone who COULD
+  /// Members reading a loop-carried operand, counted over everyone who could
   /// join: a shared unit re-injects such an operand on a select arm of its own
   /// (`populateOperatorAllocation`), charged conservatively since the cone is
   /// tabulated before the membership is decided. Zero on an acyclic region.
@@ -563,7 +563,7 @@ addSharedClasses(CpModelBuilder &model, ChainingSharedOperatorsProblem &prob,
 ///
 /// Two callers. Without \p sels, redundant against the break edges for
 /// feasibility, stated only so `addAllocationHeadroom` can hold a select cone
-/// against sub-cycle slack. With \p sels it IS the model's period statement:
+/// against sub-cycle slack. With \p sels it is the model's period statement:
 /// the break edges hold only for the rows the library picked, so a model that
 /// re-decides rows drops them and every delay here follows the row decided,
 /// one conditional bound per candidate.
@@ -898,11 +898,10 @@ void addAllocationHeadroom(CpModelBuilder &model, ProblemT &prob,
 /// cannot ride that form (its negative weights void the objective's LP bound):
 /// it is charged at its lower convex envelope, one supporting line per hull
 /// segment on a minimized cost variable. The staircase above the envelope is
-/// deliberately not modeled: stating it exactly (threshold literals per jump)
-/// doubled the solve time for no measured area, and the register-lifetime
-/// repair re-prices the shipped schedule at the real table. An element lookup
-/// is also out: or-tools 9.15's presolve crashes crushing hints through an
-/// expanded element (`TryToReplaceVariableByItsEncoding`).
+/// not modeled; the register-lifetime repair re-prices the shipped schedule at
+/// the real table. An element lookup is out: or-tools 9.15's presolve crashes
+/// crushing hints through an expanded element
+/// (`TryToReplaceVariableByItsEncoding`).
 void addPiecewiseCost(CpModelBuilder &model, IntVar size,
                       ArrayRef<int64_t> price, SmallVectorImpl<IntVar> &vars,
                       SmallVectorImpl<int64_t> &weights) {
@@ -1233,11 +1232,10 @@ constexpr double kBootstrapShare = 0.25;
 
 /// A span solve that finds a schedule but not the proof earns one retry at
 /// this multiple of the budget: an unproven span ships a possibly far-off
-/// incumbent (floyd v1's default-budget spans sat 4-5x over its optimum), so
-/// the retry buys latency exactly where the certificate failed. The retry's
-/// incumbent converges well before its certificate (which stays flaky under
-/// the worker portfolio), so the multiple is sized for the former. The rest
-/// of that solve's pipeline then runs on the escalated budget.
+/// incumbent, so the retry buys latency exactly where the certificate failed.
+/// The retry's incumbent converges well before its certificate (which stays
+/// flaky under the worker portfolio), so the multiple is sized for the former.
+/// The rest of that solve's pipeline then runs on the escalated budget.
 constexpr double kSpanEscalation = 10.0;
 
 /// What \p decided costs the device: every resource, at the price of the count
@@ -1532,7 +1530,8 @@ int64_t drainFloor(ProblemT &prob, ArrayRef<Problem::Dependence> breaks,
   for (const DrainTerm &term : terms) {
     DenseMap<Operation *, int64_t> tails = tailsTo(term.op);
     for (auto [rsrc, limit] : capped) {
-      SmallVector<Contender> group = groupFor(tails, rsrc, /*markFeeding=*/true);
+      SmallVector<Contender> group =
+          groupFor(tails, rsrc, /*markFeeding=*/true);
       if (!group.empty())
         bound = std::max(bound, strongest(group, limit) + offsetOf(term));
     }
@@ -1867,10 +1866,9 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
       // One escalated retry for the missing certificate (kSpanEscalation).
       live.budget = opts.budget * kSpanEscalation;
       CpSolverResponse retry = solveBuilt(model, solverParameters(live));
-      if (solved(retry) &&
-          (retry.status() == CpSolverStatus::OPTIMAL ||
-           SolutionIntegerValue(retry, drain) <=
-               SolutionIntegerValue(first, drain))) {
+      if (solved(retry) && (retry.status() == CpSolverStatus::OPTIMAL ||
+                            SolutionIntegerValue(retry, drain) <=
+                                SolutionIntegerValue(first, drain))) {
         first = retry;
         spanProven = retry.status() == CpSolverStatus::OPTIMAL;
       }
@@ -1958,7 +1956,7 @@ struct ModuloAttempt {
   std::optional<double> modelAreaBound;
 };
 
-/// Solve \p prob at the FIXED initiation interval \p ii, writing what it
+/// Solve \p prob at the fixed initiation interval \p ii, writing what it
 /// settles into \p out when a schedule exists. Fixing the II keeps the model
 /// linear:
 /// `ii * distance` in a precedence edge and the modulo congruence below would
@@ -2042,9 +2040,10 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   for (Operation *op : ops)
     for (auto &dep : prob.getDependences(op)) {
       Operation *src = dep.getSource();
-      LinearExpr sep = (prob.isForwarded(dep) || prob.hasSeparationOverride(dep))
-                           ? LinearExpr(prob.separationOf(dep))
-                           : latExpr(src);
+      LinearExpr sep =
+          (prob.isForwarded(dep) || prob.hasSeparationOverride(dep))
+              ? LinearExpr(prob.separationOf(dep))
+              : latExpr(src);
       model.AddLessOrEqual(startVars.at(src) + sep -
                                static_cast<int64_t>(ii) *
                                    prob.getDistance(dep).value_or(0),
@@ -2064,7 +2063,7 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
 
   // One-hot congruence class per contending op and per shared-class member.
   // `t = ii*lap + sum(p*slot[p])` defines class and modulo at once with no
-  // reification: slot[p] IS membership in class p, which the sums below need.
+  // reification: slot[p] is membership in class p, which the sums below need.
   DenseMap<Operation *, SmallVector<BoolVar>> slotsOf;
   SmallVector<int64_t> classes(ii);
   for (unsigned p = 0; p < ii; ++p)
@@ -2245,8 +2244,8 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
     unsigned stalls = 0;
     while (areaSpent < restArea.budget) {
       SchedulerOptions slice = restArea;
-      slice.budget = std::min(restArea.budget - areaSpent,
-                              opts.budget * kFoldChunkShare);
+      slice.budget =
+          std::min(restArea.budget - areaSpent, opts.budget * kFoldChunkShare);
       SatParameters sliceParams = solverParameters(slice);
       sliceParams.set_relative_gap_limit(kFoldGapEps);
       CpSolverResponse r = solveBuilt(model, sliceParams);
@@ -2259,7 +2258,8 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       if (!solved(r))
         break; // this slice found nothing; the bootstrap stands
       int64_t a = SolutionIntegerValue(r, area);
-      bool improved = !haveBest || plateauRef - a > plateauRef * kFoldPlateauEps;
+      bool improved =
+          !haveBest || plateauRef - a > plateauRef * kFoldPlateauEps;
       if (!haveBest || a <= bestArea) {
         first = r;
         bestArea = a;
@@ -2326,8 +2326,7 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   // redundant: the presolve can break the completed hint, and on a saturated
   // packing the search then burns the whole budget failing to rebuild a
   // schedule the heuristic already holds.
-  bool skipSpan =
-      hint && drainVar && floorDrain >= span.drainOf(prob);
+  bool skipSpan = hint && drainVar && floorDrain >= span.drainOf(prob);
   CpSolverResponse first;
   SchedulerOptions live = opts;
   if (skipSpan) {
@@ -2347,10 +2346,9 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
       // One escalated retry for the missing certificate (kSpanEscalation).
       live.budget = opts.budget * kSpanEscalation;
       CpSolverResponse retry = solveBuilt(model, solverParameters(live));
-      if (solved(retry) &&
-          (retry.status() == CpSolverStatus::OPTIMAL ||
-           SolutionIntegerValue(retry, primary) <=
-               SolutionIntegerValue(first, primary))) {
+      if (solved(retry) && (retry.status() == CpSolverStatus::OPTIMAL ||
+                            SolutionIntegerValue(retry, primary) <=
+                                SolutionIntegerValue(first, primary))) {
         first = retry;
         out.spanProven = retry.status() == CpSolverStatus::OPTIMAL;
       }
@@ -2374,7 +2372,7 @@ ModuloOutcome solveAtII(ChainingModuloProblem &prob, Operation *lastOp,
   if (span.trip)
     rest.budget = std::min(rest.budget, opts.budget * kAreaTieBreakShare);
   // Certified stop, as the fold's slices: a tie-break certified within
-  // kFoldGapEps reads areaProven, which also skips the fold re-solve — the
+  // kFoldGapEps reads areaProven, which also skips the fold re-solve; the
   // fold cannot beat a certificate by more than the certificate.
   SatParameters tieParams = solverParameters(rest);
   tieParams.set_relative_gap_limit(kFoldGapEps);
@@ -3041,8 +3039,8 @@ namespace {
 /// written as `sigma + M * lap` with `sigma` the solved start modulo \p M and
 /// only the laps free, so a cyclic move can never change a congruence slot;
 /// the acyclic case runs at M = 1 with sigma = 0. The system is dependences,
-/// chain breaks, the drain and depth leashes, and the pins - all difference
-/// constraints - under the linear width-weighted lifetime objective, which
+/// chain breaks, the drain and depth leashes, and the pins (all difference
+/// constraints), under the linear width-weighted lifetime objective, which
 /// CP-SAT settles at its LP root.
 template <typename ProblemT>
 void repairLifetimes(ProblemT &prob, Operation *anchor,
@@ -3155,8 +3153,7 @@ void repairLifetimes(ProblemT &prob, Operation *anchor,
             LinearExpr::Term(laps.at(term.def), term.width * modulus);
   }
   if (pulse) {
-    IntVar deepest =
-        model.NewIntVar(operations_research::Domain(0, depthCap));
+    IntVar deepest = model.NewIntVar(operations_research::Domain(0, depthCap));
     for (Operation *op : ops)
       model.AddLessOrEqual(tOf(op), deepest);
     cost += LinearExpr::Term(deepest, pulse);

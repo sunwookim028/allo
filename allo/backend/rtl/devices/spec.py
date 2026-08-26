@@ -188,7 +188,7 @@ class StorageSpec(NamedTuple):
     #: Whether this is the constant table: a logic lookup, no address bus, no
     #: port limit, priced and timed over the array's shape.
     is_table: bool = False
-    #: Whether a read returns the OLD contents under a same-cycle write to the
+    #: Whether a read returns the old contents under a same-cycle write to the
     #: same element, in hardware and not merely in RTL simulation (a LUT RAM's
     #: asynchronous read). A block RAM's cross-port same-address collision is
     #: undefined in silicon and must not carry this.
@@ -201,11 +201,9 @@ class IPRow(NamedTuple):
     symbol and area, and several rows of one archetype are candidates the
     library chooses between.
 
-    The three delays have no defaults: a row that does not state one cannot be
-    written, so no core silently inherits an archetype's or a grade's number.
-    Together they are the row's whole timing, and the period it needs for a
-    cycle of its own is ``max(reg_floor + in_delay_ns, out_delay_ns,
-    min_period_ns)``, the worst of the three arcs measured on it.
+    The three delays are required and together are the row's whole timing: the
+    period it needs for a cycle of its own is ``max(reg_floor + in_delay_ns,
+    out_delay_ns, min_period_ns)``, the worst of the three arcs measured on it.
 
     ``mnemonic`` overrides the symbol stem so two rows at one latency are named
     apart (``None`` takes the archetype's). ``area`` splits state-holding LUT

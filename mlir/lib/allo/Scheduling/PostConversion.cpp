@@ -88,10 +88,9 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
     if (at && at->startInCycle)
       dst->setAttr("z", b.getF32FloatAttr(*at->startInCycle));
   };
-  // An access also carries the setup delay the solve priced it against
-  // (`accessCharacterization`: the port's own delay, the address cone and the
-  // port select) and the two shares of it that are not the address cone, all
-  // read off the original op.
+  // Record the setup delay the solve priced the access against: the full
+  // characterization (port delay, address cone, port select), the port delay,
+  // and the port select share, read off the original op.
   auto setAccessTiming = [&](Operation *dst) {
     setZ(dst);
     dst->setAttr(
@@ -231,17 +230,15 @@ static void convertOp(Operation &op, OpBuilder &b, IRMapping &map,
   cloneKept();
 }
 
-// Stamp the store->load forwarding pairs the schedule recorded onto the dcp
-// accesses just reified: each store gets a func-unique `fwd_id`, each load the
-// list of ids its shadow serves it from. Both ends of a pair sit in one block,
-// so \p accessMap holds them together and a pair is stamped exactly once. Loads
-// are ordered by their reified position, so the ids are a function of the
-// program rather than of pointer hashing.
+// Stamp the recorded store->load forwarding pairs onto the reified dcp
+// accesses: each store gets a func-unique `fwd_id`, each load the ids and
+// offsets of the shadows serving it. Both ends of a pair reify in one block, so
+// \p accessMap holds them together. Loads are ordered by reified position, so
+// the ids are a function of the program, not of pointer hashing.
 static void stampForwards(ScheduleModel &model,
                           DenseMap<Operation *, Operation *> &accessMap,
                           int64_t &nextFwdId) {
-  SmallVector<
-      std::pair<Operation *, ArrayRef<std::pair<Operation *, int64_t>>>>
+  SmallVector<std::pair<Operation *, ArrayRef<std::pair<Operation *, int64_t>>>>
       pairs;
   for (auto &[load, stores] : model.allForwards())
     if (accessMap.contains(load))
@@ -573,11 +570,10 @@ static void materializeSequential(const RegionAttrs &r,
   };
   SmallVector<Operation *> work, hoisted;
   for (Operation *op : body) {
-    // A literal is not a value to hand across a region boundary: yielded, its
-    // consumers read the region's result and the emitter latches it into a
-    // survivor register, so a shift by it becomes a barrel shifter where the
-    // schedule priced wiring. Left at func level it stays a literal to every
-    // consumer, inside the region and out.
+    // An escaping literal stays at func level: yielded, the emitter latches it
+    // into a survivor register and a shift by it builds a barrel shifter where
+    // the schedule priced wiring. Hoisted, it stays a literal to every
+    // consumer.
     if (isa<arith::ConstantOp>(op) && escapesBody(op))
       hoisted.push_back(op);
     else if (container && isa<memref::AllocOp, memref::AllocaOp>(op) &&

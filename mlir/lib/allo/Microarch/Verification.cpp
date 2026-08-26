@@ -422,9 +422,8 @@ llvm::DenseMap<Operation *, Tail> accessTails(const Datapath &dp,
 
 /// The two arrival models checked against each other, and a warning when a
 /// shared binding grew a multiplexer past the period the schedule was cut
-/// against. The emitted RTL is functionally correct; only the target period is
-/// at risk, and the binding is a choice the user can withdraw, so this reports
-/// rather than refusing.
+/// against. Correctness is unaffected, only the target period; the binding is
+/// withdrawable, so this warns rather than refuses.
 void checkBindingMuxHeadroom(const Datapath &dp, float cycleTime,
                              const OperatorLibrary &lib, bool plannedBinding,
                              PathTrace &trace) {
@@ -612,13 +611,12 @@ void checkCombPathsMeetPeriod(const Datapath &dp, float cycleTime,
 /// out: the schedule was cut against \p cycleTime (ns) over a datapath with no
 /// sharing muxes and no port selects, so what grows them is measured here, at
 /// every capture point `forEachSource` enumerates, and appended to \p paths.
-/// \p lib prices the muxes and the units they feed. A binding-grown unit
-/// overrun warns, the binding being withdrawable; every other path is reported
-/// and not refused, missing a target period being a quality-of-result finding
-/// rather than an illegal design. \p plannedBinding says the folds realize the
-/// schedule solve's own allocation, which reserved headroom for every select it
-/// bought, so a priced unit overrun there is a broken invariant (an assert),
-/// not a warning.
+/// \p lib prices the muxes and the units they feed; a binding-grown unit
+/// overrun warns and every other path is reported, missing a target period
+/// being a quality-of-result finding, not an illegal design. \p plannedBinding
+/// says the folds realize the schedule solve's own allocation, which reserved
+/// headroom for every select it bought, so a priced unit overrun there is a
+/// broken invariant (an assert), not a warning.
 LogicalResult checkEmitterSubset(dcp::DCPathModuleOp func, const Datapath &dp,
                                  float cycleTime, const OperatorLibrary &lib,
                                  bool plannedBinding,

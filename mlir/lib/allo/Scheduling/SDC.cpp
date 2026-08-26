@@ -44,9 +44,8 @@ using namespace mlir::allo::logging;
 // terminator }. Returns [root, ..., innermost].
 //
 // Must run after `expand-region-bounds`, which places an inner loop's runtime
-// bound arithmetic beside it, breaking the band there deliberately. The
-// `allo.volatile` marker carrying that bound is not work, so it is stepped over
-// and a loop whose bound map is trivial keeps its band.
+// bound arithmetic beside it; the `allo.volatile` marker carrying that bound is
+// stepped over, so a loop with a trivial bound map keeps its band.
 static SmallVector<LoopLikeOpInterface> perfectNest(LoopLikeOpInterface root) {
   SmallVector<LoopLikeOpInterface> nest{root};
   while (true) {
@@ -64,24 +63,19 @@ static SmallVector<LoopLikeOpInterface> perfectNest(LoopLikeOpInterface root) {
   return nest;
 }
 
-// The region's outputs, as the terms whose max is its terminal cycle: how long
-// after its last issue pulse the deepest output commits. Kept as separate
-// terms so the exact scheduler can bound a variable by each one and minimize
-// the charged quantity; `drainOf` takes the max after the solve.
+// The region's outputs, as the terms whose max is its terminal cycle. Kept as
+// separate terms so the exact scheduler can bound a variable by each and
+// minimize the charged quantity; `drainOf` takes the max after the solve.
 //
-// Each output is charged at its commit cycle: a store commits `writeLatency`
-// cycles after its start, a sync sub-kernel call the same way (its `done`
-// rises at its start plus its contract), a stream put commits at its stage,
-// and a value handed onward is latched the cycle it lands, one cycle above a
-// store presented at the same depth.
+// Each output is charged at its commit cycle: a store or sync sub-kernel call
+// commits `writeLatency`/contract cycles after its start, a stream put commits
+// at its stage, and a value handed onward is latched the cycle it lands, one
+// cycle above a store at the same depth. A result only forwarded (a block
+// argument, an earlier region's survivor, or a declaration) charges nothing.
 //
-// \p results are the values escaping the region. One only forwarded (a block
-// argument, an earlier region's survivor, or a declaration) charges nothing:
-// it is settled before the region starts or binds no hardware to wait on.
-//
-// An INDETERMINATE call is charged a floor of one cycle: it has no contract
-// to place its `done` against, so the operator model gives it latency zero
-// and the only static fact left is that it occupies the cycle it issues in.
+// An indeterminate call is charged a floor of one cycle: with no contract to
+// place its `done` against the operator model gives it latency zero, and the
+// static fact left is that it occupies the cycle it issues in.
 static SmallVector<DrainTerm> drainTerms(OccupancyProblem &problem,
                                          ValueRange results) {
   SmallVector<DrainTerm> terms;
@@ -284,7 +278,7 @@ grantTarget(const SchedRegion &region, DependenceAnalysis &deps) {
   return std::pair{innermost.getOperation(), divisor};
 }
 
-/// Solves ONE function's schedule. Holds the analysis, device, model and
+/// Solves one function's schedule. Holds the analysis, device, model and
 /// options every method needs, instead of threading them through each
 /// signature.
 ///
@@ -311,9 +305,6 @@ private:
   // built.
   void eraseHint(RewriterBase &b, Operation *op);
   void consumeHints(func::FuncOp funcOp);
-
-  // The expressions a region's BOUNDARY is, turned into operations the solve
-  // can see and cut.
 
   // The IR walk: a block into regions, a region onto the problem that fits it.
   LogicalResult scheduleBlock(Block &block);
@@ -824,8 +815,8 @@ static double armDatumDelay(ChainingModuloProblem &problem, Value v,
         d = std::max<double>(regFloor, *problem.getOutgoingDelay(*opr));
       } else {
         for (Value operand : def->getOperands())
-          d = std::max(d, armDatumDelay(problem, operand, block, regFloor,
-                                        memo));
+          d = std::max(d,
+                       armDatumDelay(problem, operand, block, regFloor, memo));
         d += *problem.getOutgoingDelay(*opr);
       }
     }
@@ -843,7 +834,7 @@ static double armDatumDelay(ChainingModuloProblem &problem, Value v,
 // else is re-priced.
 //
 // A pair whose dependence distances are exact (polyhedral) is granted a
-// WINDOW of the read latency on top of the relaxation: the store may issue
+// window of the read latency on top of the relaxation: the store may issue
 // while the read is in flight, served by deeper shadow arms, taking the RAM
 // round trip out of the recurrence entirely. Sound only when the solved II
 // clears every window (an instance one iteration past the paired one must
@@ -914,11 +905,11 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
       data = cast<memref::StoreOp>(store).getValueToStore();
     // The chain breaks guarantee the datum settles early enough for the
     // store to sample it, which caps what the arm can tap.
-    double arm = armDatumDelay(problem, data, store->getBlock(), regFloor,
-                               coneMemo);
+    double arm =
+        armDatumDelay(problem, data, store->getBlock(), regFloor, coneMemo);
     auto storeOpr = *problem.getLinkedOperatorType(store);
-    arm = std::min<double>(arm,
-                           cycleTime - *problem.getIncomingDelay(storeOpr));
+    arm =
+        std::min<double>(arm, cycleTime - *problem.getIncomingDelay(storeOpr));
     auto [mux, outBase] = muxOf.lookup(load);
     if (std::max(arm, outBase) + mux > cycleTime)
       continue; // the cone does not fit the period; keep the plain relaxation
@@ -986,8 +977,8 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
     // fan differently or tap differently deep cones.
     std::string name = (opr.getValue() + ".fwd" + Twine(arms)).str();
     if (bump > 0.0)
-      name += "c" + std::to_string((int64_t)std::lround(
-                        bump / kConeDelayQuantum));
+      name +=
+          "c" + std::to_string((int64_t)std::lround(bump / kConeDelayQuantum));
     auto nw = problem.getOrInsertOperatorType(name);
     problem.setLatency(nw, *problem.getLatency(opr));
     problem.setIncomingDelay(nw, *problem.getIncomingDelay(opr));
@@ -1016,7 +1007,7 @@ static void undoForwardRelaxation(ChainingModuloProblem &problem,
 // relative to the read issue, so the RAM alone would hand the load stale
 // data. A pair whose instance lands before the read issue needs no shadow
 // and none is built; nearer instances (below the pair's distance) never
-// alias, which is what makes the offset of the PAIRED instance the only one
+// alias, which is what makes the offset of the paired instance the only one
 // to arm.
 static void
 recordForwards(ChainingModuloProblem &problem,
@@ -1119,7 +1110,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
     relax = relaxForwardableEdges(problem, deps, dev, cycleTime, opts.regFloor,
                                   minII);
   Operation *anchor = bodyBlock->getTerminator();
-  // The trip this solution records is the INNERMOST loop's, the one its solved
+  // The trip this solution records is the innermost loop's, the one its solved
   // `length`/`ii` describe. Every level above drives its child as a container,
   // composed in `buildSpanNode`.
   LoopTrip trip = deps.tripOf(body.getOperation());
@@ -1151,7 +1142,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
   recordSolve(problem, "cyclic", solvedII, solveStart);
   int64_t depth = pacedDepth(problem, anchor);
   // Iterations that do not overlap issue one body length apart, which is the
-  // interval the region RUNS at whatever the solve settled on.
+  // interval the region runs at whatever the solve settled on.
   unsigned ii = pipelined ? *solvedII : static_cast<unsigned>(depth);
   int64_t drain = span.drainOf(problem);
   // For the report only, through the arithmetic that composes it for real.
@@ -1261,10 +1252,10 @@ LogicalResult FuncScheduler::scheduleWhile(scf::WhileOp w,
 
 // The operations a sequential while's continue-condition reads, in program
 // order. The CHECK region emits arithmetic and loads only, so any other
-// producer FAILS here, reported against the op itself; leaving the cone
+// producer fails here, reported against the op itself; leaving the cone
 // unscheduled would only move the report to the emitter.
 //
-// An EMPTY cone is normal: the condition is settled before the loop starts,
+// An empty cone is normal: the condition is settled before the loop starts,
 // so there is nothing to time. A value defined outside the before block
 // bounds the walk (an iter-arg survivor, an enclosing counter, or a literal).
 static FailureOr<SmallVector<Operation *>> conditionCone(scf::WhileOp w) {
@@ -1304,7 +1295,7 @@ static FailureOr<SmallVector<Operation *>> conditionCone(scf::WhileOp w) {
 // deciding, which the emitter reads back off these start times
 // (`emitConditionRegion`), so cutting it here is what holds it to the clock.
 //
-// The BODY is a separate problem: `scheduleRegion` decomposes the after block
+// The body is a separate problem: `scheduleRegion` decomposes the after block
 // into sub-regions, and the two never overlap, CHECK deciding before RUN
 // issues.
 LogicalResult FuncScheduler::scheduleWhileCondition(scf::WhileOp w) {
@@ -1322,9 +1313,9 @@ LogicalResult FuncScheduler::scheduleWhileCondition(scf::WhileOp w) {
 // Schedule one straight-line region as a `ChainingSharedOperatorsProblem` and
 // annotate the result.
 //
-// \p ownsRegion is false for a span that is TIMED but is no region of its own:
+// \p ownsRegion is false for a span that is timed but is no region of its own:
 // a sequential while's condition cone, whose op start times the emitter reads
-// back (`emitConditionRegion`) while the WHILE's controller paces it. Its
+// back (`emitConditionRegion`) while the while's controller paces it. Its
 // `RegionSolution` would be read by nobody, and `publishKernelLatency` counts
 // the ones that exist.
 LogicalResult FuncScheduler::scheduleAcyclic(ArrayRef<Operation *> ops,

@@ -193,14 +193,11 @@ static bool boundSymbols(presburger::IntegerRelation &rel,
 }
 
 // Whether the `assume.ssa` value ranges prove \p srcAccess and \p dstAccess
-// element-disjoint over their WHOLE iteration domains: the access relations
-// (domains included), tightened by the ranges on their symbols, compose to an
-// empty iteration-to-iteration relation. Built from the same public pieces
-// the upstream test composes, minus its ordering constraints, so emptiness
-// here is a strictly stronger fact and dropping every depth's result on it is
-// sound (`A[i+n]` vs `A[i]` under `assume(n >= 64)` on a 64-trip loop).
-// The upstream polyhedron cannot answer this: its composition eliminates the
-// symbol and its returned system carries no value identities to bound.
+// element-disjoint over their whole iteration domains: the access relations,
+// tightened by the ranges on their symbols, compose to an empty
+// iteration-to-iteration relation. This is stronger than the upstream ordering
+// test, so dropping every depth's result on it is sound (`A[i+n]` vs `A[i]`
+// under `assume(n >= 64)` on a 64-trip loop).
 static bool rangesDisjoint(const affine::MemRefAccess &srcAccess,
                            const affine::MemRefAccess &dstAccess,
                            const llvm::DenseMap<Value, AssumedRange> &ranges) {
@@ -224,23 +221,20 @@ static bool rangesDisjoint(const affine::MemRefAccess &srcAccess,
   return dstRel.isEmpty();
 }
 
-// Records the affine memref dependences of every ordered pair of accesses.
-// `checkMemrefAccessDependence` is queried at each loop depth from 1 to
-// numCommonLoops (a dependence carried by the d-th common surrounding loop)
-// and at numCommonLoops + 1, the loop-independent (intra-iteration) case with
-// all common loops pinned to the same iteration. At the top depth,
-// `allowRAR = false` also orients the otherwise-symmetric dist-0 dependence
-// by program order. A result whose polyhedron the `assume.ssa` value ranges
-// empty out is dropped (see rangesEmptyDependence). Aliasing between
-// distinct memrefs is not modeled: distinct SSA memrefs are ASSUMED
+// Records the affine memref dependences of every ordered pair of accesses,
+// querying `checkMemrefAccessDependence` at each depth 1..numCommonLoops (a
+// carried dependence) and at numCommonLoops + 1 (loop-independent, all common
+// loops pinned to one iteration). At the top depth `allowRAR = false` also
+// orients the symmetric dist-0 dependence by program order. A result the
+// `assume.ssa` value ranges empty out is dropped (rangesDisjoint). Aliasing
+// between distinct memrefs is not modeled: distinct SSA memrefs are assumed
 // disjoint.
 //
-// A pair with either endpoint the test cannot model (`nonPolyhedral`) is
-// skipped entirely and left to the conservative path, so each pair is owned
-// by exactly one analysis. A pair the test ACCEPTS but cannot decide answers
-// `Failure`, which is not `NoDependence`, so it joins \p undecided and takes
-// the conservative path too: an undecided pair left silently unordered would
-// let two accesses that may alias share a cycle.
+// A pair with an endpoint the test cannot model (`nonPolyhedral`) is left to
+// the conservative path, so each pair is owned by exactly one analysis. A pair
+// the test accepts but cannot decide answers `Failure` and joins \p undecided
+// for the conservative path too, so a may-aliasing pair is never left
+// unordered.
 static void
 checkMemrefDependence(ArrayRef<Operation *> memoryOps,
                       const llvm::SmallDenseSet<Operation *> &nonPolyhedral,
@@ -263,11 +257,10 @@ checkMemrefDependence(ArrayRef<Operation *> memoryOps,
       SmallVector<circt::analysis::MemoryDependence, 2> found;
       for (unsigned depth = 1; depth <= numCommon + 1; ++depth) {
         // Read-read pairs get no edge at any depth (allowRAR = false): reads
-        // commute, and port contention is the resource model's job. A carried
-        // RAR edge is not harmless slack: composed with intra-iteration
-        // chains it closes false recurrence circuits that inflate the II
-        // floor. At the loop-independent depth allowRAR = false also orients
-        // the dist-0 dependence by program order.
+        // commute, port contention is the resource model's job, and a carried
+        // RAR edge would close false recurrence circuits that inflate the II
+        // floor. At the loop-independent depth this also orients the dist-0
+        // dependence by program order.
         affine::FlatAffineValueConstraints constraints;
         SmallVector<affine::DependenceComponent, 2> comps;
         auto result = affine::checkMemrefAccessDependence(
@@ -864,11 +857,10 @@ DependenceAnalysis::DependenceAnalysis(func::FuncOp funcOp) : func(funcOp) {
     } else if (auto hint = dyn_cast<AssumeSSAOp>(op)) {
       collectAssumptions(hint.getCondition(), assumptions);
     }
-    // Asserted HERE, in the walk whose branches above are exactly what
-    // `isUnmodeledMemoryAccess` is the complement of. `verify-rtl-legality`
-    // rejects such an access before scheduling, so reaching this means the two
-    // disagree and this op joined no access list: its dependences are dropped
-    // and the solve would freely reorder it against what it aliases.
+    // `verify-rtl-legality` rejects any access this walk fails to collect
+    // (`isUnmodeledMemoryAccess` is its complement); reaching this assert means
+    // an unmodeled access joined no list, so its dependences are dropped and
+    // the solve could freely reorder it against what it aliases.
     assert(!isUnmodeledMemoryAccess(op) &&
            "an unmodeled memory access reached the dependence analysis");
   });

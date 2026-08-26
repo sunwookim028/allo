@@ -4,14 +4,12 @@
  */
 
 //===----------------------------------------------------------------------===//
-// The SDC scheduling engine: the two rungs this backend solves against, the
-// chaining modulo and chaining shared-operators problems. The difference
-// constraints are solved on their constraint graph (longest-path potentials,
-// incremental under pins); the greedy resource placement around it (the MRT,
-// the II growth) remains derived from CIRCT's SimplexSchedulers
-// (externals/circt/lib/Scheduling/SimplexSchedulers.cpp), whose parametric
-// simplex this engine replaced. The Problem data model and the chaining
-// utilities stay CIRCT's.
+// The SDC scheduling engine for the chaining modulo and chaining
+// shared-operators problems. The difference constraints are solved on their
+// constraint graph (longest-path potentials, incremental under pins); the
+// greedy resource placement around it (the MRT, the II growth) is derived from
+// CIRCT's SimplexSchedulers. The Problem data model and the chaining utilities
+// stay CIRCT's.
 //
 // Portions derived from LLVM/CIRCT, Apache-2.0 WITH LLVM-exception.
 //===----------------------------------------------------------------------===//
@@ -79,23 +77,19 @@ static std::string render(const Recurrence &rec) {
 
 /// Solves the difference-constraint core of a scheduling problem on its
 /// constraint graph. Every constraint is
-/// `start(dst) - start(src) >= lat + extra - II*dist` (a dependence, a
-/// chain break, or a pin), so the feasible set is a lattice: the
-/// component-wise least solution exists, is unique, and is the longest-path
-/// potential from a virtual origin. That least point simultaneously minimizes
-/// the last operation's start and every other start, i.e. exactly the
-/// lexicographic (latency, then sum-of-starts) optimum the simplex fork this
-/// engine replaced steered to, so the two return the same schedule. The
-/// tie-break matters: the emitter builds an operation's start pulse as
-/// `delayValid(regionStart, t)`, one flip-flop per cycle of `t`, so a
+/// `start(dst) - start(src) >= lat + extra - II*dist`, so the feasible set is a
+/// lattice whose component-wise least solution is the longest-path potential
+/// from a virtual origin; it minimizes the last operation's start and every
+/// other start at once. The tie-break matters: the emitter builds a start pulse
+/// as `delayValid(regionStart, t)`, one flip-flop per cycle of `t`, so a
 /// slack-bearing node placed late costs registers for no latency.
 ///
 /// Feasibility is the absence of a positive cycle. The initial solve grows the
-/// II to the smallest feasible value (feasibility is monotone in the II: only
-/// the `-II*dist` terms move with it); a positive cycle found on the way names
-/// the recurrence and the least II it admits. A pin (`scheduleAt`) becomes a
-/// virtual edge pair through the origin, applied by an incremental relaxation
-/// with an undo log, so a failed pin rolls back in O(touched nodes).
+/// II to the smallest feasible value (feasibility is monotone in the II); a
+/// positive cycle found on the way names the recurrence and the least II it
+/// admits. A pin (`scheduleAt`) becomes a virtual edge pair through the origin,
+/// applied by an incremental relaxation with an undo log, so a failed pin rolls
+/// back in O(touched nodes).
 class SDCSchedulerBase {
 protected:
   /// The last operation, whose start time the least solution minimizes first.
@@ -115,7 +109,7 @@ protected:
     unsigned dist;
     int extra;
   };
-  /// Dependence and chain-break edges. A pin is a VIRTUAL edge pair through
+  /// Dependence and chain-break edges. A pin is a virtual edge pair through
   /// the origin (`frozenVariables`), added and removed without touching this.
   SmallVector<Edge> edges;
   /// Out-adjacency into `edges` by variable. The origin's outgoing edges are
@@ -188,13 +182,12 @@ protected:
 
   unsigned getStartTime(unsigned startTimeVariable);
 
-  /// ASAP is the maintained least solution; ALAP is the greatest solution
-  /// with the last operation held at its already-minimal start, the pair the
-  /// simplex read off its negated objective row. Both extremes of the lattice
-  /// are unique, so the two engines' margins agree. The greatest solution is
-  /// a longest path TO the origin over the same edges (a path i -> origin of
-  /// weight W states `start(i) <= -W`), a temporary pin on the last operation
-  /// supplying every unpinned chain's upper bound through the anchor.
+  /// ASAP is the maintained least solution; ALAP is the greatest solution with
+  /// the last operation held at its already-minimal start. Both lattice
+  /// extremes are unique. The greatest solution is a longest path to the origin
+  /// over the same edges (a path i -> origin of weight W states
+  /// `start(i) <= -W`), a temporary pin on the last operation supplying every
+  /// unpinned chain's upper bound through the anchor.
   void computeMargins(SmallVectorImpl<unsigned> &asap,
                       SmallVectorImpl<unsigned> &alap);
 
@@ -231,12 +224,11 @@ private:
   FoundCycle extractCycle(unsigned v);
   void resetScratch();
 
-  /// Relaxation scratch: the last relaxing edge per node (its source, its
-  /// `lat + extra`, its distance), the provenance chain length whose
-  /// overflow past the node count certifies a positive cycle (a feasible
-  /// least solution needs no chain longer than that; a longer one repeats a
-  /// node, and the repeated segment sums positive), the queue membership,
-  /// and the first-touch marks feeding an undo log.
+  /// Relaxation scratch: the last relaxing edge per node (source, `lat +
+  /// extra`, distance), the provenance chain length whose overflow past the
+  /// node count certifies a positive cycle (a longer chain repeats a node, and
+  /// the repeated segment sums positive), the queue membership, and the
+  /// first-touch marks feeding an undo log.
   SmallVector<int> predNode;
   SmallVector<int64_t> predLat;
   SmallVector<unsigned> predDist;
@@ -321,7 +313,7 @@ private:
   bool boundSettled = false;
   // Whether a caller places this region itself if the greedy cannot (see
   // `SimplexWarmStart`). It changes only what a placement failure is reported
-  // AS, never what the placement does.
+  // as, never what the placement does.
   bool placementAdvisory = false;
   // Placement repair bookkeeping: how often each operation was evicted, and
   // the evictions the region may still spend. Both caps keep the repair
@@ -396,6 +388,7 @@ private:
 
 protected:
   Problem &getProblem() override { return prob; }
+
 public:
   ChainingModuloSimplexScheduler(ChainingModuloProblem &prob, Operation *lastOp,
                                  float cycleTime, float regFloor,
@@ -430,6 +423,7 @@ private:
 
 protected:
   Problem &getProblem() override { return prob; }
+
 public:
   ChainingSharedOperatorsSimplexScheduler(ChainingSharedOperatorsProblem &prob,
                                           Operation *lastOp, float cycleTime,
@@ -515,7 +509,7 @@ mlir::allo::computeChainBreaks(ChainingProblem &prob, float cycleTime,
   DenseMap<Operation *, SmallDenseMap<Operation *, float>> chains;
 
   // Problem order, which is the IR's. `chains` is keyed by pointer, so its
-  // iteration order is one of ADDRESSES, and the edges below would otherwise
+  // iteration order is one of addresses, and the edges below would otherwise
   // vary between two compiles of one kernel.
   DenseMap<Operation *, unsigned> order;
   for (Operation *op : prob.getOperations())
@@ -741,7 +735,7 @@ SDCSchedulerBase::FoundCycle SDCSchedulerBase::extractCycle(unsigned v) {
   }
   FoundCycle cyc;
   if (predNode[x] < 0) {
-    // The chain runs off a zero-seeded node: only a walk started AT the
+    // The chain runs off a zero-seeded node: only a walk started at the
     // origin closes that way, through the implicit `start >= 0` edge. Sum
     // every walked node's incoming edge; the implicit closure adds nothing.
     assert(v == origin && "a chain-length trip walks into a proper cycle");
@@ -767,9 +761,9 @@ SDCSchedulerBase::FoundCycle SDCSchedulerBase::extractCycle(unsigned v) {
   return cyc;
 }
 
-std::optional<SDCSchedulerBase::FoundCycle>
-SDCSchedulerBase::relaxCore(SmallVector<unsigned> queue,
-                            SmallVectorImpl<std::pair<unsigned, int64_t>> *undo) {
+std::optional<SDCSchedulerBase::FoundCycle> SDCSchedulerBase::relaxCore(
+    SmallVector<unsigned> queue,
+    SmallVectorImpl<std::pair<unsigned, int64_t>> *undo) {
   unsigned nNodes = origin + 1;
   std::optional<unsigned> trip;
   for (unsigned head = 0; head < queue.size() && !trip; ++head) {
@@ -993,7 +987,8 @@ void SDCSchedulerBase::computeMargins(SmallVectorImpl<unsigned> &asap,
   for (unsigned stv = 0; stv < origin; ++stv) {
     assert(g[stv] != kUnreached &&
            "every operation is bounded above through the anchor");
-    assert(-g[stv] >= potentials[stv] && "the two lattice extremes are ordered");
+    assert(-g[stv] >= potentials[stv] &&
+           "the two lattice extremes are ordered");
     alap[stv] = unsigned(-g[stv]);
   }
 }
@@ -1043,10 +1038,8 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
   // operations starting at the same time. Earliest-first is a topological
   // order, which keeps the acyclic problem feasible under pinning; the scan
   // below is first fit over rectangles, which needs largest-first to behave.
-  //
-  // Slack is not available as a further tie-break here: an ALAP would maximize
-  // the start times, and with dependences the only constraints here an
-  // operation without an outgoing one (any store) is unbounded above.
+  // Slack cannot break the tie further: with dependences the only constraints,
+  // an operation without an outgoing one (any store) is unbounded above.
   auto rectangle = [&](Operation *op) {
     return prob.getResourceCycles(op) * prob.getResourceDemand(op);
   };
@@ -1096,7 +1089,6 @@ LogicalResult SharedOperatorsSimplexScheduler::schedule() {
     for (Problem::ResourceType rsrc : units)
       for (unsigned i = 0; i < occ; ++i)
         reservationTable[rsrc][candTime + i] += slots;
-
   }
 
   assert(parameterT == 0);
@@ -1313,8 +1305,9 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
         unsigned freed = 0;
         for (Operation *v : victims)
           if (auto it = revTab.find(v); it != revTab.end())
-            freed += slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
-                     prob.getResourceDemand(v);
+            freed +=
+                slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
+                prob.getResourceDemand(v);
         while (table.lookup(slot) + need > limit + freed) {
           Operation *pick = nullptr;
           unsigned mult = 0;
@@ -1415,10 +1408,10 @@ LogicalResult ModuloSimplexScheduler::scheduleWithEviction(Operation *n) {
 }
 
 /// Grows the II by one and restarts placement from scratch at the larger
-/// interval, after Rau: pins made at the smaller II would otherwise carry
-/// their scars (evicted victims stranded on late slots) into the new one. The
-/// caller's worklist loop then re-places every limited operation with a fresh
-/// reservation table and repair budget.
+/// interval, after Rau: pins made at the smaller II would otherwise strand
+/// evicted victims on late slots in the new one. The caller's worklist loop
+/// re-places every limited operation with a fresh reservation table and repair
+/// budget.
 LogicalResult ModuloSimplexScheduler::growIIAndRestart(Operation *n) {
   ++parameterT;
   // Every op fits in a disjoint window by II=totalResourceCycles; 2x+2 leaves
@@ -1467,8 +1460,8 @@ int64_t ModuloSimplexScheduler::depAsapOf(unsigned stv) {
   int64_t d = 0;
   for (const Edge &e : edges)
     if (e.dst == stv) {
-      int64_t c = potentials[e.src] + e.lat + e.extra -
-                  int64_t(parameterT) * e.dist;
+      int64_t c =
+          potentials[e.src] + e.lat + e.extra - int64_t(parameterT) * e.dist;
       d = std::max(d, c);
     }
   return d;
@@ -1520,10 +1513,10 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
       auto &table = mrt.tables[rsrc];
       auto &revTab = mrt.reverseTables[rsrc];
       // Victim order must be deterministic: the reverse table is keyed by
-      // pointer, so problem order sorts the holders the way scheduleWithEviction
-      // does before a scan.
-      SmallVector<std::pair<Operation *, unsigned>> sortedHolders(revTab.begin(),
-                                                                  revTab.end());
+      // pointer, so problem order sorts the holders the way
+      // scheduleWithEviction does before a scan.
+      SmallVector<std::pair<Operation *, unsigned>> sortedHolders(
+          revTab.begin(), revTab.end());
       llvm::sort(sortedHolders, [&](auto &a, auto &b) {
         return startTimeVariables[a.first] < startTimeVariables[b.first];
       });
@@ -1531,8 +1524,9 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
         unsigned freed = 0;
         for (Operation *v : vic)
           if (auto it = revTab.find(v); it != revTab.end())
-            freed += slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
-                     prob.getResourceDemand(v);
+            freed +=
+                slotCoverage(it->second, prob.getResourceCycles(v), slot, ii) *
+                prob.getResourceDemand(v);
         while (table.lookup(slot) + need > limit + freed) {
           Operation *pick = nullptr;
           unsigned mult = 0;
@@ -1541,8 +1535,7 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
             // land it in another low class at the same time (a swap), so the
             // final span check, not a slack pre-filter, is what rejects a move
             // that would raise the span.
-            if (taken.count(op) ||
-                evictCount.lookup(op) >= kMaxEvictionsPerOp)
+            if (taken.count(op) || evictCount.lookup(op) >= kMaxEvictionsPerOp)
               continue;
             mult = slotCoverage(base, prob.getResourceCycles(op), slot, ii);
             if (mult) {
@@ -1574,8 +1567,8 @@ bool ModuloSimplexScheduler::trySeatLower(unsigned stvX, unsigned oldPin,
     return false;
   }
 
-  // Commit: evict the victims, seat crit low, then re-place the victims by first
-  // fit. Any failure leaves the state dirty for the caller to roll back.
+  // Commit: evict the victims, seat crit low, then re-place the victims by
+  // first fit. Any failure leaves the state dirty for the caller to roll back.
   for (Operation *v : victims) {
     mrt.release(v);
     frozenVariables.erase(startTimeVariables[v]);
@@ -1722,10 +1715,9 @@ ModuloSimplexScheduler::adjudicateIIGap(unsigned resMinII) {
           << (r.verdict == ModuloFeasibility::Feasible     ? "feasible"
               : r.verdict == ModuloFeasibility::Infeasible ? "infeasible"
                                                            : "unknown")
-          << " after " << r.rounds << " round(s), "
-          << format("%.2f", r.spent) << " deterministic units ("
-          << r.literals << " slot literals, " << r.windowed
-          << " ops windowed)";
+          << " after " << r.rounds << " round(s), " << format("%.2f", r.spent)
+          << " deterministic units (" << r.literals << " slot literals, "
+          << r.windowed << " ops windowed)";
       return r;
     };
     unsigned lo = lowerBoundII, hi = parameterT, probes = 0;
@@ -1915,7 +1907,7 @@ namespace mlir::allo {
 //===----------------------------------------------------------------------===//
 
 LogicalResult OccupancyProblem::checkLatency(Operation *op) {
-  // Deliberately NOT SharedOperatorsProblem::checkLatency, which rejects a
+  // Deliberately not SharedOperatorsProblem::checkLatency, which rejects a
   // zero-latency operation on a limited resource. A combinational access holds
   // its port for the cycle it issues in and contends like any other.
   return Problem::checkLatency(op);
@@ -2086,8 +2078,7 @@ LogicalResult ModuloOccupancyProblem::verifyPrecedence(Dependence dep) {
   int64_t stI = *getStartTime(dep.getSource());
   int64_t stJ = *getStartTime(dep.getDestination());
   int64_t dist = getDistance(dep).value_or(0);
-  if (stI + separationOf(dep) <=
-      stJ + dist * (int64_t)*getInitiationInterval())
+  if (stI + separationOf(dep) <= stJ + dist * (int64_t)*getInitiationInterval())
     return success();
   return getContainingOp()->emitError()
          << "Precedence violated for a relaxed memory-ordering dependence: "

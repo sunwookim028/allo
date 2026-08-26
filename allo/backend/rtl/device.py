@@ -278,7 +278,7 @@ class Storage:  # pylint: disable=too-many-instance-attributes
     # up undefined (an UltraRAM); a compile-time-initialized array cannot bind
     # there.
     can_init: bool = True
-    # Whether a read returns the OLD contents under a same-cycle write to the
+    # Whether a read returns the old contents under a same-cycle write to the
     # same element, in hardware and not merely in RTL simulation (a LUT RAM's
     # asynchronous read). A block RAM's cross-port same-address collision is
     # undefined in silicon and must not carry this.
@@ -536,7 +536,7 @@ class Device:
         it for one that powers up undefined, as an UltraRAM does; an array
         declared with compile-time contents is then refused there.
 
-        ``read_first`` marks a structure whose read returns the OLD contents
+        ``read_first`` marks a structure whose read returns the old contents
         under a same-cycle write to the same element, in hardware and not
         merely in RTL simulation (a LUT RAM's asynchronous read). The
         scheduler relaxes write-after-read ordering to the read's sampling

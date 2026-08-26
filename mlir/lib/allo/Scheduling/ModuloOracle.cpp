@@ -6,15 +6,13 @@
 //===----------------------------------------------------------------------===//
 // The sigma/lap modulo feasibility oracle (declared in Scheduler.h).
 //
-// Start times decompose as `start = T * lap + sigma` with `sigma` in [0, T).
-// Resource capacity lives entirely in sigma space, so a small CP-SAT model
-// over the contending operations' slots is the combinatorial half; given a
-// full sigma assignment, every dependence becomes a difference constraint
-// over laps, checked by one Bellman-Ford sweep. A positive lap cycle comes
-// back as a region cut: the sigma assignments keeping every cycle edge's
-// ceiling at or above its observed value are all infeasible, so one clause
-// blocks the whole region rather than one tuple. INFEASIBLE from the sigma
-// model is then an unconditional proof, with no horizon to argue about.
+// Start times decompose as `start = T * lap + sigma`, sigma in [0, T).
+// Resource capacity lives entirely in sigma space, decided by a CP-SAT model
+// over the contending operations' slots. Given a full sigma assignment every
+// dependence becomes a lap difference constraint, checked by one Bellman-Ford
+// sweep; a positive lap cycle returns as a region cut over the sigma
+// assignments that keep it. INFEASIBLE from the sigma model is an
+// unconditional proof.
 //===----------------------------------------------------------------------===//
 
 #include "allo/Scheduling/Scheduler.h"
@@ -56,9 +54,10 @@ struct FlatEdge {
 
 } // namespace
 
-ModuloOracleResult mlir::allo::decideModuloFeasibility(
-    ModuloOccupancyProblem &prob, ArrayRef<Problem::Dependence> breaks,
-    unsigned ii, double budget) {
+ModuloOracleResult
+mlir::allo::decideModuloFeasibility(ModuloOccupancyProblem &prob,
+                                    ArrayRef<Problem::Dependence> breaks,
+                                    unsigned ii, double budget) {
   const int64_t T = ii;
   assert(T >= 1 && "an interval to decide");
   ModuloOracleResult out;
@@ -69,9 +68,8 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
   for (Operation *op : ops)
     index.try_emplace(op, index.size());
 
-  // The graph at this interval, edge weights `latency - T * distance`; a
-  // forwarded store->load edge needs only issue order, and a chain break
-  // costs one extra cycle, both as the simplex engine weighs them.
+  // The graph at this interval, edge weights `latency - T * distance`; a chain
+  // break costs one extra cycle, as the simplex engine weighs it.
   std::vector<FlatEdge> raw;
   for (Operation *op : ops)
     for (auto &dep : prob.getDependences(op)) {
@@ -87,8 +85,8 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
     auto dst = index.find(dep.getDestination());
     if (src == index.end() || dst == index.end())
       continue;
-    raw.push_back({src->second, dst->second,
-                   prob.latencyOf(dep.getSource()) + 1});
+    raw.push_back(
+        {src->second, dst->second, prob.latencyOf(dep.getSource()) + 1});
   }
 
   SmallVector<Operation *> contending;
@@ -100,17 +98,15 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
     }
   const unsigned nc = contending.size();
   if (!nc) {
-    // Nothing contends: feasibility is the plain SDC, and the caller's
-    // resource-free bound already decided it.
+    // Nothing contends: the caller's resource-free SDC bound already decided
+    // feasibility.
     out.verdict = ModuloFeasibility::Unknown;
     return out;
   }
 
-  // Longest paths whose intermediates are all free, composing the free
-  // operations away: the lap system then runs over contending nodes alone,
-  // exactly (a path through a contending node is transitive in that system).
-  // Source nullopt is the origin: every start is at least zero, so seed
-  // everything and record the best free-intermediate arrival.
+  // Longest paths with all-free intermediates: composes free ops away so the
+  // lap system runs over contending nodes alone. Source nullopt is the origin
+  // (every start is at least zero).
   auto compose = [&](std::optional<unsigned> source,
                      std::vector<int64_t> &dist) -> bool {
     if (source) {
@@ -138,8 +134,8 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
 
   std::vector<int64_t> originIn;
   if (!compose(std::nullopt, originIn)) {
-    // A positive cycle of free operations is infeasible at this interval
-    // outright, whatever the slots.
+    // A positive all-free cycle is infeasible at this interval whatever the
+    // slots.
     out.verdict = ModuloFeasibility::Infeasible;
     return out;
   }
@@ -174,15 +170,12 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
     if (cOf[v] >= 0 && originIn[v] > INT64_MIN)
       cedges.push_back({-1, cOf[v], originIn[v]});
 
-  // Rotating every start by the same amount is a symmetry (differences and
-  // per-slot loads are invariant), so one contending op's slot is pinned to
-  // zero. The composed path bounds then window every other op's start
-  // difference against the pivot, and only the residues that window admits
-  // need a slot literal at all; on a tight recurrence this collapses the
-  // model from every-op-times-every-slot to a few residues per op.
-  // All-pairs longest paths over the contending graph: start-space difference
-  // bounds compose transitively whatever the laps, and a positive diagonal is
-  // an infeasibility proof outright.
+  // Rotating every start by the same amount is a symmetry, so one op's slot is
+  // pinned to zero. Composed path bounds window every other op's start
+  // difference against the pivot, so only the residues that window admits need
+  // a slot literal. All-pairs longest paths over the contending graph compose
+  // start-space difference bounds transitively; a positive diagonal is
+  // infeasible.
   std::vector<int64_t> pathW(nc * nc, INT64_MIN);
   for (const CEdge &e : cedges)
     if (e.src >= 0)
@@ -223,9 +216,8 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
       continue;
     }
     int64_t lo = pathW[pivot * nc + ci];
-    int64_t hi = pathW[ci * nc + pivot] == INT64_MIN
-                     ? INT64_MAX
-                     : -pathW[ci * nc + pivot];
+    int64_t hi = pathW[ci * nc + pivot] == INT64_MIN ? INT64_MAX
+                                                     : -pathW[ci * nc + pivot];
     if (lo == INT64_MIN || hi == INT64_MAX || hi - lo + 1 >= T) {
       for (int64_t s = 0; s < T; ++s)
         admissible[ci].push_back(s);
@@ -314,13 +306,13 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
     params.set_random_seed(0);
     params.set_max_deterministic_time(budget - spent);
     // Any sigma satisfying capacity and the cuts is a proposal; nothing is
-    // minimized, so the first solution is the round's answer, and the model
-    // is re-solved every round, so presolve would be paid every round too.
+    // minimized, so the first solution answers the round. Presolve is off
+    // since the re-solved model would pay it every round.
     params.set_stop_after_first_solution(true);
     params.set_cp_model_presolve(false);
     const CpModelProto &proto = model.Build();
-    CpSolverResponse r = operations_research::sat::SolveWithParameters(
-        proto, params);
+    CpSolverResponse r =
+        operations_research::sat::SolveWithParameters(proto, params);
     spent += r.deterministic_time();
     if (r.status() == CpSolverStatus::INFEASIBLE) {
       out.verdict = ModuloFeasibility::Infeasible;
@@ -365,8 +357,8 @@ ModuloOracleResult mlir::allo::decideModuloFeasibility(
       // one more longest-path sweep in start space with contending pinned.
       std::vector<int64_t> start(n, 0);
       for (unsigned ci = 0; ci < nc; ++ci)
-        start[index.at(contending[ci])] = T * std::max<int64_t>(lap[ci], 0) +
-                                          sig[ci];
+        start[index.at(contending[ci])] =
+            T * std::max<int64_t>(lap[ci], 0) + sig[ci];
       bool moved = true;
       for (unsigned k = 0; moved && k <= n; ++k) {
         moved = false;

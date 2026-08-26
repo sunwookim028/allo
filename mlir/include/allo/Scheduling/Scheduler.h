@@ -29,24 +29,23 @@ class OperatorLibrary;
 struct SolveTelemetry {
   bool proven = false;
   /// The span half's own verdict, which `proven` conflates with the area
-  /// tie-break's: an exhausted budget with the span proven spent its time on
-  /// area alone. Under the area objective, the drain-under-settled-area
+  /// tie-break's. Under the area objective, the drain-under-settled-area
   /// solve's verdict.
   bool spanProven = false;
   bool budgetExhausted = false;
   bool fallback = false; // shipped the heuristic's schedule instead
   /// The greedy modulo placement's II exceeded its lower bound and the
   /// sigma/lap oracle neither certified a better schedule nor proved the gap
-  /// necessary. One trigger of the heuristic path's escalation.
+  /// necessary. Triggers heuristic escalation.
   bool heuristicIIGap = false;
-  /// A CP-SAT solve ran on this problem (the exact scheduler, or the
-  /// heuristic path escalating); the solve report reads the cpsat fields.
+  /// A CP-SAT solve ran on this problem (exact scheduler or heuristic
+  /// escalation); the solve report reads the cpsat fields.
   bool cpsatRan = false;
   /// The interval whose solve exhausted the budget, ending the cyclic search.
   std::optional<int64_t> exhaustedAtII;
-  /// The area minimization's incumbent and dual bound when its solve last
-  /// returned. The bound is absent where no area solve ran at all; under the
-  /// area objective that means the structural bootstrap spent the budget.
+  /// The area minimization's incumbent and dual bound at its solve's last
+  /// return. The bound is absent where no area solve ran; under the area
+  /// objective that means the structural bootstrap spent the budget.
   std::optional<int64_t> modelArea;
   std::optional<double> modelAreaBound;
 };
@@ -97,13 +96,12 @@ public:
   /// combinational `unsigned` `latencyOf(op) - 1` would be 2^32 - 1).
   int64_t latencyOf(Operation *op);
 
-  /// Store->load dependences a forwarding network relaxes: the load may issue
-  /// in the store's cycle, a shadow register supplying the datum on an address
-  /// match. Set before solving; every solver and verifier weighs such an edge
-  /// at `-window` instead of the store's write latency. A nonzero window lets
-  /// the store issue up to that many cycles AFTER the load while the read is
-  /// in flight, served by deeper shadow arms; window 0 is the same-cycle
-  /// shadow alone.
+  /// Store->load dependences a forwarding network relaxes: a shadow register
+  /// supplies the datum on an address match, so every solver and verifier
+  /// weighs the edge at `-window` instead of the store's write latency. A
+  /// nonzero window lets the store issue that many cycles after the load while
+  /// the read is in flight, served by deeper shadow arms; window 0 is the
+  /// same-cycle shadow alone.
   void setForwarded(Dependence dep, unsigned window = 0) {
     forwardedEdges.insert(dep);
     if (window)
@@ -554,11 +552,10 @@ struct SchedulerOptions {
   /// cycle pays it once however many operators chain.
   float regFloor = 0.0f;
   /// Whether the heuristic scheduler hands a region to the exact solver when
-  /// its own schedule is provably off (`heuristicScheduleGap`): a surviving
-  /// placement-gap warn, or a drain above the intra-iteration floor. Spends
-  /// exact-solve time only where the compile-time oracle certifies a loss;
-  /// most regions certify optimal and pay nothing. Read by the heuristic
-  /// kind alone, under the cycles objective without allocation.
+  /// its own schedule is provably off (`heuristicScheduleGap`). Spends
+  /// exact-solve time only where the compile-time oracle certifies a loss.
+  /// Read by the heuristic kind alone, under the cycles objective without
+  /// allocation.
   bool escalate = true;
 };
 
@@ -647,9 +644,8 @@ LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
 
 /// Whether the heuristic's solved schedule provably leaves cycles behind: a
 /// placement-gap warn that survived the sigma/lap oracle
-/// (`telemetry.heuristicIIGap`), or a drain above the intra-iteration floor
-/// (the floor Track B measured empirically exact). The compile-time oracle
-/// `SchedulerOptions::escalate` hands such a region to the exact solver on.
+/// (`telemetry.heuristicIIGap`), or a drain above the intra-iteration floor.
+/// `SchedulerOptions::escalate` hands such a region to the exact solver.
 bool heuristicScheduleGap(ChainingModuloProblem &prob,
                           const SpanObjective &span, float cycleTime,
                           float regFloor);
@@ -657,14 +653,13 @@ bool heuristicScheduleGap(ChainingSharedOperatorsProblem &prob,
                           const SpanObjective &span, float cycleTime,
                           float regFloor);
 
-/// The sigma/lap modulo feasibility oracle: at the FIXED interval \p ii and
-/// with \p breaks the chain-breaking edges, decide whether any schedule
-/// exists. Starts decompose as `T * lap + sigma`; capacity lives in sigma
-/// space (a small CP-SAT model over contending slots), dependences in lap
-/// space (one Bellman sweep per proposal), and a positive lap cycle comes
-/// back as a region cut. Feasible carries an ASAP witness for every
-/// operation; Infeasible is an unconditional, horizon-free proof; Unknown is
-/// a spent \p budget (deterministic units). Deterministic by construction.
+/// The sigma/lap modulo feasibility oracle: at the fixed interval \p ii with
+/// \p breaks the chain-breaking edges, decide whether any schedule exists.
+/// Starts decompose as `T * lap + sigma`; capacity lives in sigma space (a
+/// small CP-SAT model over contending slots), dependences in lap space (one
+/// Bellman sweep per proposal), and a positive lap cycle returns as a region
+/// cut. Feasible carries an ASAP witness; Infeasible is a horizon-free proof;
+/// Unknown is a spent \p budget. Deterministic by construction.
 enum class ModuloFeasibility { Feasible, Infeasible, Unknown };
 struct ModuloOracleResult {
   ModuloFeasibility verdict = ModuloFeasibility::Unknown;
@@ -676,22 +671,20 @@ struct ModuloOracleResult {
   unsigned literals = 0;
   unsigned windowed = 0;
 };
-ModuloOracleResult decideModuloFeasibility(
-    ModuloOccupancyProblem &prob,
-    ArrayRef<circt::scheduling::Problem::Dependence> breaks, unsigned ii,
-    double budget);
+ModuloOracleResult
+decideModuloFeasibility(ModuloOccupancyProblem &prob,
+                        ArrayRef<circt::scheduling::Problem::Dependence> breaks,
+                        unsigned ii, double budget);
 
 /// Post-schedule register-lifetime repair: re-place starts within the solved
-/// structure to spend schedule slack on shorter delay chains and a shallower
-/// pulse chain. The cyclic variant keeps every start's congruence slot, so
-/// the interval, the slot capacities and the unit assignments are untouched
-/// by construction; the acyclic variant pins every operation holding a
-/// limited unit. Both pin operations on allocatable operators (their select
-/// cone was timed at the solved placement), pin the anchor, and leash the
-/// drain and the schedule depth. The system is pure difference constraints
-/// under a linear objective; the move commits only where the device's real
-/// chain and pulse prices say it is strictly cheaper, re-deriving the
-/// sub-cycle starts.
+/// structure to spend schedule slack on shorter delay and pulse chains. The
+/// cyclic variant keeps every start's congruence slot, so the interval, slot
+/// capacities and unit assignments stay fixed; the acyclic variant pins every
+/// operation holding a limited unit. Both pin operations on allocatable
+/// operators (their select cone was timed at the solved placement) and the
+/// anchor, and leash the drain and schedule depth. Pure difference constraints
+/// under a linear objective; a move commits only where the device's real chain
+/// and pulse prices are strictly cheaper, re-deriving the sub-cycle starts.
 void repairRegisterLifetimes(ChainingModuloProblem &prob, Operation *anchor,
                              const SpanObjective &span, float cycleTime,
                              float regFloor);

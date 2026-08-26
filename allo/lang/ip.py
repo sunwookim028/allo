@@ -241,9 +241,8 @@ class OperatorIP(IP[P, R]):
     ) -> "OperatorIP[P, R]":
         """A copy of this core pipelined to ``latency``, carrying the timing
         measured at that depth. The symbol follows the new latency, so the same
-        core at two depths gets two names. All three delays are required: an
-        archetype declares a signature, and every number describing silicon
-        belongs to the depth it was measured at."""
+        core at two depths gets two names. All three delays are required, each
+        belonging to the depth it was measured at."""
         core = copy.copy(self)
         core.timing = replace(
             self.timing,

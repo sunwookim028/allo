@@ -339,49 +339,34 @@ def sweep_area(
     floor_ns: float,
     cap_ns: float,
 ) -> tuple[Module, ScheduleResult]:
-    """Minimize area under ``O="area"`` with the period as the free dimension:
-    probe candidate clocks with the heuristic scheduler, rank them by what they
-    cost, and solve once at the winner under the caller's own scheduler
-    settings, which is where the area objective proper runs. A slower clock
-    chains deeper, so it breaks fewer chains, spends fewer delay registers and
-    realizes on shallower rows; the rank is what stops it paying unbounded time
-    for that.
+    """Minimize area under ``O="area"`` with the period free: probe candidate
+    clocks with the heuristic scheduler, rank them by cost, and solve once at
+    the winner under the caller's own scheduler settings, where the area
+    objective proper runs. A slower clock chains deeper, so it breaks fewer
+    chains and spends fewer delay registers; the rank stops it paying unbounded
+    time for that.
 
-    Three ranks, by what there is to weigh area against.
+    The rank depends on what area is weighed against:
 
-    ``wall_ns`` set is the whole contract: a candidate is eligible while its
-    span times achieved period holds the deadline, whatever clock that takes,
-    and the least-area eligible one wins. No eligible candidate is a refusal
-    rather than a silent overrun, and a kernel with no composed span has no wall
-    to hold to a deadline and is refused too.
+    - ``wall_ns`` set: a candidate is eligible while span times achieved period
+      holds the deadline, and the least-area eligible one wins. No eligible
+      candidate, or no composed span, is refused rather than silently overrun.
+    - No deadline, span present: only clocks no faster than the requested one
+      and costing no more area are probed, and the winner minimizes area times
+      wall, so this never returns more area than the requested clock would.
+    - No deadline, no span: nothing may be traded, so a candidate qualifies only
+      while every solved per-region quantity costs no more time than at the
+      requested clock; this degrades to scheduling at the clock asked for.
 
-    With no deadline the requested clock is the reference the trade is measured
-    against: only clocks no faster than it are probed, and only those costing no
-    more than it does, so this direction never comes back with more area than it
-    was asked for. Among them the winner minimizes area times wall, which needs
-    no constant of its own, since extra time is only taken where the area it
-    buys pays for it. Buying area back for frequency is ``O="freq"``, and
-    balancing the two with no reference clock is ``O="wall"``.
-
-    With no composed span there is no wall to price an area saving against, so
-    nothing may be traded: a candidate qualifies only while every solved
-    per-region quantity costs no more time than at the requested clock (its
-    cycles times its achieved period), which is that rank restricted to the free
-    wins. The requested clock qualifies against itself, so this degrades to
-    scheduling at the clock asked for.
-
-    Without a deadline the winner is then confirmed by the solver that decides
-    it. The probes rank the heuristic's schedule at each clock, while what ships
-    is the objective's own solve there, a different schedule whose distance from
-    the probe is not uniform in the period. So a winning clock other than the
-    one asked for is solved beside it and the cheaper of the two ships, which
-    costs one extra solve and makes the direction monotone: it can never build
-    more than it would have without the sweep.
+    Without a deadline the winning clock is confirmed by solving beside the
+    requested one and shipping the cheaper, since the probe ranks the heuristic
+    schedule while the objective's own solve ships. The direction is then
+    monotone: it never builds more than it would have without the sweep.
 
     ``cap_ns`` tops the ladder at the slowest period any device row is built
     for; ``floor_ns`` is the register floor the aggressive anchor stands on,
-    which only a deadline reaches down to. Returns the scheduled module and its
-    result, with the probed curve published as ``ScheduleResult.sweep``."""
+    reached only under a deadline. Returns the scheduled module and its result,
+    with the probed curve published as ``ScheduleResult.sweep``."""
     if options.wall_ns < 0.0:
         raise ValueError(f"wall_ns must be non-negative; got {options.wall_ns}")
     vectors: dict[float, dict] = {}
@@ -401,9 +386,9 @@ def sweep_area(
             "clock instead"
         )
     points = [asked]
-    # A deadline reaches the whole ladder: the least area meeting it may sit at
-    # any clock. Without one the requested clock floors the walk, since a faster
-    # rung is a frequency purchase this direction does not make.
+    # A deadline lets the winner sit at any clock. Without one the requested
+    # clock floors the walk, a faster rung being a frequency purchase this
+    # direction does not make.
     lo = _anchor_ns(options, floor_ns) if options.wall_ns else options.cycle_ns
     hi = max(cap_ns, options.cycle_ns, lo)
     # Under a deadline the laxest candidate's span bounds every candidate's from
