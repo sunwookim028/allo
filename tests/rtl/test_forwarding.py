@@ -9,10 +9,10 @@ import sys
 import numpy as np
 
 from allo import kernel
-from allo.lang import i32
+from allo.lang import f32, i32
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _common import _iis  # noqa: E402
+from _common import _LAT, PERIOD_NS, _iis, _op_row, default_device  # noqa: E402
 
 N, BINS = 32, 8
 
@@ -62,6 +62,44 @@ def test_forwarding_survives_the_chain_break_at_the_default_clock():
     h = np.zeros(BINS, np.int32)
     mod.cosim(x, h)
     assert np.array_equal(h, np.bincount(x, minlength=BINS).astype(np.int32))
+
+
+def test_a_cone_fed_store_still_earns_the_window():
+    # A floyd-style min-relax: the store's datum is a select cone,
+    # combinational when the store issues. The youngest window arm taps that
+    # cone straight into the load's data mux, so its delay is priced onto the
+    # load's output rather than refusing the window, and the recurrence
+    # closes one read latency tighter than the plain (windowless) relaxation.
+    N = 32
+
+    @kernel
+    def relax(A: f32[N], acc: f32[4]):
+        for j in range(N):
+            t: f32 = acc[0] + A[j]
+            if acc[0] >= t:
+                acc[0] = t
+
+    fadd, fcmp = _LAT[("add", "float32")], _LAT[("cmp", "float32")]
+    row = default_device.storage["lutram"]
+    arrival = row.read_delay_ns + _op_row("add", "float32", fadd).timing.in_delay_ns
+    w = row.read_latency
+    while w and row.read_latency + fadd + fcmp - w < w + 1:
+        w = max(1, row.read_latency + fadd + fcmp - w) - 1
+    expect = row.read_latency - w + fadd + fcmp + (0 if arrival <= PERIOD_NS else 1)
+
+    mod = relax.schedule().export("rtl")
+    assert _iis(mod.schedule().func("relax").regions) == [expect]
+
+    rng = np.random.default_rng(3)
+    A = rng.uniform(-1.0, 1.0, N).astype(np.float32)
+    acc = np.full(4, 2.0, np.float32)
+    exp = acc.copy()
+    for j in range(N):
+        t = np.float32(exp[0] + A[j])
+        if exp[0] >= t:
+            exp[0] = t
+    mod.cosim(A, acc)
+    assert np.allclose(acc, exp, rtol=2e-3, atol=2e-3), (list(acc), list(exp))
 
 
 def test_an_unrolled_rmw_body_forwards_from_every_paired_store():

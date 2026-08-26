@@ -802,20 +802,36 @@ static void relaxWarEdges(ChainingModuloProblem &problem,
   }
 }
 
-// Whether \p v is settled when a store issues: a loop-carried block argument,
-// a region-invariant def, a constant, or a registered producer (latency >= 1).
-// A value combinational in its issue cycle would chain its whole cone through
-// a window arm's data mux into the load's consumers, a path the chain model
-// does not price.
-static bool registeredAtIssue(ChainingModuloProblem &problem, Value v,
-                              Block *block) {
-  if (isa<BlockArgument>(v))
-    return true;
+// The arrival delay of \p v within the cycle it is consumed in, by the chain
+// model's rules: a block argument, region-external def, constant, or
+// registered producer restarts the cone (its output leaves a register); a
+// combinational producer accumulates its outgoing delay over its operands'.
+// This is what the youngest window arm taps straight into the load's data
+// mux, so the load's outgoing delay must carry it (the caller caps it at what
+// the chain breaks let arrive at the store, then prices it into the `.fwd`
+// twin).
+static double armDatumDelay(ChainingModuloProblem &problem, Value v,
+                            Block *block, float regFloor,
+                            DenseMap<Value, double> &memo) {
+  if (auto it = memo.find(v); it != memo.end())
+    return it->second;
+  double d = regFloor;
   Operation *def = v.getDefiningOp();
-  if (!def || def->getBlock() != block || def->hasTrait<OpTrait::ConstantLike>())
-    return true;
-  auto opr = problem.getLinkedOperatorType(def);
-  return opr && *problem.getLatency(*opr) >= 1;
+  if (def && def->getBlock() == block &&
+      !def->hasTrait<OpTrait::ConstantLike>()) {
+    if (auto opr = problem.getLinkedOperatorType(def)) {
+      if (*problem.getLatency(*opr) >= 1) {
+        d = std::max<double>(regFloor, *problem.getOutgoingDelay(*opr));
+      } else {
+        for (Value operand : def->getOperands())
+          d = std::max(d, armDatumDelay(problem, operand, block, regFloor,
+                                        memo));
+        d += *problem.getOutgoingDelay(*opr);
+      }
+    }
+  }
+  memo[v] = d;
+  return d;
 }
 
 // Relax the forwardable RAW edges of \p problem when, and only when, a storage
@@ -826,13 +842,16 @@ static bool registeredAtIssue(ChainingModuloProblem &problem, Value v,
 // compare ends in the select register and touches no port path, so nothing
 // else is re-priced.
 //
-// A pair whose dependence distances are exact (polyhedral) and whose store
-// data is settled at issue is granted a WINDOW of the read latency on top of
-// the relaxation: the store may issue while the read is in flight, served by
-// deeper shadow arms, taking the RAM round trip out of the recurrence
-// entirely. Sound only when the solved II clears every window (an instance
-// one iteration past the paired one must fall outside it), which the guard
-// loop below enforces against the II floor. Returns the relaxed edges, empty
+// A pair whose dependence distances are exact (polyhedral) is granted a
+// WINDOW of the read latency on top of the relaxation: the store may issue
+// while the read is in flight, served by deeper shadow arms, taking the RAM
+// round trip out of the recurrence entirely. Sound only when the solved II
+// clears every window (an instance one iteration past the paired one must
+// fall outside it), which the guard loop below enforces against the II
+// floor. The youngest arm taps the store's datum combinationally, so its
+// cone rides the load's outgoing delay (`armDatumDelay`, capped at what the
+// chain breaks let arrive at the store); a window whose cone pushes the load
+// past the period is refused, not the pair. Returns the relaxed edges, empty
 // when there are none.
 static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
                                                DependenceAnalysis &deps,
@@ -859,13 +878,14 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
   llvm::MapVector<Operation *, unsigned> armsOf;
   for (Dependence dep : cands)
     ++armsOf[dep.getDestination()];
-  llvm::DenseMap<Operation *, double> muxOf;
+  // {mux cone, the load's own outgoing delay} per load.
+  llvm::DenseMap<Operation *, std::pair<double, double>> muxOf;
   for (auto &[load, arms] : armsOf) {
     double mux = muxCone(dev.operators, 1 + arms,
                          datapathWidth(load->getResult(0).getType()));
     NodeTiming t = accessCharacterization(load, dev.operators, dev.memory);
     if (t.outDelay + mux <= cycleTime)
-      muxOf[load] = mux;
+      muxOf[load] = {mux, t.outDelay};
   }
   llvm::erase_if(cands, [&](Dependence dep) {
     return !muxOf.count(dep.getDestination());
@@ -873,24 +893,37 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
   if (cands.empty())
     return {};
   llvm::DenseSet<Dependence> relaxed(cands.begin(), cands.end());
-  // Window grants: exact distances and settled store data (see the doc
-  // comment above).
+  // Window grants: exact distances (see the doc comment above). The store's
+  // datum cone is priced, not gated on: a window survives only if the load's
+  // output still fits the period with the cone folded in.
   llvm::DenseMap<Dependence, unsigned> windows;
+  llvm::DenseMap<Dependence, double> armOf;
+  DenseMap<Value, double> coneMemo;
   for (Dependence dep : cands) {
     Operation *store = dep.getSource(), *load = dep.getDestination();
     if (!deps.isExactPair(store, load))
+      continue;
+    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
+    unsigned rL = dev.memory.timing(ch.storage).latency.read;
+    if (!rL)
       continue;
     Value data;
     if (auto st = dyn_cast<affine::AffineWriteOpInterface>(store))
       data = st.getValueToStore();
     else
       data = cast<memref::StoreOp>(store).getValueToStore();
-    if (!registeredAtIssue(problem, data, store->getBlock()))
-      continue;
-    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
-    unsigned rL = dev.memory.timing(ch.storage).latency.read;
-    if (rL)
-      windows[dep] = rL;
+    // The chain breaks guarantee the datum settles early enough for the
+    // store to sample it, which caps what the arm can tap.
+    double arm = armDatumDelay(problem, data, store->getBlock(), regFloor,
+                               coneMemo);
+    auto storeOpr = *problem.getLinkedOperatorType(store);
+    arm = std::min<double>(arm,
+                           cycleTime - *problem.getIncomingDelay(storeOpr));
+    auto [mux, outBase] = muxOf.lookup(load);
+    if (std::max(arm, outBase) + mux > cycleTime)
+      continue; // the cone does not fit the period; keep the plain relaxation
+    windows[dep] = rL;
+    armOf[dep] = arm;
   }
   unsigned recRelaxed = recurrenceMinII(problem, relaxed, &windows);
   // A window is sound only when the solved II strictly clears it: an instance
@@ -926,6 +959,21 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
   out.edges = std::move(cands);
   for (Dependence dep : out.edges)
     problem.setForwarded(dep, windows.lookup(dep));
+  // The youngest arm is combinational only at the full read latency, so only
+  // a window still that wide carries its datum cone onto the load's output.
+  llvm::DenseMap<Operation *, double> bumpOf;
+  for (Dependence dep : out.edges) {
+    auto it = windows.find(dep);
+    if (it == windows.end())
+      continue;
+    Operation *load = dep.getDestination();
+    MemoryChar ch = characterize(asMemAccess(load)->root, dev.memory);
+    if (it->second != dev.memory.timing(ch.storage).latency.read)
+      continue;
+    double over = armOf.lookup(dep) - muxOf.lookup(load).second;
+    if (over > 0)
+      bumpOf[load] = std::max(bumpOf[load], over);
+  }
   // In `armsOf`'s (insertion) order, so the operator types the twins mint are
   // created in a deterministic order.
   for (auto &[load, arms] : armsOf) {
@@ -933,12 +981,18 @@ static ForwardRelaxation relaxForwardableEdges(ChainingModuloProblem &problem,
     if (it == muxOf.end())
       continue;
     auto opr = *problem.getLinkedOperatorType(load);
-    // Keyed by the arm count too: two loads of one storage may fan differently.
-    auto nw = problem.getOrInsertOperatorType(
-        (opr.getValue() + ".fwd" + Twine(arms)).str());
+    double bump = quantizeCone(bumpOf.lookup(load));
+    // Keyed by the arm count and datum cone too: two loads of one storage may
+    // fan differently or tap differently deep cones.
+    std::string name = (opr.getValue() + ".fwd" + Twine(arms)).str();
+    if (bump > 0.0)
+      name += "c" + std::to_string((int64_t)std::lround(
+                        bump / kConeDelayQuantum));
+    auto nw = problem.getOrInsertOperatorType(name);
     problem.setLatency(nw, *problem.getLatency(opr));
     problem.setIncomingDelay(nw, *problem.getIncomingDelay(opr));
-    problem.setOutgoingDelay(nw, *problem.getOutgoingDelay(opr) + it->second);
+    problem.setOutgoingDelay(nw, *problem.getOutgoingDelay(opr) + bump +
+                                     it->second.first);
     problem.setLinkedOperatorType(load, nw);
     out.originalTypes.push_back({load, opr});
   }
