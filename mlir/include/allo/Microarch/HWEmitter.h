@@ -779,7 +779,7 @@ struct HWEmitter {
   /// region's result-drain stage. \p captureOn is the last iteration's issue
   /// pulse for a counted loop and each continuing iteration's for a while.
   unsigned captureResults(const uarch::RegionBlock &rb, Value captureOn,
-                          Value start);
+                          Value start, Value phase);
   /// Run \p regions in program order, each starting when its predecessor drains
   /// (the first on \p start); returns the last region's drain pulse. The shared
   /// sequencer for a container's children and a guard's arms. No done level is

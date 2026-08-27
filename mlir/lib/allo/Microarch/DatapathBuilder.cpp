@@ -599,10 +599,25 @@ void DatapathBuilder::recordRegionResults() {
       // loop has none.
       if (rb.conditional)
         rb.condition = resolveValue(pipe.getConditionValue());
-      for (auto [init, next] :
-           llvm::zip(pipe.getInits(), pipe.getCarriedValues()))
-        rb.results.push_back(
-            {resolveValue(next), resolveValue(init), Source{}});
+      auto inits = pipe.getInits();
+      auto carried = pipe.getCarriedValues();
+      for (unsigned k = 0, e = carried.size(); k < e; ++k) {
+        RegionResult res;
+        res.init = resolveValue(inits[k]);
+        // A rotated reduction shifts its datum across N accumulators; iter-arg
+        // k reads the datum k iterations back. `traceIterArgSource` walks that
+        // shift to the datum, and its distance is the tap the final value sits
+        // on. A plain result traces to itself (distance 0) and reads `next`.
+        SmallVector<unsigned, 2> chain;
+        Value datum = traceIterArgSource(pipe, k, chain);
+        if (datum && chain.size() > 1) {
+          res.value = resolveValue(datum);
+          res.shiftTap = chain.size() - 1;
+        } else {
+          res.value = resolveValue(carried[k]);
+        }
+        rb.results.push_back(res);
+      }
       continue;
     }
 

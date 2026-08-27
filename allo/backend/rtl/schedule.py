@@ -71,7 +71,7 @@ def run_schedule(
         f"builtin.module(canonicalize,cse,func.func(raise-to-affine,cse,"
         f"raise-counted-while,{loops},"
         f"canonicalize,fold-if-statements,cse,{scalarize},"
-        f"{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
+        f"raise-memory-reductions,{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"
         f"legalize-arith{{expand-const-arith=true period-ns={model_ns} "

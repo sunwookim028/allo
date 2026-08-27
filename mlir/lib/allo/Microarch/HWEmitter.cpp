@@ -169,7 +169,8 @@ Value HWEmitter::emitRegion(const uarch::RegionBlock &rb, Value start,
   // every CONTINUING iteration (the doomed exit iteration must not commit).
   Value captureOn =
       rb.conditional ? ctx.andBits(rc.issue, term.cond) : lastIssue;
-  [[maybe_unused]] unsigned resultDrain = captureResults(rb, captureOn, start);
+  [[maybe_unused]] unsigned resultDrain =
+      captureResults(rb, captureOn, start, rc.phase);
   assert(std::max(fb.storeDrain, resultDrain) == rb.drainStage &&
          "the built datapath's terminal cycle is not the one the model "
          "recorded");
@@ -238,8 +239,9 @@ Value HWEmitter::lastIssuePulse(const RegionControl &rc,
 // terms of `RegionBlock::drainStage`, which `emitRegion` checks against it. A
 // store-ful region yields no result and returns 0.
 unsigned HWEmitter::captureResults(const uarch::RegionBlock &rb,
-                                   Value captureOn, Value start) {
+                                   Value captureOn, Value start, Value phase) {
   StallShell sh = datapath.shellFor(rb.id);
+  unsigned ii = rb.ii.value_or(1);
   unsigned maxStage = 0;
   for (auto [k, r] : llvm::enumerate(rb.results)) {
     if (!r.value)
@@ -250,6 +252,17 @@ unsigned HWEmitter::captureResults(const uarch::RegionBlock &rb,
     unsigned stage = dp.readyCycle(r.value);
     Value cap = ctx.delayValid(captureOn, stage, sh);
     Value res = datapath.resolveSource(r.value);
+    // A rotated reduction's slot k is the datum delayed k iterations. Its shift
+    // chain holds every live partial sum without stranding the last ones (a
+    // pulse-clocked shift would), so tap `k * ii` of it, captured on the same
+    // pulse as the head so every slot latches its own iteration's value.
+    if (r.shiftTap) {
+      unsigned depth = r.shiftTap * ii;
+      ShiftChain sc = phase && depth > 1
+                          ? ctx.foldedChain(res, depth, ii, phase, stage, sh)
+                          : ctx.shiftChain(res, depth, sh);
+      res = sc.tap(depth);
+    }
     // A loop-carried result preloads its init at `start`, so a run that never
     // captures keeps the identity rather than a stale value. An init-less
     // result always lands: it powers on at 0.

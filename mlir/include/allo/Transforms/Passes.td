@@ -508,6 +508,43 @@ def HoistInvariantReadsPass
   ];
 }
 
+def RaiseMemoryReductionsPass
+    : Pass<"raise-memory-reductions", "func::FuncOp"> {
+  let summary = "Promote a loop-carried memory reduction to an SSA iter_arg";
+  let description = [{
+    Rewrite a reduction that a loop carries through memory into one it carries
+    through an SSA iter_arg. The shape targeted is a load, an associative
+    combine, and a store to one location whose address does not change across
+    the loop:
+
+        affine.for %k = 0 to N {
+          %a = affine.load M[inv]
+          %s = arith.addf %a, %leaf
+          affine.store %s, M[inv]
+        }
+
+    becomes a preload before the loop, an iter_arg threaded through the combine,
+    and a single write-back after it. The rewrite is bit-exact: it reorders no
+    operations, it only moves the accumulator off the memory port and onto a
+    register. Its purpose is to expose the reduction to `reassociate-reductions`
+    and `rotate-reductions`, which recognize an iter_arg accumulator but not a
+    memory one, so a rolled `acc[i] += x` loop can reach II=1 the same way an
+    unrolled one already does.
+
+    A location is promoted only when it is provably self-contained across the
+    loop: the address is loop-invariant (`isInvariantAccess`), the load and store
+    are unconditional in the body with the load reaching the store, the stored
+    value and loaded value each have a single use, the array has no opaque or
+    hidden user, and the polyhedral dependence test proves no other access in the
+    loop touches the location. Several independent reductions in one loop are
+    raised together into one loop carrying several iter_args.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect", "mlir::arith::ArithDialect",
+    "mlir::memref::MemRefDialect"
+  ];
+}
+
 def ReassociateReductionsPass
     : Pass<"reassociate-reductions", "func::FuncOp"> {
   let summary = "Rebalance associative reduction chains into logarithmic trees";
