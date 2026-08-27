@@ -25,27 +25,50 @@ using namespace mlir::allo::logging;
 
 namespace {
 
-// A simple reduction: exactly one iter_arg `acc`, and the yielded value is a
-// reduction step combining `acc` with a leaf, with `acc` used only there.
-struct Reduction {
+// The reductions a loop carries, one entry per iter_arg in order: a valid step
+// is a rotatable reduction, a null step a plain carried value the rebuild
+// leaves as a single accumulator.
+struct LoopReductions {
   affine::AffineForOp loop;
-  ReductionStep step; // the recurrence operator (float bare / integer idiom)
+  SmallVector<ReductionStep> steps;
 };
 
-std::optional<Reduction> matchReduction(affine::AffineForOp loop) {
-  if (loop.getNumRegionIterArgs() != 1)
-    return std::nullopt;
-  Value acc = loop.getRegionIterArgs()[0];
+// Classify iter_arg `k`: is its yielded value a reduction step combining that
+// iter_arg with a leaf, with the iter_arg and the step result each used once?
+ReductionStep matchReductionArg(affine::AffineForOp loop, unsigned k) {
+  Value acc = loop.getRegionIterArgs()[k];
   auto yield = cast<affine::AffineYieldOp>(loop.getBody()->getTerminator());
-  Value yielded = yield.getOperand(0);
+  Value yielded = yield.getOperand(k);
   ReductionStep step = matchReductionStep(yielded);
   if (!step || !yielded.hasOneUse() || !acc.hasOneUse())
-    return std::nullopt;
+    return {};
   // `acc` must be exactly one of the combined operands (the other is the leaf).
+  // Its single use also keeps it out of any other reduction's leaf, so the
+  // reductions in one loop stay independent.
   auto [lhs, rhs] = reductionOperands(step);
   if ((lhs == acc) == (rhs == acc))
+    return {};
+  return step;
+}
+
+std::optional<LoopReductions> matchReductions(affine::AffineForOp loop) {
+  unsigned nArgs = loop.getNumRegionIterArgs();
+  if (nArgs == 0)
     return std::nullopt;
-  return Reduction{loop, step};
+  // Only a leaf loop's reduction rotates: the emitter realizes the rotated
+  // shift register on a childless modulo loop. A reduction carried by a
+  // container loop (`total += inner_sum`) stays at the operator's latency.
+  WalkResult nested = loop.getBody()->walk(
+      [](affine::AffineForOp) { return WalkResult::interrupt(); });
+  if (nested.wasInterrupted())
+    return std::nullopt;
+  LoopReductions red{loop, SmallVector<ReductionStep>(nArgs)};
+  bool any = false;
+  for (unsigned k = 0; k < nArgs; ++k)
+    any |= bool(red.steps[k] = matchReductionArg(loop, k));
+  if (!any)
+    return std::nullopt;
+  return red;
 }
 
 // The identity element of `step`'s operator (0 for add, 1 for mul) as a
@@ -59,19 +82,29 @@ Value identityFor(OpBuilder &b, Location loc, const ReductionStep &step) {
       b, loc, b.getFloatAttr(ty, step.isMul() ? 1.0 : 0.0));
 }
 
-void rotate(Reduction red, unsigned n) {
+void rotate(LoopReductions red, unsigned n) {
   affine::AffineForOp loop = red.loop;
   OpBuilder b(loop);
   Location loc = loop.getLoc();
   Value oldIv = loop.getInductionVar();
-  Value oldAcc = loop.getRegionIterArgs()[0];
-  const ReductionStep &step = red.step;
+  auto oldArgs = loop.getRegionIterArgs();
+  auto oldInits = loop.getInits();
+  unsigned nArgs = oldArgs.size();
 
-  // N accumulators: slot 0 keeps the original init, the rest are the identity.
-  Value identity = identityFor(b, loc, step);
-  SmallVector<Value> inits{loop.getInits()[0]};
-  inits.append(n - 1, identity);
+  // Lay out the new slots: each reduction expands to N accumulators (its init,
+  // then N-1 identities), each plain carried value keeps its one.
+  // `start`/`size` locate each old iter_arg's slots.
+  SmallVector<Value> inits;
+  SmallVector<unsigned> start(nArgs), size(nArgs);
+  for (unsigned k = 0; k < nArgs; ++k) {
+    start[k] = inits.size();
+    size[k] = red.steps[k] ? n : 1;
+    inits.push_back(oldInits[k]);
+    if (red.steps[k])
+      inits.append(n - 1, identityFor(b, loc, red.steps[k]));
+  }
 
+  auto oldYield = cast<affine::AffineYieldOp>(loop.getBody()->getTerminator());
   auto newLoop = affine::AffineForOp::create(
       b, loc, loop.getLowerBoundOperands(), loop.getLowerBoundMap(),
       loop.getUpperBoundOperands(), loop.getUpperBoundMap(),
@@ -79,21 +112,43 @@ void rotate(Reduction red, unsigned n) {
       [&](OpBuilder &nb, Location nloc, Value niv, ValueRange slots) {
         IRMapping map;
         map.map(oldIv, niv);
-        map.map(oldAcc, slots.back()); // the operator reads the last slot
+        // A reduction reads its oldest slot (the last of its group), a plain
+        // value its single slot.
+        for (unsigned k = 0; k < nArgs; ++k)
+          map.map(oldArgs[k], slots[start[k] + size[k] - 1]);
         for (Operation &o : loop.getBody()->without_terminator())
           nb.clone(o, map);
-        // Rotate: the new value enters slot 0 and the others shift down.
-        SmallVector<Value> yields{map.lookup(step.result())};
-        for (Value slot : slots.drop_back())
-          yields.push_back(slot);
+        SmallVector<Value> yields;
+        for (unsigned k = 0; k < nArgs; ++k) {
+          if (!red.steps[k]) {
+            yields.push_back(map.lookupOrDefault(oldYield.getOperand(k)));
+            continue;
+          }
+          // Rotate: the new partial enters slot 0, the rest shift down one.
+          yields.push_back(map.lookupOrDefault(red.steps[k].result()));
+          for (unsigned s = 0; s + 1 < size[k]; ++s)
+            yields.push_back(slots[start[k] + s]);
+        }
         affine::AffineYieldOp::create(nb, nloc, yields);
       });
 
   b.setInsertionPointAfter(newLoop);
-  Value total = buildBalancedTree(b, step, newLoop.getResults());
-  loop.getResult(0).replaceAllUsesWith(total);
+  unsigned nRot = 0;
+  for (unsigned k = 0; k < nArgs; ++k) {
+    Value total;
+    if (red.steps[k]) {
+      SmallVector<Value> groupResults;
+      for (unsigned s = 0; s < size[k]; ++s)
+        groupResults.push_back(newLoop.getResult(start[k] + s));
+      total = buildBalancedTree(b, red.steps[k], groupResults);
+      ++nRot;
+    } else {
+      total = newLoop.getResult(start[k]);
+    }
+    loop.getResult(k).replaceAllUsesWith(total);
+  }
   info(Stage::Prep, newLoop)
-      << "Rotating reduction across " << n << " accumulators";
+      << "Rotating " << nRot << " reduction(s) across " << n << " accumulators";
   loop.erase();
 }
 
@@ -104,9 +159,9 @@ struct RotateReductionsPass
   void runOnOperation() override {
     if (accumulators < 2)
       return;
-    SmallVector<Reduction> targets;
+    SmallVector<LoopReductions> targets;
     getOperation().walk([&](affine::AffineForOp loop) {
-      std::optional<Reduction> red = matchReduction(loop);
+      std::optional<LoopReductions> red = matchReductions(loop);
       if (!red)
         return;
       // Skip loops too short to fill the rotated pipeline.
@@ -119,7 +174,7 @@ struct RotateReductionsPass
       }
       targets.push_back(*red);
     });
-    for (Reduction red : targets)
+    for (LoopReductions &red : targets)
       rotate(red, accumulators);
   }
 };

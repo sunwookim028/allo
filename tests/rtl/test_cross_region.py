@@ -21,7 +21,6 @@ from _common import (  # noqa: E402
     _iis,
     _outer,
     FADD,
-    MEM_REDUCE_II,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -974,7 +973,7 @@ def test_affine_two_constraint_guard_closes_into_select():
     assert Dcp(mod).func("agf").attrs("allo.dcp.compute", "predicate").count(5) >= 2
     guard = next(r for r in res.funcs[0].regions if r.kind == "guard")
     assert guard.conditional and guard.container
-    assert _iis(res.cyclic()) == [MEM_REDUCE_II]  # memory-carried `out[i] +=`
+    assert _iis(res.cyclic()) == [FADD]  # `out[i] +=` raised to a register recurrence
 
     x = np.arange(N, dtype=np.float32) * 0.1 + 1.0
     out = np.zeros(N, np.float32)

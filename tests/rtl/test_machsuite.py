@@ -22,7 +22,6 @@ from tests.rtl._common import (
     _to_rtl,
     _iis,
     FADD,
-    MEM_REDUCE_II,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -709,14 +708,15 @@ def test_fft_strided():
 def test_grid_parallel():
     """`allo.grid` lowers to a nested affine.for band that the whole scheduling
     pipeline handles: constant trips give a static latency, and a real
-    memory-carried recurrence still closes despite the grid's nodep hint. gemm's
-    k-reduction serializes into C[i, j] and drives correctly end to end. The grid
-    stencils live in test_loop_control.py, which cosims them at non-power-of-two
-    extents that exercise the div/mod delinearisation this file's shapes miss."""
+    reduction recurrence still closes despite the grid's nodep hint. gemm's
+    k-reduction into C[i, j] is raised to an iter_arg and drives correctly end to
+    end. The grid stencils live in test_loop_control.py, which cosims them at
+    non-power-of-two extents that exercise the div/mod delinearisation this
+    file's shapes miss."""
     P = 8
 
     # The canonical grid() matmul: C[i, j] is affine, so the grid's assume.nodep
-    # does not touch the real k-reduction recurrence.
+    # does not touch the real k-reduction recurrence (raised to an iter_arg).
     @kernel
     def gemm(A: f32[P, P], B: f32[P, P], C: f32[P, P]):
         for i, j in allo.grid(P, P):
@@ -726,7 +726,7 @@ def test_grid_parallel():
     rtl = _to_rtl(gemm)
     res = rtl.schedule()
     assert res.func("gemm").latency is not None
-    assert res.func("gemm").cyclic()[-1].interval == MEM_REDUCE_II
+    assert res.func("gemm").cyclic()[-1].interval == FADD
 
     rng = np.random.default_rng(0)
     A = (rng.random((P, P), dtype=np.float32) - np.float32(0.5)).astype(np.float32)

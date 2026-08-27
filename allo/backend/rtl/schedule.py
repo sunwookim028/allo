@@ -69,9 +69,9 @@ def run_schedule(
     scalarize = f"scalarize-memory{{max-elements={prepass.scalarize_threshold}}}"
     pipeline = (
         f"builtin.module(canonicalize,cse,func.func(raise-to-affine,cse,"
-        f"raise-counted-while,{loops},"
+        f"raise-counted-while,raise-memory-reductions,{loops},"
         f"canonicalize,fold-if-statements,cse,{scalarize},"
-        f"raise-memory-reductions,{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
+        f"{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"
         f"legalize-arith{{expand-const-arith=true period-ns={model_ns} "

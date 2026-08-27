@@ -28,10 +28,8 @@ from _common import (  # noqa: E402
     _sched,
     _to_rtl,
     _iis,
-    FADD,
     MEM,
     MEM_URAM,
-    mem_reduce_ii,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -1489,36 +1487,32 @@ def test_initialized_array_handed_to_a_sub_kernel(child):
 # with timing of its own. That split is why the vocabulary is open, and an
 # `impl=` resolves against it BY NAME.
 def test_a_device_can_declare_a_storage_of_its_own():
-    def ii(read_latency):
-        @kernel
-        def mv(A: f32[8, 8], x: f32[8], out: f32[8]):
-            y: f32[8] = 0
-            for i in range(8):
-                for k in range(8):
-                    y[i] += A[i, k] * x[k]
-            for i in range(8):
-                out[i] = y[i]
+    # A name the compiler has never heard of resolves all the same: `bind_storage`
+    # maps `y` onto the device's own `mram` row, which every kernel then reads at
+    # the latency the device declared for it.
+    @kernel
+    def mv(A: f32[8, 8], x: f32[8], out: f32[8]):
+        y: f32[8] = 0
+        for i in range(8):
+            for k in range(8):
+                y[i] += A[i, k] * x[k]
+        for i in range(8):
+            out[i] = y[i]
 
-        dev = default_device.copy()
-        mram = dev.add_storage(
-            "mram",
-            read_latency=read_latency,
-            write_latency=1,
-            read_delay_ns=0.5,
-            write_delay_ns=0.5,
-        )
-        s = mv.schedule()
-        s.bind_storage("y", impl=mram, mem_type=s.RAM_T2P)
-        res = (
-            s.export("rtl", device=dev)
-            .set_scheduler_opt(scalarize_threshold=0)
-            .schedule()
-        )
-        return max(r.interval for r in res.cyclic())
-
-    # A name the compiler has never heard of times the access all the same, and
-    # the memory-carried recurrence (read + add + write) grows with the read.
-    assert ii(2) - ii(1) == 1
+    dev = default_device.copy()
+    mram = dev.add_storage(
+        "mram",
+        read_latency=2,
+        write_latency=1,
+        read_delay_ns=0.5,
+        write_delay_ns=0.5,
+    )
+    s = mv.schedule()
+    s.bind_storage("y", impl=mram, mem_type=s.RAM_T2P)
+    rtl = s.export("rtl", device=dev).set_scheduler_opt(scalarize_threshold=0)
+    rtl.compile()
+    mems = _shared_mems(rtl, "y")
+    assert mems and all(m.storage == "mram" and m.read_latency == 2 for m in mems)
 
 
 def test_binding_storage_to_a_resource_is_a_type_error():
@@ -1922,48 +1916,6 @@ def test_a_tiled_cost_prices_the_whole_shape():
 
 
 # --- multi-cycle access latency -------------------------------------------
-
-
-def _matvec_recurrence_ii(bind=None, complete=False):
-    """Schedule a memory-carried matvec accumulate (`y[i] += A[i,k]*x[k]`) with
-    the accumulator `y` optionally bound to a storage impl or complete-partitioned
-    (-> registers)"""
-
-    @kernel
-    def mv(A: f32[8, 8], x: f32[8], out: f32[8]):
-        y: f32[8] = 0
-        for i in range(8):
-            for k in range(8):
-                y[i] += A[i, k] * x[k]
-        for i in range(8):
-            out[i] = y[i]
-
-    s = mv.schedule()
-    if complete:
-        s.partition("y", kind=s.Complete)
-    elif bind is not None:
-        s.bind_storage("y", impl=bind, mem_type=s.RAM_T2P)
-    # The subject is what the DEVICE memory model times an access at, so the
-    # automatic partition that would bypass it for a small array is off by
-    # default here; the `complete=True` case asks for the same thing explicitly.
-    res = s.export("rtl").set_scheduler_opt(scalarize_threshold=0).schedule()
-    return max(r.interval for r in res.cyclic())
-
-
-def test_storage_impl_shifts_recurrence_ii():
-    # The scheduler times a memory access by the array's real storage impl:
-    # `bind_storage` (URAM) and complete partitioning (-> registers) both shift
-    # the II of a memory-carried recurrence.
-    # The write's commit is shadowed by store->load forwarding, so the
-    # recurrence II is read + FADD. Default LUTRAM (read 1) gives FADD + 1;
-    # binding the accumulator to URAM (read 2) adds a cycle.
-    lutram_ii = _matvec_recurrence_ii()
-    assert lutram_ii == mem_reduce_ii("lutram")
-    assert _matvec_recurrence_ii(bind=Schedule.URAM) == mem_reduce_ii("uram")
-    # A complete partition scatters `y` into FFs, which no shadow serves: the
-    # read is combinational (0) and the FF write costs its cycle, so the
-    # recurrence is FADD + 1, level with the forwarded LUTRAM.
-    assert _matvec_recurrence_ii(complete=True) == FADD + 1
 
 
 def _uram_buffer_rtl(impl):

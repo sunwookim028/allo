@@ -1741,6 +1741,60 @@ def test_rotate_reduction_scales_ii():
     assert mixed_ii(FADD) == 1
 
 
+# One loop carrying several independent reductions (a complex accumulate's real
+# and imaginary parts) rotates each on its own iter_arg, so every one reaches
+# II=1. Rotation reassociates the sums, so the float result holds to tolerance.
+def test_rotate_multiple_reductions_in_one_loop():
+    @kernel
+    def red(x: f32[128], y: f32[128], out: f32[2]):
+        a: f32 = 0.0
+        b: f32 = 0.0
+        for i in range(128, name="i"):
+            a += x[i]
+            b += y[i] * 2.0
+        out[0] = a
+        out[1] = b
+
+    def ii(n):
+        res = _to_rtl(red).set_scheduler_opt(accumulators=n).schedule()
+        return res.cyclic()[0].interval
+
+    assert ii(0) == FADD  # both carried at the add latency
+    assert ii(FADD) == 1  # each reduction rotated independently to II=1
+
+    rng = np.random.default_rng(0)
+    x = rng.uniform(-1.0, 1.0, 128).astype(np.float32)
+    y = rng.uniform(-1.0, 1.0, 128).astype(np.float32)
+    out = np.zeros(2, np.float32)
+    _to_rtl(red).set_scheduler_opt(accumulators=FADD).cosim(x, y, out)
+    assert np.allclose(out[0], x.sum(), rtol=1e-3, atol=1e-3)
+    assert np.allclose(out[1], (y * 2.0).sum(), rtol=1e-3, atol=1e-3)
+
+
+# Only a LEAF reduction rotates: the emitter builds the rotated shift register on
+# a childless modulo loop. A container reduction (`total += inner_sum`) is left
+# unrotated -- rotating it would double-count, so cosim pins the nest's sum.
+def test_rotate_leaves_container_reduction_alone():
+    @kernel
+    def nred(A: f32[8, 8], out: f32[1]):
+        total: f32 = 0.0
+        for i in range(8, name="i"):
+            partial: f32 = 0.0
+            for j in range(8, name="j"):
+                partial += A[i, j]
+            total += partial
+        out[0] = total
+
+    iis = _iis(_to_rtl(nred).set_scheduler_opt(accumulators=FADD).schedule().cyclic())
+    assert 1 in iis  # the inner leaf reduction rotated to II=1
+
+    rng = np.random.default_rng(1)
+    A = rng.uniform(-1.0, 1.0, (8, 8)).astype(np.float32)
+    out = np.zeros(1, np.float32)
+    _to_rtl(nred).set_scheduler_opt(accumulators=FADD).cosim(A, out)
+    assert np.allclose(out[0], A.sum(), rtol=1e-3, atol=1e-3)
+
+
 # Integer reductions rebalance unconditionally (integer arithmetic is exactly
 # associative mod 2^w), cutting an unrolled chain's recurrence to one operator.
 def test_reassociate_int_reduction_recurrence():

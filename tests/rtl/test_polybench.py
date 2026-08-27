@@ -24,7 +24,6 @@ from _common import (
     _iis,
     FADD,
     FDIV,
-    MEM_REDUCE_II,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -74,7 +73,7 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(gemm)
     res = rtl.schedule()
-    assert res.func("gemm_mm").cyclic()[0].interval == MEM_REDUCE_II
+    assert res.func("gemm_mm").cyclic()[0].interval == FADD
     assert res.func("gemm_add").cyclic()[0].interval == 1
 
     A, B, C = _f32(0, P, Q), _f32(1, Q, R), _f32(2, P, R)
@@ -117,8 +116,8 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(two_mm)
     res = rtl.schedule()
-    assert res.func("tmm_ab").cyclic()[0].interval == MEM_REDUCE_II
-    assert res.func("tmm_abc").cyclic()[0].interval == MEM_REDUCE_II
+    assert res.func("tmm_ab").cyclic()[0].interval == FADD
+    assert res.func("tmm_abc").cyclic()[0].interval == FADD
     assert res.func("tmm_add").cyclic()[0].interval == 1
 
     A, B, C, D = _f32(0, P, Q), _f32(1, Q, R), _f32(2, R, S), _f32(3, P, S)
@@ -144,7 +143,7 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(doitgen)
     iis = _iis(rtl.schedule().cyclic())
-    assert MEM_REDUCE_II in iis  # the inner accumulation
+    assert FADD in iis  # the inner accumulation
     assert 1 in iis  # the writeback copy
 
     A, x = _f32(0, DR, DQ, DP), _f32(1, DP, DP)
@@ -192,8 +191,8 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(three_mm)
     res = rtl.schedule()
-    assert res.func("mm1").cyclic()[0].interval == MEM_REDUCE_II
-    assert res.func("mm3").cyclic()[0].interval == MEM_REDUCE_II
+    assert res.func("mm1").cyclic()[0].interval == FADD
+    assert res.func("mm3").cyclic()[0].interval == FADD
 
     A, B, C, D = _f32(0, P3, Q3), _f32(1, Q3, R3), _f32(2, R3, S3), _f32(3, S3, T3)
     out = np.zeros((P3, T3), np.float32)
@@ -203,8 +202,9 @@ def test_matmul_reductions():
 
 def test_reduction_ii_follows_accumulator_location():
     """The accumulator's location sets the II: a memory cell indexed by the inner
-    IV carries no recurrence (II=1), one indexed by the outer IV closes a
-    read->add->write recurrence, and a scalar keeps the partial in a register."""
+    IV carries no recurrence (II=1), while one indexed by the outer IV is a
+    loop-carried reduction raised to an iter_arg, so its II is the register
+    recurrence FADD."""
     M, N = 6, 5
 
     # bicg: stageS accumulates into s[j0], the INNER index -- every iteration
@@ -233,7 +233,7 @@ def test_reduction_ii_follows_accumulator_location():
     rtl = _to_rtl(bicg)
     res = rtl.schedule()
     assert res.func("stageS").cyclic()[0].interval == 1
-    assert res.func("stageQ").cyclic()[0].interval == MEM_REDUCE_II
+    assert res.func("stageQ").cyclic()[0].interval == FADD
 
     A, p, r = _f32(0, N, M), _f32(1, M), _f32(2, N)
     q, s = np.zeros(N, np.float32), np.zeros(M, np.float32)
@@ -265,8 +265,8 @@ def test_reduction_ii_follows_accumulator_location():
 
     rtl = _to_rtl(atax)
     res = rtl.schedule()
-    assert res.func("atax_m").cyclic()[0].interval == MEM_REDUCE_II
-    assert res.func("atax_n").cyclic()[0].interval == MEM_REDUCE_II
+    assert res.func("atax_m").cyclic()[0].interval == FADD
+    assert res.func("atax_n").cyclic()[0].interval == FADD
 
     A, x = _f32(0, AM, AN), _f32(1, AN)
     y = np.zeros(AN, np.float32)
@@ -312,7 +312,7 @@ def test_reduction_ii_follows_accumulator_location():
 
     rtl = _to_rtl(mvt)
     sa = rtl.schedule().func("stageA")
-    assert sa.cyclic()[0].interval == FADD  # scalar recurrence, not MEM_REDUCE_II
+    assert sa.cyclic()[0].interval == FADD  # register-carried reduction recurrence
     assert len([r for r in sa.regions if r.kind == "acyclic"]) >= 2  # prologue+epilogue
     wrapper = next(r for r in sa.regions if r.is_wrapper)
     assert wrapper.depth == 0 and wrapper.trip_count == V
@@ -594,7 +594,7 @@ def test_multi_region_single_func():
 
     rtl = _to_rtl(gesummv).set_scheduler_opt(scalarize_threshold=0)
     res = rtl.schedule()
-    assert MEM_REDUCE_II in _iis(res.func("compute_tmp").cyclic())
+    assert FADD in _iis(res.func("compute_tmp").cyclic())
     assert res.func("compute_y").cyclic()[0].interval == 1
 
     A, B, x = _f32(0, G, G), _f32(1, G, G), _f32(2, G)

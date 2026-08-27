@@ -578,16 +578,21 @@ def ReassociateReductionsPass
 
 def RotateReductionsPass
     : Pass<"rotate-reductions", "func::FuncOp"> {
-  let summary = "Rotate a reduction across N accumulators to reach II=1";
+  let summary = "Rotate reductions across N accumulators to reach II=1";
   let description = [{
-    Replace a loop-carried float reduction's single accumulator with N
-    accumulators in a shift register, so a given partial sum is updated once
-    every N iterations. This turns the distance-1 recurrence (which bounds the
-    modulo II at the operator latency L) into a distance-N recurrence over one
-    pipelined operator, i.e. `RecII = ceil(L / N)`, which is 1 once `N >= L`.
-    The N partial sums are combined by a balanced tree after the loop.
+    Replace a loop-carried reduction's single accumulator with N accumulators in
+    a shift register, so a given partial sum is updated once every N iterations.
+    This turns the distance-1 recurrence (which bounds the modulo II at the
+    operator latency L) into a distance-N recurrence over one pipelined operator,
+    i.e. `RecII = ceil(L / N)`, which is 1 once `N >= L`. The N partial sums are
+    combined by a balanced tree after the loop.
 
-    Only float `add`/`mul` reductions are rotated (reassociation is inexact); the
+    A loop's iter_args are classified independently, so several independent
+    reductions in one loop (a complex accumulate's real and imaginary parts, say)
+    each rotate on their own; plain carried values are left alone. `add`/`mul`
+    reductions rotate for both float (reassociation is inexact) and integer
+    (exact) accumulators. Only leaf loops are rotated: the shift register is
+    realized on a childless modulo loop, so a container reduction stays put. The
     accumulator count `N` is opt-in via `accumulators` (a no-op below 2). Composes
     after reassociate-reductions, which first folds an unrolled reduction chain
     into a single carried operator.

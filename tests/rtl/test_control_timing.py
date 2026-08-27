@@ -247,34 +247,6 @@ def _dev(write_latency: int):
     return d
 
 
-# The memory-carried recurrence's II is read + add + write, so the scheduler
-# charges a deeper write rather than only tolerating it in the emitter. A
-# one-cycle write is the exception: store->load forwarding covers that window
-# and drops its round trip to read + add.
-def test_multi_cycle_write_costs_scheduled_cycles():
-    @kernel
-    def accumulate(A: i32[8], B: i32[8]):
-        s: i32[8] = 0
-        for i in range(8):
-            s[0] = s[0] + A[i]
-        for i in range(8):
-            B[i] = s[0]
-
-    # The device's write latency is the subject, so `s` has to stay a memory:
-    # the automatic complete partition would give it registers and time the
-    # write at zero.
-    iis = []
-    for wr in (1, 2, 3):
-        rtl = _to_rtl(accumulate, device=_dev(wr)).set_scheduler_opt(
-            scalarize_threshold=0
-        )
-        regions = rtl.schedule().func("accumulate")
-        iis.append(max(r.interval for r in regions.cyclic()))
-    # wr=1 forwards (read + add); wr=2 pays read + add + 2, one above the
-    # unforwarded wr=1 round trip, and wr=3 one more.
-    assert iis == [iis[0], iis[0] + 2, iis[0] + 3], iis
-
-
 # The registers that carry a multi-cycle write ride the region's clock
 # enable, so a stream region's back-pressure freezes the in-flight write with
 # the rest of the datapath instead of committing it a cycle early.
