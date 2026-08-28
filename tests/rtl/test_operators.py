@@ -2074,6 +2074,68 @@ def test_narrow_trunc_bitwise_cosim():
     assert np.array_equal(out, ref)
 
 
+# The dual of the redundant-mask fold: an `x | y` whose second operand sets only
+# bits the first already holds computes nothing and drops to that operand. Fires
+# both ways from known bits, and leaves a genuinely combining OR alone.
+def test_redundant_or_is_dropped():
+    # low nibble already set in y, only-low in x -> x | y == y
+    dropy = _run_narrow(
+        """
+        func.func @f(%a: i8, %b: i8) -> i8 {
+          %m = arith.constant 15 : i8
+          %x = arith.andi %a, %m : i8
+          %y = arith.ori %b, %m : i8
+          %r = arith.ori %x, %y : i8
+          return %r : i8
+        }
+        """
+    )
+    assert dropy.count("arith.ori") == 1, dropy  # the outer or is gone
+
+    # low nibble already set in x, only-low in y -> x | y == x
+    dropx = _run_narrow(
+        """
+        func.func @f(%a: i8, %b: i8) -> i8 {
+          %m = arith.constant 15 : i8
+          %x = arith.ori %a, %m : i8
+          %y = arith.andi %b, %m : i8
+          %r = arith.ori %x, %y : i8
+          return %r : i8
+        }
+        """
+    )
+    assert dropx.count("arith.ori") == 1, dropx
+
+    # two low-nibble values genuinely combine: the or stays.
+    keep = _run_narrow(
+        """
+        func.func @f(%a: i8, %b: i8) -> i8 {
+          %m = arith.constant 15 : i8
+          %x = arith.andi %a, %m : i8
+          %y = arith.andi %b, %m : i8
+          %r = arith.ori %x, %y : i8
+          return %r : i8
+        }
+        """
+    )
+    assert "arith.ori" in keep, keep
+
+    N = 16
+
+    @kernel
+    def redor(A: i8[N], B: i8[N], out: i8[N]):
+        for i in range(N):
+            out[i] = (A[i] & 15) | (B[i] | 15)
+
+    assert _op_kinds(redor)["ori"] == 1  # only `B | 15` survives
+    rng = np.random.default_rng(3)
+    A = rng.integers(-128, 128, size=N, dtype=np.int8)
+    B = rng.integers(-128, 128, size=N, dtype=np.int8)
+    out = np.zeros(N, np.int8)
+    _to_rtl(redor).cosim(A, B, out)
+    assert np.array_equal(out, (A & 15) | (B | 15))
+
+
 def _run_f2i(ir: str) -> str:
     """Parse hand-written IR and run `float-to-int` over it alone."""
     from allo._mlir.ir import Module

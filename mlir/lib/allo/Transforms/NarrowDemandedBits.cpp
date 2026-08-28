@@ -553,6 +553,32 @@ struct DropRedundantMask : OpRewritePattern<arith::AndIOp> {
   }
 };
 
+// `x | y` -> `x` when every bit `y` would set is already one in `x`, or `y`
+// never sets it: an OR that contributes no new bits. The dual of the redundant
+// AND mask (One and Zero swapped), for an OR-splice over a field already set.
+struct DropRedundantOr : OpRewritePattern<arith::OrIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::OrIOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!isa<IntegerType>(op.getType()))
+      return failure(); // an index or has no width to reason in
+    llvm::KnownBits lhs = knownBits(op.getLhs());
+    llvm::KnownBits rhs = knownBits(op.getRhs());
+    // Bit by bit: the other side already sets this one, or this side never
+    // does.
+    if ((rhs.Zero | lhs.One).isAllOnes()) {
+      rewriter.replaceOp(op, op.getLhs());
+      return success();
+    }
+    if ((lhs.Zero | rhs.One).isAllOnes()) {
+      rewriter.replaceOp(op, op.getRhs());
+      return success();
+    }
+    return failure();
+  }
+};
+
 // Rebuilds a ring or bitwise op whose value hull needs fewer bits than its
 // carrier at the hull's width, with resize casts at the seams. The casts are
 // wiring; the operator is built and priced at the width the value spans. An
@@ -769,9 +795,9 @@ struct NarrowDemandedBitsPass
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<SinkTruncThroughOp, DropRedundantMask, NarrowFromHull,
-                 NarrowIterArgs, MaskToTrunc, FoldCastThroughIndex,
-                 FoldTruncOfIndexCast>(ctx);
+    patterns.add<SinkTruncThroughOp, DropRedundantMask, DropRedundantOr,
+                 NarrowFromHull, NarrowIterArgs, MaskToTrunc,
+                 FoldCastThroughIndex, FoldTruncOfIndexCast>(ctx);
     // The cast folds are what make the rewrite chain: without them a sunk
     // truncation stops on top of an extend instead of collapsing into it.
     arith::TruncIOp::getCanonicalizationPatterns(patterns, ctx);

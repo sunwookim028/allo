@@ -681,7 +681,8 @@ def NarrowDemandedBitsPass
     the algebra). Writing a bit field splices with such a mask on every field
     after the first. A load-bearing mask stays: one overwriting a mid-word
     field stays an AND, and a low mask, being a zero-extended truncation,
-    becomes resize casts, which are wiring.
+    becomes resize casts, which are wiring. The dual holds for OR: `x | y` drops
+    to one operand when the other sets only bits it already holds.
 
     Values are narrowed forward as well. An interval walk over constants,
     constant loop bounds and the monotone arith transfers bounds each value,
