@@ -16,8 +16,11 @@ class PrepassOptions:
     Args:
         float_reassoc: rebalance float reduction chains into logarithmic trees.
             Not bit-exact.
-        accumulators: rotate float reductions across this many accumulators,
-            dropping their II to ``ceil(latency / accumulators)`` (0 = off).
+        accumulators: rotate float reductions across accumulators to drop their
+            II to ``ceil(latency / accumulators)``. ``0`` is off, a positive
+            value forces that count, and ``-1`` is auto: each reduction rotates
+            on as many accumulators as its operator's latency at the target
+            clock, the least count that reaches II=1.
         unroll_under_pipeline: fully unroll the loops nested inside a pipelined
             loop, so the nest pipelines at one II. ``False`` keeps them rolled and
             leaves the directive unhonored.
@@ -29,7 +32,7 @@ class PrepassOptions:
     """
 
     float_reassoc: bool = True
-    accumulators: int = 0
+    accumulators: int = -1
     unroll_under_pipeline: bool = True
     perfectize: bool = False
     scalarize_threshold: int = 16

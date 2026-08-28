@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "allo/Scheduling/OperatorLibrary.h" // lookup, latency at a period
 #include "allo/Support/Logging.h"
 #include "allo/Transforms/Passes.h"
 #include "allo/Transforms/ReductionUtils.h"
@@ -152,30 +153,60 @@ void rotate(LoopReductions red, unsigned n) {
   loop.erase();
 }
 
+// The auto count for one loop: the largest reduction-operator latency at the
+// selection period, so RecII = ceil(L/N) reaches 1 for every step.
+unsigned autoAccumulators(const OperatorLibrary &lib,
+                          const LoopReductions &red) {
+  unsigned n = 0;
+  for (const ReductionStep &step : red.steps)
+    if (step)
+      n = std::max(n, lib.lookup(step.core).timing.latency);
+  return n;
+}
+
 struct RotateReductionsPass
     : public allo::impl::RotateReductionsPassBase<RotateReductionsPass> {
   using RotateReductionsPassBase::RotateReductionsPassBase;
 
   void runOnOperation() override {
-    if (accumulators < 2)
-      return;
-    SmallVector<LoopReductions> targets;
+    if (accumulators == 0)
+      return; // off
+    assert(accumulators >= -1 &&
+           "accumulators is -1 (auto), 0 (off), or a forced count");
+    // Auto reads each operator's latency at the period; the library ranks its
+    // rows against that period exactly as the scheduler will.
+    std::optional<OperatorLibrary> lib;
+    if (accumulators < 0) {
+      assert(periodNs > 0.0 && "auto accumulators needs the target period");
+      lib = OperatorLibrary::fromModule(
+          getOperation()->getParentOfType<ModuleOp>());
+      lib->setSelectionPeriod((float)periodNs);
+    }
+    SmallVector<std::pair<LoopReductions, unsigned>> targets;
     getOperation().walk([&](affine::AffineForOp loop) {
       std::optional<LoopReductions> red = matchReductions(loop);
       if (!red)
         return;
-      // Skip loops too short to fill the rotated pipeline.
+      unsigned n = accumulators > 0 ? (unsigned)accumulators
+                                    : autoAccumulators(*lib, *red);
+      if (n < 2)
+        return; // a single accumulator rotates nothing
+      // Rotate only a trip known to reach N: a runtime trip below N drains the
+      // shift register wrong, so an unknown trip is skipped and a known-short
+      // one warns.
       std::optional<uint64_t> trip = affine::getConstantTripCount(loop);
-      if (trip && *trip < accumulators) {
+      if (!trip)
+        return;
+      if (*trip < n) {
         warn(Stage::Prep, loop)
             << "Reduction not rotated because its trip count " << *trip
-            << " is below the requested " << accumulators << " accumulators";
+            << " is below the " << n << " accumulators it would take";
         return;
       }
-      targets.push_back(*red);
+      targets.push_back({*red, n});
     });
-    for (LoopReductions &red : targets)
-      rotate(red, accumulators);
+    for (auto &[red, n] : targets)
+      rotate(red, n);
   }
 };
 

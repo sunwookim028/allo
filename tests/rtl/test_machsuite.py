@@ -709,8 +709,8 @@ def test_grid_parallel():
     """`allo.grid` lowers to a nested affine.for band that the whole scheduling
     pipeline handles: constant trips give a static latency, and a real
     reduction recurrence still closes despite the grid's nodep hint. gemm's
-    k-reduction into C[i, j] is raised to an iter_arg and drives correctly end to
-    end. The grid stencils live in test_loop_control.py, which cosims them at
+    k-reduction into C[i, j] is raised to an iter_arg, rotated to II=1, and
+    drives correctly end to end. The grid stencils live in test_loop_control.py, which cosims them at
     non-power-of-two extents that exercise the div/mod delinearisation this
     file's shapes miss."""
     P = 8
@@ -726,7 +726,7 @@ def test_grid_parallel():
     rtl = _to_rtl(gemm)
     res = rtl.schedule()
     assert res.func("gemm").latency is not None
-    assert res.func("gemm").cyclic()[-1].interval == FADD
+    assert res.func("gemm").cyclic()[-1].interval == 1
 
     rng = np.random.default_rng(0)
     A = (rng.random((P, P), dtype=np.float32) - np.float32(0.5)).astype(np.float32)

@@ -59,7 +59,10 @@ def run_schedule(
         "reassociate-reductions{float-reassoc="
         f"{'true' if prepass.float_reassoc else 'false'}}}"
     )
-    rotate = f"rotate-reductions{{accumulators={int(prepass.accumulators)}}}"
+    rotate = (
+        f"rotate-reductions{{accumulators={int(prepass.accumulators)} "
+        f"period-ns={model_ns}}}"
+    )
     loops = (
         "loop-canonicalization{"
         f"unroll-under-pipeline={'true' if prepass.unroll_under_pipeline else 'false'} "

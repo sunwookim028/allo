@@ -47,8 +47,9 @@ def _f32(seed, *shape):
 
 
 def test_matmul_reductions():
-    """Matmul stages accumulate into memory (II = read + add + write); the
-    elementwise and writeback stages carry no recurrence and pipeline at II=1."""
+    """Matmul stages carry a float accumulation, rotated across accumulators to
+    II=1 by default; the elementwise and writeback stages carry no recurrence and
+    also pipeline at II=1."""
     P, R, Q, S, alpha, beta = 4, 5, 6, 3, 0.1, 0.5
 
     # gemm = matmul then a scaled elementwise add.
@@ -73,7 +74,7 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(gemm)
     res = rtl.schedule()
-    assert res.func("gemm_mm").cyclic()[0].interval == FADD
+    assert res.func("gemm_mm").cyclic()[0].interval == 1
     assert res.func("gemm_add").cyclic()[0].interval == 1
 
     A, B, C = _f32(0, P, Q), _f32(1, Q, R), _f32(2, P, R)
@@ -116,8 +117,8 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(two_mm)
     res = rtl.schedule()
-    assert res.func("tmm_ab").cyclic()[0].interval == FADD
-    assert res.func("tmm_abc").cyclic()[0].interval == FADD
+    assert res.func("tmm_ab").cyclic()[0].interval == 1
+    assert res.func("tmm_abc").cyclic()[0].interval == 1
     assert res.func("tmm_add").cyclic()[0].interval == 1
 
     A, B, C, D = _f32(0, P, Q), _f32(1, Q, R), _f32(2, R, S), _f32(3, P, S)
@@ -143,7 +144,7 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(doitgen)
     iis = _iis(rtl.schedule().cyclic())
-    assert FADD in iis  # the inner accumulation
+    assert 1 in iis  # the inner accumulation, rotated to II=1
     assert 1 in iis  # the writeback copy
 
     A, x = _f32(0, DR, DQ, DP), _f32(1, DP, DP)
@@ -191,8 +192,8 @@ def test_matmul_reductions():
 
     rtl = _to_rtl(three_mm)
     res = rtl.schedule()
-    assert res.func("mm1").cyclic()[0].interval == FADD
-    assert res.func("mm3").cyclic()[0].interval == FADD
+    assert res.func("mm1").cyclic()[0].interval == 1
+    assert res.func("mm3").cyclic()[0].interval == 1
 
     A, B, C, D = _f32(0, P3, Q3), _f32(1, Q3, R3), _f32(2, R3, S3), _f32(3, S3, T3)
     out = np.zeros((P3, T3), np.float32)
@@ -230,7 +231,7 @@ def test_reduction_ii_follows_accumulator_location():
         stageS(A, r, s)
         stageQ(A_copy, p, q)
 
-    rtl = _to_rtl(bicg)
+    rtl = _to_rtl(bicg).set_scheduler_opt(accumulators=0)
     res = rtl.schedule()
     assert res.func("stageS").cyclic()[0].interval == 1
     assert res.func("stageQ").cyclic()[0].interval == FADD
@@ -263,7 +264,7 @@ def test_reduction_ii_follows_accumulator_location():
         atax_m(A, x, out_Ax)
         atax_n(A, out_Ax, y)
 
-    rtl = _to_rtl(atax)
+    rtl = _to_rtl(atax).set_scheduler_opt(accumulators=0)
     res = rtl.schedule()
     assert res.func("atax_m").cyclic()[0].interval == FADD
     assert res.func("atax_n").cyclic()[0].interval == FADD
@@ -310,7 +311,7 @@ def test_reduction_ii_follows_accumulator_location():
         stageA(x1, x1_out, A, y1)
         stageB(x2, x2_out, A_copy, y2)
 
-    rtl = _to_rtl(mvt)
+    rtl = _to_rtl(mvt).set_scheduler_opt(accumulators=0)
     sa = rtl.schedule().func("stageA")
     assert sa.cyclic()[0].interval == FADD  # register-carried reduction recurrence
     assert len([r for r in sa.regions if r.kind == "acyclic"]) >= 2  # prologue+epilogue
@@ -542,7 +543,7 @@ def test_multi_region_single_func():
             for j in range(N):
                 w[i] = w[i] + alpha * A[i, j] * x[j]
 
-    rtl = _to_rtl(gemver)
+    rtl = _to_rtl(gemver).set_scheduler_opt(accumulators=0)
     iis = set(_iis(rtl.schedule().cyclic()))
     assert 1 in iis and any(v > 1 for v in iis)
 
@@ -592,7 +593,7 @@ def test_multi_region_single_func():
         compute_tmp(y_init, y_fifo, A, B, x, tmp)
         compute_y(y_fifo, y, tmp)
 
-    rtl = _to_rtl(gesummv).set_scheduler_opt(scalarize_threshold=0)
+    rtl = _to_rtl(gesummv).set_scheduler_opt(scalarize_threshold=0, accumulators=0)
     res = rtl.schedule()
     assert FADD in _iis(res.func("compute_tmp").cyclic())
     assert res.func("compute_y").cyclic()[0].interval == 1
@@ -795,7 +796,7 @@ def test_correlation_folded_bound():
     """correlation's `if j > i` is affine in the IV, so it folds into the `j`
     loop's lower bound -- an affine.for whose lb is symbolic (`i + 1`). The dead
     iterations are skipped, not predicated, so no `affine.if` survives and the
-    inner reduction pipelines at the fadd II. The counter runs `[i+1, CM)`, a
+    inner reduction rotates to II=1. The counter runs `[i+1, CM)`, a
     variable-trip container per outer i."""
     CN, CM = 8, 5
 
@@ -814,7 +815,7 @@ def test_correlation_folded_bound():
 
     rtl = _to_rtl(compute_corr)
     assert not Dcp(rtl).has("affine.if")  # folded into the bound, not predicated
-    assert _iis(rtl.schedule().func("compute_corr").cyclic()) == [FADD]
+    assert _iis(rtl.schedule().func("compute_corr").cyclic()) == [1]
 
     data = _f32(0, CN, CM)
     corr = np.zeros((CM, CM), np.float32)
@@ -1207,8 +1208,8 @@ def test_triangular_solve():
 
 
 def test_covariance_reduction():
-    """covariance is two nested reductions with a scalar accumulator (II = the add
-    latency): a column-mean pass then the centered outer product; the trips are all
+    """covariance is two nested reductions with a scalar accumulator (rotated to
+    II=1): a column-mean pass then the centered outer product; the trips are all
     constant, so the latency resolves."""
     N, M = 6, 5
 
@@ -1229,7 +1230,9 @@ def test_covariance_reduction():
     rtl = _to_rtl(covariance)
     res = rtl.schedule()
     assert res.func("covariance").latency is not None  # constant trips
-    assert set(_iis(res.func("covariance").cyclic())) == {FADD}  # scalar reductions
+    assert set(_iis(res.func("covariance").cyclic())) == {
+        1
+    }  # scalar reductions, rotated to II=1
 
     data = _f32(0, N, M)
     mean = np.zeros(M, np.float32)

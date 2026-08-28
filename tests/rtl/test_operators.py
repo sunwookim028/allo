@@ -1741,6 +1741,35 @@ def test_rotate_reduction_scales_ii():
     assert mixed_ii(FADD) == 1
 
 
+# `accumulators=-1` is auto: the pass reads the reduction operator's latency L
+# at the target clock and rotates on exactly L accumulators, the least count
+# that brings II to 1. A fixed count cannot track L, which deepens with the
+# clock; auto does. The unrotated II (accumulators=0) is L itself, so the auto
+# result is checked against it rather than a hard-coded latency.
+def test_rotate_reduction_auto_tracks_operator_latency():
+    @kernel
+    def red(x: f32[256]) -> f32:
+        acc: f32 = 0.0
+        for i in range(256, name="i"):
+            acc += x[i]
+        return acc
+
+    def ii(freq, n):
+        rtl = _to_rtl(red, freq_mhz=freq) if freq else _to_rtl(red)
+        return rtl.set_scheduler_opt(accumulators=n).schedule().cyclic()[0].interval
+
+    # A faster clock deepens the adder; auto reaches II=1 at every clock, and by
+    # rotating on exactly L == the unrotated II, never over-provisioning.
+    for freq in (None, 450):
+        latency = ii(freq, 0)
+        assert ii(freq, -1) == 1
+        assert ii(freq, latency) == 1  # forcing N == L also reaches 1
+        assert ii(freq, -1) == ii(freq, latency)  # auto picks exactly L
+        if latency > 2:
+            # A fixed count of 2 under-provisions the deepened adder.
+            assert ii(freq, 2) == math.ceil(latency / 2)
+
+
 # One loop carrying several independent reductions (a complex accumulate's real
 # and imaginary parts) rotates each on its own iter_arg, so every one reaches
 # II=1. Rotation reassociates the sums, so the float result holds to tolerance.

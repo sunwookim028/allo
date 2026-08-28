@@ -439,7 +439,7 @@ def test_stream_ii_gt1_with_memory_read_producer():
     # (II>1) regime, not the II==1 fast path.
     iis = [
         r.interval
-        for f in _sched(build(8)).funcs
+        for f in _to_rtl(build(8)).set_scheduler_opt(accumulators=0).schedule().funcs
         for r in f.regions
         if r.interval is not None
     ]

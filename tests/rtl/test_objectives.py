@@ -179,10 +179,10 @@ def test_wall_objective_trades_the_clock_for_iterations():
             s = s + A[i]
         out[0] = s
 
-    base = _to_rtl(acc)
+    base = _to_rtl(acc).set_scheduler_opt(accumulators=0)
     wall0 = base.schedule().func("acc").latency * (1000.0 / base.freq_mhz)
 
-    rtl = _to_rtl(acc).set_scheduler_opt(O="wall")
+    rtl = _to_rtl(acc).set_scheduler_opt(O="wall", accumulators=0)
     result = rtl.schedule()
     assert result.sweep and len(result.sweep) > 2
     assert rtl.freq_mhz < base.freq_mhz

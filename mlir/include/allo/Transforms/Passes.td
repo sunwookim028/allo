@@ -592,14 +592,26 @@ def RotateReductionsPass
     each rotate on their own; plain carried values are left alone. `add`/`mul`
     reductions rotate for both float (reassociation is inexact) and integer
     (exact) accumulators. Only leaf loops are rotated: the shift register is
-    realized on a childless modulo loop, so a container reduction stays put. The
-    accumulator count `N` is opt-in via `accumulators` (a no-op below 2). Composes
-    after reassociate-reductions, which first folds an unrolled reduction chain
-    into a single carried operator.
+    realized on a childless modulo loop, so a container reduction stays put.
+    Composes after reassociate-reductions, which first folds an unrolled
+    reduction chain into a single carried operator.
+
+    `accumulators` sets the count N: 0 is off, a positive value forces that N on
+    every rotatable reduction, and -1 is auto. Auto reads each reduction
+    operator's latency L at `period-ns` from the same operator library the
+    scheduler uses, and rotates on N = L, the least count that brings
+    `RecII = ceil(L / N)` to 1 without surplus accumulators. A count below 2
+    (a forced 1, or an operator already single-cycle at the period) leaves the
+    loop alone, as does a trip not known to reach N: a runtime-short trip would
+    drain the accumulators wrong.
   }];
   let options = [
-    Option<"accumulators", "accumulators", "unsigned", "0",
-           "Number of rotated accumulators N (>= operator latency for II=1).">
+    Option<"accumulators", "accumulators", "int", "0",
+           "Rotated accumulator count: 0 off, a positive value forces N, -1 "
+           "auto (N = the reduction operator's latency at period-ns).">,
+    Option<"periodNs", "period-ns", "double", "0.0",
+           "Clock period auto mode reads the reduction operator's latency at; "
+           "unused unless accumulators is -1.">
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect", "mlir::arith::ArithDialect"

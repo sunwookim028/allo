@@ -359,7 +359,7 @@ def test_internal_signal_names():
                 acc += A[i, j] * x[j]
             out[i] = acc
 
-    v = _to_rtl(gv).verilog
+    v = _to_rtl(gv).set_scheduler_opt(accumulators=0).verilog
     # Both loop counters, including the outer (container) one. The declared
     # width is whatever each loop's own range needs, so this asks for the NAME
     # and leaves the width to the test that measures it.

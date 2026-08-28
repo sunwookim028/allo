@@ -933,7 +933,9 @@ def test_data_dependent_guard_closes_into_select_and_gates_its_store():
 
     mod = _to_rtl(cond_reduce)
     res = mod.schedule()
-    assert _iis(res.func("cond_reduce").cyclic()) == [FADD]  # guarded reduction
+    assert _iis(res.func("cond_reduce").cyclic()) == [
+        1
+    ]  # guarded reduction, rotated to II=1
     guard = next(r for r in res.funcs[0].regions if r.kind == "guard")
     assert guard.conditional and guard.container
 
@@ -973,7 +975,7 @@ def test_affine_two_constraint_guard_closes_into_select():
     assert Dcp(mod).func("agf").attrs("allo.dcp.compute", "predicate").count(5) >= 2
     guard = next(r for r in res.funcs[0].regions if r.kind == "guard")
     assert guard.conditional and guard.container
-    assert _iis(res.cyclic()) == [FADD]  # `out[i] +=` raised to a register recurrence
+    assert _iis(res.cyclic()) == [1]  # `out[i] +=` raised, then rotated to II=1
 
     x = np.arange(N, dtype=np.float32) * 0.1 + 1.0
     out = np.zeros(N, np.float32)
@@ -1006,8 +1008,8 @@ def test_guard_gates_only_its_own_store_not_a_sibling():
 
     mod = _to_rtl(imp)
     res = mod.schedule()
-    # Scalar-carried reduction inside the guard -> register recurrence (II=FADD).
-    assert _iis(res.cyclic()) == [FADD]
+    # Scalar-carried reduction inside the guard, rotated to II=1.
+    assert _iis(res.cyclic()) == [1]
     assert any(r.kind == "guard" for r in res.funcs[0].regions)
 
     A = (np.arange(N * M, dtype=np.float32) * 0.05).reshape(N, M)
