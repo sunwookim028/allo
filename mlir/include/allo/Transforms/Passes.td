@@ -566,6 +566,11 @@ def ReassociateReductionsPass
     and address arithmetic untouched. Floating-point reassociation is not
     bit-exact, so a bare float step is rebalanced only under the
     `float-reassoc` option, mirroring Vitis's fp-relaxed.
+
+    `float-reassoc` also strength-reduces a float division by a constant into a
+    multiply by its reciprocal, another fp-relaxed rewrite: it removes a divider
+    IP, which is many cycles and, on a stencil's carried path, the dominant
+    recurrence term.
   }];
   let options = [
     Option<"floatReassoc", "float-reassoc", "bool", "false",

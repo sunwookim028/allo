@@ -7,9 +7,12 @@
 #include "allo/Transforms/Passes.h"
 #include "allo/Transforms/ReductionUtils.h"
 
+#include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
+#include "mlir/Dialect/Affine/Analysis/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Matchers.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MathExtras.h"
@@ -40,6 +43,41 @@ struct ReductionChain {
   SmallVector<Value> leaves;        // the operands the chain folds together
 };
 
+// The affine.store the chain result reaches, following single-use forwarding
+// ops (a reciprocal multiply, a cast). Null if the result fans out or is not
+// stored.
+affine::AffineStoreOp closingStore(Value chainResult) {
+  Value v = chainResult;
+  while (v.hasOneUse()) {
+    Operation *u = *v.user_begin();
+    if (auto st = dyn_cast<affine::AffineStoreOp>(u))
+      return st.getValueToStore() == v ? st : affine::AffineStoreOp();
+    if (u->getNumResults() != 1)
+      return {};
+    v = u->getResult(0);
+  }
+  return {};
+}
+
+// A leaf load that reads, from an earlier iteration, what `store` writes: the
+// reduction's memory-carried recurrence tap (a stencil's `A[i, j-1]`), folded
+// in at the tree root to keep that recurrence one operator deep.
+bool isCarriedTap(Value leaf, affine::AffineStoreOp store) {
+  auto load = leaf.getDefiningOp<affine::AffineLoadOp>();
+  if (!load || load.getMemRef() != store.getMemRef())
+    return false;
+  unsigned depth = affine::getInnermostCommonLoopDepth(
+      {load.getOperation(), store.getOperation()});
+  affine::MemRefAccess src(store), dst(load);
+  SmallVector<affine::DependenceComponent, 2> comps;
+  return depth &&
+         affine::checkMemrefAccessDependence(src, dst, depth,
+                                             /*dependenceConstraints=*/nullptr,
+                                             &comps)
+                 .value == affine::DependenceResult::HasDependence &&
+         !comps.empty() && comps.back().lb.value_or(0) > 0;
+}
+
 // Flatten the maximal chain of `proto`'s operator: absorb any single-use step
 // of the same operator/idiom, collecting every non-chain operand (peeled
 // through the idiom's extends) as a leaf. Absorbed steps are recorded so their
@@ -67,12 +105,41 @@ void eraseStep(RewriterBase &b, const ReductionStep &s) {
       b.eraseOp(op);
 }
 
+// A float division by a finite non-zero constant becomes a multiply by its
+// reciprocal, trading a divider IP for a multiply. Inexact, so it rides the
+// same `float-reassoc` fast-math gate as the reassociation.
+void reciprocalizeConstDivs(func::FuncOp fn) {
+  SmallVector<arith::DivFOp> divs;
+  fn.walk([&](arith::DivFOp op) {
+    APFloat c(0.0);
+    if (matchPattern(op.getRhs(), m_ConstantFloat(&c)) && c.isFiniteNonZero())
+      divs.push_back(op);
+  });
+  OpBuilder b(fn.getContext());
+  for (arith::DivFOp op : divs) {
+    APFloat c(0.0);
+    matchPattern(op.getRhs(), m_ConstantFloat(&c));
+    APFloat recip(c.getSemantics(), 1);
+    recip.divide(c, APFloat::rmNearestTiesToEven);
+    b.setInsertionPoint(op);
+    Value k = arith::ConstantOp::create(b, op.getLoc(),
+                                        b.getFloatAttr(op.getType(), recip));
+    auto mul = arith::MulFOp::create(b, op.getLoc(), op.getLhs(), k);
+    mul->setAttrs(op->getAttrs());
+    op.getResult().replaceAllUsesWith(mul.getResult());
+    op.erase();
+  }
+}
+
 struct ReassociateReductionsPass
     : public allo::impl::ReassociateReductionsPassBase<
           ReassociateReductionsPass> {
   using ReassociateReductionsPassBase::ReassociateReductionsPassBase;
 
   void runOnOperation() override {
+    if (floatReassoc)
+      reciprocalizeConstDivs(getOperation());
+
     // Process tails first (reverse program order) so each chain is rebalanced
     // from its outermost step inward and its absorbed links are skipped. Only
     // the integer widening idiom is exactly associative; float needs opt-in.
@@ -100,10 +167,15 @@ struct ReassociateReductionsPass
         continue;
 
       // A loop-carried accumulator is folded in last so its recurrence spans
-      // one operator; the remaining leaves form a balanced tree.
+      // one operator; the remaining leaves form a balanced tree. A memory-
+      // carried stencil tap (a load reading an earlier iteration's store) plays
+      // the same role, so it is folded in last too.
+      affine::AffineStoreOp store = closingStore(op->getResult(0));
       SmallVector<Value> carried, rest;
       for (Value leaf : chain.leaves)
-        (isLoopCarried(leaf) ? carried : rest).push_back(leaf);
+        (isLoopCarried(leaf) || (store && isCarriedTap(leaf, store)) ? carried
+                                                                     : rest)
+            .push_back(leaf);
 
       // A bare integer chain carries no cast marking it as a reduction, so a
       // loop-carried accumulator is its key. Without one it is ordinary
