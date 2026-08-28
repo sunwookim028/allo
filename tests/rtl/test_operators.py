@@ -3240,7 +3240,10 @@ def test_a_variable_index_division_binds_the_typed_divider():
         for iface in rtl.interfaces.values()
         for op in iface.operators
     }
-    assert {"divui", "remui"} <= kinds or {"divsi", "remsi"} <= kinds
+    # The div and rem share one divider: the remainder fuses to `k - (k // n)*n`,
+    # so a divider binds but no separate remainder core does.
+    assert "divui" in kinds or "divsi" in kinds
+    assert "remui" not in kinds and "remsi" not in kinds
     out = np.zeros(64, np.int32)
     rtl.cosim(np.int32(7), out)
     k = np.arange(64)
@@ -3251,7 +3254,8 @@ def test_a_variable_index_division_binds_the_typed_divider():
 # (i16 with u16 gives i17), so the comparison and the division follow the
 # operand values rather than C's unsigned-domain reinterpretation. The i17
 # division that promotion mints has no divider row; it widens to the i32 row
-# instead of derating the clock as a combinational divider.
+# instead of derating the clock as a combinational divider. The paired remainder
+# fuses to the shared quotient, so it binds no divider of its own.
 def test_a_mixed_sign_pair_computes_values_not_bit_patterns():
     @kernel
     def mixed(a: i16[16], b: u16[16], lt: i32[16], q: i32[16], r: i32[16]):
@@ -3265,7 +3269,7 @@ def test_a_mixed_sign_pair_computes_values_not_bit_patterns():
     assert sched.cycle_ns == pytest.approx(PERIOD_NS)
     impls = _impls(sched)
     assert any(m.startswith("divsi_i32") for m in impls)
-    assert any(m.startswith("remsi_i32") for m in impls)
+    assert not any(m.startswith("remsi") for m in impls)  # fused into the div
     rtl.compile()
     av = np.arange(-8, 8, dtype=np.int64)
     bv = np.array([3, 40000, 7, 65535, 5, 50000, 3, 40000] * 2, dtype=np.int64)
@@ -3278,6 +3282,53 @@ def test_a_mixed_sign_pair_computes_values_not_bit_patterns():
     assert np.array_equal(lt_out, (av < bv).astype(np.int32))
     assert np.array_equal(q_out, q_g)
     assert np.array_equal(r_out, av - q_g * bv)
+
+
+# A div and rem of the same variable divisor share one divider: the remainder
+# rewrites to `x - (x // y) * y`, reusing the quotient as a multiply and a
+# subtract. A remainder with no paired division keeps its own divider.
+def test_a_div_rem_pair_shares_one_divider():
+    N = 16
+    rng = np.random.default_rng(2)
+    A = rng.integers(-1000, 1000, size=N, dtype=np.int32)
+    d = np.int32(7)
+
+    @kernel
+    def pair(A: i32[N], d: i32, Q: i32[N], R: i32[N]):
+        for i in range(N):
+            idx: i32 = A[i] * 3 + 1
+            Q[i] = idx // d
+            R[i] = idx % d
+
+    kinds = _op_kinds(pair)
+    assert kinds["divsi"] == 1 and kinds["remsi"] == 0  # one shared divider
+    assert kinds["muli"] >= 1  # the reused quotient times the divisor
+    Q = np.zeros(N, np.int32)
+    R = np.zeros(N, np.int32)
+    _to_rtl(pair).cosim(A, d, Q, R)
+    idx = A * 3 + 1
+    q = np.trunc(idx.astype(np.float64) / d).astype(np.int32)  # truncated
+    assert np.array_equal(Q, q) and np.array_equal(R, idx - q * d)
+
+    # The remainder written before the quotient still fuses: the div hoists.
+    @kernel
+    def rev(A: i32[N], d: i32, Q: i32[N], R: i32[N]):
+        for i in range(N):
+            idx: i32 = A[i] * 3 + 1
+            R[i] = idx % d
+            Q[i] = idx // d
+
+    rk = _op_kinds(rev)
+    assert rk["divsi"] == 1 and rk["remsi"] == 0
+
+    # A remainder with no paired division keeps its own divider.
+    @kernel
+    def rem_only(A: i32[N], d: i32, R: i32[N]):
+        for i in range(N):
+            idx: i32 = A[i] * 3 + 1
+            R[i] = idx % d
+
+    assert _op_kinds(rem_only)["remsi"] == 1
 
 
 # The map is ONE operator: a division cone past the clock period has no seam a

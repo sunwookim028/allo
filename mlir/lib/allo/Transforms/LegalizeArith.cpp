@@ -1017,6 +1017,41 @@ struct FuseMulAdd : OpRewritePattern<arith::AddIOp> {
   }
 };
 
+// `x % y` is `x - (x / y) * y`, so a rem paired with a div of the same variable
+// divisor reuses the quotient as a multiply and a subtract, and the pair shares
+// the one divider core it would otherwise build twice. A constant divisor is
+// left to the reciprocal patterns, whose product is already shared.
+template <typename RemOp, typename DivOp>
+struct FuseDivRem : OpRewritePattern<RemOp> {
+  using OpRewritePattern<RemOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(RemOp rem,
+                                PatternRewriter &rewriter) const override {
+    Value x = rem.getLhs(), y = rem.getRhs();
+    if (y.template getDefiningOp<arith::ConstantOp>())
+      return failure(); // a constant divisor goes to the reciprocal patterns
+    DivOp div;
+    for (Operation *user : x.getUsers())
+      if (auto d = dyn_cast<DivOp>(user); d &&
+                                          d->getBlock() == rem->getBlock() &&
+                                          d.getLhs() == x && d.getRhs() == y) {
+        div = d;
+        break;
+      }
+    if (!div)
+      return failure();
+    // The quotient must precede the rem; the div's operands are the rem's, so
+    // they dominate the new position and moving it up is legal.
+    if (!div->isBeforeInBlock(rem))
+      rewriter.moveOpBefore(div, rem);
+    rewriter.setInsertionPoint(rem);
+    Value prod =
+        arith::MulIOp::create(rewriter, rem.getLoc(), div.getResult(), y)
+            .getResult();
+    rewriter.replaceOpWithNewOp<arith::SubIOp>(rem, x, prod);
+    return success();
+  }
+};
+
 // The RTL-path, device-IP-aware replacement for `arith-expand`. A composite
 // arith op the device can realize directly (a matching `dcp.operator`) is KEPT,
 // so the scheduler binds it to that IP; every other one is EXPANDED into
@@ -1047,13 +1082,16 @@ struct LegalizeArithPass
 
     // Fusion runs after the folds settle, never beside them: a multiply whose
     // factor is still a foldable table read would fuse onto a DSP core where
-    // the fold plus NAF recoding build cheaper constant shift-adds.
-    if (expandConstArith) {
-      RewritePatternSet fuse(&getContext());
+    // the fold plus NAF recoding build cheaper constant shift-adds. Sharing a
+    // divider between a matched div and rem runs here too, before either binds
+    // a core, and independent of the const-arith flag.
+    RewritePatternSet fuse(&getContext());
+    fuse.add<FuseDivRem<arith::RemSIOp, arith::DivSIOp>,
+             FuseDivRem<arith::RemUIOp, arith::DivUIOp>>(&getContext());
+    if (expandConstArith)
       fuse.add<FuseMulAdd>(&getContext(), lib, areaFuseGate);
-      if (failed(applyPatternsGreedily(module, std::move(fuse))))
-        return signalPassFailure();
-    }
+    if (failed(applyPatternsGreedily(module, std::move(fuse))))
+      return signalPassFailure();
 
     // Reuse the upstream expansion patterns
     RewritePatternSet patterns(&getContext());

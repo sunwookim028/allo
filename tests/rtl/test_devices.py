@@ -228,11 +228,13 @@ def test_generate_builds_the_fabric_multiply_out_of_luts():
 def test_generate_wraps_integer_cores():
     # `t` has two consumers, so it keeps the plain multiplier core; the
     # single-use `x * z` over a ready addend fuses and builds the `rtl` shim.
+    # The div and rem read different operands, so they stay separate cores (a
+    # matched pair would share one divider) and each shim slices its own half.
     @kernel
     def ik(x: i32, z: i32) -> i32:
         t: i32 = x * x
         u: i32 = x * z + z
-        return (t + x // z) + (u + x % z) + t
+        return (t + x // z) + (u + z % x) + t
 
     rtl, g = _generate(ik)
     assert g.missing == ()
