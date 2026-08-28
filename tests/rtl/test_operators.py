@@ -1968,6 +1968,106 @@ def test_narrow_demanded_bits_wraps_exactly():
     assert int(r.result) == wrapped
 
 
+def _run_narrow(ir: str) -> str:
+    """Parse hand-written IR and run `narrow-demanded-bits` over it alone."""
+    from allo._mlir.ir import Module
+    from allo.backend.base import run_pipeline
+    from allo.backend.rtl.device import _scratch_context
+
+    with _scratch_context():
+        module = Module.parse(ir)
+        run_pipeline(module, "builtin.module(func.func(narrow-demanded-bits))")
+        return str(module)
+
+
+# The backward truncation sink crosses bitwise operators and a constant-amount
+# left shift, not just the ring ops: a whole `(a & M) | (b ^ c) + (d << 2)` cone
+# rebuilds at the i8 its consumer reads, and the truncation is gone.
+def test_narrow_trunc_crosses_bitwise_and_shift():
+    after = _run_narrow(
+        """
+        func.func @cone(%a: i32, %b: i32, %c: i32, %d: i32) -> i8 {
+          %m = arith.constant 255 : i32
+          %k = arith.constant 2 : i32
+          %0 = arith.andi %a, %m : i32
+          %1 = arith.xori %b, %c : i32
+          %2 = arith.ori %0, %1 : i32
+          %3 = arith.shli %d, %k : i32
+          %4 = arith.addi %2, %3 : i32
+          %5 = arith.trunci %4 : i32 to i8
+          return %5 : i8
+        }
+        """
+    )
+    # The whole cone was rebuilt at i8: every arithmetic op landed narrow, and
+    # the truncation reached the leaves, where it only truncates the block args.
+    narrowed = [
+        line
+        for line in after.splitlines()
+        if any(
+            op in line for op in ("arith.ori", "arith.xori", "arith.shli", "arith.addi")
+        )
+    ]
+    assert narrowed
+    assert all(": i8" in line for line in narrowed), after
+    for line in after.splitlines():
+        if "arith.trunci" in line:
+            assert ": i32 to i8" in line and "%arg" in line, line
+
+
+# A right shift sinks through a truncation only when the operand's high bits are
+# known: masked to the low byte, `shrui` narrows to i8; with unknown high bits it
+# must stay wide and the truncation remains.
+def test_narrow_trunc_shift_guard():
+    guarded = _run_narrow(
+        """
+        func.func @g(%a: i32) -> i8 {
+          %m = arith.constant 255 : i32
+          %one = arith.constant 1 : i32
+          %0 = arith.andi %a, %m : i32
+          %1 = arith.shrui %0, %one : i32
+          %2 = arith.trunci %1 : i32 to i8
+          return %2 : i8
+        }
+        """
+    )
+    assert re.search(r"arith\.shrui[^\n]*: i8", guarded)
+    assert not re.search(r"arith\.shrui[^\n]*: i32", guarded)
+
+    unguarded = _run_narrow(
+        """
+        func.func @u(%a: i32) -> i8 {
+          %one = arith.constant 1 : i32
+          %0 = arith.shrui %a, %one : i32
+          %1 = arith.trunci %0 : i32 to i8
+          return %1 : i8
+        }
+        """
+    )
+    assert re.search(r"arith\.shrui[^\n]*: i32", unguarded)
+    assert "arith.trunci" in unguarded
+
+
+# The narrowed bitwise + shift cone is bit-exact: computing
+# `(a & 0xFF) | ((b ^ c) << 1)` at i8 wraps identically to computing it wide and
+# truncating.
+def test_narrow_trunc_bitwise_cosim():
+    @kernel
+    def cone(A: i32[16], B: i32[16], C: i32[16], out: i8[16]):
+        for i in range(16):
+            out[i] = (A[i] & 255) | ((B[i] ^ C[i]) << 1)
+
+    rng = np.random.default_rng(5)
+    A = rng.integers(-(2**31), 2**31, 16).astype(np.int32)
+    B = rng.integers(-(2**31), 2**31, 16).astype(np.int32)
+    C = rng.integers(-(2**31), 2**31, 16).astype(np.int32)
+    out = np.zeros(16, np.int8)
+    _to_rtl(cone).cosim(A.copy(), B.copy(), C.copy(), out)
+    wide = (A.astype(np.int64) & 255) | ((B.astype(np.int64) ^ C.astype(np.int64)) << 1)
+    ref = (wide & 0xFF).astype(np.uint8).astype(np.int8)
+    assert np.array_equal(out, ref)
+
+
 # A loop-carried integer scalar is built at its recurrence envelope, not at its
 # declared carrier: a counter stepping by 2 over 50 trips stays within [0, 100]
 # and an argmax-style position within the IV's range. A data-stepped

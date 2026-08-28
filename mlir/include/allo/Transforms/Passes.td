@@ -651,17 +651,21 @@ def NarrowDemandedBitsPass
     discards 16 bits.
 
     This pass propagates that truncation back up the expression. For the
-    two's-complement ring operators (`addi`, `subi`, `muli`) the low `w` bits of
-    the result are a function of the low `w` bits of the operands alone, so
+    two's-complement ring operators (`addi`, `subi`, `muli`) and the bitwise
+    operators (`andi`, `ori`, `xori`) the low `w` bits of the result are a
+    function of the low `w` bits of the operands alone, so
 
         trunc_w(a `op` b) == trunc_w(a) `op` trunc_w(b)
 
-    exactly, for signed and unsigned alike. Sinking the truncation lands it on
-    the leaves, where it meets the extends bit growth introduced and folds away,
-    which exposes the next operator up to the same rewrite. Division, remainder,
-    right shift and comparison read the high bits, so the demand stops at them
-    and their operands keep the natural width. A wide operator with more than
-    one use keeps its width, since the wide value stays live.
+    exactly, for signed and unsigned alike. A constant-amount shift sinks too: a
+    left shift by `c < w` always, a right shift when the bits the narrow shift
+    cannot see are known clear (`shrui`) or replicated sign (`shrsi`). Sinking
+    the truncation lands it on the leaves, where it meets the extends bit growth
+    introduced and folds away, which exposes the next operator up to the same
+    rewrite. Division, remainder, comparison, min and max read the high bits, so
+    the demand stops at them and their operands keep the natural width. A wide
+    operator with more than one use keeps its width, since the wide value stays
+    live.
 
     The pass also reads the bits forward. `x & K` is dropped when every bit `K`
     clears is one the value provably never sets, which a forward walk over the

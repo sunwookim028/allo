@@ -30,10 +30,15 @@ namespace {
 
 // The two's-complement ring operators, whose low `w` result bits are a function
 // of the low `w` bits of the operands alone, which is what makes sinking a
-// truncation through them exact. Division, remainder, right shift and compare
-// read the high bits, so the demand stops at those.
+// truncation through them exact. Division, remainder and compare read the high
+// bits, so the demand stops at those.
 bool isRingOp(Operation *op) {
   return isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op);
+}
+
+// Bitwise operators are per-bit, so a truncation sinks through them too.
+bool isBitwiseOp(Operation *op) {
+  return isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp>(op);
 }
 
 //===----------------------------------------------------------------------===//
@@ -458,13 +463,38 @@ unsigned carrierWidth(Type t) {
 // Rewrites
 //===----------------------------------------------------------------------===//
 
-// trunc_w(a `op` b) -> trunc_w(a) `op` trunc_w(b), moving the truncation toward
+// A constant-amount shift sinks through a truncation to width `w`. A left shift
+// by `c < w` always does. A right shift by `c < w` does when the bits the
+// narrow shift cannot see are known: zero above `w` for a logical shift, or
+// replicated sign for an arithmetic one.
+bool shiftSinks(Operation *op, IntegerType narrow) {
+  if (!isa<arith::ShLIOp, arith::ShRUIOp, arith::ShRSIOp>(op))
+    return false;
+  APInt amt;
+  if (!matchPattern(op->getOperand(1), m_ConstantInt(&amt)))
+    return false;
+  unsigned w = narrow.getWidth();
+  if (amt.uge(w))
+    return false;
+  if (isa<arith::ShLIOp>(op))
+    return true;
+  unsigned orig = cast<IntegerType>(op->getResult(0).getType()).getWidth();
+  llvm::KnownBits kb = knownBits(op->getOperand(0));
+  if (isa<arith::ShRUIOp>(op))
+    return kb.countMinLeadingZeros() >= orig - w;
+  return orig - w <
+         std::max(kb.countMinLeadingZeros(), kb.countMinLeadingOnes());
+}
+
+// trunc_w(op(a, b)) -> op(trunc_w(a), trunc_w(b)), moving the truncation toward
 // the leaves so the operator is built at the width its consumer reads. The
 // truncations left behind meet the extends bit growth introduced and fold,
-// exposing the next operator up to the same rewrite. A select is bit-wise in
-// its two arms, so the truncation sinks into them while its condition passes
-// through; min and max read the high bits and stop the sink.
-struct SinkTruncThroughRingOp : OpRewritePattern<arith::TruncIOp> {
+// exposing the next operator up to the same rewrite. Ring and bitwise operators
+// commute with truncation; a constant-amount shift does under `shiftSinks`. A
+// select is bit-wise in its two arms, so the truncation sinks into them while
+// its condition passes through; division, remainder, compare, min and max read
+// the high bits and stop the sink.
+struct SinkTruncThroughOp : OpRewritePattern<arith::TruncIOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(arith::TruncIOp trunc,
@@ -474,7 +504,7 @@ struct SinkTruncThroughRingOp : OpRewritePattern<arith::TruncIOp> {
     // survives and this only adds truncations.
     if (!op || !op->hasOneUse())
       return failure();
-    Type narrow = trunc.getType();
+    auto narrow = cast<IntegerType>(trunc.getType());
     Location loc = op->getLoc();
     if (auto sel = dyn_cast<arith::SelectOp>(op)) {
       Value t =
@@ -485,7 +515,7 @@ struct SinkTruncThroughRingOp : OpRewritePattern<arith::TruncIOp> {
                                                    f);
       return success();
     }
-    if (!isRingOp(op))
+    if (!isRingOp(op) && !isBitwiseOp(op) && !shiftSinks(op, narrow))
       return failure();
     OperationState state(loc, op->getName());
     for (Value operand : op->getOperands())
@@ -739,7 +769,7 @@ struct NarrowDemandedBitsPass
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<SinkTruncThroughRingOp, DropRedundantMask, NarrowFromHull,
+    patterns.add<SinkTruncThroughOp, DropRedundantMask, NarrowFromHull,
                  NarrowIterArgs, MaskToTrunc, FoldCastThroughIndex,
                  FoldTruncOfIndexCast>(ctx);
     // The cast folds are what make the rewrite chain: without them a sunk
