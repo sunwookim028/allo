@@ -97,8 +97,8 @@ static LogicalResult verifyFunc(
     DenseSet<Value> &boundaryArrays, bool isTop);
 
 // Element count above which a completely-partitioned argument's
-// port-per-element boundary is worth a word. Matches `scalarize-memory`'s own
-// scatter threshold.
+// port-per-element boundary is worth a word. An interface-width warning on the
+// argument path only, independent of `scalarize-memory`'s local-array gate.
 static constexpr int64_t kScatterWarnElements = 16;
 
 // The direction \p call imposes on \p stream, from the callee parameter it is

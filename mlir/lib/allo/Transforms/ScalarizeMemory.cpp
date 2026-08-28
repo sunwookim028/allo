@@ -38,6 +38,11 @@ struct ScalarizeMemoryPass
     affine::affineScalarReplace(func, getAnalysis<DominanceInfo>(),
                                 getAnalysis<PostDominanceInfo>(), aa);
 
+    // Forwarding above always runs; max-elements 0 only disables
+    // auto-partition.
+    if (maxElements == 0)
+      return;
+
     // The arrays that SURVIVED the forwarding above. One whose every read
     // forwarded is gone entirely, and needs no storage decision at all.
     SmallVector<Operation *> survived;
@@ -75,7 +80,7 @@ struct ScalarizeMemoryPass
       if (op->hasAttr(kPartitionAttr) || op->hasAttr(kBindStorageAttr))
         continue;
       auto type = cast<MemRefType>(op->getResult(0).getType());
-      if (!type.hasStaticShape() || type.getNumElements() > maxElements)
+      if (!type.hasStaticShape())
         continue;
       // Every use a direct access, so the array's whole traffic is in view.
       // This is what excludes handing it to a sub-kernel, which masters ports
@@ -93,11 +98,12 @@ struct ScalarizeMemoryPass
         allConst &= constantSubscripts(user);
         most = std::max(most, ++perBlock[user->getBlock()]);
       }
-      // A register file pays a read mux and a write demux per variable
-      // subscript, so it is worth it only when every subscript is a constant
-      // (the accesses are wires) or one block issues more accesses than a
-      // dual-ported row serves in a cycle.
-      if (!allConst && most <= 2) // a dual-ported row serves this without a mux
+      // Every subscript constant means the array fully dissolves into wired
+      // registers with no mux, so scalarize it at any size. A variable
+      // subscript pays a read mux and a write demux, worth it only while the
+      // array is small enough to bound the mux and one block issues more
+      // accesses than a dual-ported row serves in a cycle.
+      if (!allConst && (type.getNumElements() > maxElements || most <= 2))
         continue;
 
       op->setAttr(kPartitionAttr, complete);

@@ -463,21 +463,25 @@ def ScalarizeMemoryPass
     (`alloAliasAnalysis`), which also lets it drop the overwritten stores a fully
     unrolled accumulation over a kernel argument leaves behind.
 
-    Second, for the untouched survivors, if the array is small enough (at most
-    `maxElements` elements) and a register file buys bandwidth a ported memory
-    cannot, automatically partition it with `allo.part` so it lowers to
-    registers rather than a memory whose ports and access latency bound the II.
-    That holds when every subscript is a constant (the accesses are wires), or
-    when one block issues more than two accesses, which a dual-ported row
-    cannot serve in a cycle. An array touched once or twice per iteration keeps
-    the storage the memory tables select.
+    Second, for the untouched survivors, automatically partition an array with
+    `allo.part` so it lowers to registers rather than a memory whose ports and
+    access latency bound the II. An array whose every subscript is a constant
+    fully dissolves into wired registers with no mux, so it is scalarized at any
+    size. A variable subscript instead pays a read mux and a write demux, worth
+    it only while the array is small enough (at most `maxElements` elements) to
+    bound the mux and one block issues more than two accesses, which a
+    dual-ported row cannot serve in a cycle. An array touched once or twice per
+    iteration with a variable subscript keeps the storage the memory tables
+    select. `maxElements` 0 disables auto-partition (forwarding still runs).
   }];
   let dependentDialects = [
-    "mlir::affine::AffineDialect", "mlir::memref::MemRefDialect"
+    "mlir::allo::AlloDialect", "mlir::affine::AffineDialect",
+    "mlir::memref::MemRefDialect"
   ];
   let options = [
     Option<"maxElements", "max-elements", "int64_t", "16",
-           "Partition a local array with at most this many elements">
+           "Cap on a variable-subscript array's element count; a constant-"
+           "subscript array is scalarized at any size, 0 disables both">
   ];
 }
 

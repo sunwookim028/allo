@@ -3098,6 +3098,40 @@ def test_a_rolling_small_array_keeps_ported_storage():
     assert np.array_equal(out, (A16 * 2)[A16 & 15])
 
 
+def test_a_large_all_constant_array_dissolves_to_registers():
+    # The element-count cap bounds only a variable subscript, which pays a read
+    # mux and a write demux. Every subscript here is the constant 0, so the array
+    # dissolves into wired registers with no mux and is scalarized at any size:
+    # 24 elements is past the 16-element cap yet still becomes a register file,
+    # its untouched cells folding away.
+    def build():
+        @kernel
+        def cross(A: i32[8], B: i32[8]):
+            t: i32[24]
+            t[0] = A[0]
+            for i in range(8):
+                t[0] = t[0] + A[i]
+                B[i] = t[0]
+
+        return cross
+
+    mod = _to_rtl(build())
+    assert mod.microarch.mem("t").storage == "register"
+    assert "seq.hlmem" not in mod.mlir, mod.mlir
+
+    # A threshold well below the array's size still scalarizes it, since the cap
+    # does not gate a constant-subscript array; only turning auto-partition off
+    # (threshold 0) keeps it a ported memory.
+    below = build().schedule().export("rtl").set_scheduler_opt(scalarize_threshold=4)
+    assert below.microarch.mem("t").storage == "register"
+    off = build().schedule().export("rtl").set_scheduler_opt(scalarize_threshold=0)
+    assert off.microarch.mem("t").storage != "register"
+
+    B = np.zeros(8, np.int32)
+    mod.cosim(A8, B)
+    assert np.array_equal(B, A8[0] + np.cumsum(A8))
+
+
 def test_invariant_reads_preload_ahead_of_a_pipelined_loop():
     # An unrolled body re-reading the same words of a ported array every
     # iteration would pay its port count in II. Reads whose address does not
