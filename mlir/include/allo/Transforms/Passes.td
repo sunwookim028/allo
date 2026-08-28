@@ -526,7 +526,7 @@ def RaiseMemoryReductionsPass
     becomes a preload before the loop, an iter_arg threaded through the combine,
     and a single write-back after it. The rewrite is bit-exact: it reorders no
     operations, it only moves the accumulator off the memory port and onto a
-    register. Its purpose is to expose the reduction to `reassociate-reductions`
+    register. Its purpose is to expose the reduction to `tree-height-reduction`
     and `rotate-reductions`, which recognize an iter_arg accumulator but not a
     memory one, so a rolled `acc[i] += x` loop can reach II=1 the same way an
     unrolled one already does.
@@ -550,42 +550,6 @@ def RaiseMemoryReductionsPass
   ];
 }
 
-def ReassociateReductionsPass
-    : Pass<"reassociate-reductions", "func::FuncOp"> {
-  let summary = "Rebalance associative reduction chains into logarithmic trees";
-  let description = [{
-    Rebalance a maximal single-use chain of one associative operator into a
-    balanced binary tree, so the SDC scheduler sees logarithmic depth instead of
-    a linear dependence chain. Physical loop unrolling turns an accumulation
-    `acc += x[i]` into a left-leaning chain `acc = ((((acc + x0) + x1) + x2) +
-    x3)`, whose loop-carried accumulator threads through every operator; the
-    recurrence, and hence the modulo initiation interval, then grows with the
-    unroll factor. This pass folds a loop-carried accumulator in last so its
-    recurrence spans a single operator, and balances a straight-line (fully
-    unrolled) chain to cut its datapath depth from linear to logarithmic.
-
-    Integer reductions are exactly reassociable and are always rebalanced, both
-    the widened `extsi`/`trunc` idiom bit-growth produces and a bare same-width
-    chain. A bare chain carries no cast marking it as a reduction, so it is
-    taken only when a loop-carried accumulator anchors it, which leaves index
-    and address arithmetic untouched. Floating-point reassociation is not
-    bit-exact, so a bare float step is rebalanced only under the
-    `float-reassoc` option, mirroring Vitis's fp-relaxed.
-
-    `float-reassoc` also strength-reduces a float division by a constant into a
-    multiply by its reciprocal, another fp-relaxed rewrite: it removes a divider
-    IP, which is many cycles and, on a stencil's carried path, the dominant
-    recurrence term.
-  }];
-  let options = [
-    Option<"floatReassoc", "float-reassoc", "bool", "false",
-           "Permit reassociation of floating-point reductions (inexact).">
-  ];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect", "mlir::arith::ArithDialect"
-  ];
-}
-
 def RotateReductionsPass
     : Pass<"rotate-reductions", "func::FuncOp"> {
   let summary = "Rotate reductions across N accumulators to reach II=1";
@@ -603,7 +567,7 @@ def RotateReductionsPass
     reductions rotate for both float (reassociation is inexact) and integer
     (exact) accumulators. Only leaf loops are rotated: the shift register is
     realized on a childless modulo loop, so a container reduction stays put.
-    Composes after reassociate-reductions, which first folds an unrolled
+    Composes after tree-height-reduction, which first folds an unrolled
     reduction chain into a single carried operator.
 
     `accumulators` sets the count N: 0 is off, a positive value forces that N on
@@ -622,6 +586,54 @@ def RotateReductionsPass
     Option<"periodNs", "period-ns", "double", "0.0",
            "Clock period auto mode reads the reduction operator's latency at; "
            "unused unless accumulators is -1.">
+  ];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect", "mlir::arith::ArithDialect"
+  ];
+}
+
+def TreeHeightReductionPass
+    : Pass<"tree-height-reduction", "func::FuncOp"> {
+  let summary = "Balance associative datapath and reduction trees, folding a "
+                "carried accumulator at the root";
+  let description = [{
+    Balance every maximal single-operator associative tree into minimum height,
+    so the SDC scheduler sees a logarithmic combinational cone instead of a
+    linear chain. One pass covers both within-iteration datapath and loop-carried
+    reductions; a value that recurs across iterations (an iter_arg, or a memory
+    tap reading an earlier iteration's store) is folded in last, at the root, so
+    its recurrence spans a single operator and the modulo II does not grow with
+    an unroll factor.
+
+    A tree is balanced in one of two modes. The direct mode handles three
+    families: the additive family treats `sub` as a sign flip, so a mixed add/sub
+    tree (a stencil tap `a - b + c - d`, or a subtractive accumulate) collapses
+    to a signed-leaf multiset rebuilt as (sum of the positives) - (sum of the
+    negatives); the multiplicative family balances a `mul` tree; and each of
+    `and`/`or`/`xor` balances its own. The widened mode handles the integer
+    bit-growth idiom `trunc(core(ext, ext))`, rebuilding the same idiom so operand
+    widths stay put. A different-operator operand is a leaf, balanced separately.
+
+    The balanced subtree is built as a latency-weighted Huffman tree: a leaf's
+    arrival delay (from the operator library at `period-ns`) places later-arriving
+    operands nearer the root. Equal or zero weights give a plain balanced tree, so
+    the result is never worse than an unweighted one.
+
+    Integer trees are exactly reassociable; an operator carrying an overflow flag
+    ends the tree as a leaf (reassociation moves where the wrap is observed), and
+    index arithmetic stays out. Floating-point reassociation is inexact, so a
+    float tree is balanced, and a float division by a constant is strength-reduced
+    to a reciprocal multiply, only under `enable-fp`. A carried tree is rewritten
+    from three leaves (the recurrence fold is the win); a non-carried one needs
+    four leaves and a balanced depth below the linear chain.
+  }];
+  let options = [
+    Option<"enableFp", "enable-fp", "bool", "false",
+           "Rebalance floating-point trees and reciprocalize constant "
+           "float divides (both inexact).">,
+    Option<"periodNs", "period-ns", "double", "0.0",
+           "Clock period the Huffman leaf weights are read at; 0 leaves the tree "
+           "unweighted (a plain balanced tree).">
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect", "mlir::arith::ArithDialect"

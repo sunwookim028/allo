@@ -6,9 +6,13 @@
 #ifndef ALLO_TRANSFORMS_REDUCTIONUTILS_H
 #define ALLO_TRANSFORMS_REDUCTIONUTILS_H
 
+#include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
+#include "mlir/Dialect/Affine/Analysis/Utils.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/ADT/STLExtras.h"
 
 // Helpers shared by the reduction-restructuring passes (reassociate-reductions,
 // rotate-reductions), which recognize associative reductions and rebuild them
@@ -159,6 +163,108 @@ inline Value buildBalancedTree(OpBuilder &b, const ReductionStep &proto,
     level = std::move(next);
   }
   return level.front();
+}
+
+// A leaf/subtree paired with its arrival weight for the weighted tree builder.
+using WeightedValue = std::pair<Value, double>;
+
+// Build a minimum-weighted-height tree over `nodes`, merging the two lightest
+// each round; a merged node's weight is `max(child weights) + opWeight`.
+// `combine(a, b)` emits the combining operator. Equal or zero weights give a
+// plain balanced tree, so this is a strict generalization of buildBalancedTree.
+// `nodes` must be non-empty and is consumed.
+inline Value
+buildWeightedTree(SmallVectorImpl<WeightedValue> &nodes, double opWeight,
+                  llvm::function_ref<Value(Value, Value)> combine) {
+  while (nodes.size() > 1) {
+    llvm::stable_sort(nodes,
+                      [](const WeightedValue &a, const WeightedValue &b) {
+                        return a.second < b.second;
+                      });
+    Value a = nodes[0].first, b = nodes[1].first;
+    double w = std::max(nodes[0].second, nodes[1].second) + opWeight;
+    nodes.erase(nodes.begin(), nodes.begin() + 2);
+    nodes.push_back({combine(a, b), w});
+  }
+  return nodes.front().first;
+}
+
+// A maximal chain of one reduction operator/idiom: the steps absorbed (tail
+// first) and the leaves they fold together.
+struct ReductionChain {
+  SmallVector<ReductionStep> steps;
+  SmallVector<Value> leaves;
+};
+
+// Flatten the maximal chain of `proto`'s operator into `chain`: absorb any
+// single-use step of the same operator/idiom, collecting every non-chain
+// operand (peeled through the idiom's extends) as a leaf.
+inline void flattenChain(Value v, const ReductionStep &proto,
+                         ReductionChain &chain) {
+  ReductionStep s = matchReductionStep(v);
+  if (s && sameReduction(s, proto) && v.hasOneUse()) {
+    chain.steps.push_back(s);
+    auto [a, b] = reductionOperands(s);
+    flattenChain(a, proto, chain);
+    flattenChain(b, proto, chain);
+    return;
+  }
+  chain.leaves.push_back(v);
+}
+
+// Erase a rewritten step's ops (idiom: trunc, core, both extends) once dead.
+// Steps are erased tail first, so each op is use-empty when reached.
+inline void eraseStep(const ReductionStep &s) {
+  Operation *e0 = s.widened() ? s.core->getOperand(0).getDefiningOp() : nullptr;
+  Operation *e1 = s.widened() ? s.core->getOperand(1).getDefiningOp() : nullptr;
+  for (Operation *op : {s.trunc, s.core, e0, e1})
+    if (op && op->use_empty())
+      op->erase();
+}
+
+// A loop-carried iter_arg (not the induction variable) of an enclosing
+// affine.for.
+inline bool isLoopCarried(Value v) {
+  auto arg = dyn_cast<BlockArgument>(v);
+  if (!arg)
+    return false;
+  auto forOp = dyn_cast<affine::AffineForOp>(arg.getOwner()->getParentOp());
+  return forOp && llvm::is_contained(forOp.getRegionIterArgs(), v);
+}
+
+// The affine.store the value reaches, following single-use forwarding ops (a
+// reciprocal multiply, a cast). Null if the value fans out or is not stored.
+inline affine::AffineStoreOp closingStore(Value chainResult) {
+  Value v = chainResult;
+  while (v.hasOneUse()) {
+    Operation *u = *v.user_begin();
+    if (auto st = dyn_cast<affine::AffineStoreOp>(u))
+      return st.getValueToStore() == v ? st : affine::AffineStoreOp();
+    if (u->getNumResults() != 1)
+      return {};
+    v = u->getResult(0);
+  }
+  return {};
+}
+
+// A leaf load that reads, from an earlier iteration, what `store` writes: a
+// reduction's memory-carried recurrence tap (an accumulator, a stencil's
+// `A[i, j-1]`), which belongs at the tree root to keep that recurrence one
+// operator deep.
+inline bool isCarriedTap(Value leaf, affine::AffineStoreOp store) {
+  auto load = leaf.getDefiningOp<affine::AffineLoadOp>();
+  if (!load || load.getMemRef() != store.getMemRef())
+    return false;
+  unsigned depth = affine::getInnermostCommonLoopDepth(
+      {load.getOperation(), store.getOperation()});
+  affine::MemRefAccess src(store), dst(load);
+  SmallVector<affine::DependenceComponent, 2> comps;
+  return depth &&
+         affine::checkMemrefAccessDependence(src, dst, depth,
+                                             /*dependenceConstraints=*/nullptr,
+                                             &comps)
+                 .value == affine::DependenceResult::HasDependence &&
+         !comps.empty() && comps.back().lb.value_or(0) > 0;
 }
 
 } // namespace mlir::allo

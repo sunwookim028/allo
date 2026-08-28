@@ -1850,6 +1850,68 @@ def test_reassociate_int_reduction_recurrence():
     assert region.interval * PERIOD_NS < REG_NS + 4 * comb_step_ns("mul")
 
 
+# `tree-height-reduction` rebalances a subtraction-rooted datapath tap: the
+# additive family treats `sub` as a sign flip, so `a - b + c - d` (linear
+# `((a-b)+c)-d`, depth 3) collapses to `(a+c) - (b+d)` (depth 2). The op mix is
+# the witness: two subtracts and one add become one subtract and two adds.
+def test_tree_height_reduction_balances_mixed_sign():
+    from allo.backend.base import run_pipeline
+    from allo.backend.rtl.schedule import RTL_PREPARE_PIPELINE
+    from allo.compiler.mlir_codegen import compile as compile_kernel
+
+    @kernel
+    def tap(a: f32[8], b: f32[8], c: f32[8], d: f32[8], out: f32[8]):
+        for i in range(8, name="i"):
+            out[i] = a[i] - b[i] + c[i] - d[i]
+
+    module = compile_kernel(tap)
+    run_pipeline(module, RTL_PREPARE_PIPELINE)
+    before = str(module)
+    assert before.count("arith.subf") == 2 and before.count("arith.addf") == 1
+
+    run_pipeline(
+        module, "builtin.module(func.func(tree-height-reduction{enable-fp=true}))"
+    )
+    after = str(module)
+    assert after.count("arith.addf") == 2 and after.count("arith.subf") == 1
+
+
+# The rebalanced tree is numerically correct end to end (within the fp-relaxed
+# tolerance reassociation runs under).
+def test_tree_height_reduction_cosim_mixed_sign():
+    @kernel
+    def tap(a: f32[16], b: f32[16], c: f32[16], d: f32[16], out: f32[16]):
+        for i in range(16, name="i"):
+            out[i] = a[i] - b[i] + c[i] - d[i]
+
+    rng = np.random.default_rng(0)
+    arrs = [rng.standard_normal(16).astype(np.float32) for _ in range(4)]
+    out = np.zeros(16, np.float32)
+    _to_rtl(tap).cosim(*arrs, out)
+    np.testing.assert_allclose(
+        out, arrs[0] - arrs[1] + arrs[2] - arrs[3], rtol=1e-5, atol=1e-5
+    )
+
+
+# A mixed-sign carried reduction `acc = acc + a - b`: neither predecessor pass
+# handled it (reassociate never matched `sub`, and the split THR skipped carried
+# trees). The merged pass folds the carried accumulator at the root so the
+# recurrence spans one operator, and the result stays numerically correct.
+def test_tree_height_reduction_carried_mixed_sign():
+    @kernel
+    def r(a: f32[64], b: f32[64]) -> f32:
+        acc: f32 = 0.0
+        for i in range(64, name="i"):
+            acc = acc + a[i] - b[i]
+        return acc
+
+    rng = np.random.default_rng(1)
+    a = rng.standard_normal(64).astype(np.float32)
+    b = rng.standard_normal(64).astype(np.float32)
+    res = _to_rtl(r).cosim(a, b)
+    assert abs(float(res.result) - float((a - b).sum())) < 1e-2
+
+
 # Bit growth types an expression at its natural width and applies the declared
 # type as a trailing truncation, so every operator in between is built at a
 # width nothing reads. `narrow-demanded-bits` sinks that truncation onto the

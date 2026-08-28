@@ -55,9 +55,10 @@ def run_schedule(
     if not 0.0 <= options.clock_margin < 1.0:
         raise ValueError(f"clock_margin must lie in [0, 1); got {options.clock_margin}")
     model_ns = options.cycle_ns * (1.0 - options.clock_margin)
-    reassoc = (
-        "reassociate-reductions{float-reassoc="
-        f"{'true' if prepass.float_reassoc else 'false'}}}"
+    thr = (
+        "tree-height-reduction{enable-fp="
+        f"{'true' if prepass.float_reassoc else 'false'} "
+        f"period-ns={model_ns}}}"
     )
     rotate = (
         f"rotate-reductions{{accumulators={int(prepass.accumulators)} "
@@ -80,7 +81,7 @@ def run_schedule(
         f"raise-counted-while,raise-memory-reductions,{loops},"
         f"canonicalize,fold-if-statements,cse,raise-memory-reductions,"
         f"{scalarize},"
-        f"{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
+        f"{thr},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"
         f"legalize-arith{{expand-const-arith=true period-ns={model_ns} "
