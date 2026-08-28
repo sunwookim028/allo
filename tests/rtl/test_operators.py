@@ -2395,6 +2395,114 @@ def test_float_to_int_demotes_an_if_converted_diamond():
     assert np.array_equal(out, z + a)
 
 
+# A float sum reduction over a constant trip becomes an integer recurrence when
+# the running sum's whole-trip envelope fits the accumulator's mantissa band. The
+# iter_arg is carried at the envelope width, not the declared float.
+def test_float_to_int_demotes_a_sum_reduction():
+    after = _run_f2i(
+        """
+        func.func @red(%A: memref<64xi8>, %out: memref<1xi16>) {
+          %c = arith.constant 0.000000e+00 : f32
+          %s = affine.for %i = 0 to 64 iter_args(%acc = %c) -> (f32) {
+            %v = affine.load %A[%i] : memref<64xi8>
+            %f = arith.sitofp %v : i8 to f32
+            %n = arith.addf %acc, %f : f32
+            affine.yield %n : f32
+          }
+          %r = arith.fptosi %s : f32 to i16
+          affine.store %r, %out[0] : memref<1xi16>
+          return
+        }
+        """
+    )
+    # 64 * [-128, 127] fits 14 signed bits.
+    assert "-> (i14)" in after and "arith.addi" in after, after
+    assert "arith.addf" not in after, after
+    assert "arith.sitofp" not in after and "arith.fptosi" not in after, after
+
+
+# The reduction demotes only where it stays exact. A huge trip whose sum leaves
+# f32's band, a product (not a sum), and a runtime trip all keep their floats;
+# the same huge-trip sum demotes in f64, whose band is wider.
+def test_float_to_int_reduction_refusals():
+    huge = """
+        func.func @big(%A: memref<1048576x{t}>, %out: memref<1x{o}>) {{
+          %c = arith.constant 0.000000e+00 : {f}
+          %s = affine.for %i = 0 to 1048576 iter_args(%acc = %c) -> ({f}) {{
+            %v = affine.load %A[%i] : memref<1048576x{t}>
+            %f = arith.sitofp %v : {t} to {f}
+            %n = arith.addf %acc, %f : {f}
+            affine.yield %n : {f}
+          }}
+          %r = arith.fptosi %s : {f} to {o}
+          affine.store %r, %out[0] : memref<1x{o}>
+          return
+        }}
+    """
+    f32sum = _run_f2i(huge.format(t="i16", o="i32", f="f32"))
+    assert "arith.addf" in f32sum and "arith.addi" not in f32sum, f32sum
+    f64sum = _run_f2i(huge.format(t="i16", o="i32", f="f64"))
+    assert "arith.addi" in f64sum and "arith.addf" not in f64sum, f64sum
+
+    prod = _run_f2i(
+        """
+        func.func @p(%A: memref<8xi8>, %out: memref<1xi16>) {
+          %c = arith.constant 1.000000e+00 : f32
+          %s = affine.for %i = 0 to 8 iter_args(%acc = %c) -> (f32) {
+            %v = affine.load %A[%i] : memref<8xi8>
+            %f = arith.sitofp %v : i8 to f32
+            %n = arith.mulf %acc, %f : f32
+            affine.yield %n : f32
+          }
+          %r = arith.fptosi %s : f32 to i16
+          affine.store %r, %out[0] : memref<1xi16>
+          return
+        }
+        """
+    )
+    assert "arith.mulf" in prod and "arith.muli" not in prod, prod
+
+    dyn = _run_f2i(
+        """
+        func.func @d(%A: memref<64xi8>, %out: memref<1xi16>, %n: index) {
+          %c = arith.constant 0.000000e+00 : f32
+          %s = affine.for %i = 0 to %n iter_args(%acc = %c) -> (f32) {
+            %v = affine.load %A[%i] : memref<64xi8>
+            %f = arith.sitofp %v : i8 to f32
+            %x = arith.addf %acc, %f : f32
+            affine.yield %x : f32
+          }
+          %r = arith.fptosi %s : f32 to i16
+          affine.store %r, %out[0] : memref<1xi16>
+          return
+        }
+        """
+    )
+    assert "arith.addf" in dyn and "arith.addi" not in dyn, dyn
+
+
+# End to end: a float sum accumulator over an int array demotes to an integer
+# recurrence and cosims bit-exact against the integer reference.
+def test_float_to_int_reduction_cosim():
+    N = 40
+
+    @kernel
+    def redsum(A: i8[N], out: i16[1]):
+        s: f32 = 0.0
+        for i in range(N):
+            s += A[i]
+        out[0] = s
+
+    kinds = _op_kinds(redsum)
+    assert kinds["addi"] >= 1 and kinds["addf"] == 0, kinds
+    assert kinds["sitofp"] == 0 and kinds["fptosi"] == 0, kinds
+
+    A = np.random.default_rng(11).integers(-128, 128, size=N, dtype=np.int8)
+    out = np.zeros(1, np.int16)
+    _to_rtl(redsum).cosim(A, out)
+    assert out[0] == np.int16(A.astype(np.int16).sum())
+
+
 # A loop-carried integer scalar is built at its recurrence envelope, not at its
 # declared carrier: a counter stepping by 2 over 50 trips stays within [0, 100]
 # and an argmax-style position within the IV's range. A data-stepped

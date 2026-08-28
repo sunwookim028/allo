@@ -720,12 +720,18 @@ def FloatToIntPass : Pass<"float-to-int", "func::FuncOp"> {
     Signedness follows the cast opcode: `sitofp`/`fptosi` sign extend,
     `uitofp`/`fptoui` zero extend, and `cmpf` maps to a signed `cmpi`.
 
+    A loop-carried sum reduction demotes too: an `affine.for` accumulator whose
+    running sum over a constant trip count stays inside the band becomes an
+    integer recurrence, with the loop rebuilt to carry the integer carrier.
+
     Being bit-exact it needs no fast-math flag. It runs both before the integer
     passes and again after if-conversion and reduction raising, so a demoted cone
     is balanced, narrowed and IP-bound as ordinary integer arithmetic, and an
-    if-converted diamond or an expanded min/max is caught once it is a `select`.
+    if-converted diamond, an expanded min/max, or a raised reduction is caught
+    once it is a `select` or an iter_arg.
   }];
-  let dependentDialects = ["mlir::arith::ArithDialect"];
+  let dependentDialects =
+      ["mlir::arith::ArithDialect", "mlir::affine::AffineDialect"];
 }
 
 def LegalizeArithPass : Pass<"legalize-arith", "ModuleOp"> {
