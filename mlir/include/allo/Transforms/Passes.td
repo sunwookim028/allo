@@ -531,6 +531,11 @@ def RaiseMemoryReductionsPass
     memory one, so a rolled `acc[i] += x` loop can reach II=1 the same way an
     unrolled one already does.
 
+    The combine is an associative add or mul, or a subtractive accumulate
+    `M -= leaf` (the accumulator being the minuend). Since raising reorders
+    nothing, moving the subtraction onto a register is bit-exact too, dropping
+    its recurrence from the memory round trip to the operator latency.
+
     A location is promoted only when it is provably self-contained across the
     loop: the address is loop-invariant (`isInvariantAccess`), the load and store
     are unconditional in the body with the load reaching the store, the stored

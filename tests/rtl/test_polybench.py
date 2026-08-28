@@ -1134,7 +1134,7 @@ def test_triangular_solve():
     rtl = _to_rtl(lu)
     res = rtl.schedule()
     assert res.func("lu").latency is None
-    # memory-carried subtraction recurrence
+    # subtraction recurrence, raised to an iter_arg (II = subtract latency)
     assert any(r.interval is not None and r.interval > 1 for r in res.cyclic())
 
     A = _f32(0, N, N) + np.float32(4.0) * np.eye(N, dtype=np.float32)

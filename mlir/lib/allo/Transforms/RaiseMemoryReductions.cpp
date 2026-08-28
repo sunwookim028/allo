@@ -30,7 +30,7 @@ using namespace mlir::allo::logging;
 namespace {
 
 // One promotable memory reduction: `load` and `store` touch the same
-// loop-invariant location, combined by the associative `step`.
+// loop-invariant location, combined by an add, mul, or subtract.
 struct Candidate {
   affine::AffineLoadOp load;
   affine::AffineStoreOp store;
@@ -53,21 +53,36 @@ bool writersAreVisible(Value memref) {
 
 // The store's value is `combine(load M[inv], leaf)`, with the load reading the
 // store's own location, invariant in `loop`, and both the load result and the
-// stored value used only here. Returns the load, or null.
+// stored value used only here. Returns the load, or null. The combine is an
+// associative add/mul or a subtractive accumulate `M -= leaf` (the accumulator
+// being the minuend); the shared reduction matcher stays add/mul only, so
+// reassociate and rotate never rewrite non-associative subtraction.
 affine::AffineLoadOp matchMemoryReduction(affine::AffineStoreOp store,
                                           affine::AffineForOp loop) {
-  ReductionStep step = matchReductionStep(store.getValueToStore());
-  if (!step)
-    return {};
-  auto [lhs, rhs] = reductionOperands(step);
-  auto lLoad = lhs.getDefiningOp<affine::AffineLoadOp>();
-  auto rLoad = rhs.getDefiningOp<affine::AffineLoadOp>();
   affine::MemRefAccess write(store);
-  bool lIsAcc = lLoad && affine::MemRefAccess(lLoad) == write;
-  bool rIsAcc = rLoad && affine::MemRefAccess(rLoad) == write;
-  if (lIsAcc == rIsAcc) // needs exactly one accumulator operand
-    return {};
-  affine::AffineLoadOp load = lIsAcc ? lLoad : rLoad;
+  auto accOf = [&](Value v) -> affine::AffineLoadOp {
+    auto ld = v.getDefiningOp<affine::AffineLoadOp>();
+    return ld && affine::MemRefAccess(ld) == write ? ld
+                                                   : affine::AffineLoadOp();
+  };
+  Operation *comb = store.getValueToStore().getDefiningOp();
+  affine::AffineLoadOp load;
+  if (isa_and_nonnull<arith::SubFOp, arith::SubIOp>(comb)) {
+    // Subtraction is not commutative: the accumulator is the minuend, and the
+    // subtrahend must not itself be the accumulator.
+    load = accOf(comb->getOperand(0));
+    if (!load || accOf(comb->getOperand(1)))
+      return {};
+  } else {
+    ReductionStep step = matchReductionStep(store.getValueToStore());
+    if (!step)
+      return {};
+    auto [lhs, rhs] = reductionOperands(step);
+    affine::AffineLoadOp lLoad = accOf(lhs), rLoad = accOf(rhs);
+    if (bool(lLoad) == bool(rLoad)) // needs exactly one accumulator operand
+      return {};
+    load = lLoad ? lLoad : rLoad;
+  }
   if (!load.getResult().hasOneUse() || !store.getValueToStore().hasOneUse())
     return {};
   if (!affine::isInvariantAccess(load, loop) ||

@@ -70,10 +70,16 @@ def run_schedule(
     )
     part = f"reconcile-array-directives{{top={top}}}"
     scalarize = f"scalarize-memory{{max-elements={prepass.scalarize_threshold}}}"
+    # `raise-memory-reductions` runs twice: once before `{loops}` so a reduction
+    # nested in a pipelined loop is on an iter_arg before unrolling, and again
+    # after `fold-if-statements`, which turns a guarded `if c: M += x` into a
+    # plain reduction (its guard folded into the loop bound or a select) the
+    # first run could not see.
     pipeline = (
         f"builtin.module(canonicalize,cse,func.func(raise-to-affine,cse,"
         f"raise-counted-while,raise-memory-reductions,{loops},"
-        f"canonicalize,fold-if-statements,cse,{scalarize},"
+        f"canonicalize,fold-if-statements,cse,raise-memory-reductions,"
+        f"{scalarize},"
         f"{reassoc},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"
