@@ -2317,6 +2317,84 @@ def test_float_to_int_crosses_float_widths():
     assert "arith.muli" not in rounds, rounds
 
 
+# A float select carries the cone through its two arms; the demotion rewrites the
+# arms to integers and leaves the i1 condition untouched.
+def test_float_to_int_demotes_a_select():
+    after = _run_f2i(
+        """
+        func.func @sel(%a: i8, %b: i8, %c: i1) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %t = arith.addf %fa, %fb : f32
+          %f = arith.subf %fa, %fb : f32
+          %s = arith.select %c, %t, %f : f32
+          %r = arith.fptosi %s : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.addi" in after and "arith.subi" in after, after
+    assert "arith.select %arg2" in after, after
+    assert "f32" not in after, after
+
+
+# The NaN-quieting min/max expansion `legalize-arith` emits (a compare, a select,
+# an isnan check, a select) demotes as a whole: the compare becomes `cmpi`, the
+# selects become integer selects, and the `cmpf uno` isnan test folds to a
+# constant because an integer-valued float is never NaN.
+def test_float_to_int_folds_a_nan_quieted_min_max():
+    after = _run_f2i(
+        """
+        func.func @mm(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %cmp = arith.cmpf ugt, %fa, %fb : f32
+          %sel = arith.select %cmp, %fa, %fb : f32
+          %isnan = arith.cmpf uno, %fa, %fa : f32
+          %res = arith.select %isnan, %fb, %sel : f32
+          %r = arith.fptosi %res : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.cmpi sgt" in after, after
+    assert "arith.constant false" in after, after
+    assert "arith.select" in after, after
+    assert "arith.cmpf" not in after and "f32" not in after, after
+
+
+# End to end: an if-converted diamond whose merged float value is used after the
+# merge only demotes once `fold-if-statements` has turned it into a `select`,
+# which the second `float-to-int` (after if-conversion) sees. It cosims bit-exact.
+def test_float_to_int_demotes_an_if_converted_diamond():
+    N = 8
+
+    @kernel
+    def diamond(A: i8[N], B: i8[N], out: i16[N]):
+        for i in range(N):
+            x: f32 = A[i]
+            y: f32 = B[i]
+            z: f32 = 0.0
+            if x > y:
+                z = x + y
+            else:
+                z = x - y
+            out[i] = z + x
+
+    kinds = _op_kinds(diamond)
+    assert kinds["addf"] == 0 and kinds["subf"] == 0, kinds
+    assert kinds["addi"] >= 1, kinds
+
+    rng = np.random.default_rng(7)
+    A = rng.integers(-64, 64, size=N, dtype=np.int8)
+    B = rng.integers(-64, 64, size=N, dtype=np.int8)
+    out = np.zeros(N, np.int16)
+    _to_rtl(diamond).cosim(A, B, out)
+    a, b = A.astype(np.int16), B.astype(np.int16)
+    z = np.where(a > b, a + b, a - b)
+    assert np.array_equal(out, z + a)
+
+
 # A loop-carried integer scalar is built at its recurrence envelope, not at its
 # declared carrier: a counter stepping by 2 over 50 trips stays within [0, 100]
 # and an argmax-style position within the IV's range. A data-stepped

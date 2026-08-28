@@ -75,12 +75,14 @@ def run_schedule(
     # nested in a pipelined loop is on an iter_arg before unrolling, and again
     # after `fold-if-statements`, which turns a guarded `if c: M += x` into a
     # plain reduction (its guard folded into the loop bound or a select) the
-    # first run could not see.
+    # first run could not see. `float-to-int` runs a second time here, after
+    # if-conversion and reduction raising, to demote the `select` cones and
+    # reduction iter_args the earlier run in RTL_PREPARE could not yet see.
     pipeline = (
         f"builtin.module(canonicalize,cse,func.func(raise-to-affine,cse,"
         f"raise-counted-while,raise-memory-reductions,{loops},"
         f"canonicalize,fold-if-statements,cse,raise-memory-reductions,"
-        f"{scalarize},"
+        f"float-to-int,{scalarize},"
         f"{thr},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"

@@ -699,12 +699,14 @@ def FloatToIntPass : Pass<"float-to-int", "func::FuncOp"> {
     float arithmetic IP where integer operators would do. This pass walks up from
     those float-to-int roots through the truncation-free float operators
     (`addf`, `subf`, `mulf`, `negf`, `maximumf`/`minimumf`/`maxnumf`/`minnumf`,
-    and the float resizes `extf`/`truncf`) to the integer-to-float leaves,
-    tracking the integer range each value can take with `llvm::ConstantRange`, and
-    rewrites the whole cone to `addi`/`subi`/`muli`/`maxsi`/`minsi`/`cmpi` when the
-    range proves the rewrite exact. Min and max collapse to one signed op because
-    an integer-valued float is never NaN; a resize is the identity on the integer
-    value.
+    the float resizes `extf`/`truncf`, and `select` through its two arms) to the
+    integer-to-float leaves, tracking the integer range each value can take with
+    `llvm::ConstantRange`, and rewrites the whole cone to
+    `addi`/`subi`/`muli`/`maxsi`/`minsi`/`cmpi`/`select` when the range proves the
+    rewrite exact. Min and max collapse to one signed op because an integer-valued
+    float is never NaN; the same fact makes a `uno`/`ord` NaN test a constant
+    `false`/`true`, which is how a NaN-quieting min/max expansion demotes; a resize
+    is the identity on the integer value.
 
     Float arithmetic on integers is exact only while the value stays inside the
     type's exactly representable integer band (`2^24` for f32, `2^53` for f64).
@@ -714,13 +716,14 @@ def FloatToIntPass : Pass<"float-to-int", "func::FuncOp"> {
     so when each op needs no more signed bits than its mantissa holds, no
     operation ever rounded and the integer replacement is bit-identical. A cone
     whose range escapes its band, or that reads a fractional constant, a
-    non-finite constant, a loop-carried value, or `divf`/`remf`/`select`, is left
-    as float. Signedness follows the cast opcode: `sitofp`/`fptosi` sign extend,
+    non-finite constant, a loop-carried value, or `divf`/`remf`, is left as float.
+    Signedness follows the cast opcode: `sitofp`/`fptosi` sign extend,
     `uitofp`/`fptoui` zero extend, and `cmpf` maps to a signed `cmpi`.
 
-    Being bit-exact it needs no fast-math flag. It runs before the integer
-    passes (and before min/max lower to compare+select), so the demoted cone is
-    balanced, narrowed and IP-bound as ordinary integer arithmetic.
+    Being bit-exact it needs no fast-math flag. It runs both before the integer
+    passes and again after if-conversion and reduction raising, so a demoted cone
+    is balanced, narrowed and IP-bound as ordinary integer arithmetic, and an
+    if-converted diamond or an expanded min/max is caught once it is a `select`.
   }];
   let dependentDialects = ["mlir::arith::ArithDialect"];
 }

@@ -92,7 +92,7 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
   }
   static bool isInterior(Operation *op) {
     return isa<arith::AddFOp, arith::SubFOp, arith::MulFOp, arith::NegFOp,
-               arith::ExtFOp, arith::TruncFOp>(op) ||
+               arith::ExtFOp, arith::TruncFOp, arith::SelectOp>(op) ||
            isMinMax(op);
   }
   static bool isRoot(Operation *op) {
@@ -108,7 +108,12 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
         if (isScalar(op->getOperand(0).getType()))
           roots.insert(op);
       } else if (auto c = dyn_cast<arith::CmpFOp>(op)) {
-        if (isScalar(c.getLhs().getType()) && mapPred(c.getPredicate()))
+        // A NaN test on integer valued operands folds to a constant, so uno and
+        // ord are roots too even though they have no signed integer predicate.
+        using F = arith::CmpFPredicate;
+        bool nanTest = c.getPredicate() == F::UNO || c.getPredicate() == F::ORD;
+        if (isScalar(c.getLhs().getType()) &&
+            (mapPred(c.getPredicate()) || nanTest))
           roots.insert(op);
       }
     });
@@ -143,7 +148,11 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
         continue;
       }
 
-      for (Value o : op->getOperands()) {
+      // A select carries the cone through its two arms; its condition is an i1
+      // left untouched, so the scan skips operand 0.
+      unsigned first = isa<arith::SelectOp>(op) ? 1 : 0;
+      for (unsigned i = first, e = op->getNumOperands(); i < e; ++i) {
+        Value o = op->getOperand(i);
         APFloat apf(0.0);
         if (matchPattern(o, m_ConstantFloat(&apf)))
           continue;
@@ -164,7 +173,9 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
   // yet resolved. A poisoned or non-integral constant operand returns badRange.
   std::optional<ConstantRange> calcRange(Operation *op) {
     SmallVector<ConstantRange, 3> in;
-    for (Value o : op->getOperands()) {
+    unsigned first = isa<arith::SelectOp>(op) ? 1 : 0;
+    for (unsigned i = first, e = op->getNumOperands(); i < e; ++i) {
+      Value o = op->getOperand(i);
       if (Operation *def = o.getDefiningOp(); def && seen.count(def)) {
         ConstantRange r = seen.find(def)->second;
         if (r == unknownRange())
@@ -205,7 +216,7 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
       return in[0].smin(in[1]);
     if (isa<arith::FPToSIOp, arith::FPToUIOp>(op))
       return in[0];
-    return in[0].unionWith(in[1]); // cmpf: both operands share one range
+    return in[0].unionWith(in[1]); // cmpf and select: the union of both arms
   }
 
   void walkForwards() {
@@ -241,8 +252,10 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
     Location l = op->getLoc();
 
     SmallVector<Value, 3> in;
-    if (!isa<arith::SIToFPOp, arith::UIToFPOp>(op))
-      for (Value o : op->getOperands()) {
+    if (!isa<arith::SIToFPOp, arith::UIToFPOp>(op)) {
+      unsigned first = isa<arith::SelectOp>(op) ? 1 : 0;
+      for (unsigned i = first, e = op->getNumOperands(); i < e; ++i) {
+        Value o = op->getOperand(i);
         APFloat apf(0.0);
         if (Operation *def = o.getDefiningOp(); def && seen.count(def))
           in.push_back(convert(def, toTy));
@@ -255,6 +268,7 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
                   .getResult());
         }
       }
+    }
 
     Value nv;
     if (auto s = dyn_cast<arith::SIToFPOp>(op))
@@ -265,10 +279,17 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
       nv = resize(b, l, in[0], f.getType(), /*sign=*/true);
     else if (auto f = dyn_cast<arith::FPToUIOp>(op))
       nv = resize(b, l, in[0], f.getType(), /*sign=*/false);
-    else if (auto c = dyn_cast<arith::CmpFOp>(op))
-      nv = arith::CmpIOp::create(b, l, *mapPred(c.getPredicate()), in[0], in[1])
-               .getResult();
-    else if (isa<arith::NegFOp>(op)) {
+    else if (auto c = dyn_cast<arith::CmpFOp>(op)) {
+      if (auto p = mapPred(c.getPredicate()))
+        nv = arith::CmpIOp::create(b, l, *p, in[0], in[1]).getResult();
+      else {
+        // uno is always false and ord always true on never-NaN operands.
+        bool ord = c.getPredicate() == arith::CmpFPredicate::ORD;
+        nv = arith::ConstantOp::create(
+                 b, l, IntegerAttr::get(b.getI1Type(), ord ? 1 : 0))
+                 .getResult();
+      }
+    } else if (isa<arith::NegFOp>(op)) {
       Value zero = arith::ConstantOp::create(b, l, IntegerAttr::get(toTy, 0))
                        .getResult();
       nv = arith::SubIOp::create(b, l, zero, in[0]).getResult();
@@ -282,6 +303,9 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
       nv = arith::AddIOp::create(b, l, in[0], in[1]).getResult();
     else if (isa<arith::SubFOp>(op))
       nv = arith::SubIOp::create(b, l, in[0], in[1]).getResult();
+    else if (auto sel = dyn_cast<arith::SelectOp>(op))
+      nv = arith::SelectOp::create(b, l, sel.getCondition(), in[0], in[1])
+               .getResult();
     else
       nv = arith::MulIOp::create(b, l, in[0], in[1]).getResult();
 
