@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from allo import kernel
-from allo.lang import i32, f32, index
+from allo.lang import i32, i16, i64, u32, f32, index
 from allo.lang.ip import OperatorType
 from allo.backend.rtl.devices import default_device
 
@@ -140,6 +140,128 @@ def test_i32_counted_while_raises_cosim():
         out = np.zeros(1, np.int32)
         _to_rtl(k).cosim(A, out)
         assert out[0] == int(A.sum())
+
+
+def test_cross_width_bound_while_raises_cosim():
+    # A comparison against a bound of a different width promotes to the common
+    # type, wrapping the IV (wider bound) or the bound (narrower bound) in an
+    # extend. The matcher peels the compare-side cast and computes the trip at
+    # the compare width, so the loop still raises to a counted for.
+    N = 12
+    A = (np.arange(N, dtype=np.int32) * 3 + 1) & 0xFF
+
+    @kernel
+    def wider(A: i32[N], n: i64, out: i32[1]):  # i32 IV vs i64 bound (extsi IV)
+        i: i32 = 0
+        s: i32 = 0
+        while i < n:
+            s = s + A[i]
+            i = i + 1
+        out[0] = s
+
+    @kernel
+    def narrower(A: i32[N], n: i16, out: i32[1]):  # i32 IV vs i16 bound (bound cast)
+        i: i32 = 0
+        s: i32 = 0
+        while i < n:
+            s = s + A[i]
+            i = i + 1
+        out[0] = s
+
+    @kernel
+    def uns(A: i32[N], n: i64, out: i32[1]):  # u32 IV vs i64 bound (extui IV)
+        i: u32 = 0
+        s: i32 = 0
+        while i < n:
+            s = s + A[i]
+            i = i + 1
+        out[0] = s
+
+    for k, bt in ((wider, np.int64), (narrower, np.int16), (uns, np.int64)):
+        assert not _sched(k).cyclic()[0].conditional  # raised
+        out = np.zeros(1, np.int32)
+        _to_rtl(k).cosim(A, bt(N), out)
+        assert out[0] == int(A.sum())
+
+    # A decreasing cross-width countdown raises the same way.
+    @kernel
+    def down(A: i32[N], n: i64, out: i32[1]):
+        i: i32 = N
+        s: i32 = 0
+        while i > n:
+            s = s + A[i - 1]
+            i = i - 1
+        out[0] = s
+
+    assert not _sched(down).cyclic()[0].conditional
+    out = np.zeros(1, np.int32)
+    _to_rtl(down).cosim(A, np.int64(0), out)
+    assert out[0] == int(A.sum())
+
+
+def test_ne_counted_while_raises_cosim():
+    # `while i != C` for a constant C reaches C exactly when the step divides the
+    # span, so it is a counted loop even though `!=` is not an ordered predicate.
+    N = 16
+    A = (np.arange(N, dtype=np.int32) % 7 + 1).astype(np.int32)
+
+    @kernel
+    def up(A: i32[N], out: i32[1]):
+        i: i32 = 0
+        s: i32 = 0
+        while i != N:
+            s = s + A[i]
+            i = i + 1
+        out[0] = s
+
+    @kernel
+    def down(A: i32[N], out: i32[1]):
+        i: i32 = N
+        s: i32 = 0
+        while i != 0:
+            s = s + A[i - 1]
+            i = i - 1
+        out[0] = s
+
+    for k in (up, down):
+        assert not _sched(k).cyclic()[0].conditional  # raised to a counted for
+        out = np.zeros(1, np.int32)
+        _to_rtl(k).cosim(A, out)
+        assert out[0] == int(A.sum())
+
+
+def test_ne_unprovable_while_stays_uncounted():
+    # `!=` is counted only when the step provably reaches the bound. A dynamic
+    # bound (init could start past it) and a step that does not divide the span
+    # (skips over the bound) both stay flushing pipelines, never raised.
+    N = 16
+    A = (np.arange(N, dtype=np.int32) % 5 + 1).astype(np.int32)
+
+    @kernel
+    def dyn(A: i32[N], n: i32, out: i32[1]):
+        i: i32 = 0
+        s: i32 = 0
+        while i != n:  # dynamic bound: unprovable, but still terminates for n>=0
+            s = s + A[i]
+            i = i + 1
+        out[0] = s
+
+    assert _sched(dyn).cyclic()[0].conditional  # not raised
+    out = np.zeros(1, np.int32)
+    _to_rtl(dyn).cosim(A, np.int32(N), out)
+    assert out[0] == int(A.sum())
+
+    @kernel
+    def skip(A: i32[N], out: i32[1]):
+        i: i32 = 0
+        s: i32 = 0
+        while i != 9:  # step 2 skips 9 -> non-terminating, must never be raised
+            s = s + A[i]
+            i = i + 2
+        out[0] = s
+
+    # Scheduling only: refusing to count a non-terminating loop is the point.
+    assert _sched(skip).cyclic()[0].conditional
 
 
 def test_used_iv_result_while_raises_cosim():

@@ -139,13 +139,17 @@ def RaiseCountedWhilePass
     : Pass<"raise-counted-while", "func::FuncOp"> {
   let summary = "Raise a counted scf.while to scf.for";
   let description = [{
-    Raise an `scf.while` whose exit is a pure ordered test of a monotonically
-    increasing induction variable against a loop-invariant bound to an
-    `scf.for`, so the counted-loop scheduler handles it unchanged. Only
-    provably-counted, increasing loops are raised (`<`/`<=`, constant positive
-    step, `index` IV, unused IV result, identity condition forwarding, a
-    test-only `before` region); every other `scf.while` is left untouched for
-    the uncounted (flushable-pipeline) path.
+    Raise an `scf.while` whose exit tests one induction variable against a
+    loop-invariant bound to an `scf.for`, so the counted-loop scheduler handles
+    it unchanged. The IV steps by a constant whose sign agrees with the ordered
+    test (`<`/`<=`/`>`/`>=`, either operand order, `index` or fixed-width
+    integer), read through the overflow casts the frontend wraps its arithmetic
+    in. A cross-width compare, whose promotion cast wraps the IV or the bound, is
+    peeled and the trip is taken at the compare width. A `!=` exit is raised only
+    when a constant step provably reaches a constant bound. The `before` region
+    must be a pure test (only the compare and its width casts), which keeps a
+    data-dependent exit on the uncounted flushing path; every unmatched
+    `scf.while` is left there too.
   }];
   let dependentDialects = [
     "mlir::scf::SCFDialect", "mlir::arith::ArithDialect"

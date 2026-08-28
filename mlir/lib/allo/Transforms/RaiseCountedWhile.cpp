@@ -38,6 +38,8 @@ struct AffineWhile {
   Value bound;
   int64_t delta;
   bool inclusive;
+  Type cmpTy;    // the width the exit test compares at, at least the IV width
+  bool ivSigned; // the IV was sign extended to cmpTy rather than zero extended
 };
 
 // Whether `v` is loop-invariant w.r.t. `w`: not defined inside either region.
@@ -127,35 +129,54 @@ static std::optional<AffineWhile> matchCountedWhile(scf::WhileOp w) {
     if (arg != before.getArgument(i))
       return std::nullopt;
 
-  // `before` is pure and holds only the comparison + the condition terminator.
-  // This is the fence that keeps a data-dependent exit (a load or a multi-cycle
-  // IP op in `before`) on the flushing path.
+  // `before` is pure and holds only the comparison plus the width casts a
+  // cross-width compare wraps its operands in. This is the fence that keeps a
+  // data-dependent exit (a load or a multi-cycle IP op in `before`) on the
+  // flushing path.
   auto cmp = cond.getCondition().getDefiningOp<arith::CmpIOp>();
   if (!cmp || cmp->getBlock() != &before)
     return std::nullopt;
   for (Operation &op : before.without_terminator())
-    if (&op != cmp.getOperation())
+    if (&op != cmp.getOperation() &&
+        !isa<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>(&op))
       return std::nullopt;
 
-  // One cmp operand is a before block-arg (the IV), the other is invariant.
-  auto ivArg = dyn_cast<BlockArgument>(cmp.getLhs());
-  Value bound = cmp.getRhs();
+  // One cmp operand is a before block-arg (the IV), possibly widened by a
+  // promotion cast; the other is a loop-invariant bound at the compare width.
+  Value ivSide = cmp.getLhs(), bound = cmp.getRhs();
+  auto ivArg = dyn_cast<BlockArgument>(peelCast(ivSide));
   bool ivOnLhs = true;
   if (!ivArg || ivArg.getOwner() != &before) {
-    ivArg = dyn_cast<BlockArgument>(cmp.getRhs());
+    ivSide = cmp.getRhs();
     bound = cmp.getLhs();
+    ivArg = dyn_cast<BlockArgument>(peelCast(ivSide));
     ivOnLhs = false;
   }
-  if (!ivArg || ivArg.getOwner() != &before || !isInvariant(bound, w))
+  if (!ivArg || ivArg.getOwner() != &before)
     return std::nullopt;
 
-  // Normalize the test to IV-on-lhs, then read its direction and inclusivity.
-  arith::CmpIPredicate pred =
-      ivOnLhs ? cmp.getPredicate() : swapOperands(cmp.getPredicate());
-  std::optional<std::pair<Dir, bool>> cls = classifyPredicate(pred);
-  if (!cls)
+  // The IV side is raw or a single extension to the compare width; a truncation
+  // is not monotone and an index cast is opaque to peelCast, so both are left
+  // on the flushing path.
+  Type cmpTy = cmp.getLhs().getType();
+  bool ivSigned = true;
+  if (ivSide != Value(ivArg)) {
+    Operation *c = ivSide.getDefiningOp();
+    if (!isa<arith::ExtSIOp, arith::ExtUIOp>(c) || c->getOperand(0) != ivArg)
+      return std::nullopt;
+    ivSigned = isa<arith::ExtSIOp>(c);
+  }
+
+  // The bound is invariant, possibly behind the promotion cast; that cast
+  // reconstructs before the loop from its invariant operand.
+  Value boundRoot = bound;
+  if (Operation *bc = bound.getDefiningOp(); bc && w->isProperAncestor(bc)) {
+    if (!isa<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>(bc))
+      return std::nullopt;
+    boundRoot = bc->getOperand(0);
+  }
+  if (!isInvariant(boundRoot, w))
     return std::nullopt;
-  auto [dir, inclusive] = *cls;
 
   // IV self-update: yield[k] is `addi(iv, c)` or `subi(iv, c)` with a constant
   // c, giving the signed step, read through the overflow casts. `subi(c, iv)`
@@ -185,6 +206,30 @@ static std::optional<AffineWhile> matchCountedWhile(scf::WhileOp w) {
   if (delta == 0)
     return std::nullopt;
 
+  // Normalize the test to IV-on-lhs and read its direction and inclusivity. A
+  // `ne` exit is counted only when a constant step reaches a constant bound
+  // exactly; a dynamic bound or a step that overshoots stays uncounted.
+  arith::CmpIPredicate pred =
+      ivOnLhs ? cmp.getPredicate() : swapOperands(cmp.getPredicate());
+  Dir dir;
+  bool inclusive;
+  if (pred == arith::CmpIPredicate::ne) {
+    std::optional<int64_t> ci = getConstantIntValue(w.getInits()[k]);
+    std::optional<int64_t> cb = getConstantIntValue(boundRoot);
+    if (!ci || !cb)
+      return std::nullopt;
+    int64_t span = *cb - *ci;
+    if (span == 0 || (span > 0) != (delta > 0) || span % delta != 0)
+      return std::nullopt;
+    dir = delta > 0 ? Dir::Increasing : Dir::Decreasing;
+    inclusive = false;
+  } else {
+    std::optional<std::pair<Dir, bool>> cls = classifyPredicate(pred);
+    if (!cls)
+      return std::nullopt;
+    std::tie(dir, inclusive) = *cls;
+  }
+
   // Direction agreement: the step's sign must match the exit test, else the
   // loop is non-terminating rather than counted.
   if ((dir == Dir::Increasing) != (delta > 0))
@@ -195,7 +240,8 @@ static std::optional<AffineWhile> matchCountedWhile(scf::WhileOp w) {
   if (!ivArg.getType().isIntOrIndex())
     return std::nullopt;
 
-  return AffineWhile{k, w.getInits()[k], bound, delta, inclusive};
+  return AffineWhile{k,         w.getInits()[k], bound,   delta,
+                     inclusive, cmpTy,           ivSigned};
 }
 
 struct RaiseCountedWhile : OpRewritePattern<scf::WhileOp> {
@@ -212,50 +258,69 @@ struct RaiseCountedWhile : OpRewritePattern<scf::WhileOp> {
 
     Value init = m->init;
     Type ivType = init.getType();
+    Type cmpTy = m->cmpTy;
     bool increasing = m->delta > 0;
     int64_t absDelta = increasing ? m->delta : -m->delta;
 
-    // A constant in the IV's own type (index or a fixed-width integer).
-    auto constIv = [ivType](OpBuilder &b, Location l, int64_t v) -> Value {
-      if (ivType.isIndex())
+    // A constant in a given integer or index type.
+    auto constOf = [](OpBuilder &b, Location l, Type ty, int64_t v) -> Value {
+      if (ty.isIndex())
         return arith::ConstantIndexOp::create(b, l, v);
-      return arith::ConstantIntOp::create(b, l, ivType, v);
+      return arith::ConstantIntOp::create(b, l, ty, v);
     };
 
-    // The IV value at counter position `count` (in the IV type):
-    // `init + count*delta`, which folds back to `count` for a unit-step
-    // zero-based increasing loop.
+    // The IV value at counter position `count` (an index): `init + count*delta`
+    // in the IV type, which folds back to `count` for a unit-step zero-based
+    // increasing loop.
     auto ivAt = [&](OpBuilder &b, Location l, Value count) -> Value {
+      Value c = ivType.isIndex()
+                    ? count
+                    : b.createOrFold<arith::IndexCastOp>(l, ivType, count);
       Value scaled =
-          b.createOrFold<arith::MulIOp>(l, count, constIv(b, l, m->delta));
+          b.createOrFold<arith::MulIOp>(l, c, constOf(b, l, ivType, m->delta));
       return b.createOrFold<arith::AddIOp>(l, scaled, init);
     };
+
+    // The exit compares at `cmpTy`: reconstruct the bound there (its promotion
+    // cast, if any, moves out of the loop) and lift the init to it, so the trip
+    // is the count of `init + k*delta` values that pass the test.
+    Value boundW = m->bound;
+    if (Operation *bc = m->bound.getDefiningOp(); bc && w->isProperAncestor(bc))
+      boundW = rewriter.clone(*bc)->getResult(0);
+    Value initW = init;
+    if (cmpTy != ivType)
+      initW =
+          m->ivSigned
+              ? arith::ExtSIOp::create(rewriter, loc, cmpTy, init).getResult()
+              : arith::ExtUIOp::create(rewriter, loc, cmpTy, init).getResult();
 
     // Trip count of init + k*delta: fold the inclusive test into an excluded
     // boundary so all four predicates share one span, then ceil-divide by
     // |delta|. createOrFold keeps a constant trip constant for the scheduler.
-    Value boundExcl = m->bound;
+    Value boundExcl = boundW;
     if (m->inclusive)
-      boundExcl = increasing ? rewriter.createOrFold<arith::AddIOp>(
-                                   loc, m->bound, constIv(rewriter, loc, 1))
-                             : rewriter.createOrFold<arith::SubIOp>(
-                                   loc, m->bound, constIv(rewriter, loc, 1));
+      boundExcl = increasing
+                      ? rewriter.createOrFold<arith::AddIOp>(
+                            loc, boundW, constOf(rewriter, loc, cmpTy, 1))
+                      : rewriter.createOrFold<arith::SubIOp>(
+                            loc, boundW, constOf(rewriter, loc, cmpTy, 1));
     Value span =
-        increasing ? rewriter.createOrFold<arith::SubIOp>(loc, boundExcl, init)
-                   : rewriter.createOrFold<arith::SubIOp>(loc, init, boundExcl);
+        increasing
+            ? rewriter.createOrFold<arith::SubIOp>(loc, boundExcl, initW)
+            : rewriter.createOrFold<arith::SubIOp>(loc, initW, boundExcl);
     Value numer = rewriter.createOrFold<arith::AddIOp>(
-        loc, span, constIv(rewriter, loc, absDelta - 1));
+        loc, span, constOf(rewriter, loc, cmpTy, absDelta - 1));
     Value trip = rewriter.createOrFold<arith::DivSIOp>(
-        loc, numer, constIv(rewriter, loc, absDelta));
+        loc, numer, constOf(rewriter, loc, cmpTy, absDelta));
     // Clamp a zero-trip loop (init already past the bound) to 0, so the bound
     // is empty and the exit IV below is the untouched init.
-    trip = rewriter.createOrFold<arith::MaxSIOp>(loc, trip,
-                                                 constIv(rewriter, loc, 0));
+    trip = rewriter.createOrFold<arith::MaxSIOp>(
+        loc, trip, constOf(rewriter, loc, cmpTy, 0));
 
     Value lb = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    Value ub = ivType.isIndex() ? trip
-                                : rewriter.createOrFold<arith::IndexCastOp>(
-                                      loc, rewriter.getIndexType(), trip);
+    Value ub = cmpTy.isIndex() ? trip
+                               : rewriter.createOrFold<arith::IndexCastOp>(
+                                     loc, rewriter.getIndexType(), trip);
     Value step = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
     // Carried (non-IV) iter-args, in order.
@@ -274,11 +339,8 @@ struct RaiseCountedWhile : OpRewritePattern<scf::WhileOp> {
     // value and the carried args to the iter-args. The IV self-update clones as
     // dead code and canonicalize removes it.
     auto build = [&](OpBuilder &b, Location l, Value iv, ValueRange iterArgs) {
-      Value count = ivType.isIndex()
-                        ? iv
-                        : b.createOrFold<arith::IndexCastOp>(l, ivType, iv);
       IRMapping map;
-      map.map(after.getArgument(m->ivIndex), ivAt(b, l, count));
+      map.map(after.getArgument(m->ivIndex), ivAt(b, l, iv));
       for (auto [r, idx] : llvm::enumerate(carriedIdx))
         map.map(after.getArgument(idx), iterArgs[r]);
       for (Operation &op : after.without_terminator())
@@ -302,7 +364,7 @@ struct RaiseCountedWhile : OpRewritePattern<scf::WhileOp> {
     if (!w.getResult(m->ivIndex).use_empty()) {
       rewriter.setInsertionPointAfter(forOp);
       rewriter.replaceAllUsesWith(w.getResult(m->ivIndex),
-                                  ivAt(rewriter, loc, trip));
+                                  ivAt(rewriter, loc, ub));
     }
     rewriter.eraseOp(w);
     return success();
