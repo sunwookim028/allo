@@ -26,7 +26,7 @@ canonicalize,
 cse,
 convert-allo-to-func,
 elide-dead-init,
-func.func(convert-linalg-to-affine-loops),legalize-arith,canonicalize,cse,
+func.func(convert-linalg-to-affine-loops,float-to-int),legalize-arith,canonicalize,cse,
 outline-loose-processes)
 """
 

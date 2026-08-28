@@ -691,6 +691,40 @@ def NarrowDemandedBitsPass
   let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
+def FloatToIntPass : Pass<"float-to-int", "func::FuncOp"> {
+  let summary = "Demote a provably integer-valued float cone to integer arithmetic";
+  let description = [{
+    A float computation whose values are all integers, fed in through
+    `sitofp`/`uitofp` and read back out through `fptosi`/`fptoui`/`cmpf`, builds
+    float arithmetic IP where integer operators would do. This pass walks up from
+    those float-to-int roots through the truncation-free float operators
+    (`addf`, `subf`, `mulf`, `negf`, `maximumf`/`minimumf`/`maxnumf`/`minnumf`,
+    and the float resizes `extf`/`truncf`) to the integer-to-float leaves,
+    tracking the integer range each value can take with `llvm::ConstantRange`, and
+    rewrites the whole cone to `addi`/`subi`/`muli`/`maxsi`/`minsi`/`cmpi` when the
+    range proves the rewrite exact. Min and max collapse to one signed op because
+    an integer-valued float is never NaN; a resize is the identity on the integer
+    value.
+
+    Float arithmetic on integers is exact only while the value stays inside the
+    type's exactly representable integer band (`2^24` for f32, `2^53` for f64).
+    Each op is held to its OWN float type's band, so a mixed-precision cone is
+    sound: an f64 subexpression may range past f32's band as long as it is not
+    truncated to f32 there. The accumulated range over-approximates every value,
+    so when each op needs no more signed bits than its mantissa holds, no
+    operation ever rounded and the integer replacement is bit-identical. A cone
+    whose range escapes its band, or that reads a fractional constant, a
+    non-finite constant, a loop-carried value, or `divf`/`remf`/`select`, is left
+    as float. Signedness follows the cast opcode: `sitofp`/`fptosi` sign extend,
+    `uitofp`/`fptoui` zero extend, and `cmpf` maps to a signed `cmpi`.
+
+    Being bit-exact it needs no fast-math flag. It runs before the integer
+    passes (and before min/max lower to compare+select), so the demoted cone is
+    balanced, narrowed and IP-bound as ordinary integer arithmetic.
+  }];
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 def LegalizeArithPass : Pass<"legalize-arith", "ModuleOp"> {
   let summary = "Device-IP-aware expansion of composite arith ops (RTL path)";
   let description = [{

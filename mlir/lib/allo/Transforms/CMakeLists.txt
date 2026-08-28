@@ -24,6 +24,7 @@ add_mlir_library(MLIRAlloTransforms
     RotateReductions.cpp
     TreeHeightReduction.cpp
     NarrowDemandedBits.cpp
+    FloatToInt.cpp
     LegalizeArith.cpp
     ExpandRegionBounds.cpp
 
@@ -47,4 +48,7 @@ add_mlir_library(MLIRAlloTransforms
     MLIRTransforms
     MLIRTransformUtils
     MLIRPass
+
+    LINK_COMPONENTS
+    Core
 )

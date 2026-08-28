@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from allo import kernel
-from allo.lang import bf16, f16, f32, i8, i16, i32, i64, u16, u32, KernelOptions
+from allo.lang import bf16, f16, f32, f64, i8, i16, i32, i64, u16, u32, KernelOptions
 from allo.lang.core import APInt
 from allo.lang.ip import operator_ip, OperatorType
 from allo.operators import math as amath
@@ -2072,6 +2072,249 @@ def test_narrow_trunc_bitwise_cosim():
     wide = (A.astype(np.int64) & 255) | ((B.astype(np.int64) ^ C.astype(np.int64)) << 1)
     ref = (wide & 0xFF).astype(np.uint8).astype(np.int8)
     assert np.array_equal(out, ref)
+
+
+def _run_f2i(ir: str) -> str:
+    """Parse hand-written IR and run `float-to-int` over it alone."""
+    from allo._mlir.ir import Module
+    from allo.backend.base import run_pipeline
+    from allo.backend.rtl.device import _scratch_context
+
+    with _scratch_context():
+        module = Module.parse(ir)
+        run_pipeline(module, "builtin.module(func.func(float-to-int))")
+        return str(module)
+
+
+# An integer-valued float cone (int cast in, arithmetic, cast/compare out) whose
+# range fits the mantissa is rewritten to integer ops: the casts become resizes,
+# the arithmetic becomes `addi`/`subi`, and no float op remains.
+def test_float_to_int_demotes_a_small_range_cone():
+    after = _run_f2i(
+        """
+        func.func @cone(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %s = arith.addf %fa, %fb : f32
+          %n = arith.negf %s : f32
+          %r = arith.fptosi %n : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    for gone in ("arith.sitofp", "arith.addf", "arith.negf", "arith.fptosi"):
+        assert gone not in after, after
+    assert "arith.addi" in after and "arith.subi" in after, after
+    assert "arith.extsi" in after, after
+
+
+# The demotion is exact only while every value stays inside the float type's
+# exactly representable integer band, so the guard is the mantissa width: an
+# `i16 * i16` product overflows f32's 24-bit band and stays float, but fits
+# f64's 53-bit band and demotes. The guard reads the cone's own float type.
+def test_float_to_int_guard_is_mantissa_bound():
+    kept = _run_f2i(
+        """
+        func.func @wide(%a: i16, %b: i16) -> i32 {
+          %fa = arith.sitofp %a : i16 to f32
+          %fb = arith.sitofp %b : i16 to f32
+          %m = arith.mulf %fa, %fb : f32
+          %r = arith.fptosi %m : f32 to i32
+          return %r : i32
+        }
+        """
+    )
+    assert "arith.mulf" in kept and "arith.muli" not in kept, kept
+
+    demoted = _run_f2i(
+        """
+        func.func @wide(%a: i16, %b: i16) -> i32 {
+          %fa = arith.sitofp %a : i16 to f64
+          %fb = arith.sitofp %b : i16 to f64
+          %m = arith.mulf %fa, %fb : f64
+          %r = arith.fptosi %m : f64 to i32
+          return %r : i32
+        }
+        """
+    )
+    assert "arith.muli" in demoted and "arith.mulf" not in demoted, demoted
+
+
+# A float compare of integer-valued floats becomes a signed integer compare; the
+# ordered and unordered forms of a predicate both map to it (the operands are
+# never NaN).
+def test_float_to_int_demotes_a_compare():
+    after = _run_f2i(
+        """
+        func.func @cmp(%a: i8, %b: i8) -> i1 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %c = arith.cmpf ogt, %fa, %fb : f32
+          return %c : i1
+        }
+        """
+    )
+    assert "arith.cmpi sgt" in after, after
+    assert "arith.cmpf" not in after and "arith.sitofp" not in after, after
+
+
+# The demotion fires only where it is exact: a divide has no exact integer image,
+# a fractional constant is not an integer, and a loop-carried accumulator leaves
+# the cone open. All three keep their float ops.
+def test_float_to_int_leaves_inexact_cones_float():
+    div = _run_f2i(
+        """
+        func.func @d(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %q = arith.divf %fa, %fb : f32
+          %r = arith.fptosi %q : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.divf" in div and "arith.divi" not in div, div
+
+    frac = _run_f2i(
+        """
+        func.func @f(%a: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %k = arith.constant 1.5 : f32
+          %m = arith.mulf %fa, %k : f32
+          %r = arith.fptosi %m : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.mulf" in frac, frac
+
+    carried = _run_f2i(
+        """
+        func.func @c(%n: index, %a: i8) -> i32 {
+          %c0 = arith.constant 0 : index
+          %c1 = arith.constant 1 : index
+          %fa = arith.sitofp %a : i8 to f32
+          %init = arith.constant 0.0 : f32
+          %sum = scf.for %i = %c0 to %n step %c1 iter_args(%acc = %init) -> f32 {
+            %next = arith.addf %acc, %fa : f32
+            scf.yield %next : f32
+          }
+          %r = arith.fptosi %sum : f32 to i32
+          return %r : i32
+        }
+        """
+    )
+    assert "arith.addf" in carried and "arith.addi" not in carried, carried
+
+
+# End to end: a kernel that casts int to float, adds, and stores back to an int
+# array demotes to integer arithmetic (no float op survives) and cosims
+# bit-exact against the integer reference.
+def test_float_to_int_cosim():
+    N = 8
+
+    @kernel
+    def demote(A: i8[N], B: i8[N], out: i16[N]):
+        for i in range(N):
+            x: f32 = A[i]
+            y: f32 = B[i]
+            out[i] = x + y
+
+    kinds = _op_kinds(demote)
+    assert kinds["addi"] >= 1
+    assert kinds["addf"] == 0 and kinds["sitofp"] == 0 and kinds["fptosi"] == 0
+
+    rng = np.random.default_rng(0)
+    A = rng.integers(-128, 128, size=N, dtype=np.int8)
+    B = rng.integers(-128, 128, size=N, dtype=np.int8)
+    out = np.zeros(N, np.int16)
+    _to_rtl(demote).cosim(A, B, out)
+    assert np.array_equal(out, A.astype(np.int16) + B.astype(np.int16))
+
+
+# Float min and max of integer-valued (never-NaN) operands demote to signed
+# integer min/max; all four NaN variants collapse to one op. It fires end to end
+# even though min/max lower to compare+select, because the demotion runs first.
+def test_float_to_int_demotes_min_max():
+    after = _run_f2i(
+        """
+        func.func @mm(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %x = arith.maxnumf %fa, %fb : f32
+          %y = arith.minimumf %x, %fa : f32
+          %r = arith.fptosi %y : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.maxsi" in after and "arith.minsi" in after, after
+    for gone in ("arith.maxnumf", "arith.minimumf", "arith.sitofp", "arith.fptosi"):
+        assert gone not in after, after
+
+    N = 8
+
+    @kernel
+    def relu(A: i8[N], out: i16[N]):
+        for i in range(N):
+            x: f32 = A[i]
+            out[i] = max(x, 0.0)
+
+    assert _op_kinds(relu)["maxsi"] >= 1 and _op_kinds(relu)["maxnumf"] == 0
+    A = np.random.default_rng(4).integers(-128, 128, size=N, dtype=np.int8)
+    out = np.zeros(N, np.int16)
+    _to_rtl(relu).cosim(A, out)
+    assert np.array_equal(out, np.maximum(A.astype(np.int16), 0))
+
+
+# A cone that changes float width demotes as long as each op stays exact in its
+# OWN type: extf is always exact and vanishes; truncf demotes only when the value
+# fits the narrower type, so an f64 product that overflows f32 keeps its floats.
+def test_float_to_int_crosses_float_widths():
+    widened = _run_f2i(
+        """
+        func.func @w(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f32
+          %fb = arith.sitofp %b : i8 to f32
+          %s = arith.addf %fa, %fb : f32
+          %e = arith.extf %s : f32 to f64
+          %r = arith.fptosi %e : f64 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.addi" in widened, widened
+    for gone in ("arith.extf", "arith.addf", "arith.sitofp"):
+        assert gone not in widened, widened
+
+    exact = _run_f2i(
+        """
+        func.func @te(%a: i8, %b: i8) -> i16 {
+          %fa = arith.sitofp %a : i8 to f64
+          %fb = arith.sitofp %b : i8 to f64
+          %s = arith.addf %fa, %fb : f64
+          %t = arith.truncf %s : f64 to f32
+          %r = arith.fptosi %t : f32 to i16
+          return %r : i16
+        }
+        """
+    )
+    assert "arith.addi" in exact and "arith.truncf" not in exact, exact
+
+    rounds = _run_f2i(
+        """
+        func.func @tr(%a: i16, %b: i16) -> i32 {
+          %fa = arith.sitofp %a : i16 to f64
+          %fb = arith.sitofp %b : i16 to f64
+          %m = arith.mulf %fa, %fb : f64
+          %t = arith.truncf %m : f64 to f32
+          %r = arith.fptosi %t : f32 to i32
+          return %r : i32
+        }
+        """
+    )
+    assert "arith.mulf" in rounds and "arith.truncf" in rounds, rounds
+    assert "arith.muli" not in rounds, rounds
 
 
 # A loop-carried integer scalar is built at its recurrence envelope, not at its
