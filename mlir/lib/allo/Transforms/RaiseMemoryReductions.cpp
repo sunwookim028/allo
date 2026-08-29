@@ -196,7 +196,6 @@ struct RaiseMemoryReductionsPass
 
   void runOnOperation() override {
     // One loop per sweep: raising rebuilds the loop, so re-walk the fresh IR.
-    // A raised inner loop is left with no memory reduction to find again.
     bool changed = true;
     while (changed) {
       changed = false;

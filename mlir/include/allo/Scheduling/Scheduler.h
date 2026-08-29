@@ -531,13 +531,12 @@ struct SchedulerOptions {
   /// to budget / workers seconds of wall-clock; the optimum then depends on
   /// thread timing, so no exact solve is reproducible.
   bool deterministic = true;
-  /// Span the area minimization may pay beyond the minimal span, as a fraction
-  /// of the exact solver's own proven span. Zero ships no slower: the area is
-  /// minimized under the tightest span. A positive value trades that much span
-  /// for a smaller design, opening the intervals (and, in a straight-line
-  /// region, the drain depth) whose span stays within `span * (1 + areaSlack)`,
-  /// where a wider schedule can fold operations onto fewer units. Read by the
-  /// exact solver alone; the heuristic minimizes span only.
+  /// Span the area minimization may pay beyond the exact solver's proven span,
+  /// as a fraction of it. Zero minimizes area under the tightest span and ships
+  /// no slower. A positive value trades span for a smaller design, opening the
+  /// intervals (and, in a straight-line region, the drain depth) whose span
+  /// stays within `span * (1 + areaSlack)`, where a wider schedule folds
+  /// operations onto fewer units. Read by the exact solver alone.
   double areaSlack = 0.0;
   /// Register-to-register floor (ns): the earliest sub-cycle start any op may
   /// take. Combinational rows carry their measured delay less the floor, so a

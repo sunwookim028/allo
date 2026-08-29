@@ -1009,7 +1009,7 @@ struct FuseDivRem : OpRewritePattern<RemOp> {
                                 PatternRewriter &rewriter) const override {
     Value x = rem.getLhs(), y = rem.getRhs();
     if (y.template getDefiningOp<arith::ConstantOp>())
-      return failure(); // a constant divisor goes to the reciprocal patterns
+      return failure();
     DivOp div;
     for (Operation *user : x.getUsers())
       if (auto d = dyn_cast<DivOp>(user); d &&

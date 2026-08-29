@@ -75,8 +75,8 @@ def test_area_slack_needs_the_exact_scheduler():
 
 
 def test_rejects_the_removed_area_objective():
-    # O="area" is gone: minimizing area is now the cycles solve's second pass,
-    # steered by area_slack. The removed value is refused, not silently mapped.
+    # O="area" is refused, not silently mapped; area is the cycles solve second
+    # pass, steered by area_slack.
     with pytest.raises(ValueError, match="unknown objective"):
         _to_rtl(_mixed_kernel()).set_scheduler_opt(O="area")
 

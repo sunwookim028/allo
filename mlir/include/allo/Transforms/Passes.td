@@ -715,7 +715,7 @@ def FloatToIntPass : Pass<"float-to-int", "func::FuncOp"> {
 
     Float arithmetic on integers is exact only while the value stays inside the
     type's exactly representable integer band (`2^24` for f32, `2^53` for f64).
-    Each op is held to its OWN float type's band, so a mixed-precision cone is
+    Each op is held to its own float type's band, so a mixed-precision cone is
     sound: an f64 subexpression may range past f32's band as long as it is not
     truncated to f32 there. The accumulated range over-approximates every value,
     so when each op needs no more signed bits than its mantissa holds, no

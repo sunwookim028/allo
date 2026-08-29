@@ -605,9 +605,9 @@ void DatapathBuilder::recordRegionResults() {
         RegionResult res;
         res.init = resolveValue(inits[k]);
         // A rotated reduction shifts its datum across N accumulators; iter-arg
-        // k reads the datum k iterations back. `traceIterArgSource` walks that
-        // shift to the datum, and its distance is the tap the final value sits
-        // on. A plain result traces to itself (distance 0) and reads `next`.
+        // k reads it k iterations back, so the final value sits on tap k of the
+        // shift chain. A plain result traces to itself (distance 0), reading
+        // `next`.
         SmallVector<unsigned, 2> chain;
         Value datum = traceIterArgSource(pipe, k, chain);
         if (datum && chain.size() > 1) {

@@ -487,13 +487,12 @@ bool shiftSinks(Operation *op, IntegerType narrow) {
 }
 
 // trunc_w(op(a, b)) -> op(trunc_w(a), trunc_w(b)), moving the truncation toward
-// the leaves so the operator is built at the width its consumer reads. The
-// truncations left behind meet the extends bit growth introduced and fold,
-// exposing the next operator up to the same rewrite. Ring and bitwise operators
-// commute with truncation; a constant-amount shift does under `shiftSinks`. A
-// select is bit-wise in its two arms, so the truncation sinks into them while
-// its condition passes through; division, remainder, compare, min and max read
-// the high bits and stop the sink.
+// the leaves so the operator is built at the width its consumer reads; the
+// leftover truncations fold into the extends up the chain. Ring and bitwise
+// operators commute with truncation, a constant-amount shift does under
+// `shiftSinks`, and a select is bit-wise in its arms with its condition passing
+// through. Division, remainder, compare, min and max read the high bits and
+// stop the sink.
 struct SinkTruncThroughOp : OpRewritePattern<arith::TruncIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -555,7 +554,7 @@ struct DropRedundantMask : OpRewritePattern<arith::AndIOp> {
 
 // `x | y` -> `x` when every bit `y` would set is already one in `x`, or `y`
 // never sets it: an OR that contributes no new bits. The dual of the redundant
-// AND mask (One and Zero swapped), for an OR-splice over a field already set.
+// AND mask, One and Zero swapped.
 struct DropRedundantOr : OpRewritePattern<arith::OrIOp> {
   using OpRewritePattern::OpRewritePattern;
 

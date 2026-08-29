@@ -252,10 +252,10 @@ unsigned HWEmitter::captureResults(const uarch::RegionBlock &rb,
     unsigned stage = dp.readyCycle(r.value);
     Value cap = ctx.delayValid(captureOn, stage, sh);
     Value res = datapath.resolveSource(r.value);
-    // A rotated reduction's slot k is the datum delayed k iterations. Its shift
-    // chain holds every live partial sum without stranding the last ones (a
-    // pulse-clocked shift would), so tap `k * ii` of it, captured on the same
-    // pulse as the head so every slot latches its own iteration's value.
+    // A rotated reduction's slot k is the datum delayed k iterations. The shift
+    // chain holds every live partial sum (a pulse-clocked shift would strand
+    // the last ones), so tap `k * ii`, captured on the head pulse so every slot
+    // latches its own iteration's value.
     if (r.shiftTap) {
       unsigned depth = r.shiftTap * ii;
       ShiftChain sc = phase && depth > 1

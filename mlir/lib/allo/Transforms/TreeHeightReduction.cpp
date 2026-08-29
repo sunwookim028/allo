@@ -27,9 +27,9 @@ using namespace mlir::allo;
 
 namespace {
 
-// An associative operator family balanced in "direct" mode (as opposed to the
-// widened integer idiom, handled separately). `sub` joins `add` in the additive
-// family, where it means adding a sign-flipped leaf; the rest are single-op.
+// An associative operator family balanced in direct mode (the widened integer
+// idiom is handled separately). `sub` joins `add` in the additive family as a
+// sign-flipped leaf; the rest are single-op.
 enum class Family { None, Additive, Mul, And, Or, Xor };
 
 Family familyOf(Operation *op) {
@@ -65,8 +65,7 @@ bool hasIntOverflow(Operation *op) {
   return false;
 }
 
-// A fresh binary arith op named `opName` over (x, y) with default attributes,
-// naming the operator directly so a sum can be built for a subtraction tree.
+// A fresh binary arith op named `opName` over (x, y) with default attributes.
 Value emitBin(OpBuilder &b, Location loc, StringRef opName, Value x, Value y) {
   OperationState state(loc, opName);
   state.addOperands({x, y});
@@ -77,9 +76,8 @@ Value emitBin(OpBuilder &b, Location loc, StringRef opName, Value x, Value y) {
 unsigned ceilLog2(unsigned k) { return k <= 1 ? 0 : llvm::Log2_32_Ceil(k); }
 
 // Balancing a carried reduction trades area (a wider tree) for a shorter
-// recurrence, which only pays back over enough iterations. A dynamic or tiny
-// trip count leaves the recurrence linear rather than spending the area on a
-// throughput win that a triangular / short loop never realizes.
+// recurrence, paying back only over enough iterations; a dynamic or tiny trip
+// count leaves the recurrence linear.
 constexpr uint64_t kMinCarriedTrip = 4;
 
 bool carriedTripPays(Operation *root) {
@@ -297,10 +295,9 @@ struct TreeHeightReductionPass
 
     unsigned n = leaves.size();
     // A carried tree is a reduction: folding the accumulator at the root drops
-    // the recurrence from n operators to 1, worthwhile from n>=3 over a loop
-    // whose trip amortizes the wider tree. A non-carried tree only wins by
-    // shortening its datapath, so it must beat the linear chain and clear four
-    // leaves.
+    // the recurrence from n operators to 1, worth it from n>=3 when the trip
+    // amortizes the wider tree. A non-carried tree only shortens its datapath,
+    // so it must beat the linear chain and clear four leaves.
     bool improves = carried.empty()
                         ? (n >= 4 && directDepth(fam, leaves) < n - 1)
                         : (n >= 3 && carriedTripPays(root));

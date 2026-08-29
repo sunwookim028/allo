@@ -768,10 +768,9 @@ struct RegionResult {
   Source value;
   Source init;
   Source elseValue;
-  /// Nonzero when `value` is a rotated reduction's recurrence datum and this
-  /// result is that datum delayed `shiftTap` iterations, read off tap
-  /// `shiftTap * ii` of its shift chain at emit. 0 for an ordinary result,
-  /// which `value` gives directly.
+  /// Nonzero when `value` is a rotated reduction's datum and this result is it
+  /// delayed `shiftTap` iterations, read off tap `shiftTap * ii` of the shift
+  /// chain at emit. 0 for an ordinary result, which `value` gives directly.
   unsigned shiftTap = 0;
 };
 

@@ -2545,22 +2545,16 @@ LogicalResult mlir::allo::scheduleCPSAT(ChainingModuloProblem &prob,
   }
 
   // The span scan's per-interval area tie-break runs on a capped share of the
-  // budget (kAreaTieBreakShare) and may not prove the area minimal: a proven
-  // span then ships the datapath at the scan's incidental allocation. Re-solve
-  // in the area order over the interval envelope the proven span admits, seeded
-  // from the incumbent and on a fresh budget the area solve releases early once
-  // it stops improving, so the fewest units hold. At the default `areaSlack` of
-  // zero the envelope is the winning interval alone (the fold that shortens the
-  // datapath under the proven span); a positive slack opens every interval
-  // whose span stays within `best * (1 + areaSlack)`, where a wider II can fold
-  // operations onto fewer units for a schedule the strict span would refuse.
-  // A fold whose own area solve runs out of budget ships an unminimized
+  // budget (kAreaTieBreakShare) and may not prove the area minimal, so a proven
+  // span ships at the scan's incidental allocation. Re-solve in the area order
+  // over the interval envelope the proven span admits, seeded from the
+  // incumbent on a fresh budget released early once it stops improving, so the
+  // fewest units hold. At `areaSlack` zero the envelope is the winning interval
+  // alone; a positive slack opens every interval whose span stays within `best
+  // * (1 + areaSlack)`, where a wider II folds operations onto fewer units. A
+  // fold whose own area solve runs out of budget ships an unminimized
   // bootstrap, so it is adopted only where its modeled area beats the
   // incumbent's (or none was found), a tie going to the shorter span.
-  // A proven tight-span area still leaves the envelope worth searching under a
-  // positive slack: a wider interval can be smaller than the tightest span's
-  // own minimum. At slack zero the fold only shortens the datapath at the
-  // winning interval, which a proven area already settles.
   bool foldedArea = false;
   bool hasAreaDecision = allocates || !choices.empty() || !span.regs.empty() ||
                          span.device.pulsePrice();

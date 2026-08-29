@@ -71,13 +71,11 @@ def run_schedule(
     )
     part = f"reconcile-array-directives{{top={top}}}"
     scalarize = f"scalarize-memory{{max-elements={prepass.scalarize_threshold}}}"
-    # `raise-memory-reductions` runs twice: once before `{loops}` so a reduction
-    # nested in a pipelined loop is on an iter_arg before unrolling, and again
-    # after `fold-if-statements`, which turns a guarded `if c: M += x` into a
-    # plain reduction (its guard folded into the loop bound or a select) the
-    # first run could not see. `float-to-int` runs a second time here, after
-    # if-conversion and reduction raising, to demote the `select` cones and
-    # reduction iter_args the earlier run in RTL_PREPARE could not yet see.
+    # `raise-memory-reductions` runs twice: before `{loops}` to reach a reduction
+    # nested in a pipelined loop before unrolling, and after `fold-if-statements`
+    # exposes a guarded `if c: M += x` the first run could not see. `float-to-int`
+    # runs again after if-conversion and reduction raising, to demote the `select`
+    # cones and reduction iter_args the RTL_PREPARE run could not.
     pipeline = (
         f"builtin.module(canonicalize,cse,func.func(raise-to-affine,cse,"
         f"raise-counted-while,raise-memory-reductions,{loops},"

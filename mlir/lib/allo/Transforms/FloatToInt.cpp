@@ -30,16 +30,15 @@ using llvm::ConstantRange;
 
 namespace {
 
-// The analysis works one bit wider than any integer we will emit, so a full
-// 64-bit source range never wraps while its endpoints are widened and combined.
+// One bit wider than any integer emitted, so a full 64-bit source range never
+// wraps as its endpoints widen and combine.
 constexpr unsigned kMaxIntBW = 64;
 constexpr unsigned kW = kMaxIntBW + 1;
 
-// A demotable float cone runs from integer-to-float leaves, through the
-// truncation-free float arithmetic, to a float-to-int or float-compare root.
-// Each value carries the integer range it can take; a cone is demoted only when
-// that range fits the float type's exactly representable integer band, which is
-// the proof that no operation in it ever rounded.
+// A demotable float cone runs from integer-to-float leaves through
+// truncation-free float arithmetic to a float-to-int or float-compare root.
+// Each value carries the integer range it can take; the cone demotes only when
+// that range fits the float type's exactly representable integer band.
 struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
   using Base::Base;
 
@@ -59,9 +58,9 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
       it->second = r;
   }
 
-  // The ordered and unordered forms of a predicate map to the same signed
-  // integer predicate: a value out of an integer-to-float cast is never a NaN,
-  // so the two agree. Predicates that only distinguish NaN have no image.
+  // Ordered and unordered forms map to the same signed integer predicate: a
+  // value out of an integer-to-float cast is never NaN. NaN-only predicates
+  // have no image.
   static std::optional<arith::CmpIPredicate> mapPred(arith::CmpFPredicate p) {
     using F = arith::CmpFPredicate;
     using I = arith::CmpIPredicate;
@@ -89,8 +88,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
     }
   }
 
-  // Float min/max of integer-valued (never-NaN) operands is a plain integer
-  // min/max, so all four NaN variants collapse to one signed op.
+  // Float min/max of never-NaN operands is a plain integer min/max; all four
+  // NaN variants collapse to one signed op.
   static bool isMinMax(Operation *op) {
     return isa<arith::MaximumFOp, arith::MinimumFOp, arith::MaxNumFOp,
                arith::MinNumFOp>(op);
@@ -103,8 +102,7 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
   static bool isRoot(Operation *op) {
     return isa<arith::FPToSIOp, arith::FPToUIOp, arith::CmpFOp>(op);
   }
-  // A scalar float or integer value can carry a range; a vector cannot, and its
-  // op poisons the cone.
+  // Only a scalar float or integer carries a range; a vector poisons the cone.
   static bool isScalar(Type t) { return isa<FloatType, IntegerType>(t); }
 
   void findRoots(func::FuncOp fn) {
@@ -113,8 +111,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
         if (isScalar(op->getOperand(0).getType()))
           roots.insert(op);
       } else if (auto c = dyn_cast<arith::CmpFOp>(op)) {
-        // A NaN test on integer valued operands folds to a constant, so uno and
-        // ord are roots too even though they have no signed integer predicate.
+        // uno and ord fold to a constant on integer-valued operands, so they
+        // are roots too despite having no signed integer predicate.
         using F = arith::CmpFPredicate;
         bool nanTest = c.getPredicate() == F::UNO || c.getPredicate() == F::ORD;
         if (isScalar(c.getLhs().getType()) &&
@@ -130,8 +128,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
       if (seen.count(op))
         continue;
 
-      // A cast into float seeds the analysis with its input integer width and
-      // stops the walk; the integer operand is left untouched.
+      // A float cast seeds the analysis with its input integer width and stops
+      // the walk; the integer operand is left untouched.
       if (auto s = dyn_cast<arith::SIToFPOp>(op)) {
         unsigned bw = s.getIn().getType().getIntOrFloatBitWidth();
         mark(op,
@@ -152,8 +150,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
         continue;
       }
 
-      // A select carries the cone through its two arms; its condition is an i1
-      // left untouched, so the scan skips operand 0.
+      // A select carries the cone through its two arms; the scan skips operand
+      // 0, its i1 condition.
       unsigned first = isa<arith::SelectOp>(op) ? 1 : 0;
       for (unsigned i = first, e = op->getNumOperands(); i < e; ++i) {
         Value o = op->getOperand(i);
@@ -339,9 +337,9 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
           continue;
         convertible = true;
         // Each op is exact only while its value fits its own float type's
-        // representable integer band. Per-op is what makes mixed precision
-        // sound: an f64 subexpression may exceed f32's band unless truncated to
-        // f32 there.
+        // representable integer band. Per-op keeps mixed precision sound: an
+        // f64 subexpression may exceed f32's band unless truncated to f32
+        // there.
         unsigned bits = it->second.getMinSignedBits() + 1;
         unsigned band =
             cast<FloatType>(op->getResult(0).getType()).getFPMantissaWidth() -
@@ -350,8 +348,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
           fail = true; // the float result may have rounded; leave it float
           break;
         }
-        // A non-root value must be consumed only inside the cone, or it still
-        // leaves as a float and the rewrite would drop that use.
+        // A non-root value must be used only inside the cone, else it leaves as
+        // a float and the rewrite would drop that use.
         for (Operation *user : op->getResult(0).getUsers())
           if (!seen.count(user)) {
             fail = true;
@@ -633,9 +631,8 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
     DenseSet<Operation *> redOps;
     for (const Reduction &r : reds)
       redOps.insert(r.op);
-    // Every float op in the body must fold into a demoted reduction, or the
-    // rebuild would strand a float value on an integer carrier. A stray float
-    // op leaves the loop alone.
+    // Every body float op must belong to a demoted reduction, else the rebuild
+    // strands a float value on an integer carrier.
     for (Operation &o : fo.getBody()->without_terminator())
       if ((isInterior(&o) || isRoot(&o)) && !coneTy.count(&o) &&
           !redOps.count(&o))
@@ -675,7 +672,7 @@ struct FloatToIntPass : allo::impl::FloatToIntPassBase<FloatToIntPass> {
     validateAndTransform();
 
     // The demoted float ops are dead; erase uses before defs. Their float
-    // constant operands are left for the downstream canonicalize/cse.
+    // constant operands are left to canonicalize/cse.
     for (auto &kv : llvm::reverse(converted))
       kv.first->erase();
 

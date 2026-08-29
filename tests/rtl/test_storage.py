@@ -1487,9 +1487,8 @@ def test_initialized_array_handed_to_a_sub_kernel(child):
 # with timing of its own. That split is why the vocabulary is open, and an
 # `impl=` resolves against it BY NAME.
 def test_a_device_can_declare_a_storage_of_its_own():
-    # A name the compiler has never heard of resolves all the same: `bind_storage`
-    # maps `y` onto the device's own `mram` row, which every kernel then reads at
-    # the latency the device declared for it.
+    # An unknown storage name resolves all the same: `bind_storage` maps `y` onto
+    # the device's own `mram` row, read at the latency the device declares.
     @kernel
     def mv(A: f32[8, 8], x: f32[8], out: f32[8]):
         y: f32[8] = 0
@@ -3101,9 +3100,8 @@ def test_a_rolling_small_array_keeps_ported_storage():
 def test_a_large_all_constant_array_dissolves_to_registers():
     # The element-count cap bounds only a variable subscript, which pays a read
     # mux and a write demux. Every subscript here is the constant 0, so the array
-    # dissolves into wired registers with no mux and is scalarized at any size:
-    # 24 elements is past the 16-element cap yet still becomes a register file,
-    # its untouched cells folding away.
+    # dissolves into wired registers and scalarizes at any size: 24 elements is
+    # past the 16-element cap yet still becomes a register file.
     def build():
         @kernel
         def cross(A: i32[8], B: i32[8]):

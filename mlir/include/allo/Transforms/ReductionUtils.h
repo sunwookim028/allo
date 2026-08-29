@@ -14,9 +14,10 @@
 #include "mlir/IR/Operation.h"
 #include "llvm/ADT/STLExtras.h"
 
-// Helpers shared by the reduction-restructuring passes (reassociate-reductions,
-// rotate-reductions), which recognize associative reductions and rebuild them
-// as balanced trees / rotated accumulators.
+// Helpers shared by the reduction-restructuring passes
+// (raise-memory-reductions, rotate-reductions, tree-height-reduction), which
+// recognize associative reductions and rebuild them as balanced trees / rotated
+// accumulators.
 //
 // Three operator shapes are recognized:
 //   * float: a bare `arith.addf` / `arith.mulf`;
@@ -170,9 +171,8 @@ using WeightedValue = std::pair<Value, double>;
 
 // Build a minimum-weighted-height tree over `nodes`, merging the two lightest
 // each round; a merged node's weight is `max(child weights) + opWeight`.
-// `combine(a, b)` emits the combining operator. Equal or zero weights give a
-// plain balanced tree, so this is a strict generalization of buildBalancedTree.
-// `nodes` must be non-empty and is consumed.
+// `combine(a, b)` emits the operator. Equal or zero weights give a plain
+// balanced tree. `nodes` must be non-empty and is consumed.
 inline Value
 buildWeightedTree(SmallVectorImpl<WeightedValue> &nodes, double opWeight,
                   llvm::function_ref<Value(Value, Value)> combine) {

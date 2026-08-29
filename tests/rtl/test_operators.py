@@ -1466,11 +1466,10 @@ def test_bit_field_write_drops_redundant_masks():
 
 
 def test_disjoint_or_is_a_concatenation():
-    # Two values sharing no set bit concatenate rather than combine: every result
-    # bit takes one side while the other contributes a constant zero. Disjoint
-    # ORs chained cost nothing and settle at one sub-cycle position, where
-    # overlapping ones spread a gate delay apart. The forward bit walk in
-    # `narrow-demanded-bits` is what tells them apart.
+    # Values sharing no set bit concatenate rather than combine, so chained
+    # disjoint ORs cost nothing and settle at one sub-cycle position; overlapping
+    # ORs each cost a gate and spread a gate delay apart. `narrow-demanded-bits`
+    # tells them apart by a forward bit walk.
     @kernel
     def disjoint(A: u32[64], B: u32[64], C: u32[64]):
         for i in range(64):
@@ -1747,11 +1746,9 @@ def test_rotate_reduction_scales_ii():
     assert mixed_ii(FADD) == 1
 
 
-# `accumulators=-1` is auto: the pass reads the reduction operator's latency L
-# at the target clock and rotates on exactly L accumulators, the least count
-# that brings II to 1. A fixed count cannot track L, which deepens with the
-# clock; auto does. The unrotated II (accumulators=0) is L itself, so the auto
-# result is checked against it rather than a hard-coded latency.
+# `accumulators=-1` is auto: rotate on exactly the operator latency L at the
+# target clock, the least count reaching II=1. A fixed count cannot track L as it
+# deepens with the clock; the unrotated II (accumulators=0) is L, checked here.
 def test_rotate_reduction_auto_tracks_operator_latency():
     @kernel
     def red(x: f32[256]) -> f32:
@@ -1806,9 +1803,9 @@ def test_rotate_multiple_reductions_in_one_loop():
     assert np.allclose(out[1], (y * 2.0).sum(), rtol=1e-3, atol=1e-3)
 
 
-# Only a LEAF reduction rotates: the emitter builds the rotated shift register on
-# a childless modulo loop. A container reduction (`total += inner_sum`) is left
-# unrotated -- rotating it would double-count, so cosim pins the nest's sum.
+# Only a leaf reduction rotates: the emitter builds the rotated shift register on
+# a childless modulo loop. A container reduction (`total += inner_sum`) stays
+# unrotated; rotating it would double-count, so cosim pins the nest's sum.
 def test_rotate_leaves_container_reduction_alone():
     @kernel
     def nred(A: f32[8, 8], out: f32[1]):
@@ -1899,10 +1896,9 @@ def test_tree_height_reduction_cosim_mixed_sign():
     )
 
 
-# A mixed-sign carried reduction `acc = acc + a - b`: neither predecessor pass
-# handled it (reassociate never matched `sub`, and the split THR skipped carried
-# trees). The merged pass folds the carried accumulator at the root so the
-# recurrence spans one operator, and the result stays numerically correct.
+# A mixed-sign carried reduction `acc = acc + a - b`: the additive family treats
+# `sub` as a sign flip, so the pass folds the carried accumulator at the root and
+# the recurrence spans one operator, the result staying numerically correct.
 def test_tree_height_reduction_carried_mixed_sign():
     @kernel
     def r(a: f32[64], b: f32[64]) -> f32:
@@ -2330,7 +2326,7 @@ def test_float_to_int_demotes_min_max():
 
 
 # A cone that changes float width demotes as long as each op stays exact in its
-# OWN type: extf is always exact and vanishes; truncf demotes only when the value
+# own type: extf is always exact and vanishes; truncf demotes only when the value
 # fits the narrower type, so an f64 product that overflows f32 keeps its floats.
 def test_float_to_int_crosses_float_widths():
     widened = _run_f2i(

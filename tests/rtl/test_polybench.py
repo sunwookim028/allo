@@ -467,13 +467,11 @@ def test_stencil_ii_port_vs_recurrence_bound():
     assert np.allclose(A, Ag, **FTOL)
     assert np.allclose(B, Bg, **FTOL)
 
-    # seidel_2d: a 9-point Gauss-Seidel sweep updates A in place, so A[i,j-1]
-    # reads a value written the previous iteration. The divide is strength-
-    # reduced to a reciprocal multiply and that carried tap folded in last, so
-    # the II is the one-operator recurrence add -> reciprocal-multiply -> store,
-    # well below the old divide-bound II, and still set by the recurrence rather
-    # than by ports. The grid is kept above the size at which the perfect nest
-    # flattens into a modular index the carried-tap analysis cannot read.
+    # seidel_2d: an in-place 9-point Gauss-Seidel sweep carries A[i,j-1] from the
+    # prior iteration. The divide strength-reduces to a reciprocal multiply and
+    # that tap folds in last, so the recurrence, not the ports, sets the II. The
+    # grid stays above the size where the nest flattens into a modular index the
+    # carried-tap analysis cannot read.
     SN = 8
 
     @kernel
