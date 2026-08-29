@@ -33,6 +33,9 @@ parameters:
   clock_period: 10.0
   sdf_corner: typ
   waveform: True
+  # error: a completed simulation must pass; report: preserve a failed report
+  # and allow downstream summary/reporting nodes to run.
+  bagl_failure_policy: error
   sdf_warning_policy: report
   sdf_unmatched_timingcheck_policy: report
   sdf_unmatched_iopath_policy: report
@@ -58,7 +61,7 @@ preconditions:
       import json
       from pathlib import Path
       backend = json.loads(Path('inputs/testbench-contract.json').read_text()).get('backend')
-      assert backend in {'vitis', 'catapult'}
+      assert backend in {'vitis', 'catapult', 'systemc'}
       assert backend != 'vitis' or Path('inputs/vitis-axi-memory-bfm.sv').is_file()
       assert backend != 'vitis' or Path('inputs/vitis-axilite-master-bfm.sv').is_file()
 
@@ -74,16 +77,25 @@ postconditions:
       import json
       from pathlib import Path
       report = json.loads(Path('outputs/simulation-report.json').read_text())
+      config = Path('configure.yml').read_text()
+      failure_policy = (
+          'report' if 'bagl_failure_policy: report' in config else 'error'
+      )
+      assert (
+          'bagl_failure_policy: report' in config or
+          'bagl_failure_policy: error' in config
+      )
       assert report['mode'] == 'bagl'
-      assert report['status'] == 'passed'
-      assert report['pass_marker_found']
       assert report['sdf_requested']
       assert report['sdf_error_count'] == 0
       assert report['top_sdf_annotation_completed']
       assert report['macro_sdf_expected_count'] == report['macro_sdf_annotated_count']
       assert report['missing_macro_sdf_count'] == 0
-      assert report['timing_violation_count'] == 0
-      assert not report['dut_unknown_detected']
       if report['sdf_warning_policy'] == 'error':
           assert report['sdf_warning_count'] == 0
       assert report['vcd_bytes'] > 0
+      if failure_policy == 'error':
+          assert report['status'] == 'passed'
+          assert report['pass_marker_found']
+          assert report['timing_violation_count'] == 0
+          assert not report['dut_unknown_detected']

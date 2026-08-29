@@ -37,13 +37,14 @@ case "$backend" in
       inputs/vitis-axilite-master-bfm.sv
     )
     ;;
-  catapult) ;;
+  catapult|systemc) ;;
   *) echo "unsupported testbench backend: $backend" >&2; exit 2 ;;
 esac
 sources+=(inputs/testbench.sv)
 
 vcs -full64 -sverilog -xprop=tmerge -override_timescale=1ns/1ps \
-  -top "$testbench_name" +delay_mode_zero -o simv "${sources[@]}" \
+  -top "$testbench_name" +delay_mode_zero +define+TETRAMAX \
+  -o simv "${sources[@]}" \
   2>&1 | tee outputs/compile.log
 
 run_args=()

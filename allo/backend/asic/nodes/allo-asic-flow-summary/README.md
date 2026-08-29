@@ -6,6 +6,12 @@ for commercial-flow scripts, and a short human-readable text report. It does not
 scrape `mflowgen-run.log`; unavailable measurements remain explicitly unavailable.
 It is connected after full-chip GDS merge, DRC, and LVS and records their node
 runtimes plus the explicit full-chip DRC result count and LVS status.
+The summary also records full-chip PNR peak memory and the build directory's
+apparent size. Directory sizing counts files stored under the build root and
+does not follow symbolic links to external data.
+When the optional collateral-trim node is connected, the spreadsheet-facing
+build size remains the pre-trim size for fair storage scaling estimates. The
+JSON summary additionally records post-trim size and bytes removed.
 
 ## Optional Google Sheets export
 

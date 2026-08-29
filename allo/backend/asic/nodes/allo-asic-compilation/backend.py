@@ -23,6 +23,10 @@ def parse_backend_options(options_text):
                 raise ValueError(
                     f"invalid backend option {item!r}; expected key=value"
                 )
+            if value.lower() == "true":
+                value = True
+            elif value.lower() == "false":
+                value = False
             options[key] = value
         return options
     try:
@@ -74,10 +78,45 @@ def configure_backend(backend, clock_period, options_text):
         }
         if "sub_funcs" in options:
             configs["sub_funcs"] = options["sub_funcs"]
+        if "generalize_pid_specializations" in options:
+            configs["generalize_pid_specializations"] = options[
+                "generalize_pid_specializations"
+            ]
+        if "pid_generalization_policy" in options:
+            configs["pid_generalization_policy"] = options[
+                "pid_generalization_policy"
+            ]
         return "catapult", configs, {"device": device, "rtl_stage": "rtl"}
+    if backend == "systemc":
+        device = options.get("device", "nangate-45nm_beh")
+        configs = {
+            "clock_period": clock_period,
+            "frequency": 1000.0 / clock_period,
+            "device": device,
+            "preserve_hierarchy": options.get("preserve_hierarchy", True),
+            "asic_manifest": {
+                "enabled": True,
+                "path": "asic-manifest.json",
+                "debug_artifacts": True,
+                "debug_dir": "asic-debug",
+            },
+        }
+        for name in (
+            "synth_top",
+            "sub_funcs",
+            "generalize_pid_specializations",
+            "pid_generalization_policy",
+        ):
+            if name in options:
+                configs[name] = options[name]
+        return "systemc", configs, {
+            "device": device,
+            "rtl_stage": "rtl",
+            "frontend": "systemc_connections",
+        }
     else:
         raise ValueError(
-            f"unsupported Allo backend {backend!r}; supported: vitis, catapult"
+            f"unsupported Allo backend {backend!r}; supported: vitis, catapult, systemc"
         )
 
 
@@ -107,9 +146,26 @@ def find_rtl_directory(backend, project):
                 f"under {project}, found {len(candidates)}: {candidates}"
             )
         return candidates[0]
+    if backend == "systemc":
+        rtl_files = sorted(
+            {
+                path.resolve()
+                for name in ("concat_rtl.v", "rtl.v")
+                for path in project.glob(f"build/**/{name}")
+                if path.is_file()
+            }
+        )
+        preferred = [path for path in rtl_files if path.name == "concat_rtl.v"]
+        candidates = preferred or rtl_files
+        if len(candidates) != 1:
+            raise RuntimeError(
+                "expected exactly one SystemC Catapult concat_rtl.v or rtl.v "
+                f"beneath {project / 'build'}, found {len(candidates)}: {candidates}"
+            )
+        return candidates[0].parent
     else:
         raise ValueError(
-            f"unsupported Allo backend {backend!r}; supported: vitis, catapult"
+            f"unsupported Allo backend {backend!r}; supported: vitis, catapult, systemc"
         )
 
 
@@ -124,17 +180,24 @@ def publish_rtl_artifacts(backend, project, output):
         return source
 
     output.mkdir(parents=True)
-    required = ("concat_rtl.v",)
+    if backend == "systemc":
+        source_rtl = source / "concat_rtl.v"
+        if not source_rtl.is_file():
+            source_rtl = source / "rtl.v"
+        if not source_rtl.is_file():
+            raise RuntimeError(f"missing required SystemC RTL artifact beneath: {source}")
+        shutil.copy2(source_rtl, output / "concat_rtl.v")
+    else:
+        source_rtl = source / "concat_rtl.v"
+        if not source_rtl.is_file():
+            raise RuntimeError(f"missing required Catapult RTL artifact: {source_rtl}")
+        shutil.copy2(source_rtl, output / "concat_rtl.v")
+
     optional = (
         "cycle.rpt",
         "rtl.rpt",
         "concat_rtl.v.dc.sdc",
     )
-    for name in required:
-        path = source / name
-        if not path.is_file():
-            raise RuntimeError(f"missing required Catapult RTL artifact: {path}")
-        shutil.copy2(path, output / name)
     for name in optional:
         path = source / name
         if path.is_file():

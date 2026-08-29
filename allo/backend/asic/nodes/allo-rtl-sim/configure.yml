@@ -39,6 +39,9 @@ preconditions:
   - >-
     assert '{backend}' != 'catapult' or
     '"backend": "catapult"' in File( 'inputs/testbench-contract.json' )
+  - >-
+    assert '{backend}' != 'systemc' or
+    '"backend": "systemc"' in File( 'inputs/testbench-contract.json' )
   - assert File( 'inputs/workload-vectors' )
   - assert File( 'inputs/testbench-contract.json' )
 

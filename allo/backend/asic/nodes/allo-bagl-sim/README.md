@@ -14,5 +14,11 @@ next active edge. Reset, input, and output margins remain configurable. The JSON
 and macro annotation coverage, timing violations, unknown DUT behavior, and SDF
 warning categories. Category policies can promote unmatched timing checks,
 unmatched IOPATHs, or ignored up-hierarchy interconnect warnings independently.
+`bagl_failure_policy=error` requires a completed simulation to pass the workload
+and timing checks. `bagl_failure_policy=report` keeps the JSON status and failure
+details unchanged but makes a completed simulation failure nonfatal, allowing the
+flow-summary and spreadsheet-reporting nodes to consume it. Missing collateral,
+SDF errors, incomplete top/macro annotation, and an empty VCD remain fatal in
+both modes.
 Optional SRAM and macro functional models are loaded recursively; LVS and
 power-ground macro netlists remain excluded to avoid duplicate definitions.

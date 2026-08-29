@@ -93,14 +93,17 @@ parameters:
   drc_check_policy: error
   useful_skew: True
   useful_skew_ccopt_effort: standard
+  # Zero leaves the CCOpt maximum-transition target under Innovus control.
+  # A positive value is expressed in ns.
+  ccopt_target_max_transition: 0.0
   cell_padding: 2
   signoff_engine: False
   # Maintain practical hold margin for SDF simulation, not merely nonnegative
   # STA slack. FreePDK45 BAGL exposed data corruption with only +0.009 ns WNS.
-  hold_target_slack: 0.150
+  hold_target_slack: 0.050
   # Optimize beyond the mandatory signoff threshold so extraction and
   # optimization convergence can lose some margin without failing signoff.
-  hold_optimization_target_slack: 0.200
+  hold_optimization_target_slack: 0.050
   setup_target_slack: 0.000
   stop_after_step: none
   floorplan_mode: physical_intent

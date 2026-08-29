@@ -17,6 +17,50 @@ SPEC.loader.exec_module(MODULE)
 
 
 class CoarseTopLayerObsTests(unittest.TestCase):
+    def test_merge_cells_keeps_run_that_reappears_after_row_gap(self):
+        cells = {(5, 1), (6, 1), (5, 5), (6, 5)}
+        self.assertEqual(
+            sorted(MODULE.merge_cells(cells)),
+            [(5, 1, 7, 2), (5, 5, 7, 6)],
+        )
+
+    def test_hidden_pin_extension_remains_obstructed(self):
+        lef = """MACRO sample
+  PIN result
+    USE SIGNAL ;
+    PORT
+      LAYER metal5 ;
+      RECT 7 5 8 6 ;
+    END
+  END result
+END sample
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "input.lef").write_text(lef)
+            (root / "geometry.tsv").write_text(
+                "DIE\t0\t0\t8\t8\n"
+                "LAYER\tmetal5\n"
+                "PITCH\t1\n"
+                # An earlier identical x-run exercises the row-gap merge case.
+                "RECT\twire\tother\t5\t1\t7\t2\n"
+                # The real terminal extends inward beyond its edge LEF pin.
+                "RECT\twire\tresult\t5\t5\t8\t6\n"
+            )
+            subprocess.run([
+                sys.executable, str(SCRIPT),
+                "--input-lef", str(root / "input.lef"),
+                "--geometry", str(root / "geometry.tsv"),
+                "--output-lef", str(root / "output.lef"),
+                "--report", str(root / "report.txt"),
+                "--grid-tracks", "1",
+                "--pin-grid-tracks", "1",
+                "--spacing-tracks", "0",
+            ], check=True)
+            output = (root / "output.lef").read_text()
+
+        self.assertIn("RECT 5.000000 5.000000 7.000000 6.000000", output)
+
     @staticmethod
     def sample_lef():
         return """MACRO sample

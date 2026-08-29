@@ -128,6 +128,12 @@ if {![info exists env(useful_skew)]} {
 if {![info exists env(useful_skew_ccopt_effort)]} {
   set env(useful_skew_ccopt_effort) standard
 }
+if {![info exists env(ccopt_target_max_transition)]} {
+  set env(ccopt_target_max_transition) 0.0
+}
+if {![string is double -strict $env(ccopt_target_max_transition)] || $env(ccopt_target_max_transition) < 0.0} {
+  error "ccopt_target_max_transition must be a nonnegative number in ns"
+}
 if {![info exists env(cell_padding)]} {
   set env(cell_padding) 0
 }
@@ -352,13 +358,13 @@ source scripts/place-grouped-macros.tcl
 # and fallback research. The generated physical intent now coordinates optional
 # SRAM perimeter packing and Allo PE/kernel tiling in one collision-free plan.
 set placed_hard_macros [place_allo_physical_intent]
-set cluster_density_limits [create_allo_cluster_density_limits]
+set macro_channel_soft_blockages [create_allo_macro_channel_soft_blockages]
 set has_hard_macros [expr {$placed_hard_macros > 0}]
 set intent_rpt [open reports/physical-intent-placement.rpt w]
 puts $intent_rpt "placed_hard_macros $placed_hard_macros"
 puts $intent_rpt "core_width $allo_core_width"
 puts $intent_rpt "core_height $allo_core_height"
-puts $intent_rpt "cluster_density_limits $cluster_density_limits"
+puts $intent_rpt "macro_channel_soft_blockages $macro_channel_soft_blockages"
 close $intent_rpt
 set blocks [dbGet top.insts.cell.baseClass block -p2]
 
@@ -713,6 +719,10 @@ set_ccopt_property ccopt_merge_clock_logic true
 set_ccopt_property cts_merge_clock_gates true
 set_ccopt_property cts_merge_clock_logic true
 
+if {$::env(ccopt_target_max_transition) > 0.0} {
+  set_ccopt_property target_max_trans $::env(ccopt_target_max_transition)
+}
+
 if {$::env(useful_skew)} {
   setOptMode -usefulSkew      true
   setOptMode -usefulSkewCCOpt $::env(useful_skew_ccopt_effort)
@@ -819,7 +829,11 @@ maybe_stop_after route
 set pnr_stage_started [clock milliseconds]
 
 setOptMode -verbose true
-setOptMode -usefulSkewPostRoute true
+if {$::env(useful_skew)} {
+  setOptMode -usefulSkewPostRoute true
+} else {
+  setOptMode -usefulSkewPostRoute false
+}
 setOptMode -holdTargetSlack  $::env(hold_optimization_target_slack)
 setOptMode -setupTargetSlack $::env(setup_target_slack)
 

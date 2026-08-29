@@ -7,8 +7,12 @@ import json
 import math
 import os
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from grid_macro_placement import optimize_macro_placement
 
 
 def parameter(name: str, default: float) -> float:
@@ -23,6 +27,28 @@ def boolean_parameter(name: str, default: bool) -> bool:
     if value not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
         raise ValueError(f"{name} must be a boolean")
     return value in {"true", "1", "yes", "on"}
+
+
+def choice_parameter(name: str, default: str, choices: set[str]) -> str:
+    value = os.environ.get(name, default).strip().lower()
+    if value not in choices:
+        raise ValueError(f"{name} must be one of {', '.join(sorted(choices))}")
+    return value
+
+
+def peripheral_sides_parameter(name: str = "peripheral_placement_sides") -> set[str]:
+    raw = os.environ.get(name, "all").strip().lower().replace(",", " ")
+    tokens = raw.split()
+    if tokens == ["all"]:
+        return {"left", "right", "top", "bottom"}
+    sides = set(tokens)
+    valid = {"left", "right", "top", "bottom"}
+    if not sides or len(tokens) != len(sides) or not sides <= valid:
+        raise ValueError(
+            f"{name} must be 'all' or a non-repeated space-separated subset of "
+            "top, bottom, left, right"
+        )
+    return sides
 
 
 def snap(value: float, grid: float) -> float:
@@ -63,6 +89,52 @@ def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, f
         else:
             merged[-1][1] = max(merged[-1][1], end)
     return [(item[0], item[1]) for item in merged]
+
+
+def rectangle_union_area(rectangles: list[tuple[float, float, float, float]]) -> float:
+    """Return the exact union area of axis-aligned (x0, y0, x1, y1) boxes."""
+    x_edges = sorted({value for box in rectangles for value in (box[0], box[2])})
+    area = 0.0
+    for x0, x1 in zip(x_edges, x_edges[1:]):
+        intervals = [
+            (box[1], box[3])
+            for box in rectangles
+            if box[0] < x1 and box[2] > x0
+        ]
+        area += (x1 - x0) * sum(end - start for start, end in merge_intervals(intervals))
+    return area
+
+
+def distribute_peripheral_area(
+    width: float,
+    height: float,
+    added_area: float,
+    sides: set[str],
+    preferred_aspect: float,
+) -> dict[str, float]:
+    """Expand selected edges by exactly added_area, preferring the target aspect."""
+    x_sides = [side for side in ("left", "right") if side in sides]
+    y_sides = [side for side in ("bottom", "top") if side in sides]
+    if added_area <= 0:
+        return {side: 0.0 for side in ("left", "right", "bottom", "top")}
+    target_area = width * height + added_area
+    if x_sides and y_sides:
+        final_width = math.sqrt(target_area * preferred_aspect)
+        final_height = target_area / final_width
+        if final_width < width:
+            final_width, final_height = width, target_area / width
+        if final_height < height:
+            final_height, final_width = height, target_area / height
+    elif x_sides:
+        final_width, final_height = target_area / height, height
+    else:
+        final_width, final_height = width, target_area / width
+    expansion = {side: 0.0 for side in ("left", "right", "bottom", "top")}
+    for side in x_sides:
+        expansion[side] = (final_width - width) / len(x_sides)
+    for side in y_sides:
+        expansion[side] = (final_height - height) / len(y_sides)
+    return expansion
 
 
 def short_row_fragment_cuts(
@@ -123,6 +195,35 @@ def short_row_fragment_cuts(
         {"x": box[0], "y": box[1], "width": box[2] - box[0], "height": box[3] - box[1]}
         for box in cuts
     ]
+
+
+def macro_channel_soft_blockages(
+    placements: list[dict],
+    core_width: float,
+    core_height: float,
+    separation_x: float,
+    separation_y: float,
+    spacing_fraction: float,
+) -> list[dict]:
+    """Cover each hardened PE plus a fraction of its separation."""
+    halo_x = separation_x * spacing_fraction
+    halo_y = separation_y * spacing_fraction
+    blockages = []
+    for index, item in enumerate(placements):
+        x0 = max(0.0, item["x"] - halo_x)
+        y0 = max(0.0, item["y"] - halo_y)
+        x1 = min(core_width, item["x"] + item["width"] + halo_x)
+        y1 = min(core_height, item["y"] + item["height"] + halo_y)
+        if x1 > x0 and y1 > y0:
+            blockages.append({
+                "name": f"allo_macro_channel_soft_{index}",
+                "macro": item["name"],
+                "x": x0,
+                "y": y0,
+                "width": x1 - x0,
+                "height": y1 - y0,
+            })
+    return blockages
 
 
 def lef_macros(path: Path) -> dict[str, tuple[float, float, list[str]]]:
@@ -255,6 +356,71 @@ def connection_weights(plan: dict) -> dict[tuple[str, str], float]:
             for right in kernels[index + 1 :]:
                 weights[(left, right)] += weight
     return dict(weights)
+
+
+def _stream_width(channel: dict) -> float:
+    match = re.search(r"[iu](\d+)", str(channel.get("type", "")))
+    return float(match.group(1)) if match else 1.0
+
+
+def _boundary_side(kernel: str) -> str | None:
+    leaf = kernel.rsplit("/", 1)[-1].lower()
+    for suffix, side in (("_w", "W"), ("_e", "E"), ("_n", "N"), ("_s", "S")):
+        if leaf.endswith(suffix):
+            return side
+    return None
+
+
+def _stream_direction(left_semantic: str, right_semantic: str) -> str | None:
+    """Return the preferred position of right relative to left.
+
+    Concrete PID deltas are authoritative within one kernel. Directional
+    boundary-kernel suffixes are the documented fallback because the current
+    whole-region manifest has producer/consumer roles but no cardinal side.
+    """
+    left_kernel, right_kernel = semantic_kernel(left_semantic), semantic_kernel(right_semantic)
+    left_pid, right_pid = semantic_pid(left_semantic), semantic_pid(right_semantic)
+    if left_kernel == right_kernel and len(left_pid) >= 2 and len(right_pid) >= 2:
+        row_delta = right_pid[-2] - left_pid[-2]
+        column_delta = right_pid[-1] - left_pid[-1]
+        if column_delta and not row_delta:
+            return "E" if column_delta > 0 else "W"
+        if row_delta and not column_delta:
+            return "S" if row_delta > 0 else "N"
+    left_side, right_side = _boundary_side(left_kernel), _boundary_side(right_kernel)
+    if left_side and not right_side:
+        return {"W": "E", "E": "W", "N": "S", "S": "N"}[left_side]
+    if right_side and not left_side:
+        return right_side
+    return None
+
+
+def stream_instance_edges(plan: dict, semantic_to_name: dict[str, str]) -> list[dict]:
+    """Build exact instance edges from the pre-HLS whole-region stream graph."""
+    accumulated = defaultdict(float)
+    for channel in plan.get("whole_region_connections", []):
+        endpoints = [
+            endpoint for endpoint in channel.get("endpoints", [])
+            if endpoint.get("pe") in semantic_to_name
+        ]
+        producers = [item for item in endpoints if item.get("role") == "producer"]
+        consumers = [item for item in endpoints if item.get("role") == "consumer"]
+        pairs = (
+            [(left, right) for left in producers for right in consumers]
+            if producers and consumers
+            else [(endpoints[index], right) for index, left in enumerate(endpoints) for right in endpoints[index + 1 :]]
+        )
+        for left, right in pairs:
+            left_semantic, right_semantic = left["pe"], right["pe"]
+            left_name, right_name = semantic_to_name[left_semantic], semantic_to_name[right_semantic]
+            if left_name == right_name:
+                continue
+            direction = _stream_direction(left_semantic, right_semantic)
+            accumulated[(left_name, right_name, direction)] += _stream_width(channel)
+    return [
+        {"left": left, "right": right, "direction": direction, "weight": weight}
+        for (left, right, direction), weight in sorted(accumulated.items())
+    ]
 
 
 D4_PID_TRANSFORMS = {
@@ -708,6 +874,13 @@ def main() -> None:
     grid = parameter("placement_grid", 0.005)
     macro_x = parameter("macro_separation_x", 8.0)
     macro_y = parameter("macro_separation_y", 8.0)
+    enable_macro_channel_soft_blockages = boolean_parameter(
+        "enable_macro_channel_soft_blockages", True
+    )
+    soft_blockage_fraction = parameter(
+        "macro_channel_soft_blockage_fraction", 0.5
+    )
+    peripheral_sides = peripheral_sides_parameter()
     kernel_x = parameter("kernel_separation_x", 30.0)
     kernel_y = parameter("kernel_separation_y", 30.0)
     keepout = parameter("macro_edge_keepout", 30.0)
@@ -715,12 +888,19 @@ def main() -> None:
     density = parameter("core_density_target", 0.70)
     aspect = parameter("floorplan_aspect_ratio", 1.0)
     passes = int(parameter("kernel_optimization_passes", 12))
+    placement_algorithm = choice_parameter(
+        "macro_placement_algorithm", "stream_grid", {"stream_grid", "legacy_cluster_grid"}
+    )
+    grid_passes = int(parameter("stream_grid_max_passes", 16))
+    grid_minimum_improvement = parameter("stream_grid_minimum_improvement", 1e-5)
     enable_kernel_rotation = boolean_parameter("enable_kernel_rotation", True)
     interleave_macros = boolean_parameter("interleave_macros", False)
     row_cut_halo = parameter("macro_halo", 2.0)
     min_row_width = parameter("min_placeable_row_segment_width", 12.0)
     if density <= 0 or density >= 1 or aspect <= 0 or grid <= 0:
         raise ValueError("density must be in (0,1), aspect and grid must be positive")
+    if soft_blockage_fraction < 0:
+        raise ValueError("macro_channel_soft_blockage_fraction must be nonnegative")
 
     dimensions = {}
     symmetries = {}
@@ -752,6 +932,12 @@ def main() -> None:
             "candidate_kind": item.get("candidate_kind", "semantic_pe"),
             "kernel": kernel,
         })
+    semantic_to_name = {
+        item["semantic_id"]: item["name"]
+        for members in grouped.values()
+        for item in members
+    }
+    instance_edges = stream_instance_edges(plan, semantic_to_name)
 
     # Preserve the original one-rigid-cluster-per-kernel behavior unless the
     # explicit experimental flag is enabled and a complete repeated stencil is
@@ -801,53 +987,139 @@ def main() -> None:
     # the physical LEF footprint. Remove the former, apply utilization only to
     # standard cells, and add the physical macro footprints exactly once.
     standard_area = area_budget["estimated_standard_cell_area_um2"]
-    keepout_allowance = 4 * keepout * keepout
-    target_area = standard_area / density + macro_area + sram_area + keepout_allowance
-    core_w = max(kernel_region_w + 2 * keepout, math.sqrt(target_area * aspect))
-    core_h = max(kernel_region_h + 2 * keepout, math.sqrt(target_area / aspect))
+    # Compute the invariant blocked area before choosing which core edges grow.
+    # Translation does not change this union, and overlapping half-spacing
+    # halos must be counted only once.
+    local_pe_placements = []
+    for kernel in kernel_names:
+        col, row = slot_map[kernel]
+        cluster = clusters[kernel]
+        for member in cluster["members"]:
+            local_pe_placements.append({
+                **member,
+                "x": column_offsets[col] + member["local_x"],
+                "y": row_offsets[row] + member["local_y"],
+            })
+    placement_metrics = {
+        "algorithm": "legacy_cluster_grid",
+        "region_width": kernel_region_w,
+        "region_height": kernel_region_h,
+    }
+    if placement_algorithm == "stream_grid" and local_pe_placements:
+        source_members = [
+            {**item, "orientation": item.get("orientation", "R0")}
+            for members in grouped.values()
+            for item in members
+        ]
+        local_pe_placements, placement_metrics = optimize_macro_placement(
+            source_members,
+            instance_edges,
+            separation_x=macro_x,
+            separation_y=macro_y,
+            max_passes=grid_passes,
+            minimum_improvement=grid_minimum_improvement,
+        )
+        kernel_region_w = placement_metrics["region_width"]
+        kernel_region_h = placement_metrics["region_height"]
+    halo_x = macro_x * soft_blockage_fraction
+    halo_y = macro_y * soft_blockage_fraction
+    soft_blockage_union_area = rectangle_union_area([
+        (
+            item["x"] - halo_x,
+            item["y"] - halo_y,
+            item["x"] + item["width"] + halo_x,
+            item["y"] + item["height"] + halo_y,
+        )
+        for item in local_pe_placements
+    ])
+    reserved_pe_area = (
+        soft_blockage_union_area
+        if enable_macro_channel_soft_blockages
+        else macro_area
+    )
+    target_area = reserved_pe_area + sram_area + standard_area / density
+
+    # SRAM bands, when present, contribute to the minimum macro envelope. The
+    # loop stabilizes those edge bands before finalizing the selected-edge
+    # expansion; the normal no-SRAM path converges on its first pass.
+    bands = {side: 0.0 for side in ("left", "right", "bottom", "top")}
     for _ in range(12):
+        margin_left = max(keepout, halo_x) + bands["left"] + (sram_spacing if bands["left"] else 0)
+        margin_right = max(keepout, halo_x) + bands["right"] + (sram_spacing if bands["right"] else 0)
+        margin_bottom = max(keepout, halo_y) + bands["bottom"] + (sram_spacing if bands["bottom"] else 0)
+        margin_top = max(keepout, halo_y) + bands["top"] + (sram_spacing if bands["top"] else 0)
+        base_core_w = kernel_region_w + margin_left + margin_right
+        base_core_h = kernel_region_h + margin_bottom + margin_top
+        requested_added_area = max(0.0, target_area - base_core_w * base_core_h)
+        peripheral_expansion = distribute_peripheral_area(
+            base_core_w, base_core_h, requested_added_area, peripheral_sides, aspect
+        )
+        core_w = base_core_w + peripheral_expansion["left"] + peripheral_expansion["right"]
+        core_h = base_core_h + peripheral_expansion["bottom"] + peripheral_expansion["top"]
         try:
-            sram_placements, bands = edge_pack(srams, core_w, core_h, keepout, sram_spacing)
-            break
+            sram_placements, new_bands = edge_pack(
+                srams, core_w, core_h, keepout, sram_spacing
+            )
         except ValueError:
-            core_w *= 1.15
-            core_h *= 1.15
+            target_area *= 1.15
+            continue
+        if new_bands == bands:
+            break
+        bands = new_bands
     else:
         raise ValueError("unable to create legal SRAM perimeter")
     free = {
-        "x": keepout + bands["left"] + (sram_spacing if bands["left"] else 0),
-        "y": keepout + bands["bottom"] + (sram_spacing if bands["bottom"] else 0),
+        "x": margin_left + peripheral_expansion["left"],
+        "y": margin_bottom + peripheral_expansion["bottom"],
+        "width": kernel_region_w,
+        "height": kernel_region_h,
     }
-    free["width"] = core_w - free["x"] - keepout - bands["right"] - (sram_spacing if bands["right"] else 0)
-    free["height"] = core_h - free["y"] - keepout - bands["top"] - (sram_spacing if bands["top"] else 0)
-    if kernel_region_w > free["width"] or kernel_region_h > free["height"]:
-        grow_x = max(0.0, kernel_region_w - free["width"])
-        grow_y = max(0.0, kernel_region_h - free["height"])
-        core_w += grow_x
-        core_h += grow_y
-        free["width"] += grow_x
-        free["height"] += grow_y
-    origin_x = free["x"] + (free["width"] - kernel_region_w) / 2
-    origin_y = free["y"] + (free["height"] - kernel_region_h) / 2
+    origin_x = free["x"]
+    origin_y = free["y"]
     pe_placements, cluster_records = [], []
-    for kernel in kernel_names:
-        col, row = slot_map[kernel]
-        cluster_x = origin_x + column_offsets[col]
-        cluster_y = origin_y + row_offsets[row]
-        cluster = clusters[kernel]
-        cluster_records.append({"kernel": kernel, "x": snap(cluster_x, grid), "y": snap(cluster_y, grid), **{key: cluster[key] for key in ["width", "height", "orientation"]}})
-        for member in cluster["members"]:
+    if placement_algorithm == "stream_grid":
+        for member in local_pe_placements:
             pe_placements.append({
-                **{key: value for key, value in member.items() if not key.startswith("local_")},
-                "x": snap(cluster_x + member["local_x"], grid),
-                "y": snap(cluster_y + member["local_y"], grid),
-                "kernel": member.get("kernel", kernel),
-                "spatial_cluster": kernel,
+                **member,
+                "x": snap(origin_x + member["x"], grid),
+                "y": snap(origin_y + member["y"], grid),
+                "spatial_cluster": "stream_grid",
             })
-    planned_core_w = snap(core_w, grid)
-    planned_core_h = snap(core_h, grid)
+        for kernel, members in sorted(grouped.items()):
+            placed = [item for item in pe_placements if item["kernel"] == kernel]
+            if not placed:
+                continue
+            x0, y0 = min(item["x"] for item in placed), min(item["y"] for item in placed)
+            x1 = max(item["x"] + item["width"] for item in placed)
+            y1 = max(item["y"] + item["height"] for item in placed)
+            cluster_records.append({
+                "kernel": kernel, "x": x0, "y": y0,
+                "width": x1 - x0, "height": y1 - y0,
+                "orientation": "mixed", "member_count": len(placed),
+            })
+    else:
+        for kernel in kernel_names:
+            col, row = slot_map[kernel]
+            cluster_x = origin_x + column_offsets[col]
+            cluster_y = origin_y + row_offsets[row]
+            cluster = clusters[kernel]
+            cluster_records.append({"kernel": kernel, "x": snap(cluster_x, grid), "y": snap(cluster_y, grid), **{key: cluster[key] for key in ["width", "height", "orientation"]}})
+            for member in cluster["members"]:
+                pe_placements.append({
+                    **{key: value for key, value in member.items() if not key.startswith("local_")},
+                    "x": snap(cluster_x + member["local_x"], grid),
+                    "y": snap(cluster_y + member["local_y"], grid),
+                    "kernel": member.get("kernel", kernel),
+                    "spatial_cluster": kernel,
+                })
+    planned_core_w = round(core_w, 6)
+    planned_core_h = round(core_h, 6)
     planned_core_area = planned_core_w * planned_core_h
-    estimated_placeable_area = planned_core_area - macro_area - sram_area
+    minimum_envelope_area = base_core_w * base_core_h
+    keepout_allowance = max(
+        0.0, minimum_envelope_area - reserved_pe_area - sram_area
+    )
+    estimated_placeable_area = planned_core_area - reserved_pe_area - sram_area
     predicted_density, density_limit = validate_predicted_density(
         standard_area, estimated_placeable_area, density
     )
@@ -868,15 +1140,29 @@ def main() -> None:
     row_fragment_cuts = short_row_fragment_cuts(
         placements, planned_core_w, planned_core_h, row_cut_halo, min_row_width
     )
+    channel_soft_blockages = (
+        macro_channel_soft_blockages(
+            pe_placements,
+            planned_core_w,
+            planned_core_h,
+            macro_x,
+            macro_y,
+            soft_blockage_fraction,
+        )
+        if enable_macro_channel_soft_blockages
+        else []
+    )
     intent = {
         "schema_version": 1, "stage": "physical_intent", "top_module": plan["top_module"],
         "core": {"width": planned_core_w, "height": planned_core_h, "usable_rectangle": free},
-        "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout},
+        "constraints": {"macro_separation_x": macro_x, "macro_separation_y": macro_y, "kernel_separation_x": kernel_x, "kernel_separation_y": kernel_y, "edge_keepout": keepout, "peripheral_placement_sides": sorted(peripheral_sides)},
         "standard_cell_area_estimate": standard_area,
         "area_budget": {
             **area_budget,
             "physical_pe_macro_area_um2": macro_area,
             "physical_sram_area_um2": sram_area,
+            "soft_blockage_union_area_um2": soft_blockage_union_area,
+            "reserved_pe_placement_area_um2": reserved_pe_area,
             "target_standard_cell_density": density,
             "keepout_allowance_um2": keepout_allowance,
             "target_core_area_um2": target_area,
@@ -885,13 +1171,27 @@ def main() -> None:
             "predicted_standard_cell_density": predicted_density,
             "density_sanity_limit": density_limit,
         },
+        "peripheral_placement_policy": {
+            "sides": sorted(peripheral_sides),
+            "base_width": base_core_w,
+            "base_height": base_core_h,
+            "requested_added_area_um2": requested_added_area,
+            "actual_added_area_um2": planned_core_area - minimum_envelope_area,
+            "edge_expansion": peripheral_expansion,
+            "preferred_aspect_ratio": aspect,
+        },
         "kernel_connections": [{"kernels": list(key), "weight": value} for key, value in sorted(weights.items())],
+        "instance_stream_connections": instance_edges,
         "kernel_clusters": cluster_records, "placements": placements,
         "kernel_packing_policy": {
-            "type": "variable_grid_extents",
+            "type": placement_algorithm,
             "whole_kernel_rotation_enabled": enable_kernel_rotation,
             "region_width": kernel_region_w,
             "region_height": kernel_region_h,
+            "optimization": placement_metrics,
+            "stream_grid_max_passes": grid_passes,
+            "stream_grid_minimum_improvement": grid_minimum_improvement,
+            "fallback": "legacy_cluster_grid",
         },
         "cross_kernel_interleaving": {
             "enabled": interleave_macros,
@@ -901,10 +1201,14 @@ def main() -> None:
             "decisions": interleave_decisions,
             "fallback": "rigid_semantic_kernel_cluster",
         },
-        "cluster_placement_policy": {
-            "type": "none",
-            "reason": "cluster-wide partial placement blockages disabled",
-            "region_count": 0,
+        "macro_channel_placement_policy": {
+            "type": "soft" if enable_macro_channel_soft_blockages else "none",
+            "enabled": enable_macro_channel_soft_blockages,
+            "spacing_fraction": soft_blockage_fraction,
+            "expansion_x": macro_x * soft_blockage_fraction,
+            "expansion_y": macro_y * soft_blockage_fraction,
+            "region_count": len(channel_soft_blockages),
+            "regions": channel_soft_blockages,
         },
         "pe_stream_facing_policy": {
             "pid_column_direction": "east",
@@ -924,13 +1228,13 @@ def main() -> None:
     tcl = [
         "# Generated physical intent; coordinates are offsets from the core lower-left.",
         f"set allo_core_width {intent['core']['width']}", f"set allo_core_height {intent['core']['height']}",
-        "proc place_allo_physical_intent {} {", "  set core [dbGet top.fPlan.coreBox]", "  if {[llength $core] == 1} { set core [lindex $core 0] }", "  set llx [lindex $core 0]", "  set lly [lindex $core 1]", "  set placed 0",
+        "proc place_allo_physical_intent {} {", "  set core [dbGet top.fPlan.coreBox]", "  if {[llength $core] == 1} { set core [lindex $core 0] }", "  set llx [lindex $core 0]", "  set lly [lindex $core 1]", "  set placed 0", "  set all_instance_names [dbGet top.insts.name]",
     ]
     for item in placements:
         tcl.extend([
-            f"  set matches [dbGet top.insts.name {{*{item['name']}}} -p]",
-            f"  if {{[llength $matches] != 1 || [lindex $matches 0] eq \"0x0\"}} {{ error \"Expected exactly one macro instance {item['name']}\" }}",
-            "  set actual_name [dbGet [lindex $matches 0].name]",
+            f"  set matches [lsearch -all -inline -exact $all_instance_names {{{item['name']}}}]",
+            f"  if {{[llength $matches] != 1}} {{ error \"Expected exactly one macro instance {item['name']}\" }}",
+            "  set actual_name [lindex $matches 0]",
             f"  placeInstance $actual_name [expr {{$llx + {item['x']}}}] [expr {{$lly + {item['y']}}}] {item['orientation']}",
             "  incr placed",
         ])
@@ -960,12 +1264,20 @@ def main() -> None:
     tcl.extend(["  return $cut_count", "}"])
     tcl.extend([
         "",
-        "# Compatibility hook retained for the PNR node. Cluster-wide partial",
-        "# placement blockages are intentionally disabled.",
-        "proc create_allo_cluster_density_limits {} {",
-        "  return 0",
-        "}",
+        "# Soft blockages exclude ordinary logic but permit optimization cells.",
+        "proc create_allo_macro_channel_soft_blockages {} {",
+        "  set core [dbGet top.fPlan.coreBox]",
+        "  if {[llength $core] == 1} { set core [lindex $core 0] }",
+        "  set llx [lindex $core 0]",
+        "  set lly [lindex $core 1]",
+        "  set blockage_count 0",
     ])
+    for blockage in channel_soft_blockages:
+        tcl.extend([
+            f"  createPlaceBlockage -type soft -snapToSite -name {blockage['name']} -box [list [expr {{$llx + {blockage['x']}}}] [expr {{$lly + {blockage['y']}}}] [expr {{$llx + {blockage['x']} + {blockage['width']}}}] [expr {{$lly + {blockage['y']} + {blockage['height']}}}]]",
+            "  incr blockage_count",
+        ])
+    tcl.extend(["  return $blockage_count", "}"])
     (outputs / "physical-intent.tcl").write_text("\n".join(tcl) + "\n")
     scale = min(1000 / max(core_w, 1), 800 / max(core_h, 1))
     colors = {"pe": "#4c78a8", "sram": "#f58518"}
@@ -979,10 +1291,24 @@ def main() -> None:
         f"Core: {intent['core']['width']} x {intent['core']['height']} um\n"
         f"PE macros: {len(pe_placements)}\nSRAMs: {len(srams)} (optional sequential perimeter policy)\n"
         f"Kernel clusters: {len(cluster_records)}\nWeighted inter-kernel cost optimization passes: {passes}\n"
+        f"Macro placement algorithm: {placement_algorithm}\n"
+        f"Optimized macro region: {kernel_region_w} x {kernel_region_h} um "
+        f"(coverage={placement_metrics.get('coverage', 'n/a')})\n"
+        f"Stream-grid levels: {len(placement_metrics.get('levels', []))}; "
+        f"legalization moves: {placement_metrics.get('legalization_moves', 0)}; "
+        f"compaction moves: {placement_metrics.get('compaction_moves', 0)}\n"
         f"Cross-kernel interleaving enabled: {interleave_macros}\n"
         f"Accepted interleave pairs: {len(interleave_inferences)}\n"
         f"Selective short-row cuts: {len(row_fragment_cuts)} (minimum retained width {min_row_width} um)\n"
-        "Kernel-cluster partial placement limits: disabled\n"
+        f"Macro-channel soft blockages: {len(channel_soft_blockages)} "
+        f"(enabled={enable_macro_channel_soft_blockages}, "
+        f"fraction={soft_blockage_fraction}, "
+        f"expansion={macro_x * soft_blockage_fraction} x "
+        f"{macro_y * soft_blockage_fraction} um)\n"
+        f"Soft-blockage union area: {soft_blockage_union_area} um^2\n"
+        f"Peripheral placement sides: {' '.join(sorted(peripheral_sides))}\n"
+        f"Peripheral area added: {planned_core_area - minimum_envelope_area} um^2\n"
+        f"Predicted peripheral standard-cell density: {predicted_density}\n"
     )
 
 

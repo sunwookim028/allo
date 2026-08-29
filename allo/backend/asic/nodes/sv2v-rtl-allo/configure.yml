@@ -36,7 +36,7 @@ preconditions:
   - assert File( 'inputs/asic-manifest-final.json' )
   - assert File( 'inputs/build-metadata.json' )
   - >-
-    assert '{backend}' != 'catapult' or
+    assert '{backend}' not in {'catapult', 'systemc'} or
     File( 'inputs/backend-rtl/concat_rtl.v' )
   - |
       from pathlib import Path

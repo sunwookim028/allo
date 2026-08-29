@@ -41,6 +41,23 @@ def macro_routing_layer_environment(highest_layer: str) -> dict[str, str]:
     }
 
 
+def macro_density_environment(
+    core_density: str,
+    macro_density: str,
+    use_separate: str,
+) -> dict[str, str]:
+    """Resolve the density passed to each macro-PNR worker."""
+    enabled = str(use_separate).strip().lower() in {"1", "true", "yes", "on"}
+    selected = macro_density if enabled else core_density
+    try:
+        density = float(selected)
+    except (TypeError, ValueError) as error:
+        raise ValueError("macro PNR density target must be numeric") from error
+    if not 0 < density < 1:
+        raise ValueError("macro PNR density target must be in (0,1)")
+    return {"core_density_target": str(selected)}
+
+
 def symlink(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.symlink_to(source.resolve(), target_is_directory=source.is_dir())
@@ -103,6 +120,13 @@ def run_entry(entry: dict) -> dict:
 
     env = os.environ.copy()
     env["design_name"] = entry["top_module"]
+    env.update(
+        macro_density_environment(
+            os.environ.get("core_density_target", "0.70"),
+            os.environ.get("macro_core_density_target", "0.70"),
+            os.environ.get("use_separate_macro_density_target", "False"),
+        )
+    )
     env.update(
         macro_routing_layer_environment(
             os.environ.get("highest_macro_routing_layer", "6")

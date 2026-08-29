@@ -78,3 +78,21 @@ def test_prepare_sdf_rejects_missing_macro_instance(tmp_path, monkeypatch):
         assert "cannot find macro instance" in str(error)
     else:
         raise AssertionError("missing netlist instance was accepted")
+
+
+def test_find_macro_instances_scans_for_all_expected_instances():
+    netlist = """
+module top;
+  macro_a compute_0_0 ( );
+  ordinary_cell unrelated ( );
+  macro_b compute_0_10 ( );
+endmodule
+"""
+    found = PREPARE._find_macro_instances(
+        netlist,
+        {"compute_0_0": "macro_a", "compute_0_10": "macro_b"},
+    )
+    assert found == {
+        ("macro_a", "compute_0_0"),
+        ("macro_b", "compute_0_10"),
+    }

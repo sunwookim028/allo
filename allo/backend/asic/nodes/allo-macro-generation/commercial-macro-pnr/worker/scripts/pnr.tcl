@@ -183,6 +183,27 @@ if {![info exists env(useful_skew)]} {
 if {![info exists env(useful_skew_ccopt_effort)]} {
   set env(useful_skew_ccopt_effort) standard
 }
+if {![info exists env(ccopt_target_max_transition)]} {
+  set env(ccopt_target_max_transition) 0.0
+}
+if {![string is double -strict $env(ccopt_target_max_transition)] || $env(ccopt_target_max_transition) < 0.0} {
+  error "ccopt_target_max_transition must be a nonnegative number in ns"
+}
+if {![info exists env(macro_clock_root_buffer_cell)]} {
+  set env(macro_clock_root_buffer_cell) CLKBUF_X1
+}
+if {![info exists env(macro_clock_root_buffer_input_pin)]} {
+  set env(macro_clock_root_buffer_input_pin) A
+}
+if {![info exists env(macro_clock_root_buffer_output_pin)]} {
+  set env(macro_clock_root_buffer_output_pin) Z
+}
+if {![info exists env(clock_pin_depth_width_multiplier)]} {
+  set env(clock_pin_depth_width_multiplier) 5.0
+}
+if {![string is double -strict $env(clock_pin_depth_width_multiplier)] || $env(clock_pin_depth_width_multiplier) < 1.0} {
+  error "clock_pin_depth_width_multiplier must be at least 1.0"
+}
 if {![info exists env(cell_padding)]} {
   set env(cell_padding) 0
 }
@@ -973,8 +994,13 @@ if {![info exists allo_asic_clock_pins] || ![info exists allo_asic_clock_side]} 
 array set allo_innovus_side {N TOP S BOTTOM E RIGHT W LEFT}
 set resolved_clock_ports [resolve_manifest_group $allo_asic_clock_pins $all_ports]
 if {[llength $resolved_clock_ports] > 0} {
-  editPin -layer $ports_layer -pin $resolved_clock_ports \
+  set clock_pin_layer $vars(max_route_layer)
+  set clock_pin_layer_obj [dbGetLayerByZ $clock_pin_layer]
+  set clock_pin_width [dbGet $clock_pin_layer_obj.width]
+  set clock_pin_depth [expr {$clock_pin_width * $env(clock_pin_depth_width_multiplier)}]
+  editPin -layer $clock_pin_layer -pin $resolved_clock_ports \
     -side $allo_innovus_side($allo_asic_clock_side) -spreadType CENTER \
+    -pinWidth $clock_pin_width -pinDepth $clock_pin_depth \
     -fixedPin true
   foreach port $resolved_clock_ports {
     if {[lsearch -exact $assigned_ports $port] >= 0} {
@@ -984,7 +1010,7 @@ if {[llength $resolved_clock_ports] > 0} {
     lappend assigned_ports $port
   }
   puts $pin_assignment_report \
-    "CLOCK side=$allo_asic_clock_side layer=$ports_layer ports=[join $resolved_clock_ports { }]"
+    "CLOCK side=$allo_asic_clock_side layer=$clock_pin_layer width=$clock_pin_width depth=$clock_pin_depth ports=[join $resolved_clock_ports { }]"
 }
 setPinAssignMode -pinEditInBatch false
 set unassigned_ports {}
@@ -998,6 +1024,77 @@ if {[llength $unassigned_ports] > 0} {
   error "Manifest pin intent leaves ports unassigned: $unassigned_ports"
 }
 close $pin_assignment_report
+
+# Isolate the macro boundary from the internal clock-tree load. Keep this
+# insertion deterministic and validate connectivity both before and after CTS.
+set allo_clock_root_instance allo_asic_clock_root_buffer
+set allo_clock_root_net allo_asic_clock_root_net
+
+proc validate_allo_clock_root {stage clock_port root_instance root_net root_cell input_pin output_pin} {
+  set report [open "reports/clock-root-buffer.${stage}.rpt" w]
+  set roots [dbGet -p top.insts.name $root_instance]
+  if {[llength $roots] != 1 || [lindex $roots 0] == 0} {
+    close $report
+    error "Expected exactly one dedicated clock-root instance '$root_instance' at $stage"
+  }
+  set actual_cell [dbGet [lindex $roots 0].cell.name]
+  if {$actual_cell ne $root_cell} {
+    close $report
+    error "Clock-root instance '$root_instance' uses '$actual_cell', expected '$root_cell'"
+  }
+  set input_term [dbGetTermByInstTermName "$root_instance/$input_pin"]
+  set output_term [dbGetTermByInstTermName "$root_instance/$output_pin"]
+  if {$input_term == 0x0 || $output_term == 0x0} {
+    close $report
+    error "Cannot resolve dedicated clock-root terminals '$root_instance/$input_pin' and '$root_instance/$output_pin' at $stage"
+  }
+  set input_net_ptr [dbTermNet $input_term]
+  set output_net_ptr [dbTermNet $output_term]
+  if {$input_net_ptr == 0x0 || $output_net_ptr == 0x0} {
+    close $report
+    error "Dedicated clock-root terminals are unconnected at $stage"
+  }
+  set input_net [dbNetName $input_net_ptr]
+  set output_net [dbNetName $output_net_ptr]
+  set port_net [dbGet [dbGet -p top.terms.name $clock_port].net.name]
+  set downstream [dbGet [dbGet -p top.nets.name $root_net].instTerms.name]
+  puts $report "stage $stage"
+  puts $report "instance $root_instance"
+  puts $report "cell $actual_cell"
+  puts $report "port_net $port_net"
+  puts $report "input_net $input_net"
+  puts $report "output_net $output_net"
+  puts $report "downstream_inst_terms [llength $downstream]"
+  close $report
+  if {$input_net ne $port_net || $output_net ne $root_net || [llength $downstream] < 2} {
+    error "Dedicated clock-root connectivity validation failed at $stage; see reports/clock-root-buffer.${stage}.rpt"
+  }
+}
+
+if {[llength $resolved_clock_ports] != 1} {
+  error "Dedicated macro clock root requires exactly one resolved clock port, got $resolved_clock_ports"
+}
+set allo_clock_port [lindex $resolved_clock_ports 0]
+set allo_clock_port_net [dbGet [dbGet -p top.terms.name $allo_clock_port].net.name]
+set original_clock_sinks [dbGet [dbGet -p top.nets.name $allo_clock_port_net].instTerms.name]
+if {[llength $original_clock_sinks] == 0} {
+  error "Clock port '$allo_clock_port' has no internal sinks to isolate"
+}
+addNet $allo_clock_root_net
+addInst -cell $env(macro_clock_root_buffer_cell) -inst $allo_clock_root_instance
+foreach sink $original_clock_sinks {
+  set sink_parts [split $sink /]
+  set sink_pin [lindex $sink_parts end]
+  set sink_inst [join [lrange $sink_parts 0 end-1] /]
+  attachTerm $sink_inst $sink_pin $allo_clock_root_net
+}
+attachTerm $allo_clock_root_instance $env(macro_clock_root_buffer_input_pin) $allo_clock_port_net
+attachTerm $allo_clock_root_instance $env(macro_clock_root_buffer_output_pin) $allo_clock_root_net
+set root_ptr [dbGet -p top.insts.name $allo_clock_root_instance]
+dbSet $root_ptr.dontTouch true
+validate_allo_clock_root inserted $allo_clock_port $allo_clock_root_instance \
+  $allo_clock_root_net $env(macro_clock_root_buffer_cell) \
+  $env(macro_clock_root_buffer_input_pin) $env(macro_clock_root_buffer_output_pin)
 
 reset_path_group -all
 resetPathGroupOptions
@@ -1142,6 +1239,10 @@ set_db opt_enable_podv2_clock_opt_flow true
 
 place_opt_design -out_dir reports -prefix place
 
+validate_allo_clock_root post_place $allo_clock_port $allo_clock_root_instance \
+  $allo_clock_root_net $env(macro_clock_root_buffer_cell) \
+  $env(macro_clock_root_buffer_input_pin) $env(macro_clock_root_buffer_output_pin)
+
 if {[info exists ADK_TIE_CELLS] && $ADK_TIE_CELLS ne ""} {
   set tie_cells $ADK_TIE_CELLS
 } else {
@@ -1177,6 +1278,10 @@ set_ccopt_property ccopt_merge_clock_gates true
 set_ccopt_property ccopt_merge_clock_logic true
 set_ccopt_property cts_merge_clock_gates true
 set_ccopt_property cts_merge_clock_logic true
+
+if {$::env(ccopt_target_max_transition) > 0.0} {
+  set_ccopt_property target_max_trans $::env(ccopt_target_max_transition)
+}
 
 if {$::env(useful_skew)} {
   setOptMode -usefulSkew      true
@@ -1215,6 +1320,10 @@ set_analysis_view -update_timing
 set_db timing_defer_mmmc_obj_updates $restore
 
 clock_opt_design -prefix cts -out_dir reports
+
+validate_allo_clock_root post_cts $allo_clock_port $allo_clock_root_instance \
+  $allo_clock_root_net $env(macro_clock_root_buffer_cell) \
+  $env(macro_clock_root_buffer_input_pin) $env(macro_clock_root_buffer_output_pin)
 
 report_ccopt_clock_trees -list_special_pins -filename reports/cts.clock_trees.rpt
 report_ccopt_skew_groups -filename reports/cts.skew_groups.rpt

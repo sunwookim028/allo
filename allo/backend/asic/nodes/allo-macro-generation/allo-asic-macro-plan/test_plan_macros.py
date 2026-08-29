@@ -18,6 +18,129 @@ SPEC.loader.exec_module(PLAN)
 
 
 class MacroPlanTest(unittest.TestCase):
+    def test_fifo_wrapper_signature_ignores_generated_root_aliases(self):
+        first = """
+module wrapper_a(clk, v10_dat);
+  input clk;
+  output [7:0] v10_dat;
+endmodule
+"""
+        second = first.replace("wrapper_a", "wrapper_b").replace("v10", "v99")
+        first_folding = {
+            "owned_fifos": [{"fifo_module": "ccs_pipe_v6"}],
+            "signature": [
+                {
+                    "root": "v10",
+                    "module": "ccs_pipe_v6",
+                    "parameters": {"width": "32'sd8", "fifo_sz": "32'sd8"},
+                }
+            ],
+        }
+        second_folding = {
+            **first_folding,
+            "signature": [
+                {**first_folding["signature"][0], "root": "v99"}
+            ],
+        }
+        first_signature = PLAN.wrapper_interface_signature(
+            first, "wrapper_a", first_folding
+        )
+        self.assertEqual(
+            first_signature,
+            PLAN.wrapper_interface_signature(second, "wrapper_b", second_folding),
+        )
+        second_folding["signature"][0]["parameters"] = {
+            "width": "32'sd8",
+            "fifo_sz": "32'sd16",
+        }
+        self.assertNotEqual(
+            first_signature,
+            PLAN.wrapper_interface_signature(second, "wrapper_b", second_folding),
+        )
+
+    def test_fifo_wrapper_signature_ignores_port_and_fifo_order(self):
+        first = """
+module wrapper_a(clk, west_data, north_data);
+  input clk;
+  input [7:0] west_data;
+  output [15:0] north_data;
+endmodule
+"""
+        second = """
+module wrapper_b(n99_data, clk, w42_data);
+  output [15:0] n99_data;
+  input clk;
+  input [7:0] w42_data;
+endmodule
+"""
+        fifo_a = {
+            "module": "ccs_pipe_v6",
+            "parameters": {"width": "32'sd8", "fifo_sz": "32'sd2"},
+        }
+        fifo_b = {
+            "module": "ccs_pipe_v6",
+            "parameters": {"width": "32'sd16", "fifo_sz": "32'sd4"},
+        }
+        first_folding = {
+            "signature": [
+                {"root": "west", **fifo_a},
+                {"root": "north", **fifo_b},
+            ]
+        }
+        second_folding = {
+            "signature": [
+                {"root": "n99", **fifo_b},
+                {"root": "w42", **fifo_a},
+            ]
+        }
+        self.assertEqual(
+            PLAN.wrapper_interface_signature(first, "wrapper_a", first_folding),
+            PLAN.wrapper_interface_signature(second, "wrapper_b", second_folding),
+        )
+
+    def test_fifo_wrapper_signature_keeps_vitis_fifo_parameters(self):
+        wrapper = """
+module wrapper(clk, data);
+  input clk;
+  output [7:0] data;
+endmodule
+"""
+        first = {
+            "owned_fifos": [
+                {
+                    "fifo_module": "fifo_w8",
+                    "fifo_parameters": {"depth": 2, "width": 8},
+                }
+            ]
+        }
+        second = {
+            "owned_fifos": [
+                {
+                    "fifo_module": "fifo_w8",
+                    "fifo_parameters": {"depth": 4, "width": 8},
+                }
+            ]
+        }
+        self.assertNotEqual(
+            PLAN.wrapper_interface_signature(wrapper, "wrapper", first),
+            PLAN.wrapper_interface_signature(wrapper, "wrapper", second),
+        )
+
+    def test_prefers_explicit_rtl_root_module(self):
+        pe = {
+            "semantic_id": "top/pe/pid=0",
+            "post_hls_records": [
+                {
+                    "rtl_modules": [{"name": "pe_core"}],
+                    "rtl_root_module": "pe_wrapper",
+                    "rtl_instances": [],
+                }
+            ],
+        }
+        self.assertEqual(
+            PLAN.outer_module_for_member(pe, "pe_core"), "pe_wrapper"
+        )
+
     def test_writes_vitis_clock_constraints(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "constraints.tcl"
@@ -158,6 +281,154 @@ endmodule
         ]
         self.assertEqual(PLAN.classify_macro_candidate(repeated), "repeated_hls_submodule")
         self.assertEqual(PLAN.classify_macro_candidate(semantic), "semantic_pe")
+
+    def test_discovers_and_binds_parameterized_catapult_pipe(self):
+        rtl = """
+module top(input clk, input rst);
+  ccs_pipe_v6 #(.rscid(32'sd7), .width(32'sd26), .fifo_sz(32'sd8)) fifo0 (
+    .clk(clk), .en(1'b0), .arst(1'b1), .srst(rst),
+    .din_rdy(p_rdy), .din_vld(p_vld), .din(p_dat),
+    .dout_rdy(c_rdy), .dout_vld(c_vld), .dout(c_dat),
+    .sz(), .sz_req(1'b0), .is_idle());
+endmodule
+module ccs_pipe_v6(); endmodule
+"""
+        top = PLAN.module_blocks(rtl)["top"]
+        pipes = PLAN.catapult_pipe_instances(top)
+        pe = PLAN.InstanceBlock(
+            "pe", "pe0", 0, 0,
+            {"v0_rsc_dat": "p_dat", "v0_rsc_vld": "p_vld", "v0_rsc_rdy": "p_rdy"},
+        )
+        fifo, parameters = PLAN.find_owned_catapult_fifo("v0", pe, pipes)
+        self.assertEqual(fifo.name, "fifo0")
+        self.assertEqual(parameters["fifo_sz"], "32'sd8")
+
+    def test_catapult_fifo_wrapper_connects_consumer_side_at_boundary(self):
+        rtl = """
+module top(clk, rst);
+  input clk; input rst;
+  pe pe0(.clk(clk), .rst(rst),
+    .v0_rsc_dat(producer_data), .v0_rsc_vld(producer_vld),
+    .v0_rsc_rdy(producer_rdy));
+  ccs_pipe_v6 #(.rscid(32'sd7), .width(32'sd26), .fifo_sz(32'sd8)) fifo0 (
+    .clk(clk), .en(1'b0), .arst(1'b1), .srst(rst),
+    .din_rdy(producer_rdy), .din_vld(producer_vld), .din(producer_data),
+    .dout_rdy(consumer_rdy), .dout_vld(consumer_vld), .dout(consumer_data),
+    .sz(), .sz_req(1'b0), .is_idle());
+endmodule
+module pe(clk, rst, v0_rsc_dat, v0_rsc_vld, v0_rsc_rdy);
+  input clk; input rst;
+  output [25:0] v0_rsc_dat; output v0_rsc_vld; input v0_rsc_rdy;
+endmodule
+module ccs_pipe_v6(); endmodule
+"""
+        blocks = PLAN.module_blocks(rtl)
+        pe_instance = next(
+            item
+            for item in PLAN.module_instances(blocks["top"], set(blocks))
+            if item.module == "pe"
+        )
+        semantic_id = "top/producer/pid=0"
+        manifest = {
+            "top": "top",
+            "pe_instances": [{
+                "semantic_id": semantic_id,
+                "kernel": "producer",
+                "pid": [0],
+                "ports": [{
+                    "ordinal": 0,
+                    "channel_id": "c0",
+                    "stream": "stream0",
+                    "direction": "out",
+                    "type": "!allo.stream<i26, 8>",
+                }],
+            }, {
+                "semantic_id": "top/consumer/pid=0",
+                "kernel": "consumer",
+                "pid": [0],
+                "ports": [],
+            }],
+            "channels": [{
+                "channel_id": "c0",
+                "stream": "stream0",
+                "endpoints": [
+                    {"pe": semantic_id, "direction": "out",
+                     "accesses": [{"port_ordinal": 0}]},
+                    {"pe": "top/consumer/pid=0", "direction": "in", "accesses": []},
+                ],
+            }],
+        }
+
+        wrapper, folding, connections = PLAN.generate_catapult_fifo_wrapper(
+            "canonical_wrapper",
+            manifest["pe_instances"][0],
+            blocks["pe"],
+            pe_instance,
+            blocks["top"],
+            manifest,
+            blocks,
+        )
+
+        self.assertIn("ccs_pipe_v6", wrapper)
+        self.assertEqual(folding["folded_fifo_count"], 1)
+        self.assertEqual(connections["v0_rsc_dat"], "consumer_data")
+        self.assertEqual(connections["v0_rsc_vld"], "consumer_vld")
+        self.assertEqual(connections["v0_rsc_rdy"], "consumer_rdy")
+        self.assertNotEqual(connections["v0_rsc_dat"], "producer_data")
+
+    def test_systemc_fifo_wrapper_connects_dequeue_side_at_boundary(self):
+        rtl = """
+module top(clk, rst);
+  input clk; input rst;
+  pe pe0(.clk(clk), .rst(rst), .v0_dat(p_dat), .v0_vld(p_vld), .v0_rdy(p_rdy));
+  Connections_Fifo_ac_int_26_false_8U_Connections_SYN_PORT fifo0 (
+    .clk(clk), .rst(rst), .enq_vld(p_vld), .enq_rdy(p_rdy), .enq_dat(p_dat),
+    .deq_vld(c_vld), .deq_rdy(c_rdy), .deq_dat(c_dat));
+endmodule
+module pe(clk, rst, v0_dat, v0_vld, v0_rdy);
+  input clk; input rst; output [25:0] v0_dat; output v0_vld; input v0_rdy;
+endmodule
+module Connections_Fifo_ac_int_26_false_8U_Connections_SYN_PORT(); endmodule
+"""
+        blocks = PLAN.module_blocks(rtl)
+        pe_instance = next(
+            item for item in PLAN.module_instances(blocks["top"], set(blocks))
+            if item.module == "pe"
+        )
+        semantic_id = "top/producer/pid=0"
+        manifest = {
+            "top": "top",
+            "pe_instances": [{
+                "semantic_id": semantic_id, "kernel": "producer", "pid": [0],
+                "ports": [{
+                    "ordinal": 0, "channel_id": "c0", "stream": "stream0",
+                    "direction": "out", "type": "!allo.stream<i26, 8>",
+                }],
+            }, {
+                "semantic_id": "top/consumer/pid=0", "kernel": "consumer",
+                "pid": [0], "ports": [],
+            }],
+            "channels": [{
+                "channel_id": "c0", "stream": "stream0",
+                "endpoints": [
+                    {"pe": semantic_id, "direction": "out",
+                     "accesses": [{"port_ordinal": 0}]},
+                    {"pe": "top/consumer/pid=0", "direction": "in", "accesses": []},
+                ],
+            }],
+        }
+
+        wrapper, folding, connections = PLAN.generate_catapult_fifo_wrapper(
+            "canonical_wrapper", manifest["pe_instances"][0], blocks["pe"],
+            pe_instance, blocks["top"], manifest, blocks, "systemc",
+        )
+
+        self.assertIn("Connections_Fifo_ac_int_26_false_8U_Connections_SYN_PORT", wrapper)
+        self.assertEqual(folding["protocol"], "systemc_matchlib_ready_valid")
+        self.assertEqual(folding["folded_fifo_count"], 1)
+        self.assertEqual(connections["v0_dat"], "c_dat")
+        self.assertEqual(connections["v0_vld"], "c_vld")
+        self.assertEqual(connections["v0_rdy"], "c_rdy")
 
     def test_explicit_bypass_emits_empty_batch_and_unchanged_rtl(self):
         rtl = "module chip(input clk); endmodule\n"

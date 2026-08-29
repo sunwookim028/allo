@@ -15,10 +15,25 @@ commands:
 
 parameters:
   enable_gui: False
+  # By default macro PNR follows the full-chip density target. Enable the
+  # separate target when macro hardening should use a different density.
   core_density_target: 0.70
+  macro_core_density_target: 0.70
+  use_separate_macro_density_target: False
   antenna_check_policy: report
   useful_skew: True
   useful_skew_ccopt_effort: standard
+  # Zero leaves the CCOpt maximum-transition target under Innovus control.
+  # A positive value is expressed in ns.
+  ccopt_target_max_transition: 0.0
+  # Harden a single clock root at each macro boundary so the published clock
+  # pin sees one buffer input rather than the aggregate internal clock load.
+  macro_clock_root_buffer_cell: CLKBUF_X1
+  macro_clock_root_buffer_input_pin: A
+  macro_clock_root_buffer_output_pin: Z
+  # The clock pin is placed on highest_macro_routing_layer. Its width is the
+  # layer minimum width and its inward depth is this multiple of that width.
+  clock_pin_depth_width_multiplier: 5.0
   cell_padding: 2
   signoff_engine: False
   macro_hold_target_slack: 0.050

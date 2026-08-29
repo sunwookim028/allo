@@ -25,6 +25,7 @@ inputs:
   - macro-activity-manifest.json
   - macro-power-summary.json
   - aggregate-power.rpt
+  - trim-metrics.json
 
 outputs:
   - flow-summary.json
@@ -60,6 +61,7 @@ preconditions:
   - assert File( 'inputs/macro-activity-manifest.json' )
   - assert File( 'inputs/macro-power-summary.json' )
   - assert File( 'inputs/aggregate-power.rpt' )
+  - assert File( 'inputs/trim-metrics.json' )
 
 postconditions:
   - assert File( 'outputs/flow-summary.json' )

@@ -28,7 +28,7 @@ parameters:
   build_mode: csyn
   clock_period: 10.0
   macro_clock_period: 8.0
-  # Empty selects the backend-native default: U280 for Vitis or Nangate45 for Catapult.
+  # Empty selects U280 for Vitis or Nangate45 for Catapult/SystemC.
   backend_options: ""
   allo_testbench_enabled: True
   allo_testbench_workload_factory: testbench_workload

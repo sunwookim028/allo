@@ -40,7 +40,9 @@ postconditions:
       import json
       from pathlib import Path
       collateral = json.loads(Path('outputs/macro-collateral.json').read_text())
-      expected_clock = {'vitis': 'ap_clk', 'catapult': 'clk'}[collateral['backend']]
+      expected_clock = {
+          'vitis': 'ap_clk', 'catapult': 'clk', 'systemc': 'clk'
+      }[collateral['backend']]
       assert collateral['clock_port'] == expected_clock
       constraints = Path('outputs/constraints.tcl').read_text()
       assert f'[get_ports {expected_clock}]' in constraints

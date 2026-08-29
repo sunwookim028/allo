@@ -34,6 +34,9 @@ preconditions:
   - >-
     assert '{backend}' != 'catapult' or
     '"backend": "catapult"' in File( 'inputs/asic-manifest-final.json' )
+  - >-
+    assert '{backend}' != 'systemc' or
+    '"backend": "systemc"' in File( 'inputs/asic-manifest-final.json' )
 
 postconditions:
   - assert File( 'outputs/macro-batch' )

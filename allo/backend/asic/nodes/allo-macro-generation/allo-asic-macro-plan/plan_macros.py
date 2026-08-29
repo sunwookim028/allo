@@ -117,6 +117,45 @@ def module_instances(block: ModuleBlock, modules: set[str]) -> list[InstanceBloc
     return sorted(result, key=lambda item: item.start)
 
 
+def catapult_pipe_instances(block: ModuleBlock) -> list[tuple[InstanceBlock, dict[str, str]]]:
+    """Return parameterized Catapult FIFO instances from a top module."""
+    result = []
+    pattern = re.compile(r"(?<![A-Za-z0-9_$])(ccs_pipe_v\d+)\s*#\s*\(")
+    for match in pattern.finditer(block.text):
+        parameter_open = block.text.find("(", match.start())
+        parameter_close = balanced_parentheses(block.text, parameter_open)
+        tail = re.match(
+            rf"\s*(?P<name>{IDENT})\s*\(", block.text[parameter_close + 1 :]
+        )
+        if tail is None:
+            continue
+        name = tail.group("name")
+        connection_open = parameter_close + 1 + tail.end() - 1
+        connection_close = balanced_parentheses(block.text, connection_open)
+        end = connection_close + 1
+        while end < len(block.text) and block.text[end].isspace():
+            end += 1
+        if end >= len(block.text) or block.text[end] != ";":
+            continue
+        result.append(
+            (
+                InstanceBlock(
+                    match.group(1),
+                    name,
+                    match.start(),
+                    end + 1,
+                    named_connections(
+                        block.text[connection_open + 1 : connection_close]
+                    ),
+                ),
+                named_connections(
+                    block.text[parameter_open + 1 : parameter_close]
+                ),
+            )
+        )
+    return result
+
+
 def replace_declared_name(declaration: str, old: str, new: str) -> str:
     return re.sub(rf"\b{re.escape(old)}\b", new, declaration)
 
@@ -131,15 +170,18 @@ def change_declaration_direction(declaration: str, direction: str) -> str:
 
 
 def outer_module_for_member(pe: dict, inner_module: str) -> str:
-    matches = []
+    explicit_roots = []
+    legacy_matches = []
     for record in pe.get("post_hls_records", []):
         if any(item.get("name") == inner_module for item in record.get("rtl_modules", [])):
-            matches.extend(
+            if record.get("rtl_root_module"):
+                explicit_roots.append(record["rtl_root_module"])
+            legacy_matches.extend(
                 Path(item["parent_file"]).stem
                 for item in record.get("rtl_instances", [])
                 if item.get("parent_file")
             )
-    unique = sorted(set(matches))
+    unique = sorted(set(explicit_roots or legacy_matches))
     if len(unique) != 1:
         raise ValueError(
             f"cannot resolve unique outer kernel module for {pe['semantic_id']} "
@@ -209,6 +251,247 @@ def find_owned_fifo(
     if fifo.module not in blocks:
         raise ValueError(f"FIFO module definition is absent: {fifo.module}")
     return fifo
+
+
+CATAPULT_FIFO_PRODUCER_PORTS = {
+    "rsc_dat": "din",
+    "rsc_vld": "din_vld",
+    "rsc_rdy": "din_rdy",
+}
+CATAPULT_FIFO_CONSUMER_PORTS = {
+    "rsc_dat": "dout",
+    "rsc_vld": "dout_vld",
+    "rsc_rdy": "dout_rdy",
+}
+SYSTEMC_FIFO_PRODUCER_PORTS = {
+    "vld": "enq_vld",
+    "rdy": "enq_rdy",
+    "dat": "enq_dat",
+}
+SYSTEMC_FIFO_CONSUMER_PORTS = {
+    "vld": "deq_vld",
+    "rdy": "deq_rdy",
+    "dat": "deq_dat",
+}
+
+
+def find_owned_catapult_fifo(
+    root: str,
+    pe_instance: InstanceBlock,
+    pipes: list[tuple[InstanceBlock, dict[str, str]]],
+) -> tuple[InstanceBlock, dict[str, str]]:
+    expected = {
+        fifo_port: normalize_expression(pe_instance.connections[f"{root}_{suffix}"])
+        for suffix, fifo_port in CATAPULT_FIFO_PRODUCER_PORTS.items()
+    }
+    matches = [
+        (instance, parameters)
+        for instance, parameters in pipes
+        if all(
+            normalize_expression(instance.connections.get(port, "")) == expression
+            for port, expression in expected.items()
+        )
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"cannot bind Catapult output bundle {pe_instance.module}.{root} "
+            f"to one ccs_pipe: {[(item.module, item.name) for item, _ in matches]}"
+        )
+    fifo, parameters = matches[0]
+    required = {
+        "clk", "en", "arst", "srst", "din", "din_vld", "din_rdy",
+        "dout", "dout_vld", "dout_rdy", "sz", "sz_req", "is_idle",
+    }
+    missing = sorted(required - set(fifo.connections))
+    if missing:
+        raise ValueError(f"Catapult FIFO {fifo.name} lacks expected ports {missing}")
+    return fifo, parameters
+
+
+def find_owned_systemc_fifo(
+    root: str,
+    pe_instance: InstanceBlock,
+    top_instances: list[InstanceBlock],
+) -> tuple[InstanceBlock, dict[str, str]]:
+    """Bind one SystemC PE output to its concrete MatchLib FIFO."""
+    expected = {
+        fifo_port: normalize_expression(pe_instance.connections[f"{root}_{suffix}"])
+        for suffix, fifo_port in SYSTEMC_FIFO_PRODUCER_PORTS.items()
+    }
+    matches = [
+        instance
+        for instance in top_instances
+        if instance.module.startswith("Connections_Fifo_")
+        and all(
+            normalize_expression(instance.connections.get(port, "")) == expression
+            for port, expression in expected.items()
+        )
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"cannot bind SystemC output bundle {pe_instance.module}.{root} "
+            f"to one Connections_Fifo: {[(item.module, item.name) for item in matches]}"
+        )
+    fifo = matches[0]
+    required = {
+        "clk", "rst", *SYSTEMC_FIFO_PRODUCER_PORTS.values(),
+        *SYSTEMC_FIFO_CONSUMER_PORTS.values(),
+    }
+    missing = sorted(required - set(fifo.connections))
+    if missing:
+        raise ValueError(f"SystemC FIFO {fifo.name} lacks expected ports {missing}")
+    return fifo, {}
+
+
+def generate_catapult_fifo_wrapper(
+    wrapper_name: str,
+    pe: dict,
+    outer: ModuleBlock,
+    pe_instance: InstanceBlock,
+    top_block: ModuleBlock,
+    manifest: dict,
+    blocks: dict[str, ModuleBlock],
+    backend: str = "catapult",
+) -> tuple[str, dict, dict[str, str]]:
+    """Wrap a ready/valid kernel and the FIFOs on its output bundles."""
+    outer_ports = port_names(outer)
+    outer_decls = port_declarations(outer, outer_ports)
+    intent = build_pin_intent(manifest, pe["semantic_id"], outer, blocks)
+    outgoing = [item for item in intent["stream_bundles"] if item["direction"] == "out"]
+    if backend == "systemc":
+        pipes = [
+            (instance, {})
+            for instance in module_instances(top_block, set(blocks))
+            if instance.module.startswith("Connections_Fifo_")
+        ]
+        producer_ports = SYSTEMC_FIFO_PRODUCER_PORTS
+        consumer_ports = SYSTEMC_FIFO_CONSUMER_PORTS
+    else:
+        pipes = catapult_pipe_instances(top_block)
+        producer_ports = CATAPULT_FIFO_PRODUCER_PORTS
+        consumer_ports = CATAPULT_FIFO_CONSUMER_PORTS
+    wrapper_connections = dict(pe_instance.connections)
+    pe_connections = {port: port for port in outer_ports}
+    expression_to_pe_port = {
+        normalize_expression(expression): port
+        for port, expression in pe_instance.connections.items()
+    }
+    owned = []
+    internal_decls = []
+    fifo_text = []
+
+    for bundle in outgoing:
+        root = str(bundle["root"])
+        # Internal SystemC service channels (such as a memory request port) are
+        # real wrapper boundary ports but are not backed by a top-level FIFO.
+        if backend == "systemc" and bundle.get("channel_id") is None:
+            continue
+        if backend == "systemc":
+            fifo, parameters = find_owned_systemc_fifo(
+                root, pe_instance, [item for item, _ in pipes]
+            )
+        else:
+            fifo, parameters = find_owned_catapult_fifo(root, pe_instance, pipes)
+        internal = {
+            suffix: f"_allo_fifo_in_{root}_{suffix}"
+            for suffix in producer_ports
+        }
+        for suffix, name in internal.items():
+            port = f"{root}_{suffix}"
+            internal_decls.append("  " + wire_declaration(outer_decls[port], name))
+            pe_connections[port] = name
+
+        # The wrapper replaces the producer kernel at the top level and owns the
+        # FIFO that used to follow it.  Its ready/valid bundle therefore forms the
+        # FIFO's consumer-side boundary, not the removed producer-side boundary.
+        for suffix, fifo_port in consumer_ports.items():
+            wrapper_connections[f"{root}_{suffix}"] = fifo.connections[fifo_port]
+
+        normalized_parameters = dict(parameters)
+        if "rscid" in normalized_parameters:
+            normalized_parameters["rscid"] = "32'sd0"
+        parameter_lines = [
+            f"    .{name}({value})" for name, value in normalized_parameters.items()
+        ]
+        connections = []
+        for port, expression in fifo.connections.items():
+            if port in set(producer_ports.values()):
+                suffix = next(
+                    key for key, value in producer_ports.items()
+                    if value == port
+                )
+                connected = internal[suffix]
+            elif port in set(consumer_ports.values()):
+                suffix = next(
+                    key for key, value in consumer_ports.items()
+                    if value == port
+                )
+                connected = f"{root}_{suffix}"
+            elif port in {"sz", "is_idle"}:
+                connected = ""
+            else:
+                connected = expression_to_pe_port.get(
+                    normalize_expression(expression), expression
+                )
+            connections.append(f"    .{port}({connected})")
+        instance_head = f"  {fifo.module}"
+        if parameter_lines:
+            instance_head += " #(\n" + ",\n".join(parameter_lines) + "\n  )"
+        fifo_text.extend(
+            [f"{instance_head} folded_{fifo.name} (", ",\n".join(connections), "  );"]
+        )
+        signature_parameters = {
+            key: value for key, value in normalized_parameters.items() if key != "rscid"
+        }
+        owned.append(
+            {
+                "channel_id": bundle.get("channel_id"),
+                "stream": bundle.get("stream"),
+                "root": root,
+                "fifo_module": fifo.module,
+                "fifo_instance": fifo.name,
+                "parent_module": manifest["top"],
+                "fifo_connections": fifo.connections,
+                "fifo_parameters": signature_parameters,
+            }
+        )
+
+    lines = [f"module {wrapper_name} (", "  " + ",\n  ".join(outer_ports), ");"]
+    lines.extend("  " + outer_decls[port] for port in outer_ports)
+    lines.extend(internal_decls)
+    lines.append(f"  {outer.name} producer_kernel (")
+    lines.append(",\n".join(f"    .{port}({pe_connections[port]})" for port in outer_ports))
+    lines.append("  );")
+    lines.extend(fifo_text)
+    lines.extend(["endmodule", ""])
+    wrapper_text = "\n".join(lines)
+
+    wrapper_block = module_blocks(wrapper_text)[wrapper_name]
+    wrapper_decls = port_declarations(wrapper_block, outer_ports)
+    for bundle in intent["stream_bundles"]:
+        bundle["rtl_port_widths"] = {
+            port: declaration_width(wrapper_decls[port])
+            for port in bundle["rtl_ports"]
+        }
+    folding = {
+        "owned_fifos": owned,
+        "folded_fifo_count": len(owned),
+        "pin_intent": intent,
+        "protocol": (
+            "systemc_matchlib_ready_valid"
+            if backend == "systemc"
+            else "catapult_ccs_pipe_ready_valid"
+        ),
+        "signature": [
+            {
+                "root": item["root"],
+                "module": item["fifo_module"],
+                "parameters": item["fifo_parameters"],
+            }
+            for item in owned
+        ],
+    }
+    return wrapper_text, folding, wrapper_connections
 
 
 def generate_fifo_wrapper(
@@ -440,11 +723,15 @@ STREAM_SUFFIXES = (
     "_write",
 )
 CATAPULT_STREAM_SUFFIXES = ("_rsc_dat", "_rsc_vld", "_rsc_rdy")
+SYSTEMC_STREAM_SUFFIXES = ("_dat", "_vld", "_rdy")
 
 
 def stream_bundle_root(port: str) -> str | None:
     """Return a Vitis or Catapult interface-bundle root."""
     for suffix in CATAPULT_STREAM_SUFFIXES:
+        if port.endswith(suffix):
+            return port[: -len(suffix)]
+    for suffix in SYSTEMC_STREAM_SUFFIXES:
         if port.endswith(suffix):
             return port[: -len(suffix)]
     for suffix in STREAM_SUFFIXES:
@@ -481,6 +768,7 @@ def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
             f"{root}_rsc_vld",
             f"{root}_rsc_rdy",
         }
+        systemc_triplet = {f"{root}_dat", f"{root}_vld", f"{root}_rdy"}
         if catapult_triplet.issubset(names):
             data_direction = (
                 "in" if declarations[f"{root}_rsc_dat"].lstrip().startswith("input")
@@ -488,6 +776,13 @@ def stream_bundles(block: ModuleBlock) -> list[dict[str, object]]:
             )
             direction = data_direction
             protocol = "catapult_ready_valid"
+        elif systemc_triplet.issubset(names):
+            data_direction = (
+                "in" if declarations[f"{root}_dat"].lstrip().startswith("input")
+                else "out"
+            )
+            direction = data_direction
+            protocol = "systemc_ready_valid"
         elif any(name.endswith(CATAPULT_STREAM_SUFFIXES) for name in names):
             # Direct-array Catapult arguments have ``*_rsc_dat`` without the
             # ready/valid pair. They are boundary auxiliary ports, not streams.
@@ -536,6 +831,8 @@ def rtl_stream_width(
     candidates = (
         [f"{root}_rsc_dat"]
         if bundle.get("protocol") == "catapult_ready_valid"
+        else [f"{root}_dat"]
+        if bundle.get("protocol") == "systemc_ready_valid"
         else (
             [f"{root}_dout"]
             if bundle["direction"] == "in"
@@ -613,11 +910,16 @@ def parent_wrapper_semantic_port_subset(
     ]
     if len(matching_records) != 1:
         return None
-    parent_names = {
-        Path(instance["parent_file"]).stem
-        for instance in matching_records[0].get("rtl_instances", [])
-        if instance.get("parent_file")
-    }
+    record = matching_records[0]
+    parent_names = (
+        {record["rtl_root_module"]}
+        if record.get("rtl_root_module")
+        else {
+            Path(instance["parent_file"]).stem
+            for instance in record.get("rtl_instances", [])
+            if instance.get("parent_file")
+        }
+    )
     solutions: list[list[dict[str, object]]] = []
     for parent_name in parent_names:
         parent = blocks.get(parent_name)
@@ -825,7 +1127,51 @@ def build_pin_intent(
     semantic_ports = sorted(pe.get("ports", []), key=lambda item: int(item["ordinal"]))
     bundles = stream_bundles(canonical)
     selection_method = "complete_process_interface"
-    if len(bundles) != len(semantic_ports):
+    mapped_pairs = None
+    if (
+        len(bundles) > len(semantic_ports)
+        and all(item.get("protocol") == "systemc_ready_valid" for item in bundles)
+    ):
+        # Catapult may expose internal MatchLib service requests (for example a
+        # memory request channel) beside the Allo streams.  Preserve those RTL
+        # bundles for folding/pin planning while mapping the semantic subsequence
+        # by the same stable direction/width order used by the emitter.
+        semantic_index = 0
+        mapped_pairs = []
+        for bundle_index, bundle in enumerate(bundles):
+            semantic = (
+                semantic_ports[semantic_index]
+                if semantic_index < len(semantic_ports)
+                else None
+            )
+            if (
+                semantic is not None
+                and semantic.get("direction") == bundle["direction"]
+                and semantic_stream_width(semantic) == rtl_stream_width(canonical, bundle)
+            ):
+                mapped_pairs.append((semantic, bundle))
+                semantic_index += 1
+            else:
+                mapped_pairs.append(
+                    (
+                        {
+                            "ordinal": -(bundle_index + 1),
+                            "channel_id": None,
+                            "stream": str(bundle["root"]),
+                            "direction": bundle["direction"],
+                            "operation": "systemc_auxiliary",
+                            "blocking": True,
+                            "type": "systemc_internal_channel",
+                        },
+                        bundle,
+                    )
+                )
+        if semantic_index != len(semantic_ports):
+            raise ValueError(
+                f"cannot map SystemC interface {canonical.name} to semantic ports"
+            )
+        selection_method = "systemc_semantic_subsequence_with_auxiliary_bundles"
+    elif len(bundles) != len(semantic_ports):
         selected_subset = parent_wrapper_semantic_port_subset(
             pe, canonical, semantic_ports, bundles, blocks
         )
@@ -877,16 +1223,29 @@ def build_pin_intent(
                     f"split-process ordinal {record_index} is outside the {direction} "
                     f"semantic interface of {canonical.name}"
                 )
+    if mapped_pairs is None:
+        mapped_pairs = list(zip(semantic_ports, bundles))
     side_map = graph_pin_sides(manifest)
     mapped = []
-    for semantic, bundle in zip(semantic_ports, bundles):
+    auxiliary_sides = ("W", "N", "S", "E")
+    for semantic, bundle in mapped_pairs:
         if semantic.get("direction") != bundle["direction"]:
             raise ValueError(
                 f"stream direction mismatch for {canonical.name} ordinal "
                 f"{semantic['ordinal']}: manifest={semantic.get('direction')} "
                 f"rtl={bundle['direction']}"
             )
-        decision = side_map[(representative, int(semantic["ordinal"]))]
+        if semantic.get("channel_id") is None:
+            decision = {
+                # Use the stable interface ordinal, not emitter-local signal
+                # names, so equivalent rotated/reflected PEs retain D4 intent.
+                "side": auxiliary_sides[
+                    (-int(semantic["ordinal"]) - 1) % len(auxiliary_sides)
+                ],
+                "method": "systemc_auxiliary_load_balance",
+            }
+        else:
+            decision = side_map[(representative, int(semantic["ordinal"]))]
         mapped.append({**semantic, **bundle, **decision})
 
     stream_rtl_ports = {port for item in mapped for port in item["rtl_ports"]}
@@ -1148,23 +1507,61 @@ def classify_macro_candidate(members: list[dict]) -> str:
     )
 
 
-def wrapper_interface_signature(wrapper_text: str, wrapper_name: str, folding: dict) -> str:
+def canonical_folded_wrapper_contract(
+    wrapper_text: str, wrapper_name: str, folding: dict
+) -> dict:
+    """Describe a folded wrapper independent of directional port/FIFO order.
+
+    The semantic PE/HLS implementation contract has already established that
+    members are interchangeable modulo a D4 port permutation. Preserve that
+    proof here: compare multisets of realized port shapes and producer-owned
+    FIFO implementations instead of generated argument order or stream roots.
+    The later pin-intent comparison validates the concrete D4 orientation for
+    every selected member.
+    """
     block = module_blocks(wrapper_text)[wrapper_name]
     ports = port_names(block)
     declarations = port_declarations(block, ports)
-    shapes = []
-    for port in ports:
-        shapes.append(
-            normalized_declaration(
-                declarations[port].replace(port, "PORT")
-            )
+    shapes = sorted(
+        normalized_declaration(declarations[port].replace(port, "PORT"))
+        for port in ports
+    )
+    fifo_descriptors = []
+    signature = folding.get("signature")
+    if signature is not None:
+        # Catapult supplies this compact form.  The root identifies a generated
+        # wrapper port, so it is deliberately excluded from the contract.
+        fifo_descriptors.extend(
+            {
+                "module": item["module"],
+                "parameters": item.get("parameters", {}),
+            }
+            for item in signature
         )
-    payload = {
+    else:
+        # Vitis folding carries the same information on each owned FIFO.
+        fifo_descriptors.extend(
+            {
+                "module": item["fifo_module"],
+                "parameters": item.get("fifo_parameters", {}),
+            }
+            for item in folding.get("owned_fifos", [])
+        )
+    fifo_descriptors.sort(
+        key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":"))
+    )
+    return {
+        "schema_version": 1,
+        "transform_family": "D4",
         "port_shapes": shapes,
-        "fifo_modules": [
-            item["fifo_module"] for item in folding.get("owned_fifos", [])
-        ],
+        # Roots, stream names, and instance names are generated aliases.
+        # Width/depth and implementation remain in module/parameters.
+        "producer_owned_fifos": fifo_descriptors,
     }
+
+
+def wrapper_interface_signature(wrapper_text: str, wrapper_name: str, folding: dict) -> str:
+    payload = canonical_folded_wrapper_contract(wrapper_text, wrapper_name, folding)
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
@@ -1186,12 +1583,12 @@ def main() -> None:
     bypassed = env_bool("bypass_macro_generation")
     harden_hls_submodules = env_bool("harden_repeated_hls_submodules")
     fold_fifos_requested = env_bool("fold_fifos_into_macro")
-    fold_fifos = fold_fifos_requested and not bypassed and backend == "vitis"
+    fold_fifos = fold_fifos_requested and not bypassed
     if threshold < 1:
         raise ValueError("min_macro_reuse must be at least 1")
     if macro_clock_period <= 0:
         raise ValueError("macro_clock_period must be positive")
-    if backend not in {"vitis", "catapult"}:
+    if backend not in {"vitis", "catapult", "systemc"}:
         raise ValueError(f"unsupported macro-plan backend {backend!r}")
     manifest_backend = manifest.get("backend")
     if manifest_backend and manifest_backend != backend:
@@ -1236,15 +1633,27 @@ def main() -> None:
                     f"{[item.name for item in instances]}"
                 )
             provisional_name = f"{outer_name}_fifo_signature"
-            wrapper_text, folding, _connections = generate_fifo_wrapper(
-                provisional_name,
-                pe,
-                blocks[outer_name],
-                instances[0],
-                top_instances,
-                manifest,
-                blocks,
-            )
+            if backend in {"catapult", "systemc"}:
+                wrapper_text, folding, _connections = generate_catapult_fifo_wrapper(
+                    provisional_name,
+                    pe,
+                    blocks[outer_name],
+                    instances[0],
+                    top_block,
+                    manifest,
+                    blocks,
+                    backend,
+                )
+            else:
+                wrapper_text, folding, _connections = generate_fifo_wrapper(
+                    provisional_name,
+                    pe,
+                    blocks[outer_name],
+                    instances[0],
+                    top_instances,
+                    manifest,
+                    blocks,
+                )
             signature = wrapper_interface_signature(
                 wrapper_text, provisional_name, folding
             )
@@ -1319,15 +1728,29 @@ def main() -> None:
                     if index == 0
                     else f"{outer_name}_fifo_member"
                 )
-                wrapper_text, folding, wrapper_connections = generate_fifo_wrapper(
-                    wrapper_name,
-                    pe,
-                    blocks[outer_name],
-                    instances[0],
-                    top_instances,
-                    manifest,
-                    blocks,
-                )
+                if backend in {"catapult", "systemc"}:
+                    wrapper_text, folding, wrapper_connections = (
+                        generate_catapult_fifo_wrapper(
+                            wrapper_name,
+                            pe,
+                            blocks[outer_name],
+                            instances[0],
+                            top_block,
+                            manifest,
+                            blocks,
+                            backend,
+                        )
+                    )
+                else:
+                    wrapper_text, folding, wrapper_connections = generate_fifo_wrapper(
+                        wrapper_name,
+                        pe,
+                        blocks[outer_name],
+                        instances[0],
+                        top_instances,
+                        manifest,
+                        blocks,
+                    )
                 folding.update(
                     {
                         "enabled": True,
@@ -1488,6 +1911,11 @@ def main() -> None:
             "member_placements": member_placements,
             "port_maps": port_maps,
             "fold_fifos_into_macro": fold_fifos,
+            "folded_wrapper_contract_hash": group.get("fifo_wrapper_signature"),
+            "folded_wrapper_equivalence_method": (
+                "d4_semantic_contract_plus_unordered_fifo_contract"
+                if fold_fifos else None
+            ),
             "folded_fifo_count": sum(
                 len(item.get("fifo_folding", {}).get("owned_fifos", []))
                 for item in members
@@ -1577,11 +2005,6 @@ def main() -> None:
             f"{plan['selected_instance_count']} instances at reuse threshold {threshold}"
             ".\n"
         )
-        if backend == "catapult" and fold_fifos_requested:
-            log += (
-                "Catapult FIFO folding request ignored; ready/valid support logic "
-                "remains in each macro dependency closure.\n"
-            )
         if fold_fifos:
             log += (
                 "Producer-owned FIFO folding wrapped "

@@ -17,7 +17,7 @@ case "$backend" in
       files+=("$file")
     done < <(find -H inputs/backend-rtl -type f \( -name '*.v' -o -name '*.sv' \) | sort)
     ;;
-  catapult)
+  catapult|systemc)
     files+=(inputs/backend-rtl/concat_rtl.v)
     ;;
   *)
@@ -34,8 +34,8 @@ fi
 
 printf '%s\n' "${files[@]}" > outputs/source-manifest.f
 
-if [[ "$backend" == "catapult" && "${#files[@]}" -ne 1 ]]; then
-  echo "ERROR: Catapult normalization must consume only concat_rtl.v" \
+if [[ "$backend" =~ ^(catapult|systemc)$ && "${#files[@]}" -ne 1 ]]; then
+  echo "ERROR: Catapult/SystemC normalization must consume only concat_rtl.v" \
     | tee outputs/sv2v.log
   exit 1
 fi

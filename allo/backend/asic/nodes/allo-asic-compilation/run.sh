@@ -40,17 +40,22 @@ case "$backend" in
   vitis)
     module load xilinx-2022.1
     ;;
-  catapult)
+  catapult|systemc)
     module load catapult
     ;;
   *)
-    echo "ERROR: unsupported backend '$backend'; supported: vitis, catapult" >&2
+    echo "ERROR: unsupported backend '$backend'; supported: vitis, catapult, systemc" >&2
     exit 2
     ;;
 esac
 
 source "$allo_setup_script"
 set -u
+
+if [ "$backend" = "systemc" ]; then
+  : "${MGC_HOME:?SystemC backend selected, but MGC_HOME is unset}"
+  export SYSTEMC_HOME="${SYSTEMC_HOME:-$MGC_HOME/shared}"
+fi
 
 "$python_bin" preflight.py \
   --python-bin "$python_bin" \
@@ -82,6 +87,11 @@ case "$backend" in
   catapult)
     command -v catapult >/dev/null
     : "${MGC_HOME:?Catapult backend selected, but MGC_HOME is unset}"
+    ;;
+  systemc)
+    command -v catapult >/dev/null
+    : "${MGC_HOME:?SystemC backend selected, but MGC_HOME is unset}"
+    export SYSTEMC_HOME="${SYSTEMC_HOME:-$MGC_HOME/shared}"
     ;;
 esac
 

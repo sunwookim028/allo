@@ -153,18 +153,34 @@ def remove_instances(body: str, removals: list[dict]) -> tuple[str, list[dict]]:
     edits = []
     removed = []
     for item in removals:
-        pattern = re.compile(
-            rf"(?<![A-Za-z0-9_$]){re.escape(item['fifo_module'])}\s+"
-            rf"{re.escape(item['fifo_instance'])}\s*\("
+        module_pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$]){re.escape(item['fifo_module'])}\b"
         )
-        matches = list(pattern.finditer(body))
+        matches = []
+        for module_match in module_pattern.finditer(body):
+            cursor = module_match.end()
+            while cursor < len(body) and body[cursor].isspace():
+                cursor += 1
+            if cursor < len(body) and body[cursor] == "#":
+                cursor += 1
+                while cursor < len(body) and body[cursor].isspace():
+                    cursor += 1
+                if cursor >= len(body) or body[cursor] != "(":
+                    continue
+                cursor = closing_parenthesis(body, cursor) + 1
+                while cursor < len(body) and body[cursor].isspace():
+                    cursor += 1
+            instance_match = re.match(
+                rf"{re.escape(item['fifo_instance'])}\s*\(", body[cursor:]
+            )
+            if instance_match is not None:
+                matches.append((module_match, cursor + instance_match.end() - 1))
         if len(matches) != 1:
             raise ValueError(
                 f"expected one folded FIFO instance {item['fifo_module']} "
                 f"{item['fifo_instance']}, found {len(matches)}"
             )
-        match = matches[0]
-        opening = body.find("(", match.start())
+        match, opening = matches[0]
         closing = closing_parenthesis(body, opening)
         end = closing + 1
         while end < len(body) and body[end].isspace():
@@ -220,7 +236,7 @@ def main() -> None:
     registry = json.loads((inputs / "macro-registry.json").read_text())
     configured_backend = os.environ.get("backend")
     backend = configured_backend or plan.get("backend", "vitis")
-    if backend not in {"vitis", "catapult"}:
+    if backend not in {"vitis", "catapult", "systemc"}:
         raise ValueError(f"unsupported full-chip RTL assembly backend {backend!r}")
     plan_backend = plan.get("backend")
     if plan_backend is not None and plan_backend != backend:
@@ -293,7 +309,7 @@ def main() -> None:
     top_module = plan["top_module"]
     if top_module not in assembled_blocks:
         raise ValueError(f"assembled RTL does not define top module {top_module!r}")
-    clock_port = {"vitis": "ap_clk", "catapult": "clk"}[backend]
+    clock_port = {"vitis": "ap_clk", "catapult": "clk", "systemc": "clk"}[backend]
     top_ports = module_port_names(assembled_blocks[top_module])
     if clock_port not in top_ports:
         raise ValueError(

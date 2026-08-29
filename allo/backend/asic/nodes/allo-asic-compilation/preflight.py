@@ -74,14 +74,21 @@ def main():
             raise RuntimeError(
                 "Vitis backend selected, but vitis_hls is not available on PATH"
             )
-    elif args.backend == "catapult":
+    elif args.backend in {"catapult", "systemc"}:
         if shutil.which("catapult") is None:
             raise RuntimeError(
-                "Catapult backend selected, but catapult is not available on PATH"
+                f"{args.backend} backend selected, but catapult is not available on PATH"
             )
+        if args.backend == "systemc":
+            import os  # pylint: disable=import-outside-toplevel
+            systemc_home_value = os.environ.get("SYSTEMC_HOME")
+            if not systemc_home_value or not Path(systemc_home_value).is_dir():
+                raise RuntimeError(
+                    "SystemC backend selected, but SYSTEMC_HOME is unset or invalid"
+                )
     else:
         raise RuntimeError(
-            f"unsupported Allo backend {args.backend!r}; supported: vitis, catapult"
+            f"unsupported Allo backend {args.backend!r}; supported: vitis, catapult, systemc"
         )
 
     print(f"Python: {running_python}")

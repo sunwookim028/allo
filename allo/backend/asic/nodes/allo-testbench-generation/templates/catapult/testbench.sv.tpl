@@ -37,7 +37,7 @@ module allo_generated_testbench;
 @ARGUMENT_MODELS@
 
   always @(posedge @CLOCK@) begin
-    if (@RESET@ || clear_completion)
+    if ((@RESET@ === 1'b@RESET_ASSERTED@) || clear_completion)
       completion_seen <= '0;
     else begin
 @COMPLETION_UPDATES@
@@ -66,7 +66,10 @@ module allo_generated_testbench;
 @ARGUMENT_TASKS@
 
   initial begin
-    @RESET@ = 1'b1;
+    // Start inactive so the per-workload reset below produces a real assertion
+    // edge. Gate-level reset trees may not settle when reset starts asserted at
+    // time zero and is then redundantly assigned the same value.
+    @RESET@ = 1'b@RESET_DEASSERTED@;
     clear_completion = 1'b1;
 @WORKLOAD_SEQUENCE@
     $display("ALLO_TEST_PASS");

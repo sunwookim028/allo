@@ -128,7 +128,14 @@ def merge_cells(occupied):
         for run in present:
             if run in active and active[run][1] == y:
                 active[run] = (active[run][0], y + 1)
-            elif run not in active:
+            elif run in active:
+                # The same x-run reappeared after one or more empty rows.
+                # Finish its earlier rectangle before starting the new one;
+                # otherwise the later cells are silently dropped.
+                y0, y1 = active[run]
+                merged.append((run[0], y0, run[1], y1))
+                active[run] = (y, y + 1)
+            else:
                 active[run] = (y, y + 1)
     for run, (y0, y1) in active.items():
         merged.append((run[0], y0, run[1], y1))

@@ -41,7 +41,7 @@ test -s drc.summary
 ln -sf ../drc.results outputs/drc.results
 ln -sf ../drc.summary outputs/drc.summary
 
-python - "${antenna_check_policy:-report}" <<'PY'
+python - "${antenna_check_policy:-report}" "${drc_check_policy:-error}" <<'PY'
 import json
 import re
 import sys
@@ -51,9 +51,14 @@ text = Path("drc.summary").read_text(errors="replace")
 match = re.search(r"TOTAL DRC Results Generated:\s*(\d+)", text, re.I)
 if match is None:
     raise SystemExit("ERROR: Calibre DRC summary has no total result count")
-policy = sys.argv[1].lower()
-if policy not in {"error", "report", "off"}:
-    raise SystemExit(f"ERROR: unsupported antenna_check_policy: {policy}")
+antenna_policy = sys.argv[1].lower()
+drc_policy = sys.argv[2].lower()
+if antenna_policy not in {"error", "report", "off"}:
+    raise SystemExit(
+        f"ERROR: unsupported antenna_check_policy: {antenna_policy}"
+    )
+if drc_policy not in {"error", "report"}:
+    raise SystemExit(f"ERROR: unsupported drc_check_policy: {drc_policy}")
 global_section = re.split(
     r"RULECHECK RESULTS STATISTICS \(BY CELL\)", text, maxsplit=1, flags=re.I
 )[0]
@@ -74,16 +79,31 @@ non_antenna = sum(
 total = int(match.group(1))
 result = {
     "schema_version": 1,
-    "antenna_check_policy": policy,
+    "antenna_check_policy": antenna_policy,
+    "drc_check_policy": drc_policy,
     "total_results": total,
     "antenna_results": antenna,
     "non_antenna_results": non_antenna,
-    "antenna_enforced": policy == "error",
-    "status": "passed" if non_antenna == 0 and (policy != "error" or antenna == 0) else "failed",
+    "antenna_enforced": antenna_policy == "error",
+    "non_antenna_enforced": drc_policy == "error",
+    "status": (
+        "failed"
+        if (drc_policy == "error" and non_antenna)
+        or (antenna_policy == "error" and antenna)
+        else "reported"
+        if non_antenna or antenna
+        else "passed"
+    ),
 }
 Path("outputs/drc-policy.json").write_text(json.dumps(result, indent=2) + "\n")
-if non_antenna:
+if drc_policy == "error" and non_antenna:
     raise SystemExit(f"ERROR: Calibre DRC reported {non_antenna} non-antenna result(s)")
-if policy == "error" and antenna:
+if drc_policy == "report" and non_antenna:
+    print(
+        f"WARNING: Calibre DRC reported {non_antenna} non-antenna result(s); "
+        "continuing under drc_check_policy=report",
+        file=sys.stderr,
+    )
+if antenna_policy == "error" and antenna:
     raise SystemExit(f"ERROR: Calibre DRC reported {antenna} antenna result(s)")
 PY

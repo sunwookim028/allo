@@ -50,6 +50,52 @@ def test_density_sanity_check_rejects_underprovisioned_floorplan():
         raise AssertionError("82% predicted density passed a 77% sanity limit")
 
 
+def test_peripheral_side_parser(monkeypatch):
+    monkeypatch.setenv("peripheral_placement_sides", "top left")
+    assert PLAN.peripheral_sides_parameter() == {"top", "left"}
+    monkeypatch.setenv("peripheral_placement_sides", "all")
+    assert PLAN.peripheral_sides_parameter() == {"top", "bottom", "left", "right"}
+    monkeypatch.setenv("peripheral_placement_sides", "left left")
+    try:
+        PLAN.peripheral_sides_parameter()
+    except ValueError as error:
+        assert "non-repeated" in str(error)
+    else:
+        raise AssertionError("repeated peripheral side was accepted")
+
+
+def test_peripheral_choices_add_identical_area_and_move_macro_origin():
+    base_width, base_height, area = 100.0, 80.0, 4000.0
+    choices = [
+        {"left"},
+        {"right"},
+        {"top", "left"},
+        {"left", "right"},
+        {"top", "bottom"},
+        {"left", "right", "top", "bottom"},
+    ]
+    for sides in choices:
+        expansion = PLAN.distribute_peripheral_area(
+            base_width, base_height, area, sides, preferred_aspect=1.0
+        )
+        width = base_width + expansion["left"] + expansion["right"]
+        height = base_height + expansion["bottom"] + expansion["top"]
+        assert math.isclose(width * height - base_width * base_height, area)
+    left = PLAN.distribute_peripheral_area(
+        base_width, base_height, area, {"left"}, preferred_aspect=1.0
+    )
+    right = PLAN.distribute_peripheral_area(
+        base_width, base_height, area, {"right"}, preferred_aspect=1.0
+    )
+    assert left["left"] == right["right"]
+    assert left["left"] > 0 and left["right"] == 0
+
+
+def test_soft_blockage_union_counts_overlapping_spacing_once():
+    rectangles = [(0, 0, 12, 10), (10, 0, 22, 10)]
+    assert PLAN.rectangle_union_area(rectangles) == 220
+
+
 def test_variable_kernel_slots_do_not_pad_small_kernel_to_largest_width():
     clusters = {
         "compute": {"width": 100, "height": 40},
@@ -168,6 +214,114 @@ def test_connection_weights_are_remapped_around_composite_cluster():
     assert PLAN.remap_connection_weights(weights, mapping) == {
         ("interleave:a+b", "top/c"): 24,
     }
+
+
+def test_instance_stream_graph_preserves_width_roles_and_direction():
+    plan = {"whole_region_connections": [
+        {
+            "type": "!allo.stream<i32, 8>",
+            "endpoints": [
+                {"pe": "top/node/pid=0,0", "role": "producer"},
+                {"pe": "top/node/pid=0,1", "role": "consumer"},
+            ],
+        },
+        {
+            "type": "!allo.stream<i8, 4>",
+            "endpoints": [
+                {"pe": "top/drv_w/pid=0", "role": "producer"},
+                {"pe": "top/node/pid=0,0", "role": "consumer"},
+            ],
+        },
+    ]}
+    edges = PLAN.stream_instance_edges(plan, {
+        "top/node/pid=0,0": "n00",
+        "top/node/pid=0,1": "n01",
+        "top/drv_w/pid=0": "dw0",
+    })
+    assert edges == [
+        {"left": "dw0", "right": "n00", "direction": "E", "weight": 8.0},
+        {"left": "n00", "right": "n01", "direction": "E", "weight": 32.0},
+    ]
+
+
+def test_stream_grid_placement_is_legal_compact_and_deterministic():
+    items = [
+        {"name": "n00", "width": 20.0, "height": 20.0, "pid": (0, 0), "kernel": "top/node"},
+        {"name": "n01", "width": 20.0, "height": 20.0, "pid": (0, 1), "kernel": "top/node"},
+        {"name": "dw0", "width": 10.0, "height": 10.0, "pid": (0,), "kernel": "top/drv_w"},
+    ]
+    edges = [
+        {"left": "dw0", "right": "n00", "direction": "E", "weight": 16.0},
+        {"left": "n00", "right": "n01", "direction": "E", "weight": 16.0},
+    ]
+    first, metrics = PLAN.optimize_macro_placement(items, edges, 2.0, 2.0)
+    second, _ = PLAN.optimize_macro_placement(items, edges, 2.0, 2.0)
+    assert first == second
+    by_name = {item["name"]: item for item in first}
+    assert by_name["dw0"]["x"] < by_name["n00"]["x"] < by_name["n01"]["x"]
+    for index, left in enumerate(first):
+        for right in first[index + 1 :]:
+            assert (
+                left["x"] + left["width"] + 2.0 <= right["x"]
+                or right["x"] + right["width"] + 2.0 <= left["x"]
+                or left["y"] + left["height"] + 2.0 <= right["y"]
+                or right["y"] + right["height"] + 2.0 <= left["y"]
+            )
+    assert metrics["algorithm"] == "multiresolution_stream_grid"
+    assert metrics["coverage"] > 0.6
+    assert all(level["evaluations"] <= 16 * len(items) for level in metrics["levels"])
+
+
+def test_stream_grid_anchors_cardinal_kernels_to_matching_sides():
+    items = [
+        {"name": "node", "width": 20.0, "height": 20.0, "pid": (0, 0), "kernel": "top/node"},
+        {"name": "west", "width": 8.0, "height": 8.0, "pid": (0,), "kernel": "top/drv_w"},
+        {"name": "east", "width": 8.0, "height": 8.0, "pid": (0,), "kernel": "top/drv_e"},
+        {"name": "north", "width": 8.0, "height": 8.0, "pid": (0,), "kernel": "top/drv_n"},
+        {"name": "south", "width": 8.0, "height": 8.0, "pid": (0,), "kernel": "top/drv_s"},
+    ]
+    edges = [
+        {"left": side, "right": "node", "direction": direction, "weight": 8.0}
+        for side, direction in (("west", "E"), ("east", "W"), ("north", "S"), ("south", "N"))
+    ]
+    placed, metrics = PLAN.optimize_macro_placement(items, edges, 2.0, 2.0)
+    by_name = {item["name"]: item for item in placed}
+    center_x = lambda item: item["x"] + item["width"] / 2
+    center_y = lambda item: item["y"] + item["height"] / 2
+    assert center_x(by_name["west"]) < center_x(by_name["node"]) < center_x(by_name["east"])
+    assert center_y(by_name["south"]) < center_y(by_name["node"]) < center_y(by_name["north"])
+    assert "normalized_boundary_side" in metrics["cost_function"]
+
+
+def test_regular_grid_stops_without_exhaustive_global_search():
+    size = 8
+    items = [
+        {
+            "name": f"n{row}_{column}", "width": 8.0, "height": 8.0,
+            "pid": (row, column), "kernel": "top/node",
+        }
+        for row in range(size)
+        for column in range(size)
+    ]
+    edges = []
+    for row in range(size):
+        for column in range(size):
+            if column + 1 < size:
+                edges.append({
+                    "left": f"n{row}_{column}", "right": f"n{row}_{column + 1}",
+                    "direction": "E", "weight": 8.0,
+                })
+            if row + 1 < size:
+                edges.append({
+                    "left": f"n{row}_{column}", "right": f"n{row + 1}_{column}",
+                    "direction": "S", "weight": 8.0,
+                })
+    placed, metrics = PLAN.optimize_macro_placement(
+        items, edges, 0.0, 0.0, max_passes=4
+    )
+    assert len(placed) == size * size
+    assert all(level["evaluations"] <= 4 * len(items) for level in metrics["levels"])
+    assert metrics["legalization_moves"] == 0
 
 
 def test_systolic_pid_rows_are_placed_north_to_south(tmp_path, monkeypatch):
@@ -342,19 +496,88 @@ def test_planner_main_without_optional_srams(tmp_path, monkeypatch):
         "policy": "sequential_perimeter",
     }
     generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
+    assert "set all_instance_names [dbGet top.insts.name]" in generated_tcl
+    assert (
+        "lsearch -all -inline -exact $all_instance_names {allo_pe_test}"
+        in generated_tcl
+    )
+    assert "dbGet top.insts.name {*allo_pe_test}" not in generated_tcl
     assert "proc cut_allo_short_row_fragments" in generated_tcl
-    assert "proc create_allo_cluster_density_limits" in generated_tcl
-    assert "createPlaceBlockage" not in generated_tcl
-    assert intent["cluster_placement_policy"] == {
-        "type": "none",
-        "reason": "cluster-wide partial placement blockages disabled",
-        "region_count": 0,
-    }
+    assert "proc create_allo_macro_channel_soft_blockages" in generated_tcl
+    assert "createPlaceBlockage -type soft -snapToSite" in generated_tcl
+    assert intent["macro_channel_placement_policy"]["enabled"] is True
+    assert intent["macro_channel_placement_policy"]["type"] == "soft"
+    assert intent["macro_channel_placement_policy"]["expansion_x"] == 4.0
+    assert intent["macro_channel_placement_policy"]["expansion_y"] == 4.0
+    assert intent["macro_channel_placement_policy"]["region_count"] == 1
     assert intent["row_fragment_policy"]["cut_count"] == 0
     assert intent["area_budget"]["dc_macro_abstract_area_um2"] == 200
     assert intent["area_budget"]["estimated_standard_cell_area_um2"] == 800
     assert intent["area_budget"]["physical_pe_macro_area_um2"] == 200
     assert intent["area_budget"]["target_standard_cell_density"] == 0.70
+
+    monkeypatch.setenv("enable_macro_channel_soft_blockages", "false")
+    PLAN.main()
+    disabled_intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())
+    disabled_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
+    assert disabled_intent["macro_channel_placement_policy"]["enabled"] is False
+    assert disabled_intent["macro_channel_placement_policy"]["region_count"] == 0
+    assert "createPlaceBlockage" not in disabled_tcl
+
+
+def test_generated_instance_lookup_does_not_use_ambiguous_suffix_globs(
+    tmp_path, monkeypatch
+):
+    inputs = tmp_path / "inputs"
+    macro_dir = inputs / "macro-registry" / "macro_alpha_test"
+    macro_dir.mkdir(parents=True)
+    (macro_dir / "m.lef").write_text(
+        "MACRO m\n  SIZE 10 BY 20 ;\n  SYMMETRY X Y R90 ;\nEND m\n"
+    )
+    names = ["drv_e_0", "rdrv_e_0"]
+    plan = {
+        "top_module": "top",
+        "elaborated_macro_instance_count": len(names),
+        "replacements": [
+            {
+                "stable_instance_name": name,
+                "semantic_id": f"top/{name}/pid=0",
+                "macro_class_id": "macro_alpha_test",
+                "canonical_module": "m",
+                "desired_orientation": "R0",
+            }
+            for name in names
+        ],
+        "whole_region_connections": [],
+    }
+    registry = {"macros": [{
+        "macro_class_id": "macro_alpha_test",
+        "top_module": "m",
+        "views": {"lef": {"path": "macro_alpha_test/m.lef"}},
+    }]}
+    (inputs / "assembly-plan.json").write_text(json.dumps(plan))
+    (inputs / "macro-registry.json").write_text(json.dumps(registry))
+    (inputs / "macro-collateral.json").write_text("{}")
+    (inputs / "design.v").write_text(
+        "module top; m drv_e_0(); m rdrv_e_0(); endmodule\n"
+    )
+    (inputs / "macro-link.rpt").write_text("m 2\nTOTAL 2\n")
+    write_area_report(inputs, total=1000, macro=400)
+    monkeypatch.chdir(tmp_path)
+
+    PLAN.main()
+
+    generated_tcl = (tmp_path / "outputs/physical-intent.tcl").read_text()
+    assert "{*drv_e_0}" not in generated_tcl
+    assert "{*rdrv_e_0}" not in generated_tcl
+    assert (
+        "lsearch -all -inline -exact $all_instance_names {drv_e_0}"
+        in generated_tcl
+    )
+    assert (
+        "lsearch -all -inline -exact $all_instance_names {rdrv_e_0}"
+        in generated_tcl
+    )
 
 
 def test_planner_main_interleaves_only_with_explicit_flag(tmp_path, monkeypatch):
@@ -406,6 +629,7 @@ def test_planner_main_interleaves_only_with_explicit_flag(tmp_path, monkeypatch)
     write_area_report(inputs, total=1000, macro=480)
     monkeypatch.setenv("interleave_macros", "True")
     monkeypatch.setenv("enable_kernel_rotation", "False")
+    monkeypatch.setenv("macro_placement_algorithm", "legacy_cluster_grid")
     monkeypatch.chdir(tmp_path)
     PLAN.main()
     intent = json.loads((tmp_path / "outputs/physical-intent.json").read_text())

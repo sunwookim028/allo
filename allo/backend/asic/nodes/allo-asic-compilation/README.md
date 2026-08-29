@@ -7,7 +7,7 @@ entrypoint with:
 build(project, target, mode, configs)
 ```
 
-Both `backend: vitis` and `backend: catapult` are supported. Backend selection is handled by
+The `vitis`, `catapult`, and `systemc` backends are supported. Backend selection is handled by
 explicit branches in `backend.py`; later backends can add their own target,
 configuration, tool checks, artifact discovery, and validation without adding
 backend-specific path parameters to the graph. The node currently runs Vitis C
@@ -19,12 +19,13 @@ Important parameters are:
 - `allo_design_file`: absolute path, or a path relative to the design's
   `construct_path`.
 - `allo_entrypoint`: design-module callable, default `build`.
-- `backend`: `vitis` or `catapult`; unsupported values fail explicitly.
+- `backend`: `vitis`, `catapult`, or `systemc`; unsupported values fail explicitly.
 - `backend_options`: shell-safe comma-separated `key=value` options interpreted
   by the selected backend branch. The Vitis default is `device=u280`.
 - `build_mode`: currently expected to be `csyn`.
-- `macro_clock_period`: Vitis HLS and hardened-macro target period in
-  nanoseconds. The node converts this to the MHz value required by Allo/Vitis.
+- `macro_clock_period`: HLS and hardened-macro target period in nanoseconds.
+  The SystemC path passes the period directly to Catapult so fractional periods
+  are not lost in a frequency conversion.
 - `clock_period`: full-chip target period in nanoseconds. It must be greater
   than or equal to `macro_clock_period`, ensuring macros are built for a clock
   at least as fast as the chip that instantiates them.
@@ -51,7 +52,9 @@ The success marker is written only after the pre-HLS/final manifests, zero
 unmatched joins, debug directory, synthesized Verilog, and frozen workload
 interface have all been validated. Catapult publishes a compact RTL contract:
 the self-contained `concat_rtl.v`, available reports/constraints, and selected
-SCVerify protocol sources. Its complete project remains available under
+SCVerify protocol sources. SystemC synthesis uses Catapult from the project's
+`build/` subdirectory and publishes the same stable filename, normalizing
+`rtl.v` to `concat_rtl.v` when necessary. The complete project remains available under
 `allo-build` but is not duplicated into `backend-rtl`.
 
 This mflowgen version does not expand node parameters inside assertion text.
@@ -59,12 +62,13 @@ Parameterized environment checks therefore run in `preflight.py`, invoked as
 the first expanded command. Static mflowgen preconditions only verify that the
 node's required scripts were staged. The preflight checks the selected Python
 executable, Allo import, design path, build mode, backend selection, and backend
-tool availability before `run.sh` starts.
+tool availability before `run.sh` starts. SystemC additionally requires a valid
+`SYSTEMC_HOME`; `run.sh` defaults it to `$MGC_HOME/shared` after loading Catapult.
 
 Preflight and compilation run from the same `run.sh` command, so the backend
 module and LLVM setup are each loaded only once. Backend selection owns module
-selection: the Vitis branch loads `xilinx-2022.1`, and unsupported backends
-error. The wrapper disables Bash
+selection: the Vitis branch loads `xilinx-2022.1`, while Catapult and SystemC
+load `catapult`; unsupported backends error. The wrapper disables Bash
 `nounset` while sourcing because the shared setup script unsets and subsequently
 reads `PYTHONPATH`.
 

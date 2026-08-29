@@ -20,6 +20,21 @@ PLANNER = load("plan_assembly", PLANNER_PATH)
 ASSEMBLER = load("assemble_rtl", HERE / "assemble_rtl.py")
 
 
+def test_remove_parameterized_catapult_fifo_instance():
+    rtl = """
+module top;
+  ccs_pipe_v6 #(.width(32'sd8), .fifo_sz(32'sd4)) fifo0 (
+    .clk(clk), .din(data), .dout(out));
+endmodule
+"""
+    updated, removed = ASSEMBLER.remove_instances(
+        rtl,
+        [{"fifo_module": "ccs_pipe_v6", "fifo_instance": "fifo0"}],
+    )
+    assert "fifo0" not in updated
+    assert len(removed) == 1
+
+
 def test_member_instances_become_one_canonical_macro(tmp_path, monkeypatch):
     rtl = """
 module top(input ap_clk);

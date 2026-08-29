@@ -19,6 +19,9 @@ parameters:
   drc_rule_deck: calibre-drc-block.rule
   drc_env_setup: undefined
   antenna_check_policy: report
+  # error: require zero non-antenna Calibre results; report: publish them and
+  # allow downstream reporting/signoff nodes to continue.
+  drc_check_policy: error
 
 debug:
   - calibredrv -m inputs/design_merged.gds -l inputs/adk/calibre.layerprops -rve -drc drc.results

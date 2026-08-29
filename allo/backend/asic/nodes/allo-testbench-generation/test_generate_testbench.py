@@ -92,6 +92,15 @@ def test_vitis_bfms_drive_away_from_propagated_clock_edge():
     assert "#(allo_bagl_clock_compensation_ns + allo_bagl_output_delay_ns);" in testbench
 
 
+def test_catapult_reset_starts_deasserted_before_workload_assertion():
+    template = (
+        SCRIPT.parent / "templates" / "catapult" / "testbench.sv.tpl"
+    ).read_text()
+
+    assert "@RESET@ = 1'b@RESET_DEASSERTED@;" in template
+    assert "@RESET@ = 1'b@RESET_ASSERTED@;" not in template
+
+
 def test_catapult_direct_array_generation(tmp_path, monkeypatch):
     inputs = tmp_path / "inputs"
     outputs = tmp_path / "outputs"
@@ -296,3 +305,94 @@ def test_catapult_synchronous_memory_generation(tmp_path, monkeypatch):
     assert 'load_A("inputs/workload-vectors/call_000/A.initial.hex")' in testbench
     assert 'check_C("inputs/workload-vectors/call_000/C.expected.hex")' in testbench
     assert contract["arguments"][0]["protocol"] == "catapult_sync_memory_read"
+
+
+def test_systemc_reuses_synchronous_memory_generation(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    outputs = tmp_path / "outputs"
+    rtl = inputs / "backend-rtl"
+    rtl.mkdir(parents=True)
+    outputs.mkdir()
+    (rtl / "concat_rtl.v").write_text(
+        "module top(input clk, input rst, output done, "
+        "output [1:0] v10_radr, output v10_re, input [15:0] v10_q, "
+        "input v10_rrdy, output [1:0] v11_wadr, output v11_we, "
+        "output [15:0] v11_d, input v11_wrdy); endmodule\n"
+    )
+
+    def port(name, direction, width):
+        return {"name": name, "direction": direction, "width": width}
+
+    read_roles = {
+        "read_address": port("v10_radr", "output", 2),
+        "read_enable": port("v10_re", "output", 1),
+        "read_data": port("v10_q", "input", 16),
+        "read_ready": port("v10_rrdy", "input", 1),
+    }
+    write_roles = {
+        "write_address": port("v11_wadr", "output", 2),
+        "write_enable": port("v11_we", "output", 1),
+        "write_data": port("v11_d", "output", 16),
+        "write_ready": port("v11_wrdy", "input", 1),
+    }
+    manifest = {
+        "backend": "systemc", "top": "top",
+        "rtl_artifact": {"published_path": "backend-rtl/concat_rtl.v"},
+        "top_interface": {
+            "protocol": "systemc_connections",
+            "clock": {"name": "clk", "edge": "rising"},
+            "reset": {"name": "rst", "polarity": "active_low",
+                      "default_asserted_cycles": 2},
+            "completion": {"kind": "top_done", "port": "done", "active_level": 1},
+        },
+        "top_arguments": [
+            {
+                "name": "A", "catapult_argument": "v10",
+                "semantic_direction": "input",
+                "interface_protocol": "systemc_sync_memory_read",
+                "interface": {"roles": read_roles, "layout": "row_major",
+                              "element_bits": 16, "element_count": 4,
+                              "data_width": 16, "address_width": 2,
+                              "address_capacity": 4, "read_latency_cycles": 1},
+                "rtl_ports": list(read_roles.values()), "triosy_ports": [],
+            },
+            {
+                "name": "C", "catapult_argument": "v11",
+                "semantic_direction": "output",
+                "interface_protocol": "systemc_sync_memory_write",
+                "interface": {"roles": write_roles, "layout": "row_major",
+                              "element_bits": 16, "element_count": 4,
+                              "data_width": 16, "address_width": 2,
+                              "address_capacity": 4, "read_latency_cycles": None},
+                "rtl_ports": list(write_roles.values()), "triosy_ports": [],
+            },
+        ],
+    }
+    (inputs / "asic-manifest-final.json").write_text(json.dumps(manifest))
+    vector = lambda name: {
+        "element_bits": 16, "element_count": 4,
+        "file": f"workload-vectors/call_000/{name}.initial.hex",
+    }
+    workload = {
+        "top_function": "top", "call_signature": ["A", "C"],
+        "default_timeout_cycles": 100,
+        "calls": [{"name": "memory", "reset_before": True,
+                   "arguments": {"A": vector("A"), "C": vector("C")},
+                   "expected": {"C": {"element_count": 4,
+                       "file": "workload-vectors/call_000/C.expected.hex"}}}],
+    }
+    monkeypatch.setattr(GENERATOR, "INPUTS", inputs)
+    monkeypatch.setattr(GENERATOR, "OUTPUTS", outputs)
+    monkeypatch.setattr(GENERATOR, "TEMPLATES", SCRIPT.parent / "templates")
+    contract = GENERATOR._generate_catapult(
+        workload, {"backend": "systemc", "clock_period_ns": 10.0}
+    )
+    testbench = (outputs / "testbench.sv").read_text()
+    assert "assign v10_rrdy = 1'b1;" in testbench
+    assert "assign v11_wrdy = 1'b1;" in testbench
+    assert "if ((rst === 1'b1) && (v10_re === 1'b1)) begin" in testbench
+    assert "if (done === 1'b1) completion_seen[0] <= 1'b1;" in testbench
+    assert "rst = 1'b0;" in testbench
+    assert "rst = 1'b1;" in testbench
+    assert contract["backend"] == "systemc"
+    assert contract["completion_output_count"] == 1

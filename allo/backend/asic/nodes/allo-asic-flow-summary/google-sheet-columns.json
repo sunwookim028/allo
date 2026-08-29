@@ -127,6 +127,14 @@
     {
       "header": "Combined power (W)",
       "path": "power.combined_power_w.total_w"
+    },
+    {
+      "header": "Full-chip PNR peak memory (MB)",
+      "path": "resources.full_chip_pnr_peak_memory_mb"
+    },
+    {
+      "header": "Build directory size (GiB)",
+      "path": "resources.build_directory_size_gib"
     }
   ]
 }

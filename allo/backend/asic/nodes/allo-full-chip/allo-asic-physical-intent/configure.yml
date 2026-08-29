@@ -24,6 +24,13 @@ parameters:
   floorplan_aspect_ratio: 1.0
   macro_separation_x: 18.0
   macro_separation_y: 18.0
+  # Exclude ordinary logic from macro channels while allowing optimization cells.
+  enable_macro_channel_soft_blockages: True
+  # Expand each macro's soft blockage by this fraction of macro separation.
+  # 0.5 makes neighboring blockages meet and reserves the complete channel.
+  macro_channel_soft_blockage_fraction: 0.5
+  # Space-separated subset of top, bottom, left, right, or the shorthand all.
+  peripheral_placement_sides: all
   kernel_separation_x: 30.0
   kernel_separation_y: 30.0
   macro_edge_keepout: 30.0
@@ -31,6 +38,13 @@ parameters:
   placement_grid: 0.005
   kernel_optimization_passes: 12
   enable_kernel_rotation: True
+  # Default instance-level stream-graph optimizer. Select legacy_cluster_grid
+  # only to reproduce the previous rigid semantic-kernel slot placement.
+  macro_placement_algorithm: stream_grid
+  # Bounded active evaluations per macro and grid resolution.
+  stream_grid_max_passes: 16
+  # Smallest normalized cost reduction accepted as a useful move.
+  stream_grid_minimum_improvement: 0.00001
   # Experimental and conservative: only exact, complete, repeated D4 PID
   # stencils may combine two semantic kernels into interleaved spatial tiles.
   interleave_macros: False

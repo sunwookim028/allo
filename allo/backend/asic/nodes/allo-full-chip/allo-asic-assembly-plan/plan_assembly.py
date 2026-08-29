@@ -13,7 +13,10 @@ from pathlib import Path
 IDENT = r"[A-Za-z_$][A-Za-z0-9_$]*"
 MODULE_RE = re.compile(rf"(?<![A-Za-z0-9_$])module\s+(?P<name>{IDENT})\b")
 ENDMODULE_RE = re.compile(r"(?<![A-Za-z0-9_$])endmodule\b")
-INSTANCE_RE_TEMPLATE = r"(?m)(?<![A-Za-z0-9_$]){module}\s+(?P<instance>{ident})\s*\("
+INSTANCE_RE = re.compile(
+    rf"(?m)(?<![A-Za-z0-9_$])(?P<module>{IDENT})\s+"
+    rf"(?P<instance>{IDENT})\s*\("
+)
 REQUIRED_VIEWS = {"verilog", "liberty", "db", "lef", "gds"}
 
 
@@ -37,27 +40,29 @@ def module_blocks(text: str) -> dict[str, tuple[int, int, str]]:
     return blocks
 
 
-def find_instances(blocks: dict, module_name: str) -> list[dict]:
-    pattern = re.compile(
-        INSTANCE_RE_TEMPLATE.format(module=re.escape(module_name), ident=IDENT)
-    )
-    found = []
+def index_instances(blocks: dict) -> dict[str, list[dict]]:
+    """Index syntactic instances with one scan of each RTL module body."""
+    instances_by_module: dict[str, list[dict]] = {name: [] for name in blocks}
     for parent, (_start, _end, body) in blocks.items():
-        if parent == module_name:
-            continue
-        for match in pattern.finditer(body):
-            prefix = body[max(0, match.start() - 12) : match.start()]
-            if re.search(r"\bmodule\s*$", prefix):
+        for match in INSTANCE_RE.finditer(body):
+            child = match.group("module")
+            if child not in blocks or child == parent:
                 continue
-            found.append({"parent_module": parent, "instance_name": match.group("instance")})
-    return found
+            instances_by_module[child].append(
+                {"parent_module": parent, "instance_name": match.group("instance")}
+            )
+    return instances_by_module
 
 
-def elaborated_instance_paths(blocks: dict, top: str) -> dict[tuple[str, str, str], list[str]]:
+def elaborated_instance_paths(
+    blocks: dict,
+    top: str,
+    instances_by_module: dict[str, list[dict]],
+) -> dict[tuple[str, str, str], list[str]]:
     """Expand syntactic module instances into top-rooted RTL hierarchy paths."""
     children: dict[str, list[tuple[str, str]]] = {name: [] for name in blocks}
-    for child in blocks:
-        for instance in find_instances(blocks, child):
+    for child, instances in instances_by_module.items():
+        for instance in instances:
             children[instance["parent_module"]].append((instance["instance_name"], child))
     result: dict[tuple[str, str, str], list[str]] = {}
 
@@ -97,7 +102,7 @@ def main() -> None:
     expected_top = os.environ.get("top_module", "top")
     configured_backend = os.environ.get("backend")
     backend = configured_backend or manifest.get("backend", "vitis")
-    if backend not in {"vitis", "catapult"}:
+    if backend not in {"vitis", "catapult", "systemc"}:
         raise ValueError(f"unsupported full-chip assembly backend {backend!r}")
     manifest_backend = manifest.get("backend")
     if manifest_backend is not None and manifest_backend != backend:
@@ -110,7 +115,10 @@ def main() -> None:
             f"top mismatch: requested={expected_top}, manifest={manifest.get('top')}, "
             f"RTL definition present={expected_top in blocks}"
         )
-    hierarchy_paths = elaborated_instance_paths(blocks, expected_top)
+    instances_by_module = index_instances(blocks)
+    hierarchy_paths = elaborated_instance_paths(
+        blocks, expected_top, instances_by_module
+    )
     manifest_groups = {
         item["macro_class_id"]: item for item in manifest.get("macro_groups", [])
     }
@@ -148,7 +156,7 @@ def main() -> None:
             replaced_modules.add(source_module)
             if source_module not in blocks:
                 raise ValueError(f"selected member module absent from RTL: {source_module}")
-            instances = find_instances(blocks, source_module)
+            instances = instances_by_module[source_module]
             requested_instance = member.get("source_instance")
             if requested_instance:
                 instances = [

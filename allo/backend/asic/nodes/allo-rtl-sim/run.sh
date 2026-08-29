@@ -22,7 +22,7 @@ case "$backend" in
       inputs/vitis-axilite-master-bfm.sv
     )
     ;;
-  catapult)
+  catapult|systemc)
     ;;
   *)
     echo "ERROR: unsupported RTL simulation backend: $backend" >&2

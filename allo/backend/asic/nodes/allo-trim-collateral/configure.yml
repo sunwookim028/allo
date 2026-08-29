@@ -1,0 +1,29 @@
+name: allo-trim-collateral
+
+inputs:
+  - ffgl-complete.json
+  - bagl-complete.json
+  - full-chip-drc-metrics.json
+  - full-chip-lvs-metrics.json
+  - macro-activity-manifest.json
+  - macro-power-summary.json
+
+outputs:
+  - trim-metrics.json
+
+commands:
+  - python trim_collateral.py
+
+parameters:
+  trim_collateral: False
+
+preconditions:
+  - assert File( 'inputs/ffgl-complete.json' )
+  - assert File( 'inputs/bagl-complete.json' )
+  - assert File( 'inputs/full-chip-drc-metrics.json' )
+  - assert File( 'inputs/full-chip-lvs-metrics.json' )
+  - assert File( 'inputs/macro-activity-manifest.json' )
+  - assert File( 'inputs/macro-power-summary.json' )
+
+postconditions:
+  - assert File( 'outputs/trim-metrics.json' )

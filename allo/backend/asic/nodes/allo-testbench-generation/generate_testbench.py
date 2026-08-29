@@ -396,6 +396,7 @@ def _sv_identifier(name):
 
 
 def _catapult_arguments(workload, manifest):
+    backend = manifest.get("backend")
     arguments = manifest.get("top_arguments", [])
     if workload["call_signature"] != [item.get("name") for item in arguments]:
         raise RuntimeError(
@@ -412,7 +413,8 @@ def _catapult_arguments(workload, manifest):
         semantic_direction = argument.get(
             "semantic_direction", argument.get("rtl_direction", argument.get("direction"))
         )
-        if semantic_direction in {"output", "inout"} and len(triosy_ports) != 1:
+        if (backend == "catapult" and semantic_direction in {"output", "inout"}
+                and len(triosy_ports) != 1):
             raise RuntimeError(
                 f"Catapult output argument {name} requires exactly one triosy port"
             )
@@ -450,7 +452,8 @@ def _catapult_arguments(workload, manifest):
             })
         elif protocol in {
             "catapult_sync_memory_read", "catapult_sync_memory_write",
-            "catapult_sync_memory_readwrite",
+            "catapult_sync_memory_readwrite", "systemc_sync_memory_read",
+            "systemc_sync_memory_write",
         }:
             interface = argument.get("interface") or {}
             roles = interface.get("roles", {})
@@ -460,6 +463,12 @@ def _catapult_arguments(workload, manifest):
                 "catapult_sync_memory_readwrite": {
                     "read_address", "read_enable", "read_data",
                     "write_address", "write_enable", "write_data",
+                },
+                "systemc_sync_memory_read": {
+                    "read_address", "read_enable", "read_data", "read_ready",
+                },
+                "systemc_sync_memory_write": {
+                    "write_address", "write_enable", "write_data", "write_ready",
                 },
             }[protocol]
             if set(roles) != expected_roles:
@@ -592,11 +601,12 @@ def _catapult_memory_check_task(mapping):
   endtask"""
 
 
-def _catapult_memory_model(mapping, clock, reset):
+def _catapult_memory_model(mapping, clock, reset, reset_asserted=1):
     ident, bits, count = (
         mapping["identifier"], mapping["element_width"], mapping["element_count"]
     )
     roles = mapping["roles"]
+    reset_deasserted = 1 - reset_asserted
     lines = [f"  logic [{bits - 1}:0] memory_{ident} [0:{count - 1}];"]
     if "read_data" in roles:
         address = roles["read_address"]["name"]
@@ -605,7 +615,7 @@ def _catapult_memory_model(mapping, clock, reset):
         lines += [
             f"  initial {data} = '0;",
             f"  always @(posedge {clock}) begin",
-            f"    if (({reset} === 1'b0) && ({enable} === 1'b1)) begin",
+            f"    if (({reset} === 1'b{reset_deasserted}) && ({enable} === 1'b1)) begin",
             f"      if ($isunknown({address}))",
             f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} read address is unknown after reset");',
             f"      if ({address} >= {count})",
@@ -620,7 +630,7 @@ def _catapult_memory_model(mapping, clock, reset):
         data = roles["write_data"]["name"]
         lines += [
             f"  always @(posedge {clock}) begin",
-            f"    if (({reset} === 1'b0) && ({enable} === 1'b1)) begin",
+            f"    if (({reset} === 1'b{reset_deasserted}) && ({enable} === 1'b1)) begin",
             f"      if ($isunknown({address}))",
             f'        $fatal(1, "Catapult memory {mapping["semantic_name"]} write address is unknown after reset");',
             f"      if ({address} >= {count})",
@@ -629,6 +639,9 @@ def _catapult_memory_model(mapping, clock, reset):
             "    end",
             "  end",
         ]
+    for role in ("read_ready", "write_ready"):
+        if role in roles:
+            lines.append(f"  assign {roles[role]['name']} = 1'b1;")
     return "\n".join(lines)
 
 
@@ -637,19 +650,22 @@ def _generate_catapult(workload, metadata):
     if not manifest_path.is_file():
         raise RuntimeError(f"missing Catapult ASIC manifest: {manifest_path}")
     manifest = json.loads(manifest_path.read_text())
-    if manifest.get("backend") != "catapult":
-        raise RuntimeError("Catapult generator received a non-Catapult manifest")
+    backend = manifest.get("backend")
+    if backend not in {"catapult", "systemc"}:
+        raise RuntimeError("Catapult-family generator received an unsupported manifest")
     interface = manifest.get("top_interface", {})
     if interface.get("protocol") not in {
-        "catapult_direct_array", "catapult_argument_protocols"
+        "catapult_direct_array", "catapult_argument_protocols", "systemc_connections"
     }:
         raise RuntimeError(
             f"unsupported Catapult top protocol {interface.get('protocol')!r}"
         )
     reset = interface.get("reset", {})
     clock = interface.get("clock", {})
-    if reset.get("polarity") != "active_high" or clock.get("edge") != "rising":
+    if reset.get("polarity") not in {"active_high", "active_low"} or clock.get("edge") != "rising":
         raise RuntimeError("unsupported Catapult clock/reset contract")
+    reset_asserted = 1 if reset["polarity"] == "active_high" else 0
+    reset_deasserted = 1 - reset_asserted
 
     mappings = _catapult_arguments(workload, manifest)
     ports = {
@@ -661,11 +677,6 @@ def _generate_catapult(workload, metadata):
             ports[port["name"]] = {
                 "direction": port["direction"], "width": port["width"]
             }
-    declarations = "\n".join(
-        _logic_declaration(name, info["width"]) for name, info in ports.items()
-    )
-    connections = ",\n".join(f"    .{name}({name})" for name in ports)
-
     output_mappings = [
         mapping for mapping in mappings
         if mapping["semantic_direction"] in {"output", "inout"}
@@ -673,10 +684,23 @@ def _generate_catapult(workload, metadata):
     output_indices = {
         mapping["semantic_name"]: index for index, mapping in enumerate(output_mappings)
     }
-    completion_updates = "\n".join(
-        f"      if ({mapping['triosy_port']} === 1'b1) completion_seen[{index}] <= 1'b1;"
-        for index, mapping in enumerate(output_mappings)
+    if backend == "systemc":
+        completion_port = interface.get("completion", {}).get("port", "done")
+        ports[completion_port] = {"direction": "output", "width": 1}
+        completion_updates = (
+            f"      if ({completion_port} === 1'b1) completion_seen[0] <= 1'b1;"
+        )
+        completion_count = 1
+    else:
+        completion_updates = "\n".join(
+            f"      if ({mapping['triosy_port']} === 1'b1) completion_seen[{index}] <= 1'b1;"
+            for index, mapping in enumerate(output_mappings)
+        )
+        completion_count = len(output_mappings)
+    declarations = "\n".join(
+        _logic_declaration(name, info["width"]) for name, info in ports.items()
     )
+    connections = ",\n".join(f"    .{name}({name})" for name in ports)
     tasks = []
     memory_models = []
     for mapping in mappings:
@@ -687,7 +711,9 @@ def _generate_catapult(workload, metadata):
                 tasks.append(_catapult_check_task(mapping))
         else:
             memory_models.append(
-                _catapult_memory_model(mapping, clock["name"], reset["name"])
+                _catapult_memory_model(
+                    mapping, clock["name"], reset["name"], reset_asserted
+                )
             )
             tasks.append(_catapult_memory_load_task(mapping))
             if mapping["semantic_direction"] in {"output", "inout"}:
@@ -706,7 +732,7 @@ def _generate_catapult(workload, metadata):
             [
                 f"    @(negedge {clock['name']});",
                 "    #(allo_bagl_input_delay_ns);",
-                f"    {reset['name']} = 1'b1;",
+                f"    {reset['name']} = 1'b{reset_asserted};",
                 "    clear_completion = 1'b1;",
             ]
         )
@@ -726,17 +752,20 @@ def _generate_catapult(workload, metadata):
                 f"@(negedge {clock['name']});",
                 "    #(allo_bagl_input_delay_ns);",
                 "    clear_completion = 1'b0;",
-                f"    {reset['name']} = 1'b0;",
+                f"    {reset['name']} = 1'b{reset_deasserted};",
             ]
         )
         expected_names = list(call.get("expected", {}))
         invalid = [name for name in expected_names if name not in output_indices]
         if invalid:
             raise RuntimeError(f"Catapult expected values target non-outputs: {invalid}")
-        required_mask = sum(1 << output_indices[name] for name in expected_names)
+        required_mask = (
+            1 if backend == "systemc" and expected_names else
+            sum(1 << output_indices[name] for name in expected_names)
+        )
         if required_mask:
             sequence.append(
-                f"    wait_for_completion({len(output_mappings)}'h{required_mask:x}, "
+                f"    wait_for_completion({completion_count}'h{required_mask:x}, "
                 f"{workload['default_timeout_cycles']});"
             )
         for name, expected in call.get("expected", {}).items():
@@ -761,7 +790,9 @@ def _generate_catapult(workload, metadata):
             "SIGNAL_DECLARATIONS": declarations,
             "TOP_MODULE": top,
             "DUT_CONNECTIONS": connections,
-            "OUTPUT_COUNT": str(len(output_mappings)),
+            "OUTPUT_COUNT": str(completion_count),
+            "RESET_ASSERTED": str(reset_asserted),
+            "RESET_DEASSERTED": str(reset_deasserted),
             "COMPLETION_UPDATES": completion_updates,
             "ARGUMENT_TASKS": "\n\n".join(tasks),
             "ARGUMENT_MODELS": "\n\n".join(memory_models),
@@ -789,13 +820,13 @@ def _generate_catapult(workload, metadata):
     (OUTPUTS / "vcs-rtl.f").write_text("\n".join(file_list) + "\n")
     return {
         "schema_version": 1,
-        "backend": "catapult",
+        "backend": backend,
         "top_module": top,
         "clock_period_ns": float(metadata["clock_period_ns"]),
         "interface": interface,
         "arguments": mappings,
         "calls": workload["calls"],
-        "completion_output_count": len(output_mappings),
+        "completion_output_count": completion_count,
     }
 
 
@@ -807,7 +838,11 @@ def main():
         raise RuntimeError("testbench generation requested with disabled workload manifest")
 
     backend = os.environ.get("backend", metadata.get("backend"))
-    generators = {"catapult": _generate_catapult, "vitis": _generate_vitis}
+    generators = {
+        "catapult": _generate_catapult,
+        "systemc": _generate_catapult,
+        "vitis": _generate_vitis,
+    }
     generator = generators.get(backend)
     if generator is None:
         raise RuntimeError(

@@ -7,6 +7,7 @@ from pathlib import Path
 
 INPUTS = Path("inputs")
 OUTPUTS = Path("outputs")
+IDENT = r"[A-Za-z_$][A-Za-z0-9_$]*"
 
 
 def _load(path):
@@ -24,6 +25,24 @@ def _source_latencies(sdc_text):
     return values
 
 
+def _find_macro_instances(netlist, expected_by_instance):
+    """Find all expected macro instances with one pass over the netlist."""
+    if not expected_by_instance:
+        return set()
+    instance_names = "|".join(
+        re.escape(name)
+        for name in sorted(expected_by_instance, key=len, reverse=True)
+    )
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_$])(?P<module>{IDENT})\s+"
+        rf"(?P<instance>(?:{instance_names}))\s*\("
+    )
+    return {
+        (match.group("module"), match.group("instance"))
+        for match in pattern.finditer(netlist)
+    }
+
+
 def main():
     OUTPUTS.mkdir(parents=True, exist_ok=True)
     registry = _load(INPUTS / "macro-registry" / "index.json")
@@ -37,6 +56,7 @@ def main():
     )
     annotations = []
     seen_instances = set()
+    expected_by_instance = {}
     for item in collateral.get("rewritten_instances", []):
         module = item["canonical_module"]
         instance = item["stable_instance_name"]
@@ -52,11 +72,7 @@ def main():
         sdf_path = INPUTS / "macro-registry" / relative_sdf
         if not sdf_path.is_file() or sdf_path.stat().st_size == 0:
             raise ValueError(f"missing or empty macro SDF: {sdf_path}")
-        pattern = rf"\b{re.escape(module)}\s+{re.escape(instance)}\s*\("
-        if not re.search(pattern, netlist):
-            raise ValueError(
-                f"cannot find macro instance {module} {instance} in design.vcs.v"
-            )
+        expected_by_instance[instance] = module
         annotations.append({
             "module": module,
             "instance": instance,
@@ -64,6 +80,13 @@ def main():
             "scope": f"{dut_scope}.{instance}",
             "sdf": str(Path("inputs/macro-registry") / relative_sdf),
         })
+
+    found_instances = _find_macro_instances(netlist, expected_by_instance)
+    for instance, module in expected_by_instance.items():
+        if (module, instance) not in found_instances:
+            raise ValueError(
+                f"cannot find macro instance {module} {instance} in design.vcs.v"
+            )
 
     expected = int(collateral.get("macro_instance_count", len(annotations)))
     if expected != len(annotations):

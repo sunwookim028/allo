@@ -53,7 +53,7 @@ case "$backend" in
       inputs/vitis-axilite-master-bfm.sv
     )
     ;;
-  catapult) ;;
+  catapult|systemc) ;;
   *) echo "unsupported testbench backend: $backend" >&2; exit 2 ;;
 esac
 sources+=(inputs/testbench.sv)
@@ -66,7 +66,8 @@ done < outputs/sdf-annotations.tsv
 
 vcs -full64 -sverilog -xprop=tmerge -override_timescale=1ns/1ps \
   -debug_access+all \
-  -top "$testbench_name" +neg_tchk +no_notifier +sdfverbose +define+NTC \
+  -top "$testbench_name" +neg_tchk +no_notifier +sdfverbose \
+  +define+NTC +define+TETRAMAX \
   "${sdf_args[@]}" \
   -o simv "${sources[@]}" 2>&1 | tee outputs/compile.log
 

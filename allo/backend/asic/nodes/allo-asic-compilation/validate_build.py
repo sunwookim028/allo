@@ -35,6 +35,8 @@ def validate_workload_interface(final, workload, vectors):
                 "catapult_sync_memory_read",
                 "catapult_sync_memory_write",
                 "catapult_sync_memory_readwrite",
+                "systemc_sync_memory_read",
+                "systemc_sync_memory_write",
             }:
                 if vector.get("element_bits") != interface.get("element_bits"):
                     raise RuntimeError(f"workload element width mismatch for {name}")
