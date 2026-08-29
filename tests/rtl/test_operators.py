@@ -3490,7 +3490,7 @@ def test_resource_weights_steer_a_realization_between_fabrics():
 
     def chosen(**weights):
         rtl = _to_rtl(mulk, device=dev)
-        rtl.set_scheduler_opt(scheduler="exact", O="area", resource_weights=weights)
+        rtl.set_scheduler_opt(scheduler="exact", resource_weights=weights)
         return _impls(rtl.schedule())
 
     # One DSP (2311) undercuts 200 LUTs (3200); at eight times the price the
@@ -3499,39 +3499,9 @@ def test_resource_weights_steer_a_realization_between_fabrics():
     assert mul_on_lut.symbol in chosen(dsp=8.0)
 
 
-# Under the area objective the combinational row joins the candidates, so a
-# weight can move a multiply off its IP onto the fabric.
-def test_a_weight_moves_a_multiply_onto_the_comb_row():
-    @kernel
-    def mulk(x: i16[8], y: i16[8], out: i16[8]):
-        for i in range(8):
-            out[i] = x[i] * y[i]
-
-    # 300 LUTs (4800) for the comb multiply, which an eightfold DSP price ranks
-    # past the builtin DSP cores.
-    dev = default_device.copy()
-    dev.set_comb_delay(CombKind.MUL, 2.0, uses={dev.resources["lut"]: Const(300.0)})
-
-    rtl = _to_rtl(mulk, device=dev)
-    rtl.set_scheduler_opt(scheduler="exact", O="area")
-    assert any("mul" in s for s in _impls(rtl.schedule()))
-
-    rtl = _to_rtl(mulk, device=dev)
-    rtl.set_scheduler_opt(scheduler="exact", O="area", resource_weights={"dsp": 8.0})
-    assert "weight = 8" in rtl.dcp
-    assert not _impls(rtl.schedule())
-    rng = np.random.default_rng(3)
-    x = rng.integers(-(2**15), 2**15, 8, dtype=np.int16)
-    y = rng.integers(-(2**15), 2**15, 8, dtype=np.int16)
-    out = np.zeros(8, np.int16)
-    rtl.cosim(x, y, out)
-    assert np.array_equal(out, (x.astype(np.int32) * y).astype(np.int16))
-
-
-# The area objective takes the muladd fusion only when it prices below the
-# multiply plus the add it replaces; on this device it does not, so the pair
-# fuses under cycles and stays apart under area.
-def test_the_area_objective_gates_the_muladd_fusion_by_price():
+# A multiply feeding one add binds the device's fused muladd core: the pair is
+# minted onto the advanced row whenever the device declares its signature.
+def test_muladd_fusion_binds_the_fused_core():
     @kernel
     def mac(A: i32[16], B: i32[16], C: i32[16], out: i32[16]):
         for i in range(16):
@@ -3541,12 +3511,14 @@ def test_the_area_objective_gates_the_muladd_fusion_by_price():
     # is a compute op bound to it.
     row = "@muladd_i32_i32_i32_i32_l3"
     rtl = _to_rtl(mac)
-    rtl.set_scheduler_opt(scheduler="exact", O="cycles")
+    rtl.set_scheduler_opt(scheduler="exact")
     assert rtl.dcp.count(row) > 1
-
-    rtl = _to_rtl(mac)
-    rtl.set_scheduler_opt(scheduler="exact", O="area")
-    assert rtl.dcp.count(row) == 1
+    A = np.arange(16, dtype=np.int32)
+    B = np.arange(16, dtype=np.int32) + 1
+    C = np.arange(16, dtype=np.int32) + 2
+    out = np.zeros(16, dtype=np.int32)
+    rtl.cosim(A, B, C, out)
+    assert np.array_equal(out, A * B + C)
 
 
 # Each multiply is declared twice at one depth, as DSP and as fabric; the rows

@@ -176,10 +176,8 @@ public:
   /// characterization `lookup` would resolve had selection picked it: the
   /// non-comb `matchEntries` rows that fit the period and are measured at \p
   /// op's width, in declaration order. The row `lookup` resolves is among them
-  /// whenever it is an IP. \p withComb also appends the combinational row where
-  /// it is measured at the width and its chain fits the period.
-  SmallVector<OperatorChar, 2> candidateChars(Operation *op,
-                                              bool withComb = false) const;
+  /// whenever it is an IP.
+  SmallVector<OperatorChar, 2> candidateChars(Operation *op) const;
 
   /// The clock period (ns) selection ranks IP rows against: a fitting row
   /// outranks a non-fitting one. Set when the module period resolves and again
@@ -429,18 +427,12 @@ NodeTiming accessCharacterization(Operation *op, const OperatorLibrary &opLib,
 /// limit drops (an occupancy window varying with the decision would move the
 /// interval bound the search starts from).
 ///
-/// \p withComb admits the combinational row beside the IPs, letting a resource
-/// weight steer an operation between fabrics. Only the area objective passes
-/// it: the cycles order would take the zero-latency comb row wherever its chain
-/// fits.
-///
 /// An operation with choices joins no static class:
 /// `populateOperatorAllocation` skips it, and the exact solve folds it into the
 /// class of the row it decides (a shared class), straight-line and modulo
 /// alike.
-SmallVector<OperatorChar, 2> selectionCandidates(Operation *op,
-                                                 const OperatorLibrary &lib,
-                                                 bool cyclic, bool withComb);
+SmallVector<OperatorChar, 2>
+selectionCandidates(Operation *op, const OperatorLibrary &lib, bool cyclic);
 
 /// Assign an operator type (latency + chaining delays) to every operation
 /// \p problem holds. Three sources for the three kinds of node: an operator row
@@ -589,7 +581,7 @@ enum class AllocationScope { All, Static, Selecting };
 
 template <class ProblemT>
 void populateOperatorAllocation(ProblemT &problem, const OperatorLibrary &lib,
-                                AllocationScope scope, bool withComb = false) {
+                                AllocationScope scope) {
   using namespace circt::scheduling;
   constexpr bool isCyclic = std::is_base_of_v<CyclicProblem, ProblemT>;
   // The loop whose carried values a shared unit re-injects; its own induction
@@ -619,7 +611,7 @@ void populateOperatorAllocation(ProblemT &problem, const OperatorLibrary &lib,
     if (!c.identity.realized() || c.identity.comb)
       continue;
     bool selects = scope != AllocationScope::All &&
-                   !selectionCandidates(op, lib, isCyclic, withComb).empty();
+                   !selectionCandidates(op, lib, isCyclic).empty();
     if (scope == AllocationScope::Static && selects)
       continue; // the realization is the solver's decision
     if (scope == AllocationScope::Selecting && !selects)

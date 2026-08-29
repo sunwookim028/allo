@@ -244,47 +244,6 @@ static Stopwatch now() { return std::chrono::steady_clock::now(); }
 
 namespace {
 
-/// What the area objective's slack pass collects from the heuristic
-/// pre-schedule: leash widenings for regions the kernel's composition proved
-/// off its longest path (`grants`, keyed by the region's solve key), and
-/// in-region float on a sync call, banked for the callee's own regions
-/// (`calleeBudget`, single-site callees only).
-struct SlackLedger {
-  DenseMap<Operation *, int64_t> grants;
-  DenseMap<Operation *, int64_t> calleeBudget;
-  /// Sync call sites per callee, module-wide: a budget is only safe when one
-  /// site holds the whole float.
-  DenseMap<Operation *, unsigned> callSites;
-};
-
-/// Where a composition-slack grant on \p region lands, and what one granted
-/// cycle costs there: the solve key of the region's own schedule, and the trip
-/// product of the counted wrappers between the region's span and that schedule
-/// (a container re-runs its body per iteration, so widening the body by one
-/// widens the region by the product). nullopt where the region holds no
-/// interval a grant could widen: a straight-line span, a container decomposed
-/// into sub-regions, a call node, a while.
-std::optional<std::pair<Operation *, int64_t>>
-grantTarget(const SchedRegion &region, DependenceAnalysis &deps) {
-  if (region.kind != allo::RegionKind::Loop)
-    return std::nullopt;
-  if (!isa<AffineForOp, scf::ForOp>(region.anchor()))
-    return std::nullopt;
-  SmallVector<LoopLikeOpInterface> band =
-      perfectNest(cast<LoopLikeOpInterface>(region.anchor()));
-  LoopLikeOpInterface innermost = band.back();
-  if (countedLoopShape(innermost) != RegionShape::Leaf)
-    return std::nullopt;
-  int64_t divisor = 1;
-  for (LoopLikeOpInterface level : ArrayRef(band).drop_back()) {
-    std::optional<int64_t> t = deps.tripOf(level.getOperation()).count;
-    if (!t || *t <= 0)
-      return std::nullopt;
-    divisor *= *t;
-  }
-  return std::pair{innermost.getOperation(), divisor};
-}
-
 /// Solves one function's schedule. Holds the analysis, device, model and
 /// options every method needs, instead of threading them through each
 /// signature.
@@ -295,13 +254,8 @@ class FuncScheduler {
 public:
   FuncScheduler(DependenceAnalysis &deps, const DeviceModel &dev,
                 ScheduleModel &model, float cycleTime,
-                const SchedulerOptions &opts, SlackLedger *ledger = nullptr,
-                const DenseMap<Operation *, int64_t> *grants = nullptr)
-      : deps(deps), dev(dev), model(model), cycleTime(cycleTime), opts(opts),
-        ledger(ledger), grants(grants) {
-    assert(!(ledger && grants) &&
-           "one pass collects slack, the other consumes it");
-  }
+                const SchedulerOptions &opts)
+      : deps(deps), dev(dev), model(model), cycleTime(cycleTime), opts(opts) {}
 
   /// Consume this function's assumption hints, solve its regions, and publish
   /// what the whole kernel costs.
@@ -341,22 +295,11 @@ private:
   void recordTripBounds(func::FuncOp funcOp);
   void publishKernelLatency(func::FuncOp funcOp);
 
-  // The slack pass (area objective, pass 1 of two): what this func's
-  // composition leaves free, banked into `ledger`.
-  void collectCallSlack(ChainingSharedOperatorsProblem &problem,
-                        ArrayRef<Operation *> ops);
-  void collectSiblingSlack(ArrayRef<SpanNode> nodes,
-                           ArrayRef<SchedRegion> regions,
-                           ArrayRef<SmallVector<unsigned, 2>> preds);
-
   DependenceAnalysis &deps;
   const DeviceModel &dev;
   ScheduleModel &model;
   float cycleTime;
   const SchedulerOptions &opts;
-  /// Pass 1: collect slack here. Pass 2: consume `grants`. Never both.
-  SlackLedger *ledger;
-  const DenseMap<Operation *, int64_t> *grants;
 };
 
 } // namespace
@@ -1087,7 +1030,8 @@ void FuncScheduler::recordSolve(OccupancyProblem &problem, StringRef kind,
 // Schedule one counted loop body (affine.for or scf.for) as a
 // `ChainingModuloProblem` and annotate the result (start times, II, sub-cycle
 // times). \p minII lower-bounds the II; \p maxII, nonzero, is an explicit
-// directive's ceiling, honored by the exact area objective alone. When
+// directive's ceiling, capping the interval envelope the area fold searches
+// under a positive `areaSlack`. When
 // \p pipelined is false iterations do not overlap: the II is reported as the
 // body length, so the region latency folds to `trip * depth`, and it still
 // reifies to a dcp.pipeline.
@@ -1107,8 +1051,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
     populateOperatorAllocation(problem, dev.operators,
                                usesExactScheduler(opts.kind)
                                    ? AllocationScope::Static
-                                   : AllocationScope::All,
-                               opts.objective == ScheduleObjective::Area);
+                                   : AllocationScope::All);
   // Overlapping iterations only: without overlap the RAW round trip costs
   // depth, not II, and a shadow would buy latency a mux is not worth.
   relaxWarEdges(problem, deps, dev);
@@ -1126,10 +1069,9 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
   // depth there, so depth, not drain, is what the trip multiplies.
   SpanObjective span(problem, anchor->getOperands(), bodyBlock,
                      pipelined ? trip.count : std::nullopt, dev.operators);
-  int64_t grant = grants ? grants->lookup(body.getOperation()) : 0;
   Stopwatch solveStart = now();
   if (failed(solveSchedulingProblem(problem, anchor, cycleTime, minII, opts,
-                                    span, maxII, grant))) {
+                                    span, maxII))) {
     if (relax.edges.empty())
       return failure();
     // The relaxed problem starts its II search lower, which can strand the
@@ -1140,7 +1082,7 @@ LogicalResult FuncScheduler::scheduleCyclic(LoopLikeOpInterface body,
            "store->load forwarding relaxation";
     undoForwardRelaxation(problem, relax);
     if (failed(solveSchedulingProblem(problem, anchor, cycleTime, minII, opts,
-                                      span, maxII, grant)))
+                                      span, maxII)))
       return failure();
   }
   std::optional<unsigned> solvedII = problem.getInitiationInterval();
@@ -1223,8 +1165,7 @@ LogicalResult FuncScheduler::scheduleWhile(scf::WhileOp w,
     populateOperatorAllocation(problem, dev.operators,
                                usesExactScheduler(opts.kind)
                                    ? AllocationScope::Static
-                                   : AllocationScope::All,
-                               opts.objective == ScheduleObjective::Area);
+                                   : AllocationScope::All);
   Operation *anchor = w.getYieldOp().getOperation();
   // Honor a requested target II (>=1) as a lower bound. `ii=-1` (pipelining
   // off) is not modeled for while loops.
@@ -1335,8 +1276,7 @@ LogicalResult FuncScheduler::scheduleAcyclic(ArrayRef<Operation *> ops,
     populateOperatorAllocation(problem, dev.operators,
                                usesExactScheduler(opts.kind)
                                    ? AllocationScope::Static
-                                   : AllocationScope::All,
-                               opts.objective == ScheduleObjective::Area);
+                                   : AllocationScope::All);
   // A straight-line region runs once, so its whole cost is its drain, and it
   // carries nothing between iterations it does not have.
   SpanObjective span(problem, spanEscapingValues(ops),
@@ -1346,8 +1286,6 @@ LogicalResult FuncScheduler::scheduleAcyclic(ArrayRef<Operation *> ops,
           solveSchedulingProblem(problem, ops.back(), cycleTime, opts, span)))
     return failure();
   recordSolve(problem, "acyclic", /*ii=*/std::nullopt, solveStart);
-  if (ledger && ownsRegion)
-    collectCallSlack(problem, ops);
   int64_t depth = problem.scheduleDepth();
   info(Stage::Sched, ops.front())
       << "Scheduled: depth = " << depth << " cycles";
@@ -1505,105 +1443,10 @@ void FuncScheduler::publishKernelLatency(func::FuncOp funcOp) {
   std::optional<int64_t> total = composeDag(top, preds);
   if (!total)
     return; // a data-dependent region leaves the kernel total unknown
-  if (ledger)
-    collectSiblingSlack(top, topRegions, preds);
 
   // Only the number is published, not whether it is a bound: a bound is an
   // upper one, so a caller placing consumers against it is safe either way.
   funcOp->setAttr(kLatencyAttr, b.getI64IntegerAttr(*total));
-}
-
-// The sibling half of the slack pass: total float over the func's top-level
-// DAG, spent whole on one region at a time (a thin slice cannot buy an II
-// step). Reserving a node's full float re-times the DAG, so each round
-// recomputes before granting the next; a node grants once.
-void FuncScheduler::collectSiblingSlack(
-    ArrayRef<SpanNode> nodes, ArrayRef<SchedRegion> regions,
-    ArrayRef<SmallVector<unsigned, 2>> preds) {
-  unsigned n = nodes.size();
-  SmallVector<int64_t> spans(n);
-  for (auto [i, node] : llvm::enumerate(nodes)) {
-    std::optional<int64_t> s = composeSpan(node);
-    assert(s && "the composed total exists, so every node span does");
-    spans[i] = *s;
-  }
-  SmallVector<SmallVector<unsigned, 2>> succs(n);
-  for (unsigned i = 0; i < n; ++i)
-    for (unsigned p : preds[i])
-      succs[p].push_back(i);
-  SmallVector<std::optional<std::pair<Operation *, int64_t>>> targets(n);
-  for (unsigned i = 0; i < n; ++i)
-    targets[i] = grantTarget(regions[i], deps);
-  for (unsigned round = 0; round < n; ++round) {
-    // Program order is topological: a node's predecessors are earlier nodes.
-    SmallVector<int64_t> est(n, 0), down(n, 0);
-    for (unsigned i = 0; i < n; ++i)
-      for (unsigned p : preds[i])
-        est[i] = std::max(est[i], est[p] + spans[p]);
-    int64_t total = 0;
-    for (unsigned i = n; i-- > 0;) {
-      down[i] = spans[i];
-      for (unsigned s : succs[i])
-        down[i] = std::max(down[i], spans[i] + down[s]);
-      total = std::max(total, est[i] + down[i]);
-    }
-    int64_t bestFloat = 0;
-    int best = -1;
-    for (unsigned i = 0; i < n; ++i)
-      if (targets[i])
-        if (int64_t f = total - est[i] - down[i]; f > bestFloat) {
-          bestFloat = f;
-          best = static_cast<int>(i);
-        }
-    if (best < 0)
-      break;
-    auto [key, divisor] = *targets[best];
-    if (int64_t g = bestFloat / divisor)
-      ledger->grants[key] += g;
-    spans[best] += bestFloat;
-    targets[best].reset();
-  }
-}
-
-// The call half: total float of a single-site sync call within its region's
-// latency DAG. The callee may run that much longer without moving this
-// region's span, whatever loop re-runs the region; the budget lands on the
-// callee's own regions after the pass.
-void FuncScheduler::collectCallSlack(ChainingSharedOperatorsProblem &problem,
-                                     ArrayRef<Operation *> ops) {
-  if (llvm::none_of(ops, [](Operation *op) { return isSyncSubKernelCall(op); }))
-    return;
-  auto latOf = [&](Operation *op) -> int64_t {
-    return *problem.getLatency(*problem.getLinkedOperatorType(op));
-  };
-  DenseMap<Operation *, int64_t> asap, down;
-  DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
-  for (Operation *op : ops) { // block order is topological over the deps
-    int64_t t = 0;
-    for (auto &dep : problem.getDependences(op)) {
-      Operation *src = dep.getSource();
-      t = std::max(t, asap.lookup(src) + latOf(src));
-      succs[src].push_back(op);
-    }
-    asap[op] = t;
-  }
-  int64_t total = 0;
-  for (Operation *op : llvm::reverse(ops)) {
-    int64_t d = latOf(op);
-    for (Operation *s : succs.lookup(op))
-      d = std::max(d, latOf(op) + down.lookup(s));
-    down[op] = d;
-    total = std::max(total, asap.lookup(op) + d);
-  }
-  for (Operation *op : ops) {
-    if (!isSyncSubKernelCall(op))
-      continue;
-    Operation *callee = calleeOf(op);
-    if (!callee || ledger->callSites.lookup(callee) != 1)
-      continue;
-    if (int64_t f = total - asap.lookup(op) - down.lookup(op); f > 0)
-      ledger->calleeBudget[callee] = f;
-  }
 }
 
 // Schedule one region: a straight-line span as an acyclic problem, a counted
@@ -1832,72 +1675,6 @@ static float minSchedulablePeriod(ArrayRef<func::FuncOp> funcs,
   return least;
 }
 
-// The area objective's slack pass: a cheap heuristic pre-schedule of the whole
-// module, whose composition prices each region's float off the sibling DAG's
-// longest path. What it proves free widens the real pass's leashes; the
-// composed kernel span stays within the heuristic's by construction, since
-// every float is charged once.
-static DenseMap<Operation *, int64_t> collectCompositionSlack(
-    ModuleOp module, func::FuncOp topFunc, ArrayRef<func::FuncOp> order,
-    ArrayRef<std::unique_ptr<DependenceAnalysis>> depsFor,
-    const DeviceModel &dev, float cycleTime, const SchedulerOptions &opts) {
-  DenseMap<Operation *, int64_t> grants;
-  SlackLedger ledger;
-  module.walk([&](Operation *op) {
-    if (isSyncSubKernelCall(op))
-      if (Operation *callee = calleeOf(op))
-        ++ledger.callSites[callee];
-  });
-  ScheduleModel probe;
-  probe.cycleTimeNs = cycleTime;
-  SchedulerOptions heur = opts;
-  heur.kind = SchedulerKind::Heuristic;
-  bool preScheduled = true;
-  for (auto [fn, deps] : llvm::zip(order, depsFor)) {
-    FuncScheduler sched(*deps, dev, probe, cycleTime, heur, &ledger);
-    if (failed(sched.run(fn))) {
-      preScheduled = false;
-      break;
-    }
-  }
-  if (preScheduled) {
-    // A single-site callee's banked float lands on its one grantable top
-    // region, divided by the wrappers between the callee's span and it.
-    for (auto [calleeOp, budget] : ledger.calleeBudget) {
-      auto fn = cast<func::FuncOp>(calleeOp);
-      const auto *at = llvm::find(order, fn);
-      assert(at != order.end() && "a called func is in the order");
-      DependenceAnalysis &calleeDeps = *depsFor[at - order.begin()];
-      std::optional<std::pair<Operation *, int64_t>> target;
-      unsigned grantable = 0;
-      for (const SchedRegion &r : enumerateRegions(fn))
-        if (auto t = grantTarget(r, calleeDeps)) {
-          ++grantable;
-          target = t;
-        }
-      if (grantable != 1)
-        continue;
-      if (int64_t g = budget / target->second)
-        grants[target->first] += g;
-    }
-    for (auto [key, g] : ledger.grants)
-      grants[key] += g;
-    if (!grants.empty()) {
-      int64_t granted = 0;
-      for (auto [key, g] : grants)
-        granted += g;
-      info(Stage::Sched, topFunc)
-          << "Composition slack: " << grants.size()
-          << " region leash(es) widened by " << granted << " cycle(s) in total";
-    }
-  } else {
-    info(Stage::Sched, topFunc)
-        << "The slack pre-schedule did not place; area leashes stay "
-           "region-local";
-  }
-  return grants;
-}
-
 LogicalResult mlir::allo::runSDCScheduler(ModuleOp module, StringRef top,
                                           float cycleTime,
                                           const SchedulerOptions &opts,
@@ -1973,18 +1750,11 @@ LogicalResult mlir::allo::runSDCScheduler(ModuleOp module, StringRef top,
         << " deterministic units per region"
         << (opts.deterministic || opts.workers == 1 ? "" : ", workers racing");
 
-  DenseMap<Operation *, int64_t> grants;
-  if (opts.objective == ScheduleObjective::Area &&
-      usesExactScheduler(opts.kind))
-    grants = collectCompositionSlack(module, topFunc, *orderOr, depsFor,
-                                     loadedDev, scheduled, optsWithFloor);
-
   for (auto [fn, deps] : llvm::zip(*orderOr, depsFor)) {
     model.dependence.push_back({fn.getSymName().str(),
                                 (int64_t)deps->conservativeAccesses(),
                                 (int64_t)deps->undecidedPairs()});
-    FuncScheduler sched(*deps, loadedDev, model, scheduled, optsWithFloor,
-                        /*ledger=*/nullptr, &grants);
+    FuncScheduler sched(*deps, loadedDev, model, scheduled, optsWithFloor);
     if (failed(sched.run(fn)))
       return failure();
   }

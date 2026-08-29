@@ -205,9 +205,10 @@ class ScheduleResult:
     #: this schedule, tightest last. Empty outside the period policies.
     sweep: tuple[SweepPoint, ...] = ()
     #: what the whole module's schedule costs in the device's own currency: the
-    #: quantity ``O="area"`` minimizes, summed over every region and evaluated
-    #: on the settled schedule. A model figure, not a synthesis estimate: it
-    #: compares two schedules of one kernel, not two kernels.
+    #: quantity the exact solver minimizes under the span, summed over every
+    #: region and evaluated on the settled schedule. A model figure, not a
+    #: synthesis estimate: it compares two schedules of one kernel, not two
+    #: kernels.
     area: int | None = None
 
     @classmethod

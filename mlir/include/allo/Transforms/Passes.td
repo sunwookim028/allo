@@ -783,11 +783,7 @@ def LegalizeArithPass : Pass<"legalize-arith", "ModuleOp"> {
                         "small constant to its shift-add network">,
                  Option<"periodNs", "period-ns", "double", "0.0",
                         "Clock period a typed reciprocal multiply must fit; "
-                        "0 keeps every typed division on its IP">,
-                 Option<"areaFuseGate", "area-fuse-gate", "bool", "false",
-                        "Fuse a multiply-add only where the fused core prices "
-                        "no higher than the multiply plus the combinational "
-                        "add it replaces; the area objective sets this">];
+                        "0 keeps every typed division on its IP">];
   let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 

@@ -501,15 +501,6 @@ inline bool usesExactScheduler(SchedulerKind kind) {
   return kind != SchedulerKind::Heuristic;
 }
 
-/// The direction a solve optimizes toward. Only an exact solve reads it.
-enum class ScheduleObjective {
-  /// Shortest span, with area breaking ties under it.
-  Cycles,
-  /// Smallest area under a span leash (no slower than the heuristic), span
-  /// slack reclaimed under the settled area.
-  Area,
-};
-
 /// Defaults for one solve. The budget is in OR-Tools deterministic time units
 /// (roughly a core-second), charged per solve and shared by its span and area
 /// passes, so a cyclic search spends it again at every II it probes.
@@ -525,7 +516,6 @@ inline constexpr int kDefaultSolveSeed = 0;
 /// What the caller asked the scheduler for.
 struct SchedulerOptions {
   SchedulerKind kind = SchedulerKind::Heuristic;
-  ScheduleObjective objective = ScheduleObjective::Cycles;
   double budget = kDefaultSolveBudget;
   /// Whether to decide how many copies of each operator a region builds
   /// (`populateOperatorAllocation`) rather than one per op. Meaningful only
@@ -541,11 +531,13 @@ struct SchedulerOptions {
   /// to budget / workers seconds of wall-clock; the optimum then depends on
   /// thread timing, so no exact solve is reproducible.
   bool deterministic = true;
-  /// Span the area objective may pay beyond its leash, as a fraction of the
-  /// reference span (the heuristic's, or the first solved interval the greedy
-  /// did not place). Zero ships no slower than the heuristic. Buys interval
-  /// room for unit folds alone: an interval the ungranted leash already admits
-  /// keeps its tight drain bound.
+  /// Span the area minimization may pay beyond the minimal span, as a fraction
+  /// of the exact solver's own proven span. Zero ships no slower: the area is
+  /// minimized under the tightest span. A positive value trades that much span
+  /// for a smaller design, opening the intervals (and, in a straight-line
+  /// region, the drain depth) whose span stays within `span * (1 + areaSlack)`,
+  /// where a wider schedule can fold operations onto fewer units. Read by the
+  /// exact solver alone; the heuristic minimizes span only.
   double areaSlack = 0.0;
   /// Register-to-register floor (ns): the earliest sub-cycle start any op may
   /// take. Combinational rows carry their measured delay less the floor, so a
@@ -554,18 +546,13 @@ struct SchedulerOptions {
   /// Whether the heuristic scheduler hands a region to the exact solver when
   /// its own schedule is provably off (`heuristicScheduleGap`). Spends
   /// exact-solve time only where the compile-time oracle certifies a loss.
-  /// Read by the heuristic kind alone, under the cycles objective without
-  /// allocation.
+  /// Read by the heuristic kind alone, without allocation.
   bool escalate = true;
 };
 
 /// \p name ("heuristic" / "exact") as a kind, or nullopt when it names
 /// neither.
 std::optional<SchedulerKind> parseSchedulerKind(StringRef name);
-
-/// \p name ("cycles" / "area") as an objective, or nullopt when it names
-/// neither.
-std::optional<ScheduleObjective> parseScheduleObjective(StringRef name);
 
 /// One region's operator-sharing problem, decided at bind time with the
 /// schedule fixed: which same-class units to fold onto one instance. Numeric
@@ -628,19 +615,14 @@ LogicalResult scheduleCPSAT(ChainingSharedOperatorsProblem &prob,
                             const SpanObjective &span,
                             const SchedulerOptions &opts);
 /// Cyclic twin; \p minII lower-bounds the initiation interval, and the search
-/// over intervals is a branch and bound on \p span. \p maxII, nonzero, caps
-/// the search under the area objective (an explicit pipeline directive's
-/// ceiling, held no lower than the natural floor); the cycles objective
-/// ignores it. \p slackGrant, nonzero, is composition slack the enclosing
-/// kernel proved free of this region (off the sibling DAG's longest path). It
-/// buys interval room alone under the area objective: intervals the ungranted
-/// leash admits keep their own tight drain bound, wider ones are admitted with
-/// what the grant leaves. The cycles objective ignores it.
+/// over intervals is a branch and bound on \p span. \p maxII, nonzero, is an
+/// explicit pipeline directive's ceiling, held no lower than the natural floor;
+/// it caps the interval envelope the area fold searches under a positive
+/// `areaSlack`.
 LogicalResult scheduleCPSAT(ChainingModuloProblem &prob, Operation *lastOp,
                             float cycleTime, unsigned minII, unsigned maxII,
                             const SpanObjective &span,
-                            const SchedulerOptions &opts,
-                            int64_t slackGrant = 0);
+                            const SchedulerOptions &opts);
 
 /// Whether the heuristic's solved schedule provably leaves cycles behind: a
 /// placement-gap warn that survived the sigma/lap oracle
@@ -696,20 +678,21 @@ void repairRegisterLifetimes(ChainingSharedOperatorsProblem &prob,
 /// The chaining modulo variant, with a target-II lower bound (from a pipeline
 /// directive): the achieved II is max(\p minII, the natural minimum). \p minII
 /// == 1 imposes no additional bound. \p maxII, nonzero, is an explicit
-/// directive's II ceiling, honored by the exact area objective alone. \p opts
-/// selects the resource solver; both paths go through the same `check` and
-/// `verify`, and the lifetime repair runs before the verify so what ships is
-/// what was verified.
-inline LogicalResult
-solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
-                       float cycleTime, unsigned minII,
-                       const SchedulerOptions &opts, const SpanObjective &span,
-                       unsigned maxII = 0, int64_t slackGrant = 0) {
+/// directive's II ceiling, capping the interval envelope the area fold searches
+/// under a positive `areaSlack`. \p opts selects the resource solver; both
+/// paths go through the same `check` and `verify`, and the lifetime repair runs
+/// before the verify so what ships is what was verified.
+inline LogicalResult solveSchedulingProblem(ChainingModuloProblem &problem,
+                                            Operation *anchor, float cycleTime,
+                                            unsigned minII,
+                                            const SchedulerOptions &opts,
+                                            const SpanObjective &span,
+                                            unsigned maxII = 0) {
   if (failed(problem.check()))
     return failure();
   if (usesExactScheduler(opts.kind)) {
     if (failed(scheduleCPSAT(problem, anchor, cycleTime, minII, maxII, span,
-                             opts, slackGrant)))
+                             opts)))
       return failure();
   } else {
     if (failed(mlir::allo::scheduleSimplex(problem, anchor, cycleTime,
@@ -719,10 +702,9 @@ solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
     // the exact solver, which starts from the heuristic's own placement and
     // never ships worse.
     if (opts.escalate && !opts.allocate &&
-        opts.objective == ScheduleObjective::Cycles &&
         heuristicScheduleGap(problem, span, cycleTime, opts.regFloor) &&
         failed(scheduleCPSAT(problem, anchor, cycleTime, minII, maxII, span,
-                             opts, slackGrant)))
+                             opts)))
       return failure();
   }
   repairRegisterLifetimes(problem, anchor, span, cycleTime, opts.regFloor);
@@ -731,8 +713,7 @@ solveSchedulingProblem(ChainingModuloProblem &problem, Operation *anchor,
   return success();
 }
 
-/// Acyclic twin of the variant above. A slack grant has no interval to buy in
-/// a straight-line region, so none is taken.
+/// Acyclic twin of the variant above.
 inline LogicalResult solveSchedulingProblem(
     ChainingSharedOperatorsProblem &problem, Operation *anchor, float cycleTime,
     const SchedulerOptions &opts, const SpanObjective &span) {
@@ -747,7 +728,6 @@ inline LogicalResult solveSchedulingProblem(
       return failure();
     // The compile-time oracle, as in the cyclic variant above.
     if (opts.escalate && !opts.allocate &&
-        opts.objective == ScheduleObjective::Cycles &&
         heuristicScheduleGap(problem, span, cycleTime, opts.regFloor) &&
         failed(scheduleCPSAT(problem, anchor, cycleTime, span, opts)))
       return failure();

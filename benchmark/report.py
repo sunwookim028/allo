@@ -219,9 +219,10 @@ def measure_one(item, knobs: Knobs) -> dict:
     many search workers one exact solve runs; ``deterministic`` off lets them
     race. ``binding`` is ``"trivial"`` (one
     unit per op) or ``"auto"``, the binding the scheduler implies; the recorded
-    row carries the resolved name. ``objective`` is the exact solver's
-    optimization direction (the ``O`` knob); the heuristic ignores it.
-    ``area_slack`` widens the area solve's span limit by that fraction."""
+    row carries the resolved name. ``objective`` is the ``O`` knob (``"cycles"``
+    or a period policy); the heuristic ignores it. ``area_slack`` is the
+    fraction of the minimal span the area solve may trade for a smaller
+    design."""
     from benchmark.spec import find
 
     key, variant, scheduler = item
@@ -763,15 +764,15 @@ def main():
         "-O",
         "--objective",
         default="cycles",
-        help="the exact solver's optimization direction (the O knob); the "
-        "heuristic ignores it",
+        help="the O knob: 'cycles' (minimize span, then area under it) or the "
+        "'freq'/'wall' period policies",
     )
     ap.add_argument(
         "--area-slack",
         type=float,
         default=0.0,
-        help="fraction the area solve's span leash is widened by (the "
-        "area_slack knob); 0 keeps the strict leash",
+        help="fraction of the minimal span the area solve may trade for a "
+        "smaller design (the area_slack knob); 0 keeps the tightest span",
     )
     ap.add_argument(
         "--weight",

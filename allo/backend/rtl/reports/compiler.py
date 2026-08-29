@@ -48,8 +48,8 @@ class SolveReport:
     #: the interval whose solve exhausted the budget, ending the cyclic search.
     exhausted_at_ii: int | None = None
     #: the area minimization's incumbent and dual bound when its solve last
-    #: returned; the bound is absent where no area solve ran at all (under the
-    #: area objective, the structural bootstrap spent the budget).
+    #: returned; the bound is absent where no area solve ran at all (the
+    #: structural bootstrap spent the budget first).
     model_area: int | None = None
     model_area_bound: float | None = None
     #: whether re-running this compile reproduces the same schedule: a simplex

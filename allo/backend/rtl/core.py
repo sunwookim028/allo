@@ -32,7 +32,7 @@ from .interface import Interfaces
 from .options import PERIOD_POLICIES, PrepassOptions, SchedulerOptions
 from .qor import QoR, estimate
 from .reports import CompileReport, MicroarchReport, ScheduleResult
-from .schedule import run_schedule, sweep_area, sweep_freq, sweep_wall
+from .schedule import run_schedule, sweep_freq, sweep_wall
 from .sim import shell
 from ...lang.core import ShapedType
 from ...lang.kernel import Kernel
@@ -47,6 +47,10 @@ _NORMALIZE_PIPELINE = "builtin.module(dcp-resolve-banking)"
 # The one option the handle derives rather than takes: the scheduler's view of
 # `freq_mhz`, which the emitter and the cosim clock read too.
 _DERIVED_OPTIONS = {"cycle_ns"}
+
+# The values the ``O`` knob accepts: minimize span (area traded within
+# `area_slack`), or one of the two period policies that make the clock an output.
+_OBJECTIVES = {"cycles"} | PERIOD_POLICIES
 
 
 def _operator_period_cap(device: Device) -> float:
@@ -161,6 +165,10 @@ class RTL(Backend[P, R]):
                 f"unknown scheduler option(s) {unknown}; "
                 f"expected any of {sorted(sched | prepass)}"
             )
+        if (o := opts.get("O")) is not None and o not in _OBJECTIVES:
+            raise ValueError(
+                f"unknown objective O={o!r}; expected any of {sorted(_OBJECTIVES)}"
+            )
         self._sched_opts = replace(
             self._sched_opts, **{k: v for k, v in opts.items() if k in sched}
         )
@@ -225,8 +233,7 @@ class RTL(Backend[P, R]):
                         self._device.reg_delay_ns,
                     )
                 else:
-                    sweep = sweep_wall if self._sched_opts.O == "wall" else sweep_area
-                    self._dcp_ir, self._schedule_result = sweep(
+                    self._dcp_ir, self._schedule_result = sweep_wall(
                         self.top,
                         make_module,
                         self._sched_opts,

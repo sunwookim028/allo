@@ -12,7 +12,7 @@ from ..base import run_pipeline
 from ..._mlir.ir import Module
 from ..._mlir.dialects.allo import run_sdc_scheduling
 
-from .options import REGION_ORDERS, PrepassOptions, SchedulerOptions
+from .options import PrepassOptions, SchedulerOptions
 from .reports.schedule import ScheduleResult, SweepPoint
 
 RTL_PREPARE_PIPELINE = """
@@ -86,8 +86,7 @@ def run_schedule(
         f"{thr},{rotate},narrow-demanded-bits),drop-trivial-func,"
         f"{part},func.func(hoist-invariant-reads,assign-banks),canonicalize,cse,"
         f"func.func(expand-region-bounds),"
-        f"legalize-arith{{expand-const-arith=true period-ns={model_ns} "
-        f"area-fuse-gate={'true' if options.O == 'area' else 'false'}}},"
+        f"legalize-arith{{expand-const-arith=true period-ns={model_ns}}},"
         f"canonicalize,cse)"
     )
     run_pipeline(module, pipeline)
@@ -101,9 +100,6 @@ def run_schedule(
             top,
             model_ns,
             options.scheduler,
-            # A period policy that ranks clocks by time leaves its regions on
-            # the cycles order; "area" keeps its own (see `REGION_ORDERS`).
-            REGION_ORDERS.get(options.O, options.O),
             options.budget,
             allocate,
             options.workers,
@@ -340,148 +336,3 @@ def sweep_wall(
     return _solve_at(
         top, make_module, options, prepass, allocate, winner.cycle_ns, curve
     )
-
-
-def sweep_area(
-    top,
-    make_module: Callable[[], Module],
-    options: SchedulerOptions,
-    prepass: PrepassOptions,
-    allocate: bool,
-    floor_ns: float,
-    cap_ns: float,
-) -> tuple[Module, ScheduleResult]:
-    """Minimize area under ``O="area"`` with the period free: probe candidate
-    clocks with the heuristic scheduler, rank them by cost, and solve once at
-    the winner under the caller's own scheduler settings, where the area
-    objective proper runs. A slower clock chains deeper, so it breaks fewer
-    chains and spends fewer delay registers; the rank stops it paying unbounded
-    time for that.
-
-    The rank depends on what area is weighed against:
-
-    - ``wall_ns`` set: a candidate is eligible while span times achieved period
-      holds the deadline, and the least-area eligible one wins. No eligible
-      candidate, or no composed span, is refused rather than silently overrun.
-    - No deadline, span present: only clocks no faster than the requested one
-      and costing no more area are probed, and the winner minimizes area times
-      wall, so this never returns more area than the requested clock would.
-    - No deadline, no span: nothing may be traded, so a candidate qualifies only
-      while every solved per-region quantity costs no more time than at the
-      requested clock; this degrades to scheduling at the clock asked for.
-
-    Without a deadline the winning clock is confirmed by solving beside the
-    requested one and shipping the cheaper, since the probe ranks the heuristic
-    schedule while the objective's own solve ships. The direction is then
-    monotone: it never builds more than it would have without the sweep.
-
-    ``cap_ns`` tops the ladder at the slowest period any device row is built
-    for; ``floor_ns`` is the register floor the aggressive anchor stands on,
-    reached only under a deadline. Returns the scheduled module and its result,
-    with the probed curve published as ``ScheduleResult.sweep``."""
-    if options.wall_ns < 0.0:
-        raise ValueError(f"wall_ns must be non-negative; got {options.wall_ns}")
-    vectors: dict[float, dict] = {}
-
-    def probe(period: float) -> SweepPoint:
-        point, vectors[period] = _probe(
-            top, make_module, options, prepass, allocate, period
-        )
-        return point
-
-    asked = probe(options.cycle_ns)
-    if options.wall_ns and asked.latency is None:
-        raise RuntimeError(
-            f"O='area' holds wall_ns against span times period, and '{top}' "
-            "publishes no span at the requested clock; add allo.assume trip "
-            "bounds, or leave wall_ns unset to trade against the requested "
-            "clock instead"
-        )
-    points = [asked]
-    # A deadline lets the winner sit at any clock. Without one the requested
-    # clock floors the walk, a faster rung being a frequency purchase this
-    # direction does not make.
-    lo = _anchor_ns(options, floor_ns) if options.wall_ns else options.cycle_ns
-    hi = max(cap_ns, options.cycle_ns, lo)
-    # Under a deadline the laxest candidate's span bounds every candidate's from
-    # below (feasible sets only grow with the period), so a period no schedule
-    # can meet the deadline at is skipped unprobed.
-    floor_span = None
-    for period in _descending(lo, hi, options.cycle_ns):
-        if options.wall_ns and floor_span and floor_span * period > options.wall_ns:
-            continue
-        p = probe(period)
-        if floor_span is None:
-            floor_span = p.latency
-        points.append(p)
-    curve = _dedup(points)
-    assert all(
-        p.area is not None for p in curve
-    ), "every schedule carries a modeled area, whatever solved it"
-
-    def wall(p: SweepPoint) -> float:
-        return p.latency * p.achieved_ns
-
-    if options.wall_ns:
-        eligible = [p for p in curve if p.latency and wall(p) <= options.wall_ns]
-        if not eligible:
-            best = min((p for p in curve if p.latency), key=wall, default=None)
-            raise RuntimeError(
-                f"O='area' found no clock at which '{top}' finishes within "
-                f"{options.wall_ns:g} ns: the best of {len(curve)} probed "
-                f"periods runs {best.latency} cycles at {best.achieved_ns:g} ns "
-                f"= {wall(best):g} ns; raise wall_ns, or leave it unset to trade "
-                "against the requested clock instead"
-            )
-        return _solve_at(
-            top,
-            make_module,
-            options,
-            prepass,
-            allocate,
-            min(eligible, key=lambda p: (p.area, wall(p))).cycle_ns,
-            curve,
-        )
-    # Nothing faster than asked was probed; a candidate must also cost no more
-    # than asked, so the rank never proposes a bigger design than the one the
-    # requested clock would have built.
-    slower = [
-        p
-        for p in curve
-        if p.achieved_ns >= asked.achieved_ns - 1e-9 and p.area <= asked.area
-    ]
-    if asked.latency is not None:
-        # Area times wall, not area times span: a span alone does not compare
-        # across periods. Wall breaks the tie, so an equal-area slower clock is
-        # never taken.
-        winner = min(slower, key=lambda p: (p.area * wall(p), wall(p)))
-    else:
-        # No span, so no wall to price an area saving against: take only the
-        # clocks that cost no region any time either.
-        ref = vectors[asked.cycle_ns]
-        free = [
-            p
-            for p in slower
-            if vectors[p.cycle_ns].keys() == ref.keys()
-            and all(
-                vectors[p.cycle_ns][k] * p.achieved_ns <= v * asked.achieved_ns
-                for k, v in ref.items()
-            )
-        ]
-        winner = min(free, key=lambda p: (p.area, p.achieved_ns))
-    solved = _solve_at(
-        top, make_module, options, prepass, allocate, winner.cycle_ns, curve
-    )
-    if abs(winner.cycle_ns - options.cycle_ns) < 1e-9:
-        return solved
-
-    def cost(outcome: tuple[Module, ScheduleResult]) -> tuple[int, float]:
-        """What the solver says the schedule costs, wall breaking a tie."""
-        result = outcome[1]
-        span = result.func(top).latency
-        return (result.area, span * result.cycle_ns if span else 0.0)
-
-    asked_solve = _solve_at(
-        top, make_module, options, prepass, allocate, options.cycle_ns, curve
-    )
-    return min(solved, asked_solve, key=cost)

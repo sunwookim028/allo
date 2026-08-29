@@ -841,15 +841,12 @@ OperatorChar OperatorLibrary::lookup(Operation *op, StringRef symbol) const {
 }
 
 SmallVector<OperatorChar, 2>
-OperatorLibrary::candidateChars(Operation *op, bool withComb) const {
+OperatorLibrary::candidateChars(Operation *op) const {
   SmallVector<OperatorChar, 2> out;
   int64_t width = combParamWidth(op);
-  const OperatorEntry *comb = nullptr;
   for (const OperatorEntry *e : matchEntries(advancedEntries, entries, op)) {
-    if (e->comb) {
-      comb = e; // the last comb row of a kind wins
-      continue;
-    }
+    if (e->comb)
+      continue; // a comb row is never a selection candidate under this order
     // The same float fit test `selectImplementation` ranks by, so the set here
     // and the row `lookup` picks never disagree about what fits.
     float need = periodNeed(static_cast<float>(regFloor), e->inDelay,
@@ -859,15 +856,6 @@ OperatorLibrary::candidateChars(Operation *op, bool withComb) const {
     if (!priceOf(e->uses, {width}))
       continue; // unmeasured at this width: it cannot realize the op
     out.push_back(characterize(op, *e, width));
-  }
-  if (withComb && comb) {
-    std::optional<double> delay = comb->delay.evaluate(width);
-    if (delay && priceOf(comb->uses, {width})) {
-      auto d = static_cast<float>(std::max(0.0, *delay - regFloor));
-      if (periodNeed(static_cast<float>(regFloor), d, d, 0.0f) <=
-          selectionPeriodNs)
-        out.push_back(characterize(op, *comb, width));
-    }
   }
   return out;
 }
@@ -915,14 +903,14 @@ SmallVector<StringRef, 2> OperatorLibrary::candidateIPs(Operation *op) const {
 
 SmallVector<OperatorChar, 2>
 mlir::allo::selectionCandidates(Operation *op, const OperatorLibrary &lib,
-                                bool cyclic, bool withComb) {
+                                bool cyclic) {
   if (isSyncSubKernelCall(op) || asMemAccess(op) || isZeroDelay(op))
     return {};
   OperatorChar own = lib.lookup(op);
   if (own.identity.ipSymbol.empty() &&
       !StringRef(own.timing.typeName).starts_with("comb."))
     return {}; // the default realization stays the library's
-  SmallVector<OperatorChar, 2> cands = lib.candidateChars(op, withComb);
+  SmallVector<OperatorChar, 2> cands = lib.candidateChars(op);
   llvm::erase_if(cands, [&](const OperatorChar &c) {
     return (cyclic && !c.pipelined) ||
            (c.timing.latency == 0 && c.timing.inDelay != c.timing.outDelay);
