@@ -28,7 +28,7 @@ create_library_set -name libs_typical \
   ]
 
 create_library_set -name libs_bc \
-  -timing [list $env(adk_bc_lib)]
+  -timing [concat [list $env(adk_bc_lib)] $sram_lib_files]
 
 create_library_set -name libs_wc \
   -timing [concat \

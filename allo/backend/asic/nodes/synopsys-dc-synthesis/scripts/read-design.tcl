@@ -25,7 +25,14 @@ define_design_lib WORK -path ${dc_results_dir}/WORK
 
 # Analyze the RTL source file
 
-if { ![analyze -format sverilog $dc_rtl_handoff] } { exit 1 }
+if {[file exists inputs/rtl-sources.f]} {
+  puts "Info: Reading packaged RTL source manifest inputs/rtl-sources.tcl"
+  source inputs/rtl-sources.tcl
+  set_app_var search_path [concat $rtl_include_dirs $search_path]
+  if { ![analyze -format sverilog -define $rtl_defines $rtl_source_files] } { exit 1 }
+} else {
+  if { ![analyze -format sverilog $dc_rtl_handoff] } { exit 1 }
+}
 
 # Elaborate the design with design parameters from a file, or else just
 # elaborate normally
@@ -38,7 +45,10 @@ if {[file exists [which setup-design-params.txt]]} {
 }
 
 current_design $dc_design_name
-link
+if {![link]} {
+  echo "Error: failed to link design $dc_design_name"
+  exit 1
+}
 
 # Load UPF if it exists
 if {[file exists $dc_upf]} {
@@ -59,5 +69,3 @@ write -hierarchy -format ddc \
 
 write -hierarchy -format verilog \
       -output ${dc_results_dir}/${dc_design_name}.elab.v
-
-

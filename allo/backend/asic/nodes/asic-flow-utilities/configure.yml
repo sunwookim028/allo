@@ -1,0 +1,20 @@
+name: asic-flow-utilities
+
+inputs: []
+
+outputs:
+  - cleanup-node.py
+  - run-commercial-simulation.py
+
+commands:
+  - mkdir -p outputs
+  - cp cleanup_node.py outputs/cleanup-node.py
+  - cp run_commercial_simulation.py outputs/run-commercial-simulation.py
+
+preconditions:
+  - assert File( 'cleanup_node.py' )
+  - assert File( 'run_commercial_simulation.py' )
+
+postconditions:
+  - assert File( 'outputs/cleanup-node.py' )
+  - assert File( 'outputs/run-commercial-simulation.py' )

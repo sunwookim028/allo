@@ -6,15 +6,18 @@ inputs:
   - design.lvs.v
   - macro-registry
   - srams
+  - cleanup-node.py
 
 outputs:
   - lvs.report
   - design.schematic.spi
   - design_merged.lvs.v
   - full-chip-lvs-metrics.json
+  - full-chip-lvs-cleanup-metrics.json
 
 commands:
   - bash run.sh
+  - python3 inputs/cleanup-node.py --node commercial-full-chip-lvs --output full-chip-lvs-cleanup-metrics.json svdb
 
 parameters:
   design_name: undefined
@@ -28,6 +31,7 @@ parameters:
   lvs_connect_names: ''
   lvs_verify_netlist: 1
   lvs_extra_spice_include: ''
+  cleanup_enabled: True
 
 debug:
   - calibredrv -m inputs/design_merged.gds -l inputs/adk/calibre.layerprops -rve -lvs svdb
@@ -45,6 +49,7 @@ postconditions:
   - assert File( 'outputs/design.schematic.spi' )
   - assert File( 'outputs/design_merged.lvs.v' )
   - assert File( 'outputs/full-chip-lvs-metrics.json' )
+  - assert File( 'outputs/full-chip-lvs-cleanup-metrics.json' )
   - >-
     assert 'drc_check_policy: report' in File( 'configure.yml' ) or
     '#     INCORRECT     #' not in File( 'outputs/lvs.report' )

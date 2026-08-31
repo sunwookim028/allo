@@ -31,7 +31,7 @@ Here is the directory tree when this error occurred:
     ├── design_merged.gds
     ├── inputs
     │   ├── adk -> ../../1-freepdk-45nm/outputs/adk
-    │   └── design.gds.gz -> ../../6-cadence-innovus-place-route/outputs/design.gds.gz
+    │   └── design.gds.gz -> ../../6-cadence-innovus-pnr/outputs/design.gds.gz
     ├── merge.log
     ├── mflowgen-debug
     ├── mflowgen-run.log

@@ -10,19 +10,23 @@ inputs:
   - testbench-contract.json
   - macro-registry
   - srams
+  - cleanup-node.py
 
 outputs:
   - run.vcd
   - compile.log
   - simulation.log
   - simulation-report.json
+  - ffgl-cleanup-metrics.json
 
 commands:
   - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-ffgl-sim --output ffgl-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
 
 parameters:
   testbench_name: allo_generated_testbench
   waveform: True
+  cleanup_enabled: True
 
 preconditions:
   - assert Tool( 'vcs' )
@@ -46,6 +50,7 @@ postconditions:
   - assert File( 'outputs/compile.log' )
   - assert File( 'outputs/simulation.log' )
   - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/ffgl-cleanup-metrics.json' )
   - |
       import json
       from pathlib import Path

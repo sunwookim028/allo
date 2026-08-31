@@ -1,6 +1,7 @@
 name: allo-asic-compilation
 
-inputs: []
+inputs:
+  - cleanup-node.py
 
 outputs:
   - allo-build
@@ -16,9 +17,11 @@ outputs:
   - allo-compilation-metrics.json
   - workload-manifest.json
   - workload-vectors
+  - allo-compilation-cleanup-metrics.json
 
 commands:
   - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-asic-compilation --output allo-compilation-cleanup-metrics.json work
 
 parameters:
   construct_path: undefined
@@ -35,6 +38,7 @@ parameters:
   allo_testbench_top_function: undefined
   python_bin: python
   allo_setup_script: /work/shared/common/allo/setup-llvm-main.sh
+  cleanup_enabled: True
 
 preconditions:
   - assert File( 'preflight.py' )
@@ -56,5 +60,6 @@ postconditions:
   - assert File( 'outputs/allo-compilation-metrics.json' )
   - assert File( 'outputs/workload-manifest.json' )
   - assert File( 'outputs/workload-vectors' )
+  - assert File( 'outputs/allo-compilation-cleanup-metrics.json' )
   - assert 'traceback' not in File( 'outputs/allo-build.log' )
   - assert 'post_hls_enriched' in File( 'outputs/asic-manifest-final.json' )

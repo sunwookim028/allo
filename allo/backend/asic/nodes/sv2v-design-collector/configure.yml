@@ -15,7 +15,13 @@ inputs: []
 
 outputs:
   - design.v
+  - normalized-rtl
+  - source-rtl
   - source-manifest.f
+  - rtl-source-package
+  - rtl-sources.f
+  - rtl-sources.tcl
+  - rtl-collection.json
   - sv2v.log
 
 #-------------------------------------------------------------------------
@@ -33,7 +39,10 @@ parameters:
   design_path: undefined
   top_module: undefined
   manifest: rtl/sv2v_manifest.f
+  sv2v_bin: sv2v
+  sv2v_defines: "TARGET_ASIC=1"
   sv2v_include_dirs: "."
+  normalize_rtl: True
   construct_path: undefined
 
 #-------------------------------------------------------------------------
@@ -42,9 +51,21 @@ parameters:
 
 preconditions:
 
-  - assert Tool( 'sv2v' )           # tool check
+  - assert File( 'collect_rtl.py' )
+  - |
+    import os
+    import shutil
+    normalize = os.environ.get('normalize_rtl', 'True').strip().lower()
+    assert normalize == 'false' or shutil.which(os.environ.get('sv2v_bin', 'sv2v'))
 
 postconditions:
   - assert File( 'outputs/design.v' )
+  - assert File( 'outputs/normalized-rtl/design.v' )
+  - assert File( 'outputs/source-rtl' )
   - assert File( 'outputs/source-manifest.f' )
+  - assert File( 'outputs/rtl-source-package' )
+  - assert File( 'outputs/rtl-sources.f' )
+  - assert File( 'outputs/rtl-sources.tcl' )
+  - assert File( 'outputs/rtl-collection.json' )
   - assert File( 'outputs/sv2v.log' )
+  - assert 'error:' not in File( 'outputs/sv2v.log' )

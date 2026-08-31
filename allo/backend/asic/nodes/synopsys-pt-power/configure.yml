@@ -28,6 +28,7 @@ inputs:
   - design.namemap
   - macro-registry
   - srams
+  - testbench-contract.json
 
 outputs:
   - primetime.session
@@ -35,14 +36,17 @@ outputs:
   - power-reports
   - power.rpt
   - activity.rpt
+  - activity-source.json
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
+  - python3 prepare_activity.py
   - python3 prepare_pt_sdc.py inputs/design.pt.sdc prepared-design.pt.sdc
   - source run.sh
+  - cp activity-source.json outputs/activity-source.json
   - cp -a reports outputs/power-reports
   - ln -sf ../reports/$design_name.power.rpt outputs/power.rpt
   - ln -sf ../reports/$design_name.activity.post.rpt outputs/activity.rpt
@@ -56,13 +60,14 @@ debug:
 
 parameters:
   design_name: undefined
-  #The strip path/saif_instance must be defined, without any quotations!
-  saif_instance: th/dut
+  # auto derives <testbench_top>/<dut_instance> from testbench-contract.json.
+  # An explicit value remains supported for legacy or unusual hierarchies.
+  saif_instance: auto
+  # bagl_vcd, ffgl_vcd, rtl_vcd, or saif. Selection is explicit; the node no
+  # longer chooses an activity source merely because a file happens to exist.
+  activity_source: bagl_vcd
   # analysis mode either "averaged" or "time_based"
   analysis_mode: averaged
-  # If VCD activity files is the result of a zero-delay simulation, it needs
-  # to be specified! (Otherwise SDF simulation will be assumed)
-  zero_delay_simulation: False
   # Set library operating condition to be used for timing and power estimation
   # Leaving it undefined PrimeTime will choose the operating condition of the first target library in the list
   # eg. the Operating condition of the FreePDK45 ADK can be set "typical"
@@ -78,11 +83,19 @@ parameters:
 preconditions:
   - assert Tool( 'pt_shell' )
   - assert Tool( 'python3' )
+  - assert File( 'prepare_activity.py' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/design.vcs.v' )
   - assert File( 'inputs/design.pt.sdc' )
   - assert File( 'inputs/design.spef.gz' )
-  - assert File( 'inputs/run.vcd' )
+  - >-
+    assert '{activity_source}' == 'saif' or File( 'inputs/run.vcd' )
+  - >-
+    assert '{activity_source}' != 'saif' or File( 'inputs/run.saif' )
+  - >-
+    assert '{activity_source}' != 'rtl_vcd' or File( 'inputs/design.namemap' )
+  - >-
+    assert '{saif_instance}' != 'auto' or File( 'inputs/testbench-contract.json' )
 
 postconditions:
   - assert File( 'outputs/primetime.session' )
@@ -90,3 +103,4 @@ postconditions:
   - assert File( 'outputs/power-reports' )
   - assert File( 'outputs/power.rpt' )
   - assert File( 'outputs/activity.rpt' )
+  - assert File( 'outputs/activity-source.json' )

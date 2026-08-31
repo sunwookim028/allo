@@ -412,15 +412,12 @@ def main() -> None:
     stages_by_node = {item["node"]: item for item in stages}
     full_chip_pnr = stages_by_node.get("commercial-full-chip-pnr", {})
     peak_memory_mb = full_chip_pnr.get("resources", {}).get("peak_memory_mb")
-    trim_metrics = json.loads(read_optional(INPUTS / "trim-metrics.json") or "{}")
     summary_node_root = OUTPUTS.parent
     build_root = summary_node_root.parent if re.match(
         r"^\d+-", summary_node_root.name
     ) else summary_node_root
     measured_size = directory_apparent_size_bytes(build_root)
-    build_directory_size_bytes = trim_metrics.get(
-        "before_apparent_size_bytes", measured_size
-    )
+    build_directory_size_bytes = measured_size
     drc_policy_path = INPUTS / "drc-policy.json"
     drc_policy = (
         json.loads(drc_policy_path.read_text()) if drc_policy_path.is_file() else {}
@@ -477,15 +474,12 @@ def main() -> None:
             "build_directory_size_gib": round(
                 build_directory_size_bytes / (1024 ** 3), 6
             ),
-            "post_trim_build_directory_size_bytes": trim_metrics.get(
-                "after_apparent_size_bytes", measured_size
+            # Cleanup is now owned by each producing node. This is the actual
+            # build size observed after all upstream per-node cleanup.
+            "post_cleanup_build_directory_size_bytes": measured_size,
+            "post_cleanup_build_directory_size_gib": round(
+                measured_size / (1024 ** 3), 6
             ),
-            "post_trim_build_directory_size_gib": trim_metrics.get(
-                "after_apparent_size_gib",
-                round(measured_size / (1024 ** 3), 6),
-            ),
-            "trimmed_bytes": trim_metrics.get("deleted_bytes", 0),
-            "trimmed_gib": trim_metrics.get("deleted_gib", 0.0),
         },
         "macros": macros,
         "simulation": {

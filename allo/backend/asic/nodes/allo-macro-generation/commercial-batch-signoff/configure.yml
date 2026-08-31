@@ -4,18 +4,22 @@ inputs:
   - adk
   - verified-pnr-batch
   - srams
+  - cleanup-node.py
 
 outputs:
   - signoff-batch
   - signoff-status.json
   - macro-signoff-metrics.json
+  - macro-signoff-cleanup-metrics.json
 
 commands:
   - python batch_signoff.py
+  - python3 inputs/cleanup-node.py --node commercial-batch-signoff --output macro-signoff-cleanup-metrics.json work
 
 parameters:
   corner_setup: typical
   corner_hold: bc
+  cleanup_enabled: True
 
 preconditions:
   - assert File( 'inputs/adk' )
@@ -31,3 +35,4 @@ postconditions:
   - assert File( 'outputs/signoff-batch' )
   - assert File( 'outputs/signoff-status.json' )
   - assert File( 'outputs/macro-signoff-metrics.json' )
+  - assert File( 'outputs/macro-signoff-cleanup-metrics.json' )

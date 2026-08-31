@@ -33,13 +33,19 @@ foreach tcl $order {
   # Try to find the script in the "inputs" directory first
   if {[ file exists inputs/$tcl ]} {
     puts "\n  > Info: Sourcing \"inputs/$tcl\"\n"
-    source -echo -verbose inputs/$tcl
+    if {[catch {source -echo -verbose inputs/$tcl} message]} {
+      puts stderr "Error: inputs/$tcl failed: $message"
+      exit 1
+    }
     # Hook to drop into interactive Design Compiler shell after setup
     if {[ info exists SYN_SETUP_DONE ]} { return }
   # Try to find the script in the "scripts" directory
   } elseif {[ file exists scripts/$tcl ]} {
     puts "\n  > Info: Sourcing \"scripts/$tcl\"\n"
-    source -echo -verbose scripts/$tcl
+    if {[catch {source -echo -verbose scripts/$tcl} message]} {
+      puts stderr "Error: scripts/$tcl failed: $message"
+      exit 1
+    }
     # Hook to drop into interactive Design Compiler shell after setup
     if {[ info exists SYN_SETUP_DONE ]} { return }
   # Failed to find the script anywhere...
@@ -53,5 +59,4 @@ foreach tcl $order {
 save_session outputs/primetime.session
 
 exit
-
 

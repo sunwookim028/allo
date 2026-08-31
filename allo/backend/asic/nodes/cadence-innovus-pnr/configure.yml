@@ -28,12 +28,20 @@ outputs:
   - design.virtuoso.v
   - design.spef.gz
   - design.def.gz
+  - pnr-metrics.json
+  - area.rpt
+  - innovus-drc.rpt
+  - innovus-antenna.rpt
+  - welltap-precleanup.rpt
+  - welltap-adaptive-cuts.rpt
+  - welltap.rpt
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
+  - flow_start_epoch=$(date +%s)
   - if [[ "x$enable_gui" == "xTrue" ]]; then gui_flag=""; else gui_flag="-nowin"; fi
   - innovus -overwrite -64 $gui_flag -init START.tcl -log logs/run.log
   # Outputs
@@ -51,6 +59,15 @@ commands:
   - if compgen -G "../results/*.sdf" > /dev/null; then ln -sf ../results/*.sdf design.sdf; fi
   - if compgen -G "../results/*.virtuoso.v" > /dev/null; then ln -sf ../results/*.virtuoso.v design.virtuoso.v; fi
   - if compgen -G "../results/*.def.gz" > /dev/null; then ln -sf ../results/*.def.gz design.def.gz; fi
+  - cd ..
+  - export PNR_SECONDS="$(( $(date +%s) - flow_start_epoch ))"
+  - python3 collect_pnr_metrics.py --wall-seconds "$PNR_SECONDS" --stop-after-step "$stop_after_step" --drc-check-policy "$drc_check_policy" --hold-target-slack "$hold_target_slack"
+  - ln -sf ../reports/innovus-drc.rpt outputs/innovus-drc.rpt
+  - ln -sf ../reports/innovus-antenna.rpt outputs/innovus-antenna.rpt
+  - ln -sf ../reports/welltap-precleanup.rpt outputs/welltap-precleanup.rpt
+  - ln -sf ../reports/welltap-adaptive-cuts.rpt outputs/welltap-adaptive-cuts.rpt
+  - ln -sf ../reports/welltap.rpt outputs/welltap.rpt
+  - ln -sf ../reports/signoff.area.rpt outputs/area.rpt
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -60,11 +77,15 @@ parameters:
   design_name: undefined
   enable_gui: true
   core_density_target: 0.70
+  antenna_check_policy: report
+  drc_check_policy: error
   useful_skew: True
   useful_skew_ccopt_effort: standard
+  ccopt_target_max_transition: 0.0
   cell_padding: 2
   signoff_engine: False
   hold_target_slack: 0.005
+  hold_optimization_target_slack: 0.020
   setup_target_slack: 0.000
   stop_after_step: none
   floorplan_mode: auto
@@ -72,6 +93,8 @@ parameters:
   floorplan_width: ''
   floorplan_height: ''
   process_node: 45
+  # Prefer an ADK-provided ADK_DBU_PRECISION; this is only the fallback.
+  gds_stream_out_units: 1000
   max_route_layer: 7
   base_layer_idx: 0
   pin_layer_offset: 3
@@ -93,8 +116,8 @@ parameters:
   primary_ground_net: VSS
   power_nets: 'VDD,VNW,VDDPST,POC,VDDCE,VDDPE'
   ground_nets: 'VSS,VPW,VSSPST,VSSE'
-  power_pin_names: 'VDD,vdd'
-  ground_pin_names: 'VSS,gnd'
+  power_pin_names: 'VDD'
+  ground_pin_names: 'VSS'
   lvs_exclude_cell_list: 'FILL*,WELLTAP*'
   virtuoso_exclude_cell_list: 'FILL*,WELLTAP*'
   adk_tech_lef: inputs/adk/rtk-tech.lef
@@ -122,8 +145,25 @@ preconditions:
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/design.v' )
   - assert File( 'inputs/design.sdc' )
+  - assert File( 'collect_pnr_metrics.py' )
+  - assert File( 'scripts/plan-welltap-cuts.py' )
 
 postconditions:
   - assert File( 'outputs/design.checkpoint' )
-  - assert 'ERROR'
+  - assert File( 'outputs/pnr-metrics.json' )
+  - assert File( 'outputs/welltap.rpt' )
+  - assert 'Found 0 violations in total' in File( 'outputs/welltap.rpt' )
+  - |
+      import json
+      from pathlib import Path
+      metrics = json.loads(Path('outputs/pnr-metrics.json').read_text())
+      assert metrics['status'] == 'passed'
+      if metrics['run_mode'] == 'full':
+          assert metrics['completed_step'] == 'signoff'
+          assert File('outputs/area.rpt')
+          assert File('outputs/innovus-drc.rpt')
+          if metrics['drc']['policy'] == 'error':
+              assert metrics['drc']['violation_count'] == 0
+          assert metrics['timing']['signoff_hold']['target_met']
+  - assert '**ERROR:'
       not in File( 'logs/run.log', enable_case_sensitive=True )

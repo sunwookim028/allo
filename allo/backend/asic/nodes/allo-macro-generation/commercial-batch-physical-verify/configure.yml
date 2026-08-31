@@ -4,14 +4,17 @@ inputs:
   - adk
   - pnr-batch
   - srams
+  - cleanup-node.py
 
 outputs:
   - verified-pnr-batch
   - physical-verify-status.json
   - macro-physical-verify-metrics.json
+  - macro-physical-verify-cleanup-metrics.json
 
 commands:
   - python batch_physical_verify.py
+  - python3 inputs/cleanup-node.py --node commercial-batch-physical-verify --output macro-physical-verify-cleanup-metrics.json work
 
 parameters:
   drc_nthreads: 4
@@ -24,6 +27,7 @@ parameters:
   lvs_connect_names: ''
   lvs_verify_netlist: 1
   lvs_extra_spice_include: ''
+  cleanup_enabled: True
 
 preconditions:
   - assert File( 'inputs/adk' )
@@ -38,3 +42,4 @@ postconditions:
   - assert File( 'outputs/verified-pnr-batch' )
   - assert File( 'outputs/physical-verify-status.json' )
   - assert File( 'outputs/macro-physical-verify-metrics.json' )
+  - assert File( 'outputs/macro-physical-verify-cleanup-metrics.json' )

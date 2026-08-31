@@ -1,0 +1,51 @@
+name: commercial-rtl-sim
+
+inputs:
+  - design.v
+  - rtl-source-package
+  - rtl-sources.f
+  - testbench
+  - testbench-contract.json
+  - srams
+  - run-commercial-simulation.py
+  - cleanup-node.py
+
+outputs:
+  - run.vcd
+  - compile.log
+  - simulation.log
+  - simulation-report.json
+  - rtl-sim-cleanup-metrics.json
+
+commands:
+  - python3 inputs/run-commercial-simulation.py
+  - python3 inputs/cleanup-node.py --node commercial-rtl-sim --output rtl-sim-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
+
+parameters:
+  simulation_mode: rtl
+  waveform: True
+  xprop_enabled: True
+  cleanup_enabled: True
+
+preconditions:
+  - assert Tool( 'vcs' )
+  - assert File( 'inputs/design.v' )
+  - >-
+    assert not File( 'inputs/rtl-sources.f' ) or
+    File( 'inputs/rtl-source-package' )
+  - assert File( 'inputs/testbench/testbench.f' )
+  - assert File( 'inputs/testbench/testbench-runtime.args' )
+  - assert File( 'inputs/testbench-contract.json' )
+  - assert File( 'inputs/run-commercial-simulation.py' )
+  - assert File( 'inputs/cleanup-node.py' )
+
+postconditions:
+  - assert File( 'outputs/run.vcd' )
+  - assert File( 'outputs/compile.log' )
+  - assert File( 'outputs/simulation.log' )
+  - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/rtl-sim-cleanup-metrics.json' )
+  - >-
+    assert '"mode": "rtl"' in File( 'outputs/simulation-report.json' )
+  - >-
+    assert '"status": "passed"' in File( 'outputs/simulation-report.json' )

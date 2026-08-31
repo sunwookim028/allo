@@ -13,6 +13,7 @@ inputs:
   - testbench-contract.json
   - macro-registry
   - srams
+  - cleanup-node.py
 
 outputs:
   - run.vcd
@@ -22,10 +23,12 @@ outputs:
   - sdf-annotation-manifest.json
   - timing-config.json
   - timing-config.values
+  - bagl-cleanup-metrics.json
 
 commands:
   - python3 prepare_sdf.py
   - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-bagl-sim --output bagl-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
 
 parameters:
   testbench_name: allo_generated_testbench
@@ -43,6 +46,7 @@ parameters:
   bagl_input_delay_ns: 0.025
   bagl_output_delay_ns: 0.025
   bagl_num_reset_cycles: 8
+  cleanup_enabled: True
 
 preconditions:
   - assert Tool( 'vcs' )
@@ -73,6 +77,7 @@ postconditions:
   - assert File( 'outputs/sdf-annotation-manifest.json' )
   - assert File( 'outputs/timing-config.json' )
   - assert File( 'outputs/timing-config.values' )
+  - assert File( 'outputs/bagl-cleanup-metrics.json' )
   - |
       import json
       from pathlib import Path

@@ -22,16 +22,15 @@ inputs:
 
 outputs:
   - design.sdf
+  - timing-reports
+  - timing-metrics.json
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
-  - mkdir -p reports
-  - pt_shell -file pt.tcl
-  - mkdir -p outputs && cd outputs
-  - ln -sf ../design.sdf design.sdf
+  - bash run.sh
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -41,4 +40,18 @@ parameters:
   design_name: undefined
   corner_setup: typical
   corner_hold: bc
+  setup_target_slack: 0.0
+  hold_target_slack: 0.0
+  timing_check_policy: error
 
+preconditions:
+  - assert Tool( 'pt_shell' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.vcs.v' )
+  - assert File( 'inputs/design.pt.sdc' )
+  - assert File( 'inputs/design.spef.gz' )
+
+postconditions:
+  - assert File( 'outputs/design.sdf' )
+  - assert File( 'outputs/timing-reports' )
+  - assert File( 'outputs/timing-metrics.json' )

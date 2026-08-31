@@ -25,12 +25,17 @@ set_app_var link_library     "* $ptpx_target_libraries $ptpx_extra_link_librarie
 read_verilog   $ptpx_gl_netlist
 current_design $ptpx_design_name
 
-link_design
+if {[catch {link_design} link_error]} {
+  echo "Error: failed to link $ptpx_design_name: $link_error"
+  exit 1
+}
 
 # Read in the SDC and parasitics
 
 # read_sdc -echo $ptpx_sdc
 source $ptpx_sdc
 
-read_parasitics -format spef $ptpx_spef
-
+if {[catch {read_parasitics -format spef $ptpx_spef} spef_error]} {
+  echo "Error: failed to read parasitics $ptpx_spef: $spef_error"
+  exit 1
+}

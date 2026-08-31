@@ -1,0 +1,35 @@
+name: asic-flow-summary
+
+inputs:
+  - synthesis-metrics.json
+  - pnr-metrics.json
+  - timing-metrics.json
+  - activity-source.json
+  - power.rpt
+  - gdsmerge-metrics.json
+  - drc-metrics.json
+  - drc-policy.json
+  - lvs-metrics.json
+  - rtl-simulation-report.json
+  - ffgl-simulation-report.json
+  - bagl-simulation-report.json
+
+outputs:
+  - flow-summary.json
+  - flow-summary.txt
+  - flow-summary.tcl
+
+commands:
+  - python3 summarize_flow.py
+
+parameters:
+  design_name: undefined
+
+preconditions:
+  - assert Tool( 'python3' )
+  - assert File( 'summarize_flow.py' )
+
+postconditions:
+  - assert File( 'outputs/flow-summary.json' )
+  - assert File( 'outputs/flow-summary.txt' )
+  - assert File( 'outputs/flow-summary.tcl' )

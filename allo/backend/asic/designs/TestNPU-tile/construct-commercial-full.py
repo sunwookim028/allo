@@ -35,7 +35,7 @@ def construct():
     'saif_instance'       : 'ComputeTileTb/compute_tile_inst',
     # Synthesis
     # Flatten effort 0 is strict hierarchy, 3 is full flattening
-    'flatten_effort'      : 0,
+    'flatten_effort'      : 3,
     'topographical'       : False,
     # Postroute timing target slack
     'setup_target_slack'  : 0.000,
@@ -59,6 +59,11 @@ def construct():
     'analytical_delay' : True,
     #'use_sram_cache' : True,
     #'sram_cache_path': 'srams',
+    'consume_upstream_testbench' : True,
+    'testbench_top'       : 'ComputeTileTb',
+    'dut_instance'        : 'compute_tile_inst',
+    'activity_source'     : 'bagl_vcd',
+    'pass_marker'         : 'PASS',
   }
 
   #-----------------------------------------------------------------------
@@ -76,66 +81,53 @@ def construct():
   adk = g.get_adk_node()
 
   testbench      = Node( this_dir + '/testbench'   )
+  testbench_collect = Node( os.path.join(nodes_dir, 'testbench-collector')        )
   constraints    = Node( this_dir + '/constraints' )
 
-  info           = Node( 'info',                            default=True          )
   openram        = Node( os.path.join(nodes_dir, 'openram-sram-generation')       )
   sv2v           = Node( os.path.join(nodes_dir, 'sv2v-design-collector')         )
   synth          = Node( os.path.join(nodes_dir, 'synopsys-dc-synthesis')         )
-  iflow          = Node( os.path.join(nodes_dir, 'cadence-innovus-flowsetup')     )
-  init           = Node( os.path.join(nodes_dir, 'cadence-innovus-init')          )
-  power          = Node( os.path.join(nodes_dir, 'cadence-innovus-power')         )
-  place          = Node( os.path.join(nodes_dir, 'cadence-innovus-place')         )
-  cts            = Node( os.path.join(nodes_dir, 'cadence-innovus-cts')           )
-  postcts_hold   = Node( os.path.join(nodes_dir, 'cadence-innovus-postcts_hold')  )
-  route          = Node( os.path.join(nodes_dir, 'cadence-innovus-route')         )
-  postroute_hold = Node( os.path.join(nodes_dir, 'cadence-innovus-postroute_hold'))
-  signoff        = Node( os.path.join(nodes_dir, 'cadence-innovus-signoff')       )
+  pnr            = Node( os.path.join(nodes_dir, 'cadence-innovus-pnr')           )
   pt_signoff     = Node( os.path.join(nodes_dir, 'synopsys-pt-timing-signoff')    )
   genlibdb       = Node( os.path.join(nodes_dir, 'synopsys-ptpx-genlibdb')        )
   gdsmerge       = Node( os.path.join(nodes_dir, 'mentor-calibre-gdsmerge')       )
   drc            = Node( os.path.join(nodes_dir, 'mentor-calibre-drc')            )
   lvs            = Node( os.path.join(nodes_dir, 'mentor-calibre-lvs')            ) 
-  vcs_sim        = Node( os.path.join(nodes_dir, 'synopsys-vcs-sim-old')          )
+  utilities      = Node( os.path.join(nodes_dir, 'asic-flow-utilities')            )
+  rtl_sim        = Node( os.path.join(nodes_dir, 'commercial-rtl-sim')             )
+  ffgl_sim       = Node( os.path.join(nodes_dir, 'commercial-ffgl-sim')            )
+  bagl_sim       = Node( os.path.join(nodes_dir, 'commercial-bagl-sim')            )
   power_est      = Node( os.path.join(nodes_dir, 'synopsys-pt-power')             )
+  summary        = Node( os.path.join(nodes_dir, 'asic-flow-summary')              )
+  finalize       = Node( os.path.join(nodes_dir, 'asic-flow-finalize')             )
 
   #-----------------------------------------------------------------------
   # Modify Nodes
   #-----------------------------------------------------------------------
 
-  vcs_sim.extend_inputs( ['test_vectors.txt'] )
-  vcs_sim.update_params( testbench.params() )
-  # Pass/fail GLS should not dump the complete post-route gate netlist. The
-  # testbench also leaves VPD/memory dumping off; enable a focused dump only
-  # for a dedicated debug run.
-  vcs_sim.update_params( {'waveform': False} )
-
   #-----------------------------------------------------------------------
   # Graph -- Add nodes
   #-----------------------------------------------------------------------
 
-  g.add_node( info              )
   g.add_node( sv2v              )
   g.add_node( testbench         )
   g.add_node( openram           )
   g.add_node( constraints       )
   g.add_node( synth             )
-  g.add_node( iflow             )
-  g.add_node( init              )
-  g.add_node( power             )
-  g.add_node( place             )
-  g.add_node( cts               )
-  g.add_node( postcts_hold      )
-  g.add_node( route             )
-  g.add_node( postroute_hold    )
-  g.add_node( signoff           )
+  g.add_node( pnr               )
   g.add_node( gdsmerge          )
   g.add_node( drc               )
   g.add_node( lvs               )
-  g.add_node( vcs_sim           )
+  g.add_node( testbench_collect )
+  g.add_node( utilities         )
+  g.add_node( rtl_sim           )
+  g.add_node( ffgl_sim          )
+  g.add_node( bagl_sim          )
   g.add_node( pt_signoff        )
   g.add_node( power_est         )
   g.add_node( genlibdb          )
+  g.add_node( summary           )
+  g.add_node( finalize          )
 
   #-----------------------------------------------------------------------
   # Graph -- Add edges
@@ -143,79 +135,43 @@ def construct():
 
   # Connect by name
 
-  g.connect_by_name( adk,            synth          )
-  g.connect_by_name( adk,            iflow          )
-  g.connect_by_name( adk,            init           )
-  g.connect_by_name( adk,            power          )
-  g.connect_by_name( adk,            place          )
-  g.connect_by_name( adk,            cts            )
-  g.connect_by_name( adk,            postcts_hold   )
-  g.connect_by_name( adk,            route          )
-  g.connect_by_name( adk,            postroute_hold )
-  g.connect_by_name( adk,            signoff        )
-  g.connect_by_name( adk,            pt_signoff     )
-  g.connect_by_name( adk,            gdsmerge       )
-  g.connect_by_name( adk,            drc            )
-  g.connect_by_name( adk,            lvs            )
-  g.connect_by_name( adk,            genlibdb       )
-
-  g.connect_by_name( openram,        synth )
-  g.connect_by_name( openram,        iflow )
-  g.connect_by_name( openram,        init )
-  g.connect_by_name( openram,        place )
-  g.connect_by_name( openram,        cts )
-  g.connect_by_name( openram,        route )
-  g.connect_by_name( openram,        postroute_hold )
-  g.connect_by_name( openram,        signoff )
-  g.connect_by_name( openram,        pt_signoff )
-  g.connect_by_name( openram,        genlibdb )
-  g.connect_by_name( openram,        gdsmerge )
-  g.connect_by_name( openram,        lvs )
-  g.connect_by_name( openram,        vcs_sim        )
-  g.connect_by_name( openram,        power_est      )
-
+  for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, drc, lvs,
+               ffgl_sim, bagl_sim, power_est]:
+    g.connect_by_name( adk, node )
+  for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, lvs,
+               rtl_sim, ffgl_sim, bagl_sim, power_est]:
+    g.connect_by_name( openram, node )
   g.connect_by_name( sv2v,           synth          )
+  g.connect_by_name( sv2v,           rtl_sim        )
   g.connect_by_name( constraints,    synth          )
-
-  g.connect_by_name( synth,          iflow          )
-  g.connect_by_name( synth,          init           )
-  g.connect_by_name( synth,          power          )
-  g.connect_by_name( synth,          place          )
-  g.connect_by_name( synth,          cts            )
-
-  g.connect_by_name( iflow,          init           )
-  g.connect_by_name( iflow,          power          )
-  g.connect_by_name( iflow,          place          )
-  g.connect_by_name( iflow,          cts            )
-  g.connect_by_name( iflow,          postcts_hold   )
-  g.connect_by_name( iflow,          route          )
-  g.connect_by_name( iflow,          postroute_hold )
-  g.connect_by_name( iflow,          signoff        )
-
-  g.connect_by_name( init,           power          )
-  g.connect_by_name( power,          place          )
-  g.connect_by_name( place,          cts            )
-  g.connect_by_name( cts,            postcts_hold   )
-  g.connect_by_name( postcts_hold,   route          )
-  g.connect_by_name( route,          postroute_hold )
-  g.connect_by_name( postroute_hold, signoff        )
-
-  g.connect_by_name( signoff,        pt_signoff     )
-  g.connect_by_name( signoff,        genlibdb       )
-  g.connect_by_name( signoff,        gdsmerge       )
-  g.connect_by_name( signoff,        drc            )
-  g.connect_by_name( signoff,        lvs            )
-
+  g.connect_by_name( synth,          pnr            )
+  g.connect_by_name( synth,          ffgl_sim       )
+  for node in [pt_signoff, genlibdb, gdsmerge, drc, lvs, bagl_sim, power_est]:
+    g.connect_by_name( pnr, node )
   g.connect_by_name( gdsmerge,       drc            )
   g.connect_by_name( gdsmerge,       lvs            )
-
-  g.connect_by_name( adk,            vcs_sim        )
-  g.connect_by_name( signoff,        vcs_sim        )
-  g.connect_by_name( testbench,      vcs_sim        )
-
-  g.connect_by_name( adk,            power_est      )
-  g.connect_by_name( signoff,        power_est      )
-  g.connect_by_name( vcs_sim,        power_est      )
+  g.connect_by_name( testbench,      testbench_collect )
+  for node in [rtl_sim, ffgl_sim, bagl_sim, power_est]:
+    g.connect_by_name( testbench_collect, node )
+  for node in [rtl_sim, ffgl_sim, bagl_sim, lvs]:
+    g.connect_by_name( utilities, node )
+  g.connect_by_name( bagl_sim,       power_est      )
+  for source, output, target in [
+    (synth, 'synthesis-metrics.json', 'synthesis-metrics.json'),
+    (pnr, 'pnr-metrics.json', 'pnr-metrics.json'),
+    (pt_signoff, 'timing-metrics.json', 'timing-metrics.json'),
+    (gdsmerge, 'gdsmerge-metrics.json', 'gdsmerge-metrics.json'),
+    (drc, 'drc-metrics.json', 'drc-metrics.json'),
+    (drc, 'drc-policy.json', 'drc-policy.json'),
+    (lvs, 'lvs-metrics.json', 'lvs-metrics.json'),
+    (power_est, 'power.rpt', 'power.rpt'),
+    (power_est, 'activity-source.json', 'activity-source.json'),
+    (rtl_sim, 'simulation-report.json', 'rtl-simulation-report.json'),
+    (ffgl_sim, 'simulation-report.json', 'ffgl-simulation-report.json'),
+    (bagl_sim, 'simulation-report.json', 'bagl-simulation-report.json'),
+  ]:
+    g.connect(source.o(output), summary.i(target))
+  g.connect_by_name( summary,         finalize       )
 
   #-----------------------------------------------------------------------
   # Parameterize

@@ -18,21 +18,15 @@ inputs:
 outputs:
   - drc.results
   - drc.summary
+  - drc-policy.json
+  - drc-metrics.json
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
-  # Set some variables for substitution into the template runset
-  - if [ -f "inputs/adk/{drc_env_setup}" ]; then source inputs/adk/{drc_env_setup}; fi
-  # Substitute variables into the template runset
-  - envsubst < drc.runset.template > drc.runset
-  # Run DRC
-  - calibre -gui -drc -batch -runset drc.runset
-  - mkdir -p outputs && cd outputs
-  - ln -sf ../drc.results
-  - ln -sf ../drc.summary
+  - bash run.sh
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -47,6 +41,8 @@ parameters:
   # as environment variables, source this script
   # to set environment variables before running.
   drc_env_setup: undefined
+  antenna_check_policy: report
+  drc_check_policy: error
 
 #-------------------------------------------------------------------------
 # Debug
@@ -66,5 +62,10 @@ preconditions:
   - assert Tool( 'calibre' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/design_merged.gds' )
-
-
+  - assert File( 'run.sh' )
+  - assert File( 'parse_drc.py' )
+postconditions:
+  - assert File( 'outputs/drc.results' )
+  - assert File( 'outputs/drc.summary' )
+  - assert File( 'outputs/drc-policy.json' )
+  - assert File( 'outputs/drc-metrics.json' )

@@ -23,10 +23,9 @@ set ptpx_design_name        		$::env(design_name)
 #   export strip_path = "th/dut"
 #
 
-set ptpx_strip_path         		$::env(saif_instance)
+source activity-config.tcl
 
 set ptpx_analysis_mode				$::env(analysis_mode)
-set ptpx_zero_delay_simulation		$::env(zero_delay_simulation)
 set ptpx_op_condition				$::env(lib_op_condition)
 
 #-------------------------------------------------------------------------

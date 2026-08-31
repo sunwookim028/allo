@@ -14,6 +14,9 @@ name: synopsys-dc-synthesis
 inputs:
   - adk
   - design.v
+  - rtl-source-package
+  - rtl-sources.f
+  - rtl-sources.tcl
   - constraints.tcl
   - run.saif
   - design.upf
@@ -25,13 +28,16 @@ outputs:
   - design.namemap
   - design.svf
   - design.upf
+  - design.spef.gz
+  - synthesis-metrics.json
+  - synthesis-reports
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
-  - bash run.sh
+  - bash timed-run.sh
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -43,7 +49,8 @@ parameters:
   # Path to the design instance in run.saif (e.g., tb/dut)
   saif_instance: undefined
   # Flatten effort 0 is strict hierarchy, 3 is full flattening
-  flatten_effort: 0
+  # This is the canonical flat flow: allow full cross-boundary optimization.
+  flatten_effort: 3
   topographical: True
   # Multithreading available to the tool
   nthreads: 16
@@ -55,7 +62,7 @@ parameters:
   # Uniquify by prefixing every module in the design with the design name.
   # This is useful for hierarchical LVS when multiple blocks use modules
   # with the same name but different definitions.
-  uniquify_with_design_name: True
+  uniquify_with_design_name: False
   # Enable supression of selected warnings/messages. 
   suppress_msg: False
   # List of suppressed messages. Select carefully
@@ -101,16 +108,30 @@ preconditions:
   - assert Tool( 'dc_shell-xg-t' )           # tool check
   - assert File( 'inputs/adk' )              # must exist
   - assert File( 'inputs/design.v' )         # must exist
+  - >-
+    assert not File( 'inputs/rtl-sources.f' ) or
+    (File( 'inputs/rtl-source-package' ) and File( 'inputs/rtl-sources.tcl' ))
   - assert File( 'inputs/constraints.tcl' )  # must exist
+  - assert File( 'timed-run.sh' )
 
 postconditions:
 
   - assert File( 'outputs/design.v' )        # must exist
   - assert File( 'outputs/design.sdc' )      # must exist
+  - assert File( 'outputs/design.spef.gz' )
+  - assert File( 'outputs/synthesis-metrics.json' )
+  - assert File( 'outputs/synthesis-reports' )
 
   # Basic error checking
 
-  - assert 'error:' not in File( 'logs/dc.log' )
+  - |
+    from pathlib import Path
+    log_lines = Path('logs/dc.log').read_text(errors='replace').splitlines()
+    fatal_lines = [
+        line for line in log_lines
+        if line.lstrip().startswith(('Error:', 'Fatal:'))
+    ]
+    assert not fatal_lines, 'DC errors:\n' + '\n'.join(fatal_lines)
   - assert 'Unresolved references' not in File( 'logs/dc.log' )
   - assert 'Unable to resolve' not in File( 'logs/dc.log' )
   - assert 'Presto compilation terminated' not in File( 'logs/dc.log' )
@@ -176,5 +197,3 @@ postconditions:
         f"WARNING: <50% of registers were clock-gated ",
         flush=True,
       )
-
-

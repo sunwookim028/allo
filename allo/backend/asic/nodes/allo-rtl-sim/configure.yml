@@ -8,6 +8,7 @@ inputs:
   - workload-vectors
   - testbench-contract.json
   - srams
+  - cleanup-node.py
 
 outputs:
   - design.v
@@ -15,14 +16,17 @@ outputs:
   - compile.log
   - simulation.log
   - simulation-report.json
+  - rtl-sim-cleanup-metrics.json
 
 commands:
   - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-rtl-sim --output rtl-sim-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
 
 parameters:
   backend: vitis
   testbench_name: allo_generated_testbench
   waveform: True
+  cleanup_enabled: True
 
 preconditions:
   - assert Tool( 'vcs' )
@@ -51,6 +55,7 @@ postconditions:
   - assert File( 'outputs/compile.log' )
   - assert File( 'outputs/simulation.log' )
   - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/rtl-sim-cleanup-metrics.json' )
   - |
       import json
       from pathlib import Path

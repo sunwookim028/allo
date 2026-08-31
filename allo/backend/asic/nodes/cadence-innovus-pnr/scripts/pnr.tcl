@@ -24,6 +24,16 @@ file mkdir $reports_dir
 file mkdir $checkpoints_dir
 file mkdir $checkpoints_dir/LEC
 
+set pnr_stage_report [open reports/pnr-stage-times.rpt w]
+close $pnr_stage_report
+proc record_pnr_stage {name started_ms} {
+  set elapsed [expr {([clock milliseconds] - $started_ms) / 1000.0}]
+  set stream [open reports/pnr-stage-times.rpt a]
+  puts $stream "$name $elapsed"
+  close $stream
+}
+set pnr_stage_started [clock milliseconds]
+
 setDistributeHost -local
 
 source inputs/adk/adk.tcl
@@ -38,6 +48,9 @@ if {![info exists env(process_node)]} {
   } else {
     set env(process_node) 45
   }
+}
+if {![info exists env(gds_stream_out_units)]} {
+  set env(gds_stream_out_units) 1000
 }
 if {![info exists env(max_route_layer)]} {
   if {[info exists ADK_MAX_ROUTING_LAYER_INNOVUS]} {
@@ -115,11 +128,20 @@ if {![info exists env(useful_skew)]} {
 if {![info exists env(useful_skew_ccopt_effort)]} {
   set env(useful_skew_ccopt_effort) standard
 }
+if {![info exists env(ccopt_target_max_transition)]} {
+  set env(ccopt_target_max_transition) 0.0
+}
+if {![string is double -strict $env(ccopt_target_max_transition)] || $env(ccopt_target_max_transition) < 0.0} {
+  error "ccopt_target_max_transition must be a nonnegative number in ns"
+}
 if {![info exists env(cell_padding)]} {
   set env(cell_padding) 0
 }
 if {![info exists env(hold_target_slack)]} {
   set env(hold_target_slack) 0.05
+}
+if {![info exists env(hold_optimization_target_slack)]} {
+  set env(hold_optimization_target_slack) 0.020
 }
 if {![info exists env(setup_target_slack)]} {
   set env(setup_target_slack) 0.0
@@ -362,6 +384,14 @@ if {$env(well_tap_cell) ne ""} {
     -cellInterval $env(well_tap_interval)
 
   verifyWellTap -cells [list $env(well_tap_cell)] \
+    -report reports/welltap-precleanup.rpt \
+    -rule [expr {$env(well_tap_interval)/2}]
+  exec python3 scripts/plan-welltap-cuts.py \
+    reports/welltap-precleanup.rpt \
+    reports/welltap-adaptive-cuts.tcl \
+    reports/welltap-adaptive-cuts.rpt
+  source reports/welltap-adaptive-cuts.tcl
+  verifyWellTap -cells [list $env(well_tap_cell)] \
     -report reports/welltap.rpt \
     -rule [expr {$env(well_tap_interval)/2}]
 }
@@ -588,6 +618,9 @@ maybe_stop_after power
 # Placement
 #-------------------------------------------------------------------------
 
+record_pnr_stage initialization_floorplan_power $pnr_stage_started
+set pnr_stage_started [clock milliseconds]
+
 if {$::env(useful_skew)} {
   setOptMode -usefulSkew       true
   setOptMode -usefulSkewPreCTS true
@@ -641,11 +674,14 @@ checkPlace -macroBlockage -verbose > reports/place.checkPlace.macroBlockage.afte
 reportDensityMap > reports/place.density.rpt
 
 report_metrics place
+record_pnr_stage placement $pnr_stage_started
 maybe_stop_after place
 
 #-------------------------------------------------------------------------
 # CTS
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 set_ccopt_property clone_clock_gates true
 set_ccopt_property clone_clock_logic true
@@ -653,6 +689,10 @@ set_ccopt_property ccopt_merge_clock_gates true
 set_ccopt_property ccopt_merge_clock_logic true
 set_ccopt_property cts_merge_clock_gates true
 set_ccopt_property cts_merge_clock_logic true
+
+if {$::env(ccopt_target_max_transition) > 0.0} {
+  set_ccopt_property target_max_trans $::env(ccopt_target_max_transition)
+}
 
 if {$::env(useful_skew)} {
   setOptMode -usefulSkew      true
@@ -697,22 +737,29 @@ report_ccopt_skew_groups -filename reports/cts.skew_groups.rpt
 report_ccopt_clock_tree_structure -show_sinks -expand_generated_clock_trees independently -file reports/cts.structure.rpt
 
 report_metrics cts
+record_pnr_stage cts $pnr_stage_started
 maybe_stop_after cts
 
 #-------------------------------------------------------------------------
 # Post-CTS Hold
 #-------------------------------------------------------------------------
 
+set pnr_stage_started [clock milliseconds]
+
 setOptMode -fixHoldAllowOverlap TRUE
 setOptMode -fixHoldAllowSetupTnsDegrade true
+setOptMode -holdTargetSlack $::env(hold_optimization_target_slack)
 
 optDesign -postCTS -hold -outDir reports -prefix postcts_hold
 
 report_metrics postcts_hold
+record_pnr_stage post_cts_optimization $pnr_stage_started
 
 #-------------------------------------------------------------------------
 # Route
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 setAnalysisMode -cppr both
 setDelayCalMode -siAware true -engine aae
@@ -734,9 +781,6 @@ if {[info exists ADK_FILLER_CELLS] && $ADK_FILLER_CELLS ne ""} {
   set filler_cells "FILLCELL_X32 FILLCELL_X16 FILLCELL_X8 FILLCELL_X4 FILLCELL_X2 FILLCELL_X1"
 }
 
-setFillerMode -core $filler_cells -corePrefix FILL
-addFiller
-
 routeDesign -placementCheck
 
 setNanoRouteMode -droutePostRouteSpreadWire true -routeWithTimingDriven false
@@ -746,15 +790,18 @@ setNanoRouteMode -droutePostRouteSpreadWire false
 setExtractRCMode -engine postRoute -effortLevel low
 
 report_metrics route
+record_pnr_stage routing $pnr_stage_started
 maybe_stop_after route
 
 #-------------------------------------------------------------------------
 # Postroute Optimization
 #-------------------------------------------------------------------------
 
+set pnr_stage_started [clock milliseconds]
+
 setOptMode -verbose true
-setOptMode -usefulSkewPostRoute true
-setOptMode -holdTargetSlack  $::env(hold_target_slack)
+setOptMode -usefulSkewPostRoute $::env(useful_skew)
+setOptMode -holdTargetSlack  $::env(hold_optimization_target_slack)
 setOptMode -setupTargetSlack $::env(setup_target_slack)
 
 if { $::env(signoff_engine) } {
@@ -774,14 +821,21 @@ optDesign -postRoute -outDir reports -prefix postroute_setup -setup
 optDesign -postRoute -outDir reports -prefix postroute_drv -drv
 optDesign -postRoute -outDir reports -prefix postroute_hold -hold
 
+setFillerMode -core $filler_cells -corePrefix FILL
+addFiller
+ecoRoute -target
+
 if {$need_restore_multi == true} {
   setDistributeHost -local
   setMultiCpuUsage -localCpu $ncpu
 }
+record_pnr_stage post_route_optimization $pnr_stage_started
 
 #-------------------------------------------------------------------------
 # Signoff
 #-------------------------------------------------------------------------
+
+set pnr_stage_started [clock milliseconds]
 
 update_names -nocase
 
@@ -821,7 +875,7 @@ timeDesign -prefix signoff \
 if { [info exists ADK_DBU_PRECISION] } {
   set stream_out_units $ADK_DBU_PRECISION
 } else {
-  set stream_out_units 1000
+  set stream_out_units $env(gds_stream_out_units)
 }
 
 streamOut $results_dir/$design_name.gds.gz \
@@ -841,12 +895,42 @@ streamOut $results_dir/$design_name-merged.gds \
   -uniquifyCellNames \
   -merge $merge_files
 
+# Preserve a recoverable routed database even if verification fails.
+save_design_checkpoint
 summaryReport -noHtml -outfile reports/signoff.summaryReport.rpt
 verifyConnectivity -noAntenna
-verify_drc
-verifyProcessAntenna
+redirect -file reports/innovus-drc.rpt { verify_drc }
 
-write_sdf $results_dir/$design_name.sdf
+set antenna_policy $::env(antenna_check_policy)
+if {[lsearch -exact {error report off} $antenna_policy] < 0} {
+  error "Unsupported antenna_check_policy '$antenna_policy'; expected error, report, or off"
+}
+if {$antenna_policy eq "off"} {
+  set stream [open reports/innovus-antenna.rpt w]
+  puts $stream "Antenna verification skipped by antenna_check_policy=off"
+  close $stream
+} else {
+  set status [catch {redirect -file reports/innovus-antenna.rpt { verifyProcessAntenna }} message]
+  set native_report "$design_name.antenna.rpt"
+  if {$status == 0 && [file exists $native_report]} {
+    file copy -force $native_report reports/innovus-antenna.rpt
+  }
+  if {$status != 0} {
+    set stream [open reports/innovus-antenna.rpt a]
+    puts $stream "ERROR: verifyProcessAntenna failed: $message"
+    close $stream
+    if {$antenna_policy eq "error"} { error $message }
+  } elseif {$antenna_policy eq "error"} {
+    set stream [open reports/innovus-antenna.rpt r]
+    set text [read $stream]
+    close $stream
+    if {![regexp -nocase {Verification Complete\s*:\s*0\s+(Viols|Violations)} $text]} {
+      error "Innovus antenna verification is not explicitly clean"
+    }
+  }
+}
+
+write_sdf -recompute_delay_calc $results_dir/$design_name.sdf
 writeTimingCon $results_dir/$design_name.pt.sdc
 sed -i "s/^current_design/\#current_design/" $results_dir/$design_name.pt.sdc
 sed -i "s/get_design.*$/current_design\]/" $results_dir/$design_name.pt.sdc
@@ -889,3 +973,4 @@ report_area -verbose > reports/signoff.area.rpt
 
 report_metrics signoff
 save_design_checkpoint
+record_pnr_stage signoff_and_output $pnr_stage_started

@@ -238,6 +238,10 @@ module ComputeTileTb;
   end
 
   initial begin
+    if ($test$plusargs("ASIC_DUMP_VCD")) begin
+      $dumpfile("outputs/run.vcd");
+      $dumpvars(0, ComputeTileTb);
+    end
     #(`FINISH_TIME);
     $error("ComputeTileTb timed out");
     $finish(2);

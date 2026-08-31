@@ -15,22 +15,22 @@ link_design > ${ptpx_logs_dir}/${ptpx_design_name}.link.rpt
 
 # Namemapping for RTL switching activities
 
-if { $ptpx_rtl_mapping == True } {
+if { $ptpx_activity_is_rtl == True } {
 	echo "Sourcing RTL name mapping file for RTL switching activity annotation."
 	source $ptpx_namemap -echo > ${ptpx_logs_dir}/${ptpx_design_name}.namemap.rpt
 }
 
 # Read in switching activity
 
-if {$ptpx_analysis_mode == "time_based" || $ptpx_averaged_use_activity == "vcd"} {
+if {$ptpx_activity_format == "vcd"} {
 	report_activity_file_check $ptpx_vcd -strip_path $ptpx_strip_path \
 		> $ptpx_reports_dir/$ptpx_design_name.activity.pre.rpt
 
-	if { $ptpx_rtl_mapping == True } {
+	if { $ptpx_activity_is_rtl == True } {
 		echo "Read VCD activity annotation file from RTL simulation."
 		read_vcd -strip_path $ptpx_strip_path -rtl $ptpx_vcd 
 	} else {
-		if {$ptpx_zero_delay_simulation == True} {
+		if {$ptpx_activity_is_zero_delay == True} {
 			echo "Read VCD activity annotation file from zero-delay simulation."
 			read_vcd -strip_path $ptpx_strip_path -zero_delay $ptpx_vcd 
 		} else {

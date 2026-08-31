@@ -17,55 +17,22 @@ inputs:
   - design.lvs.v
   - rules.svrf
   - srams
+  - cleanup-node.py
 
 outputs:
   - lvs.report
   - design.schematic.spi
   - design_merged.lvs.v
+  - lvs-metrics.json
+  - lvs-cleanup-metrics.json
 
 #-------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------
 
 commands:
-  # Set some variables for substitution into the template runset
-  - if [ -z "$lvs_hcells_file" ]; then export lvs_use_hcells=0; else export lvs_use_hcells=1; fi
-  - if [ -z "$lvs_connect_names" ]; then export lvs_connect_names_state=NONE; else export lvs_connect_names_state=SOME; fi
-  # Set up spice includes from the adk, only including file extensions that exist
-  - export lvs_spice_include=""
-  - if ls inputs/adk/*.cdl 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/adk/*.cdl";
-    fi
-  - if ls inputs/adk/*.spi 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/adk/*.spi";
-    fi
-  - if ls inputs/adk/*.sp 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/adk/*.sp";
-    fi
-  - if ls inputs/adk/*source.added 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/adk/*source.added";
-    fi
-  # add sram files if they exist
-  - if ls inputs/srams/*/*.cdl 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/srams/*/*.cdl";
-    fi
-  - if ls inputs/srams/*/*.spi 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/srams/*/*.spi";
-    fi
-  - if ls inputs/srams/*/*.sp 1> /dev/null 2>&1; then
-      export lvs_spice_include="${{lvs_spice_include}} inputs/srams/*/*.sp";
-    fi
-  # Substitute variables into the template runset
-  - envsubst < lvs.runset.template > lvs.runset
-  # Misc file prep
-  - if [ ! -f inputs/*.svrf ]; then touch inputs/rules.svrf; fi
-  - cat inputs/*.lvs.v > merged.lvs.v
-  # Run LVS
-  - calibre -gui -lvs -batch -runset lvs.runset
-  - mkdir -p outputs && cd outputs
-  - ln -sf ../lvs.report
-  - ln -sf ../_merged.lvs.v.sp design.schematic.spi
-  - ln -sf ../merged.lvs.v design_merged.lvs.v
+  - bash run.sh
+  - python3 inputs/cleanup-node.py --node mentor-calibre-lvs --output lvs-cleanup-metrics.json svdb
 
 #-------------------------------------------------------------------------
 # Parameters
@@ -108,6 +75,10 @@ parameters:
   # our case) needs a different view b/c it uses LVT cells etc.
   #
   lvs_extra_spice_include: ""
+  lvs_power_name: VDD
+  lvs_ground_name: VSS
+  lvs_check_policy: error
+  cleanup_enabled: True
 
 #-------------------------------------------------------------------------
 # Debug
@@ -125,11 +96,16 @@ debug:
 preconditions:
 
   - assert Tool( 'calibre' )
+  - assert Tool( 'v2lvs' )
   - assert File( 'inputs/adk' )
   - assert File( 'inputs/design_merged.gds' )
   - assert File( 'inputs/design.lvs.v' )
+  - assert File( 'inputs/cleanup-node.py' )
 
 postconditions:
 
-  - "assert '#     INCORRECT     #' not in File( 'lvs.report' )"
-
+  - assert File( 'outputs/lvs.report' )
+  - assert File( 'outputs/design.schematic.spi' )
+  - assert File( 'outputs/design_merged.lvs.v' )
+  - assert File( 'outputs/lvs-metrics.json' )
+  - assert File( 'outputs/lvs-cleanup-metrics.json' )

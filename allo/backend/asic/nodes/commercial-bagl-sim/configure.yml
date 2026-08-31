@@ -1,0 +1,56 @@
+name: commercial-bagl-sim
+
+inputs:
+  - adk
+  - design.vcs.v
+  - design.sdf
+  - testbench
+  - testbench-contract.json
+  - srams
+  - run-commercial-simulation.py
+  - cleanup-node.py
+
+outputs:
+  - run.vcd
+  - compile.log
+  - simulation.log
+  - simulation-report.json
+  - bagl-cleanup-metrics.json
+
+commands:
+  - python3 inputs/run-commercial-simulation.py
+  - python3 inputs/cleanup-node.py --node commercial-bagl-sim --output bagl-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
+
+parameters:
+  simulation_mode: bagl
+  waveform: True
+  xprop_enabled: True
+  cleanup_enabled: True
+  sdf_corner: typ
+  bagl_failure_policy: error
+  sdf_warning_policy: report
+  sdf_unmatched_timingcheck_policy: report
+  sdf_unmatched_iopath_policy: report
+  sdf_uphier_interconnect_policy: report
+
+preconditions:
+  - assert Tool( 'vcs' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.vcs.v' )
+  - assert File( 'inputs/design.sdf' )
+  - assert File( 'inputs/testbench/testbench.f' )
+  - assert File( 'inputs/testbench-contract.json' )
+  - assert File( 'inputs/run-commercial-simulation.py' )
+  - assert File( 'inputs/cleanup-node.py' )
+
+postconditions:
+  - assert File( 'outputs/run.vcd' )
+  - assert File( 'outputs/compile.log' )
+  - assert File( 'outputs/simulation.log' )
+  - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/bagl-cleanup-metrics.json' )
+  - >-
+    assert '"mode": "bagl"' in File( 'outputs/simulation-report.json' )
+  - >-
+    assert 'bagl_failure_policy: report' in File( 'configure.yml' ) or
+    '"status": "passed"' in File( 'outputs/simulation-report.json' )

@@ -49,14 +49,18 @@ module GcdUnitTb;
       $display("got c = %d, expected c = %d", c_w, test_vectors[c_addr_r][48 - 1 : 32]);
       assert(c_w == test_vectors[c_addr_r][48 - 1 : 32]);
       c_addr_r <= c_addr_r + 1;
-      if (c_addr_r == `NUM_TEST_VECTORS - 1) $finish;
+      if (c_addr_r == `NUM_TEST_VECTORS - 1) begin
+        $display("GcdUnitTb PASS");
+        $finish;
+      end
     end
   end
 
   initial begin
-    $vcdplusfile("dump.vcd");
-    $vcdplusmemon();
-    $vcdpluson(0, GcdUnitTb);
+    if ($test$plusargs("ASIC_DUMP_VCD")) begin
+      $dumpfile("outputs/run.vcd");
+      $dumpvars(0, GcdUnitTb);
+    end
     #(`FINISH_TIME);
     $finish(2);
   end

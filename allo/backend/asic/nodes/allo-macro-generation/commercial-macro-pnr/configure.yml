@@ -4,14 +4,17 @@ inputs:
   - adk
   - synthesis-batch
   - srams
+  - cleanup-node.py
 
 outputs:
   - pnr-batch
   - pnr-status.json
   - macro-pnr-metrics.json
+  - macro-pnr-cleanup-metrics.json
 
 commands:
   - python batch_pnr.py
+  - python3 inputs/cleanup-node.py --node commercial-macro-pnr --output macro-pnr-cleanup-metrics.json work
 
 parameters:
   enable_gui: False
@@ -106,6 +109,7 @@ parameters:
   adk_typical_lib: inputs/adk/stdcells.lib
   adk_bc_lib: inputs/adk/stdcells-bc.lib
   adk_wc_lib: inputs/adk/stdcells-wc.lib
+  cleanup_enabled: True
 
 preconditions:
   - assert File( 'inputs/adk' )
@@ -120,3 +124,4 @@ postconditions:
   - assert File( 'outputs/pnr-batch' )
   - assert File( 'outputs/pnr-status.json' )
   - assert File( 'outputs/macro-pnr-metrics.json' )
+  - assert File( 'outputs/macro-pnr-cleanup-metrics.json' )

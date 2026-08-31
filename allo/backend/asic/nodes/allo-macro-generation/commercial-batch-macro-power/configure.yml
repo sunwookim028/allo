@@ -6,18 +6,22 @@ inputs:
   - macro-activity
   - power.rpt
   - srams
+  - cleanup-node.py
 
 outputs:
   - macro-power-reports
   - macro-power-summary.json
   - aggregate-power.rpt
+  - macro-power-cleanup-metrics.json
 
 commands:
   - python3 batch_macro_power.py
+  - python3 inputs/cleanup-node.py --node commercial-batch-macro-power --output macro-power-cleanup-metrics.json work
 
 parameters:
   macro_power_max_workers: 4
   lib_op_condition: undefined
+  cleanup_enabled: True
 
 preconditions:
   - assert Tool( 'python3' )
@@ -35,6 +39,7 @@ postconditions:
   - assert File( 'outputs/macro-power-reports' )
   - assert File( 'outputs/macro-power-summary.json' )
   - assert File( 'outputs/aggregate-power.rpt' )
+  - assert File( 'outputs/macro-power-cleanup-metrics.json' )
   - |
       import json
       from pathlib import Path
