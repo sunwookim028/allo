@@ -29,7 +29,7 @@ that actually run on an FPGA -- lives in ``microarch.py``.
 
 from allo.exp.dsa import primitive
 from allo.exp.dsa.access import contiguous, view
-from allo.exp.dsa.core import ISA
+from allo.exp.dsa.core import ISA, scratch
 from allo.lang.core import f32
 
 tpu = ISA("CornellTPU")
@@ -167,6 +167,9 @@ def vabs(I):
 #     are expanded to a batched 1x4x4 tile (matching TOSA's batched matmul); the
 #     weight transpose lives in the compute region (primitive.transpose), so the access
 #     patterns are plain value-transparent views. ---
+MATMUL_TILE = 4
+
+
 @tpu.instruction(src=[bram, bram], dst=bram)
 def matmul(I):
     @I.access
@@ -180,3 +183,105 @@ def matmul(I):
     @I.compute
     def _(w, x, z):
         return primitive.matmul(x, primitive.transpose(w, [0, 2, 1]))
+
+
+@tpu.instruction(src=[bram, bram, bram], dst=bram)
+def matmul_acc(I):
+    """Accumulate one systolic K tile: ``Z += X @ W^T``.
+
+    This is a separate ISA semantic because both the old result and new result
+    are 4x4 tiles. Keeping that tile contract explicit lets the generic DSA
+    allocator preserve one residence across an arbitrary K reduction. The
+    current HLS decoder has only overwrite ``matmul``; implementing this semantic
+    in hardware is the corresponding next ISA/microarchitecture co-design step.
+    """
+
+    @I.access
+    def _(w, x, c, z):
+        return (
+            view(bram, w, (1, MATMUL_TILE, MATMUL_TILE)),
+            view(bram, x, (1, MATMUL_TILE, MATMUL_TILE)),
+            view(bram, c, (1, MATMUL_TILE, MATMUL_TILE)),
+            view(bram, z, (1, MATMUL_TILE, MATMUL_TILE)),
+        )
+
+    @I.compute
+    def _(w, x, c, z):
+        return primitive.add(c, primitive.matmul(x, primitive.transpose(w, [0, 2, 1])))
+
+
+# --- Layer lowering: C[M,N] = A[M,K] @ B[K,N] over the fixed 4x4 systolic
+# array. This is a compiler macro in the Allo ISA spec: ACT expands it into
+# DMA, systolic, and accumulation instructions, then allocates every
+# ``scratch`` tile. B is physically transposed while it is loaded because the
+# systolic array consumes W = B^T.
+@tpu.instruction(
+    src=[dram, dram],
+    dst=dram,
+    cost=lambda M, K, N: (M // MATMUL_TILE)
+    * (N // MATMUL_TILE)
+    * ((K // MATMUL_TILE) * 21 + 4),
+)
+def gemm(I):
+    """Whole standard GEMM, lowered to 4x4 Cornell-TPU instructions.
+
+    The source and result use standard TOSA layout: A[M,K], B[K,N], C[M,N].
+    Divisible shapes are intentional for this first contract; tails require a
+    separately specified padding policy rather than silently reading past a tile.
+    """
+
+    @I.access
+    def _(a, b, c, M, K, N):
+        return (
+            view(dram, a, (1, M, K)),
+            view(dram, b, (1, K, N)),
+            view(dram, c, (1, M, N)),
+        )
+
+    @I.compute
+    def _(a, b, c):
+        return primitive.matmul(a, b)
+
+    @I.expand
+    def _(a, b, c, M, K, N):
+        for extent, name in ((M, "M"), (K, "K"), (N, "N")):
+            assert extent % MATMUL_TILE == 0, (
+                f"gemm: {name}={extent} is not divisible by the "
+                f"{MATMUL_TILE}x{MATMUL_TILE} systolic tile"
+            )
+
+        x_tile, w_tile, z_tile = (
+            scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(3)
+        )
+
+        for m in range(0, M, MATMUL_TILE):
+            for n in range(0, N, MATMUL_TILE):
+                for k in range(0, K, MATMUL_TILE):
+                    # A's tile rows are contiguous in the host layout.
+                    for row in range(MATMUL_TILE):
+                        dma_load(
+                            s=a + (m + row) * K + k,
+                            d=x_tile + row * MATMUL_TILE,
+                            n=MATMUL_TILE,
+                        )
+                    # Transpose B[K,N] while staging it as W[N,K].  Scalar DMA
+                    # is deliberate: it is the existing ISA's general transpose
+                    # primitive, not a hidden compiler-side data reorder.
+                    for row in range(MATMUL_TILE):
+                        for col in range(MATMUL_TILE):
+                            dma_load(
+                                s=b + (k + row) * N + n + col,
+                                d=w_tile + col * MATMUL_TILE + row,
+                                n=1,
+                            )
+                    if k == 0:
+                        matmul(w=w_tile, x=x_tile, z=z_tile)
+                    else:
+                        matmul_acc(w=w_tile, x=x_tile, c=z_tile, z=z_tile)
+                # C's tile rows are likewise scattered with existing linear DMA.
+                for row in range(MATMUL_TILE):
+                    dma_store(
+                        s=z_tile + row * MATMUL_TILE,
+                        d=c + (m + row) * N + n,
+                        n=MATMUL_TILE,
+                    )
