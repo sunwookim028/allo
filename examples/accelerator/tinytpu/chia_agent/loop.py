@@ -69,7 +69,14 @@ def ask(llm: OpenCodeLLM, tool: AlloSpecTool, prompt: str):
 
 
 def run(task: str, max_debug_attempts: int) -> int:
-    ray.init(address="auto", runtime_env={"working_dir": str(AGENT_DIR)})
+    runtime_env = {"working_dir": str(AGENT_DIR)}
+    try:
+        ray.init(address="auto", runtime_env=runtime_env)
+    except ConnectionError:
+        # Some shared hosts immediately tear down ``ray start --head``. Keep the
+        # single-machine demo self-contained by creating the same credential
+        # resource in an in-process local Ray cluster.
+        ray.init(resources={"opencode_creds": 1}, runtime_env=runtime_env)
     tool = AlloSpecTool("tinytpu", str(TINYTPU_DIR), CONDA_EXE)
     try:
         llm = make_llm(tool)
