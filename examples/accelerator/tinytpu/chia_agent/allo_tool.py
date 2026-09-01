@@ -18,6 +18,7 @@ class AlloSpecTool(ChiaTool):
         assert self.spec.is_file(), f"missing ISA specification: {self.spec}"
         self.mcp.add_tool(self.read_spec, name="tinytpu_read_spec")
         self.mcp.add_tool(self.apply_spec_patch, name="tinytpu_apply_spec_patch")
+        self.mcp.add_tool(self.insert_after, name="tinytpu_insert_after")
         self.mcp.add_tool(self.run_compiler_check, name="tinytpu_run_compiler_check")
 
     def read_spec(self) -> str:
@@ -53,6 +54,14 @@ class AlloSpecTool(ChiaTool):
         )
         assert applied.returncode == 0, applied.stdout + applied.stderr
         return "Patch applied to isa.py."
+
+    def insert_after(self, anchor: str, content: str) -> str:
+        """Insert ``content`` after a unique literal anchor in ``isa.py`` only."""
+        source = self.spec.read_text(encoding="utf-8")
+        if source.count(anchor) != 1:
+            return "Rejected: anchor must occur exactly once in isa.py."
+        self.spec.write_text(source.replace(anchor, anchor + content, 1), encoding="utf-8")
+        return "Content inserted into isa.py."
 
     def run_compiler_check(self) -> str:
         """Run TinyTPU's direct-TOSA compiler regression suite in the Allo env."""

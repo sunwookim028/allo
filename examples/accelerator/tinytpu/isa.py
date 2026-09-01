@@ -151,6 +151,16 @@ def vneg(I):
     def _(a, d):
         return primitive.negate(a)
 
+@tpu.instruction(src=vreg, dst=vreg)
+def vabs(I):
+    @I.access
+    def _(a, d):
+        return (contiguous(vreg, a, 1), contiguous(vreg, d, 1))
+
+    @I.compute
+    def _(a, d):
+        return primitive.abs(a)
+
 
 # --- Systolic (MODE 1): Z = X @ W^T over fixed 4x4 tiles. ADDR_A=W, ADDR_B=X,
 #     ADDR_OUT=Z (the assembler order `matmul <w>, <x>, <z>`). The 1-D bram words

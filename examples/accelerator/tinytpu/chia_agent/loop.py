@@ -71,10 +71,15 @@ def run(task: str, max_debug_attempts: int) -> int:
         response = ask(
             llm,
             tool,
-            f"""Implement this ISA-level change:\n\n{task}\n\n"
-            "First inspect isa.py. If a change is needed, submit one unified diff via "
-            "tinytpu_apply_spec_patch, then call tinytpu_run_compiler_check. Report "
-            "the patch and the check result succinctly.""",
+            f"""Implement this ISA-level change:
+
+{task}
+
+First inspect isa.py. If a change is needed, use tinytpu_insert_after rather
+than a unified diff: anchor on the exact text `return primitive.negate(a)` and
+insert the complete vabs definition immediately after it. Then call
+tinytpu_run_compiler_check. Report the change and the check result succinctly.
+""",
         )
         print(response.result)
         for attempt in range(1, max_debug_attempts + 1):

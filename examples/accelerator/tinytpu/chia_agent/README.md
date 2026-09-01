@@ -1,10 +1,10 @@
 # TinyTPU CHIA agent
 
 This is a minimal, host-runnable CHIA loop for ISA-only co-design. Its agent
-can use only three MCP operations: read `isa.py`, patch `isa.py` via a unified
-diff, and run the direct-TOSA compiler check. It cannot edit `microarch.py`,
-compiler code, or tests. The hardware/compiler are therefore fixed contracts,
-as required.
+can use only four MCP operations: read `isa.py`, apply a unified diff to
+`isa.py`, insert text after a unique `isa.py` anchor, and run the direct-TOSA
+compiler check. It cannot edit `microarch.py`, compiler code, or tests. The
+hardware/compiler are therefore fixed contracts, as required.
 
 The host uses `chia_env` (Python 3.10); the check is run by the existing `allo`
 environment through `conda run -n allo`. No Docker is required for the local
