@@ -1,10 +1,12 @@
 # TinyTPU CHIA agent
 
-This is a minimal, host-runnable CHIA loop for ISA-only co-design. Its agent
-can use only four MCP operations: read `isa.py`, apply a unified diff to
-`isa.py`, insert text after a unique `isa.py` anchor, and run the direct-TOSA
-compiler check. It cannot edit `microarch.py`, compiler code, or tests. The
-hardware/compiler are therefore fixed contracts, as required.
+This is a minimal, host-runnable CHIA loop for TinyTPU co-design. Its agent can
+read and edit only `isa.py` and `microarch.py`; it cannot alter generic compiler
+code, runtime, tests, or benchmarks. `microarch.py` stays explicitly composed
+from named Allo-HLS blocks: `dma_load`/`dma_store`, `vload`/`vstore`, `vpu`,
+`mxu`, and the top-level decoder/composition. The agent may connect or refine
+those blocks (or add one focused `@tpu.unit`) while keeping ISA, decoder, and
+schedules aligned.
 
 The host uses `chia_env` (Python 3.10); the check is run by the existing `allo`
 environment through `conda run -n allo`. No Docker is required for the local
@@ -26,16 +28,18 @@ export TINYTPU_CONDA="$(command -v conda)"
 ray stop
 ray start --head --resources='{"opencode_creds": 1}' --include-dashboard=false
 python chia_agent/loop.py \
-  --task 'Add the ISA-level vabs instruction for static-shape TOSA absolute values. Keep the existing ISA unchanged otherwise.'
+  --task 'Explore whether MXU and VPU can share tiled GEMM values through VREG rather than VMEM. Preserve results and minimize the VREG/VMEM traffic objective.'
 ray stop
 ```
 
 The default model is `google-vertex/gemini-3.1-pro-preview`; override it with
-`TINYTPU_OPENCODE_MODEL`. The agent’s final compiler check guards existing
-direct-TOSA add and negate coverage. A new operation’s backend realization is
-intentionally out of scope for this loop. `cluster.yaml` remains available for
-multi-machine CHIA use; it requires SSH connectivity between the declared
-workers.
+`TINYTPU_OPENCODE_MODEL`. Each candidate must pass the direct-TOSA compiler
+check, then is evaluated on 8×8×8 and 8×16×32 GEMMs. The pre-synthesis
+checkpoint has frozen costs: `VREG words × 1 + VMEM words × 4`; DRAM traffic
+is reported but intentionally not scored. Allo-HLS export and synthesis are
+deferred until the dedicated HLS tooling server is available.
+`cluster.yaml` remains available for multi-machine CHIA use; it requires SSH
+connectivity between the declared workers.
 
 ## Prerequisites
 

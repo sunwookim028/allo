@@ -1,4 +1,4 @@
-"""A minimal CHIA generate -> validate -> debug loop for TinyTPU's Allo ISA."""
+"""A minimal CHIA generate -> validate -> score loop for TinyTPU co-design."""
 
 from __future__ import annotations
 
@@ -34,10 +34,15 @@ def make_llm(tool: AlloSpecTool) -> OpenCodeLLM:
     return OpenCodeLLM(
         model=MODEL,
         system_message=(
-            "You are a TPU ISA co-design engineer. The hardware and compiler are "
-            "complete and must be treated as fixed. Work only at the Allo ISA layer. "
-            "Use the provided TinyTPU MCP tools; do not attempt other tools or make "
-            "changes outside isa.py. Preserve existing operand order and semantics."
+            "You are a TPU ISA/microarchitecture co-design engineer. You may edit "
+            "only isa.py and microarch.py through the TinyTPU MCP tools; the generic "
+            "ACT compiler, runtime, tests, and benchmark are fixed. microarch.py is "
+            "a composition of named Allo-HLS blocks: dma_load/dma_store (DRAM-VMEM), "
+            "vload/vstore (VMEM-VREG), vpu, mxu, and tinytpu's decoder/composition. "
+            "Preserve this compositional structure: implement an architectural change "
+            "by connecting or refining these blocks (or adding one focused @tpu.unit), "
+            "then keep ISA encoding, decoder, operands, schedules, and ISA semantics "
+            "consistent. Do not modify anything outside the two writable files."
         ),
         timeout_seconds=900,
         additional_providers=[
@@ -71,30 +76,39 @@ def run(task: str, max_debug_attempts: int) -> int:
         response = ask(
             llm,
             tool,
-            f"""Implement this ISA-level change:
+            f"""Implement this TinyTPU co-design task:
 
 {task}
 
-First inspect isa.py. If a change is needed, use tinytpu_insert_after rather
-than a unified diff: anchor on the exact text `return primitive.negate(a)` and
-insert the complete vabs definition immediately after it. Then call
-tinytpu_run_compiler_check. Report the change and the check result succinctly.
+First inspect the full writable specification, then call
+tinytpu_score_access_cost to establish a baseline. Implement the smallest
+correct candidate, using a unified diff for coupled ISA/microarchitecture
+changes. Verify it with tinytpu_run_compiler_check, then score it again. The
+optimization objective is only the reported VREG/VMEM storage-access cost,
+with frozen costs VREG=1 and VMEM=4; DRAM traffic is informational and there
+is no direct-path mnemonic bonus. HLS export and synthesis are deferred until
+the dedicated tooling server is available. Report baseline, candidate score,
+and compiler feasibility succinctly.
 """,
         )
         print(response.result)
         for attempt in range(1, max_debug_attempts + 1):
-            check = tool.run_compiler_check()
-            if check.startswith("exit=0"):
+            compiler_check = tool.run_compiler_check()
+            score = tool.score_access_cost()
+            if compiler_check.startswith("exit=0") and score.startswith("exit=0"):
                 print("TinyTPU compiler check: PASS")
+                print(score)
                 return 0
             response = ask(
                 llm,
                 tool,
-                f"The compiler check failed after your change (attempt {attempt}):\n"
-                f"```\n{check}\n```\nDiagnose it, patch only isa.py, and rerun the check.",
+                f"The candidate failed evaluation (attempt {attempt}):\n"
+                f"compiler:\n```\n{compiler_check}\n```\n"
+                f"score:\n```\n{score}\n```\n"
+                "Diagnose it, patch only isa.py and/or microarch.py, then rerun all gates.",
             )
             print(response.result)
-        print("TinyTPU compiler check: FAILED after debug budget")
+        print("TinyTPU co-design evaluation: FAILED after debug budget")
         return 1
     finally:
         tool.stop()
