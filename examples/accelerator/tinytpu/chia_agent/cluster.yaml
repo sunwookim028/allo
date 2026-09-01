@@ -1,0 +1,29 @@
+cluster_name: tinytpu-chia
+
+provider:
+    head_ip: ${THIS_MACHINE}
+
+auth:
+    ssh_user: ${USER}
+
+available_node_types:
+    opencode:
+        resources: {"opencode_creds": 1}
+        num_workers: 1
+        compatible_ips: ["${THIS_MACHINE}"]
+        worker_setup_commands:
+            - "source /home/sk3463/miniconda3/etc/profile.d/conda.sh && conda activate chia_env"
+
+head_env_commands:
+    - "source /home/sk3463/miniconda3/etc/profile.d/conda.sh && conda activate chia_env"
+
+head_start_ray_commands:
+    - ray stop
+    - ray start --head --port=6379 --include-dashboard=true --dashboard-agent-listen-port=0
+
+worker_start_ray_commands:
+    - ray stop
+    - "source /home/sk3463/miniconda3/etc/profile.d/conda.sh && conda activate chia_env && export PATH=/tmp/chia-opencode-cli/node_modules/.bin:$PATH && ray start --address=$RAY_HEAD_IP:6379 --dashboard-agent-listen-port=0"
+
+min_workers: 1
+max_workers: 1
