@@ -436,6 +436,11 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
              << "split factor is larger than or equal to the loop trip count";
     }
 
+    // Capture the source IV location before tiling; the affine utility below
+    // builds fresh loops whose induction variables would otherwise lose the
+    // source NameLoc that drives readable codegen.
+    Location ivLoc = forOp.getInductionVar().getLoc();
+
     // perform split
     // single loop is always perfectly nested
     SmallVector<affine::AffineForOp, 2> splitOps;
@@ -447,6 +452,10 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
     // normalize loop
     auto outer = splitOps.front();
     auto inner = splitOps.back();
+    // Both halves inherit the original loop variable's name (the emitter
+    // uniquifies the duplicate, e.g. `k` / `k_1`).
+    outer.getInductionVar().setLoc(ivLoc);
+    inner.getInductionVar().setLoc(ivLoc);
     if (failed(affine::normalizeAffineFor(outer)) ||
         failed(affine::normalizeAffineFor(inner))) {
       return emitSilenceableFailure(forOp) << "failed to normalize the loop";
@@ -492,6 +501,7 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
              << "split factor is larger than or equal to the loop trip count";
     }
     // perform split
+    Location ivLoc = forOp.getInductionVar().getLoc();
     rewriter.setInsertionPoint(forOp);
     Value cst =
         arith::ConstantIndexOp::create(rewriter, forOp.getLoc(), factor);
@@ -499,6 +509,8 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
     if (loops.size() != 1) {
       return emitSilenceableFailure(forOp) << "failed to split the loop";
     }
+    // The freshly created inner loop inherits the source loop variable's name.
+    loops.front().getInductionVar().setLoc(ivLoc);
     // record results
     results.push_back(forOp);
     results.push_back(loops.front());
@@ -658,6 +670,13 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
     SmallVector<Operation *, 4> tileLoops;
     SmallVector<Operation *, 4> pointLoops;
 
+    // Source IV locations, captured before tiling rebuilds the loops, so the
+    // tile and point induction variables keep the original loop-variable names
+    // that drive readable codegen.
+    SmallVector<Location, 4> srcIVLocs;
+    for (auto loop : sortedLoops)
+      srcIVLocs.push_back(loop.getInductionVar().getLoc());
+
     // Choose perfect vs imperfect tiling based on structural contiguity.
     bool perfect = isContiguousPerfectBand<affine::AffineForOp>(sortedLoops);
 
@@ -720,6 +739,9 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
       for (unsigned i = 0; i < nLoops; ++i) {
         auto outer = tiledNest[i];
         auto point = tiledNest[i + nLoops];
+        // Tile and point loops inherit the original loop variable's name.
+        outer.getInductionVar().setLoc(srcIVLocs[i]);
+        point.getInductionVar().setLoc(srcIVLocs[i]);
         for (auto applyOp : llvm::make_early_inc_range(
                  outer.getOps<affine::AffineApplyOp>())) {
           bool allUsesInPoint =
@@ -756,6 +778,9 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
       }
       for (auto loop : sortedLoops)
         tileLoops.push_back(loop);
+      // The freshly strip-mined point loops inherit their source loop names.
+      for (auto [i, loop] : llvm::enumerate(point))
+        loop.getInductionVar().setLoc(srcIVLocs[i]);
       for (auto loop : point)
         pointLoops.push_back(loop);
     }
@@ -777,6 +802,12 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
 
     SmallVector<Operation *, 4> tileLoops;
     SmallVector<Operation *, 4> pointLoops;
+
+    // Source IV locations, so the freshly created point loops keep the original
+    // loop-variable names (the reused tile loops already retain theirs).
+    SmallVector<Location, 4> srcIVLocs;
+    for (auto loop : sortedLoops)
+      srcIVLocs.push_back(loop.getInductionVar().getLoc());
 
     // Build runtime tile-size SSA values from sorted factors.
     SmallVector<Value, 4> sizeVals;
@@ -804,6 +835,8 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
       }
       for (auto loop : sortedLoops)
         tileLoops.push_back(loop);
+      for (auto [i, loop] : llvm::enumerate(point))
+        loop.getInductionVar().setLoc(srcIVLocs[i]);
       for (auto loop : point)
         pointLoops.push_back(loop);
     } else {
@@ -814,6 +847,8 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
         return emitSilenceableError()
                << "failed to tile scf imperfectly nested loops";
       }
+      for (auto [i, loop] : llvm::enumerate(point))
+        loop.getInductionVar().setLoc(srcIVLocs[i]);
       for (auto loop : sortedLoops)
         tileLoops.push_back(loop);
       for (auto loop : point)
@@ -3104,6 +3139,7 @@ precomputeRingAccessClusterIndices(OpBuilder &builder, Location loc,
   const ReuseStatePlan &plan = executionPlan.statePlan;
   int slidingReusePos = plan.resultToReusePos[plan.slidingDim];
   assert(slidingReusePos >= 0 && "expected sliding dimension to be kept");
+  (void)slidingReusePos;
 
   for (const RingAccessCluster &cluster : collectRingAccessClusters(accesses)) {
     OpBuilder::InsertionGuard guard(builder);

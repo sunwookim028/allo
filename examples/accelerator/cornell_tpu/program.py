@@ -25,12 +25,23 @@ into the batched form the instruction carries), so a chain of matmuls compiles t
 pure ``matmul`` instructions with zero on-chip transposes -- even when a matmul
 reads an *intermediate* result transposed (the 3mm case).
 
+Importing ``microarch`` binds every instruction to the hardware unit that runs it and
+declares each unit's ``(ii, depth)``, so the search minimizes **cycles** rather than
+instruction count and each compiled program reports a cycle estimate. Without that
+import the ISA still compiles — it just falls back to counting operations.
+
+Each program prints two bounds and the unit between them. Every one of these turns out
+to be ``dma_load``-bound, with the ``mxu`` close behind on the matmul chains (52 vs 56
+on 2mm) — i.e. this microarchitecture is memory-bound and its systolic array is nearly
+saturated. That is a statement no single cycle number can make.
+
 Run all examples:  ``python -m example.accelerator.cornell_tpu.program``
 """
 
 import numpy as np
 
 from .isa import tpu
+from . import microarch  # noqa: F401  -- binds instructions to units + latencies
 
 
 def _tosa(model, *inputs) -> str:
@@ -52,6 +63,17 @@ def _run(prog, inputs, want) -> None:
     spills = n_store - len(prog.outputs)
     note = f"{len(prog.emits)} instructions"
     note += f", {spills} register spill(s) to bram" if spills > 0 else ", no spills"
+    # Every instruction is bound to a unit with a declared latency (microarch.py), so
+    # the program's cycle count is bracketed: `cycles()` assumes nothing overlaps (an
+    # upper bound), `bottleneck_cycles()` assumes every unit runs concurrently and
+    # reports the busiest one (a lower bound). Naming that unit is the useful part --
+    # it says where the time sits, which no single number can.
+    units = prog.unit_cycles()
+    busiest = max(units, key=lambda u: units[u])
+    note += (
+        f", {prog.cycles():.0f} cycles serial / "
+        f"{prog.bottleneck_cycles():.0f} bound on '{busiest}'"
+    )
     out = np.asarray(prog(*inputs), np.float32)
     np.testing.assert_allclose(out, np.asarray(want, np.float32), rtol=1e-4, atol=1e-4)
     print(f"  -> {note}; matches NumPy reference\n")

@@ -50,6 +50,15 @@ class Schedule(Generic[P, R]):
     def __str__(self) -> str:
         """Return the payload IR as a string (auto-applies any pending transforms)."""
 
+    def __call__(
+        self,
+        backend: Literal["cpu", "vitis"] = "cpu",
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        """Call the scheduled kernel with ``*args``/``**kwargs`` (auto-applies any
+        pending transforms) on specified ``backend`` (default: CPU JIT)."""
+
     @classmethod
     def from_module(cls, module: Any, context: Any = ...) -> Schedule[Any, Any]:
         """Build a schedule from an in-memory MLIR ``module``."""
@@ -210,7 +219,9 @@ class Schedule(Generic[P, R]):
         (``transform.allo.reorder``); unselected loops keep their positions.
         Returns the loop handles in the requested order."""
 
-    def split(self, target: LoopRef, *, factor: int = 1) -> tuple[LoopRef, LoopRef]:
+    def split(
+        self, target: LoopRef | str, *, factor: int = 1
+    ) -> tuple[LoopRef, LoopRef]:
         """Split ``target`` loop into ``(outer, inner)`` with tiling ``factor``
         (``transform.allo.split``). ``factor`` must be positive."""
 

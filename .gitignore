@@ -1,5 +1,6 @@
 **.pyc
 **/*.pyc
+**/*.pyo
 **/build
 **/test.ll
 **/*.log
@@ -98,3 +99,4 @@ tests/xlscc_tests/**/test
 *.pyi
 
 /allo/_mlir
+drafts

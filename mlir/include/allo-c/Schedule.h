@@ -32,6 +32,8 @@ MLIR_CAPI_EXPORTED constexpr const char *kScheduleIdAttr = "allo.schedule.id";
 MLIR_CAPI_EXPORTED constexpr const char *kScheduleNameAttr =
     "allo.schedule.name";
 MLIR_CAPI_EXPORTED constexpr const char *kPipelineIIAttr = "allo.pipeline.ii";
+MLIR_CAPI_EXPORTED constexpr const char *kPipelineRewindAttr =
+    "allo.pipeline.rewind";
 MLIR_CAPI_EXPORTED constexpr const char *kDataflowAttr = "allo.dataflow";
 MLIR_CAPI_EXPORTED constexpr const char *kUnrollFactorAttr = "allo.unroll.f";
 MLIR_CAPI_EXPORTED constexpr const char *kPartitionAttr = "allo.part";

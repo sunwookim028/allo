@@ -1,5 +1,5 @@
-# Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+# Copyright Allo authors. All Rights Reserved.
 
 """Schedule analysis on top of the upstream MLIR Python bindings.
 
@@ -16,6 +16,7 @@ from ._mlir_libs._allo import schedule as _schedule
 SCHEDULE_NAME_ATTR_NAME = _schedule.SCHEDULE_NAME_ATTR_NAME
 SCHEDULE_ID_ATTR_NAME = _schedule.SCHEDULE_ID_ATTR_NAME
 PIPELINE_II_ATTR_NAME = _schedule.PIPELINE_II_ATTR_NAME
+PIPELINE_REWIND_ATTR_NAME = _schedule.PIPELINE_REWIND_ATTR_NAME
 DATAFLOW_ATTR_NAME = _schedule.DATAFLOW_ATTR_NAME
 UNROLL_FACTOR_ATTR_NAME = _schedule.UNROLL_FACTOR_ATTR_NAME
 PARTITION_ATTR_NAME = _schedule.PARTITION_ATTR_NAME

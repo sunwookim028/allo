@@ -16,7 +16,10 @@ buffer-global initializers (inputs) and replace each anchor with a
 from __future__ import annotations
 
 import ctypes
+import os
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
+from pathlib import Path
 
 import ml_dtypes
 import numpy as np
@@ -29,7 +32,8 @@ from ..._mlir.runtime import get_ranked_memref_descriptor
 
 from ..._mlir.passmanager import PassManager
 from ..._mlir.dialects.allo import register_passes as _register_allo_passes
-from .codegen import INSPECT_PREFIX, buffer_memref_shape, build_main, emit_catalog
+from .codegen import INSPECT_PREFIX, build_main, emit_catalog
+from .errors import AcceleratorDescriptionError, AssemblyError
 
 _register_allo_passes()
 
@@ -39,6 +43,37 @@ def run_pipeline(module: ir.Module, pipeline: str) -> None:
     PassManager.parse(pipeline, module.context).run(module.operation)
 
 
+_RUNNER_STEMS = ("libmlir_runner_utils", "libmlir_c_runner_utils")
+
+
+@lru_cache(maxsize=1)
+def _runner_utils() -> list[str]:
+    """The MLIR runner-utils shared libraries, for the JIT symbols a lowered program
+    can call into — ``_memrefCopy``, which a copy between differently-laid-out memrefs
+    lowers to. Searched under ``$LLVM_BASE_DIR/lib`` then the in-tree LLVM build.
+
+    Deliberately not ``backend.cpu._default_shared_libs``: that one also demands the
+    dataflow runtime (raising if absent), which the functional simulator never calls.
+    Returning ``[]`` when nothing is found leaves programs that need no runtime symbol
+    working, and the ones that do fail with the JIT's own ``Symbols not found``."""
+    base = os.environ.get("LLVM_BASE_DIR")
+    roots = [Path(base) / "lib"] if base else []
+    roots += [
+        p / "externals" / "llvm-project" / "build" / "lib"
+        for p in Path(__file__).resolve().parents
+    ]
+    for lib_dir in roots:
+        found = [
+            str(lib_dir / f"{stem}{ext}")
+            for stem in _RUNNER_STEMS
+            for ext in (".dylib", ".so")
+            if (lib_dir / f"{stem}{ext}").exists()
+        ]
+        if len(found) == len(_RUNNER_STEMS):
+            return found
+    return []
+
+
 # ==========================================================================#
 # Recorded program (the traced emit/inspect stream) + simulator config
 # ==========================================================================#
@@ -46,9 +81,17 @@ def run_pipeline(module: ir.Module, pipeline: str) -> None:
 
 @dataclass
 class EmitRecord:
+    """One serialized instruction. In a *compiled* stream this is one epoch's
+    total configuration on the wire — ``epoch.Epoch`` is its denotational
+    reading; an ``@oracle`` stream is hand-written and makes no such promise
+    (it may omit schedule fields, which the simulator ignores anyway)."""
+
     name: str  # instruction mnemonic
-    addr: list  # address-param values (Phase 1: static ints)
-    compute: list  # extra compute-param values (Phase 1: empty)
+    addr: list  # address-param values (static ints)
+    compute: list  # computational attributes (α): the instruction's immediates
+    # Schedule params: instruction-word fields the compiler *chose*. They change the
+    # configuration, never the value, so the simulator ignores them.
+    schedule: list = field(default_factory=list)
 
 
 @dataclass
@@ -116,7 +159,8 @@ _NUMPY_DTYPE = {
 
 
 def _np_dtype(dtype) -> np.dtype:
-    assert dtype.name in _NUMPY_DTYPE, f"no host numpy dtype for {dtype.name}"
+    if dtype.name not in _NUMPY_DTYPE:
+        raise AcceleratorDescriptionError(f"no host numpy dtype for {dtype.name}")
     return np.dtype(_NUMPY_DTYPE[dtype.name])
 
 
@@ -147,10 +191,11 @@ def simulate(isa, program: OracleProgram, config: OracleConfig) -> dict:
     with context, Location.unknown(context):
         module = Module.create()
         with InsertionPoint(module.body):
-            emit_catalog(context, isa)
+            emit_catalog(context, isa, program)
             build_main(context, isa, program)
         if config.verify:
-            assert module.operation.verify(), "oracle module failed verification"
+            if not module.operation.verify():
+                raise AcceleratorDescriptionError("oracle module failed verification")
         if config.print_ir:
             print(module)
 
@@ -198,7 +243,7 @@ def _dense_initial_value(data, buf, context) -> ir.DenseElementsAttr:
     data = np.ascontiguousarray(data)
     if buf.kind.dtype.is_bf16():
         tt = ir.RankedTensorType.get(
-            buffer_memref_shape(buf), buf.kind.dtype.materialize(context)
+            buf.memref_shape, buf.kind.dtype.materialize(context)
         )
         return ir.DenseElementsAttr.get(data.view(np.uint16), type=tt)
     return ir.DenseElementsAttr.get(data)
@@ -211,14 +256,16 @@ def _apply_initializers(module: Module, isa, config: OracleConfig):
         glob = _find_global(module, buf.name)
         if glob is None:
             continue
-        shape = buffer_memref_shape(buf)
+        shape = buf.memref_shape
         np_dt = _np_dtype(buf.kind.dtype)
         if buf in config.init:
             data = np.zeros(shape, np_dt)
             flat = np.asarray(config.init[buf], np_dt).reshape(-1)
-            assert (
-                flat.size <= data.size
-            ), f"init for '{buf.name}' has {flat.size} elems > capacity {data.size}"
+            if flat.size > data.size:
+                raise AssemblyError(
+                    f"init for '{buf.name}' has {flat.size} elems > "
+                    f"capacity {data.size}"
+                )
             data.reshape(-1)[: flat.size] = flat
         elif config.mem_init == "random":
             data = rng.standard_normal(shape).astype(np_dt)
@@ -247,9 +294,7 @@ def _wire_inspect_captures(context, module: Module, isa, program: OracleProgram)
     for call in calls:
         k = int(call.attributes["callee"].value[len(INSPECT_PREFIX) :])
         buf = inspects[k].buffer
-        mtype = ir.MemRefType.get(
-            buffer_memref_shape(buf), buf.kind.dtype.materialize(context)
-        )
+        mtype = ir.MemRefType.get(buf.memref_shape, buf.kind.dtype.materialize(context))
         with InsertionPoint(call):
             g = memref.get_global(mtype, buf.name)
             memref.copy(g, out_args[k])
@@ -271,15 +316,18 @@ def _jit_run(module: Module, isa, program: OracleProgram, config: OracleConfig):
     inspects = program.inspects
     packed, keepalive, out_arrays = [], [], []
     for ins in inspects:
-        arr = np.zeros(
-            buffer_memref_shape(ins.buffer), _np_dtype(ins.buffer.kind.dtype)
-        )
+        arr = np.zeros(ins.buffer.memref_shape, _np_dtype(ins.buffer.kind.dtype))
         desc = get_ranked_memref_descriptor(arr)
         ptr = ctypes.pointer(ctypes.pointer(desc))
         packed.append(ptr)
         keepalive += [arr, desc, ptr]
         out_arrays.append(arr)
-    engine = ExecutionEngine(module, opt_level=config.opt_level)
+    # A copy between differently-laid-out memrefs (any relayout: a strided gather, a
+    # multi-dimensional block) lowers to a `memref.copy` call into `_memrefCopy`, so
+    # the MLIR runner utils have to be loaded. Contiguous copies inline and do not.
+    engine = ExecutionEngine(
+        module, opt_level=config.opt_level, shared_libs=_runner_utils()
+    )
     engine.invoke("main", *packed)
     return out_arrays
 
@@ -310,7 +358,8 @@ def _report(program: OracleProgram, results: dict):
 def _diff(results: dict, config: OracleConfig):
     reference = config.reference()
     for key, expected in reference.items():
-        assert key in results, f"reference key '{key}' was not inspected"
+        if key not in results:
+            raise AssemblyError(f"reference key '{key}' was not inspected")
         np.testing.assert_allclose(
             results[key], expected, rtol=config.rtol, atol=config.atol
         )

@@ -17,7 +17,7 @@ from typing import Any, ClassVar, Generic, ParamSpec, TypeVar
 from .._mlir import ir
 from .._mlir.ir import MLIRError, DiagnosticInfo
 from .._mlir._mlir_libs._allo import ir_ext
-from .._mlir.ir import SymbolTable, UnitAttr
+from .._mlir.ir import SymbolTable, UnitAttr, FileLineColLoc
 from .._mlir.passmanager import PassManager
 from .._mlir.dialects.allo import register_passes as _register_allo_passes
 from ..lang.kernel import Kernel
@@ -51,7 +51,7 @@ def run_pipeline(module: ir.Module, pipeline: str) -> None:
         PassManager.parse(pipeline, module.context).run(module.operation)
     except MLIRError as e:
         for diag in e.error_diagnostics:
-            if diag.location.is_a_file:
+            if isinstance(diag.location, FileLineColLoc):
                 diag: DiagnosticInfo
                 import linecache
 

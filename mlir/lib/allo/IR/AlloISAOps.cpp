@@ -18,9 +18,6 @@
 
 #include "allo/IR/AlloOps.h"
 
-#include <functional>
-#include <numeric>
-
 using namespace mlir;
 using namespace mlir::allo;
 
@@ -28,10 +25,50 @@ using namespace mlir::allo;
 // Resource declaration ops
 //===----------------------------------------------------------------------===//
 
+void DeclareBufferOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  p.printSymbolName(getSymName());
+  p << " extents(";
+  llvm::interleaveComma(getExtents(), p, [&](int64_t e) { p << e; });
+  p << ") ";
+  p.printOptionalAttrDict(getOperation()->getAttrs(),
+                          /*elidedAttrs=*/{SymbolTable::getSymbolAttrName(),
+                                           getExtentsAttrName(),
+                                           getBufferTypeAttrName()});
+  p << ": " << getBufferType();
+}
+
+ParseResult DeclareBufferOp::parse(OpAsmParser &parser,
+                                   OperationState &result) {
+  StringAttr symName;
+  SmallVector<int64_t, 4> extents;
+  Type bufferType;
+  if (parser.parseSymbolName(symName) || parser.parseKeyword("extents") ||
+      parser.parseCommaSeparatedList(AsmParser::Delimiter::Paren,
+                                     [&]() {
+                                       int64_t extent;
+                                       if (parser.parseInteger(extent))
+                                         return failure();
+                                       extents.push_back(extent);
+                                       return success();
+                                     }) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(bufferType))
+    return failure();
+  result.addAttribute(SymbolTable::getSymbolAttrName(), symName);
+  result.addAttribute(getExtentsAttrName(result.name),
+                      parser.getBuilder().getDenseI64ArrayAttr(extents));
+  result.addAttribute(getBufferTypeAttrName(result.name),
+                      TypeAttr::get(bufferType));
+  return success();
+}
+
 LogicalResult DeclareBufferOp::verify() {
-  auto bufferType = getBufferType();
-  if (isa<HBMBufferType>(bufferType) && getSize() != 1)
-    return emitError() << "global HBM buffers must have size 1";
+  if (getExtents().empty())
+    return emitError() << "a buffer must have at least one extent";
+  for (int64_t extent : getExtents())
+    if (extent <= 0)
+      return emitError() << "extents must be positive, got " << extent;
   return success();
 }
 
@@ -136,30 +173,58 @@ LogicalResult StridedOp::verify() {
   return success();
 }
 
-LogicalResult StridedOp::verifyCompatibility(BufferTypeInterface bufferType,
-                                             unsigned size) {
-  unsigned dims = getStaticCounts().size();
-  // Rule 1: dimensionality check
-  if (!isa<HBMBufferType>(bufferType) && dims != 1)
-    return emitError() << "on-chip buffers must be accessed in 1D patterns";
-  // Rule 2: bounds check (static only)
-  auto hbm = dyn_cast<HBMBufferType>(bufferType);
-  ArrayRef<int64_t> shape = hbm ? hbm.getShape() : size;
-  auto basis = getStaticBasis();
-  auto strides = getStaticStrides();
-  auto counts = getStaticCounts();
-  for (unsigned i = 0; i < dims; ++i) {
-    if (ShapedType::isStatic(strides[i]) && ShapedType::isStatic(counts[i])) {
-      int64_t maxIndex = strides[i] * (counts[i] - 1);
-      if (ShapedType::isStatic(basis[i]))
-        maxIndex += basis[i];
-      if (maxIndex >= shape[i])
-        return emitError() << "access out of bounds in dimension " << i
-                           << ": max index is " << maxIndex
-                           << " but dimension size is " << shape[i];
+// Shared by the access-pattern ops: an access carries one component per address
+// extent, and each component must stay inside its extent. The footprint along
+// an axis is `basis + stride * (count - 1)`, plus whatever extra reach the
+// pattern itself has (a tile's own width).
+static LogicalResult
+verifyAgainstExtents(Operation *op, ArrayRef<int64_t> extents,
+                     ArrayRef<int64_t> basis, ArrayRef<int64_t> strides,
+                     ArrayRef<int64_t> counts, ArrayRef<int64_t> reach = {}) {
+  if (counts.size() != extents.size())
+    return op->emitError() << "access pattern has " << counts.size()
+                           << " dimension(s) but the buffer is addressed by "
+                           << extents.size()
+                           << " (one access component per buffer extent)";
+  for (unsigned i = 0, e = counts.size(); i < e; ++i) {
+    if (!ShapedType::isStatic(strides[i]) || !ShapedType::isStatic(counts[i]))
+      continue;
+    int64_t maxIndex = strides[i] * (counts[i] - 1);
+    if (ShapedType::isStatic(basis[i]))
+      maxIndex += basis[i];
+    if (!reach.empty()) {
+      if (!ShapedType::isStatic(reach[i]))
+        continue;
+      maxIndex += reach[i] - 1;
     }
+    if (maxIndex >= extents[i])
+      return op->emitError()
+             << "access out of bounds in dimension " << i << ": max index is "
+             << maxIndex << " but the buffer's extent is " << extents[i];
   }
   return success();
+}
+
+LogicalResult StridedOp::verifyCompatibility(BufferTypeInterface,
+                                             ArrayRef<int64_t> extents) {
+  // The slot type is deliberately unused: an access addresses *slots*, so what
+  // one slot holds is none of its business. That separation is what lets the
+  // same rule cover a flat register file and a row-major off-chip array.
+  return verifyAgainstExtents(getOperation(), extents, getStaticBasis(),
+                              getStaticStrides(), getStaticCounts());
+}
+
+// How many of an access's dimensions vanish from the tensor the compute region
+// sees. A count of exactly 1 *selects* one slot along that axis rather than
+// spanning a range, so — like numpy's `a[3]` versus `a[3:4]` — it contributes
+// no tensor dimension: `vld vr[d], vmem[s]` reads one slot of a vector register
+// file and hands the compute region the lanes, not a 1 x lanes tensor. The
+// Python frontend's `PatternExpr.visible_shape` mirrors this exactly; if the
+// two ever disagree the inlined semantics get an operand of the wrong rank.
+static unsigned rankReduction(ArrayRef<int64_t> counts) {
+  return llvm::count_if(counts, [](int64_t count) {
+    return ShapedType::isStatic(count) && count == 1;
+  });
 }
 
 FailureOr<Value> StridedOp::materialize(OpBuilder &builder, Location loc,
@@ -178,9 +243,10 @@ FailureOr<Value> StridedOp::materialize(OpBuilder &builder, Location loc,
   for (unsigned i = 0; i < diff; ++i)
     mixedCounts.push_back(
         builder.getI64IntegerAttr(shaped.getDimSize(i + currRank)));
-  // drop leading dimension if equals to 1
+  // Drop the selected (count == 1) address dims; the slot's own dims all stay.
   auto resultTy = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-      shaped.getRank() - 1, cast<RankedTensorType>(shaped), mixedCounts);
+      shaped.getRank() - rankReduction(getStaticCounts()),
+      cast<RankedTensorType>(shaped), mixedCounts);
   Value extracted = tensor::ExtractSliceOp::create(
       builder, loc, resultTy, buffer, mixedBasis, mixedCounts, mixedStrides);
   return extracted;
@@ -237,45 +303,20 @@ LogicalResult TiledOp::verify() {
   return success();
 }
 
-LogicalResult TiledOp::verifyCompatibility(BufferTypeInterface bufferType,
-                                           unsigned size) {
-  unsigned dims = getStaticCounts().size();
-  // Rule 1: dimensionality — same as StridedOp
-  if (!isa<HBMBufferType>(bufferType) && dims != 1)
-    return emitError() << "on-chip buffers must be accessed in 1D patterns";
-  // Rule 2: tile size must divide buffer element size (on-chip only)
-  if (!isa<HBMBufferType>(bufferType)) {
-    auto tileSizes = getStaticTileSizes();
-    int64_t elemSize = std::accumulate(bufferType.getShape().begin(),
-                                       bufferType.getShape().end(), 1,
-                                       std::multiplies<int64_t>());
-    if (ShapedType::isStatic(tileSizes[0])) {
-      if (elemSize % tileSizes[0] != 0)
-        return emitError() << "tile_size " << tileSizes[0]
-                           << " does not evenly divide buffer element size "
-                           << elemSize;
-    }
-  }
-  // Rule 3: bounds check — footprint includes tile extent
-  auto hbm = dyn_cast<HBMBufferType>(bufferType);
-  ArrayRef<int64_t> shape = hbm ? hbm.getShape() : size;
-  auto basis = getStaticBasis();
-  auto strides = getStaticStrides();
-  auto counts = getStaticCounts();
-  auto tileSizes = getStaticTileSizes();
-  for (unsigned i = 0; i < dims; ++i) {
-    if (ShapedType::isStatic(strides[i]) && ShapedType::isStatic(counts[i]) &&
-        ShapedType::isStatic(tileSizes[i])) {
-      int64_t maxIndex = strides[i] * (counts[i] - 1) + (tileSizes[i] - 1);
-      if (ShapedType::isStatic(basis[i]))
-        maxIndex += basis[i];
-      if (maxIndex >= shape[i])
-        return emitError() << "tiled access out of bounds in dimension " << i
-                           << ": max index is " << maxIndex
-                           << " but dimension size is " << shape[i];
-    }
-  }
-  return success();
+LogicalResult TiledOp::verifyCompatibility(BufferTypeInterface,
+                                           ArrayRef<int64_t> extents) {
+  // Same rank + bounds rule as StridedOp, with the tile's own width counted
+  // into the footprint. The old "tile_size must evenly divide the buffer
+  // element size" rule is gone with the on-chip/HBM split it belonged to: it
+  // compared the tile along dimension 0 against the *slot*, which was only
+  // meaningful while dimension 0 necessarily indexed slots of a 1-D buffer.
+  // What a tiled access means relative to a slot has to be re-derived when
+  // something needs it — this op has no `materialize` and no frontend user (the
+  // Python `access.tiled` was deleted), so guessing now would only bake in a
+  // rule nobody has tested.
+  return verifyAgainstExtents(getOperation(), extents, getStaticBasis(),
+                              getStaticStrides(), getStaticCounts(),
+                              getStaticTileSizes());
 }
 
 // Tiled materialize is not implemented yet (deferred until a workload needs
@@ -301,16 +342,17 @@ LogicalResult CollapseShapeOp::verify() {
 }
 
 LogicalResult ExpandShapeOp::verifyCompatibility(BufferTypeInterface,
-                                                 unsigned) {
+                                                 ArrayRef<int64_t>) {
   return success(); // base access op handles buffer-level checks
 }
 
 LogicalResult CollapseShapeOp::verifyCompatibility(BufferTypeInterface,
-                                                   unsigned) {
+                                                   ArrayRef<int64_t>) {
   return success();
 }
 
-LogicalResult TransposeOp::verifyCompatibility(BufferTypeInterface, unsigned) {
+LogicalResult TransposeOp::verifyCompatibility(BufferTypeInterface,
+                                               ArrayRef<int64_t>) {
   return success();
 }
 
@@ -579,18 +621,47 @@ LogicalResult DefineOp::verify() {
       return emitError() << "compute parameters must be int or index "
                          << "types";
   }
+
+  // The two regions are written independently, so nothing but this ties them
+  // together: each yielded semantics value must have the type of the block
+  // argument standing for the destination it is written into -- i.e. the shape
+  // the destination's access pattern writes. A dynamic dim on either side is a
+  // parameter resolved per emit, so it matches anything.
+  unsigned nSources = getSources().size();
+  for (unsigned k = 0, e = getDestinations().size(); k < e; ++k) {
+    Type yieldedTy = semYield.getOperand(k).getType();
+    auto got = dyn_cast<RankedTensorType>(yieldedTy);
+    auto want =
+        cast<RankedTensorType>(semantics.getArgument(nSources + k).getType());
+    if (!got || got.getElementType() != want.getElementType() ||
+        got.getRank() != want.getRank())
+      return emitError() << "semantics region yields " << yieldedTy
+                         << " for destination #" << k
+                         << " but its access pattern writes " << want;
+    for (int64_t dim = 0; dim < got.getRank(); ++dim) {
+      int64_t g = got.getDimSize(dim), w = want.getDimSize(dim);
+      if (!ShapedType::isDynamic(g) && !ShapedType::isDynamic(w) && g != w)
+        return emitError() << "semantics region yields " << got
+                           << " for destination #" << k
+                           << " but its access pattern writes " << want
+                           << " (dim " << dim << ": " << g << " vs " << w
+                           << ")";
+    }
+  }
   return success();
 }
 
 LogicalResult DefineOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-  SmallVector<std::pair<BufferTypeInterface, unsigned>, 4> bufferArgs;
+  // The extents are ArrayRefs into each declaration's own attribute storage, so
+  // they stay valid for the whole check.
+  SmallVector<std::pair<BufferTypeInterface, ArrayRef<int64_t>>, 4> bufferArgs;
   for (auto source : getSources().getAsRange<FlatSymbolRefAttr>()) {
     auto sourceOp =
         symbolTable.lookupNearestSymbolFrom<DeclareBufferOp>(*this, source);
     if (!sourceOp)
       return emitError() << "referred source buffer '" << source
                          << "' does not exist";
-    bufferArgs.push_back({sourceOp.getBufferType(), sourceOp.getSize()});
+    bufferArgs.push_back({sourceOp.getBufferType(), sourceOp.getExtents()});
   }
   for (auto dest : getDestinations().getAsRange<FlatSymbolRefAttr>()) {
     auto destOp =
@@ -598,7 +669,7 @@ LogicalResult DefineOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if (!destOp)
       return emitError() << "referred destination buffer '" << dest
                          << "' does not exist";
-    bufferArgs.push_back({destOp.getBufferType(), destOp.getSize()});
+    bufferArgs.push_back({destOp.getBufferType(), destOp.getExtents()});
   }
   // Walk relayout chains to find base access ops for buffer compatibility
   SmallVector<BufferAccessOpInterface, 4> basePatterns;
@@ -611,8 +682,8 @@ LogicalResult DefineOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     basePatterns.push_back(cast<BufferAccessOpInterface>(curr));
   }
   for (auto [bufferArg, pattern] : llvm::zip(bufferArgs, basePatterns)) {
-    auto [bufferType, bufferSize] = bufferArg;
-    if (failed(pattern.verifyCompatibility(bufferType, bufferSize)))
+    auto [slotType, extents] = bufferArg;
+    if (failed(pattern.verifyCompatibility(slotType, extents)))
       return emitError() << "buffer access pattern is not compatible with the "
                             "referred buffer";
   }

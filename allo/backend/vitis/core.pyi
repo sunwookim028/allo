@@ -14,8 +14,16 @@ AxiliteStorageImpl = Literal["auto", "bram", "uram"]
 VitisMode = Literal["csim", "csyn", "sw_emu", "hw_emu", "hw"]
 
 HLS_PREPARE_PIPELINE: str = ...
+DEFAULT_DEVICE: str = ...
+DEFAULT_FREQ_MHZ: str = ...
+DEFAULT_PART: str = ...
 
 class Vitis(Generic[P, R]):
+    part: str
+    device: str
+    freq_mhz: float
+    flow: Literal["vitis", "vivado"]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Wrap a compiled kernel for the Vitis HLS backend.
 

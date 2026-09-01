@@ -19,8 +19,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...lang.core import DType, u1
+from ...lang.core import DType, f32, u1
 from .core import IndexExpr, TensorProxy
+from .errors import AcceleratorDescriptionError
 
 # ==========================================================================#
 # Categories + registry
@@ -98,6 +99,20 @@ REGISTRY: dict[str, PrimSpec] = {p.tag: p for p in _REGISTRY}
 # ==========================================================================#
 
 
+def _same_dtype(tag: str, a: TensorProxy, b: TensorProxy) -> None:
+    if a.dtype != b.dtype:
+        raise AcceleratorDescriptionError(
+            f"{tag}: dtype mismatch {a.dtype} vs {b.dtype}"
+        )
+
+
+def _check_axis(tag: str, a: TensorProxy, axis: int) -> None:
+    if not 0 <= axis < len(a.shape):
+        raise AcceleratorDescriptionError(
+            f"{tag}: axis {axis} out of range for {a.shape}"
+        )
+
+
 def _conflict(x, y) -> bool:
     """Two shape dims definitely disagree only when both are statically known and
     differ. A symbolic (parametric) dim is left for ``solve`` to constrain, so it
@@ -117,7 +132,8 @@ def _bcast_dim(x, y):
         return y
     if ys == 1:
         return x
-    assert not _conflict(x, y), f"shapes not broadcastable: {x} vs {y}"
+    if _conflict(x, y):
+        raise AcceleratorDescriptionError(f"shapes not broadcastable: {x} vs {y}")
     return x
 
 
@@ -126,7 +142,8 @@ def _broadcast(a, b) -> tuple:
     side ``1`` (a size-1 dim stretches). This is how ``codegen`` lowers (TOSA
     elementwise ops broadcast) and how a lowered source program spells it — no
     explicit broadcast node, so the matcher stays isomorphic."""
-    assert len(a) == len(b), f"rank mismatch {a} vs {b}"
+    if len(a) != len(b):
+        raise AcceleratorDescriptionError(f"rank mismatch {a} vs {b}")
     return tuple(_bcast_dim(x, y) for x, y in zip(a, b))
 
 
@@ -140,17 +157,17 @@ def _unary(tag: str, a: TensorProxy) -> TensorProxy:
 
 
 def _binary(tag: str, a: TensorProxy, b: TensorProxy) -> TensorProxy:
-    assert a.dtype == b.dtype, f"{tag}: dtype mismatch {a.dtype} vs {b.dtype}"
+    _same_dtype(tag, a, b)
     return TensorProxy(tag, a.dtype, _broadcast(a.shape, b.shape), args=(a, b))
 
 
 def _compare(tag: str, a: TensorProxy, b: TensorProxy) -> TensorProxy:
-    assert a.dtype == b.dtype, f"{tag}: dtype mismatch {a.dtype} vs {b.dtype}"
+    _same_dtype(tag, a, b)
     return TensorProxy(tag, u1, _broadcast(a.shape, b.shape), args=(a, b))  # bool out
 
 
 def _reduce(tag: str, a: TensorProxy, axis: int) -> TensorProxy:
-    assert 0 <= axis < len(a.shape), f"{tag}: axis {axis} out of range for {a.shape}"
+    _check_axis(tag, a, axis)
     shape = list(a.shape)
     shape[axis] = 1  # TOSA reduce keeps the reduced dim (size 1)
     return TensorProxy(tag, a.dtype, tuple(shape), args=(a,), axis=axis)
@@ -161,6 +178,29 @@ def _reduce(tag: str, a: TensorProxy, axis: int) -> TensorProxy:
 # ==========================================================================#
 
 # --- bespoke prims (irregular shape/codegen; not in REGISTRY) ---
+
+
+def const(value, dtype: DType = f32, shape=(1,)) -> TensorProxy:
+    """A literal baked into the instruction — the compute DAG's second kind of leaf.
+
+    Not every operand of a real instruction comes from a buffer: MiniNPU's ``vexp``
+    computes ``2**x`` from one register, so the ``2`` is part of the *instruction*,
+    not of the program. Without this, such an instruction can only be described by
+    lying about its arity (an extra buffer operand nobody supplies) or about its
+    semantics (base-e for base-2) — so it was left undescribed instead.
+
+    ``value`` is either a number — a **fixed** literal, which the matcher compares by
+    value (rounded through ``dtype``), making it load-bearing for selection exactly
+    like a transpose's permutation — or a ``ScalarProxy``, i.e. one of ``@I.compute``'s
+    extra params: a **parametric** literal (ACT's α), which the matcher *binds* from
+    whatever constant the source supplies and emits in the instruction word. The two
+    are one construct because they are one thing to the hardware, an immediate; the
+    ISA says whether that immediate is wired or encoded.
+
+    ``shape`` defaults to rank 1, which is how TOSA spells a broadcast scalar
+    (``tensor<1xf32>``) and what torch's backend emits; give it explicitly to
+    broadcast against a higher-rank operand."""
+    return TensorProxy("const", dtype, tuple(shape), value=value)
 
 
 def identity(a: TensorProxy) -> TensorProxy:
@@ -175,24 +215,26 @@ def transpose(a: TensorProxy, permutation) -> TensorProxy:
     """Permute a tensor's dims. A value-reordering relayout, so it lives in the
     compute vocabulary (semantics), not in the access patterns."""
     perm = list(permutation)
-    assert sorted(perm) == list(
-        range(len(a.shape))
-    ), f"transpose: {perm} is not a permutation of {len(a.shape)} dims"
+    if sorted(perm) != list(range(len(a.shape))):
+        raise AcceleratorDescriptionError(
+            f"transpose: {perm} is not a permutation of {len(a.shape)} dims"
+        )
     shape = tuple(a.shape[p] for p in perm)
     return TensorProxy("transpose", a.dtype, shape, args=(a,), permutation=perm)
 
 
 def matmul(a: TensorProxy, b: TensorProxy) -> TensorProxy:
     # Batched, matching TOSA's matmul: (B, M, K) x (B, K, N) -> (B, M, N).
-    assert (
-        len(a.shape) == 3 and len(b.shape) == 3
-    ), "matmul expects batched 3-D operands"
-    assert not _conflict(
-        a.shape[0], b.shape[0]
-    ), f"matmul: batch mismatch {a.shape} x {b.shape}"
-    assert not _conflict(
-        a.shape[2], b.shape[1]
-    ), f"matmul: inner dims mismatch {a.shape} x {b.shape}"
+    if len(a.shape) != 3 or len(b.shape) != 3:
+        raise AcceleratorDescriptionError("matmul expects batched 3-D operands")
+    if _conflict(a.shape[0], b.shape[0]):
+        raise AcceleratorDescriptionError(
+            f"matmul: batch mismatch {a.shape} x {b.shape}"
+        )
+    if _conflict(a.shape[2], b.shape[1]):
+        raise AcceleratorDescriptionError(
+            f"matmul: inner dims mismatch {a.shape} x {b.shape}"
+        )
     return TensorProxy(
         "matmul", a.dtype, (a.shape[0], a.shape[1], b.shape[2]), args=(a, b)
     )
@@ -201,7 +243,7 @@ def matmul(a: TensorProxy, b: TensorProxy) -> TensorProxy:
 def reverse(a: TensorProxy, axis: int) -> TensorProxy:
     """Reverse ``a`` along ``axis``. Like transpose, a value-reordering relayout, so
     it is a compute prim (not an access pattern); shape is preserved."""
-    assert 0 <= axis < len(a.shape), f"reverse: axis {axis} out of range for {a.shape}"
+    _check_axis("reverse", a, axis)
     return TensorProxy("reverse", a.dtype, a.shape, args=(a,), axis=axis)
 
 
@@ -381,7 +423,7 @@ def greater_equal(a, b):
 
 
 def select(cond: TensorProxy, a: TensorProxy, b: TensorProxy) -> TensorProxy:
-    assert a.dtype == b.dtype, f"select: dtype mismatch {a.dtype} vs {b.dtype}"
+    _same_dtype("select", a, b)
     return TensorProxy(
         "select", a.dtype, _broadcast(a.shape, b.shape), args=(cond, a, b)
     )

@@ -61,10 +61,12 @@ def render_diagnostic(
         file=io.StringIO(),
         record=True,
         force_terminal=color,
+        # Under Jupyter, rich would otherwise route print() to display(), a raised
+        # diagnostic scatters across several output cells. Pin it non-Jupyter.
+        force_jupyter=False,
         color_system="auto" if color else None,
         width=width,
     )
-    message = str(message)
 
     if location is None:
         console.print(Text.assemble(("error", "bold red"), ": ", message))

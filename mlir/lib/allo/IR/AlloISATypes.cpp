@@ -83,33 +83,6 @@ Type TileBufferType::parse(AsmParser &p) {
   return get(p.getContext(), elementType, shape);
 }
 
-LogicalResult
-HBMBufferType::verify(llvm::function_ref<InFlightDiagnostic()> emitError,
-                      Type elementType, ArrayRef<int64_t>) {
-  if (!elementType.isIntOrIndexOrFloat())
-    return emitError() << "expected int, index or float type";
-  return success();
-}
-
-void HBMBufferType::print(AsmPrinter &p) const {
-  p << "<";
-  p.printDimensionList(getShape());
-  p << "x" << getElementType() << ">";
-}
-
-Type HBMBufferType::parse(AsmParser &p) {
-  if (p.parseLess())
-    return {};
-  SmallVector<int64_t, 4> shape;
-  if (p.parseDimensionList(shape, /*allowDynamic=*/false,
-                           /*withTrailingX=*/true))
-    return {};
-  Type elementType;
-  if (p.parseType(elementType) || p.parseGreater())
-    return {};
-  return get(p.getContext(), elementType, shape);
-}
-
 //===----------------------------------------------------------------------===//
 // Descriptor and state types
 //===----------------------------------------------------------------------===//

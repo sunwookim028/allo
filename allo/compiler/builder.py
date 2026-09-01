@@ -11,6 +11,8 @@ from .._mlir import ir
 from .._mlir.dialects import arith, tensor, linalg, math, memref
 from .._mlir.dialects import affine as affine_d
 from .._mlir.dialects import allo as allo_d
+from .._mlir.dialects._affine_ops_gen import AffineForOp
+from .._mlir.dialects._scf_ops_gen import ForOp
 
 from .errors import CompilationError
 from ..lang.core import (
@@ -160,11 +162,26 @@ class AlloOpBuilder:
             dtype,
         )
 
+    def _checked_int_const(self, value, dtype: DType) -> int:
+        """Coerce a numeric literal to the ``int64_t`` that ``IntegerAttr``'s
+        nanobind binding accepts, raising a readable error when it overflows.
+
+        The binding wraps modulo the type width internally, but only takes a C
+        ``int64_t``, so a value outside ``[-2**63, 2**63)`` -- e.g. ``int(-1e30)``
+        from casting a large float constant to ``i32`` -- would otherwise surface
+        as an opaque nanobind ``TypeError``."""
+        ival = int(value)
+        if not -(1 << 63) <= ival < (1 << 63):
+            self.compile_error(f"Integer constant {ival} is out of range for '{dtype}'")
+        return ival
+
     def create_const_int(self, value: int, dtype: DType) -> AlloValue:
         assert dtype.is_int_signless()
         ir_ty = dtype.materialize(self.context)
         return AlloValue(
-            arith.ConstantOp(ir_ty, int(value), ip=self._ip, loc=self._loc).result,
+            arith.ConstantOp(
+                ir_ty, self._checked_int_const(value, dtype), ip=self._ip, loc=self._loc
+            ).result,
             dtype,
         )
 
@@ -215,7 +232,7 @@ class AlloOpBuilder:
         if dtype.is_float():
             return ir.FloatAttr.get(ir_ty, float(value))
         if dtype.is_int_signless() or dtype.is_index():
-            return ir.IntegerAttr.get(ir_ty, int(value))
+            return ir.IntegerAttr.get(ir_ty, self._checked_int_const(value, dtype))
         assert False, f"Unsupported dense element type: {dtype}"
 
     def _dense_initializer(self, values: Sequence[int | float], dtype: DType, shape):
@@ -687,12 +704,16 @@ class AlloOpBuilder:
 
         def build_fn(l, r):
             if floating:
+                # Floats keep Python floor semantics (there is no HLS QoR concern).
                 divf = arith.DivFOp(
                     l.handle, r.handle, ip=self._ip, loc=self._loc
                 ).result
                 return math.FloorOp(divf, ip=self._ip, loc=self._loc).result
+            # Integer ``//`` truncates toward zero, like ``/`` and ``%``: a single
+            # HLS-native divide that Vitis recognizes for addressing, and it keeps
+            # the div/mod identity intact against ``remsi``/``remui``.
             if signed:
-                return arith.FloorDivSIOp(
+                return arith.DivSIOp(
                     l.handle, r.handle, ip=self._ip, loc=self._loc
                 ).result
             return arith.DivUIOp(l.handle, r.handle, ip=self._ip, loc=self._loc).result
@@ -1105,11 +1126,13 @@ class AlloOpBuilder:
         ub_map: ir.AffineMap,
         ub_operands: Sequence,
         steps: list[int],
+        arg_locs: Sequence[ir.Location] | None = None,
     ):
         """Build an ``affine.parallel`` from multi-result lower/upper bound maps
         (one result per dim) and their operands. ``mapOperands`` is the lower
-        operands followed by the upper operands. Returns the op and its body block
-        (one index IV per dim, terminated by an ``affine.yield``)."""
+        operands followed by the upper operands. ``arg_locs`` optionally names the
+        per-dim induction-variable block arguments. Returns the op and its body
+        block (one index IV per dim, terminated by an ``affine.yield``)."""
         ndim = len(steps)
         i64 = ir.IntegerType.get_signless(64)
         groups = [1] * ndim  # one bound expression per induction variable
@@ -1125,10 +1148,56 @@ class AlloOpBuilder:
             ip=self._ip,
             loc=self._loc,
         )
-        body = par.regions[0].blocks.append(*([ir.IndexType.get()] * ndim))
+        body = par.regions[0].blocks.append(
+            *([ir.IndexType.get()] * ndim), arg_locs=arg_locs
+        )
         with ir.InsertionPoint(body):
             affine_d.AffineYieldOp([], loc=self._loc)
         return par, body
+
+    def create_affine_for(
+        self,
+        lb_map: ir.AffineMap,
+        lb_operands: Sequence,
+        ub_map: ir.AffineMap,
+        ub_operands: Sequence,
+        step: int,
+        iter_args: Sequence,
+        arg_locs: Sequence[ir.Location] | None = None,
+    ):
+        """Build an ``affine.for`` whose body block carries ``arg_locs`` on its
+        induction variable and loop-carried arguments. ``arg_locs`` is ordered
+        ``[iv, *iter_args]``. Returns the specialized op view."""
+        results = [v.type for v in iter_args]
+        op = AffineForOp(
+            results,
+            list(lb_operands),
+            list(ub_operands),
+            list(iter_args),
+            ir.AffineMapAttr.get(lb_map),
+            ir.AffineMapAttr.get(ub_map),
+            step,
+            ip=self._ip,
+            loc=self._loc,
+        )
+        op.regions[0].blocks.append(ir.IndexType.get(), *results, arg_locs=arg_locs)
+        return op.operation.opview
+
+    def create_scf_for(
+        self,
+        lb,
+        ub,
+        step,
+        iter_args: Sequence,
+        arg_locs: Sequence[ir.Location] | None = None,
+    ):
+        """Build an ``scf.for`` whose body block carries ``arg_locs`` on its
+        induction variable and loop-carried arguments. ``arg_locs`` is ordered
+        ``[iv, *iter_args]``. Returns the specialized op view."""
+        results = [v.type for v in iter_args]
+        op = ForOp(results, lb, ub, step, list(iter_args), ip=self._ip, loc=self._loc)
+        op.regions[0].blocks.append(op.operands[0].type, *results, arg_locs=arg_locs)
+        return op.operation.opview
 
     def _stream_handle_and_indices(self, stream):
         assert isinstance(stream, AlloValue)

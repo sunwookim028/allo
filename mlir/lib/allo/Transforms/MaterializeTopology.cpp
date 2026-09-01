@@ -532,7 +532,6 @@ static LogicalResult insertScalarPortsAndRewriteDirectUses(
         "materialize-topology only supports kernels with identity mapping");
 
   Block &entry = kernel.getBody().front();
-  Location loc = kernel.getLoc();
   for (BlockArgument arg : entry.getArguments())
     state.originalArgNos[arg] = arg.getArgNumber();
 
@@ -555,11 +554,12 @@ static LogicalResult insertScalarPortsAndRewriteDirectUses(
     auto oldType = cast<StreamType>(port.sourceArg.getType());
     assert(!oldType.getShape().empty() &&
            "scalarized port must originate from a ranked stream");
-    // create a new argument for the scalar stream
+    // create a new argument for the scalar stream; inherit the source ranked
+    // stream argument's location (its NameLoc) so codegen keeps the name.
     auto scalarType = StreamType::get(
         kernel.getContext(), oldType.getBaseType(), oldType.getDepth(), {});
-    port.newArg =
-        entry.insertArgument(port.sourceArgNo + shift, scalarType, loc);
+    port.newArg = entry.insertArgument(port.sourceArgNo + shift, scalarType,
+                                       port.sourceArg.getLoc());
     shift++;
   }
 
@@ -662,8 +662,10 @@ static Value getOrCreateScalarStream(
     rewriter.setInsertionPointAfter(sourceCreate);
   else
     rewriter.setInsertionPoint(invoke);
+  // Inherit the ranked stream's location (its NameLoc) so the materialized
+  // scalar channel keeps the source name in codegen.
   auto scalarCreate =
-      StreamCreateOp::create(rewriter, invoke.getLoc(), scalarType);
+      StreamCreateOp::create(rewriter, rankedStream.getLoc(), scalarType);
   // The scalar lane carries the ranked stream's payload, hence its signedness.
   if (sourceCreate)
     if (auto sgn = sourceCreate->getAttrOfType<StringAttr>(kAlloSignedAttr))

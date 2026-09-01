@@ -14,9 +14,10 @@ include "allo/IR/Allo.td"
 
 def BufferTypeInterface : TypeInterface<"BufferTypeInterface"> {
   let description = [{
-    Common interface for all buffer element types (scalar, vector, tile, HBM).
-    Each buffer element type describes the access granularity of a hardware
-    scratchpad or memory space.
+    Common interface for all buffer element types (scalar, vector, tile). Each
+    describes the access granularity of *one addressable position* in a hardware
+    scratchpad or memory space; how many such positions there are, and along how
+    many axes, is the buffer's `extents` (see `allo.buffer`).
   }];
   let cppNamespace = "::mlir::allo";
   let methods = [
@@ -86,22 +87,10 @@ def Allo_TileBuffer : Allo_BufferTypeBase<"TileBuffer"> {
   let genVerifyDecl = 1;
 }
 
-def Allo_HBMBuffer : Allo_BufferTypeBase<"HBMBuffer"> {
-  let summary = "Off-chip HBM memory element type";
-  let description = [{
-    Element type for off-chip high-bandwidth memory (HBM) buffers. Unlike on-chip
-    buffer types, HBM elements can be multi-dimensional. Syntax: `!allo.hbm<8192xbf16>`.
-  }];
-  let parameters = (ins
-    "Type":$elementType,
-    ArrayRefParameter<"int64_t">:$shape);
-  let mnemonic = "hbm";
-  let hasCustomAssemblyFormat = 1;
-  let extraClassDeclaration = [{
-    unsigned getRank() const { return getShape().size(); }
-  }];
-  let genVerifyDecl = 1;
-}
+// There is deliberately no `hbm` buffer *type*. Off-chip memory used to be one,
+// because it was the only buffer allowed a multi-dimensional access — but that
+// was a property of the addressing, not of the element. It is now spelled as an
+// ordinary buffer with multi-dimensional `extents` and a scalar slot.
 
 //===----------------------------------------------------------------------===//
 // Descriptor and state types

@@ -74,7 +74,7 @@ def _register_cmdline_source(fn: Callable) -> None:
 
 
 class Kernel(Generic[P, R]):
-    module: Module
+    _module: Module
 
     def __init__(
         self,
@@ -109,7 +109,7 @@ class Kernel(Generic[P, R]):
         self.definition_scope = (
             {} if definition_scope is None else definition_scope.copy()
         )
-        self.module: Module | None = None
+        self._module: Module | None = None
         self.context: Context | None = None
 
         # record whether this kernel is a lazy consteval kernel
@@ -204,6 +204,14 @@ class Kernel(Generic[P, R]):
             template_bindings=template_bindings,
             definition_scope=self.definition_scope,
         )
+
+    @property
+    def module(self) -> Module:
+        return self.compile()
+
+    @module.setter
+    def module(self, value: Module):
+        self._module = value
 
     def check_templates_bounded(self):
         if not self.template:
@@ -414,8 +422,8 @@ class Kernel(Generic[P, R]):
         return res_types
 
     def compile(self):
-        if self.module is not None:
-            return self.module
+        if self._module is not None:
+            return self._module
 
         from ..compiler.mlir_codegen import compile
 

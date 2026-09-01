@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import functools
+import copy
 from collections.abc import Iterable, Sequence
 from typing import Literal, Generic, TypeVar, ParamSpec
 from enum import Enum
@@ -45,6 +46,8 @@ from .._mlir.schedule import (
 )
 from .._mlir.dialects import allo as allo_d
 from .._mlir.dialects import transform as t
+from .._mlir._mlir_libs._allo import ir_ext
+
 from .._mlir.dialects.transform import allo as ta
 from .._mlir.dialects.transform import interpreter
 from ..logging import log_debug, text_tail
@@ -144,7 +147,7 @@ class Schedule(Generic[P, R]):
         # parses `str(_payload)` into a fresh working copy, runs the delta there, and
         # rebinds `_payload` to it. The snapshot is collected from the named module so
         # value names (e.g. buffer "B") are available before the first apply.
-        self._payload = module
+        self._payload: Module = ir_ext.clone_module(module)
         self._real = ScheduleSnapshot.from_raw(
             schedule_d.collect_schedule_snapshot(module),
             primary_path=self._primary_path,
@@ -154,7 +157,16 @@ class Schedule(Generic[P, R]):
         self.query = Query(self)
 
     def __str__(self) -> str:
-        return str(self.payload)
+        return self.payload.__str__()
+
+    def __call__(self, backend: str = "cpu", *args: P.args, **kwargs: P.kwargs) -> R:
+        if self.kernel is None:
+            raise ScheduleError("Cannot call a schedule without a source kernel")
+        if backend == "vitis":
+            return self.export_vitis()(*args, **kwargs)
+        if backend == "cpu":
+            return self.export_cpu()(*args, **kwargs)
+        raise ScheduleError(f"unsupported backend '{backend}' for execution")
 
     @staticmethod
     def _detect_primary(snap: ScheduleSnapshot, primary: str | None) -> tuple[str, str]:
@@ -208,15 +220,18 @@ class Schedule(Generic[P, R]):
 
         with self.context:
             run_pipeline(self._payload, "builtin.module(reuse-cleanup)")
-        self.kernel.module = self._payload
+        # shallow copy, not modifying the original kernel
+        kernel = copy.copy(self.kernel)
+        kernel.module = self._payload
+
         if backend == "cpu":
             from ..backend import CPU
 
-            return CPU(self.kernel, **kwargs)
+            return CPU(kernel, **kwargs)
         elif backend == "vitis":
             from ..backend.vitis import Vitis
 
-            return Vitis(self.kernel, **kwargs)
+            return Vitis(kernel, **kwargs)
 
         raise ScheduleError(f"unsupported backend '{backend}' for export()")
 
@@ -359,9 +374,9 @@ class Schedule(Generic[P, R]):
     @_within_context
     def pipeline(self, targets: Targets = None, *, ii: int = 1) -> Schedule:
         self._require_int("pipeline ii", ii)
-        if ii <= 0:
+        if ii < -1:
             raise InvalidScheduleArgumentError(
-                f"pipeline ii must be positive, got {ii}"
+                f"pipeline ii must be -1 (disable) or non-negative (0 = auto), got {ii}"
             )
         loops = self._resolve_loop_targets(targets, "pipeline")
         self.script.set_callsite_loc()
@@ -753,7 +768,7 @@ class Schedule(Generic[P, R]):
                 )
             # Run the unapplied tail on a clone of the current payload (already-applied
             # transforms are not re-run); keep `_payload` as last-good on failure.
-            work = Module.parse(str(self._payload), self.context)
+            work = ir_ext.clone_module(self._payload)
             try:
                 interpreter.apply_named_sequence(
                     work.operation,

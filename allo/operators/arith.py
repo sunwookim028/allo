@@ -56,6 +56,30 @@ def _const_bool(value, name: str) -> bool:
     return value.value
 
 
+def _fold_div(lhs, rhs):
+    """Constant division matching codegen: integers truncate toward zero (like
+    ``arith.divsi``/``divui``), floats use true division (``arith.divf``)."""
+    if isinstance(lhs, float) or isinstance(rhs, float):
+        return lhs / rhs
+    quotient = abs(lhs) // abs(rhs)
+    return -quotient if (lhs < 0) != (rhs < 0) else quotient
+
+
+def _fold_mod(lhs, rhs):
+    """Constant remainder matching codegen: the remainder takes the dividend's
+    sign (like ``arith.remsi``/``remui``/``remf``), unlike Python's floored ``%``."""
+    remainder = abs(lhs) % abs(rhs)
+    return -remainder if lhs < 0 else remainder
+
+
+def _fold_floordiv(lhs, rhs):
+    """Constant ``//`` matching codegen: integers truncate toward zero like ``/``
+    (``divsi``/``divui``); floats keep Python's floor (``divf`` + ``math.floor``)."""
+    if isinstance(lhs, float) or isinstance(rhs, float):
+        return lhs // rhs
+    return _fold_div(lhs, rhs)
+
+
 def _fold_enabled(acc) -> bool:
     return is_default_acc(acc)
 
@@ -204,30 +228,24 @@ def _build_mul(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
     return builder.create_mul(lhs, rhs, floating=lhs.dtype.is_float())
 
 
-def _build_div(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue, signed: bool):
-    lhs, rhs, _ = _promote_binary_operands(builder, lhs, rhs, "div")
-    floating = lhs.dtype.is_float() and rhs.dtype.is_float()
-    return builder.create_div(
-        lhs, rhs, signed=False if floating else signed, floating=floating
-    )
+def _build_div(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
+    lhs, rhs, result_dtype = _promote_binary_operands(builder, lhs, rhs, "div")
+    floating = result_dtype.is_float()
+    return builder.create_div(lhs, rhs, signed=result_dtype.is_int(), floating=floating)
 
 
-def _build_floordiv(
-    builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue, signed: bool
-):
-    lhs, rhs, _ = _promote_binary_operands(builder, lhs, rhs, "floordiv")
-    floating = lhs.dtype.is_float() and rhs.dtype.is_float()
+def _build_floordiv(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
+    lhs, rhs, result_dtype = _promote_binary_operands(builder, lhs, rhs, "floordiv")
+    floating = result_dtype.is_float()
     return builder.create_floordiv(
-        lhs, rhs, signed=False if floating else signed, floating=floating
+        lhs, rhs, signed=result_dtype.is_int(), floating=floating
     )
 
 
-def _build_mod(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue, signed: bool):
-    lhs, rhs, _ = _promote_binary_operands(builder, lhs, rhs, "mod")
-    floating = lhs.dtype.is_float() and rhs.dtype.is_float()
-    return builder.create_mod(
-        lhs, rhs, signed=False if floating else signed, floating=floating
-    )
+def _build_mod(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
+    lhs, rhs, result_dtype = _promote_binary_operands(builder, lhs, rhs, "mod")
+    floating = result_dtype.is_float()
+    return builder.create_mod(lhs, rhs, signed=result_dtype.is_int(), floating=floating)
 
 
 def _build_pow(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
@@ -242,9 +260,9 @@ def _build_lshift(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
     return builder.create_lshift(lhs, rhs)
 
 
-def _build_rshift(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue, signed: bool):
-    lhs, rhs, _ = _promote_binary_operands(builder, lhs, rhs, "rshift")
-    return builder.create_rshift(lhs, rhs, signed=signed)
+def _build_rshift(builder: AlloOpBuilder, lhs: AlloValue, rhs: AlloValue):
+    lhs, rhs, result_dtype = _promote_binary_operands(builder, lhs, rhs, "rshift")
+    return builder.create_rshift(lhs, rhs, signed=result_dtype.is_int())
 
 
 def _build_bitwise(
@@ -412,34 +430,23 @@ def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
 
 
 @operator
-def div(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
+def div(x, y, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @div.fold
-def _(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
-    if not _fold_enabled(acc) or _fold_const_bool(signed) is None:
+def _(x, y, acc=ConstexprValue(None)):
+    if not _fold_enabled(acc):
         return NO_FOLD
-    return _fold_binary(x, y, lambda lhs, rhs: lhs / rhs)
+    return _fold_binary(x, y, _fold_div)
 
 
 @div.build
-def _(
-    builder: AlloOpBuilder,
-    x,
-    y,
-    acc=ConstexprValue(None),
-    signed=ConstexprValue(False),
-):
-    signed_value = _const_bool(signed, "signed")
+def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
     x, y = _materialize_binary_operands(builder, x, y, acc, "div")
     assert isinstance(x, AlloValue) and isinstance(y, AlloValue)
     result_dtype = _binary_result_dtype(builder, x, y, "div")
-    named_op_cls = (
-        linalg_d.DivUnsignedOp
-        if result_dtype.is_uint() and not signed_value
-        else linalg_d.DivOp
-    )
+    named_op_cls = linalg_d.DivUnsignedOp if result_dtype.is_uint() else linalg_d.DivOp
     return _lower_binary_arith(
         builder,
         x,
@@ -447,32 +454,25 @@ def _(
         acc,
         "div",
         result_dtype,
-        lambda lhs, rhs: _build_div(builder, lhs, rhs, signed_value),
+        lambda lhs, rhs: _build_div(builder, lhs, rhs),
         named_op_cls=named_op_cls,
     )
 
 
 @operator
-def floordiv(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
+def floordiv(x, y, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @floordiv.fold
-def _(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
-    if not _fold_enabled(acc) or _fold_const_bool(signed) is None:
+def _(x, y, acc=ConstexprValue(None)):
+    if not _fold_enabled(acc):
         return NO_FOLD
-    return _fold_binary(x, y, lambda lhs, rhs: lhs // rhs)
+    return _fold_binary(x, y, _fold_floordiv)
 
 
 @floordiv.build
-def _(
-    builder: AlloOpBuilder,
-    x,
-    y,
-    acc=ConstexprValue(None),
-    signed=ConstexprValue(False),
-):
-    signed_value = _const_bool(signed, "signed")
+def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
     x, y = _materialize_binary_operands(builder, x, y, acc, "floordiv")
     assert isinstance(x, AlloValue) and isinstance(y, AlloValue)
     result_dtype = _binary_result_dtype(builder, x, y, "floordiv")
@@ -483,31 +483,24 @@ def _(
         acc,
         "floordiv",
         result_dtype,
-        lambda lhs, rhs: _build_floordiv(builder, lhs, rhs, signed_value),
+        lambda lhs, rhs: _build_floordiv(builder, lhs, rhs),
     )
 
 
 @operator
-def mod(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
+def mod(x, y, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @mod.fold
-def _(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
-    if not _fold_enabled(acc) or _fold_const_bool(signed) is None:
+def _(x, y, acc=ConstexprValue(None)):
+    if not _fold_enabled(acc):
         return NO_FOLD
-    return _fold_binary(x, y, lambda lhs, rhs: lhs % rhs)
+    return _fold_binary(x, y, _fold_mod)
 
 
 @mod.build
-def _(
-    builder: AlloOpBuilder,
-    x,
-    y,
-    acc=ConstexprValue(None),
-    signed=ConstexprValue(False),
-):
-    signed_value = _const_bool(signed, "signed")
+def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
     x, y = _materialize_binary_operands(builder, x, y, acc, "mod")
     assert isinstance(x, AlloValue) and isinstance(y, AlloValue)
     result_dtype = _binary_result_dtype(builder, x, y, "mod")
@@ -518,7 +511,7 @@ def _(
         acc,
         "mod",
         result_dtype,
-        lambda lhs, rhs: _build_mod(builder, lhs, rhs, signed_value),
+        lambda lhs, rhs: _build_mod(builder, lhs, rhs),
     )
 
 
@@ -583,29 +576,21 @@ def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
 
 
 @operator
-def rshift(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
+def rshift(x, y, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @rshift.fold
-def _(x, y, acc=ConstexprValue(None), signed=ConstexprValue(False)):
-    signed_value = _fold_const_bool(signed)
-    if not _fold_enabled(acc) or signed_value is None:
+def _(x, y, acc=ConstexprValue(None)):
+    if not _fold_enabled(acc):
         return NO_FOLD
-    if signed_value:
-        return _fold_binary(x, y, lambda lhs, rhs: lhs >> rhs)
-    return _fold_binary(x, y, lambda lhs, rhs: (lhs & ((1 << 64) - 1)) >> rhs)
+    # A constant is only negative when it is signed, so Python's arithmetic
+    # ``>>`` matches both ``arith.shrsi`` and (for non-negative) ``shrui``.
+    return _fold_binary(x, y, lambda lhs, rhs: lhs >> rhs)
 
 
 @rshift.build
-def _(
-    builder: AlloOpBuilder,
-    x,
-    y,
-    acc=ConstexprValue(None),
-    signed=ConstexprValue(False),
-):
-    signed_value = _const_bool(signed, "signed")
+def _(builder: AlloOpBuilder, x, y, acc=ConstexprValue(None)):
     x, y = _materialize_binary_operands(builder, x, y, acc, "rshift")
     assert isinstance(x, AlloValue) and isinstance(y, AlloValue)
     result_dtype = _binary_result_dtype(builder, x, y, "rshift")
@@ -616,7 +601,7 @@ def _(
         acc,
         "rshift",
         result_dtype,
-        lambda lhs, rhs: _build_rshift(builder, lhs, rhs, signed_value),
+        lambda lhs, rhs: _build_rshift(builder, lhs, rhs),
     )
 
 

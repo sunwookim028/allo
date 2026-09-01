@@ -44,6 +44,12 @@ message(STATUS "Using Python binding")
 include(MLIRDetectPythonEnv)
 mlir_configure_python_dev_packages()
 
+option(ALLO_STRIP_RELEASE_LIBS "Strip symbol tables from Release shared libs" ON)
+if(ALLO_STRIP_RELEASE_LIBS AND
+   (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel"))
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,-s")
+endif()
+
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)

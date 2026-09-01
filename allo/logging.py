@@ -59,8 +59,15 @@ def in_notebook() -> bool:
 
 
 def _make_console() -> Console:
-    # Jupyter renders stderr as a red error block, so target stdout there.
-    return Console() if in_notebook() else Console(stderr=True)
+    if in_notebook():
+        # Write ANSI to stdout instead of emitting one rich display widget per
+        # `print`. Jupyter coalesces consecutive stdout writes into a single
+        # output block, so a cell's backend log lines (Compiling..., Running...)
+        # render as one block rather than a stack that looks like separate cells.
+        # `in_notebook()` still governs spinner-vs-static status independently.
+        return Console(force_jupyter=False)
+    # Jupyter renders stderr as a red error block, so terminals target stderr.
+    return Console(stderr=True)
 
 
 console = _make_console()

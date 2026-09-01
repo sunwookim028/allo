@@ -35,7 +35,15 @@ from pathlib import Path
 
 from allo.lang.core import f32, i32, range as arange
 
-from .isa import tpu, DRAM_SIZE, BRAM_SIZE, IMEM_SIZE, VEC_LANES, VEC_REGS
+from .isa import (
+    tpu,
+    DRAM_SIZE,
+    BRAM_SIZE,
+    IMEM_SIZE,
+    VEC_LANES,
+    VEC_REGS,
+)
+from . import isa as _isa
 
 IWIDTH = 4  # words per instruction record: [opcode, a0, a1, a2]
 SYS_DIM = 4  # the systolic array is SYS_DIM x SYS_DIM
@@ -141,12 +149,22 @@ def mxu(bram: f32[BRAM_SIZE], w_addr: i32, x_addr: i32, z_addr: i32):
 
 
 # --- Top: fetch-decode-dispatch -------------------------------------------- #
+from .isa import bram
+@tpu.unit(extends=bram)
+def bram_controller():
+    bram_hw = ...
+    def crossbar(...):
+        pass
+    crossbar(bram_hw) # define crossbar logic here
+    pass
+
+
 @tpu.entry
 def cornell_tpu(dmem: f32[DRAM_SIZE], imem: i32[IMEM_SIZE], n_instr: i32):
     """The accelerator. ``bram``/``vreg`` are on-chip; the loop fetches each
     4-word instruction from ``imem``, decodes the opcode, and dispatches to the
     matching unit."""
-    bram: f32[BRAM_SIZE]
+    bram: f32[BRAM_SIZE] = bram
     vreg: f32[VEC_REGS, VEC_LANES]
     for pc in arange(n_instr, name="pc"):
         base: i32 = pc * IWIDTH
@@ -207,6 +225,40 @@ mxu_s.pipeline("j")  # then pipeline the 4 output columns
 top_s = cornell_tpu.schedule()
 top_s.partition(top_s.buffer("vreg"), dim=1, kind=top_s.Complete)  # on-chip reg file
 top_s.compose(dl_s, ds_s, vl_s, vs_s, vpu_s, mxu_s)
+
+
+# ==========================================================================#
+# Binding: which unit runs each instruction, and what that unit costs.
+#
+# This is the ISA <-> microarchitecture link as *data*. Without it the connection
+# exists only as the opcode convention the decoder above is written against, and
+# the compiler cannot attribute a cycle to anything.
+#
+# Latency is stated per UNIT, not per instruction, because units are shared: the
+# four VPU ops are one opcode-multiplexed datapath and cost the same. `trips` is
+# per instruction -- how many times it occupies its unit -- which is what makes a
+# burst mover's cost scale with the block it copies (`trips=lambda n: n`) while a
+# fixed-size op stays at 1. An instruction's cost is then `depth + ii * trips`.
+#
+# The numbers below are AUTHORED, matching the schedules above (every inner loop
+# is pipelined at II=1, so a unit's II is per element and its depth is the
+# pipeline fill + call overhead). They are the (ii, depth) pair a synthesis report
+# yields, so a measured table can replace this block without an API change.
+# ==========================================================================#
+tpu.latency(dma_load, ii=1, depth=8)  # DRAM burst: 1 word/cycle + AXI latency
+tpu.latency(dma_store, ii=1, depth=8)
+tpu.latency(vload, ii=1, depth=3)  # on-chip BRAM <-> vreg
+tpu.latency(vstore, ii=1, depth=3)
+tpu.latency(vpu, ii=1, depth=5)  # 8 lanes at II=1 + fmul/fadd depth
+tpu.latency(mxu, ii=1, depth=20)  # stage 2 tiles, then 4 unrolled columns
+
+tpu.bind(_isa.dma_load, dma_load, trips=lambda n: n)  # cost scales with the block
+tpu.bind(_isa.dma_store, dma_store, trips=lambda n: n)
+tpu.bind(_isa.vload, vload, trips=lambda: VEC_LANES)
+tpu.bind(_isa.vstore, vstore, trips=lambda: VEC_LANES)
+for _op in (_isa.vadd, _isa.vsub, _isa.vmul, _isa.vrelu):
+    tpu.bind(_op, vpu, trips=lambda: VEC_LANES)  # one datapath, four opcodes
+tpu.bind(_isa.matmul, mxu, trips=lambda: SYS_DIM * SYS_DIM)
 
 
 # ==========================================================================#

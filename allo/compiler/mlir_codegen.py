@@ -45,7 +45,6 @@ from .._mlir.dialects.allo import (
 from .._mlir.dialects.cf import BranchOp, CondBranchOp
 from .._mlir.dialects.scf import (
     IfOp,
-    ForOp,
     IndexSwitchOp,
     YieldOp as SCFYieldOp,
     WhileOp,
@@ -53,7 +52,7 @@ from .._mlir.dialects.scf import (
     ParallelOp,
     ReduceOp,
 )
-from .._mlir.dialects.affine import AffineForOp, AffineIfOp, AffineYieldOp
+from .._mlir.dialects.affine import AffineIfOp, AffineYieldOp
 from .._mlir.dialects.arith import SelectOp
 from .._mlir.dialects.ub import PoisonOp
 from .builder import AlloOpBuilder
@@ -130,6 +129,17 @@ def generate_signedness_marker(
         if not isinstance(ty, (ConstexprType, StreamType))
     ]
     return "".join(chars)
+
+
+def _global_symbol(func_name: str, var_id: str, kind: str, node: ast.AST) -> str:
+    """Canonical name for a compiler-emitted module global or helper kernel,
+    shared by stateful variables (``kind="stateful"``), list/NumPy-initialized
+    constants (``kind="const"``) and bufferize copy kernels (``kind="bufferize"``).
+    Keyed on the source declaration -- enclosing kernel, variable, line and column
+    -- so the name is stable and unique: repeated kernel instantiations resolve to
+    one symbol, while distinct declarations never collide. The C++ emitter
+    sanitizes it into a valid identifier."""
+    return f"_allo_{kind}_{func_name}_{var_id}_l{node.lineno}c{node.col_offset}"
 
 
 class ReturnPlacementChecker(ast.NodeVisitor):
@@ -2029,16 +2039,9 @@ class MLIRCodeGenerator(ast.NodeVisitor):
         return value
 
     def _global_symbol(self, node: ast.AST, var_id: str, kind: str) -> str:
-        """Canonical name for a compiler-emitted module global, shared by stateful
-        variables (``kind="stateful"``) and list-initialized constants
-        (``kind="const"``). Keyed on the source declaration -- entry kernel,
-        variable, line and column -- so the name is stable and unique: repeated
-        kernel instantiations resolve to one global, while distinct declarations
-        never collide. The C++ emitter sanitizes it into a valid identifier."""
-        return (
-            f"_allo_{kind}_{self.kernel.func_name}_{var_id}"
-            f"_l{node.lineno}c{node.col_offset}"
-        )
+        """Instance-scoped wrapper over the module-level ``_global_symbol``, keyed
+        on this generator's entry kernel."""
+        return _global_symbol(self.kernel.func_name, var_id, kind, node)
 
     def _visit_stateful_decl(self, node: ast.AnnAssign, parsed_type: StatefulType):
         inner = parsed_type.inner
@@ -2370,27 +2373,27 @@ class MLIRCodeGenerator(ast.NodeVisitor):
             names, init_handles, init_types = self._test_loop_iter_args(
                 node, liveins, ignore={node.target.id}
             )
-            # create for op
+            arg_locs = [Location.name(node.target.id, self.builder._loc)] + [
+                Location.name(nm, self.builder._loc) for nm in names
+            ]
             if is_affine:
                 (lb_map, lb_operands), (ub_map, ub_operands) = affine_bounds
-                for_op = AffineForOp(
+                for_op = self.builder.create_affine_for(
                     lb_map,
+                    [v.handle for v in lb_operands],
                     ub_map,
+                    [v.handle for v in ub_operands],
                     step.value,
-                    iter_args=init_handles,
-                    lower_bound_operands=[v.handle for v in lb_operands],
-                    upper_bound_operands=[v.handle for v in ub_operands],
-                    ip=self.builder._ip,
-                    loc=self.builder._loc,
+                    init_handles,
+                    arg_locs=arg_locs,
                 )
             else:
-                for_op = ForOp(
+                for_op = self.builder.create_scf_for(
                     lb.handle,
                     ub.handle,
                     step.handle,
                     init_handles,
-                    ip=self.builder._ip,
-                    loc=self.builder._loc,
+                    arg_locs=arg_locs,
                 )
             # Default the loop's schedule name to its induction variable, so an
             # unnamed `for i in range(N)` is queryable as `s.loop("i")`. An
@@ -2514,6 +2517,9 @@ class MLIRCodeGenerator(ast.NodeVisitor):
                     ub_map,
                     [v.handle for v in ub_operands],
                     [step.value for step in steps],
+                    arg_locs=[
+                        Location.name(t.id, self.builder._loc) for t in node.target.elts
+                    ],
                 )
             else:
                 par_op = ParallelOp(
@@ -2528,7 +2534,12 @@ class MLIRCodeGenerator(ast.NodeVisitor):
                 # scf.parallel has no auto-created body: build a block with one
                 # index induction variable per dimension and the scf.reduce
                 # terminator. see: https://mlir.llvm.org/docs/Dialects/SCFDialect/#scfparallel-scfparallelop
-                par_op_body = par_op.region.blocks.append(*([index_ty] * len(lbs)))
+                par_op_body = par_op.region.blocks.append(
+                    *([index_ty] * len(lbs)),
+                    arg_locs=[
+                        Location.name(t.id, self.builder._loc) for t in node.target.elts
+                    ],
+                )
                 with InsertionPoint(par_op_body):
                     ReduceOp([], 0)
             if iterator.name:

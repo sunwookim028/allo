@@ -47,7 +47,7 @@ def attention_ref(q, k, v):
 
 
 def run_attention(q, k, v):
-    pool = np.zeros(qkv.buffers["d0"].size, ml_dtypes.bfloat16)
+    pool = np.zeros(qkv.buffers["d0"].capacity, ml_dtypes.bfloat16)
     pool[Q_OFF : Q_OFF + N * N] = _bf16(q).reshape(-1)
     pool[K_OFF : K_OFF + N * N] = _bf16(k).reshape(-1)
     pool[V_OFF : V_OFF + N * N] = _bf16(v).reshape(-1)

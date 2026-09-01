@@ -25,6 +25,12 @@
 #include <memory>
 #include <vector>
 
+#if defined(_WIN32)
+#define ALLO_RUNTIME_EXPORT __declspec(dllexport)
+#else
+#define ALLO_RUNTIME_EXPORT __attribute__((visibility("default")))
+#endif
+
 namespace {
 
 // A single bounded MPMC FIFO lane with inline fixed-size slots (no per-item
@@ -95,8 +101,8 @@ struct DataflowScheduler {
 
 // ---- stream ABI (called from PE fibers; blocking is fiber-aware) ------------
 
-extern "C" uint64_t allo_sim_stream_create(int64_t lanes, int64_t depth,
-                                           int64_t itemBytes) {
+extern "C" ALLO_RUNTIME_EXPORT uint64_t
+allo_sim_stream_create(int64_t lanes, int64_t depth, int64_t itemBytes) {
   assert(lanes > 0 && "stream must have at least one lane");
   assert(depth > 0 && "stream depth must be positive");
   assert(itemBytes > 0 && "stream payload size must be positive");
@@ -113,15 +119,16 @@ extern "C" uint64_t allo_sim_stream_create(int64_t lanes, int64_t depth,
   return reinterpret_cast<uint64_t>(stream.release());
 }
 
-extern "C" void allo_sim_stream_write(uint64_t handle, int64_t lane,
-                                      uint64_t value) {
+extern "C" ALLO_RUNTIME_EXPORT void
+allo_sim_stream_write(uint64_t handle, int64_t lane, uint64_t value) {
   Stream *stream = asStream(handle);
   assert(stream->itemBytes <= static_cast<int64_t>(sizeof(value)) &&
          "scalar stream payload is too wide");
   writeBytes(stream, lane, &value);
 }
 
-extern "C" uint64_t allo_sim_stream_read(uint64_t handle, int64_t lane) {
+extern "C" ALLO_RUNTIME_EXPORT uint64_t allo_sim_stream_read(uint64_t handle,
+                                                             int64_t lane) {
   Stream *stream = asStream(handle);
   assert(stream->itemBytes <= static_cast<int64_t>(sizeof(uint64_t)) &&
          "scalar stream payload is too wide");
@@ -130,17 +137,17 @@ extern "C" uint64_t allo_sim_stream_read(uint64_t handle, int64_t lane) {
   return value;
 }
 
-extern "C" void allo_sim_stream_write_mem(uint64_t handle, int64_t lane,
-                                          uint64_t ptr) {
+extern "C" ALLO_RUNTIME_EXPORT void
+allo_sim_stream_write_mem(uint64_t handle, int64_t lane, uint64_t ptr) {
   writeBytes(asStream(handle), lane, reinterpret_cast<const void *>(ptr));
 }
 
-extern "C" void allo_sim_stream_read_mem(uint64_t handle, int64_t lane,
-                                         uint64_t ptr) {
+extern "C" ALLO_RUNTIME_EXPORT void
+allo_sim_stream_read_mem(uint64_t handle, int64_t lane, uint64_t ptr) {
   readBytes(asStream(handle), lane, reinterpret_cast<void *>(ptr));
 }
 
-extern "C" void allo_sim_stream_destroy(uint64_t handle) {
+extern "C" ALLO_RUNTIME_EXPORT void allo_sim_stream_destroy(uint64_t handle) {
   delete asStream(handle);
 }
 
@@ -149,7 +156,7 @@ extern "C" void allo_sim_stream_destroy(uint64_t handle) {
 // Create a marl scheduler and bind it to the calling thread so that subsequent
 // allo_df_spawn calls (and the join) run against it. `numWorkers <= 0` requests
 // one worker per logical core.
-extern "C" void *allo_df_open(int64_t numWorkers) {
+extern "C" ALLO_RUNTIME_EXPORT void *allo_df_open(int64_t numWorkers) {
   marl::Scheduler::Config cfg =
       numWorkers > 0 ? marl::Scheduler::Config().setWorkerThreadCount(
                            static_cast<int>(numWorkers))
@@ -161,7 +168,8 @@ extern "C" void *allo_df_open(int64_t numWorkers) {
 
 // Launch `fn(ctx)` as a fiber. The shared `ctx` (the PE operands) stays valid
 // because allo_df_join keeps the launcher frame alive until every fiber exits.
-extern "C" void allo_df_spawn(void *handle, void (*fn)(void *), void *ctx) {
+extern "C" ALLO_RUNTIME_EXPORT void
+allo_df_spawn(void *handle, void (*fn)(void *), void *ctx) {
   auto *df = static_cast<DataflowScheduler *>(handle);
   df->pending.add(1);
   marl::WaitGroup pending = df->pending;
@@ -171,11 +179,11 @@ extern "C" void allo_df_spawn(void *handle, void (*fn)(void *), void *ctx) {
   });
 }
 
-extern "C" void allo_df_join(void *handle) {
+extern "C" ALLO_RUNTIME_EXPORT void allo_df_join(void *handle) {
   static_cast<DataflowScheduler *>(handle)->pending.wait();
 }
 
-extern "C" void allo_df_close(void *handle) {
+extern "C" ALLO_RUNTIME_EXPORT void allo_df_close(void *handle) {
   auto *df = static_cast<DataflowScheduler *>(handle);
   df->scheduler->unbind();
   delete df->scheduler;

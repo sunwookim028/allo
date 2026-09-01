@@ -54,9 +54,11 @@ struct ConvertDeclareBufferOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.setInsertionPoint(op);
     BufferTypeInterface bufferTy = op.getBufferType();
-    SmallVector<int64_t, 4> shape;
-    if (op.getSize() != 1)
-      shape.push_back(op.getSize());
+    // A buffer is its address space times its slot, so the memref is exactly
+    // extents ++ slot shape. (The old rule dropped a unit slot count, which the
+    // access patterns did not know about: a 1-slot vector buffer then verified
+    // and failed to lower.)
+    SmallVector<int64_t, 4> shape(op.getExtents());
     llvm::append_range(shape, bufferTy.getShape());
     auto memrefTy = MemRefType::get(shape, bufferTy.getElementType());
     memref::GlobalOp::create(rewriter, op.getLoc(), op.getSymNameAttr(),
@@ -101,7 +103,11 @@ struct SemanticsBuilder {
           return failure();
         continue;
       }
-      if (isa<arith::ConstantOp, tosa::ConstOp, tosa::ConstShapeOp>(op)) {
+      // Ops whose result type is fixed by the op itself, not by its operands:
+      // constants, and the splat that broadcasts a compute parameter (a scalar
+      // immediate) to a tensor. Cloning them verbatim is exactly right.
+      if (isa<arith::ConstantOp, tosa::ConstOp, tosa::ConstShapeOp,
+              tensor::SplatOp>(op)) {
         b.clone(op, mapping);
         continue;
       }
@@ -487,7 +493,7 @@ struct LowerInstructionsPass
                         bufferization::MaterializeInDestinationOp>();
       target.addLegalOp<tensor::ExtractSliceOp, tensor::InsertSliceOp,
                         tensor::ExpandShapeOp, tensor::CollapseShapeOp,
-                        tensor::EmptyOp, tensor::DimOp>();
+                        tensor::EmptyOp, tensor::DimOp, tensor::SplatOp>();
       target.addLegalOp<math::Exp2Op, math::Log2Op, math::ExpOp, math::LogOp,
                         math::AbsFOp, math::AbsIOp, math::FloorOp, math::SqrtOp,
                         math::RsqrtOp, math::CeilOp, math::TruncOp>();

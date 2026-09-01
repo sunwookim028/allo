@@ -34,8 +34,8 @@ def BufferAccessOpInterface : OpInterface<"BufferAccessOpInterface"> {
   }];
   let cppNamespace = "::mlir::allo";
   let methods = [
-    InterfaceMethod<"Verify that this access pattern is compatible with the given buffer type and size",
-    "mlir::LogicalResult", "verifyCompatibility", (ins "BufferTypeInterface":$bufferType, "unsigned":$size)>,
+    InterfaceMethod<"Verify that this access pattern is compatible with the buffer's slot type and address extents",
+    "mlir::LogicalResult", "verifyCompatibility", (ins "BufferTypeInterface":$slotType, "llvm::ArrayRef<int64_t>":$extents)>,
 
     InterfaceMethod<"Materialize a read: extract a slice from the buffer according to this access pattern",
     "llvm::FailureOr<mlir::Value>", "materialize",
@@ -62,19 +62,24 @@ def BufferRelayoutOpInterface : OpInterface<"BufferRelayoutOpInterface"> {
 def Allo_DeclareBufferOp : Allo_Op<"buffer", [Symbol]> {
   let summary = "Declare a named buffer in a hardware memory space";
   let description = [{
-    Declares a buffer with a symbol name, a size (number of elements), and a
-    buffer element type that describes the access granularity. For example,
-    `allo.buffer @vecreg size(8) : !allo.scalar<f32>` declares a buffer with
-    8 slots, each holding one f32. HBM buffers must have size 1.
+    Declares a buffer as an **address space times a slot**: `extents` is the
+    array of addressable positions, and the buffer element type describes the
+    access granularity of one position. For example,
+    `allo.buffer @vecreg extents(8) : !allo.vector<16xf32>` declares 8 slots of
+    16 f32 lanes each, and `allo.buffer @dram extents(1024, 64) : !allo.scalar<f32>`
+    declares a row-major off-chip array addressed by two indices.
+
+    An access pattern on this buffer carries one component per extent — that is
+    the only dimensionality rule, and it applies to on-chip and off-chip memory
+    alike (there is no separate "HBM" kind: off-chip memory is simply a buffer
+    whose extents are multi-dimensional and whose slot is a scalar).
   }];
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    I64Attr:$size,
+    DenseI64ArrayAttr:$extents,
     TypeAttrOf<BufferTypeInterface>:$bufferType);
   let results = (outs);
-  let assemblyFormat = [{
-    $sym_name `size` `(` $size `)` attr-dict `:` $bufferType
-  }];
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 

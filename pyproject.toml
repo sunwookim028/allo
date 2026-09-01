@@ -47,7 +47,13 @@ wheel.packages = ["allo"]
 # Build against the same LLVM toolchain the bundled MLIR was built with.
 CMAKE_C_COMPILER = "clang"
 CMAKE_CXX_COMPILER = "clang++"
+CMAKE_VISIBILITY_INLINES_HIDDEN = "ON"
+CMAKE_C_VISIBILITY_PRESET = "hidden"
+CMAKE_CXX_VISIBILITY_PRESET = "hidden"
+Python_FIND_VIRTUALENV = "ONLY"
+Python3_FIND_VIRTUALENV = "ONLY"
 MLIR_BINDINGS_PYTHON_NB_DOMAIN = "allo"
+LLVM_ENABLE_ZSTD = "OFF"
 
 [tool.scikit-build.editable]
 # Rebuild the native bits on import so `pip install -e .` is one self-healing step.

@@ -23,9 +23,7 @@ top-level `allo` namespace.
 ## Kernel Definition
 
 Allo kernels are Python functions decorated with `@kernel`. Every parameter must
-have a type annotation. All examples in this document assume the file starts with
-`from __future__ import annotations`; this lets shaped annotations be written
-directly as `f32[16]` instead of quoted strings such as `"f32[16]"`.
+have a type annotation.
 
 ```python
 from allo.lang import f32, kernel

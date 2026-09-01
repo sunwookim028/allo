@@ -53,8 +53,8 @@ from allo.operators import math as m
 
 from .isa import qkv, N, D0_SIZE
 
-D1_SLOTS = qkv.buffers["d1"].size  # 128 GEMM-operand staging rows
-D2_SLOTS = qkv.buffers["d2"].size  # 64 GEMM-output / softmax rows
+D1_SLOTS = qkv.buffers["d1"].capacity  # 128 GEMM-operand staging rows
+D2_SLOTS = qkv.buffers["d2"].capacity  # 64 GEMM-output / softmax rows
 IMEM_SIZE = 4096  # instruction-stream words (IWIDTH words per instruction)
 IWIDTH = 4  # words per instruction record: [opcode, a0, a1, a2]
 NEG = -1e30  # additive "-inf" seed for the stable-softmax row max

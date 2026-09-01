@@ -86,7 +86,7 @@ NB_MODULE(_allo, m) {
         return out;
       },
       nb::arg("module"), nb::arg("enable_apfloat"), nb::arg("top") = "",
-      nb::arg("index_width") = 32, nb::arg("with_location") = false);
+      nb::arg("index_width") = 32, nb::arg("with_location") = true);
 
   //===--------------------------------------------------------------------===//
   // schedule
@@ -116,6 +116,7 @@ NB_MODULE(_allo, m) {
   schedule.attr("DATAFLOW_ATTR_NAME") = kDataflowAttr;
   schedule.attr("UNROLL_FACTOR_ATTR_NAME") = kUnrollFactorAttr;
   schedule.attr("PARTITION_ATTR_NAME") = kPartitionAttr;
+  schedule.attr("PIPELINE_REWIND_ATTR_NAME") = kPipelineRewindAttr;
 
   //===--------------------------------------------------------------------===//
   // ir_ext: block surgery + KernelOp helpers not exposed by upstream

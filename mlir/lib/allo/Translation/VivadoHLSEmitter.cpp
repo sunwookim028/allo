@@ -11,8 +11,6 @@
 
 #include "allo/Translation/VivadoHLSEmitter.h"
 
-#include <cctype>
-
 using namespace mlir;
 using namespace mlir::allo;
 
@@ -48,19 +46,6 @@ static std::string getBitMaskLiteral(unsigned width) {
   assert(width >= 1 && width <= 64 && "bit slice width out of range");
   uint64_t mask = width == 64 ? ~uint64_t(0) : (uint64_t(1) << width) - 1;
   return "0x" + llvm::utohexstr(mask, /*LowerCase=*/true) + "ULL";
-}
-
-static std::string sanitizeCppIdentifier(llvm::StringRef name) {
-  std::string result;
-  result.reserve(name.size());
-  for (char c : name) {
-    unsigned char uc = static_cast<unsigned char>(c);
-    result.push_back(std::isalnum(uc) || c == '_' ? c : '_');
-  }
-  if (result.empty() ||
-      std::isdigit(static_cast<unsigned char>(result.front())))
-    result.insert(result.begin(), '_');
-  return result;
 }
 
 std::string VivadoHLSEmitter::getSymbolName(llvm::StringRef name) {
@@ -151,6 +136,34 @@ static std::size_t streamFifoDepth(StreamType type) {
   return depth;
 }
 
+/// Return the outermost loop with `allo.pipeline.ii` if there is only
+/// a single loop nest in the block, otherwise return nullptr.
+/// This is used to determine if we can apply a rewind pragma to the loop.
+static LoopLikeOpInterface hasSingleLoopNest(Block &block) {
+  LoopLikeOpInterface ret = nullptr;
+  Block *currBlock = &block;
+  while (true) {
+    auto loopOps = llvm::to_vector<2>(currBlock->getOps<LoopLikeOpInterface>());
+    if (loopOps.size() != 1)
+      break; // has sibling loops or no loops
+    auto currLoop = loopOps.front();
+    // stop at while loops, they are not supported for rewind
+    if (isa<scf::WhileOp>(currLoop))
+      break;
+    if (currLoop->hasAttr(kPipelineIIAttr) && !ret)
+      ret = currLoop;
+
+    Block &body = currLoop->getRegion(0).front();
+    unsigned numOps = body.getOperations().size();
+    if (body.mightHaveTerminator())
+      --numOps;
+    if (numOps != 1)
+      break; // imperfect loop nest, has sibling ops in the body
+    currBlock = &body;
+  }
+  return ret;
+}
+
 void VivadoHLSEmitter::emitFunction(func::FuncOp func) {
   if (func.getBlocks().empty())
     return;
@@ -161,7 +174,14 @@ void VivadoHLSEmitter::emitFunction(func::FuncOp func) {
     state.failed = true;
     return;
   }
+  // preprocess: auto rewind single-loop processes
+  if (auto loop = hasSingleLoopNest(func.getBlocks().front())) {
+    loop->setAttr(kPipelineRewindAttr, UnitAttr::get(func.getContext()));
+  }
 
+  // Fresh value-name scope, seeded with the argument names already assigned in
+  // the declaration pass so body locals never collide with a parameter.
+  state.beginValueScope(func.getArguments());
   emitFunctionSignature(func);
   state.os << " {\n";
   state.addIndent();
@@ -194,6 +214,8 @@ void VivadoHLSEmitter::emitFunctionSignature(func::FuncOp func) {
   // The top function is the C ABI boundary csim/synth call into
   if (isTopFunc(func))
     state.os << "extern \"C\" ";
+  else
+    state.os << "static ";
   emitFunctionReturnType(func);
   state.os << " " << getSymbolName(func.getSymName()) << "(";
   emitFunctionArguments(func);
@@ -202,9 +224,11 @@ void VivadoHLSEmitter::emitFunctionSignature(func::FuncOp func) {
 
 void VivadoHLSEmitter::emitTrailingLocation(Operation *op) {
   if (state.withLocation) {
-    if (auto loc = dyn_cast<FileLineColLoc>(op->getLoc()))
-      state.os << "\t// " << loc.getFilename() << ":" << loc.getLine() << ":"
-               << loc.getColumn();
+    if (auto loc = dyn_cast<FileLineColLoc>(op->getLoc())) {
+      state.os.indent(2 * state.indentSize);
+      state.os << "// " << loc.getFilename().data() << ":" << loc.getLine()
+               << ":" << loc.getColumn();
+    }
   }
   state.os << "\n";
 }
@@ -310,6 +334,8 @@ void VivadoHLSEmitter::emitCall(func::CallOp op) {
 
 void VivadoHLSEmitter::emitPartitionPragma(allo::PartitionAttr attr,
                                            llvm::StringRef varName) {
+  unsigned i = 0;
+  unsigned n = attr.getPartitions().size();
   for (auto axiAttr : attr.getPartitions()) {
     state.os.indent(state.currentIndent);
     state.os << "#pragma HLS array_partition variable=" << varName;
@@ -328,7 +354,8 @@ void VivadoHLSEmitter::emitPartitionPragma(allo::PartitionAttr attr,
       // ignore factor for complete partition since it is not needed
       break;
     }
-    state.os << "\n";
+    if (i + 1 != n)
+      state.os << "\n";
   }
 }
 
@@ -359,7 +386,7 @@ void VivadoHLSEmitter::emitAffineFor(affine::AffineForOp op) {
 
   if (op.getNumResults())
     os.indent(state.currentIndent);
-  os << "for (";
+  os << state.uniqueLoopLabel(op.getInductionVar()) << ": for (";
   emitValueDecl(op.getInductionVar());
   os << " = ";
   std::string ivName = state.getName(op.getInductionVar());
@@ -403,7 +430,19 @@ void VivadoHLSEmitter::emitLoopDirectives(Operation *op) {
   if (auto pipelineAttr = op->getAttrOfType<IntegerAttr>(kPipelineIIAttr)) {
     int64_t ii = pipelineAttr.getInt();
     state.os.indent(state.currentIndent);
-    state.os << "#pragma HLS pipeline II=" << ii << "\n";
+    if (ii == -1)
+      state.os << "#pragma HLS pipeline off\n";
+    else if (ii == 0) // let vitis auto determine the II
+      state.os << "#pragma HLS pipeline\n";
+    else {
+      if (auto rewindAttr = op->getAttrOfType<UnitAttr>(kPipelineRewindAttr)) {
+        state.os << "#pragma HLS loop_flatten\n";
+        state.os.indent(state.currentIndent);
+        state.os << "#pragma HLS pipeline II=" << ii << " rewind\n";
+      } else {
+        state.os << "#pragma HLS pipeline II=" << ii << "\n";
+      }
+    }
   }
 }
 
@@ -904,7 +943,7 @@ void VivadoHLSEmitter::emitFor(scf::ForOp op) {
 
   if (op.getNumResults())
     os.indent(state.currentIndent);
-  os << "for (";
+  os << state.uniqueLoopLabel(op.getInductionVar()) << ": for (";
   emitValueDecl(op.getInductionVar());
   os << " = ";
   emitValueRef(op.getLowerBound());
@@ -1476,8 +1515,8 @@ void VivadoHLSEmitter::emitCmpF(arith::CmpFOp op) {
   os << ";";
 }
 
-constexpr llvm::StringLiteral deviceHeader = R"XXX(
-//===------------------------------------------------------------*- C++ -*-===//
+constexpr llvm::StringLiteral deviceHeader =
+    R"XXX(//===------------------------------------------------------------*- C++ -*-===//
 //
 // Automatically generated file for High-level Synthesis (HLS).
 //
@@ -1490,7 +1529,9 @@ constexpr llvm::StringLiteral deviceHeader = R"XXX(
 #include <hls_stream.h>
 #include <math.h>
 #include <stdint.h>
+)XXX";
 
+constexpr llvm::StringLiteral bitCastHeader = R"XXX(
 template <typename To, typename From> inline To allo_bitcast(From src) {
 #pragma HLS inline
   union {
@@ -1510,7 +1551,8 @@ void VivadoHLSEmitter::emitModule(ModuleOp mod) {
   if (state.enabledApFloat) {
     os << "#include <ap_float.h>\n";
   }
-  os << "using namespace std;\n\n";
+  os << "using namespace std;\n";
+  os << bitCastHeader << "\n";
   // Step 1: emit top-level declarations other than functions.
   for (Operation &op : mod.getBody()->without_terminator()) {
     if (isa<func::FuncOp>(&op))
@@ -1518,8 +1560,10 @@ void VivadoHLSEmitter::emitModule(ModuleOp mod) {
     dispatch(&op);
   }
 
-  // Step 2: generate all function declarations
+  // Step 2: generate all function declarations. Each gets a fresh value-name
+  // scope so per-function argument names are uniquified within the function.
   for (auto func : mod.getOps<func::FuncOp>()) {
+    state.beginValueScope(func.getArguments());
     emitFunctionSignature(func);
     os << ";";
     emitTrailingLocation(func);

@@ -24,3 +24,6 @@ add_mlir_library(AlloDataflowRuntime SHARED
 set_target_properties(AlloDataflowRuntime PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/allo/_mlir/_mlir_libs"
 )
+
+install(TARGETS AlloDataflowRuntime
+    LIBRARY DESTINATION "allo/_mlir/_mlir_libs")

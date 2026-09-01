@@ -1,10 +1,12 @@
 [submodule "externals/llvm-project"]
 	path = externals/llvm-project
 	url = https://github.com/llvm/llvm-project.git
-
 [submodule "externals/past-python-bindings"]
 	path = externals/past-python-bindings
 	url = https://github.com/cornell-zhang/past-python-bindings.git
 [submodule "externals/marl"]
 	path = externals/marl
 	url = https://github.com/google/marl
+[submodule "externals/circt"]
+	path = externals/circt
+	url = https://github.com/llvm/circt.git

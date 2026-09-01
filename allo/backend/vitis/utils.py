@@ -103,10 +103,18 @@ def _top_signature_marker(top: str) -> str:
     return f" {top}("
 
 
+def _strip_line_comment(text: str) -> str:
+    """Drop a trailing ``// ...`` comment (e.g. a ``with_location`` annotation)
+    so line-structure checks see the real code ending (``;`` / ``{``). Signature
+    lines contain no other ``//``, so the first occurrence starts the comment."""
+    idx = text.find("//")
+    return (text[:idx] if idx != -1 else text).rstrip()
+
+
 def _extract_top_declaration(hls_code: str, top: str) -> str:
     marker = _top_signature_marker(top)
     for line in hls_code.splitlines():
-        stripped = line.strip()
+        stripped = _strip_line_comment(line.strip())
         if marker in stripped and stripped.endswith(";"):
             return stripped.removeprefix('extern "C" ').strip()
     raise RuntimeError(f"Failed to find emitted declaration for top function {top}")
@@ -153,7 +161,7 @@ def _extract_cpp_arg_name(argument: str) -> str:
 def _extract_top_port_names(hls_code: str, top: str) -> list[str]:
     marker = _top_signature_marker(top)
     for line in hls_code.splitlines():
-        stripped = line.strip()
+        stripped = _strip_line_comment(line.strip())
         if marker not in stripped or not stripped.endswith("{"):
             continue
         args_begin = stripped.find(marker) + len(marker)
@@ -321,7 +329,7 @@ def apply_interface_pragmas(
     index_order = sorted(pragmas, key=lambda index: (index == -1, index))
     for line in hls_code.splitlines():
         lines.append(line)
-        stripped = line.strip()
+        stripped = _strip_line_comment(line.strip())
         if inserted or marker not in stripped or not stripped.endswith("{"):
             continue
         indent = line[: len(line) - len(line.lstrip())] + "  "
@@ -434,7 +442,7 @@ def detect_vitis_home(vitis_home: str | None) -> Path:
     ``$XILINX_HLS``/``$XILINX_VITIS``, then the packaged default."""
     if vitis_home:
         return Path(vitis_home)
-    vitis_env = os.environ.get("XILINX_HLS") or os.environ.get("XILINX_VITIS")
+    vitis_env = os.environ.get("XILINX_VITIS") or os.environ.get("XILINX_HLS")
     if vitis_env:
         return Path(vitis_env)
     return DEFAULT_VITIS_HOME

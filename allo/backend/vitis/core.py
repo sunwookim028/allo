@@ -76,7 +76,7 @@ materialize-topology,
 canonicalize,
 cse,
 convert-allo-to-func,
-func.func(convert-linalg-to-affine-loops),canonicalize,cse)
+func.func(convert-linalg-to-affine-loops,arith-expand),canonicalize,cse)
 """
 CSIM_CACHE_DIR_KEY_LENGTH = 24
 PART_NUMBERS = {

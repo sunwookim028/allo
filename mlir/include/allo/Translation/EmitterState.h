@@ -6,11 +6,150 @@
 #ifndef ALLO_TRANSLATION_EMITTERSTATE_H
 #define ALLO_TRANSLATION_EMITTERSTATE_H
 
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <cctype>
+#include <optional>
+#include <string>
+
 namespace mlir::allo {
+
+// Turn an arbitrary source name into a valid C++ identifier: characters that
+// are not alphanumeric or '_' become '_', and a leading digit (or an empty
+// result) is prefixed with '_'.
+inline std::string sanitizeCppIdentifier(llvm::StringRef name) {
+  std::string result;
+  result.reserve(name.size());
+  for (char c : name) {
+    unsigned char uc = static_cast<unsigned char>(c);
+    result.push_back(std::isalnum(uc) || c == '_' ? c : '_');
+  }
+  if (result.empty() ||
+      std::isdigit(static_cast<unsigned char>(result.front())))
+    result.insert(result.begin(), '_');
+  return result;
+}
+
+// C++ keywords and emitter-reserved identifiers that a source-derived name must
+// never alias -- a local named ``int``/``default``/``allo_bitcast`` would break
+// compilation. Such a name is uniquified with a numeric suffix instead.
+inline bool isReservedCppName(llvm::StringRef name) {
+  static const llvm::StringSet<> reserved = {"allo_bitcast",
+                                             "alignas",
+                                             "alignof",
+                                             "and",
+                                             "and_eq",
+                                             "asm",
+                                             "auto",
+                                             "bitand",
+                                             "bitor",
+                                             "bool",
+                                             "break",
+                                             "case",
+                                             "catch",
+                                             "char",
+                                             "class",
+                                             "compl",
+                                             "const",
+                                             "constexpr",
+                                             "const_cast",
+                                             "continue",
+                                             "decltype",
+                                             "default",
+                                             "delete",
+                                             "do",
+                                             "double",
+                                             "dynamic_cast",
+                                             "else",
+                                             "enum",
+                                             "explicit",
+                                             "export",
+                                             "extern",
+                                             "false",
+                                             "float",
+                                             "for",
+                                             "friend",
+                                             "goto",
+                                             "if",
+                                             "inline",
+                                             "int",
+                                             "long",
+                                             "mutable",
+                                             "namespace",
+                                             "new",
+                                             "noexcept",
+                                             "not",
+                                             "not_eq",
+                                             "nullptr",
+                                             "operator",
+                                             "or",
+                                             "or_eq",
+                                             "private",
+                                             "protected",
+                                             "public",
+                                             "register",
+                                             "reinterpret_cast",
+                                             "return",
+                                             "short",
+                                             "signed",
+                                             "sizeof",
+                                             "static",
+                                             "static_cast",
+                                             "struct",
+                                             "switch",
+                                             "template",
+                                             "this",
+                                             "throw",
+                                             "true",
+                                             "try",
+                                             "typedef",
+                                             "typeid",
+                                             "typename",
+                                             "union",
+                                             "unsigned",
+                                             "using",
+                                             "virtual",
+                                             "void",
+                                             "volatile",
+                                             "while",
+                                             "xor",
+                                             "xor_eq"};
+  return reserved.contains(name);
+}
+
+// The readable name carried by a value's NameLoc, if any. The value's own name
+// is the outermost NameLoc (frontend attaches it as ``NameLoc(name, ...)``).
+inline std::optional<std::string> nameFromLoc(Location loc) {
+  if (auto nameLoc = dyn_cast<NameLoc>(loc))
+    return nameLoc.getName().str();
+  return std::nullopt;
+}
+
+// The source (line, column) a location ultimately points at, peeling NameLoc /
+// CallSite / Fused wrappers to reach a FileLineColLoc. Used to tag loop labels
+// with a stable, source-traceable suffix.
+inline std::optional<std::pair<unsigned, unsigned>>
+lineColFromLoc(Location loc) {
+  if (auto fileLoc = dyn_cast<FileLineColLoc>(loc))
+    return std::make_pair(fileLoc.getLine(), fileLoc.getColumn());
+  if (auto nameLoc = dyn_cast<NameLoc>(loc))
+    return lineColFromLoc(nameLoc.getChildLoc());
+  if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) {
+    if (auto lc = lineColFromLoc(callLoc.getCallee()))
+      return lc;
+    return lineColFromLoc(callLoc.getCaller());
+  }
+  if (auto fusedLoc = dyn_cast<FusedLoc>(loc))
+    for (Location child : fusedLoc.getLocations())
+      if (auto lc = lineColFromLoc(child))
+        return lc;
+  return std::nullopt;
+}
 
 struct EmitterState {
   llvm::raw_ostream &os;
@@ -22,6 +161,14 @@ struct EmitterState {
   // differs from the declared one; a missing entry means unsigned (the
   // default).
   DenseMap<Value, bool> signedness;
+  // Names handed out in the current function scope, so source-derived names are
+  // uniquified per function (see `beginValueScope`); `fallbackCounter` feeds
+  // the synthetic `v<n>` names for values without a NameLoc and stays global.
+  llvm::StringSet<> usedValueNames;
+  unsigned fallbackCounter = 0;
+  // Loop labels emitted in the current function scope (Vitis HLS ``label:``
+  // before a ``for``); kept unique so the C labels never clash.
+  llvm::StringSet<> usedLabels;
   unsigned indexWidth = 32;
   bool withLocation = false;
   bool failed = false;
@@ -37,9 +184,57 @@ struct EmitterState {
   std::string addName(Value v) {
     assert(!nameTable.contains(v) &&
            "Value already has a name in the name table");
-    std::string name = "v" + std::to_string(nameTable.size());
-    nameTable[v] = name;
-    return name;
+    // Prefer the value's source name (from its NameLoc) for readability, else a
+    // synthetic `v<n>`; then uniquify within the current function scope.
+    std::string base;
+    if (auto name = nameFromLoc(v.getLoc()))
+      base = sanitizeCppIdentifier(*name);
+    else
+      base = "v" + std::to_string(fallbackCounter++);
+    std::string unique = base;
+    unsigned suffix = 0;
+    while (usedValueNames.contains(unique) || isReservedCppName(unique))
+      unique = base + "_" + std::to_string(++suffix);
+    usedValueNames.insert(unique);
+    nameTable[v] = unique;
+    return unique;
+  }
+
+  // Vitis HLS loop label for a loop induction variable:
+  // ``loop_<name>_l<L>c<C>`` where ``<name>`` is the IV's source name (its
+  // NameLoc) and ``l<L>c<C>`` the source line/column -- readable and traceable.
+  // The line/column disambiguates sibling loops without a counter; a numeric
+  // suffix is only appended as a last resort when two loops share both name and
+  // source location (e.g. the two halves of a split), so the emitted C labels
+  // stay unique.
+  std::string uniqueLoopLabel(Value iv) {
+    Location loc = iv.getLoc();
+    std::string base = "loop";
+    if (auto name = nameFromLoc(loc))
+      base += "_" + sanitizeCppIdentifier(*name);
+    if (auto lc = lineColFromLoc(loc))
+      base +=
+          "_l" + std::to_string(lc->first) + "c" + std::to_string(lc->second);
+    std::string unique = base;
+    unsigned suffix = 0;
+    while (usedLabels.contains(unique))
+      unique = base + "_" + std::to_string(++suffix);
+    usedLabels.insert(unique);
+    return unique;
+  }
+
+  // Start a fresh value-name scope for a function, so per-function locals reuse
+  // clean source names. `seeded` are names already assigned to the function's
+  // arguments (during the declaration pass) that body locals must not collide
+  // with; pass the argument values so their existing names are reserved.
+  template <typename ValueSeq> void beginValueScope(ValueSeq &&seeded) {
+    usedValueNames.clear();
+    usedLabels.clear();
+    for (Value v : seeded) {
+      auto it = nameTable.find(v);
+      if (it != nameTable.end())
+        usedValueNames.insert(it->second);
+    }
   }
 
   std::string getOrAddName(Value v) {
