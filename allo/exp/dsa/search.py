@@ -2139,6 +2139,55 @@ class _Planner:
         That is Stage 2b's rule applied to a value the lowering invented, and it is
         why a body may stage a run of words with one instruction and read it back as
         a multi-dimensional tile with the next."""
+        def contiguous_volume(m) -> int | None:
+            """Return a dense map's element count, otherwise ``None``.
+
+            An expansion may name a whole staging tile as a matrix producer and
+            later consume contiguous pieces of that same tile as vector lanes. The
+            pieces preserve the tile's physical residence; they only select a
+            subrange through ``Ref.offset``. Strided or reordered accesses remain
+            distinct residences and therefore retain the ordinary exact check.
+            """
+            volume = 1
+            for size, stride in reversed(m):
+                if not isinstance(size, int) or stride != volume:
+                    return None
+                volume *= size
+            return volume
+
+        def record(table: dict, tile: Tile, mapping, offset: int, name: str) -> None:
+            """Record one tile residence, accepting bounded dense subviews."""
+            tile_volume = prod(_shape(tile))
+            new_volume = contiguous_volume(mapping)
+            if new_volume is not None and offset + new_volume > tile_volume:
+                raise LayoutError(
+                    f"{who}: '{name}' accesses {new_volume} element(s) at offset "
+                    f"{offset} of its {tile_volume}-element staging tile"
+                )
+            previous = table.get(tile)
+            if previous is None or previous == mapping:
+                table[tile] = mapping
+                return
+            old_volume = contiguous_volume(previous)
+            if (
+                old_volume is not None
+                and new_volume is not None
+                and old_volume <= tile_volume
+                and new_volume <= tile_volume
+            ):
+                # Keep the full-tile map for allocation. A later full access can
+                # replace an earlier subview, but two partial views alone cannot
+                # establish a residence for the entire staging value.
+                if new_volume == tile_volume:
+                    table[tile] = mapping
+                return
+            raise LayoutError(
+                f"{who}: its staging tile of shape {tile.shape} is read as "
+                f"{show_map(previous)} by one instruction and "
+                f"{show_map(mapping)} by '{name}' — a value has one residence, "
+                "so the expansion has to stage them separately"
+            )
+
         fixed: dict = {}
         carried: dict = {}
         for name, addr in calls:
@@ -2153,13 +2202,7 @@ class _Planner:
                     continue
                 pos = offset_of[i][0][0]
                 into = carried if preserving else fixed
-                if into.setdefault(v.value, maps[pos]) != maps[pos]:
-                    raise LayoutError(
-                        f"{who}: its staging tile of shape {v.value.shape} is read as "
-                        f"{show_map(into[v.value])} by one instruction and "
-                        f"{show_map(maps[pos])} by '{name}' — a value has one "
-                        f"residence, so the expansion has to stage them separately"
-                    )
+                record(into, v.value, maps[pos], v.offset, name)
         out = {}
         for tile, res in (carried | fixed).items():
             if prod(_shape(tile)) != prod(s for s, _st in res):

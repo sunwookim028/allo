@@ -85,8 +85,8 @@ def _check_tiled_gemm(M: int, K: int, N: int) -> None:
     prog = tpu.compile_program(_gemm_source(M, K, N))
     names = [emit.name for emit in prog.emits]
     n_tiles = (M // 4) * (K // 4) * (N // 4)
-    assert names.count("matmul") + names.count("matmul_acc") == n_tiles
-    assert names.count("matmul_acc") == (M // 4) * (N // 4) * (K // 4 - 1)
+    assert names.count("matmul") == n_tiles
+    assert names.count("vadd") == (M // 4) * (N // 4) * (K // 4 - 1) * 2
     np.testing.assert_allclose(prog(a, b), a @ b, rtol=1e-4, atol=1e-4)
     print(
         f"TOSA GEMM {M}x{K}x{N}: {len(names)} tiled ISA instructions; "

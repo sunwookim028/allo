@@ -185,31 +185,6 @@ def matmul(I):
         return primitive.matmul(x, primitive.transpose(w, [0, 2, 1]))
 
 
-@tpu.instruction(src=[bram, bram, bram], dst=bram)
-def matmul_acc(I):
-    """Accumulate one systolic K tile: ``Z += X @ W^T``.
-
-    This is a separate ISA semantic because both the old result and new result
-    are 4x4 tiles. Keeping that tile contract explicit lets the generic DSA
-    allocator preserve one residence across an arbitrary K reduction. The
-    current HLS decoder has only overwrite ``matmul``; implementing this semantic
-    in hardware is the corresponding next ISA/microarchitecture co-design step.
-    """
-
-    @I.access
-    def _(w, x, c, z):
-        return (
-            view(bram, w, (1, MATMUL_TILE, MATMUL_TILE)),
-            view(bram, x, (1, MATMUL_TILE, MATMUL_TILE)),
-            view(bram, c, (1, MATMUL_TILE, MATMUL_TILE)),
-            view(bram, z, (1, MATMUL_TILE, MATMUL_TILE)),
-        )
-
-    @I.compute
-    def _(w, x, c, z):
-        return primitive.add(c, primitive.matmul(x, primitive.transpose(w, [0, 2, 1])))
-
-
 # --- Layer lowering: C[M,N] = A[M,K] @ B[K,N] over the fixed 4x4 systolic
 # array. This is a compiler macro in the Allo ISA spec: ACT expands it into
 # DMA, systolic, and accumulation instructions, then allocates every
@@ -220,7 +195,7 @@ def matmul_acc(I):
     dst=dram,
     cost=lambda M, K, N: (M // MATMUL_TILE)
     * (N // MATMUL_TILE)
-    * ((K // MATMUL_TILE) * 21 + 4),
+    * ((K // MATMUL_TILE) * 21 + max(K // MATMUL_TILE - 1, 0) * 8 + 4),
 )
 def gemm(I):
     """Whole standard GEMM, lowered to 4x4 Cornell-TPU instructions.
@@ -250,8 +225,11 @@ def gemm(I):
                 f"{MATMUL_TILE}x{MATMUL_TILE} systolic tile"
             )
 
-        x_tile, w_tile, z_tile = (
-            scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(3)
+        x_tile, w_tile, z_tile, partial_tile = (
+            scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(4)
+        )
+        z_lo, z_hi, partial_lo, partial_hi = (
+            scratch((VEC_LANES,)) for _ in range(4)
         )
 
         for m in range(0, M, MATMUL_TILE):
@@ -277,7 +255,16 @@ def gemm(I):
                     if k == 0:
                         matmul(w=w_tile, x=x_tile, z=z_tile)
                     else:
-                        matmul_acc(w=w_tile, x=x_tile, c=z_tile, z=z_tile)
+                        matmul(w=w_tile, x=x_tile, z=partial_tile)
+                        # Two 8-lane VPU additions accumulate the 16-word tile.
+                        vload(s=z_tile, d=z_lo)
+                        vload(s=partial_tile, d=partial_lo)
+                        vadd(a=z_lo, b=partial_lo, d=z_lo)
+                        vstore(s=z_lo, d=z_tile)
+                        vload(s=z_tile + VEC_LANES, d=z_hi)
+                        vload(s=partial_tile + VEC_LANES, d=partial_hi)
+                        vadd(a=z_hi, b=partial_hi, d=z_hi)
+                        vstore(s=z_hi, d=z_tile + VEC_LANES)
                 # C's tile rows are likewise scattered with existing linear DMA.
                 for row in range(MATMUL_TILE):
                     dma_store(
