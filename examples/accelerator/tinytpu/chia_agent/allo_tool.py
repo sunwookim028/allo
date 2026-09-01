@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from chia.base.tools.ChiaTool import ChiaTool
@@ -54,23 +56,24 @@ class AlloSpecTool(ChiaTool):
             paths.append(old_path)
         if len(paths) != len(set(paths)):
             return "Rejected: each writable file may appear only once per patch."
-        checked = subprocess.run(
-            ["patch", "--dry-run", "--batch", "--forward", "-p1"],
-            input=patch,
-            text=True,
-            cwd=self.repo,
-            capture_output=True,
-        )
-        if checked.returncode:
-            return f"Rejected: patch does not apply.\n{checked.stdout}{checked.stderr}"
-        applied = subprocess.run(
-            ["patch", "--batch", "--forward", "-p1"],
-            input=patch,
-            text=True,
-            cwd=self.repo,
-            capture_output=True,
-        )
-        assert applied.returncode == 0, applied.stdout + applied.stderr
+        # Never invoke patch in the real repository: GNU patch can leave a
+        # partially-applied file and ``.orig`` backup after a malformed hunk.
+        # First patch isolated copies, then commit all modified source files.
+        with tempfile.TemporaryDirectory(prefix="tinytpu-patch-") as tmp:
+            sandbox = Path(tmp)
+            for name, source in self.sources.items():
+                shutil.copy2(source, sandbox / name)
+            applied = subprocess.run(
+                ["patch", "--batch", "--forward", "--no-backup-if-mismatch", "-p1"],
+                input=patch,
+                text=True,
+                cwd=sandbox,
+                capture_output=True,
+            )
+            if applied.returncode:
+                return f"Rejected: patch does not apply.\n{applied.stdout}{applied.stderr}"
+            for name in paths:
+                self.sources[name].write_bytes((sandbox / name).read_bytes())
         return f"Patch applied to {', '.join(paths)}."
 
     def insert_after(self, path: str, anchor: str, content: str) -> str:
