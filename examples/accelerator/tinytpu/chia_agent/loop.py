@@ -140,6 +140,8 @@ def run(
     iterations: int,
     max_debug_attempts: int,
     log_dir: Path,
+    workspace: Path = TINYTPU_DIR,
+    tool_name: str = "tinytpu",
 ) -> int:
     runtime_env = {"working_dir": str(AGENT_DIR)}
     try:
@@ -152,7 +154,9 @@ def run(
 
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "variants.jsonl"
-    tool = AlloSpecTool("tinytpu", str(TINYTPU_DIR), CONDA_EXE)
+    # ``workspace`` is this worker's own copy of the writable spec, so several
+    # searches can run at once without clobbering one another.
+    tool = AlloSpecTool(tool_name, str(workspace), CONDA_EXE)
     try:
         baseline_snapshot = tool.snapshot()
 
@@ -207,9 +211,10 @@ Already attempted:
 
 Propose ONE new candidate that should reduce the synthesized cycle count.
 Inspect the spec first, apply a coupled ISA/microarchitecture edit as a unified
-diff, and verify it with tinytpu_run_compiler_check. You may call
-tinytpu_score_cycles yourself to see the synthesized result. Explain in one or
-two sentences what you changed and why it should cost fewer cycles.
+diff, and verify it with {tool.name}_run_compiler_check. You may call
+{tool.name}_score_cycles yourself to see the synthesized result. Keep the change
+as small as it can be while still being a real architectural change. Explain in
+one or two sentences what you changed and why it should cost fewer cycles.
 """,
             )
             print(response.result)
@@ -313,9 +318,27 @@ def main() -> None:
         type=Path,
         default=Path(os.environ.get("TINYTPU_CHIA_LOG_DIR", "chia_runs/latest")),
     )
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=TINYTPU_DIR,
+        help="this worker's own copy of the writable spec (a git worktree)",
+    )
+    parser.add_argument(
+        "--tool-name",
+        default="tinytpu",
+        help="MCP tool prefix; must be unique per concurrent worker",
+    )
     args = parser.parse_args()
     raise SystemExit(
-        run(args.task, args.iterations, args.max_debug_attempts, args.log_dir)
+        run(
+            args.task,
+            args.iterations,
+            args.max_debug_attempts,
+            args.log_dir,
+            args.workspace,
+            args.tool_name,
+        )
     )
 
 

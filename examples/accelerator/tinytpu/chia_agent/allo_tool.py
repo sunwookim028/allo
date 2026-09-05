@@ -12,6 +12,8 @@ from pathlib import Path
 
 from chia.base.tools.ChiaTool import ChiaTool
 
+from spec_policy import policy_violations
+
 #: Sourced before any Vitis-invoking check so the synthesis gate works whether
 #: the loop was launched from a Vitis-configured shell or a bare Ray worker.
 VITIS_SETTINGS = os.environ.get(
@@ -29,17 +31,27 @@ class AlloSpecTool(ChiaTool):
             "microarch.py": self.repo / "microarch.py",
         }
         self.conda_exe = conda_exe
+        # Per-instance, so parallel workers never share one HLS project dir.
         self.synth_project = Path(
-            os.environ.get("TINYTPU_SYNTH_PROJECT", "/tmp/tinytpu_chia_synth_prj")
+            os.environ.get("TINYTPU_SYNTH_PROJECT", "/tmp/tinytpu_chia_synth")
+        ).with_name(
+            Path(
+                os.environ.get("TINYTPU_SYNTH_PROJECT", "/tmp/tinytpu_chia_synth")
+            ).name
+            + f"_{self.name}"
         )
         assert all(path.is_file() for path in self.sources.values()), self.sources
-        self.mcp.add_tool(self.read_spec, name="tinytpu_read_spec")
-        self.mcp.add_tool(self.apply_spec_patch, name="tinytpu_apply_spec_patch")
-        self.mcp.add_tool(self.insert_after, name="tinytpu_insert_after")
-        self.mcp.add_tool(self.run_compiler_check, name="tinytpu_run_compiler_check")
-        self.mcp.add_tool(self.run_hardware_check, name="tinytpu_run_hardware_check")
-        self.mcp.add_tool(self.score_access_cost, name="tinytpu_score_access_cost")
-        self.mcp.add_tool(self.score_cycles, name="tinytpu_score_cycles")
+        self.mcp.add_tool(self.read_spec, name=f"{self.name}_read_spec")
+        self.mcp.add_tool(self.apply_spec_patch, name=f"{self.name}_apply_spec_patch")
+        self.mcp.add_tool(self.insert_after, name=f"{self.name}_insert_after")
+        self.mcp.add_tool(
+            self.run_compiler_check, name=f"{self.name}_run_compiler_check"
+        )
+        self.mcp.add_tool(
+            self.run_hardware_check, name=f"{self.name}_run_hardware_check"
+        )
+        self.mcp.add_tool(self.score_access_cost, name=f"{self.name}_score_access_cost")
+        self.mcp.add_tool(self.score_cycles, name=f"{self.name}_score_cycles")
 
     # -- Variant bookkeeping. Deliberately *not* MCP tools: the search harness
     # -- accepts or rewinds a candidate, the agent does not get to choose.
@@ -76,6 +88,14 @@ class AlloSpecTool(ChiaTool):
             return (
                 f"Rejected: the edit leaves {name} unparseable — "
                 f"{error.msg} at line {error.lineno}. The file is unchanged."
+            )
+        problems = policy_violations(name, source)
+        if problems:
+            return (
+                "Rejected: the edit is outside what a hardware spec may contain — "
+                + "; ".join(problems)
+                + ". Describe hardware; do not read, write, or execute. "
+                "The file is unchanged."
             )
         return None
 
