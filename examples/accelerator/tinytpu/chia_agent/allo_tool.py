@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import shlex
 import shutil
@@ -62,6 +63,22 @@ class AlloSpecTool(ChiaTool):
             chunks.extend(difflib.unified_diff(before, after, f"a/{name}", f"b/{name}"))
         return "".join(chunks)
 
+    def _syntax_error(self, name: str, source: str) -> str | None:
+        """``None`` if ``source`` parses, else the message to hand back.
+
+        Both edit paths go through this. An edit that leaves a writable file
+        unparseable would otherwise be discovered only by the compiler check,
+        costing a whole debug round to a mistake visible at edit time.
+        """
+        try:
+            ast.parse(source, filename=name)
+        except SyntaxError as error:
+            return (
+                f"Rejected: the edit leaves {name} unparseable — "
+                f"{error.msg} at line {error.lineno}. The file is unchanged."
+            )
+        return None
+
     def read_spec(self) -> str:
         """Return the complete ISA plus its writable composed hardware blocks."""
         return "\n\n".join(
@@ -109,8 +126,13 @@ class AlloSpecTool(ChiaTool):
                 return (
                     f"Rejected: patch does not apply.\n{applied.stdout}{applied.stderr}"
                 )
-            for name in paths:
-                self.sources[name].write_bytes((sandbox / name).read_bytes())
+            patched = {name: (sandbox / name).read_bytes() for name in paths}
+            for name, content in patched.items():
+                broken = self._syntax_error(name, content.decode("utf-8"))
+                if broken:
+                    return broken
+            for name, content in patched.items():
+                self.sources[name].write_bytes(content)
         return f"Patch applied to {', '.join(paths)}."
 
     def insert_after(self, path: str, anchor: str, content: str) -> str:
@@ -125,7 +147,16 @@ class AlloSpecTool(ChiaTool):
         source = target.read_text(encoding="utf-8")
         if source.count(anchor) != 1:
             return f"Rejected: anchor must occur exactly once in {path}."
-        target.write_text(source.replace(anchor, anchor + content, 1), encoding="utf-8")
+        # Insert at the end of the anchor's line. An anchor that stops mid-line
+        # would otherwise splice new code into that statement.
+        cut = source.index(anchor) + len(anchor)
+        line_end = source.find("\n", cut)
+        cut = len(source) if line_end == -1 else line_end + 1
+        updated = source[:cut] + content + source[cut:]
+        broken = self._syntax_error(path, updated)
+        if broken:
+            return broken
+        target.write_text(updated, encoding="utf-8")
         return f"Content inserted into {path}."
 
     def run_compiler_check(self) -> str:
