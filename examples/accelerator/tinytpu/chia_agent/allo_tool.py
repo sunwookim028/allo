@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 from chia.base.tools.ChiaTool import ChiaTool
+
+#: Sourced before any Vitis-invoking check so the synthesis gate works whether
+#: the loop was launched from a Vitis-configured shell or a bare Ray worker.
+VITIS_SETTINGS = os.environ.get(
+    "TINYTPU_VITIS_SETTINGS", "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
+)
 
 
 class AlloSpecTool(ChiaTool):
@@ -21,6 +28,9 @@ class AlloSpecTool(ChiaTool):
             "microarch.py": self.repo / "microarch.py",
         }
         self.conda_exe = conda_exe
+        self.synth_project = Path(
+            os.environ.get("TINYTPU_SYNTH_PROJECT", "/tmp/tinytpu_chia_synth_prj")
+        )
         assert all(path.is_file() for path in self.sources.values()), self.sources
         self.mcp.add_tool(self.read_spec, name="tinytpu_read_spec")
         self.mcp.add_tool(self.apply_spec_patch, name="tinytpu_apply_spec_patch")
@@ -28,6 +38,29 @@ class AlloSpecTool(ChiaTool):
         self.mcp.add_tool(self.run_compiler_check, name="tinytpu_run_compiler_check")
         self.mcp.add_tool(self.run_hardware_check, name="tinytpu_run_hardware_check")
         self.mcp.add_tool(self.score_access_cost, name="tinytpu_score_access_cost")
+        self.mcp.add_tool(self.score_cycles, name="tinytpu_score_cycles")
+
+    # -- Variant bookkeeping. Deliberately *not* MCP tools: the search harness
+    # -- accepts or rewinds a candidate, the agent does not get to choose.
+    def snapshot(self) -> dict[str, bytes]:
+        """Capture the current writable spec so a candidate can be rewound."""
+        return {name: path.read_bytes() for name, path in self.sources.items()}
+
+    def restore(self, snapshot: dict[str, bytes]) -> None:
+        """Put the writable spec back to a captured snapshot."""
+        for name, content in snapshot.items():
+            self.sources[name].write_bytes(content)
+
+    def diff_against(self, snapshot: dict[str, bytes]) -> str:
+        """A unified diff from ``snapshot`` to the current spec, for the record."""
+        import difflib
+
+        chunks = []
+        for name, path in self.sources.items():
+            before = snapshot.get(name, b"").decode("utf-8").splitlines(keepends=True)
+            after = path.read_text(encoding="utf-8").splitlines(keepends=True)
+            chunks.extend(difflib.unified_diff(before, after, f"a/{name}", f"b/{name}"))
+        return "".join(chunks)
 
     def read_spec(self) -> str:
         """Return the complete ISA plus its writable composed hardware blocks."""
@@ -43,7 +76,9 @@ class AlloSpecTool(ChiaTool):
         ``b/isa.py``. No other repository path is accepted: the generic ACT
         compiler, runtime, tests, and benchmark remain fixed.
         """
-        headers = [line for line in patch.splitlines() if line.startswith(("--- ", "+++ "))]
+        headers = [
+            line for line in patch.splitlines() if line.startswith(("--- ", "+++ "))
+        ]
         if not headers or len(headers) % 2:
             return "Rejected: patch needs paired git-style file headers."
         paths = []
@@ -71,7 +106,9 @@ class AlloSpecTool(ChiaTool):
                 capture_output=True,
             )
             if applied.returncode:
-                return f"Rejected: patch does not apply.\n{applied.stdout}{applied.stderr}"
+                return (
+                    f"Rejected: patch does not apply.\n{applied.stdout}{applied.stderr}"
+                )
             for name in paths:
                 self.sources[name].write_bytes((sandbox / name).read_bytes())
         return f"Patch applied to {', '.join(paths)}."
@@ -109,19 +146,31 @@ class AlloSpecTool(ChiaTool):
             output = output[-24_000:]
         return f"exit={result.returncode}\n{output}"
 
-    def _run_allo_module(self, module: str, *args: str) -> str:
+    def _run_allo_module(
+        self, module: str, *args: str, vitis: bool = False, timeout: int = 300
+    ) -> str:
         root = self.repo.parents[2]
         env = os.environ | {
             "PYTHONPATH": str(root),
             "SKBUILD_EDITABLE_SKIP": str(root / "build"),
         }
+        command = [self.conda_exe, "run", "-n", "allo", "python", "-m", module, *args]
+        if vitis and os.path.exists(VITIS_SETTINGS):
+            # ``conda run`` does not read a profile, so Vitis has to be put on
+            # PATH explicitly for the synthesis gate.
+            quoted = " ".join(shlex.quote(part) for part in command)
+            command = [
+                "bash",
+                "-c",
+                f". {shlex.quote(VITIS_SETTINGS)} >/dev/null && {quoted}",
+            ]
         result = subprocess.run(
-            [self.conda_exe, "run", "-n", "allo", "python", "-m", module, *args],
+            command,
             cwd=root,
             env=env,
             text=True,
             capture_output=True,
-            timeout=300,
+            timeout=timeout,
         )
         output = (result.stdout + result.stderr).strip()
         if len(output) > 24_000:
@@ -130,8 +179,23 @@ class AlloSpecTool(ChiaTool):
 
     def run_hardware_check(self) -> str:
         """Export the composed Allo-HLS microarchitecture as a feasibility gate."""
+        return self._run_allo_module("examples.accelerator.tinytpu.verify", "--hls")
+
+    def score_cycles(self) -> str:
+        """Synthesize the candidate and score its benchmark cycle count.
+
+        This is the optimization objective. Vitis HLS C-synthesis runs on the
+        composed schedule, every unit's ``(ii, depth)`` is re-measured from that
+        report, and the GEMM benchmarks are then costed under the measured
+        table -- so a declared ``ISA.latency`` cannot influence the score. Area
+        and Fmax come back in the same JSON but are not scored.
+        """
         return self._run_allo_module(
-            "examples.accelerator.tinytpu.verify", "--hls"
+            "examples.accelerator.tinytpu.ppa",
+            "--project",
+            str(self.synth_project),
+            vitis=True,
+            timeout=1800,
         )
 
     def score_access_cost(self) -> str:

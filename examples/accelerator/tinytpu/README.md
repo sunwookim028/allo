@@ -23,7 +23,13 @@ make compiler     # direct-TOSA compiler, tiling, and spill checks
 make cpu          # scaffold LLVM-JIT lowered MLIR
 make hls          # generate and sanity-check Vitis HLS C++
 make rtl          # schedule and emit Kai RTLGen SystemVerilog
+make synth        # run Vitis HLS C-synthesis, print the measured latency table
+make ppa          # the co-design objective: synthesize, re-measure, score cycles
 ```
+
+`make synth` and `make ppa` invoke Vitis HLS, so source its `settings64.sh`
+first (`. /opt/xilinx/Vitis_HLS/2023.2/settings64.sh`). The other targets need
+no synthesis tool.
 
 Set `CONDA=/path/to/conda` or `ENV=name` when needed. The compiler check uses
 TOSA text directly, so it does not require PyTorch or torch-mlir.
@@ -41,10 +47,37 @@ TOSA text directly, so it does not require PyTorch or torch-mlir.
 | CPU backend | complete TinyTPU interpreter compiles to LLVM JIT |
 | Vitis backend | HLS C++ export succeeds without Vitis installed |
 | Kai RTLGen backend | complete TinyTPU emits CIRCT-scheduled SystemVerilog |
+| Vitis HLS C-synthesis | 411 MHz Fmax, 8515 LUT / 9111 FF / 20 DSP / 26 BRAM18K on `xcu55c` |
+| Synthesis-grounded objective | 126,432 cycles across both GEMMs (41 s per evaluation) |
 
 The pressure graph has 20 vector inputs and 10 partial sums, deliberately
 exceeding the eight vector-register slots. It exercises allocation, movement,
 and spilling.
+
+## Closing the loop with synthesis
+
+`microarch.py` declares each unit's cycle model as a frozen constant, marked in
+the source as replaceable by a synthesis-derived table. `synth.py` does that
+replacement: it runs C-synthesis on the same composed schedule and rebuilds
+every unit's `(ii, depth)` from the report, reconciling the measured call
+latency with the per-loop `ii`/depth/trip count so `depth + ii * trips`
+reproduces exactly what the tool measured.
+
+The correction is large, which is the point — the frozen guesses were not close:
+
+| Unit | declared | measured | note |
+| --- | --- | --- | --- |
+| `vload` | 11 cyc | 9 cyc | |
+| `vstore` | 11 cyc | 10 cyc | |
+| `vpu` | 13 cyc | 18 cyc | |
+| `mxu` | 36 cyc | 72 cyc | two sequential passes, so `ii=2` |
+| `dma_load` | depth 8 | depth 75 | the `m_axi` read latency HLS actually builds |
+
+`ppa.py` scores a candidate under that measured table: the objective is
+`sum(CompiledProgram.cycles())` over the two GEMMs. Area and Fmax are reported
+for every candidate but deliberately not scored. Because the table is
+overwritten from synthesis before scoring, editing an `ISA.latency` declaration
+cannot move the score — only building different hardware can.
 
 ## Map of the flow
 
@@ -55,8 +88,11 @@ and spilling.
 - `oracle.py`: hand-written instruction-stream examples and functional checks.
 - `program.py`: optional PyTorch-to-TOSA examples; requires `torch_mlir`.
 - `verify.py`: dependency-light direct-TOSA checks used by the Makefile.
-- `feedback.py`: frozen VREG/VMEM access-cost objective consumed by CHIA.
-- `chia_agent/`: narrow generate -> validate -> score agent loop.
+- `feedback.py`: the pre-synthesis VREG/VMEM access-cost objective.
+- `synth.py`: runs Vitis HLS C-synthesis and rebuilds the per-unit `(ii, depth)`
+  table from the measured report.
+- `ppa.py`: the co-design objective — synthesize, re-measure, score cycles.
+- `chia_agent/`: the generate -> synthesize -> score -> keep-or-rewind loop.
 
 The backend switch is explicit and contains no device-specific compiler fork:
 

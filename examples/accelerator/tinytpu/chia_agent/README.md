@@ -1,58 +1,106 @@
 # TinyTPU CHIA agent
 
-This is a minimal, host-runnable CHIA loop for TinyTPU co-design. Its agent can
-read and edit only `isa.py` and `microarch.py`; it cannot alter generic compiler
-code, runtime, tests, or benchmarks. `microarch.py` stays explicitly composed
-from named Allo-HLS blocks: `dma_load`/`dma_store`, `vload`/`vstore`, `vpu`,
-`mxu`, and the top-level decoder/composition. The agent may connect or refine
-those blocks (or add one focused `@tpu.unit`) while keeping ISA, decoder, and
-schedules aligned.
+A host-runnable CHIA co-design loop for TinyTPU. The agent can read and edit
+only `isa.py` and `microarch.py`; it cannot alter the generic ACT compiler,
+runtime, tests, benchmarks, or the evaluator. `microarch.py` stays explicitly
+composed from named Allo-HLS blocks: `dma_load`/`dma_store`, `vload`/`vstore`,
+`vpu`, `mxu`, and the top-level decoder/composition. The agent may connect or
+refine those blocks (or add one focused `@tpu.unit`) while keeping ISA,
+decoder, and schedules aligned.
 
-The host uses `chia_env` (Python 3.10); the check is run by the existing `allo`
-environment through `conda run -n allo`. No Docker is required for the local
-demo.
+The host uses `chia_env` (Python 3.10); checks run in the existing `allo`
+environment through `conda run -n allo`. No Docker is required.
 
-## First authenticated run
+## The objective
 
-After Vertex AI, billing, and Application Default Credentials are configured:
+Each candidate is scored by **synthesizing it**:
+
+1. the composed `top_s` schedule is exported to Vitis HLS and C-synthesized,
+2. every unit's `(ii, depth)` is re-measured from that report, replacing
+   `microarch.py`'s frozen declarations (`../synth.py`),
+3. the GEMM benchmarks are compiled, checked against NumPy, and costed under
+   the measured table (`../ppa.py`).
+
+The score is `sum(CompiledProgram.cycles())` over the 8x8x8 and 8x16x32 GEMMs.
+Area and Fmax are recorded for every candidate but **not** scored. Because the
+latency table is overwritten from synthesis before scoring, an optimistic
+`ISA.latency` declaration cannot move the score.
+
+One evaluation (synthesis included) takes about 50 seconds.
+
+## The search
+
+`loop.py` runs generate -> gate -> score -> keep-or-rewind:
+
+- it synthesizes the unmodified design first, as the baseline,
+- each iteration proposes one candidate *from the best design so far*,
+- a candidate must pass the direct-TOSA compiler check, then is synthesized
+  and scored,
+- it is kept only if it strictly beats the best score; otherwise the writable
+  spec is rewound and the next iteration is told what failed,
+- every candidate is appended to `<log-dir>/variants.jsonl` with its score,
+  synthesis summary, and diff; the winning diff lands in `<log-dir>/best.diff`.
+
+The repository is left holding the best design found.
+
+## Running it
+
+Prerequisites are installed under `/home/sk3463/chia-tools` (deliberately not
+`/tmp`, which gets wiped):
 
 ```bash
-export GOOGLE_CLOUD_PROJECT=<project-id>
+git clone https://github.com/ucb-bar/chia.git /home/sk3463/chia-tools/chia
+conda create -n chia_env python=3.10.19
+conda run -n chia_env pip install -e /home/sk3463/chia-tools/chia
+npm install --prefix /home/sk3463/chia-tools/opencode-cli opencode-ai@1.18.25
+```
+
+Then:
+
+```bash
+export GOOGLE_CLOUD_PROJECT=test-adrs
+. /opt/xilinx/Vitis_HLS/2023.2/settings64.sh   # the score gate needs Vitis
 
 source /home/sk3463/miniconda3/etc/profile.d/conda.sh
 conda activate chia_env
-npm install --prefix /tmp/chia-opencode-cli opencode-ai@1.18.25
-export PATH=/tmp/chia-opencode-cli/node_modules/.bin:$PATH
+export PATH=/home/sk3463/chia-tools/opencode-cli/node_modules/.bin:$PATH
 export TINYTPU_CONDA="$(command -v conda)"
 
 ray stop
 ray start --head --resources='{"opencode_creds": 1}' --include-dashboard=false
 python chia_agent/loop.py \
-  --task 'Explore whether MXU and VPU can share tiled GEMM values through VREG rather than VMEM. Preserve results and minimize the VREG/VMEM traffic objective.'
+  --iterations 5 \
+  --log-dir chia_runs/$(date +%Y%m%d-%H%M%S) \
+  --task 'Reduce the synthesized cycle count of the tiled GEMMs. dma_load
+          dominates: its measured depth is 75 cycles of m_axi read latency paid
+          per instruction, so fewer, larger DRAM transfers or more on-chip reuse
+          through VREG should pay off.'
 ray stop
 ```
 
-The default model is `google-vertex/gemini-3.1-pro-preview`; override it with
-`TINYTPU_OPENCODE_MODEL`. Each candidate must pass the direct-TOSA compiler
-check, then is evaluated on 8×8×8 and 8×16×32 GEMMs. The pre-synthesis
-checkpoint has frozen costs: `VREG words × 1 + VMEM words × 4`; DRAM traffic
-is reported but intentionally not scored. CPU, Vitis C++ export, and Kai's
-RTLGen are all available from the same composed schedule; external synthesis
-is deferred until the dedicated HLS tooling server is available.
-`cluster.yaml` remains available for multi-machine CHIA use; it requires SSH
-connectivity between the declared workers.
+The default model is `google-vertex/gemini-3.1-pro-preview`; override with
+`TINYTPU_OPENCODE_MODEL`. `cluster.yaml` remains available for multi-machine
+CHIA use; it requires SSH connectivity between the declared workers.
 
-## Prerequisites
+## Vertex AI
 
-Install CHIA in a separate Python 3.10 environment, then install it editable:
+Project `test-adrs` has `aiplatform.googleapis.com` enabled and billing active,
+and `gemini-3.1-pro-preview` answers on location `global`. Application Default
+Credentials are already present and refresh cleanly. If they lapse:
 
 ```bash
-git clone https://github.com/ucb-bar/chia.git /tmp/chia
-conda create -n chia_env python=3.10.19
-conda run -n chia_env pip install -e /tmp/chia
+gcloud auth application-default login
+gcloud auth application-default set-quota-project test-adrs
 ```
 
-The parent Allo checkout must already have its `allo` environment built, as
-documented by that repository. For Vertex AI, enable `aiplatform.googleapis.com`,
-enable billing, then run `gcloud auth application-default login` and
-`gcloud auth application-default set-quota-project <project-id>`.
+## Environment knobs
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GOOGLE_CLOUD_PROJECT` | *(required)* | Vertex AI project |
+| `TINYTPU_VERTEX_LOCATION` | `global` | Vertex AI location |
+| `TINYTPU_OPENCODE_MODEL` | `google-vertex/gemini-3.1-pro-preview` | model |
+| `TINYTPU_CONDA` | discovered | conda used to reach the `allo` env |
+| `TINYTPU_VITIS_SETTINGS` | `/opt/xilinx/Vitis_HLS/2023.2/settings64.sh` | sourced for the synthesis gate |
+| `TINYTPU_SYNTH_PROJECT` | `/tmp/tinytpu_chia_synth_prj` | scratch HLS project |
+| `TINYTPU_CHIA_LOG_DIR` | `chia_runs/latest` | default variant log directory |

@@ -85,11 +85,29 @@ class Interface:
 
 
 @dataclass(frozen=True)
+class LoopReport:
+    """One loop nest inside a module, as Vitis reports it.
+
+    A module's own ``latency`` covers a whole call; this covers the loop that
+    call spends its time in. ``trip_count`` and ``latency_cycles`` are ``None``
+    for a data-dependent bound, where the loop's ``ii``/``depth`` are still
+    reported -- that pair is what survives to describe an unbounded mover."""
+
+    name: str
+    trip_count: int | None  # None when the bound is data-dependent ("undef")
+    latency_cycles: int | None
+    ii: int | None  # initiation interval, when the loop is pipelined
+    depth: int | None  # iteration latency of one pipelined iteration
+    pipelined: bool
+
+
+@dataclass(frozen=True)
 class ModuleReport:
     name: str
     timing: TimingReport
     latency: LatencyReport
     resources: ResourceUsage
+    loops: list[LoopReport] = field(default_factory=list)
 
 
 @dataclass(repr=False)
@@ -235,6 +253,24 @@ def _parse_interfaces(root: ET.Element) -> list[Interface]:
     ]
 
 
+def _parse_loops(perf: ET.Element | None) -> list[LoopReport]:
+    """Every loop under a module's ``SummaryOfLoopLatency``, outermost first."""
+    summary = perf.find("SummaryOfLoopLatency") if perf is not None else None
+    if summary is None:
+        return []
+    return [
+        LoopReport(
+            name=_text(loop, "Name") or loop.tag,
+            trip_count=_opt_int(loop, "TripCount"),
+            latency_cycles=_opt_int(loop, "Latency"),
+            ii=_opt_int(loop, "PipelineII"),
+            depth=_opt_int(loop, "PipelineDepth"),
+            pipelined=_text(loop, "PipelineType").lower() == "yes",
+        )
+        for loop in summary
+    ]
+
+
 def _parse_modules(root: ET.Element) -> dict[str, ModuleReport]:
     info = root.find("ModuleInformation")
     if info is None:
@@ -248,6 +284,7 @@ def _parse_modules(root: ET.Element) -> dict[str, ModuleReport]:
             timing=_parse_timing(perf),
             latency=_parse_latency(perf),
             resources=_parse_resources(module.find("AreaEstimates/Resources")),
+            loops=_parse_loops(perf),
         )
     return modules
 
