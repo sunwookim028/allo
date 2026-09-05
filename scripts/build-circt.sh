@@ -16,6 +16,11 @@ BUILD_JOBS=${BUILD_JOBS:-$(nproc)}
 mkdir -p "$CIRCT_DIR/build"
 
 cd "$CIRCT_DIR"
+# OR-Tools 9.5 fetches deps (zlib among them) that still declare
+# cmake_minimum_required(VERSION <3.5), which CMake >= 4 refuses outright. The
+# shim applies to every nested configure; without it ortools never installs and
+# the Allo build then fails with "No OR-Tools cmake package was found".
+export CMAKE_POLICY_VERSION_MINIMUM="${CMAKE_POLICY_VERSION_MINIMUM:-3.5}"
 ./utils/get-or-tools.sh
 
 cd "$CIRCT_DIR/build"

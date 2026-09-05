@@ -45,8 +45,12 @@ build-dir = "build"
 wheel.packages = ["allo"]
 
 [tool.scikit-build.cmake.define]
-CMAKE_C_COMPILER = "clang"
-CMAKE_CXX_COMPILER = "clang++"
+# gcc, not clang: under clang, the enable_if attribute on llvm::StringLiteral
+# makes std::is_convertible<const char (&)[N], StringLiteral> false, so every
+# `return "==";` into a std::optional<StringLiteral> fails to compile (see
+# VivadoHLSEmitter). This also matches the compiler LLVM/CIRCT are built with.
+CMAKE_C_COMPILER = "gcc"
+CMAKE_CXX_COMPILER = "g++"
 CMAKE_VISIBILITY_INLINES_HIDDEN = "ON"
 CMAKE_C_VISIBILITY_PRESET = "hidden"
 CMAKE_CXX_VISIBILITY_PRESET = "hidden"

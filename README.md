@@ -76,8 +76,24 @@ ninja
 Return to the root directory and install Allo with pip:
 
 ```bash
-pip install -e .
+CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PWD/externals/circt/ext" pip install -v -e .
 ```
+
+`CMAKE_PREFIX_PATH` points at the OR-Tools install that `build-circt.sh` places
+in `externals/circt/ext`; RTL scheduling does not build without it.
+
+#### Build notes
+
+- **`lld` must be on PATH as `ld.lld`.** Distributions that ship it versioned
+  (`ld.lld-18`) satisfy the package but not `-DLLVM_USE_LINKER=lld`; symlink it,
+  or drop the flag to use the default linker.
+- **CMake 4 removed `cmake_minimum_required(VERSION <3.5)`.** OR-Tools 9.5 still
+  fetches deps that declare it, so `scripts/build-circt.sh` exports
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5`. Building OR-Tools by hand needs the same.
+- **Build Allo with gcc**, which is what `pyproject.toml` now selects. Under
+  clang, `llvm::StringLiteral`'s `enable_if` attribute defeats the
+  `std::optional<StringLiteral>` conversion the HLS emitters rely on.
+- The pinned MLIR Python bindings need `nanobind>=2.9,<3`.
 
 If you are a developer, please install extra dependencies for development:
 
