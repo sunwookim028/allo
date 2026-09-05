@@ -36,8 +36,9 @@ The default model is `google-vertex/gemini-3.1-pro-preview`; override it with
 `TINYTPU_OPENCODE_MODEL`. Each candidate must pass the direct-TOSA compiler
 check, then is evaluated on 8×8×8 and 8×16×32 GEMMs. The pre-synthesis
 checkpoint has frozen costs: `VREG words × 1 + VMEM words × 4`; DRAM traffic
-is reported but intentionally not scored. Allo-HLS export and synthesis are
-deferred until the dedicated HLS tooling server is available.
+is reported but intentionally not scored. CPU, Vitis C++ export, and Kai's
+RTLGen are all available from the same composed schedule; external synthesis
+is deferred until the dedicated HLS tooling server is available.
 `cluster.yaml` remains available for multi-machine CHIA use; it requires SSH
 connectivity between the declared workers.
 

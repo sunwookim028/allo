@@ -1,9 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
-# Assembles the `allo._mlir` Python package on top of the upstream MLIR Python
-# bindings (single MLIR instance via the aggregate CAPI dylib). This is additive
-# and lives alongside the legacy hand-written `_liballo` extension in ../python.
+
+set(MLIR_BINDINGS_PYTHON_NB_DOMAIN "allo")
 
 include(AddMLIRPython)
 
@@ -60,6 +58,7 @@ declare_mlir_python_extension(AlloMLIRPythonSources.Extension
     AlloAttrs.cpp
   EMBED_CAPI_LINK_LIBS
     MLIRCAPIIR
+    MLIRCAPITransforms
     MLIRAlloCAPI
   PRIVATE_LINK_LIBS
     LLVMSupport
@@ -69,14 +68,31 @@ declare_mlir_python_extension(AlloMLIRPythonSources.Extension
 # Common CAPI aggregate (single shared MLIR instance)
 ################################################################################
 
-# RegisterEverything owns ALL upstream dialect/pass/extension registration (run
-# at site-init) and provides the full CAPI breadth the core/dialect extensions
-# need at runtime. MLIRAlloCAPI registration is therefore strictly ADDITIVE
-# (allo dialect/extension/passes only) so the two never double-register.
 set(_allo_declared_sources
   AlloMLIRPythonSources
-  MLIRPythonSources
-  MLIRPythonExtension.RegisterEverything
+  MLIRPythonSources.Core
+  MLIRPythonSources.ExecutionEngine
+  MLIRPythonSources.Dialects.builtin
+  MLIRPythonSources.Dialects.arith
+  MLIRPythonSources.Dialects.affine
+  MLIRPythonSources.Dialects.bufferization
+  MLIRPythonSources.Dialects.cf
+  MLIRPythonSources.Dialects.complex
+  MLIRPythonSources.Dialects.func
+  MLIRPythonSources.Dialects.index
+  MLIRPythonSources.Dialects.linalg
+  MLIRPythonSources.Dialects.llvm
+  MLIRPythonSources.Dialects.math
+  MLIRPythonSources.Dialects.memref
+  MLIRPythonSources.Dialects.scf
+  MLIRPythonSources.Dialects.tensor
+  MLIRPythonSources.Dialects.tosa
+  MLIRPythonSources.Dialects.vector
+  MLIRPythonSources.Dialects.transform
+  MLIRPythonSources.Dialects.transform.extras
+  MLIRPythonSources.Dialects.transform.interpreter
+  MLIRPythonSources.Dialects.structured_transform
+  MLIRPythonSources.Dialects.ub
 )
 
 add_mlir_python_common_capi_library(AlloMLIRAggregateCAPI

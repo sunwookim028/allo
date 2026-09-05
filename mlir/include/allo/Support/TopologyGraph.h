@@ -28,11 +28,11 @@ struct ProcessNode {
   KernelOp callee;
 
   /// SPMD related information.
-  // the mapping attribute of the callee
+  // the callee's mapping attribute
   SmallVector<int32_t, 4> mapping;
-  // the grid that this node is mapped to
+  // grid this node is mapped to
   SmallVector<int32_t, 4> grid;
-  // the coordinate of this node in the grid
+  // this node's coordinate in the grid
   SmallVector<int32_t, 4> coord;
 
   bool isConcrete = false;
@@ -40,9 +40,9 @@ struct ProcessNode {
 
 struct Endpoint {
   enum class Kind { Producer, Consumer };
-  // the id of the node that produces or consumes from the channel
+  // node that produces or consumes on the channel
   unsigned nodeId = 0;
-  // the argument number of the stream in the invoke operation
+  // the stream's argument number in the invoke
   unsigned argNo = 0;
   Operation *streamOp = nullptr;
   Kind kind = Kind::Producer;

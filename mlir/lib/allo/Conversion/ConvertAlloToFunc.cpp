@@ -28,6 +28,11 @@ static void copyInvokeAttrs(InvokeOp invoke, func::CallOp call) {
     call.setArgAttrsAttr(argAttrs);
   if (auto resAttrs = invoke.getResAttrsAttr())
     call.setResAttrsAttr(resAttrs);
+  // `func.call` has no `async` field, so the async bit rides a discardable attr
+  // that survives canonicalize/cse; the dataflow lowering keys on it to
+  // classify the call as a spawn.
+  if (invoke.getAsync())
+    call->setAttr(kAlloAsyncAttr, UnitAttr::get(call.getContext()));
 }
 
 namespace {
@@ -91,14 +96,9 @@ struct ConvertAlloToFuncPass
     : public allo::impl::ConvertAlloToFuncPassBase<ConvertAlloToFuncPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    // LoweredKernelMap loweredKernels;
     RewritePatternSet patterns(context);
-    // patterns.add<ConvertKernelToFunc>(context);
-    // if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
-    //   return signalPassFailure();
 
     ConversionTarget target(*context);
-    // patterns.clear();
     target.addLegalDialect<arith::ArithDialect, func::FuncDialect>();
     target.addIllegalOp<KernelOp, InvokeOp, ReturnOp, GetWorkerIdOp,
                         GetNumWorkersOp>();

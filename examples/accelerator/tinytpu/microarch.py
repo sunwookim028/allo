@@ -35,6 +35,7 @@ from pathlib import Path
 
 from allo.lang.core import f32, i32, range as arange
 
+from . import isa as _isa
 from .isa import tpu, DRAM_SIZE, BRAM_SIZE, IMEM_SIZE, VEC_LANES, VEC_REGS
 
 IWIDTH = 4  # words per instruction record: [opcode, a0, a1, a2]
@@ -213,23 +214,65 @@ top_s = tinytpu.schedule()
 top_s.partition(top_s.buffer("vreg"), dim=1, kind=top_s.Complete)  # on-chip reg file
 top_s.compose(dl_s, ds_s, vl_s, vs_s, vpu_s, mxu_s)
 
+# Frozen pre-synthesis latency constants. A synthesis-derived table can replace
+# these declarations without changing the ISA/compiler interface.
+tpu.latency(dma_load, ii=1, depth=8)
+tpu.latency(dma_store, ii=1, depth=8)
+tpu.latency(vload, ii=1, depth=3)
+tpu.latency(vstore, ii=1, depth=3)
+tpu.latency(vpu, ii=1, depth=5)
+tpu.latency(mxu, ii=1, depth=20)
+
+tpu.bind(_isa.dma_load, dma_load, trips=lambda n: n)
+tpu.bind(_isa.dma_store, dma_store, trips=lambda n: n)
+tpu.bind(_isa.vload, vload, trips=lambda: VEC_LANES)
+tpu.bind(_isa.vstore, vstore, trips=lambda: VEC_LANES)
+for _op in (_isa.vadd, _isa.vsub, _isa.vmul, _isa.vrelu, _isa.vneg):
+    tpu.bind(_op, vpu, trips=lambda: VEC_LANES)
+tpu.bind(_isa.matmul, mxu, trips=lambda: SYS_DIM * SYS_DIM)
+
 
 # ==========================================================================#
-# Vitis HLS project scaffolding
+# Backend selection and project scaffolding
 # ==========================================================================#
-def scaffold(out_dir: str, part: str | None = None, freq_mhz: float = 300.0) -> Path:
-    """Lower the optimized, composed ``top_s`` and emit a Vitis HLS project at
-    ``out_dir``. ``dmem``/``imem`` become AXI-master ports; ``n_instr`` and the
-    ap_ctrl return are AXI-lite."""
+def export_backend(
+    backend: str, part: str | None = None, freq_mhz: float = 300.0
+):
+    """Export the same optimized, composed TinyTPU schedule to one backend.
+
+    ``cpu`` produces an LLVM-JIT handle, ``vitis`` produces HLS C++, and
+    ``rtl`` selects Kai's CIRCT RTL generator.  Backend choice does not alter
+    the Allo kernel or schedule.
+    """
+    assert backend in ("cpu", "vitis", "rtl"), f"unknown backend: {backend}"
+    if backend == "cpu":
+        assert part is None, "an FPGA part is not meaningful for the CPU backend"
+        return top_s.export("cpu")
+    if backend == "rtl":
+        assert part is None, "RTLGen selects devices through its device model"
+        return top_s.export("rtl", freq_mhz=freq_mhz)
+
     kwargs: dict = {"freq_mhz": freq_mhz}
     if part:
         kwargs["part"] = part
-    backend = top_s.export("vitis", **kwargs)
-    backend.set_axi(0, offset="slave", bundle="dmem")  # dmem  -> DRAM
-    backend.set_axi(1, offset="slave", bundle="imem")  # imem  -> DRAM
-    backend.set_axilite(2)  # n_instr (scalar control)
-    backend.set_axilite(-1)  # ap_ctrl on return
-    return backend.scaffold_project(out_dir)
+    result = top_s.export("vitis", **kwargs)
+    result.set_axi(0, offset="slave", bundle="dmem")  # dmem  -> DRAM
+    result.set_axi(1, offset="slave", bundle="imem")  # imem  -> DRAM
+    result.set_axilite(2)  # n_instr (scalar control)
+    result.set_axilite(-1)  # ap_ctrl on return
+    return result
+
+
+def scaffold(
+    out_dir: str,
+    part: str | None = None,
+    freq_mhz: float = 300.0,
+    backend: str = "vitis",
+) -> Path:
+    """Emit a self-contained project for ``cpu``, ``vitis``, or ``rtl``."""
+    return export_backend(backend, part=part, freq_mhz=freq_mhz).scaffold_project(
+        out_dir
+    )
 
 
 def main() -> None:
@@ -237,16 +280,32 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--out", default="tinytpu_prj", help="output project dir")
+    ap.add_argument(
+        "--backend",
+        choices=("cpu", "vitis", "rtl"),
+        default="vitis",
+        help="lower the same schedule to LLVM JIT, Vitis HLS, or Kai RTLGen",
+    )
     ap.add_argument("--part", default=None, help="target FPGA part")
     ap.add_argument("--freq", type=float, default=300.0, help="clock target in MHz")
-    ap.add_argument("--print-hls", action="store_true", help="print the HLS C++")
+    ap.add_argument(
+        "--print-code", action="store_true", help="print the selected lowered form"
+    )
     args = ap.parse_args()
 
-    if args.print_hls:
-        print(top_s.export("vitis").hls_code)
+    result = export_backend(args.backend, part=args.part, freq_mhz=args.freq)
+    if args.print_code:
+        if args.backend == "vitis":
+            print(result.hls_code)
+        elif args.backend == "rtl":
+            print(result.verilog)
+        else:
+            print(result.compile())
 
-    proj = scaffold(args.out, part=args.part, freq_mhz=args.freq)
-    print(f"Scaffolded top '{tpu.top.func_name}' -> {proj}")  # type: ignore[union-attr]
+    proj = result.scaffold_project(args.out)
+    print(
+        f"Scaffolded {args.backend} top '{tpu.top.func_name}' -> {proj}"
+    )  # type: ignore[union-attr]
     for f in sorted(Path(proj).iterdir()):
         print(f"    {f.name}")
 

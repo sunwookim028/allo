@@ -1,6 +1,8 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# `range` and `bool` are the DSL's own names (see allo/lang/core.py).
+# pylint: disable-next=redefined-builtin
 from .core import (
     i2,
     i3,

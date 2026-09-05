@@ -1,5 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+# pylint: disable=redefined-builtin
 # pylint: disable=unused-argument
 
 from __future__ import annotations
@@ -65,9 +66,12 @@ def _emit_unary_math(
     operand = _materialize_unary_operand(builder, value, acc)
     result_dtype = builder.get_promoted_dtype_nary(op_name, [operand.dtype])
     operand = builder.cast_to_dtype(operand, result_dtype)
-    build_fn = lambda inner: op_cls(
-        inner.handle, ip=builder.save_insertion_point(), loc=builder.get_loc()
-    ).result
+
+    def build_fn(inner):
+        return op_cls(
+            inner.handle, ip=builder.save_insertion_point(), loc=builder.get_loc()
+        ).result
+
     if isinstance(operand.type, ShapedType) or not is_default_acc(acc):
         return emit_linalg_unary(
             builder,
@@ -91,12 +95,14 @@ def _emit_binary_math(
     op_name: str,
     linalg_op_cls=None,
 ):
-    build_fn = lambda lhs_arg, rhs_arg: op_cls(
-        lhs_arg.handle,
-        rhs_arg.handle,
-        ip=builder.save_insertion_point(),
-        loc=builder.get_loc(),
-    ).result
+    def build_fn(lhs_arg, rhs_arg):
+        return op_cls(
+            lhs_arg.handle,
+            rhs_arg.handle,
+            ip=builder.save_insertion_point(),
+            loc=builder.get_loc(),
+        ).result
+
     if (
         isinstance(lhs.type, ShapedType)
         or isinstance(rhs.type, ShapedType)
@@ -196,22 +202,22 @@ def _(builder: AlloOpBuilder, value, acc=ConstexprValue(None)):
 
 
 @operator
-def exp2(exp, acc=ConstexprValue(None)):
+def exp2(exponent, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @exp2.fold
-def _(exp, acc=ConstexprValue(None)):
+def _(exponent, acc=ConstexprValue(None)):
     if not _fold_enabled(acc):
         return NO_FOLD
-    if _is_const(exp, 0):
+    if _is_const(exponent, 0):
         return ConstexprValue(1)
-    return _fold_unary(exp, py_math.exp2)
+    return _fold_unary(exponent, py_math.exp2)
 
 
 @exp2.build
-def _(builder: AlloOpBuilder, exp, acc=ConstexprValue(None)):
-    return _emit_unary_math(builder, exp, acc, "exp2", math.Exp2Op)
+def _(builder: AlloOpBuilder, exponent, acc=ConstexprValue(None)):
+    return _emit_unary_math(builder, exponent, acc, "exp2", math.Exp2Op)
 
 
 @operator
@@ -289,20 +295,20 @@ def _(builder: AlloOpBuilder, value, acc=ConstexprValue(None)):
 
 
 @operator
-def pow(base, exp, acc=ConstexprValue(None)):
+def pow(base, exponent, acc=ConstexprValue(None)):
     operator_body_unreachable()
 
 
 @pow.fold
-def _(base, exp, acc=ConstexprValue(None)):
+def _(base, exponent, acc=ConstexprValue(None)):
     if not _fold_enabled(acc):
         return NO_FOLD
-    folded = _fold_binary(base, exp, lambda lhs, rhs: lhs**rhs)
+    folded = _fold_binary(base, exponent, lambda lhs, rhs: lhs**rhs)
     if folded is not NO_FOLD:
         return folded
-    if _is_const(exp, 0):
+    if _is_const(exponent, 0):
         return ConstexprValue(1)
-    if _is_const(exp, 1):
+    if _is_const(exponent, 1):
         return base
     if _is_const(base, 1):
         return ConstexprValue(1)
@@ -310,8 +316,8 @@ def _(base, exp, acc=ConstexprValue(None)):
 
 
 @pow.build
-def _(builder: AlloOpBuilder, base, exp, acc=ConstexprValue(None)):
-    return _lower_pow(builder, base, exp, acc)
+def _(builder: AlloOpBuilder, base, exponent, acc=ConstexprValue(None)):
+    return _lower_pow(builder, base, exponent, acc)
 
 
 @operator

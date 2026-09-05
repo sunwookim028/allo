@@ -29,6 +29,7 @@ class TransformHost(Protocol):
     context: Context
 
 
+# pylint: disable-next=too-many-instance-attributes
 class TransformScript:
     """Builds the schedule's reusable transform program as a set of leaf *body*
     sequences plus an ordered include *plan*.
@@ -92,6 +93,8 @@ class TransformScript:
             with self.context, unknown:
                 self._body_counter += 1
                 sym = f"__body_{self._body_counter}"
+                # the MLIR op builders take an extension __init__ that pylint cannot see
+                # pylint: disable-next=too-many-function-args
                 batch = t.NamedSequenceOp(
                     sym,
                     [self.any_op_type],
@@ -214,6 +217,7 @@ class TransformScript:
         plan entry's function and includes its body. Caller runs then erases it."""
         unknown = Location.unknown(self.context)
         with self.context, unknown:
+            # pylint: disable-next=too-many-function-args
             entry = t.NamedSequenceOp(
                 name,
                 [self.any_op_type],

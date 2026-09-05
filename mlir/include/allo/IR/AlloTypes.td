@@ -35,8 +35,7 @@ def Stream : Allo_Type<"Stream"> {
   let genVerifyDecl = 1;
 }
 
-// ISA buffer/pattern types are generated through this single typedef unit so the
-// dialect emits exactly one parseType/printType dispatch.
+// ACT buffer and affine-access pattern types share the Allo dialect.
 include "allo/IR/AlloISATypes.td"
 
 #endif // ALLO_TYPES

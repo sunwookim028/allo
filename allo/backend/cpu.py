@@ -4,25 +4,28 @@
 from __future__ import annotations
 
 import ctypes
-import os
+import platform
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generic, ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar
 
-import ml_dtypes
 import numpy as np
 
-from .utils import make_project_path, numpy_to_ctype
+from .marshal import (
+    LLVM_ABI,
+    as_array,
+    from_ctype_scalar,
+    host_type,
+    to_ctype_scalar,
+    writeback,
+)
+from .utils import make_project_path
 
 from ..lang.core import (
-    APFloat,
-    APInt,
     BufferType,
     DType,
-    IndexType,
     StreamType,
     TypeBase,
-    widen_apint_to_std,
 )
 from ..logging import stage, terminate_on_error
 from .base import Backend, run_pipeline, set_top_llvm_c_wrapper
@@ -45,79 +48,21 @@ class _CPUCompileCacheEntry:
     res_types: list[TypeBase]
 
 
-_DTYPE_TO_NP = {
-    "bfloat16": ml_dtypes.bfloat16,
-    "float16": np.float16,
-    "float32": np.float32,
-    "float64": np.float64,
-    "index": np.int64,
-    "int8": np.int8,
-    "int16": np.int16,
-    "int32": np.int32,
-    "int64": np.int64,
-    "uint1": np.bool_,
-    "uint8": np.uint8,
-    "uint16": np.uint16,
-    "uint32": np.uint32,
-    "uint64": np.uint64,
-}
-
-
-def _find_first(paths: list[Path], stem: str) -> str | None:
-    for lib_dir in paths:
-        for suffix in (".dylib", ".so"):
-            path = lib_dir / f"{stem}{suffix}"
-            if path.exists():
-                return str(path)
-    return None
-
-
 def _dataflow_runtime_lib() -> str:
-    cur_dir = Path(__file__).resolve().parent
-    candidates = [
-        cur_dir.parent / "_mlir" / "_mlir_libs",
-        cur_dir.parents[1] / "build" / "lib",
-    ]
-    path = _find_first(candidates, "libAlloDataflowRuntime")
-    if path is None:
+    lib_dir = Path(__file__).resolve().parent.parent / "_mlir" / "_mlir_libs"
+    lib_name = "libAlloDataflowRuntime"
+    if platform.system() == "Darwin":
+        lib_name += ".dylib"
+    elif platform.system() == "Linux":
+        lib_name += ".so"
+    else:
+        raise RuntimeError(f"Unsupported platform: {platform.system()}")
+    lib_path = lib_dir / lib_name
+    if not lib_path.exists():
         raise RuntimeError(
-            "Cannot find libAlloDataflowRuntime. Rebuild Allo with `pip install -v -e .`."
+            f"Cannot find Allo dataflow runtime library at {lib_path}. Installation may be broken."
         )
-    return path
-
-
-def _default_shared_libs() -> list[str]:
-    llvm_base_dir = os.environ.get("LLVM_BASE_DIR")
-    candidates = []
-    if llvm_base_dir:
-        candidates.append(Path(llvm_base_dir) / "lib")
-    candidates.append(
-        Path(__file__).resolve().parents[3]
-        / "externals"
-        / "llvm-project"
-        / "build"
-        / "lib"
-    )
-
-    libs = []
-    for lib_dir in candidates:
-        found = []
-        for stem in ("libmlir_runner_utils", "libmlir_c_runner_utils"):
-            match = next(
-                (
-                    lib_dir / f"{stem}{suffix}"
-                    for suffix in (".dylib", ".so")
-                    if (lib_dir / f"{stem}{suffix}").exists()
-                ),
-                None,
-            )
-            if match is None:
-                break
-            found.append(str(match))
-        if len(found) == 2:
-            libs.extend(found)
-            break
-    return [*libs, _dataflow_runtime_lib()]
+    return str(lib_path)
 
 
 def _make_output_struct(memref_descriptors):
@@ -157,21 +102,15 @@ def _pack_kernel_args(args, arg_types: list[TypeBase], res_types: list[TypeBase]
     return packed_args, keepalive, arg_arrays, result_decode
 
 
-def _writeback_args(arg_arrays):
-    for original, array in arg_arrays:
-        if isinstance(original, np.ndarray) and original is not array:
-            original[...] = _convert_back(array, original.dtype)
-
-
 def _pack_arg(arg, arg_type: TypeBase):
     if isinstance(arg_type, BufferType):
-        array = _as_array(arg, arg_type)
+        array = as_array(arg, arg_type, LLVM_ABI)
         desc = get_ranked_memref_descriptor(array)
         ptr = ctypes.pointer(ctypes.pointer(desc))
         return ptr, (array, desc, ptr), array
 
     if isinstance(arg_type, DType):
-        value = _make_scalar(arg, arg_type)
+        value = to_ctype_scalar(arg, host_type(arg_type, LLVM_ABI))
         return value, value, None
 
     raise TypeError(f"Unsupported CPU argument type: {arg_type}")
@@ -182,15 +121,16 @@ def _pack_results(res_types: list[TypeBase]):
         return None
 
     if len(res_types) == 1 and isinstance(res_types[0], DType):
-        scalar = _make_scalar(-1, res_types[0])
-        return scalar, [scalar], lambda: scalar[0]
+        host = host_type(res_types[0], LLVM_ABI)
+        scalar = to_ctype_scalar(-1, host)
+        return scalar, [scalar], lambda: from_ctype_scalar(scalar[0], host)
 
     descriptors = []
     keepalive = []
     for res_type in res_types:
         if not isinstance(res_type, BufferType):
             raise TypeError("Multiple CPU return values must be buffers")
-        ctp = as_ctype(np.dtype(_numpy_dtype_for_dtype(res_type.dtype)))
+        ctp = as_ctype(np.dtype(host_type(res_type.dtype, LLVM_ABI).np_dtype))
         desc = make_nd_memref_descriptor(len(res_type.shape), ctp)()
         descriptors.append(desc)
         keepalive.append(desc)
@@ -213,65 +153,11 @@ def _pack_results(res_types: list[TypeBase]):
     )
 
 
-def _as_array(arg, buffer_type: BufferType):
-    if not isinstance(arg, np.ndarray):
-        raise TypeError("CPU buffer arguments must be numpy arrays")
-    if tuple(arg.shape) != tuple(buffer_type.shape):
-        raise ValueError(
-            f"Expected buffer shape {tuple(buffer_type.shape)}, got {arg.shape}"
-        )
-    if not arg.flags["C_CONTIGUOUS"]:
-        arg = np.ascontiguousarray(arg)
-
-    np_dtype = _numpy_dtype_for_dtype(buffer_type.dtype)
-    if arg.dtype != np_dtype:
-        arg = arg.astype(np_dtype)
-    return arg
-
-
-def _make_scalar(value, dtype: DType):
-    ctp = _ctype_for_dtype(dtype)
-    if dtype.name == "float16":
-        value = np.float16(value).view(np.int16)
-    elif dtype.name == "bfloat16":
-        value = ml_dtypes.bfloat16(value).view(np.int16)
-    return (ctp * 1)(value)
-
-
-def _numpy_dtype_for_dtype(dtype: DType):
-    dtype = widen_apint_to_std(dtype)
-    if dtype.name not in _DTYPE_TO_NP:
-        _check_supported_dtype(dtype)
-    return _DTYPE_TO_NP[dtype.name]
-
-
-def _ctype_for_dtype(dtype: DType):
-    return numpy_to_ctype(_numpy_dtype_for_dtype(dtype))
-
-
-def _check_supported_dtype(dtype: DType):
-    if isinstance(dtype, APInt) and dtype.primitive_width > 64:
-        raise NotImplementedError("CPU backend does not support APInt > 64 bits yet")
-    if isinstance(dtype, APFloat):
-        raise NotImplementedError(f"CPU backend does not support {dtype.name}")
-    if isinstance(dtype, IndexType):
-        return
-    raise TypeError(f"Unsupported CPU dtype: {dtype}")
-
-
-def _convert_back(array, dtype):
-    if dtype == np.dtype(np.float16):
-        return array.view(np.float16)
-    if dtype == ml_dtypes.bfloat16:
-        return array.view(ml_dtypes.bfloat16)
-    return array.astype(dtype, copy=False)
-
-
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class CPU(Backend, Generic[P, R]):
+class CPU(Backend[P, R]):
     """
     Backend for executing kernels on the CPU using LLVM's JIT compilation.
 
@@ -289,12 +175,12 @@ class CPU(Backend, Generic[P, R]):
         kernel: Kernel[P, R],
         *,
         opt_level: int = 2,
-        shared_libs: list[str] = [],
+        shared_libs: list[str] | None = None,
     ):
         super().__init__(kernel)
         self.opt_level = opt_level
-        self.shared_libs = _default_shared_libs()
-        self.shared_libs.extend(shared_libs)
+        self.shared_libs = [_dataflow_runtime_lib()]
+        self.shared_libs.extend(shared_libs or [])
         self.engine: ExecutionEngine | None = None
         self.arg_types: list[TypeBase] = []
         self.res_types: list[TypeBase] = []
@@ -321,14 +207,13 @@ class CPU(Backend, Generic[P, R]):
             self.arg_types = cache.arg_types
             self.res_types = cache.res_types
             return self.module
-        else:
-            cache = self._build_pcache(self.shared_libs)
-            self._pcache_set("cpu.compile", cache_key, cache)
-            self.module = cache.module
-            self.engine = cache.engine
-            self.arg_types = cache.arg_types
-            self.res_types = cache.res_types
-            return self.module
+        cache = self._build_pcache(self.shared_libs)
+        self._pcache_set("cpu.compile", cache_key, cache)
+        self.module = cache.module
+        self.engine = cache.engine
+        self.arg_types = cache.arg_types
+        self.res_types = cache.res_types
+        return self.module
 
     def _build_pcache(self, shared_libs: list[str]) -> _CPUCompileCacheEntry:
         with stage("Compiling CPU Kernels"):
@@ -373,7 +258,7 @@ class CPU(Backend, Generic[P, R]):
         with stage("Running CPU Kernels (JIT)"):
             assert self.engine is not None
             self.engine.invoke(self.kernel.func_name, *packed_args)
-            _writeback_args(arg_arrays)
+            writeback(arg_arrays)
             if result_decode is None:
                 return None  # type: ignore
             return result_decode()  # type: ignore

@@ -1,19 +1,11 @@
 /*
  * Copyright Allo authors. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
- *
- * Thin nanobind extension for the upstream-bindings migration. It exposes only
- * the Allo-specific drivers that cannot be auto-generated from ODS, and reaches
- * every C++ entry point through MLIRAlloCAPI so that the extension links no
- * MLIR C++ statically (a single MLIR instance lives in the aggregate CAPI
- * dylib).
- *
- * Operation/type construction is provided by ODS-generated Python
- * (`allo._mlir.dialects.allo`) on top of upstream `mlir.ir`, not here.
  */
 
 #include "AlloBindings.h"
 
+#include "allo-c/AlloAttrs.h"
 #include "allo-c/IRUtils.h"
 #include "allo-c/Passes.h"
 #include "allo-c/Registration.h"
@@ -26,13 +18,18 @@
 
 #include "nanobind/nanobind.h"
 #include "nanobind/stl/optional.h"
+#include "nanobind/stl/pair.h"
 #include "nanobind/stl/string.h"
+#include "nanobind/stl/vector.h"
 
 #include "llvm-c/ErrorHandling.h"
 #include "llvm/Support/Signals.h"
 
+#include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace nb = nanobind;
 
@@ -65,6 +62,7 @@ NB_MODULE(_allo, m) {
   allo.def(
       "register_passes", []() { alloMlirRegisterAllPasses(); },
       "Register all Allo passes with the global pass registry.");
+  alloMlirRegisterAllPasses();
   allo.attr("SIGNED_ATTR_NAME") = kAlloSignedAttr;
   allo.attr("LAZY_ATTR_NAME") = kAlloLazyAttr;
 
@@ -87,6 +85,58 @@ NB_MODULE(_allo, m) {
       },
       nb::arg("module"), nb::arg("enable_apfloat"), nb::arg("top") = "",
       nb::arg("index_width") = 32, nb::arg("with_location") = true);
+  allo.def(
+      "emit_verilog",
+      [](MlirModule module) -> std::optional<std::string> {
+        std::string out;
+        if (mlirLogicalResultIsFailure(
+                alloEmitVerilog(module, appendToString, &out)))
+          return std::nullopt;
+        return out;
+      },
+      nb::arg("module"));
+  allo.def(
+      "emit_datapath_to_hw",
+      [](MlirModule module, const std::string &binding, const std::string &top,
+         double cycle_time) -> std::optional<std::string> {
+        std::string out;
+        if (mlirLogicalResultIsFailure(alloEmitDatapathToHW(
+                module, mlirStringRefCreate(binding.data(), binding.size()),
+                mlirStringRefCreate(top.data(), top.size()), cycle_time,
+                appendToString, &out)))
+          return std::nullopt;
+        return out;
+      },
+      nb::arg("module"), nb::arg("binding"), nb::arg("top"),
+      nb::arg("cycle_time"));
+  allo.def(
+      "emit_split_verilog",
+      [](MlirModule module, const std::string &directory) -> bool {
+        return mlirLogicalResultIsSuccess(alloEmitSplitVerilog(
+            module, mlirStringRefCreate(directory.data(), directory.size())));
+      },
+      nb::arg("module"), nb::arg("directory"));
+
+  allo.def(
+      "run_sdc_scheduling",
+      [](MlirModule module, const std::string &top, float cycleTime,
+         const std::string &scheduler, double budget, bool allocate,
+         int workers, int seed, bool deterministic, double areaSlack,
+         bool escalate) -> std::optional<std::string> {
+        std::string out;
+        if (mlirLogicalResultIsFailure(alloRunSDCSchedulingPipeline(
+                module, mlirStringRefCreate(top.data(), top.size()), cycleTime,
+                mlirStringRefCreate(scheduler.data(), scheduler.size()), budget,
+                allocate, workers, seed, deterministic, areaSlack, escalate,
+                appendToString, &out)))
+          return std::nullopt;
+        return out;
+      },
+      nb::arg("module"), nb::arg("top"), nb::arg("cycle_time"),
+      nb::arg("scheduler") = "heuristic", nb::arg("budget") = 0.0,
+      nb::arg("allocate") = false, nb::arg("workers") = 0, nb::arg("seed") = 0,
+      nb::arg("deterministic") = true, nb::arg("area_slack") = 0.0,
+      nb::arg("escalate") = true);
 
   //===--------------------------------------------------------------------===//
   // schedule
@@ -136,7 +186,7 @@ NB_MODULE(_allo, m) {
       nb::arg("module"), "Return a clone of the given module.");
 
   //===--------------------------------------------------------------------===//
-  // Allo dialect types / attributes (subclasses of
+  // Allo dialect types / attributes (CRTP subclasses of
   // allo._mlir.ir.Type/Attribute)
   //===--------------------------------------------------------------------===//
   allo::populateAlloTypes(m);

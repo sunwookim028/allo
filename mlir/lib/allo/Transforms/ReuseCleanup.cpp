@@ -82,7 +82,6 @@ private:
       }
     }
 
-    // merge the ifs
     IRMapping mapping;
     auto firstIf = ifOps.front();
     if (!firstIf.hasElse() ||
@@ -91,14 +90,12 @@ private:
 
     rewriter.setInsertionPoint(firstIf);
     Location loc = parentOp.getLoc();
-    // create a free block
     Block *thenBlock = rewriter.createBlock(parentOp.getBody());
     rewriter.setInsertionPointToStart(thenBlock);
     SmallVector<Value, 4> thenResults;
     SmallVector<Type, 4> resultTypes;
     for (auto ifOp : ifOps) {
       Block *thenBlock = ifOp.getThenBlock();
-      // clone without mapping since the ifs can not use each others results
       for (Operation &op : thenBlock->without_terminator())
         rewriter.clone(op, mapping);
       auto yieldOp = cast<affine::AffineYieldOp>(thenBlock->getTerminator());
@@ -107,7 +104,6 @@ private:
         resultTypes.push_back(result.getType());
       }
     }
-    // create a single yield op with all results
     affine::AffineYieldOp::create(rewriter, loc, thenResults);
 
     Block *elseBlock = rewriter.createBlock(parentOp.getBody());
@@ -133,7 +129,6 @@ private:
     rewriter.mergeBlocks(thenBlock, mergedIf.getThenBlock());
     rewriter.mergeBlocks(elseBlock, mergedIf.getElseBlock());
 
-    // replace uses of original ifs
     unsigned resultIdx = 0;
     for (auto ifOp : ifOps) {
       for (auto [idx, result] : llvm::enumerate(ifOp.getResults())) {
@@ -142,7 +137,6 @@ private:
       }
       resultIdx += ifOp.getNumResults();
     }
-    // erase original ifs
     for (auto ifOp : ifOps)
       rewriter.eraseOp(ifOp);
   }
@@ -236,12 +230,12 @@ private:
     rewriter.setInsertionPointToStart(dst);
     for (Operation &op : src->without_terminator())
       rewriter.clone(op, mapping);
-    // map yield operands
+    // Map each if result to the yielded value its branch produced, so the
+    // intermediates clone against the branch's own copy.
     auto yield = cast<affine::AffineYieldOp>(src->getTerminator());
     for (OpOperand &v : yield->getOpOperands())
       mapping.map(ifOp->getResult(v.getOperandNumber()),
                   mapping.lookupOrDefault(v.get()));
-    // clone intermediates to block
     for (Operation *op : intermediates)
       rewriter.clone(*op, mapping);
   }
@@ -264,14 +258,11 @@ public:
         rewriter, ifOp->getLoc(), ifOp.getCondition(), ifOp.getOperands(),
         /*withElseRegion=*/true);
 
-    // clone then region
     cloneIntermediatesIntoBranch(intermediates, ifOp.getThenBlock(),
                                  newIf.getThenBlock(), ifOp, rewriter);
-    // clone else region
     cloneIntermediatesIntoBranch(intermediates, ifOp.getElseBlock(),
                                  newIf.getElseBlock(), ifOp, rewriter);
 
-    // remove intermediates
     for (Operation *op : llvm::reverse(intermediates))
       rewriter.eraseOp(op);
     rewriter.eraseOp(ifOp);
@@ -327,8 +318,7 @@ struct ReuseCleanupPass
       (void)applyPatternsGreedily(module, std::move(patterns));
     }
 
-    // The maintenance markers are an internal scheduling detail; drop them from
-    // the final IR.
+    // The maintenance markers are an internal detail; drop them from the IR.
     module.walk([](Operation *op) { op->removeAttr(kReuseMaintenanceAttr); });
   }
 };

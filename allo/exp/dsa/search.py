@@ -2765,7 +2765,14 @@ def compile_program(source: str, isa, mapping_for=None) -> CompiledProgram:
     instruction its own, which is the exact point at which tiling enters the
     backend.
     """
-    with ir.Context(), ir.Location.unknown():
+    context = ir.Context()
+    # Kai's lean Python package registers only builtin eagerly.  Load the
+    # common + Allo dialect registry into each isolated ACT parse context.
+    from ..._mlir.dialects import allo as allo_d
+
+    allo_d.register_dialect(context)
+    allo_d.register_extensions(context)
+    with context, ir.Location.unknown(context):
         module = ir.Module.parse(source)
         normalize_source(module)
         catalog = Catalog(isa)

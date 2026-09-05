@@ -3,10 +3,18 @@
 
 add_mlir_library(MLIRAlloTranslation
   VivadoHLSEmitter.cpp
+  VerilogEmitter.cpp
 
   DEPENDS
   MLIRAlloIncGen
 
   LINK_LIBS PUBLIC
   MLIRAllo
+  MLIRReconcileUnrealizedCasts
+  CIRCTSV
+  CIRCTSeqTransforms
+  CIRCTSeqToSV
+  CIRCTHWToSV
+  CIRCTVerifToSV
+  CIRCTExportVerilog
 )

@@ -3,7 +3,7 @@
 
 import numpy as np
 
-from allo.lang.core import APInt, i32, range as arange
+from allo.lang.core import APInt, i32, range as arange, Stream
 from allo.lang.kernel import kernel
 
 
@@ -173,3 +173,85 @@ def test_simulator_bit_extract_insert():
 
     expected = np.array([int(f"{int(v):08b}"[::-1], 2) for v in src], dtype=np.uint8)
     np.testing.assert_array_equal(out, expected)
+
+
+def test_simulator_feedback_init_tokens():
+    # A feedback CYCLE seeded with an initial token.
+    N = 8
+
+    @kernel
+    async def emit(t: Stream[i32], s: Stream[i32], out: i32[N]):
+        for i in range(N):
+            x = t.get()
+            out[i] = x
+            s.put(x + 1)
+
+    @kernel
+    async def fwd(s: Stream[i32], t: Stream[i32]):
+        for i in range(N):
+            t.put(s.get())
+
+    @kernel
+    async def top(out: i32[N]):
+        s: Stream[i32]
+        t: Stream[i32] = [0]  # feedback channel, one initial token
+        await emit(t, s, out)
+        await fwd(s, t)
+
+    out = np.zeros(N, np.int32)
+    top(out)
+    assert np.array_equal(out, np.arange(N, dtype=np.int32)), list(out)
+
+
+def test_dataflow_nested_container_golden():
+    # P-hier Slice 0: the CPU golden must run NESTED dataflow containers -- a
+    # process that is itself a container. `mid` awaits inner_a/inner_b and is
+    # awaited by `top`, carrying two boundary streams (s in, t out). The runtime
+    # flattens the nest onto one marl scheduler (a nested `allo_df_open` reuses
+    # the enclosing scheduler instead of binding a second one to the fiber's
+    # thread, which aborts); each level keeps its own WaitGroup so joins are
+    # scoped. csim ONLY -- RTL emit of a container-as-callee is Slice 1/2 and
+    # still asserts; this pins the golden half.
+    N = 16
+    a = (np.arange(N, dtype=np.int32) * 7 + 13) & 0xFF
+
+    @kernel
+    async def produce(a: i32[N], s: Stream[i32]):
+        for i in range(N):
+            s.put(a[i])
+
+    @kernel
+    async def inner_a(x: Stream[i32], y: Stream[i32]):
+        for i in range(N):
+            y.put(x.get() + 1)
+
+    @kernel
+    async def inner_b(y: Stream[i32], z: Stream[i32]):
+        for i in range(N):
+            z.put(y.get() * 2)
+
+    @kernel
+    async def mid(x: Stream[i32], z: Stream[i32]):
+        y: Stream[i32]
+        await inner_a(x, y)
+        await inner_b(y, z)
+
+    @kernel
+    async def consume(t: Stream[i32], out: i32[N]):
+        for i in range(N):
+            out[i] = t.get()
+
+    @kernel
+    async def top(a: i32[N], out: i32[N]):
+        s: Stream[i32]
+        t: Stream[i32]
+        await produce(a, s)
+        await mid(s, t)
+        await consume(t, out)
+
+    exp = (a + 1) * 2
+    # csim is deterministic (KPN); repeat to surface any scheduler/WaitGroup race.
+    for _ in range(8):
+        out = np.zeros(N, np.int32)
+        top(a, out)
+        assert np.array_equal(out, exp), list(out)

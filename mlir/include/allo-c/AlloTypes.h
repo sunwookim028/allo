@@ -2,8 +2,7 @@
  * Copyright Allo authors. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
- * C API for the Allo dialect's custom types, so the Python bindings can build
- * and introspect them without round-tripping through textual parsing.
+ * C API for the Allo dialect's custom types, used by the Python bindings.
  */
 
 #ifndef ALLO_C_ALLOTYPES_H
@@ -32,6 +31,7 @@ MLIR_CAPI_EXPORTED uint64_t alloStreamTypeGetDepth(MlirType type);
 MLIR_CAPI_EXPORTED intptr_t alloStreamTypeGetRank(MlirType type);
 MLIR_CAPI_EXPORTED int64_t alloStreamTypeGetDimSize(MlirType type,
                                                     intptr_t pos);
+MLIR_CAPI_EXPORTED MlirTypeID alloStreamTypeGetTypeID(void);
 
 #ifdef __cplusplus
 }

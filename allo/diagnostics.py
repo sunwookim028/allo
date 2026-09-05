@@ -1,13 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Shared source-diagnostic rendering.
-
-Both the compiler (:class:`allo.compiler.errors.CompilationError`) and the
-scheduler (:class:`allo.schedule.errors.ScheduleError`) point at a source
-location and render a ``file:line:col`` header with the offending line and a
-caret underline. This module holds the one implementation they share.
-"""
+"""Shared source-diagnostic rendering."""
 
 from __future__ import annotations
 

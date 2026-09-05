@@ -20,7 +20,7 @@ from allo.exp.dsa.errors import (
 from allo.exp.dsa import primitive
 from allo.exp.dsa.access import collapse, contiguous, expand, strided, view
 from allo.exp.dsa.core import ISA
-from examples.accelerator.cornell_tpu.isa import tpu
+from examples.accelerator.tinytpu.isa import tpu
 from allo.lang.core import f32
 
 

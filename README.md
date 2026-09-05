@@ -17,10 +17,84 @@ Allo is a Python-embedded, MLIR-based language and compiler designed to facilita
 
 ## Getting Started
 
-Please check out the [Allo documentation](https://cornell-zhang.github.io/allo) for installation instructions and tutorials.
-If you encounter any problems, please feel free to open an [issue](https://github.com/cornell-zhang/allo/issues).
+### Installation
+
+Install package dependencies:
+
+```bash
+sudo apt install build-essential cmake ninja-build clang lld ccache verilator
+# or on macOS
+brew install cmake ninja llvm ccache verilator
+```
+
+Create a Python virtual environment and activate it: (conda, uv, or venv are all fine)
+
+```bash
+conda create -n allo python=3.12
+conda activate allo
+```
+
+Clone the repository and fetch submodules:
+
+```bash
+git clone https://github.com/kkkaishao/allo.git
+cd allo
+git submodule update --init --recursive
+```
+
+Build MLIR and CIRCT:
+
+```bash
+cd externals/llvm-project
+pip install -r mlir/python/requirements.txt
+mkdir build && cd build
+cmake -G Ninja ../llvm \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_ENABLE_PROJECTS="mlir" \
+  -DLLVM_TARGETS_TO_BUILD="host" \
+  -DLLVM_USE_LINKER=lld \
+  -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+  -DPython3_EXECUTABLE=$(which python3)
+ninja
+```
+
+```bash
+cd externals/circt
+mkdir build && cd build
+cmake -G Ninja ../ \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_DIR=$PWD/../../llvm-project/build/lib/cmake/llvm \
+  -DMLIR_DIR=$PWD/../../llvm-project/build/lib/cmake/mlir \
+  -DLLVM_USE_LINKER=lld
+ninja
+```
+
+Return to the root directory and install Allo with pip:
+
+```bash
+pip install -e .
+```
+
+If you are a developer, please install extra dependencies for development:
+
+```bash
+pip install -e .[dev]
+```
+
+Note: on Linux, you can flip the `rebuild` option in `pyproject.toml` to `true` to
+automatically rebuild the native bits on import. This is useful for development, but
+may slow down the import time. on macOS, the rebuild option will lead to `LC_RPATH`
+warnings, not fatal but annoying.
+
+Note: You may want to flip `cmake.build_type` in `pyproject.toml` to `Debug` for
+debugging purposes. The default is `Release`.
 
 **IMPORTANT:** If you are using a coding agent for our codebase, please import [AGENTS.md](AGENTS.md).
+Claude code will automatically read [CLAUDE.md](CLAUDE.md).
 
 
 ## Publications

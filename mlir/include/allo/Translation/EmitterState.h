@@ -19,9 +19,9 @@
 
 namespace mlir::allo {
 
-// Turn an arbitrary source name into a valid C++ identifier: characters that
-// are not alphanumeric or '_' become '_', and a leading digit (or an empty
-// result) is prefixed with '_'.
+// Turn an arbitrary source name into a valid C++ identifier: a character that
+// is not alphanumeric or '_' becomes '_', and a leading digit or an empty
+// result is prefixed with '_'.
 inline std::string sanitizeCppIdentifier(llvm::StringRef name) {
   std::string result;
   result.reserve(name.size());
@@ -36,8 +36,7 @@ inline std::string sanitizeCppIdentifier(llvm::StringRef name) {
 }
 
 // C++ keywords and emitter-reserved identifiers that a source-derived name must
-// never alias -- a local named ``int``/``default``/``allo_bitcast`` would break
-// compilation. Such a name is uniquified with a numeric suffix instead.
+// never alias. Such a name is uniquified with a numeric suffix instead.
 inline bool isReservedCppName(llvm::StringRef name) {
   static const llvm::StringSet<> reserved = {"allo_bitcast",
                                              "alignas",
@@ -122,8 +121,8 @@ inline bool isReservedCppName(llvm::StringRef name) {
   return reserved.contains(name);
 }
 
-// The readable name carried by a value's NameLoc, if any. The value's own name
-// is the outermost NameLoc (frontend attaches it as ``NameLoc(name, ...)``).
+// The readable name carried by a value's NameLoc, if any. The frontend attaches
+// a value's own name as the outermost NameLoc.
 inline std::optional<std::string> nameFromLoc(Location loc) {
   if (auto nameLoc = dyn_cast<NameLoc>(loc))
     return nameLoc.getName().str();
@@ -131,8 +130,7 @@ inline std::optional<std::string> nameFromLoc(Location loc) {
 }
 
 // The source (line, column) a location ultimately points at, peeling NameLoc /
-// CallSite / Fused wrappers to reach a FileLineColLoc. Used to tag loop labels
-// with a stable, source-traceable suffix.
+// CallSite / Fused wrappers to reach a FileLineColLoc.
 inline std::optional<std::pair<unsigned, unsigned>>
 lineColFromLoc(Location loc) {
   if (auto fileLoc = dyn_cast<FileLineColLoc>(loc))
@@ -156,18 +154,16 @@ struct EmitterState {
   std::size_t currentIndent = 0;
   std::size_t indentSize = 2;
   DenseMap<Value, std::string> nameTable;
-  // The C++ signedness each named integer value was declared with. Sign-
-  // sensitive uses consult this so they only cast when the wanted signedness
-  // differs from the declared one; a missing entry means unsigned (the
-  // default).
+  // The C++ signedness each named integer value was declared with; a missing
+  // entry means unsigned. Sign-sensitive uses cast only when the signedness
+  // they want differs from the declared one.
   DenseMap<Value, bool> signedness;
-  // Names handed out in the current function scope, so source-derived names are
-  // uniquified per function (see `beginValueScope`); `fallbackCounter` feeds
-  // the synthetic `v<n>` names for values without a NameLoc and stays global.
+  // Names handed out in the current function scope; `fallbackCounter` feeds the
+  // synthetic `v<n>` names for values without a NameLoc and stays global.
   llvm::StringSet<> usedValueNames;
   unsigned fallbackCounter = 0;
-  // Loop labels emitted in the current function scope (Vitis HLS ``label:``
-  // before a ``for``); kept unique so the C labels never clash.
+  // Loop labels emitted in the current function scope, kept unique so the
+  // emitted C labels never clash.
   llvm::StringSet<> usedLabels;
   unsigned indexWidth = 32;
   bool withLocation = false;
@@ -184,8 +180,6 @@ struct EmitterState {
   std::string addName(Value v) {
     assert(!nameTable.contains(v) &&
            "Value already has a name in the name table");
-    // Prefer the value's source name (from its NameLoc) for readability, else a
-    // synthetic `v<n>`; then uniquify within the current function scope.
     std::string base;
     if (auto name = nameFromLoc(v.getLoc()))
       base = sanitizeCppIdentifier(*name);
@@ -200,13 +194,9 @@ struct EmitterState {
     return unique;
   }
 
-  // Vitis HLS loop label for a loop induction variable:
-  // ``loop_<name>_l<L>c<C>`` where ``<name>`` is the IV's source name (its
-  // NameLoc) and ``l<L>c<C>`` the source line/column -- readable and traceable.
-  // The line/column disambiguates sibling loops without a counter; a numeric
-  // suffix is only appended as a last resort when two loops share both name and
-  // source location (e.g. the two halves of a split), so the emitted C labels
-  // stay unique.
+  // Vitis HLS loop label for a loop induction variable,
+  // ``loop_<name>_l<L>c<C>``, from the IV's source name and source line/column.
+  // A numeric suffix is appended only when two loops share both.
   std::string uniqueLoopLabel(Value iv) {
     Location loc = iv.getLoc();
     std::string base = "loop";
@@ -224,9 +214,8 @@ struct EmitterState {
   }
 
   // Start a fresh value-name scope for a function, so per-function locals reuse
-  // clean source names. `seeded` are names already assigned to the function's
-  // arguments (during the declaration pass) that body locals must not collide
-  // with; pass the argument values so their existing names are reserved.
+  // clean source names. `seeded` are values whose already assigned names stay
+  // reserved, typically the function's arguments.
   template <typename ValueSeq> void beginValueScope(ValueSeq &&seeded) {
     usedValueNames.clear();
     usedLabels.clear();

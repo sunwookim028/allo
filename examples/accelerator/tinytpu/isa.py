@@ -30,6 +30,7 @@ that actually run on an FPGA -- lives in ``microarch.py``.
 from allo.exp.dsa import primitive
 from allo.exp.dsa.access import contiguous, view
 from allo.exp.dsa.core import ISA, scratch
+from allo.exp.dsa.errors import ShapeError
 from allo.lang.core import f32
 
 tpu = ISA("CornellTPU")
@@ -220,10 +221,11 @@ def gemm(I):
     @I.expand
     def _(a, b, c, M, K, N):
         for extent, name in ((M, "M"), (K, "K"), (N, "N")):
-            assert extent % MATMUL_TILE == 0, (
-                f"gemm: {name}={extent} is not divisible by the "
-                f"{MATMUL_TILE}x{MATMUL_TILE} systolic tile"
-            )
+            if extent % MATMUL_TILE:
+                raise ShapeError(
+                    f"gemm: {name}={extent} is not divisible by the "
+                    f"{MATMUL_TILE}x{MATMUL_TILE} systolic tile"
+                )
 
         x_tile, w_tile, z_tile, partial_tile = (
             scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(4)

@@ -1,9 +1,9 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Phase 1 frontend: the CornellTPU catalog verifies and lowers."""
+"""The current TinyTPU catalog verifies and lowers."""
 
-from examples.accelerator.cornell_tpu.isa import tpu
+from examples.accelerator.tinytpu.isa import tpu
 
 
 def test_catalog_verifies():
@@ -26,6 +26,8 @@ def test_catalog_structure():
         "vsub",
         "vmul",
         "vrelu",
+        "vneg",
+        "vabs",
         "matmul",
     ):
         assert f"allo.define @{name}" in text

@@ -5,14 +5,8 @@
 
 //===- MaterializeApintWrapper.cpp ----------------------------------------===//
 //
-// Wrap a top kernel whose boundary uses non-standard-width integers (e.g.
-// ap_int<5>) with a standard-width interface, so numpy/ctypes/the LLVM memref
-// ABI can talk to it. The real kernel is renamed `<name>__impl` and made
-// private; a public wrapper keeps the original name and converts each
-// non-standard operand element-by-element (truncate on the way in, sign/zero
-// extend on the way out) around an invoke of the real kernel.
-//
-// Boundary signedness is read from the `allo.signed` marker on the kernel.
+// Wrap a top kernel whose boundary uses non-standard-width integers with a
+// standard-width interface, so numpy/ctypes/the LLVM memref ABI can talk to it.
 //
 //===----------------------------------------------------------------------===//
 
@@ -153,7 +147,8 @@ struct MaterializeApintWrapperPass
     StringAttr origName = top.getSymNameAttr();
     std::string implName = (origName.getValue() + "__impl").str();
 
-    // Rename the real kernel and hide it; the wrapper takes the public name.
+    // Rename the real kernel `<name>__impl` and hide it; the wrapper takes the
+    // public name and converts around an invoke of it.
     top.setSymName(implName);
     top.setSymVisibility("private");
 

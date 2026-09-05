@@ -4,6 +4,7 @@
  */
 
 #include "allo/Conversion/Passes.h"
+#include "allo/IR/AlloOps.h"
 #include "allo/Transforms/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Transforms/Passes.h"
@@ -20,7 +21,27 @@
 using namespace mlir;
 using namespace mlir::allo;
 
+namespace {
+struct StripSchedulingHintsPass
+    : public PassWrapper<StripSchedulingHintsPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(StripSchedulingHintsPass)
+  StringRef getArgument() const final { return "allo-strip-scheduling-hints"; }
+
+  void runOnOperation() override {
+    // Collect first: erasing mid-walk invalidates the iteration.
+    SmallVector<Operation *> hints;
+    getOperation()->walk([&](Operation *op) {
+      if (isa<AssumeNoDepOp, AssumeSSAOp, VolatileOp>(op))
+        hints.push_back(op);
+    });
+    for (Operation *hint : hints)
+      hint->erase();
+  }
+};
+} // namespace
+
 void allo::populateLowerToLLVMPipeline(OpPassManager &pm, bool enableTensor) {
+  pm.addPass(std::make_unique<StripSchedulingHintsPass>());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addPass(createGridMappingPass());
@@ -45,10 +66,8 @@ void allo::populateLowerToLLVMPipeline(OpPassManager &pm, bool enableTensor) {
 
   pm.addPass(createConvertAlloToFuncPass());
   // No global C-wrapper request: only the top kernel needs the C interface ABI,
-  // and the backend marks it explicitly with `llvm.emit_c_interface` (preserved
-  // through ConvertAlloToFunc). Requesting wrappers for every function would
-  // otherwise force the `_mlir_ciface_` prefix onto the dataflow runtime
-  // symbols.
+  // marked with `llvm.emit_c_interface` and preserved by ConvertAlloToFunc. A
+  // global request would prefix the dataflow runtime symbols `_mlir_ciface_`.
   auto &nestedPM = pm.nest<func::FuncOp>();
   nestedPM.addPass(createConvertLinalgToAffineLoopsPass());
   nestedPM.addPass(affine::createAffineScalarReplacementPass());

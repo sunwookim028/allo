@@ -50,25 +50,28 @@ payload type is checked at `put(value)`: the value is cast to the stream
 
 ## Common Helpers
 
-Several rules reuse a common integer type selector.
+Several rules reuse a common integer type selector. The two styles differ on
+a mixed-sign pair: `cpp` follows C++'s usual arithmetic conversions, while
+`hls` selects a signed type wide enough for both value ranges, so
+comparisons, divisions, and bitwise operations compute on the operand values.
 
 For two integer types with widths `L` and `R`:
 
-| Inputs                                                         | Common integer result     |
-| :------------------------------------------------------------- | :------------------------ |
-| Both signed                                                    | signed `max(L, R)`        |
-| Both unsigned                                                  | unsigned `max(L, R)`      |
-| One signed, one unsigned, and `unsigned_width >= signed_width` | unsigned `unsigned_width` |
-| One signed, one unsigned, and `unsigned_width < signed_width`  | signed `signed_width`     |
+| Inputs                                                         | `cpp` common result       | `hls` common result                     |
+| :------------------------------------------------------------- | :------------------------ | :-------------------------------------- |
+| Both signed                                                    | signed `max(L, R)`        | signed `max(L, R)`                      |
+| Both unsigned                                                  | unsigned `max(L, R)`      | unsigned `max(L, R)`                    |
+| One signed, one unsigned, and `unsigned_width >= signed_width` | unsigned `unsigned_width` | signed `max(signed_width, unsigned_width + 1)` |
+| One signed, one unsigned, and `unsigned_width < signed_width`  | signed `signed_width`     | signed `max(signed_width, unsigned_width + 1)` |
 
 Examples:
 
-| Expression types | Common integer |
-| :--------------- | :------------- |
-| `i16`, `i32`     | `i32`          |
-| `u8`, `u32`      | `u32`          |
-| `i32`, `u32`     | `u32`          |
-| `i32`, `u16`     | `i32`          |
+| Expression types | `cpp` common | `hls` common |
+| :--------------- | :----------- | :----------- |
+| `i16`, `i32`     | `i32`        | `i32`        |
+| `u8`, `u32`      | `u32`        | `u32`        |
+| `i32`, `u32`     | `u32`        | `apint(33)`  |
+| `i32`, `u16`     | `i32`        | `i32`        |
 
 Floating-point common rules are shared by both styles:
 
@@ -155,6 +158,25 @@ Examples:
 | `u16 * u16`       | `u32`      |
 | `i32 * i32 * i32` | `i96`      |
 | `u8 * i8 * u4`    | `i20`      |
+
+### Natural Width vs Built Width
+
+These rules give an expression its **natural** width, computed from the leaves
+up, so an expression never silently loses precision. They do not say how wide
+the operator the RTL backend builds is. Assigning to a narrower declared type
+appends a truncation, and the `narrow-demanded-bits` prepass then sinks that
+truncation onto the leaves, so each operator is built at the width its consumer
+actually reads:
+
+```python
+a: i48 = b * c        # b, c : i32
+```
+
+types `b * c` as `i64` and truncates, but the multiplier that reaches hardware
+is 48 bits wide, with the extends folded into its operands and no truncation
+left. The rewrite is bit-exact: it moves a truncation the program already
+performed. Division, remainder, right shift and comparison read the high bits,
+so their operands keep the natural width.
 
 ### HLS Other Numeric Operators
 

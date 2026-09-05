@@ -2,4 +2,5 @@
   "typeCheckingMode": "basic",
   "reportUnboundVariable": "warning",
   "reportInvalidTypeForm": "none",
+  "reportUnusedCoroutine": "none"
 }

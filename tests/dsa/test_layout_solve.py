@@ -40,7 +40,7 @@ from allo.exp.dsa.errors import (
     AssemblyError,
     LayoutError,
 )
-from allo.exp.dsa.search import _movement_catalog, expand_emits
+from allo.exp.dsa.search import _movement_catalog, expand_calls
 from allo.lang.core import f32
 
 A, B, C = 2, 3, 4
@@ -714,7 +714,7 @@ def test_an_ordering_param_cannot_ride_along_with_expansion():
                 tile_relu(s + i * B * C, d + i * B * C)
 
     with pytest.raises(AcceleratorDescriptionError, match="ordering param"):
-        expand_emits(isa, layer_relu.spec, [0, 64, ROW])
+        expand_calls(isa, layer_relu.spec, [0, 64, ROW])
 
 
 # --- declaration-time rules -------------------------------------------------------

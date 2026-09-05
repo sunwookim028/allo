@@ -5,7 +5,7 @@
 a placed program is reported between — ``cycles()`` (nothing overlaps, upper) and
 ``bottleneck_cycles()`` / ``unit_cycles()`` (every unit runs concurrently, lower).
 
-Importing ``cornell_tpu.microarch`` binds every CornellTPU instruction to the unit
+Importing ``tinytpu.microarch`` binds every TinyTPU instruction to the unit
 that runs it, so from here on the ISA prices instructions in cycles rather than
 counting them. That binding is global and permanent for the session — verified
 benign: the whole suite selects identically with it on or off.
@@ -16,8 +16,8 @@ import pytest
 
 from allo.exp.dsa.errors import AcceleratorDescriptionError
 
-from examples.accelerator.cornell_tpu import microarch  # noqa: F401  (binds the ISA)
-from examples.accelerator.cornell_tpu.isa import tpu, VEC_LANES
+from examples.accelerator.tinytpu import microarch  # noqa: F401  (binds the ISA)
+from examples.accelerator.tinytpu.isa import tpu, VEC_LANES
 
 
 def _torch_relu_add(a, b) -> str:

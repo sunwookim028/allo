@@ -5,14 +5,12 @@
 
 // CPU dataflow simulator runtime.
 //
-// Each PE of a dataflow/systolic kernel runs as a *fiber* on a small pool of
-// marl worker threads (M:N scheduling). Streams are bounded MPMC FIFOs whose
-// blocking put/get suspend the calling *fiber* (not the OS thread) via marl's
-// fiber-aware condition variables. This decouples FIFO depth from correctness:
-// a producer that runs ahead simply parks its fiber until a consumer drains the
-// channel, so the authored depth (often 1-2) is enough and no PE starves a
-// thread. The lowering emits allo_df_open/spawn/join/close around the PE calls
-// (see LowerDataflow.cpp) and the usual allo_sim_stream_* calls inside them.
+// Each PE of a dataflow/systolic kernel runs as a marl fiber on a small pool of
+// worker threads. Streams are bounded MPMC FIFOs whose blocking put/get suspend
+// the calling FIBER, not the OS thread, so the authored depth never affects
+// correctness and no PE starves a thread. The lowering emits
+// allo_df_open/spawn/join/close around the PE calls and allo_sim_stream_*
+// inside them.
 
 #include "marl/conditionvariable.h"
 #include "marl/mutex.h"
@@ -33,9 +31,8 @@
 
 namespace {
 
-// A single bounded MPMC FIFO lane with inline fixed-size slots (no per-item
-// heap allocation). Blocking is fiber-aware: a full put / empty get parks the
-// current fiber on a marl condition variable and yields the worker thread.
+// A single bounded MPMC FIFO lane with inline fixed-size slots. A full put or
+// empty get parks the current fiber and yields the worker thread.
 struct Lane {
   marl::mutex mutex;
   marl::ConditionVariable notEmpty;
@@ -90,11 +87,13 @@ void readBytes(Stream *stream, int64_t laneId, void *data) {
   lane.notFull.notify_one();
 }
 
-// Owns a marl scheduler bound to the launcher thread plus a WaitGroup that
-// tracks the live PE fibers.
+// A marl scheduler plus a WaitGroup tracking this region's live PE fibers.
+// `owning` is false for a nested container, which reuses the enclosing region's
+// already-bound scheduler, so close() must not tear it down.
 struct DataflowScheduler {
   marl::Scheduler *scheduler;
   marl::WaitGroup pending;
+  bool owning;
 };
 
 } // namespace
@@ -127,6 +126,27 @@ allo_sim_stream_write(uint64_t handle, int64_t lane, uint64_t value) {
   writeBytes(stream, lane, &value);
 }
 
+// Preload one initial token into `lane`, seeding a feedback cycle so it does
+// not deadlock. The bound (and every lane's ring) grows by one, so seeding
+// never consumes the declared steady-state depth and never blocks. Called once
+// per token at construction, before any PE fiber exists, so the ring is empty
+// and the resize preserves the contiguous (head == 0) layout.
+extern "C" ALLO_RUNTIME_EXPORT void
+allo_sim_stream_seed(uint64_t handle, int64_t lane, uint64_t value) {
+  Stream *stream = asStream(handle);
+  assert(stream->itemBytes <= static_cast<int64_t>(sizeof(value)) &&
+         "scalar stream payload is too wide");
+  Lane &l = getLane(stream, lane);
+  marl::lock lock(l.mutex);
+  ++stream->depth;
+  for (auto &lp : stream->lanes)
+    lp->ring.resize(static_cast<size_t>(stream->depth) * stream->itemBytes);
+  std::memcpy(&l.ring[l.tail * stream->itemBytes], &value, stream->itemBytes);
+  l.tail = (l.tail + 1) % stream->depth;
+  ++l.count;
+  l.notEmpty.notify_one();
+}
+
 extern "C" ALLO_RUNTIME_EXPORT uint64_t allo_sim_stream_read(uint64_t handle,
                                                              int64_t lane) {
   Stream *stream = asStream(handle);
@@ -153,17 +173,21 @@ extern "C" ALLO_RUNTIME_EXPORT void allo_sim_stream_destroy(uint64_t handle) {
 
 // ---- dataflow scheduler ABI (called from the launcher thread) ---------------
 
-// Create a marl scheduler and bind it to the calling thread so that subsequent
-// allo_df_spawn calls (and the join) run against it. `numWorkers <= 0` requests
-// one worker per logical core.
+// Open a dataflow region. At the top level this creates a marl scheduler and
+// binds it to the calling thread; `numWorkers <= 0` requests one worker per
+// logical core. A nested container reuses the scheduler already bound to its
+// thread. Each region gets its own WaitGroup, so join blocks only for the
+// fibers spawned at this level.
 extern "C" ALLO_RUNTIME_EXPORT void *allo_df_open(int64_t numWorkers) {
+  if (marl::Scheduler *cur = marl::Scheduler::get())
+    return new DataflowScheduler{cur, marl::WaitGroup{}, /*owning=*/false};
   marl::Scheduler::Config cfg =
       numWorkers > 0 ? marl::Scheduler::Config().setWorkerThreadCount(
                            static_cast<int>(numWorkers))
                      : marl::Scheduler::Config::allCores();
   auto *scheduler = new marl::Scheduler(cfg);
   scheduler->bind();
-  return new DataflowScheduler{scheduler, marl::WaitGroup{}};
+  return new DataflowScheduler{scheduler, marl::WaitGroup{}, /*owning=*/true};
 }
 
 // Launch `fn(ctx)` as a fiber. The shared `ctx` (the PE operands) stays valid
@@ -185,7 +209,10 @@ extern "C" ALLO_RUNTIME_EXPORT void allo_df_join(void *handle) {
 
 extern "C" ALLO_RUNTIME_EXPORT void allo_df_close(void *handle) {
   auto *df = static_cast<DataflowScheduler *>(handle);
-  df->scheduler->unbind();
-  delete df->scheduler;
+  // A nested region reuses the enclosing scheduler; leave it bound and alive.
+  if (df->owning) {
+    df->scheduler->unbind();
+    delete df->scheduler;
+  }
   delete df;
 }

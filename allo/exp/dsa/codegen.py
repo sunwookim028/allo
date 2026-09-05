@@ -72,6 +72,7 @@ def _val(x) -> ir.Value:
 def build_catalog(isa: ISA) -> Module:
     context = ir.Context()
     allo_d.register_dialect(context)
+    allo_d.register_extensions(context)
     with context, Location.unknown(context):
         module = Module.create()
         with InsertionPoint(module.body):

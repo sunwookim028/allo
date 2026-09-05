@@ -804,10 +804,13 @@ def test_grid_loop_store():
             out[i, j] = i + j
 
     ir = _compile_ir(top)
+    # A grid lowers to a nest of affine.for (one per axis) plus an
+    # `allo.assume.nodep` per written array carrying the independence guarantee.
     _assert_contains(
         ir,
-        "affine.parallel",
-        "= (0, 0) to (2, 2)",
+        "affine.for %i = 0 to 2",
+        "affine.for %j = 0 to 2",
+        "allo.assume.nodep",
         "arith.addi",
         "arith.index_cast",
         "memref<2x2xi32>",
@@ -884,7 +887,7 @@ def test_affine_tiled_dim_bound():
 
 
 def test_affine_dynamic_grid():
-    # grid() with runtime (symbol) bounds lowers to affine.parallel.
+    # grid() with runtime (symbol) bounds lowers to a nest of affine.for.
     @kernel
     def top(n: index, m: index, a: f32[16, 16], b: f32[16, 16]):
         for i, j in allo.grid(n, m):
@@ -892,7 +895,11 @@ def test_affine_dynamic_grid():
 
     ir = _compile_ir(top)
     _assert_contains(
-        ir, "affine.parallel", "to (symbol(%n), symbol(%m))", "affine.load"
+        ir,
+        "affine.for %i = 0 to %n",
+        "affine.for %j = 0 to %m",
+        "allo.assume.nodep",
+        "affine.load",
     )
 
 
@@ -980,7 +987,7 @@ def test_scope_shape_annotation():
     _assert_contains(
         ir,
         "memref<2x2xi32>",
-        "affine.parallel",
+        "affine.for %i = 0 to 2",
     )
 
 
@@ -1547,6 +1554,17 @@ def test_cpp_typing_compile():
     _assert_contains(ir, "arith.addi", ": i32")
 
 
+# The hls style promotes a mixed-sign pair to a signed type holding both
+# ranges: u32 with i32 divides as i33, zero- and sign-extended by source.
+def test_hls_typing_mixed_sign_promotes_signed():
+    @kernel
+    def top(x: u32, y: i32, out: i32[1]):
+        out[0] = x // y
+
+    ir = _compile_ir(top)
+    _assert_contains(ir, "arith.extui", "arith.extsi", "arith.divsi", ": i33")
+
+
 def test_return_scalar_value():
     @kernel
     def top(x: i32, y: i32) -> i32:
@@ -1701,3 +1719,46 @@ def test_kernel_defined_via_python_dash_c():
     )
     assert result.returncode == 0, result.stderr
     _assert_contains(result.stdout, "allo.kernel public @top", "arith.addi")
+
+
+def test_await_lowers_to_async_invoke():
+    # P1 frontend: `await`-ing an `async def` kernel emits `allo.invoke {async}`
+    # (a concurrent spawn), and that bit survives `convert-allo-to-func` as the
+    # `allo.async` attr on the resulting `func.call` (which has no async field) --
+    # the carrier the dataflow-composition lowering keys on. A non-async kernel
+    # cannot be awaited. This is an IR-level check (no scheduling/emit yet).
+
+    @kernel
+    async def prod(s: Stream[i32]):
+        for i in range(16):
+            s.put(i)
+
+    @kernel
+    async def cons(s: Stream[i32], out: i32[16]):
+        for i in range(16):
+            out[i] = s.get()
+
+    @kernel
+    async def top(out: i32[16]):
+        fifo: Stream[i32]
+        await prod(fifo)
+        await cons(fifo, out)
+
+    ir = _compile_ir(top)
+    _assert_contains(ir, "async", "invoke @")
+
+    # Contract: only an `async def` kernel may be awaited.
+    @kernel
+    def plain(s: Stream[i32]):
+        for i in range(16):
+            s.put(i)
+
+    @kernel
+    async def bad(out: i32[16]):
+        fifo: Stream[i32]
+        await plain(fifo)
+
+    _assert_compile_error(
+        bad,
+        "not async",
+    )

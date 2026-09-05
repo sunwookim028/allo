@@ -23,4 +23,16 @@ set(MARL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(MARL_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
 add_subdirectory(externals/marl EXCLUDE_FROM_ALL)
 
+# spdlog: use header-only mode to avoid rtti, exceptions, and shared lib dependencies
+set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(SPDLOG_HEADER_ONLY ON CACHE BOOL "" FORCE)
+include(FetchContent)
+FetchContent_Declare(spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG v1.17.0
+  SYSTEM
+)
+FetchContent_MakeAvailable(spdlog)
+
 add_subdirectory(mlir)

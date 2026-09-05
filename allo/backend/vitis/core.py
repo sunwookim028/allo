@@ -7,7 +7,7 @@ import os
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Generic, TypeVar, ParamSpec
+from typing import Any, Literal, TypeVar, ParamSpec
 from collections.abc import Mapping
 
 from ..base import (
@@ -148,7 +148,8 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class Vitis(Backend, Generic[P, R]):
+# pylint: disable-next=too-many-instance-attributes
+class Vitis(Backend[P, R]):
     name = "vitis"
     part: str
 
@@ -236,6 +237,8 @@ class Vitis(Backend, Generic[P, R]):
     # Interface configuration methods
     #################################
 
+    # the AXI knobs are all keyword-only
+    # pylint: disable-next=too-many-arguments
     def set_axi(
         self,
         index: int,
@@ -353,6 +356,7 @@ class Vitis(Backend, Generic[P, R]):
         self._set_interface_pragma(index, "s_axilite", options)
 
     @terminate_on_error
+    # pylint: disable-next=arguments-differ
     def run(
         self,
         mode: VitisMode,
@@ -376,7 +380,7 @@ class Vitis(Backend, Generic[P, R]):
                 "simulation (csim) instead."
             )
             return self.csim(*args, exist_ok=exist_ok)
-        if mode in ("hw_emu", "hw"):
+        if mode in {"hw_emu", "hw"}:
             return self._run_impl(mode, *args, exist_ok=exist_ok)
         if args:
             raise TypeError("Vitis csyn does not accept runtime arguments")
@@ -470,6 +474,8 @@ class Vitis(Backend, Generic[P, R]):
             return False
 
     @terminate_on_error
+    # `project` leads the kernel arguments; that is the documented call shape.
+    # pylint: disable-next=keyword-arg-before-vararg
     def scaffold_project(
         self, project: str | None = None, *args, exist_ok: bool = True
     ) -> Path:
@@ -484,6 +490,7 @@ class Vitis(Backend, Generic[P, R]):
             )
         return self._materialize_project(project, args, exist_ok=exist_ok)
 
+    # pylint: disable-next=keyword-arg-before-vararg
     def _materialize_project(
         self, project: Path | str | None = None, *args, exist_ok: bool = True
     ) -> Path:

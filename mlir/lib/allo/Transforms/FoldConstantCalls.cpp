@@ -6,6 +6,7 @@
 #include "allo/Transforms/Passes.h"
 
 #include "allo/IR/AlloOps.h"
+#include "allo/Support/AliasAnalysis.h" // alloAliasAnalysis
 #include "mlir/Analysis/AliasAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -78,14 +79,12 @@ bool FoldConstantCallsPass::evaluate(IRRewriter &rewriter, KernelOp callee,
   fn.setPrivate();
   IRMapping mapping;
   callee.getBody().cloneInto(&fn.getBody(), mapping);
-  // Swap the `allo.return` terminator for `func.return`.
   fn.walk([&](ReturnOp ret) {
     rewriter.setInsertionPoint(ret);
     func::ReturnOp::create(rewriter, ret.getLoc(), ret.getOperands());
     ret.erase();
   });
 
-  // Materialize the arguments as constants inside the clone.
   Block &entry = fn.getBody().front();
   rewriter.setInsertionPointToStart(&entry);
   for (auto [arg, attr] : llvm::zip_equal(entry.getArguments(), constArgs)) {
@@ -94,10 +93,8 @@ bool FoldConstantCallsPass::evaluate(IRRewriter &rewriter, KernelOp callee,
   }
 
   // Fixpoint: simplify the body, then fully unroll one constant-trip loop
-  // (affine.for or scf.for, outermost first). Simplification folds arithmetic,
-  // resolves constant conditionals, forwards scratch memory, and turns loop
-  // bounds into constant trip counts; unrolling exposes the next round of
-  // folds.
+  // (affine.for or scf.for, outermost first). Each unroll exposes the next
+  // round of folds.
   bool reduced = true;
   constexpr unsigned kMaxRounds = 32;
   for (unsigned round = 0; round < kMaxRounds; ++round) {
@@ -105,7 +102,7 @@ bool FoldConstantCallsPass::evaluate(IRRewriter &rewriter, KernelOp callee,
     {
       DominanceInfo dom(fn);
       PostDominanceInfo pdom(fn);
-      AliasAnalysis aa(fn);
+      AliasAnalysis aa = alloAliasAnalysis(fn);
       affine::affineScalarReplace(fn, dom, pdom, aa);
     }
     {
@@ -159,13 +156,13 @@ void FoldConstantCallsPass::runOnOperation() {
   canonicalizers = buildCanonicalizers(context);
   SymbolTableCollection symbols;
 
-  // Fast filter: collect the lazy-consteval kernels via the `allo.lazy` marker.
+  // Collect the lazy-consteval kernels via the `allo.lazy` marker.
   DenseSet<Operation *> lazyKernels;
   for (KernelOp kernel : module.getOps<KernelOp>()) {
     if (!kernel->hasAttr(kAlloLazyAttr))
       continue;
     // The frontend cannot express a lazy consteval kernel with a non-identity
-    // mapping, so it is never an SPMD grid -- guard the invariant.
+    // mapping, so it is never an SPMD grid.
     assert(
         llvm::all_of(kernel.getMapping(), [](int32_t m) { return m == 1; }) &&
         "lazy consteval kernel must have identity mapping");

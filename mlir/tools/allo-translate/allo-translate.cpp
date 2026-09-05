@@ -10,5 +10,6 @@ using namespace mlir;
 
 int main(int argc, char **argv) {
   allo::registerVivadoHLSTranslation();
+
   return failed(mlirTranslateMain(argc, argv, "Allo IR translator"));
 }

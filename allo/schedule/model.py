@@ -512,7 +512,7 @@ class PredictedSnapshot:
         return loop
 
     def flatten(self, band: list[PredictedOp], flat_key: str) -> PredictedOp:
-        band = sorted(band, key=lambda op: self.depth(op))
+        band = sorted(band, key=self.depth)
         outermost, innermost = band[0], band[-1]
         body = list(innermost.children)
         flat_sk = (outermost.scope, flat_key)
@@ -539,7 +539,7 @@ class PredictedSnapshot:
     def tile(
         self, band: list[PredictedOp], tile_keys: list[str], point_keys: list[str]
     ) -> tuple[list[PredictedOp], list[PredictedOp]]:
-        band = sorted(band, key=lambda op: self.depth(op))
+        band = sorted(band, key=self.depth)
         outermost, innermost = band[0], band[-1]
         body = list(innermost.children)
         scope, traits = outermost.scope, outermost.traits
@@ -575,8 +575,8 @@ class PredictedSnapshot:
         # `order` lists the loops outermost-first in the desired nesting. They form a
         # perfect band today; only their relative nesting changes.
         band = {op.skey for op in order}
-        cur_outer = min(order, key=lambda op: self.depth(op))
-        cur_inner = max(order, key=lambda op: self.depth(op))
+        cur_outer = min(order, key=self.depth)
+        cur_inner = max(order, key=self.depth)
         top_parent = cur_outer.parent
         body = [c for c in cur_inner.children if c not in band]
         self._replace_in_parent(top_parent, cur_outer.skey, order[0].skey)

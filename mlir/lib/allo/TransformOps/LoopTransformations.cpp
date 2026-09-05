@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "allo/Support/AliasAnalysis.h" // alloAliasAnalysis
 #include "allo/TransformOps/AlloTransformOps.h"
 #include "allo/TransformOps/Utils.h"
 #include "mlir/Analysis/FlatLinearValueConstraints.h"
@@ -30,10 +31,8 @@ using namespace mlir::allo;
 ///===----------------------------------------------------------------------===//
 /// OutlineOp implementation
 ///===----------------------------------------------------------------------===//
-/// Wraps the given operation `op` into an `scf.execute_region` operation. Uses
-/// the provided rewriter for all operations to remain compatible with the
-/// rewriting infra, as opposed to just splicing the op in place.
-/// Supports operations with either zero or one region.
+/// Wraps `op` into an `scf.execute_region` operation. Supports operations with
+/// either zero or one region.
 static scf::ExecuteRegionOp wrapInExecuteRegion(RewriterBase &b,
                                                 Operation *op) {
   if (op->getNumRegions() > 1)
@@ -121,9 +120,8 @@ static InvokeOp convertOutlinedCallToInvoke(RewriterBase &rewriter,
   return invoke;
 }
 
-/// Modified from
+/// Outlines arbitrary operations with at most one region. Modified from
 /// https://github.com/llvm/llvm-project/blob/main/mlir/lib/Dialect/SCF/TransformOps/SCFTransformOps.cpp
-/// to support outlining of arbitrary operations with at most one region
 DiagnosedSilenceableFailure
 transform::OutlineOp::apply(transform::TransformRewriter &rewriter,
                             transform::TransformResults &results,
@@ -159,8 +157,7 @@ transform::OutlineOp::apply(transform::TransformRewriter &rewriter,
       symbolTable.insert(*outlined);
       call.setCalleeAttr(FlatSymbolRefAttr::get(*outlined));
     }
-    // `scf.execute_region` is only an outlining helper container. Inline it
-    // back so the final IR directly contains `allo.call`.
+    // `scf.execute_region` is only an outlining container; inline it back.
     Operation *outlinedOp = *outlined;
     Operation *callOp = call;
     if (DenseI32ArrayAttr mapping = getMappingAttr()) {
@@ -182,16 +179,15 @@ transform::OutlineOp::apply(transform::TransformRewriter &rewriter,
 /// ReorderOp implementation
 ///===-------------------------------------------------------------------===//
 
-/// Checks if the given loops are in the same perfectly nested loop band.
-/// Return the outermost loop if true. Otherwise returns null.
-/// The input loops do not need to be contiguous, or sorted by depth
+/// Checks if the given loops are in the same perfectly nested loop band and
+/// returns the outermost loop, or null. The input loops need not be contiguous
+/// or sorted by depth.
 static affine::AffineForOp
 inSamePerfectlyNestedLoopBand(ArrayRef<affine::AffineForOp> loops) {
   if (loops.empty())
     return {};
   if (loops.size() == 1)
     return {};
-  // create a temp copy and sort by depth
   auto tmp = llvm::to_vector(loops);
   DenseMap<affine::AffineForOp, unsigned> depthMap;
   llvm::for_each(tmp, [&depthMap](auto op) {
@@ -204,16 +200,12 @@ inSamePerfectlyNestedLoopBand(ArrayRef<affine::AffineForOp> loops) {
   llvm::sort(tmp,
              [&depthMap](auto a, auto b) { return depthMap[a] < depthMap[b]; });
 
-  // no need to be contiguous
-  // check perfectly nested
   for (unsigned i = 0; i < tmp.size() - 1; ++i) {
     affine::AffineForOp currLoop = tmp[i];
     affine::AffineForOp nextLoop = tmp[i + 1];
-    // check if they are in the same loop nest
     if (!currLoop->isProperAncestor(nextLoop)) {
       return {};
     }
-    // check if perfectly nested between currLoop and nextLoop
     Operation *ptr = currLoop;
     while (ptr != nextLoop) {
       auto loop = dyn_cast<affine::AffineForOp>(ptr);
@@ -221,15 +213,13 @@ inSamePerfectlyNestedLoopBand(ArrayRef<affine::AffineForOp> loops) {
         return {};
       }
       Block *body = loop.getBody();
-      // the first one is affine.for
-      // the second one is the terminator
+      // The body holds the nested affine.for and the terminator.
       if (body->getOperations().size() != 2) {
         return {};
       }
       ptr = &body->getOperations().front();
     }
   }
-  // return the top-level loop
   return tmp.front();
 }
 
@@ -239,7 +229,6 @@ transform::LoopReorderOp::apply(transform::TransformRewriter &rewriter,
                                 transform::TransformState &state) {
 
   SmallVector<affine::AffineForOp> loops;
-  // validate input operation handles
   for (Operation *payload : state.getPayloadOps(getLoops())) {
     if (auto forOp = dyn_cast<affine::AffineForOp>(payload)) {
       loops.push_back(forOp);
@@ -256,9 +245,8 @@ transform::LoopReorderOp::apply(transform::TransformRewriter &rewriter,
            << "at least two loops are required for reordering";
   }
 
-  // The permutation is interpreted positionally over `loops`, so duplicate
-  // payloads would corrupt the permutation map below (non-bijective) and break
-  // `permuteLoops`.
+  // The permutation is interpreted positionally over `loops`; duplicates would
+  // make the permutation map non-bijective and break `permuteLoops`.
   DenseSet<Operation *> seenLoops;
   for (auto loop : loops) {
     if (!seenLoops.insert(loop).second)
@@ -273,13 +261,11 @@ transform::LoopReorderOp::apply(transform::TransformRewriter &rewriter,
   SmallVector<affine::AffineForOp, 4> band;
   affine::getPerfectlyNestedLoops(band, outermostLoop);
 
-  // Validate permutation size against the number of selected loops.
   if (getPermutation().size() != loops.size()) {
     return emitSilenceableError()
            << "the size of permutation must match the number of loops";
   }
 
-  // Construct the permutation vector over selected loops.
   auto permutation = getPermutation();
 
   // Map selected loops to their original positions in the full perfect band.
@@ -302,7 +288,6 @@ transform::LoopReorderOp::apply(transform::TransformRewriter &rewriter,
     permMap[targetPos] = srcPos;
   }
 
-  // perform reordering
   if (!affine::isValidLoopInterchangePermutation(band, permMap)) {
     return emitSilenceableError() << "permutation violates legality "
                                      "constraints (e.g., data dependencies)";
@@ -318,8 +303,8 @@ void transform::LoopReorderOp::getEffects(
 }
 
 LogicalResult transform::LoopReorderOp::verify() {
-  // we cannot know the number of loops at verification time
-  // so we only check the validity of the permutation itself
+  // The number of loops is unknown at verification time, so only the
+  // permutation itself is checked.
   unsigned nPerm = getPermutation().size();
   auto permutation = getPermutation();
   for (unsigned i = 0; i < nPerm; ++i) {
@@ -340,13 +325,9 @@ LogicalResult transform::LoopReorderOp::verify() {
 /// SplitOp implementation
 ///===----------------------------------------------------------------------===//
 
-/// Sink an index-reconstruction affine.apply as deep as possible: while a loop
-/// in its current block is a proper ancestor of *all* its uses, move it to that
-/// loop's body front. Splitting/tiling materializes such applies between band
-/// loops, which would break perfect nesting (reorder/tile/compute_at require
-/// single-op loop bodies between band loops); sinking them into the innermost
-/// using loop restores it without changing semantics (operands are enclosing
-/// IVs, which still dominate the deeper location).
+/// Sinks an index-reconstruction affine.apply into the innermost loop of its
+/// block that is a proper ancestor of all its uses, restoring the perfect
+/// nesting that reorder/tile/compute_at require between band loops.
 static void sinkAffineApply(affine::AffineApplyOp apply) {
   while (!apply->use_empty()) {
     affine::AffineForOp target;
@@ -429,31 +410,28 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
     return emitSilenceableFailure(getOperation())
            << "split factor must be positive";
   }
-  // Case 1: affine.for loop
   if (auto forOp = dyn_cast<affine::AffineForOp>(target)) {
     if (!checkSplitFactor(forOp, factor)) {
       return emitSilenceableFailure(forOp)
              << "split factor is larger than or equal to the loop trip count";
     }
 
-    // Capture the source IV location before tiling; the affine utility below
+    // Capture the source IV location before tiling: the affine utility below
     // builds fresh loops whose induction variables would otherwise lose the
-    // source NameLoc that drives readable codegen.
+    // source NameLoc.
     Location ivLoc = forOp.getInductionVar().getLoc();
 
-    // perform split
-    // single loop is always perfectly nested
+    // A single loop is always perfectly nested.
     SmallVector<affine::AffineForOp, 2> splitOps;
     if (failed(affine::tilePerfectlyNested(forOp, factor, &splitOps))) {
       return emitSilenceableFailure(forOp) << "failed to split the loop";
     }
     assert(splitOps.size() == 2 && "expected exactly two loops after tiling");
 
-    // normalize loop
     auto outer = splitOps.front();
     auto inner = splitOps.back();
-    // Both halves inherit the original loop variable's name (the emitter
-    // uniquifies the duplicate, e.g. `k` / `k_1`).
+    // Both halves inherit the original loop variable's name; the emitter
+    // uniquifies the duplicate.
     outer.getInductionVar().setLoc(ivLoc);
     inner.getInductionVar().setLoc(ivLoc);
     if (failed(affine::normalizeAffineFor(outer)) ||
@@ -463,15 +441,14 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
 
     AffineMap innerUb = inner.getUpperBoundMap();
     if (innerUb.isConstant() && innerUb.getNumInputs() != 0) {
-      // simplify the upper bound if it's a constant map with unused symbols
+      // Drop the unused symbols of a constant upper bound map.
       auto cstUb = cast<AffineConstantExpr>(innerUb.getResult(0)).getValue();
       rewriter.setInsertionPoint(inner);
       inner.setUpperBound({}, rewriter.getConstantAffineMap(cstUb));
     }
 
-    // Keep the band perfectly nested for later reorder/tile/etc: erase index
-    // applies left dead by normalization, then sink the live ones to the
-    // innermost loop that uses them.
+    // Keep the band perfectly nested: erase the applies left dead by
+    // normalization, then sink the live ones into the loop that uses them.
     bool erased = true;
     while (erased) {
       erased = false;
@@ -489,18 +466,15 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
     outer.walk([&](affine::AffineApplyOp a) { applies.push_back(a); });
     for (auto a : applies)
       sinkAffineApply(a);
-    // record results
     results.push_back(outer);
     results.push_back(inner);
     return DiagnosedSilenceableFailure::success();
   }
-  // Case 2: scf.for loop
   if (auto forOp = dyn_cast<scf::ForOp>(target)) {
     if (!checkSplitFactor(forOp, factor)) {
       return emitSilenceableFailure(forOp)
              << "split factor is larger than or equal to the loop trip count";
     }
-    // perform split
     Location ivLoc = forOp.getInductionVar().getLoc();
     rewriter.setInsertionPoint(forOp);
     Value cst =
@@ -511,7 +485,6 @@ transform::LoopSplitOp::applyToOne(transform::TransformRewriter &rewriter,
     }
     // The freshly created inner loop inherits the source loop variable's name.
     loops.front().getInductionVar().setLoc(ivLoc);
-    // record results
     results.push_back(forOp);
     results.push_back(loops.front());
     return DiagnosedSilenceableFailure::success();
@@ -554,7 +527,6 @@ sortAndCheckLoopFactorPairs(SmallVectorImpl<LoopWithFactor<ForOp>> &pairs) {
     return getOperationDepth(a.loop) < getOperationDepth(b.loop);
   });
 
-  // Check they belong to one loop nest.
   for (unsigned i = 0; i < pairs.size() - 1; ++i) {
     if (!pairs[i].loop->isProperAncestor(pairs[i + 1].loop))
       return failure();
@@ -588,10 +560,9 @@ static FailureOr<SmallVector<uint64_t, 4>> parseTileFactors(ArrayAttr attr) {
   return factors;
 }
 
-/// Bind tile `factors` to `loops` by handle order, then depth-sort the pairs
-/// while validating they are unique and form one ancestor chain. On success,
-/// `sortedLoops`/`sortedFactors` receive the depth-ordered loops and their
-/// matching factors. Shared by the affine and scf tiling paths.
+/// Binds tile `factors` to `loops` by handle order, then depth-sorts the pairs
+/// while validating they are unique and form one ancestor chain. `sortedLoops`
+/// and `sortedFactors` receive the depth-ordered loops and factors.
 template <typename ForOp>
 static DiagnosedSilenceableFailure
 bindAndSortTileLoops(Operation *op, ArrayRef<ForOp> loops,
@@ -628,8 +599,7 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
   SmallVector<affine::AffineForOp, 4> affineLoops;
   SmallVector<scf::ForOp, 4> scfLoops;
 
-  // Collect payload loops in handle iteration order.
-  // This order is the semantic order for mapping input factors to loops.
+  // Handle iteration order is the semantic order for mapping factors to loops.
   for (Operation *payload : state.getPayloadOps(getLoops())) {
     if (auto affineFor = dyn_cast<affine::AffineForOp>(payload)) {
       affineLoops.push_back(affineFor);
@@ -641,7 +611,6 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
     }
   }
 
-  // A single tile op must target one loop dialect only.
   if (!affineLoops.empty() && !scfLoops.empty()) {
     return emitSilenceableError()
            << "cannot mix affine.for and scf.for loops in the same tiling";
@@ -650,14 +619,12 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
     return emitSilenceableError() << "expected at least one loop to tile";
   }
 
-  // Parse and validate tile factors once for both affine/scf paths.
   auto maybeFactors = parseTileFactors(getFactors());
   if (failed(maybeFactors))
     return emitSilenceableError() << "tile factors must be positive";
   const SmallVector<uint64_t, 4> &factors = *maybeFactors;
 
   if (!affineLoops.empty()) {
-    // Bind factors by handle order, depth-sort, and validate the nest.
     SmallVector<affine::AffineForOp, 4> sortedLoops;
     SmallVector<uint64_t, 4> sortedFactors;
     if (DiagnosedSilenceableFailure diag =
@@ -670,19 +637,16 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
     SmallVector<Operation *, 4> tileLoops;
     SmallVector<Operation *, 4> pointLoops;
 
-    // Source IV locations, captured before tiling rebuilds the loops, so the
-    // tile and point induction variables keep the original loop-variable names
-    // that drive readable codegen.
+    // Capture the source IV locations before tiling rebuilds the loops, so the
+    // tile and point induction variables keep the original names.
     SmallVector<Location, 4> srcIVLocs;
     for (auto loop : sortedLoops)
       srcIVLocs.push_back(loop.getInductionVar().getLoc());
 
-    // Choose perfect vs imperfect tiling based on structural contiguity.
     bool perfect = isContiguousPerfectBand<affine::AffineForOp>(sortedLoops);
 
     if (perfect) {
-      // Perfect affine tiling creates [outer tile loops..., inner point
-      // loops...].
+      // Perfect affine tiling creates [tile loops..., point loops...].
       SmallVector<unsigned, 4> uFactors;
       uFactors.reserve(sortedFactors.size());
       for (uint64_t factor : sortedFactors) {
@@ -739,7 +703,6 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
       for (unsigned i = 0; i < nLoops; ++i) {
         auto outer = tiledNest[i];
         auto point = tiledNest[i + nLoops];
-        // Tile and point loops inherit the original loop variable's name.
         outer.getInductionVar().setLoc(srcIVLocs[i]);
         point.getInductionVar().setLoc(srcIVLocs[i]);
         for (auto applyOp : llvm::make_early_inc_range(
@@ -778,7 +741,6 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
       }
       for (auto loop : sortedLoops)
         tileLoops.push_back(loop);
-      // The freshly strip-mined point loops inherit their source loop names.
       for (auto [i, loop] : llvm::enumerate(point))
         loop.getInductionVar().setLoc(srcIVLocs[i]);
       for (auto loop : point)
@@ -792,7 +754,6 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
   }
 
   if (!scfLoops.empty()) {
-    // Bind factors by handle order, depth-sort, and validate the nest.
     SmallVector<scf::ForOp, 4> sortedLoops;
     SmallVector<uint64_t, 4> sortedFactors;
     if (DiagnosedSilenceableFailure diag = bindAndSortTileLoops<scf::ForOp>(
@@ -803,13 +764,12 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
     SmallVector<Operation *, 4> tileLoops;
     SmallVector<Operation *, 4> pointLoops;
 
-    // Source IV locations, so the freshly created point loops keep the original
-    // loop-variable names (the reused tile loops already retain theirs).
+    // Capture the source IV locations so the freshly created point loops keep
+    // the original names; the reused tile loops already retain theirs.
     SmallVector<Location, 4> srcIVLocs;
     for (auto loop : sortedLoops)
       srcIVLocs.push_back(loop.getInductionVar().getLoc());
 
-    // Build runtime tile-size SSA values from sorted factors.
     SmallVector<Value, 4> sizeVals;
     sizeVals.reserve(sortedFactors.size());
     rewriter.setInsertionPoint(sortedLoops.front());
@@ -822,7 +782,6 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
                                          static_cast<int64_t>(factor)));
     }
 
-    // Choose perfect vs imperfect tiling based on structural contiguity.
     bool perfect = isContiguousPerfectBand<scf::ForOp>(sortedLoops);
     if (perfect) {
       // Perfect scf tiling returns only point loops; outer loops are updated
@@ -872,31 +831,24 @@ transform::LoopTileOp::apply(transform::TransformRewriter &rewriter,
 static void coalesceLoops(MutableArrayRef<affine::AffineForOp> loops,
                           int64_t flattenedTripCount,
                           transform::TransformRewriter &rewriter) {
-  // RAII helper to restore the insertion point.
   OpBuilder::InsertionGuard guard(rewriter);
 
   affine::AffineForOp innermost = loops.back();
   affine::AffineForOp outermost = loops.front();
   Location loc = outermost.getLoc();
 
-  // 1. Store the upper bound of the outermost loop in a variable.
   SmallVector<int64_t, 4> ubs;
   for (auto loop : loops) {
     auto cstUb = loop.getConstantUpperBound();
     ubs.push_back(cstUb);
   }
 
-  // 2. The flattened trip count is validated by the caller.
+  // The flattened trip count is validated by the caller.
   outermost.setConstantUpperBound(flattenedTripCount);
 
-  // 3. Remap induction variables. For each original loop, the value of the
-  // induction variable can be obtained by dividing the induction variable of
-  // the linearized loop by the total number of iterations of the loops nested
-  // in it modulo the number of iterations in this loop (remove the values
-  // related to the outer loops):
-  //   iv_i = floordiv(iv_linear, product-of-loop-ranges-until-i) mod range_i.
-  // Compute these iteratively from the innermost loop by creating a "running
-  // quotient" of division by the range.
+  // Remap the induction variables as
+  //   iv_i = floordiv(iv_linear, product-of-loop-ranges-until-i) mod range_i,
+  // computed from the innermost loop outwards as a running quotient.
   rewriter.setInsertionPointToStart(outermost.getBody());
   Value previous = outermost.getInductionVar();
   SmallVector<Operation *> opToSink;
@@ -904,8 +856,7 @@ static void coalesceLoops(MutableArrayRef<affine::AffineForOp> loops,
     int64_t currUb = ubs[idx - 1];
     if (idx != loops.size()) {
       // Divide by the range of the loop processed in the previous (inner)
-      // iteration, i.e. the next-inner loop `ubs[idx]` — not this loop's own
-      // bound. (Equal for a square nest, which is why that case masks the bug.)
+      // iteration, `ubs[idx]`, not this loop's own bound.
       auto quotientMap =
           AffineMap::get(/*dimCount=*/1, /*symbolCount=*/0,
                          rewriter.getAffineDimExpr(0).floorDiv(ubs[idx]));
@@ -913,8 +864,6 @@ static void coalesceLoops(MutableArrayRef<affine::AffineForOp> loops,
           affine::AffineApplyOp::create(rewriter, loc, quotientMap, previous);
       opToSink.push_back(previous.getDefiningOp());
     }
-    // Modified value of the induction variables of the nested loops after
-    // coalescing.
     Value inductionVariable;
     if (idx == 1) {
       inductionVariable = previous;
@@ -929,8 +878,8 @@ static void coalesceLoops(MutableArrayRef<affine::AffineForOp> loops,
                                inductionVariable, loops.back().getRegion());
   }
 
-  // 4. Move the operations from the innermost just above the second-outermost
-  // loop, delete the extra terminator and the second-outermost loop.
+  // Move the innermost body above the second-outermost loop, then erase that
+  // loop and the extra terminator.
   affine::AffineForOp secondOutermostLoop = loops[1];
   innermost.getBody()->back().erase();
   outermost.getBody()->getOperations().splice(
@@ -944,7 +893,7 @@ static void coalesceLoops(MutableArrayRef<affine::AffineForOp> loops,
   }
   secondOutermostLoop.erase();
 
-  // 5. Sink affine.apply operations.
+  // Sink the index applies into a nested loop that contains all their users.
   std::reverse(opToSink.begin(), opToSink.end());
   outermost.walk([&](affine::AffineForOp nestedLoop) {
     if (nestedLoop == outermost)
@@ -974,7 +923,6 @@ transform::LoopFlattenOp::apply(transform::TransformRewriter &rewriter,
                                 transform::TransformResults &results,
                                 transform::TransformState &state) {
   SmallVector<affine::AffineForOp, 4> loops;
-  // validate input operation handles
   for (Operation *payload : state.getPayloadOps(getLoops())) {
     if (auto forOp = dyn_cast<affine::AffineForOp>(payload)) {
       loops.push_back(forOp);
@@ -1018,9 +966,8 @@ transform::LoopFlattenOp::apply(transform::TransformRewriter &rewriter,
   // trip counts.
   int64_t flattenedTripCount = 1;
   for (auto loop : flattenBand) {
-    // The coalescing logic erases the inner terminator and rewrites induction
-    // variables; loop-carried values (iter_args) are not handled and would be
-    // left dangling, so reject them explicitly.
+    // Coalescing erases the inner terminator and rewrites induction variables;
+    // loop-carried values are not handled and would be left dangling.
     if (loop.getNumResults() != 0) {
       return emitSilenceableError()
              << "flatten does not support affine.for loops carrying iteration "
@@ -1044,10 +991,8 @@ transform::LoopFlattenOp::apply(transform::TransformRewriter &rewriter,
     flattenedTripCount *= ub;
   }
 
-  // perform flattening
   ::coalesceLoops(flattenBand, flattenedTripCount, rewriter);
 
-  // record results
   results.set(cast<OpResult>(getResult()), {flattenBand.front()});
   return DiagnosedSilenceableFailure::success();
 }
@@ -1103,17 +1048,16 @@ DependenceType operator&(DependenceType a, DependenceType b) {
 }
 } // namespace
 
-// check dependencies between two affine.for loop nests up to a certain depth
-// assume forOpA is source, forOpB is sink
-// return a bitmask of DependenceType
+// Checks dependencies between two affine.for loop nests up to `depth`, with
+// `forOpA` the source and `forOpB` the sink, and returns a DependenceType mask.
 static FailureOr<DependenceType> checkDependencies(affine::AffineForOp forOpA,
                                                    affine::AffineForOp forOpB,
                                                    unsigned depth) {
   SmallVector<affine::MemRefAccess, 4> accA;
   SmallVector<affine::MemRefAccess, 4> accB;
   bool hasUnsupportedAccess = false;
-  // Collect only affine accesses; non-affine memref accesses are conservatively
-  // treated as unsupported so we can fail instead of mis-transforming.
+  // Collect only affine accesses; a non-affine memref access is conservatively
+  // unsupported so the transform fails instead of mis-transforming.
   forOpA.walk([&](Operation *op) {
     if (isa<affine::AffineReadOpInterface, affine::AffineWriteOpInterface>(
             op)) {
@@ -1133,22 +1077,19 @@ static FailureOr<DependenceType> checkDependencies(affine::AffineForOp forOpA,
   if (hasUnsupportedAccess)
     return failure();
 
-  // Build a coarse dependence summary (RAW/WAR/WAW) between source and sink
-  // loop nests, using affine dependence checks per matching memref access pair.
   DependenceType ret = DependenceType::NONE;
   for (auto &a : accA) {
     for (auto &b : accB) {
       if (a.memref != b.memref) {
-        continue; // different memrefs
+        continue;
       }
       if (!a.isStore() && !b.isStore()) {
-        continue; // we don't care about rar
+        continue;
       }
       SmallVector<affine::DependenceComponent, 2> deps;
-      // `checkMemrefAccessDependence` requires the probed loop depth to be in
-      // [1, numCommonSurroundingLoops + 1]. Producer and consumer are sibling
-      // nests, so clamp the caller's depth into the valid range (otherwise MLIR
-      // asserts when compute_at targets a non-outermost axis).
+      // `checkMemrefAccessDependence` requires the probed depth to be in
+      // [1, numCommonSurroundingLoops + 1]; producer and consumer are sibling
+      // nests, so clamp the caller's depth into that range.
       unsigned numCommon =
           affine::getNumCommonSurroundingLoops(*a.opInst, *b.opInst);
       unsigned probeDepth = std::min(depth, numCommon + 1);
@@ -1294,8 +1235,8 @@ struct ComputeAtAnalysis {
 static std::optional<std::string>
 analyzeComputeAt(Operation *producerOp, affine::AffineForOp consumerLoop,
                  ComputeAtAnalysis &analysis) {
-  // Normalize producer/consumer into loop-chain metadata once so execution
-  // paths can focus on transformation mechanics.
+  // Collect the producer and consumer loop chains and check the structural
+  // preconditions of compute_at.
   analysis.producerOp = producerOp;
   analysis.consumerLoop = consumerLoop;
   analysis.producerChain = collectAffineLoopChain(producerOp);
@@ -1339,8 +1280,8 @@ applyNoDependenceMove(transform::TransformRewriter &rewriter,
   unsigned consumerDepth = analysis.consumerDepth;
   unsigned producerDepth = analysis.producerDepth;
 
-  // We only rewrite a single-path producer prefix; imperfect control flow in
-  // this prefix would make region move/remap semantics ambiguous.
+  // Only a single-path producer prefix is rewritten; imperfect control flow
+  // there would make the region move and IV remap ambiguous.
   unsigned prefixDepthToValidate =
       producerDepth == consumerDepth ? producerDepth : consumerDepth + 1;
   if (!hasSinglePathLoopPrefix(analysis.producerChain, prefixDepthToValidate)) {
@@ -1407,7 +1348,6 @@ applyNoDependenceMove(transform::TransformRewriter &rewriter,
   unsigned remapDepth = consumerDepth;
   if (producerDepth == consumerDepth)
     remapDepth -= 1;
-  // Rewrite producer IV uses to consumer IVs in the moved region prefix.
   remapProducerIVPrefix(analysis.producerChain, analysis.consumerChain,
                         remapDepth, *ivRemapRegion);
   analysis.producerRoot.erase();
@@ -1451,14 +1391,14 @@ static bool mayWriteAliasingMemref(Operation *op, Value memref,
 }
 
 static void runComputeAtPostCleanup(affine::AffineForOp consumerLoop) {
-  // Run local store-to-load forwarding in the transformed loop nest only.
-  // This avoids full-function affineScalarReplace on large kernels.
+  // Forward stores to loads within the transformed loop nest only, avoiding a
+  // full-function affineScalarReplace.
   Operation *scopeOp = nullptr;
   if (auto kernel = consumerLoop->getParentOfType<func::FuncOp>())
     scopeOp = kernel.getOperation();
   else
     scopeOp = consumerLoop->getParentOp();
-  AliasAnalysis aliasAnalysis(scopeOp);
+  AliasAnalysis aliasAnalysis = alloAliasAnalysis(scopeOp);
 
   SmallVector<affine::AffineReadOpInterface, 16> loads;
   consumerLoop.walk(
@@ -1530,8 +1470,7 @@ transform::ComputeAtOp::apply(transform::TransformRewriter &rewriter,
     return emitSilenceableError() << *reason;
   }
 
-  // Classify producer->consumer dependence first; this decides whether to use
-  // affine fusion or conservative manual move.
+  // The dependence class decides between affine fusion and a manual move.
   auto depTypeOr = checkDependencies(
       analysis.producerRoot, analysis.consumerLoop, analysis.consumerDepth);
   if (failed(depTypeOr)) {
@@ -1541,11 +1480,9 @@ transform::ComputeAtOp::apply(transform::TransformRewriter &rewriter,
   DependenceType depType = *depTypeOr;
 
   if ((depType & DependenceType::RAW) != DependenceType::NONE) {
-    // RAW dependence requires true producer-consumer fusion to preserve
-    // semantics while changing loop placement.
-    // Producer-consumer fusion fuses the producer nest into the consumer's
-    // *root* (its sibling in the same block) at `consumerDepth`; the axis loop
-    // is reached via that depth, not by passing the inner loop as destination.
+    // Fusion targets the consumer's root (its sibling in the same block) at
+    // `consumerDepth`; the axis loop is reached through that depth, not by
+    // passing the inner loop as the destination.
     auto reason = tryAffineLoopFusion(
         analysis.producerRoot, analysis.consumerRoot, analysis.consumerDepth);
     if (reason.has_value()) {
@@ -1554,7 +1491,6 @@ transform::ComputeAtOp::apply(transform::TransformRewriter &rewriter,
              << reason.value();
     }
   } else if (depType == DependenceType::NONE) {
-    // No dependence: perform structurally-checked move/inline + IV remap.
     if (auto reason = applyNoDependenceMove(rewriter, analysis)) {
       return emitSilenceableError() << *reason;
     }
@@ -1717,47 +1653,8 @@ static FailureOr<int64_t> getConstantExprDelta(AffineExpr lhs, AffineExpr rhs,
 /// ReuseAt implementation
 ///===----------------------------------------------------------------------===///
 ///
-/// reuse_at(target, axis) exploits overlap between successive iterations of
-/// `axis`: instead of re-reading the sliding region of `target` every
-/// iteration, it keeps a small per-iteration "window" buffer and only loads the
-/// newly-entering elements.
-///
-/// Pipeline (see `ReuseAtOp::apply`):
-///   0. Preconditions: `target` is one memref defined outside `axis`; `axis` is
-///      one affine.for with constant bounds and positive constant step and is a
-///      *spatial* loop (it indexes stores), not a reduction loop.
-///   1. Collect accesses (`collectReuseAccesses`): every direct affine.load of
-///      `target` under `axis` becomes a `ReuseLogicalAccess` (its op + composed
-///      affine map). Non-affine loads / writes / aliasing views are rejected;
-///      writes carrying `allo.reuse.maintenance` (this op's own fill/shift) are
-///      ignored so the buffer reads as read-only.
-///   2. State plan (`analyzeReuseStatePlan`): from the set of access maps
-///   derive
-///      the window shape — the sliding dim (its index moves with `axis`), each
-///      dim's extent/anchor/stride — i.e. the reuse buffer's `MemRefType`.
-///   3. Validity plan (`analyzeReuseValidityPlan`): per-iteration schedule —
-///      which iterations are warm-up (must load from source) vs steady-state
-///      (may read the window), and the [updateStart, updateEnd] range over
-///      which per-iteration maintenance (shift/refill) runs.
-///   4. Reset boundary (`analyzeReuseResetBoundary`): whether the window can be
-///      allocated once above `axis` (hoisted) or must reset per outer
-///      iteration.
-///   5. Materialize: alloc the window; emit maintenance inside `axis`
-///      (`emitReuseStateMaintenance`). PhysicalShift shifts and refills the
-///      entering face each steady iteration; Ring rotates a head iter_arg
-///      instead of moving data. Each access is rewritten into a conditional
-///      load (`createConditionalReuseLoad`): warm-up reads source, steady-state
-///      reads the window. When the per-access stores do NOT tile the whole
-///      window (`!statePlan.accessesCoverWindow`, e.g. a diagonal access set in
-///      a 2D window) a full-window warm-up fill
-///      (`generateReuseStateWarmupFill`) is emitted so the shift never
-///      propagates stale slots; the common dense/separable case skips it. All
-///      window writes are tagged `allo.reuse.maintenance`.
-///
-/// Chaining is purely structural: `reuse_at(rb, axis2)` where `rb` is a
-/// previous stage's window simply finds `rb`'s loads as ordinary accesses (its
-/// fills are skipped via the attribute). There is no cross-call state — the IR
-/// is the only source of truth, so chained stages survive payload round-trips.
+/// reuse_at(target, axis) keeps a sliding window buffer of `target` across
+/// iterations of `axis` and loads only the newly entering elements.
 namespace {
 struct LoopRoleInfo {
   DenseSet<Value> spatialIVs;
@@ -1784,10 +1681,9 @@ struct ReuseStatePlan {
   unsigned slidingDim = 0;
   int64_t slidingDelta = 1;
   int64_t slidingStepAbs = 1;
-  // Whether the per-access warm-up stores already cover every window slot. When
-  // false (e.g. a diagonal access set in a 2D window) an explicit full-window
-  // warm-up fill is required so the steady-state shift never reads a stale
-  // slot.
+  // Whether the per-access warm-up stores already cover every window slot.
+  // When false, an explicit full-window warm-up fill is required so the
+  // steady-state shift never reads a stale slot.
   bool accessesCoverWindow = true;
 };
 
@@ -1872,8 +1768,7 @@ struct ReuseDimFootprint {
 };
 
 // One reuse candidate: a direct affine.load of the target buffer under the
-// selected axis. In the structural model there is no producer/consumer split,
-// so a single composed access fully describes it.
+// selected axis.
 struct ReuseLogicalAccess {
   Operation *anchorOp = nullptr; // the original affine.load
   Value exposedValue;            // its result value (uses are redirected)
@@ -1910,12 +1805,9 @@ struct ReuseAccessFamilyAnalysis {
 };
 } // namespace
 
-// Attribute marking writes that the reuse_at pipeline itself emits into a reuse
-// buffer (warmup fill, shift, refill). A chained reuse_at targeting that buffer
-// skips these instead of rejecting them as user writes. Encoding this in the IR
-// (rather than a transform-state map keyed by Operation*) keeps the marker
-// valid across the post-cleanup rewrites and across separate transform
-// applications.
+// Marks writes that the reuse_at pipeline itself emits into a reuse buffer
+// (warmup fill, shift, refill). A chained reuse_at targeting that buffer skips
+// them instead of rejecting them as user writes.
 static constexpr StringLiteral kReuseMaintenanceAttr = "allo.reuse.maintenance";
 
 static ReuseLogicalAccess makeReuseLogicalAccess(Operation *op) {
@@ -1951,10 +1843,9 @@ static bool valueDependsOnTargetLoad(Value value, Value target,
       depends = yieldedDependsOnTarget(ifOp.getThenBlock()) ||
                 yieldedDependsOnTarget(ifOp.getElseBlock());
     } else if (auto forOp = dyn_cast<affine::AffineForOp>(result.getOwner())) {
-      // A loop-carried result (reduction via iter_args) depends on the target
-      // when the matching yielded value does. The yielded value lives in the
-      // loop body and is not reachable through the for-op's own operands, so
-      // trace it explicitly; also keep the operand walk for the init/bounds.
+      // The yielded value of a loop-carried result lives in the loop body and
+      // is not reachable through the for-op's own operands, so trace it
+      // explicitly; the operand walk still covers the inits and bounds.
       unsigned resultNumber = result.getResultNumber();
       auto yieldOp =
           dyn_cast<affine::AffineYieldOp>(forOp.getBody()->getTerminator());
@@ -2027,17 +1918,14 @@ static affine::AffineForOp getRootLoop(affine::AffineForOp loop) {
   return root;
 }
 
-// Classify each loop IV in the root nest:
-// - spatial: contributes to store indexing
-// - reduction: contributes to target-load indexing but not store indexing
-// Also cache reduction loop upper bounds for span/distance derivation.
+// Classify each loop IV in the root nest: spatial IVs contribute to store
+// indexing, reduction IVs to target-load indexing only. Also caches the
+// reduction loops' upper bounds.
 static LogicalResult
 classifyLoopRoles(affine::AffineForOp rootForOp, Value target,
                   LoopRoleInfo &roles,
                   DenseMap<Value, LoopNormalizationInfo> &loopInfos,
                   SmallVectorImpl<affine::AffineForOp> &allLoops) {
-  // Spatial loops affect stores fed by target loads; reduction loops only
-  // affect target-load indexing. reuse_at uses this split to validate the axis.
   WalkResult walkResult = rootForOp.walk([&](affine::AffineForOp forOp) {
     auto infoOr = analyzeLoopNormalization(forOp);
     if (failed(infoOr))
@@ -2131,10 +2019,9 @@ static LogicalResult
 collectReuseAccesses(affine::AffineForOp axisLoop, Value target,
                      SmallVectorImpl<ReuseLogicalAccess> &accesses,
                      SmallVectorImpl<affine::AffineForOp> &innerLoops) {
-  // Structural model: every reuse access is a direct affine.load of `target`.
-  // A chained reuse_at simply targets the previous stage's reuse buffer; its
-  // loads are ordinary affine.loads here (the previous stage's own internal
-  // fill/shift/refill writes are skipped via `kReuseMaintenanceAttr`).
+  // Every reuse access is a direct affine.load of `target`. A chained reuse_at
+  // targets the previous stage's buffer, whose own maintenance writes are
+  // skipped via `kReuseMaintenanceAttr`.
   collectReuseInnerLoops(axisLoop, innerLoops);
 
   Value targetRoot = resolveMemRefValueRoot(target);
@@ -2658,10 +2545,8 @@ analyzeReuseStatePlan(ArrayRef<ReuseLogicalAccess> accesses,
     }
   }
 
-  // Decide whether the per-access warm-up stores already tile the window box:
-  // enumerate the box over kept dims and mark each slot covered by some access.
-  // If every slot is covered, the explicit full-window warm-up fill is
-  // redundant (the common dense/separable case); otherwise it is required.
+  // Mark every window slot covered by some access: when all are covered the
+  // explicit full-window warm-up fill is redundant.
   {
     unsigned nKept = plan.keptDims.size();
     int64_t totalSlots = 1;
@@ -2720,9 +2605,8 @@ analyzeReuseValidityPlan(ArrayRef<ReuseLogicalAccess> accesses,
                          const LoopNormalizationInfo &axisInfo,
                          DenseMap<Value, LoopNormalizationInfo> &loopInfos,
                          const ReuseStatePlan &plan) {
-  // Direct-target reuse starts with one explicit source-backed iteration, but
-  // record the per-access local coverage now so later phases can refine it
-  // beyond the current one-iteration warm-up model.
+  // Direct-target reuse starts with one explicit source-backed iteration, then
+  // records the per-access local coverage over the sliding dimension.
   ReuseValidityPlan validityPlan;
   validityPlan.axisTripCount = axisInfo.tripCount;
   validityPlan.steadyStateStart =
@@ -2809,10 +2693,9 @@ analyzeReuseValidityPlan(ArrayRef<ReuseLogicalAccess> accesses,
                                        rhs.firstReusableIter;
                               })
                 ->firstReusableIter;
-  // State maintenance (shift+refill) runs before the read in the *same*
+  // State maintenance (shift+refill) runs before the read in the same
   // iteration, so it must stay active through the last iteration that reads a
-  // slot. Using `maxLastUseIter - 1` leaves the final iteration reading a stale
-  // window (off-by-one at the high boundary of the axis).
+  // slot.
   int64_t maxLastUseIter = *llvm::max_element(validityPlan.slotLastUseIters);
   validityPlan.updateEndIter = maxLastUseIter;
 
@@ -3021,8 +2904,7 @@ static Value buildWrappedIncrementValue(OpBuilder &builder, Location loc,
 
 static IntegerSet buildReuseWarmupMissSet(OpBuilder &builder,
                                           int64_t firstReusableIter) {
-  // Validity in this phase keeps the current direct-target lower-bound miss
-  // explicit. More precise tail predicates can layer on top of this plan.
+  // Iterations before `firstReusableIter` miss the window and read the source.
   auto d0 = builder.getAffineDimExpr(0);
   return IntegerSet::get(/*dimCount=*/1, /*symbolCount=*/0,
                          {-d0 + (firstReusableIter - 1)},
@@ -3246,12 +3128,9 @@ static void generateReuseStateRefill(OpBuilder &builder, Location loc,
                                 logicalIndices);
 }
 
-// Warm-up fill: populate the ENTIRE reuse window from source before steady
-// state begins. Steady-state maintenance only refills the entering face and
-// relies on the rest of the window already being valid; the per-access loads,
-// however, only touch the points they read (e.g. the diagonal of a multi-dim
-// window), so without this the shift would propagate uninitialized slots.
-// (PhysicalShift only — the ring head fills lazily as it rotates.)
+// Populates the entire reuse window from source before steady state begins:
+// steady-state maintenance only refills the entering face and relies on the
+// rest of the window already being valid. PhysicalShift only.
 static void generateReuseStateWarmupFill(
     OpBuilder &builder, Location loc, Value sourceBuffer, Value reuseBuffer,
     const ReuseExecutionPlan &executionPlan, ValueRange stateOperands) {
@@ -3322,11 +3201,6 @@ emitReuseStateMaintenance(OpBuilder &builder, affine::AffineForOp axisLoop,
   auto updateActiveSet = buildReuseUpdateActiveSet(
       builder, executionPlan.updateStartIter, executionPlan.updateEndIter);
   if (executionPlan.strategy != ReuseBufferStrategy::Ring) {
-    // When the per-access warm-up stores do not tile the whole window (e.g. a
-    // diagonal access set in a 2D window), fill the entire window on warm-up
-    // iterations so the steady-state shift never propagates uninitialized
-    // slots. When they do tile it (the common dense/separable case) the
-    // per-access stores already cover the window and this is skipped.
     if (!executionPlan.statePlan.accessesCoverWindow) {
       IntegerSet warmupSet =
           buildReuseWarmupMissSet(builder, executionPlan.steadyStateStart);
@@ -3493,7 +3367,6 @@ static ReuseConditionalLoadResult createConditionalReuseLoad(
   auto buildMiss = [&](Block *block) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToEnd(block);
-    // Warm-up / miss: load from the source buffer and capture into reuse state.
     Value loaded = affine::AffineLoadOp::create(builder, loc, sourceBuffer,
                                                 access.composed.map,
                                                 access.composed.operands);
@@ -3522,8 +3395,8 @@ static Value materializeGlobalAccessIndex(OpBuilder &builder, Location loc,
   return affine::makeComposedAffineApply(builder, loc, singleResultMap, ofrs);
 }
 
-// Resolve the single-char `allo.signed` marker ('s'/'u') for a memref value so
-// a buffer derived from it.
+// Resolve the single-char `allo.signed` marker ('s'/'u') of a memref value so
+// a buffer derived from it can inherit the marker.
 static StringAttr resolveMemRefSignedMarker(Value memref) {
   if (Operation *def = memref.getDefiningOp())
     return def->getAttrOfType<StringAttr>(kAlloSignedAttr);
@@ -3542,8 +3415,7 @@ DiagnosedSilenceableFailure
 transform::ReuseAtOp::apply(transform::TransformRewriter &rewriter,
                             transform::TransformResults &results,
                             transform::TransformState &state) {
-  // Stage 0: resolve payload handles and validate basic structural
-  // preconditions.
+  // Stage 0: resolve payload handles and validate structural preconditions.
   auto targets = llvm::to_vector(state.getPayloadValues(getTarget()));
   if (targets.size() != 1) {
     return emitSilenceableError()
@@ -3572,7 +3444,6 @@ transform::ReuseAtOp::apply(transform::TransformRewriter &rewriter,
               "bounds and a positive constant step";
   LoopNormalizationInfo axisInfo = *axisInfoOr;
 
-  // require the target buffer to be defined outside the axis loop
   Operation *targetDef = target.getDefiningOp();
   if (targetDef && axisLoop->isAncestor(targetDef))
     return emitSilenceableError()
@@ -3621,9 +3492,8 @@ transform::ReuseAtOp::apply(transform::TransformRewriter &rewriter,
   if (auto sgn = resolveMemRefSignedMarker(target))
     reuseBuffer->setAttr(kAlloSignedAttr, sgn);
   if (executionPlan.strategy == ReuseBufferStrategy::Ring) {
-    // `replaceWithAdditionalYields` builds a fresh affine.for; capture the
-    // schedule annotations (e.g. allo.schedule.key) so the recreated loop stays
-    // matchable by downstream primitives and the frontend snapshot.
+    // `replaceWithAdditionalYields` builds a fresh affine.for; carry over the
+    // schedule annotations so the recreated loop stays matchable downstream.
     SmallVector<NamedAttribute, 4> savedAttrs(
         axisLoop->getDiscardableAttrs().begin(),
         axisLoop->getDiscardableAttrs().end());
@@ -3672,19 +3542,14 @@ transform::ReuseAtOp::apply(transform::TransformRewriter &rewriter,
     });
   }
 
-  // A freshly created reuse buffer has no user stores: every write into it is
-  // reuse machinery (warmup fill, shift, refill). Mark them all so a chained
-  // reuse_at targeting this buffer does not mistake an internal fill for a user
-  // write. (The per-`updateIf` marking above only covers shift/refill.)
+  // A freshly created reuse buffer has no user stores, so mark every write
+  // into it; the per-`updateIf` marking above only covers shift and refill.
   markReuseMaintenanceWrites(axisLoop, reuseBuffer);
 
-  // Stage 5: publish the new buffer handle.
-  //
-  // No cleanup is run here: it would reshape the conditional loads and strip
-  // the maintenance markers that a *chained* reuse_at targeting this buffer
-  // relies on. The redundant IR (duplicate affine.applys, mergeable per-access
-  // affine.ifs) is simplified once afterwards by the `allo-reuse-cleanup` pass,
-  // applied unconditionally during schedule export.
+  // Stage 5: publish the new buffer handle. No cleanup runs here: it would
+  // reshape the conditional loads and strip the maintenance markers a chained
+  // reuse_at relies on. The `allo-reuse-cleanup` pass simplifies the IR during
+  // schedule export instead.
   results.setValues(cast<OpResult>(getResult()), {reuseBuffer});
   return DiagnosedSilenceableFailure::success();
 }
@@ -3764,10 +3629,9 @@ static DiagnosedSilenceableFailure
 collectBufferAtAccesses(affine::AffineForOp axisLoop, Value buffer,
                         SmallVectorImpl<Operation *> &accessOps, bool &hasLoads,
                         bool &hasStores) {
-  // Gather the affine accesses that will be rewritten to the local buffer.
-  // At the same time, reject non-affine direct accesses and alias/view-based
-  // accesses because the later remap step only understands direct affine
-  // accesses to the chosen memref value.
+  // Gather the affine accesses to rewrite, rejecting non-affine and
+  // alias/view-based accesses: the later remap step only understands direct
+  // affine accesses to the chosen memref value.
   Value bufferRoot = resolveMemRefValueRoot(buffer);
   Operation *offendingOp = nullptr;
   StringRef reason;
@@ -3826,9 +3690,9 @@ computeFootprintDim(const ComposedBufferAccess &access, unsigned resultPos,
                     ArrayRef<affine::AffineForOp> innerLoops,
                     DenseMap<Value, unsigned> &prefixOperandPos,
                     SmallVectorImpl<Value> &prefixOperands) {
-  // Infer one local-buffer dimension from one access result. We only accept a
-  // singleton point or a unit-stride interval driven by exactly one inner loop,
-  // which keeps the local allocation finite and easy to reindex.
+  // Infer one local-buffer dimension from one access result. Only a singleton
+  // point or a unit-stride interval driven by exactly one inner loop is
+  // accepted, which keeps the local allocation finite and easy to reindex.
   AffineExpr accessExpr = access.map.getResult(resultPos);
   SmallVector<affine::AffineForOp, 2> dependentLoops;
   for (affine::AffineForOp loop : innerLoops) {
@@ -3906,9 +3770,8 @@ static FailureOr<BufferAtFootprint>
 analyzeBufferAtFootprint(ArrayRef<Operation *> accessOps,
                          ArrayRef<affine::AffineForOp> innerLoops,
                          unsigned bufferRank, MLIRContext *ctx) {
-  // All accesses inside one axis instance must fit into the same local layout.
-  // We infer a footprint per access and require them to agree exactly before
-  // building copy loops and the global-to-local remap.
+  // All accesses inside one axis instance must fit into the same local layout:
+  // the per-access footprints must agree exactly.
   BufferAtFootprint footprint;
   footprint.shape.resize(bufferRank);
   footprint.lowerBounds.resize(bufferRank);
@@ -3987,8 +3850,8 @@ static DiagnosedSilenceableFailure
 checkBufferAtFootprintSeparability(const BufferAtFootprint &footprint,
                                    affine::AffineForOp axisLoop) {
   // A legal buffer_at needs the selected axis to separate per-instance regions.
-  // We approximate this by checking whether the axis moves some footprint bound
-  // far enough that adjacent iterations do not overlap on that dimension.
+  // This is approximated by checking whether the axis moves some footprint
+  // bound far enough that adjacent iterations do not overlap on that dimension.
   auto notPrivatizable = [&](StringRef note) {
     DiagnosedSilenceableFailure diag = emitSilenceableFailure(axisLoop);
     diag << "cannot buffer_at on this axis because the target buffer cannot "
@@ -4036,9 +3899,9 @@ static void generateBufferAtCopy(OpBuilder &builder, Location loc,
                                  Value globalBuffer, Value localBuffer,
                                  const BufferAtFootprint &footprint,
                                  bool isCopyOut) {
-  // Materialize copy-in/copy-out from the derived footprint maps instead of
-  // cloning original accesses. The generated loops enumerate the global region
-  // and compute local indices by subtracting each dimension's lower bound.
+  // Materialize copy-in/copy-out from the derived footprint maps: the
+  // generated loops enumerate the global region and compute local indices by
+  // subtracting each dimension's lower bound.
   unsigned rank = cast<MemRefType>(globalBuffer.getType()).getRank();
   if (rank == 0) {
     if (!isCopyOut) {
@@ -4062,19 +3925,26 @@ static void generateBufferAtCopy(OpBuilder &builder, Location loc,
   localOperands.reserve(2 * rank);
 
   for (unsigned d = 0; d < rank; ++d) {
-    auto forOp = affine::createCanonicalizedAffineForOp(
-        builder, loc, footprint.symbols, footprint.lowerBounds[d],
-        footprint.symbols, footprint.upperBounds[d], /*step=*/1);
-    builder = OpBuilder::atBlockTerminator(forOp.getBody());
+    Value globalIndex;
+    if (footprint.shape[d] == 1) {
+      globalIndex = builder.createOrFold<affine::AffineApplyOp>(
+          loc, footprint.lowerBounds[d], footprint.symbols);
+    } else {
+      auto forOp = affine::createCanonicalizedAffineForOp(
+          builder, loc, footprint.symbols, footprint.lowerBounds[d],
+          footprint.symbols, footprint.upperBounds[d], /*step=*/1);
+      builder = OpBuilder::atBlockTerminator(forOp.getBody());
+      globalIndex = forOp.getInductionVar();
+    }
 
     auto offset = affine::AffineApplyOp::create(
         builder, loc, footprint.lowerBounds[d], footprint.symbols);
     maybeDeadApplys.push_back(offset);
     localOperands.push_back(offset);
-    localOperands.push_back(forOp.getInductionVar());
+    localOperands.push_back(globalIndex);
     localExprs.push_back(builder.getAffineDimExpr(2 * d + 1) -
                          builder.getAffineDimExpr(2 * d));
-    globalIndices.push_back(forOp.getInductionVar());
+    globalIndices.push_back(globalIndex);
   }
 
   auto localMap = AffineMap::get(2 * rank, /*symbolCount=*/0, localExprs,
@@ -4127,14 +3997,12 @@ transform::BufferAtOp::apply(transform::TransformRewriter &rewriter,
     return emitSilenceableError()
            << "expected axis to resolve to a affine.for loop";
   }
-  // buffer should be defined outside the axis loop
   Operation *bufferDef = buffer.getDefiningOp();
   if (bufferDef && axisLoop->isAncestor(bufferDef)) {
     return emitSilenceableError() << "expected target buffer to be defined "
                                      "outside the selected axis loop";
   }
 
-  // get the root loop of the selected axis
   affine::AffineForOp rootLoop = getRootLoop(axisLoop);
 
   SmallVector<affine::AffineForOp, 4> band;
@@ -4153,9 +4021,6 @@ transform::BufferAtOp::apply(transform::TransformRewriter &rewriter,
     return emitSilenceableError() << "cannot buffer at innermost loop axis";
   }
 
-  // First collect the direct accesses we will rewrite. This also filters out
-  // unsupported aliasing cases early, before we spend work inferring a
-  // footprint that we would not be able to remap safely.
   SmallVector<Operation *, 8> localAccessOps;
   bool hasLoads = false;
   bool hasStores = false;
@@ -4170,9 +4035,8 @@ transform::BufferAtOp::apply(transform::TransformRewriter &rewriter,
   }
 
   SmallVector<affine::AffineForOp, 4> innerLoops(axisIt + 1, band.end());
-  // Then synthesize a single per-instance footprint and verify that different
-  // axis iterations stay separate enough to privatize. These two checks encode
-  // the main legality test for buffer_at.
+  // The footprint synthesis and the separability check together are the
+  // legality test for buffer_at.
   FailureOr<BufferAtFootprint> footprintOr = analyzeBufferAtFootprint(
       localAccessOps, innerLoops, bufferType.getRank(), axisLoop.getContext());
   if (failed(footprintOr)) {
@@ -4186,9 +4050,6 @@ transform::BufferAtOp::apply(transform::TransformRewriter &rewriter,
       !diag.succeeded())
     return diag;
 
-  // Finally allocate the local buffer, emit copy-in/copy-out around the axis
-  // body, and rewrite each collected access through the synthesized local index
-  // remap.
   rewriter.setInsertionPointToStart(axisLoop.getBody());
   Location loc = buffer.getLoc();
   auto localBuffer = memref::AllocOp::create(

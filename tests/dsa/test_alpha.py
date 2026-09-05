@@ -28,7 +28,7 @@ from allo.exp.dsa import primitive
 from allo.exp.dsa.access import contiguous
 from allo.exp.dsa.core import ISA
 from allo.exp.dsa.errors import AcceleratorDescriptionError, NoMatchError
-from allo.exp.dsa.search import _movement_catalog, expand_emits
+from allo.exp.dsa.search import _movement_catalog, expand_calls
 from allo.lang.core import f32, i32
 
 N = 8
@@ -368,7 +368,7 @@ def test_expand_and_alpha_cannot_be_combined():
                 unit_addi(s=s + i * N, d=d + i * N, k=0)  # <- no `k` in scope
 
     with pytest.raises(AcceleratorDescriptionError, match="cannot be combined"):
-        expand_emits(isa, isa._ops["layer_addi"].spec, [0, 8, N])
+        expand_calls(isa, isa._ops["layer_addi"].spec, [0, 8, N])
 
 
 def test_a_data_movement_instruction_cannot_take_one():

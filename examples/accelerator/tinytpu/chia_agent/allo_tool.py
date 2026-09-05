@@ -131,7 +131,7 @@ class AlloSpecTool(ChiaTool):
     def run_hardware_check(self) -> str:
         """Export the composed Allo-HLS microarchitecture as a feasibility gate."""
         return self._run_allo_module(
-            "examples.accelerator.tinytpu.microarch", "--print-hls"
+            "examples.accelerator.tinytpu.verify", "--hls"
         )
 
     def score_access_cost(self) -> str:

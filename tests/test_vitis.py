@@ -24,6 +24,7 @@ import os
 from allo.operators import math as m
 from allo.lang.core import (
     range as arange,
+    grid,
     i32,
     f32,
     bf16,
@@ -161,6 +162,24 @@ def test_codegen_vadd2_tile():
     # 8 split by 4 -> a 2-iteration outer band over a 4-iteration inner band.
     _regex(code, r"< 2;", r"< 4;")
     assert code.count("for (") >= 4
+
+
+def test_codegen_grid_dependence_pragma():
+    # A grid() lowers to a for-nest plus `allo.assume.nodep` (its iterations are
+    # independent). The Vitis emitter turns that into `#pragma HLS dependence
+    # ... dependent=false`, the direct analogue.
+    @kernel
+    def grid_add(A: f32[8, 8], B: f32[8, 8], C: f32[8, 8]):
+        for i, j in grid(8, 8):
+            C[i, j] = A[i, j] + B[i, j]
+
+    code = _hls(grid_add.schedule())
+    _contains(
+        code,
+        "#pragma HLS dependence variable=",
+        "type=inter",
+        "dependent=false",
+    )
 
 
 def test_codegen_gemm_reorder_pipeline():

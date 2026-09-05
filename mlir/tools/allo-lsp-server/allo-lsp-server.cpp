@@ -5,6 +5,7 @@
 
 #include "allo/InitAllDialects.h"
 #include "allo/InitAllExtensions.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
 
 using namespace mlir;

@@ -176,42 +176,42 @@ def test_calling_a_compiled_program_with_the_wrong_arity():
 # --- the reason the taxonomy exists ----------------------------------------------
 
 
-# An 8x8 matmul in the systolic-native `a @ b^T` form: it matches CornellTPU's
-# `matmul` structurally, and only the exact-fit check refuses it. `__ROOT__` is
-# substituted rather than formatted, so the MLIR attribute braces stay literal.
+# A non-divisible 6x8x8 matmul. TinyTPU now
+# tiles larger exact multiples, so the validation invariant is the explicit
+# tail-policy rejection. `__ROOT__` is substituted rather than formatted, so
+# the MLIR attribute braces stay literal.
 _O_SMOKE = '''
 import sys
 sys.path.insert(0, "__ROOT__")
 from allo.exp.dsa.errors import ShapeError
-from examples.accelerator.cornell_tpu.isa import tpu
+from examples.accelerator.tinytpu.isa import tpu
 
 if __debug__:
     raise SystemExit("subprocess is not running under -O")
 
 SRC = """
-func.func @main(%a: tensor<1x8x8xf32>, %b: tensor<1x8x8xf32>) -> tensor<1x8x8xf32> {
+func.func @main(%a: tensor<1x6x8xf32>, %b: tensor<1x8x8xf32>) -> tensor<1x6x8xf32> {
   %z = "tosa.const"() {values = dense<0.0> : tensor<1xf32>} : () -> tensor<1xf32>
-  %t = tosa.transpose %b {perms = array<i32: 0, 2, 1>} : (tensor<1x8x8xf32>) -> tensor<1x8x8xf32>
-  %r = tosa.matmul %a, %t, %z, %z : (tensor<1x8x8xf32>, tensor<1x8x8xf32>, tensor<1xf32>, tensor<1xf32>) -> tensor<1x8x8xf32>
-  return %r : tensor<1x8x8xf32>
+  %r = tosa.matmul %a, %b, %z, %z : (tensor<1x6x8xf32>, tensor<1x8x8xf32>, tensor<1xf32>, tensor<1xf32>) -> tensor<1x6x8xf32>
+  return %r : tensor<1x6x8xf32>
 }
 """
 
 try:
     tpu.compile_program(SRC)
 except ShapeError as e:
-    if "expects 4 but source is 8" not in str(e):
+    if "not divisible" not in str(e):
         raise SystemExit("wrong rejection: " + str(e))
     print("REJECTED-UNDER-O")
 else:
-    raise SystemExit("an 8x8 matmul compiled onto a 4x4-only ISA under -O")
+    raise SystemExit("a tail GEMM compiled without an explicit policy under -O")
 '''
 
 
 def test_validation_survives_python_dash_O():
     """The whole point. Under ``-O`` every ``assert`` in the frontend disappears, so
-    when these checks were asserts an 8x8 matmul on CornellTPU's 4x4-only systolic
-    stopped being rejected on shape and blew up later somewhere unrelated
+    when these checks were asserts an incompatible matmul stopped being rejected
+    on shape and blew up later somewhere unrelated
     (``ValueError: list.remove(x): x not in list``). Run the real compiler in a real
     ``-O`` interpreter and require the same, specific rejection."""
     out = subprocess.run(

@@ -6,6 +6,8 @@ import argparse
 
 import numpy as np
 
+from allo.exp.dsa.errors import ShapeError
+
 from .isa import tpu
 
 
@@ -97,7 +99,7 @@ def _check_tiled_gemm(M: int, K: int, N: int) -> None:
 def _check_gemm_tail_rejected() -> None:
     try:
         tpu.compile_program(_gemm_source(6, 8, 8))
-    except AssertionError as exc:
+    except ShapeError as exc:
         assert "not divisible" in str(exc)
     else:
         raise AssertionError("non-divisible GEMM unexpectedly compiled")

@@ -1,0 +1,119 @@
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: "Build MLIR and CIRCT"
+description: >
+  Builds externals/llvm-project (MLIR) and externals/circt in Release mode,
+  or restores them from cache. The cache key is derived from the pinned
+  submodule commits, so it is invalidated automatically whenever either
+  submodule is bumped. Compiles through ccache when the caller has put one on
+  PATH, so a cache miss costs an incremental build rather than a cold one.
+
+outputs:
+  cache-hit:
+    description: "Whether the build trees were restored rather than built"
+    value: ${{ steps.cache.outputs.cache-hit }}
+  llvm-dir:
+    description: "Directory holding LLVMConfig.cmake"
+    value: ${{ steps.paths.outputs.llvm-dir }}
+  mlir-dir:
+    description: "Directory holding MLIRConfig.cmake"
+    value: ${{ steps.paths.outputs.mlir-dir }}
+  circt-dir:
+    description: "Directory holding CIRCTConfig.cmake"
+    value: ${{ steps.paths.outputs.circt-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve submodule commits
+      id: submodules
+      shell: bash
+      run: |
+        llvm_sha=$(git -C externals/llvm-project rev-parse HEAD)
+        circt_sha=$(git -C externals/circt rev-parse HEAD)
+        echo "llvm-sha=${llvm_sha}" >> "$GITHUB_OUTPUT"
+        echo "circt-sha=${circt_sha}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore MLIR/CIRCT build cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          externals/llvm-project/build
+          externals/circt/build
+        key: mlir-circt-${{ runner.os }}-${{ runner.arch }}-llvm-${{ steps.submodules.outputs.llvm-sha }}-circt-${{ steps.submodules.outputs.circt-sha }}
+
+    # Unconditional: `mlir_configure_python_dev_packages()` runs again when Allo
+    # itself configures, so nanobind and PyYAML are needed on a cache hit too.
+    - name: Install MLIR Python build requirements
+      shell: bash
+      run: pip install -r externals/llvm-project/mlir/python/requirements.txt
+
+    # ccache and lld are optional: the caller decides whether to install them,
+    # and the flags collapse to nothing when they are absent.
+    - name: Resolve optional toolchain flags
+      id: toolchain
+      shell: bash
+      run: |
+        launcher=""
+        if command -v ccache >/dev/null; then
+          launcher="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+        fi
+        linker=""
+        if command -v ld.lld >/dev/null || command -v lld >/dev/null; then
+          linker="-DLLVM_USE_LINKER=lld"
+        fi
+        echo "launcher=${launcher}" >> "$GITHUB_OUTPUT"
+        echo "linker=${linker}" >> "$GITHUB_OUTPUT"
+
+    - name: Build LLVM/MLIR
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        cmake -G Ninja -S externals/llvm-project/llvm -B externals/llvm-project/build \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_ENABLE_PROJECTS="mlir" \
+          -DLLVM_TARGETS_TO_BUILD="Native" \
+          -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+          -DPython3_EXECUTABLE="$(which python3)" \
+          -DLLVM_INCLUDE_TESTS=OFF \
+          -DMLIR_INCLUDE_TESTS=OFF \
+          -DLLVM_INCLUDE_BENCHMARKS=OFF \
+          -DLLVM_INCLUDE_EXAMPLES=OFF \
+          -DLLVM_INCLUDE_DOCS=OFF \
+          -DMLIR_INCLUDE_DOCS=OFF \
+          -DLLVM_ENABLE_BINDINGS=OFF \
+          -DLLVM_ENABLE_ZSTD=OFF \
+          ${{ steps.toolchain.outputs.launcher }} \
+          ${{ steps.toolchain.outputs.linker }}
+        ninja -C externals/llvm-project/build
+
+    - name: Build CIRCT
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        cmake -G Ninja -S externals/circt -B externals/circt/build \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_DIR="$PWD/externals/llvm-project/build/lib/cmake/llvm" \
+          -DMLIR_DIR="$PWD/externals/llvm-project/build/lib/cmake/mlir" \
+          -DOR_TOOLS_DISABLE=ON \
+          -DCIRCT_INCLUDE_TESTS=OFF \
+          -DCIRCT_INCLUDE_DOCS=OFF \
+          -DCIRCT_INCLUDE_INTEGRATION_TESTS=OFF \
+          -DCIRCT_BINDINGS_PYTHON_ENABLED=OFF \
+          ${{ steps.toolchain.outputs.launcher }} \
+          ${{ steps.toolchain.outputs.linker }}
+        ninja -C externals/circt/build
+
+    - name: Export package directories
+      id: paths
+      shell: bash
+      run: |
+        echo "llvm-dir=$PWD/externals/llvm-project/build/lib/cmake/llvm" >> "$GITHUB_OUTPUT"
+        echo "mlir-dir=$PWD/externals/llvm-project/build/lib/cmake/mlir" >> "$GITHUB_OUTPUT"
+        echo "circt-dir=$PWD/externals/circt/build/lib/cmake/circt" >> "$GITHUB_OUTPUT"

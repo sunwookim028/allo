@@ -1,29 +1,11 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import ctypes
 import random
 import string
 import tempfile
 
 from pathlib import Path
-
-import ml_dtypes
-import numpy as np
-
-
-def numpy_to_ctype(np_dtype) -> type:
-    """Map a numpy element dtype to the ctypes scalar used at the host boundary.
-
-    Shared by the CPU (LLVM JIT) and Vitis C-simulation backends, which both
-    marshal numpy buffers/scalars through ctypes. ``np.float16``/``bfloat16`` have
-    no native ctype, so they cross as raw ``c_int16`` (the caller reinterprets the
-    bits); every other dtype maps via ``np.ctypeslib.as_ctypes_type``.
-    """
-    np_dtype = np.dtype(np_dtype)
-    if np_dtype == np.dtype(np.float16) or np_dtype == np.dtype(ml_dtypes.bfloat16):
-        return ctypes.c_int16
-    return np.ctypeslib.as_ctypes_type(np_dtype)
 
 
 def generate_random_string(prefix: str, length: int = 8) -> str:

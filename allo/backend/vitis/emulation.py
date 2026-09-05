@@ -14,64 +14,38 @@ from __future__ import annotations
 
 import os
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
 
 import numpy as np
 
-from .csim import _numpy_dtype_for_dtype
+from ..marshal import HLS_HW_ABI, as_array, host_type
 from .utils import _render_template
-from ...lang.core import APInt, BufferType, DType, TypeBase
+from ...lang.core import BufferType, DType, TypeBase
 from ...logging import run_command, stage
 
 IMPL_MAKEFILE = "Makefile"
 HOST_CPP = "host.cpp"
 
-# C scalar type used at the XRT host boundary, keyed by the standard-width dtype
-# name. APInt widths are validated to be standard (8/16/32/64) before lookup.
-_C_SCALAR_TYPE = {
-    "int8": "int8_t",
-    "int16": "int16_t",
-    "int32": "int32_t",
-    "int64": "int64_t",
-    "uint1": "uint8_t",
-    "uint8": "uint8_t",
-    "uint16": "uint16_t",
-    "uint32": "uint32_t",
-    "uint64": "uint64_t",
-    "index": "int32_t",
-    "float32": "float",
-    "float64": "double",
-}
-
 
 def _validate_impl_dtype(dtype: TypeBase, index: int) -> None:
-    """Reject element types whose host byte layout is ambiguous at the m_axi /
-    s_axilite boundary. Unlike C simulation (which widens through the
-    ``generate-apint-wrapper`` ABI), emulation/hardware uses the real kernel
-    types, so non-standard-width ``APInt`` and 16-bit floats are not supported."""
+    """Reject element types :data:`HLS_HW_ABI` cannot carry at the m_axi /
+    s_axilite boundary. Emulation and hardware use the real kernel types rather
+    than the widened ``generate-apint-wrapper`` ABI C simulation uses."""
     where = "return value" if index == -1 else f"argument {index}"
-    if isinstance(dtype, APInt):
-        if dtype.primitive_width not in (1, 8, 16, 32, 64):
-            raise TypeError(
-                f"Vitis emulation/hardware {where}: non-standard integer width "
-                f"{dtype.primitive_width} is unsupported at the host boundary; "
-                "use a standard width (8/16/32/64)."
-            )
-        return
-    if isinstance(dtype, DType):
-        if dtype.name not in _C_SCALAR_TYPE:
-            raise TypeError(
-                f"Vitis emulation/hardware {where}: dtype {dtype.name} is "
-                "unsupported at the host boundary."
-            )
-        return
-    raise TypeError(f"Vitis emulation/hardware {where}: unsupported type {dtype!r}.")
+    if not isinstance(dtype, DType):
+        raise TypeError(
+            f"Vitis emulation/hardware {where}: unsupported type {dtype!r}."
+        )
+    try:
+        host_type(dtype, HLS_HW_ABI)
+    except TypeError as exc:
+        raise TypeError(f"{exc} ({where})") from exc
 
 
 def _element_bytes(dtype: DType) -> int:
     """Host byte size of one element of ``dtype`` (its standard-width container)."""
-    return int(np.dtype(_numpy_dtype_for_dtype(dtype)).itemsize)
+    return host_type(dtype, HLS_HW_ABI).container_bits // 8
 
 
 def _buffer_bytes(buffer_type: BufferType) -> int:
@@ -108,7 +82,7 @@ def generate_impl_host(top: str, arg_types: list[TypeBase]) -> str:
             run_args.append(f"bo{i}")
             buffer_indices.append(i)
         elif isinstance(arg_type, DType):
-            ctype = _C_SCALAR_TYPE[arg_type.name]
+            ctype = host_type(arg_type, HLS_HW_ABI).c_scalar
             nbytes = _element_bytes(arg_type)
             body += [
                 f'  auto raw{i} = read_data("input{i}.data", {nbytes});',
@@ -138,7 +112,7 @@ def generate_impl_makefile(top: str, freq_mhz: float, vitis_root: Path) -> str:
     """Render ``impl.mk`` (the emulation/hardware Makefile) for ``top``."""
     # v++ --kernel_frequency expects an integer MHz.
     freq = int(freq_mhz) if float(freq_mhz).is_integer() else freq_mhz
-    n_jobs = int(os.getenv("VIVADO_IMPL_JOBS", 4))
+    n_jobs = int(os.getenv("VIVADO_IMPL_JOBS", "4"))
     return _render_template(
         "impl.mk",
         top=top,
@@ -148,29 +122,17 @@ def generate_impl_makefile(top: str, freq_mhz: float, vitis_root: Path) -> str:
     )
 
 
-def _as_impl_array(arg: Any, buffer_type: BufferType) -> np.ndarray:
-    """Validate a buffer argument and return it as a contiguous host array."""
-    if not isinstance(arg, np.ndarray):
-        raise TypeError("Vitis emulation buffer arguments must be numpy arrays")
-    if tuple(arg.shape) != tuple(buffer_type.shape):
-        raise ValueError(
-            f"Expected buffer shape {tuple(buffer_type.shape)}, got {arg.shape}"
-        )
-    np_dtype = _numpy_dtype_for_dtype(buffer_type.dtype)
-    array = arg if arg.dtype == np_dtype else arg.astype(np_dtype)
-    return np.ascontiguousarray(array)
-
-
 def write_impl_inputs(
     project_path: Path, arg_types: list[TypeBase], args: tuple
 ) -> None:
     """Serialize each kernel argument to ``input<i>.data`` for the host to read."""
     for i, (arg_type, arg) in enumerate(zip(arg_types, args)):
         if isinstance(arg_type, BufferType):
-            data = _as_impl_array(arg, arg_type).tobytes()
+            data = as_array(arg, arg_type, HLS_HW_ABI).tobytes()
         else:
             assert isinstance(arg_type, DType)
-            data = np.asarray(arg, dtype=_numpy_dtype_for_dtype(arg_type)).tobytes()
+            np_dtype = host_type(arg_type, HLS_HW_ABI).np_dtype
+            data = np.asarray(arg, dtype=np_dtype).tobytes()
         (project_path / f"input{i}.data").write_bytes(data)
 
 
@@ -181,7 +143,7 @@ def read_impl_outputs(
     for i, (arg_type, arg) in enumerate(zip(arg_types, args)):
         if not isinstance(arg_type, BufferType):
             continue
-        np_dtype = _numpy_dtype_for_dtype(arg_type.dtype)
+        np_dtype = host_type(arg_type.dtype, HLS_HW_ABI).np_dtype
         data = np.fromfile(project_path / f"output{i}.data", dtype=np_dtype)
         arg[...] = data.reshape(arg_type.shape).astype(arg.dtype, copy=False)
 

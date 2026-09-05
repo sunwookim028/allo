@@ -142,18 +142,14 @@ PartitionAttr mergePartitionAttrs(PartitionAttr a, PartitionAttr b) {
   auto partA = a.getPartitions();
   auto partB = b.getPartitions();
   std::map<int64_t, std::pair<PartitionKindEnum, int64_t>> partMap;
-  // init with A
   for (auto part : partA) {
     partMap[part.getDim()] = {part.getKind(), part.getFactor()};
   }
-  // merge B to A
   for (auto part : partB) {
     partMap[part.getDim()] = {part.getKind(), part.getFactor()};
   }
-  // part map is an ordered map
-  // no need to sort the dims after merging
 
-  // construct the merged partition attribute
+  // partMap is ordered, so the merged dims need no sorting.
   SmallVector<PartitionAxisAttr, 4> mergedParts;
   MLIRContext *ctx = a.getContext();
   for (auto &[dim, info] : partMap) {

@@ -7,6 +7,7 @@
 
 #include "allo/IR/AlloTypes.h"
 #include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Support.h"
 #include "llvm/ADT/ArrayRef.h"
 
 using namespace mlir;
@@ -37,4 +38,8 @@ intptr_t alloStreamTypeGetRank(MlirType type) {
 
 int64_t alloStreamTypeGetDimSize(MlirType type, intptr_t pos) {
   return cast<allo::StreamType>(unwrap(type)).getShape()[pos];
+}
+
+MlirTypeID alloStreamTypeGetTypeID(void) {
+  return wrap(allo::StreamType::getTypeID());
 }

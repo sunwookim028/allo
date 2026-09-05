@@ -1,5 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+# pylint: disable=redefined-builtin
 # pylint: disable=unused-argument
 
 from __future__ import annotations

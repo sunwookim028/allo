@@ -160,11 +160,9 @@ static void collectBlockedStreams(ModuleOp module,
 
 // "Blocked" must be a property of the whole channel, not of a single accessor:
 // if any process accesses a stream-array channel with a dynamic lane, every
-// other accessor must keep the array too -- otherwise the dynamic-index process
-// retains the array while the static-index siblings get fresh scalar streams,
-// silently disconnecting the design. Propagate blocked-ness across each
-// `invoke` operand <-> callee argument edge (both directions) to a fixpoint so
-// the channel's `stream.create` and all bound arguments share one status.
+// other accessor must keep the array too, otherwise the static-index siblings
+// get fresh scalar streams and silently disconnect from it. The fixpoint gives
+// a channel's `stream.create` and all its bound arguments one shared status.
 static void propagateBlockedStreams(ModuleOp module,
                                     SymbolTableCollection &symbols,
                                     BlockedStreamSet &blockedStreams) {
@@ -554,8 +552,8 @@ static LogicalResult insertScalarPortsAndRewriteDirectUses(
     auto oldType = cast<StreamType>(port.sourceArg.getType());
     assert(!oldType.getShape().empty() &&
            "scalarized port must originate from a ranked stream");
-    // create a new argument for the scalar stream; inherit the source ranked
-    // stream argument's location (its NameLoc) so codegen keeps the name.
+    // Inherit the source ranked stream argument's location (its NameLoc) so
+    // codegen keeps the name.
     auto scalarType = StreamType::get(
         kernel.getContext(), oldType.getBaseType(), oldType.getDepth(), {});
     port.newArg = entry.insertArgument(port.sourceArgNo + shift, scalarType,
@@ -575,7 +573,7 @@ static LogicalResult finalizeKernelSignature(IRRewriter &rewriter,
                                              KernelMaterialization &state) {
   Block &entry = kernel.getBody().front();
   ArrayAttr oldArgAttrs = kernel.getArgAttrsAttr();
-  // rebuild the operand signess in lockstep with the new argument list
+  // Rebuild the signedness marker in lockstep with the new argument list.
   auto markerAttr = kernel->getAttrOfType<StringAttr>(kAlloSignedAttr);
   StringRef oldMarker = markerAttr ? markerAttr.getValue() : StringRef();
   unsigned numOldInputs = kernel.getFunctionType().getNumInputs();

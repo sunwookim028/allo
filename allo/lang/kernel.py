@@ -6,10 +6,9 @@ import inspect
 import textwrap
 import functools
 import re
-from collections.abc import Sequence
-from typing import Literal, ParamSpec, Generic, TypeVar, overload
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Literal, ParamSpec, Generic, TypeVar, overload
 
 from ..lang.core import (
     constexpr,
@@ -73,6 +72,7 @@ def _register_cmdline_source(fn: Callable) -> None:
     linecache.cache[filename] = (len(source), None, lines, filename)
 
 
+# pylint: disable-next=too-many-instance-attributes
 class Kernel(Generic[P, R]):
     _module: Module
 
@@ -81,7 +81,7 @@ class Kernel(Generic[P, R]):
         fn: Callable[P, R],
         *,
         mapping: Sequence[int | Template],
-        options: KernelOptions,
+        options: KernelOptions = KernelOptions(),
         template: Sequence[Template] = (),
         template_bindings: dict[str, object] | None = None,
         definition_scope: dict[str, object] | None = None,
@@ -109,7 +109,7 @@ class Kernel(Generic[P, R]):
         self.definition_scope = (
             {} if definition_scope is None else definition_scope.copy()
         )
-        self._module: Module | None = None
+        self._module = None
         self.context: Context | None = None
 
         # record whether this kernel is a lazy consteval kernel
@@ -130,7 +130,11 @@ class Kernel(Generic[P, R]):
                 )
 
         src = textwrap.dedent("".join(raw_src))
-        match = re.search(r"^def\s+\w+\s*\(", src, re.MULTILINE)
+        match = re.search(r"^(async\s+)?def\s+\w+\s*\(", src, re.MULTILINE)
+        # `async def` marks a kernel as awaitable (a dataflow process): only an
+        # async kernel may be `await`-called (a concurrent spawn); the keyword
+        # is a frontend contract and is not itself carried into the IR.
+        self.is_async = bool(match and match.group(1))
         if match:
             start_pos = match.start()
             offset = src[:start_pos].count("\n")
@@ -228,7 +232,9 @@ class Kernel(Generic[P, R]):
         tree = ast.parse(self.src)
         assert isinstance(tree, ast.Module)
         assert len(tree.body) == 1
-        assert isinstance(tree.body[0], ast.FunctionDef)
+        # An `async def` kernel (a dataflow process/region) parses to an
+        # AsyncFunctionDef; the codegen handles both the same way.
+        assert isinstance(tree.body[0], (ast.FunctionDef, ast.AsyncFunctionDef))
         return tree.body[0]
 
     def _build_capture_scope(self):
@@ -280,6 +286,8 @@ class Kernel(Generic[P, R]):
             {name: unwrap_if_constexpr(value) for name, value in scope.items()}
         )
         try:
+            # a type annotation is an expression; evaluating it is the point
+            # pylint: disable-next=eval-used
             return eval(text, {"__builtins__": {}}, eval_scope)
         except Exception as e:
             raise TypeError(f"Unsupported type annotation '{text}': {e}") from e
@@ -376,6 +384,8 @@ class Kernel(Generic[P, R]):
                 )
         return StatefulType(inner)
 
+    # keyed on the kernel, so the cache dies with it
+    # pylint: disable-next=method-cache-max-size-none
     @functools.cache
     def parse_argument_annotations(self) -> list[TypeBase]:
         arg_types = []
@@ -395,6 +405,8 @@ class Kernel(Generic[P, R]):
             arg_types.append(ty)
         return arg_types
 
+    # keyed on the kernel, so the cache dies with it
+    # pylint: disable-next=method-cache-max-size-none
     @functools.cache
     def parse_return_annotation(self) -> list[TypeBase]:
         annotation = self.signature.return_annotation
@@ -425,12 +437,12 @@ class Kernel(Generic[P, R]):
         if self._module is not None:
             return self._module
 
-        from ..compiler.mlir_codegen import compile
+        from ..compiler.mlir_codegen import compile as compile_kernel
 
         self.check_templates_bounded()
         arg_types = self.parse_argument_annotations()
         res_types = self.parse_return_annotation()
-        return compile(self, arg_types, res_types, options=self.options)
+        return compile_kernel(self, arg_types, res_types, options=self.options)
 
     def schedule(self):
         from ..schedule import Schedule
@@ -504,8 +516,6 @@ class ConstevalFunction(Generic[P, R]):
         self.__qualname__ = fn.__qualname__
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        from ..lang.core import unwrap_if_constexpr
-
         args = [unwrap_if_constexpr(arg) for arg in args]  # type: ignore
         kwargs = {k: unwrap_if_constexpr(v) for k, v in kwargs.items()}  # type: ignore
         return self.fn(*args, **kwargs)

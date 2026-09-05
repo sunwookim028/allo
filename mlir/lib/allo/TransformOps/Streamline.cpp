@@ -22,26 +22,19 @@ using namespace mlir;
 using namespace mlir::allo;
 
 // `transform.allo.streamline` converts the memref boundaries between fused
-// kernels into on-chip stream hand-offs. For each boundary value (a memref
-// written by producer(s) and read by consumer(s)) apply() dispatches on the
-// (writers, readers) shape:
-//   * 1->1  a direct hand-off;
-//   * 1->N  fan-out through a generated `tee` (broadcast);
-//   * N->1  fan-in through a generated `merge` (concatenate disjoint blocks).
-// Each side then independently meets the row-major FIFO contract via:
-//   * passthrough -- put/get in place (whole-tensor row-major access), no
-//   buffer;
-//   * windowed    -- a K-row circular line buffer (a bounded sliding window);
-//   * staged      -- a full-tensor reorder buffer (anything else).
-// `lanes=L` widens a boundary to L parallel FIFOs; `depth` sizes them, and a
-// reconvergence check warns when a residual's short FIFO may deadlock.
+// kernels into on-chip stream hand-offs. apply() dispatches each boundary on
+// its (writers, readers) shape: 1->1 a direct hand-off, 1->N a generated `tee`,
+// N->1 a generated `merge`. Each side then meets the row-major FIFO contract as
+// passthrough (in place), windowed (a K-row line buffer) or staged (a
+// full-tensor reorder buffer). `lanes=L` widens a boundary to L parallel FIFOs
+// and `depth` sizes them.
 namespace {
 
 enum class ArgKind { Unused, ReadOnly, WriteOnly, ReadWrite, NonAnalyzable };
 
 // Read operand `idx` of a kernel's positional `allo.signed` marker ('s' =>
-// signed). MLIR integers are signless, so this is how a boundary memref's
-// element signedness is recovered to render the matching FIFO element type.
+// signed). MLIR integers are signless, so the FIFO element type's signedness
+// can only be recovered from this marker.
 static bool operandIsSigned(KernelOp kernel, unsigned idx) {
   auto attr = kernel->getAttrOfType<StringAttr>(allo::kAlloSignedAttr);
   if (!attr)
@@ -52,7 +45,7 @@ static bool operandIsSigned(KernelOp kernel, unsigned idx) {
 
 // Classify a kernel block argument by walking its direct uses. Any use that is
 // not a direct affine/memref load or store (a view, a nested invoke, ...) makes
-// the argument non-analyzable for v1.
+// the argument non-analyzable.
 static ArgKind classifyArg(BlockArgument arg) {
   bool hasLoad = false, hasStore = false;
   for (OpOperand &use : arg.getUses()) {
@@ -87,16 +80,13 @@ buildRowMajorNest(OpBuilder &builder, Location loc, ArrayRef<int64_t> shape,
     innermost = forOp;
     builder.setInsertionPointToStart(forOp.getBody());
   }
-  // Pipeline the streaming copy at II=1 (matches ws_streaming's hand-written
-  // feed/collect schedules; without it the drain/re-emit run unpipelined).
   if (innermost)
     innermost->setAttr(kPipelineIIAttr, builder.getI64IntegerAttr(1));
   body(builder, ivs);
 }
 
 // Cyclic-partition `alloc`'s (1-indexed) `dim` by `factor` for conflict-free
-// parallel access along that axis (the L lanes of a staged buffer, or the K
-// window rows of a line buffer).
+// parallel access along that axis.
 static void partitionDimCyclic(Operation *alloc, int64_t factor, unsigned dim) {
   MLIRContext *ctx = alloc->getContext();
   auto axis = PartitionAxisAttr::get(ctx, PartitionKindEnum::CyclicPartition,
@@ -106,9 +96,8 @@ static void partitionDimCyclic(Operation *alloc, int64_t factor, unsigned dim) {
 
 // Build an L-lane row-major copy nest over `shape` (last dim must be a multiple
 // of L): outer loops over all-but-last dims, an inner contiguous-tile loop of
-// `last/L` (pipelined II=1), and L manually-unrolled lane bodies. `perLane`
-// receives the affine access `buf[i0,...,i_{r-2}, ic*L + lane]` and the
-// constant lane index, and emits one lane's stream put/get + buffer load/store.
+// `last/L`, and L unrolled lane bodies. `perLane` receives the affine access
+// `buf[i0,...,i_{r-2}, ic*L + lane]` and the constant lane index.
 static void buildLanedNest(
     OpBuilder &builder, Location loc, ArrayRef<int64_t> shape, int64_t L,
     function_ref<void(OpBuilder &, AffineMap, ValueRange, int64_t)> perLane) {
@@ -165,7 +154,7 @@ static void streamifyProducerArg(OpBuilder &rewriter, KernelOp kernel,
       allo::kAlloSignedAttr,
       rewriter.getStringAttr(operandIsSigned(kernel, p) ? "s" : "u"));
   Value buf = alloc.getResult();
-  arg.replaceAllUsesWith(buf); // existing stores now write the buffer
+  arg.replaceAllUsesWith(buf);
   arg.setType(streamTy);
 
   rewriter.setInsertionPoint(entry.getTerminator());
@@ -204,7 +193,7 @@ static void streamifyConsumerArg(OpBuilder &rewriter, KernelOp kernel,
       allo::kAlloSignedAttr,
       rewriter.getStringAttr(operandIsSigned(kernel, c) ? "s" : "u"));
   Value buf = alloc.getResult();
-  arg.replaceAllUsesWith(buf); // existing loads now read the buffer
+  arg.replaceAllUsesWith(buf);
   arg.setType(streamTy);
 
   rewriter.setInsertionPointAfter(alloc); // drain runs before the original body
@@ -234,9 +223,8 @@ static void streamifyConsumerArg(OpBuilder &rewriter, KernelOp kernel,
 //===--------------------------------------------------------------------===//
 
 // Enclosing affine.for band of `accessOp`, outer-first (band[d] is depth d).
-// The walk stops at the first non-affine.for parent, so any affine.if guard
-// between the access and its loops shortens the band (and fails the rank check
-// below).
+// The walk stops at the first non-affine.for parent, so an affine.if guard
+// between the access and its loops shortens the band.
 static SmallVector<affine::AffineForOp, 4> enclosingBand(Operation *accessOp) {
   SmallVector<affine::AffineForOp, 4> band;
   Operation *cur = accessOp->getParentOp();
@@ -248,14 +236,11 @@ static SmallVector<affine::AffineForOp, 4> enclosingBand(Operation *accessOp) {
   return band;
 }
 
-// True iff `accessOp` touches the WHOLE memref exactly once in row-major order:
-// a band of rank == memref.rank, each loop [0, dim_d) step 1, and an identity
-// access map (tensor dim d indexed by the depth-d IV). This is the
-// single-assignment + in-order condition under which the boundary is
-// passthrough-safe -- producer put sequence == consumer get sequence ==
-// row-major -- so no staging/reorder buffer is needed. An extra (e.g.
-// reduction) loop makes band.size() != rank; a transpose or broadcast breaks
-// the identity-map check; both fall back to staging.
+// True iff `accessOp` touches the WHOLE memref in row-major order: a band of
+// rank == memref.rank, each loop [0, dim_d) step 1, and an identity access map
+// (tensor dim d indexed by the depth-d IV). This is the in-order condition
+// under which the boundary is passthrough-safe, producer put sequence ==
+// consumer get sequence == row-major, so no reorder buffer is needed.
 static bool isCanonicalRowMajorFull(Operation *accessOp, MemRefType mt) {
   unsigned rank = mt.getRank();
   SmallVector<affine::AffineForOp, 4> band = enclosingBand(accessOp);
@@ -303,9 +288,9 @@ static AccessOp uniqueAffineAccess(BlockArgument arg) {
 //===--------------------------------------------------------------------===//
 
 // The static last-dim offset (0..L-1) an unrolled access carries relative to
-// its now-strided innermost IV -- the parallel lane it belongs to. The
-// canonical map is `IV` (lane 0) or `IV + k` (lane k) after unrolling the
-// contiguous loop by L.
+// its now-strided innermost IV, i.e. the parallel lane it belongs to. After
+// unrolling the contiguous loop by L the canonical map is `IV` (lane 0) or
+// `IV + k` (lane k).
 static int64_t laneOffsetOf(Operation *access, unsigned rank) {
   affine::MemRefAccess acc(access);
   affine::AffineValueMap avm;
@@ -319,10 +304,10 @@ static int64_t laneOffsetOf(Operation *access, unsigned rank) {
   return 0;
 }
 
-// Producer passthrough: the canonical row-major store streams out in place, no
-// buffer. Scalar (L==1) rewrites the lone store to a put; laned (L>1) unrolls
-// the innermost (contiguous) loop by L so L elements are computed and put --
-// one to each parallel lane FIFO -- per cycle.
+// Producer passthrough: the row-major store streams out in place, no buffer.
+// Scalar (L==1) rewrites the lone store to a put; laned (L>1) unrolls the
+// innermost (contiguous) loop by L so L elements are put per cycle, one to each
+// parallel lane FIFO.
 static void passthroughProducerArg(OpBuilder &b, BlockArgument arg,
                                    affine::AffineStoreOp store,
                                    StreamType streamTy, int64_t L) {
@@ -356,9 +341,9 @@ static void passthroughProducerArg(OpBuilder &b, BlockArgument arg,
   inner->setAttr(kPipelineIIAttr, b.getI64IntegerAttr(1));
 }
 
-// Consumer passthrough: the canonical row-major load streams in place, no
-// buffer. Symmetric to the producer -- laned unrolls the contiguous loop by L
-// and reads L lane FIFOs per cycle.
+// Consumer passthrough: the row-major load streams in place, no buffer.
+// Symmetric to the producer: laned unrolls the contiguous loop by L and reads
+// L lane FIFOs per cycle.
 static void passthroughConsumerArg(OpBuilder &b, BlockArgument arg,
                                    affine::AffineLoadOp load,
                                    StreamType streamTy, int64_t L) {
@@ -419,10 +404,9 @@ static void convertProducerSide(OpBuilder &b, KernelOp kernel, unsigned p,
 // window along dim 0: every read is `arg[i0 + d, <inner not using i0>]` with
 // the outer loop i0 streaming dim 0 ([0,T) step 1, T == dim0 - K + 1 so the
 // stream drains exactly), d a constant in [0, K), K = max d + 1. Only K rows
-// then need to be buffered (a line buffer) instead of the whole tensor -- the
-// conv/stencil minimal-staging case.
+// then need to be buffered instead of the whole tensor.
 struct WindowInfo {
-  int64_t k;                 // window height -- rows to buffer
+  int64_t k;                 // window height, rows to buffer
   affine::AffineForOp outer; // the streamed (dim-0) loop
   bool
       vertical; // identity inner access -> the fill fuses into the compute body
@@ -482,11 +466,10 @@ static std::optional<WindowInfo> detectSlidingWindow(BlockArgument arg,
     for (unsigned r = 1; r < rank; ++r)
       if (map.getResult(r).isFunctionOfDim(dim0.getPosition()))
         return std::nullopt;
-    // A purely vertical window (perfect nest, identity inner access) lets the
-    // newest-row fill fuse into the compute body: each read of the newest row
-    // is exactly the just-filled element. A column offset (e.g. a 2D conv)
-    // would read an unfilled cell, so it keeps the fill and compute as separate
-    // loops.
+    // A purely vertical window lets the newest-row fill fuse into the compute
+    // body: each read of the newest row is exactly the just-filled element. A
+    // column offset (e.g. a 2D conv) would read an unfilled cell, so fill and
+    // compute stay separate loops.
     if (band.size() != rank)
       vertical = false;
     else
@@ -536,11 +519,9 @@ static void buildRowFill(OpBuilder &b, Location loc, Value cbuf,
 }
 
 // Consumer side, windowed: arg #c becomes an input stream feeding a K-row
-// circular line buffer (instead of a full-tensor stage). A warmup fills rows
-// 0..K-2; each output row i streams in the newest row (i+K-1) before computing,
-// and every read `arg[i0+d, inner]` is redirected to `cbuf[(i0+d) mod K,
-// inner]`. For a purely vertical window the newest-row fill fuses into the
-// consumer's innermost loop (one pass); otherwise it is a separate fill loop.
+// circular line buffer. A warmup fills rows 0..K-2; each output row i streams
+// in the newest row (i+K-1) before computing, and every read `arg[i0+d, inner]`
+// is redirected to `cbuf[(i0+d) mod K, inner]`.
 static void windowedConsumerArg(OpBuilder &b, KernelOp kernel, unsigned c,
                                 MemRefType mt, StreamType streamTy,
                                 const WindowInfo &win) {
@@ -565,7 +546,6 @@ static void windowedConsumerArg(OpBuilder &b, KernelOp kernel, unsigned c,
     partitionDimCyclic(alloc, K, /*dim=*/1); // separate the K window rows
   arg.setType(streamTy);
 
-  // Redirect every read arg[i0+d, inner...] -> cbuf[(i0+d) mod K, inner...].
   SmallVector<affine::AffineLoadOp, 4> loads;
   for (Operation *user : arg.getUsers())
     if (auto ld = dyn_cast<affine::AffineLoadOp>(user))
@@ -598,9 +578,8 @@ static void windowedConsumerArg(OpBuilder &b, KernelOp kernel, unsigned c,
 
   AffineExpr slot = (b.getAffineDimExpr(0) + (K - 1)) % K;
   if (win.vertical) {
-    // Fused: emit `cbuf[(i0+K-1) mod K, inner...] = get()` at the start of the
-    // innermost loop, so each element is streamed in right before it is read --
-    // one pass over the inner dims, no extra fill loop.
+    // Fused: emit the get() at the start of the innermost loop, so each element
+    // is streamed in right before it is read, one pass over the inner dims.
     b.setInsertionPointToStart(band.back().getBody());
     Value v = StreamGetOp::create(b, loc, arg, ArrayRef<Value>{}).getResult();
     SmallVector<AffineExpr, 4> exprs{slot};
@@ -628,8 +607,7 @@ static void convertConsumerSide(OpBuilder &b, KernelOp kernel, unsigned c,
   if (load && isCanonicalRowMajorFull(load, mt)) {
     passthroughConsumerArg(b, arg, load, streamTy, L);
   } else if (L == 1) {
-    // A bounded sliding window over the streamed dim needs only a K-row line
-    // buffer; otherwise stage the whole tensor.
+    // A bounded sliding window needs only a K-row line buffer.
     if (auto win = detectSlidingWindow(arg, mt))
       windowedConsumerArg(b, kernel, c, mt, streamTy, *win);
     else
@@ -643,10 +621,10 @@ static void convertConsumerSide(OpBuilder &b, KernelOp kernel, unsigned c,
 // Fan-out (tee)
 //===--------------------------------------------------------------------===//
 
-// Body of a `tee`: read each element of the (row-major) input stream once and
-// broadcast it to every output stream -- a buffer-free passthrough fan-out. The
-// stream get/put order IS the row-major contract, so the loops only set the
-// trip count; with L>1 each inner iteration moves L lanes.
+// Body of a `tee`: read each element of the input stream once and broadcast it
+// to every output stream, a buffer-free passthrough fan-out. The stream get/put
+// order IS the row-major contract, so the loops only set the trip count; with
+// L>1 each inner iteration moves L lanes.
 static void buildBroadcastBody(OpBuilder &b, Location loc,
                                ArrayRef<int64_t> shape, int64_t L, Value in,
                                ValueRange outs) {
@@ -658,8 +636,7 @@ static void buildBroadcastBody(OpBuilder &b, Location loc,
     });
     return;
   }
-  // Laned: reuse the L-lane nest skeleton; the broadcast only needs the lane
-  // index (not the per-lane buffer map).
+  // Laned: the broadcast needs only the lane index, not the per-lane map.
   buildLanedNest(
       b, loc, shape, L,
       [&](OpBuilder &bb, AffineMap, ValueRange, int64_t lane) {
@@ -673,7 +650,7 @@ static void buildBroadcastBody(OpBuilder &b, Location loc,
 
 // Create a private dataflow kernel `name` with `numStreams` stream arguments,
 // fill its body via `buildBody(entry)`, terminate it, and insert it into the
-// module with a uniquified name. The shared skeleton behind the tee and merge.
+// module with a uniquified name. Shared by the tee and the merge.
 static KernelOp buildStreamKernel(OpBuilder &b, Operation *moduleOp,
                                   Location loc, StringRef name,
                                   StreamType streamTy, unsigned numStreams,
@@ -688,9 +665,8 @@ static KernelOp buildStreamKernel(OpBuilder &b, Operation *moduleOp,
       TypeAttr::get(FunctionType::get(ctx, inputs, {})),
       b.getStringAttr("private"),
       /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr, b.getDenseI32ArrayAttr({}));
-  // All args share the boundary payload, so the marker is a uniform run of one
-  // char -- the emitter renders the FIFO element type with the right
-  // signedness.
+  // All args carry the boundary payload, so the marker is a uniform run of one
+  // char.
   kernel->setAttr(
       allo::kAlloSignedAttr,
       b.getStringAttr(std::string(numStreams, isSigned ? 's' : 'u')));
@@ -722,8 +698,8 @@ static KernelOp buildTeeKernel(OpBuilder &b, Operation *moduleOp, Location loc,
 // Fan-in (merge)
 //===--------------------------------------------------------------------===//
 
-// If `store` writes a contiguous row-major block of `mt` -- inner dims full and
-// identity, dim 0 a sub-range [c, c+Nk) via the access `iv0 + c` -- return the
+// If `store` writes a contiguous row-major block of `mt` (inner dims full and
+// identity, dim 0 a sub-range [c, c+Nk) via the access `iv0 + c`), return the
 // block's (offset, length) in elements. This is the fan-in producer contract:
 // each producer fills one such block, drained in order to rebuild the tensor.
 static std::optional<std::pair<int64_t, int64_t>>
@@ -778,9 +754,8 @@ contiguousOuterBlock(Operation *store, MemRefType mt) {
 }
 
 // Create a `merge` kernel (N block streams -> 1 output stream): drain input k
-// for `lens[k]` elements, forwarding each to the output, so the blocks
-// concatenate in order to the tensor's row-major sequence. Inserted with a
-// uniquified name.
+// for `lens[k]` elements into the output, so the blocks concatenate in order to
+// the tensor's row-major sequence.
 static KernelOp buildMergeKernel(OpBuilder &b, Operation *moduleOp,
                                  Location loc, StreamType streamTy,
                                  ArrayRef<int64_t> lens, bool isSigned) {
@@ -810,9 +785,9 @@ static KernelOp buildMergeKernel(OpBuilder &b, Operation *moduleOp,
 // Reconvergence (deadlock) analysis
 //===--------------------------------------------------------------------===//
 
-// Direction of a stream-typed invoke operand: does the callee PUT (produce) or
-// GET (consume) through the matching arg? Used to orient the dataflow graph for
-// reconvergence (deadlock) analysis.
+// Direction of a stream-typed invoke operand: does the callee PUT or GET
+// through the matching arg? Orients the dataflow graph for the reconvergence
+// analysis.
 enum class StreamDir { None, Producer, Consumer };
 static StreamDir streamArgDir(InvokeOp invoke, unsigned idx) {
   auto kernel = SymbolTable::lookupNearestSymbolFrom<KernelOp>(
@@ -893,7 +868,6 @@ transform::StreamlineOp::apply(transform::TransformRewriter &rewriter,
 
   // A *boundary* is a memref value shared at the invoke operands: written by
   // some producers (WriteOnly) and read by some consumers (ReadOnly).
-  // writers/readers record which (node, arg) touches each value.
   using Refs = SmallVector<std::pair<unsigned, unsigned>, 2>;
   llvm::DenseMap<Value, Refs> writers, readers;
   for (unsigned pi = 0; pi < producers.size(); ++pi) {
@@ -926,8 +900,8 @@ transform::StreamlineOp::apply(transform::TransformRewriter &rewriter,
     rewriter.setInsertionPointToStart(parent);
     auto op = StreamCreateOp::create(rewriter, loc, ty);
     op->setAttr("allo.fifo.elems", rewriter.getI64IntegerAttr(elems));
-    // Carry the boundary payload's signedness so the emitter renders the FIFO
-    // element type to match the converted producer/consumer parameters.
+    // Carry the payload signedness so the emitter renders a FIFO element type
+    // matching the converted producer/consumer parameters.
     op->setAttr(allo::kAlloSignedAttr,
                 rewriter.getStringAttr(isSigned ? "s" : "u"));
     return op.getResult();
@@ -944,14 +918,13 @@ transform::StreamlineOp::apply(transform::TransformRewriter &rewriter,
     if (!mt.hasStaticShape())
       return emitSilenceableError()
              << "streamline boundary has a non-static footprint";
-    // The boundary's element signedness (signless in MLIR) is read from the
-    // producer kernel's marker; every stream/kernel derived from it inherits
-    // it.
+    // The boundary's element signedness comes from the producer kernel's
+    // marker; every stream and kernel derived from it inherits it.
     bool sgn = operandIsSigned(producers[w[0].first].kernel, w[0].second);
 
-    // lanes=L widens the boundary to L parallel FIFOs (a !allo.stream<...,[L]>)
-    // moving L elements/cycle -- the bandwidth lever. It requires L to divide
-    // the tensor's contiguous dim; fan-in is scalar-only for now.
+    // lanes=L widens the boundary to L parallel FIFOs moving L elements/cycle.
+    // It requires L to divide the tensor's contiguous dim, and fan-in is scalar
+    // only.
     int64_t L = getLanes();
     bool fanIn = w.size() > 1;
     if (L > 1 && (fanIn || mt.getShape().back() % L != 0)) {
@@ -1072,13 +1045,12 @@ transform::StreamlineOp::apply(transform::TransformRewriter &rewriter,
            << "streamline: no convertible memory boundary found between the "
               "given producers and consumers";
 
-  // Deadlock-safety: streamline may now have built a reconvergent fork/join (a
-  // residual: one value reaches a join both directly and through a longer
-  // path). The short branch's FIFO must hold the latency skew or the dataflow
-  // deadlocks. We can't measure the skew at the IR level, so we bound it by the
-  // whole tensor and warn when the short FIFO is shallower than that. The check
-  // runs over the whole parent dataflow graph, so it fires on the streamline
-  // call that closes the diamond.
+  // Deadlock safety: streamline may now have built a reconvergent fork/join,
+  // where one value reaches a join both directly and through a longer path. The
+  // short branch's FIFO must hold the latency skew or the dataflow deadlocks.
+  // The skew is not measurable at the IR level, so it is over-bounded by the
+  // whole tensor. The check runs over the whole parent dataflow graph, so it
+  // fires on the streamline call that closes the diamond.
   llvm::DenseMap<Value, InvokeOp> producerOf;
   SmallVector<InvokeOp, 8> invokes;
   for (Operation &op : *parent)

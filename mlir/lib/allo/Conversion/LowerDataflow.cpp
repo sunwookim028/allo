@@ -23,6 +23,7 @@ using namespace mlir::allo;
 namespace {
 constexpr StringLiteral kCreate = "allo_sim_stream_create";
 constexpr StringLiteral kWrite = "allo_sim_stream_write";
+constexpr StringLiteral kSeed = "allo_sim_stream_seed";
 constexpr StringLiteral kRead = "allo_sim_stream_read";
 constexpr StringLiteral kWriteMem = "allo_sim_stream_write_mem";
 constexpr StringLiteral kReadMem = "allo_sim_stream_read_mem";
@@ -95,6 +96,8 @@ static void declareRuntimeFuncs(ModuleOp module) {
   declareRuntimeFunc(module, kCreate,
                      FunctionType::get(ctx, {i64, i64, i64}, {i64}));
   declareRuntimeFunc(module, kWrite,
+                     FunctionType::get(ctx, {i64, i64, i64}, {}));
+  declareRuntimeFunc(module, kSeed,
                      FunctionType::get(ctx, {i64, i64, i64}, {}));
   declareRuntimeFunc(module, kRead, FunctionType::get(ctx, {i64, i64}, {i64}));
   declareRuntimeFunc(module, kWriteMem,
@@ -210,13 +213,10 @@ static bool isStreamInvoke(InvokeOp op) {
   });
 }
 
-// Tag the callee of every stream-connected invoke as a dataflow PE. The CPU
-// pipeline's late `allo-dataflow-spawn` pass rewrites the (post-LLVM-lowering)
-// calls to these functions into fiber spawns onto the marl runtime, so that all
-// PEs of a dataflow region run concurrently as cooperatively-scheduled fibers.
-// We mark the *callees* rather than the call sites because a unit attribute on
-// a function definition survives the kernel -> func -> llvm.func lowering,
-// whereas call-site attributes are dropped by the conversion patterns.
+// Tag the callee of every stream-connected invoke as a dataflow PE; the later
+// `dataflow-spawn` pass rewrites calls to these functions into marl fiber
+// spawns. The mark goes on the callee because a call-site attribute is dropped
+// by the kernel -> func -> llvm.func lowering.
 static void markDataflowPEs(ModuleOp module) {
   auto marker = UnitAttr::get(module.getContext());
   module.walk([&](InvokeOp invoke) {
@@ -254,6 +254,25 @@ struct StreamCreateLowering : public OpConversionPattern<StreamCreateOp> {
         func::CallOp::create(rewriter, loc, rewriter.getStringAttr(kCreate),
                              TypeRange{i64}, operands);
     call->setAttr(kCreateAttr, rewriter.getUnitAttr());
+
+    // Feedback seeding: preload each initial token into lane 0 in order. The
+    // create and seed calls precede the invokes, so the FIFO is seeded
+    // single-threaded before any fiber spawns.
+    if (ArrayAttr init = op.getInitAttr()) {
+      Value handle = call.getResult(0);
+      Value lane0 = makeI64Constant(rewriter, loc, 0);
+      for (Attribute token : init) {
+        Value cst =
+            arith::ConstantOp::create(rewriter, loc, cast<TypedAttr>(token));
+        FailureOr<Value> bits = packScalar(rewriter, loc, cst);
+        if (failed(bits))
+          return op.emitOpError(
+              "stream initial token must be a scalar payload");
+        func::CallOp::create(rewriter, loc, rewriter.getStringAttr(kSeed),
+                             TypeRange{}, ValueRange{handle, lane0, *bits});
+      }
+    }
+
     rewriter.replaceOp(op, call.getResults());
     return success();
   }
@@ -327,8 +346,8 @@ struct StreamGetLowering : public OpConversionPattern<StreamGetOp> {
 };
 
 // Extract bits [lo, lo+width) of an integer: result = trunc(src >> lo). The
-// result width fixes the slice width (matching the Vivado HLS emitter), so the
-// truncation implicitly applies the mask. `lo` is dynamic; `hi` is unused.
+// result width fixes the slice width, matching the Vivado HLS emitter. `lo` is
+// dynamic; `hi` is unused.
 struct BitGetSliceLowering : public OpConversionPattern<BitGetSliceOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -354,8 +373,8 @@ struct BitGetSliceLowering : public OpConversionPattern<BitGetSliceOp> {
 
 // Splice `value` into bits [lo, lo+width) of `src`:
 //   result = (src & ~(mask << lo)) | ((value & mask) << lo)
-// with mask = low `width` bits set, width = value's bit width (matching the
-// Vivado HLS emitter). `lo` is dynamic; `hi` is unused.
+// with mask = low `width` bits set and width = value's bit width, matching the
+// Vivado HLS emitter. `lo` is dynamic; `hi` is unused.
 struct BitSetSliceLowering : public OpConversionPattern<BitSetSliceOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -444,13 +463,12 @@ struct LowerDataflowPass
 
     markDataflowPEs(module);
 
-    // inject runtime helper functions
     declareRuntimeFuncs(module);
 
     MLIRContext *ctx = module.getContext();
     TypeConverter converter;
     converter.addConversion([](Type type) { return type; });
-    // convert stream type to a runtime handle/pointer represented as i64
+    // a stream lowers to an opaque runtime handle carried as i64
     auto handleTy = IntegerType::get(ctx, 64);
     converter.addConversion(
         [handleTy](StreamType) -> Type { return handleTy; });

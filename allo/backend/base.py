@@ -19,14 +19,8 @@ from .._mlir.ir import MLIRError, DiagnosticInfo
 from .._mlir._mlir_libs._allo import ir_ext
 from .._mlir.ir import SymbolTable, UnitAttr, FileLineColLoc
 from .._mlir.passmanager import PassManager
-from .._mlir.dialects.allo import register_passes as _register_allo_passes
 from ..lang.kernel import Kernel
 from ..diagnostics import render_diagnostic, DiagnosticLocation
-
-# Allo passes live in the process-global MLIR pass registry; register them once
-# (std::call_once-guarded in C++) so backend pipelines (`lower-to-llvm`,
-# `grid-mapping`, `convert-allo-to-func`, ...) resolve via upstream PassManager.
-_register_allo_passes()
 
 
 def lookup_kernel(module: ir.Module, name: str):
@@ -71,10 +65,9 @@ def run_pipeline(module: ir.Module, pipeline: str) -> None:
                 raise RuntimeError(
                     f"An error occurred during code generation process:\n{msg}"
                 ) from None
-            else:
-                raise RuntimeError(
-                    f"An error occurred during code generation process:\n{diag.message}"
-                ) from None
+            raise RuntimeError(
+                f"An error occurred during code generation process:\n{diag.message}"
+            ) from None
 
 
 _PROCESS_CACHE: dict[tuple[str, str], Any] = {}
@@ -147,6 +140,7 @@ class Backend(ABC, Generic[P, R]):
         self.module: ir.Module = ir_ext.clone_module(kernel.compile())
         self.kernel = kernel
         self._kernel_cache: dict[str, Any] | None = None
+        self.__name__ = self.kernel.func_name
 
     def _compute_kernel_cache(self) -> dict[str, Any]:
         """The kernel's contribution to a cache key, computed once and reused.

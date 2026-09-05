@@ -50,6 +50,8 @@ struct VivadoHLSEmitter {
   void emitBitGetSlice(allo::BitGetSliceOp op);
   void emitBitSetSlice(allo::BitSetSliceOp op);
 
+  void emitAssumeNoDep(allo::AssumeNoDepOp op);
+
   void emitFor(scf::ForOp op);
   void emitIf(scf::IfOp op);
   void emitIndexSwitch(scf::IndexSwitchOp op);

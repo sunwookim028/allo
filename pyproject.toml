@@ -2,35 +2,37 @@
 # SPDX-License-Identifier: Apache-2.0
 
 [build-system]
-requires = [
-    "nanobind>=2.10",
-    "scikit-build-core>=0.10",
-]
+requires = ["nanobind>=2.10,<3", "scikit-build-core>=0.10", "setuptools_scm>=8"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "allo"
-version = "0.5"
-dependencies = [
-    "rich",
-    "sympy",
-    "numpy",
-    "ml_dtypes"
-]
+version = "1.0.0"
+dependencies = ["rich", "sympy", "numpy", "ml_dtypes"]
 requires-python = ">=3.12"
-authors = [
-    {name = "Allo Authors"}
-]
+authors = [{ name = "Allo Authors" }]
 description = "Allo: Accelerator Design and Programming Language"
-readme = {file = "README.md", content-type = "text/markdown"}
+readme = { file = "README.md", content-type = "text/markdown" }
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 keywords = ["compiler", "hls", "fpga", "accelerator"]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering",
-    "Topic :: System :: Hardware",
-    "Operating System :: OS Independent"
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+  "Topic :: System :: Hardware",
+  "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = [
+  "nanobind",
+  "pytest",
+  "pytest-xdist",
+  "cocotb",
+  "sccache",
+  "clang-format==22.1.8",
+  "black==24.8.0",
+  "pylint==3.0.2",
 ]
 
 [tool.scikit-build]
@@ -39,12 +41,10 @@ cmake.version = ">=3.20"
 ninja.version = ">=1.10"
 cmake.build-type = "Release"
 cmake.source-dir = "."
-# Persistent build tree so the generated `allo/_mlir` symlinks always resolve.
 build-dir = "build"
 wheel.packages = ["allo"]
 
 [tool.scikit-build.cmake.define]
-# Build against the same LLVM toolchain the bundled MLIR was built with.
 CMAKE_C_COMPILER = "clang"
 CMAKE_CXX_COMPILER = "clang++"
 CMAKE_VISIBILITY_INLINES_HIDDEN = "ON"
@@ -52,11 +52,10 @@ CMAKE_C_VISIBILITY_PRESET = "hidden"
 CMAKE_CXX_VISIBILITY_PRESET = "hidden"
 Python_FIND_VIRTUALENV = "ONLY"
 Python3_FIND_VIRTUALENV = "ONLY"
-MLIR_BINDINGS_PYTHON_NB_DOMAIN = "allo"
 LLVM_ENABLE_ZSTD = "OFF"
+LLVM_USE_LINKER = "lld"
 
 [tool.scikit-build.editable]
-# Rebuild the native bits on import so `pip install -e .` is one self-healing step.
 mode = "redirect"
-rebuild = true
+rebuild = false
 verbose = false

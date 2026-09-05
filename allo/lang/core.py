@@ -171,7 +171,7 @@ def widen_apint_to_std(dtype: "DType") -> "DType":
     if not isinstance(dtype, APInt):
         return dtype
     w = dtype.primitive_width
-    if w in (1, 8, 16, 32, 64):
+    if w in {1, 8, 16, 32, 64}:
         return dtype
     if w > 64:
         raise TypeError(
@@ -224,6 +224,8 @@ u64 = APInt(64, signed=False)
 u128 = APInt(128, signed=False)
 u256 = APInt(256, signed=False)
 
+# the DSL's boolean type; inside a kernel `bool` is this, not the builtin.
+# pylint: disable-next=redefined-builtin
 bool = u1
 
 
@@ -257,14 +259,13 @@ class APFloat(DType):
     def materialize(self, context: Context, /) -> Type:
         if self.name == "float16":
             return ir.F16Type.get(context)
-        elif self.name == "float32":
+        if self.name == "float32":
             return ir.F32Type.get(context)
-        elif self.name == "float64":
+        if self.name == "float64":
             return ir.F64Type.get(context)
-        elif self.name == "bfloat16":
+        if self.name == "bfloat16":
             return ir.BF16Type.get(context)
-        else:
-            assert False, f"unsupported floating-point type: {self.name}"
+        assert False, f"unsupported floating-point type: {self.name}"
 
 
 apfloat = APFloat  # name alias for easier usage
@@ -294,6 +295,8 @@ class IndexType(DType):
 index = IndexType()  # singleton instance for index type
 
 
+# `materialize` stays abstract here: ShapedType is itself an abstract base.
+# pylint: disable-next=abstract-method
 class ShapedType(TypeBase):
     """
     Represents a shaped type in the Allo compiler, such as tensor, memref, etc.
@@ -317,7 +320,7 @@ class TensorType(ShapedType):
     """
 
     def __init__(self, shape: Sequence[int], dtype: DType):
-        prefix = "x".join(map(str, shape))
+        prefix = "x".join(str(dim) for dim in shape)
         name = f"tensor<{prefix + 'x' if prefix else ''}{dtype.name}>"
         super().__init__(name, shape, dtype)
 
@@ -334,7 +337,7 @@ class BufferType(ShapedType):
     """
 
     def __init__(self, shape: Sequence[int], dtype: DType):
-        prefix = "x".join(map(str, shape))
+        prefix = "x".join(str(dim) for dim in shape)
         name = f"memref<{prefix + 'x' if prefix else ''}{dtype.name}>"
         super().__init__(name, shape, dtype)
 
@@ -369,7 +372,7 @@ class StreamType(TypeBase):
         shape = tuple(shape)
         assert all(isinstance(dim, int) and dim >= 0 for dim in shape)
         shape_suffix = "[" + ",".join(str(dim) for dim in shape) + "]" if shape else ""
-        super().__init__(f"Stream[{base_type}]{shape_suffix}")
+        super().__init__(f"Stream[{base_type},{depth}]{shape_suffix}")
         self.base_type = base_type
         self.depth = depth
         self.shape = shape
@@ -419,7 +422,7 @@ class ShapeExpr:
         self.shape = _as_shape(shape)
 
     def __repr__(self) -> str:
-        return f"{self.dtype}[{', '.join(map(str, self.shape))}]"
+        return f"{self.dtype}[{', '.join(str(dim) for dim in self.shape)}]"
 
 
 class StreamExpr:
@@ -438,7 +441,7 @@ class StreamExpr:
         return StreamExpr(self.base, self.depth, _as_shape(key))
 
     def __repr__(self) -> str:
-        suffix = f"[{','.join(map(str, self.shape))}]" if self.shape else ""
+        suffix = f"[{','.join(str(dim) for dim in self.shape)}]" if self.shape else ""
         return f"Stream[{self.base!r}, {self.depth}]{suffix}"
 
 
@@ -514,6 +517,7 @@ class ConstexprValue(ValueBase):
     A constexpr value is a frontend-only value that does not have a corresponding MLIR value handle.
     """
 
+    # pylint: disable-next=super-init-not-called
     def __init__(self, value):
         # peel out nested constexpr value
         while isinstance(value, ConstexprValue):
@@ -539,15 +543,18 @@ class AlloValue(ValueBase):
     An Allo value should always have a corresponding MLIR value handle, as it represents a value that will be materialized into MLIR.
     """
 
-    def __init__(self, handle: Value, type: TypeBase):
+    # pylint: disable-next=super-init-not-called
+    def __init__(self, handle: Value, value_type: TypeBase):
         assert handle is not None, "handle cannot be None for AlloValue"
         self._handle = handle
-        self.type = type
-        self.dtype = type.dtype if isinstance(type, ShapedType) else type
+        self.type = value_type
+        self.dtype = (
+            value_type.dtype if isinstance(value_type, ShapedType) else value_type
+        )
         # wrap the shape to frontend values
         self.shape = (
-            [ConstexprValue(s) for s in type.shape]
-            if isinstance(type, (ShapedType, StreamType))
+            [ConstexprValue(s) for s in value_type.shape]
+            if isinstance(value_type, (ShapedType, StreamType))
             else ()
         )
         self.rank = len(self.shape)
@@ -581,6 +588,7 @@ class StatefulValue(ValueBase):
     (a `DType` for scalars, a `BufferType` for arrays).
     """
 
+    # pylint: disable-next=super-init-not-called
     def __init__(self, storage: AlloValue, value_type: TypeBase):
         self.storage = storage
         self.type = value_type
@@ -659,7 +667,9 @@ class Range:
         raise RuntimeError("allo.range can only be used within allo kernels")
 
 
-range = Range  # name alias for easier usage
+# the DSL's loop constructor; inside a kernel `range` is this, not the builtin.
+# pylint: disable-next=redefined-builtin
+range = Range
 
 
 class Grid:

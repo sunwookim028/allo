@@ -10,7 +10,8 @@ ignore=CVS
 
 # Add files or directories matching the regex patterns to the ignore-list. The
 # regex matches against paths and can be in Posix or Windows format.
-ignore-paths=
+ignore-paths=(^|.*/)allo/library/.*,
+             (^|.*/)allo/_mlir/.*
 
 # Files or directories matching the regex patterns are skipped. The regex
 # matches against base names, not paths.
@@ -51,8 +52,8 @@ unsafe-load-any-extension=no
 # run arbitrary code
 extension-pkg-allow-list=past
 
-# Minimum supported python version
-py-version = 3.7.2
+# Minimum supported python version (keep in sync with requires-python in pyproject.toml)
+py-version = 3.12
 
 # Control the amount of potential inferred values when inferring a single
 # object. This can help the performance when dealing with large functions or
@@ -105,11 +106,25 @@ disable=
     no-member,
     too-many-locals,
     missing-raises-doc,
+    # types are carried by annotations, not repeated in the docstring
+    missing-type-doc,
     # Needs Python 3.10+
     consider-alternative-union-syntax,
     too-many-statements,
     duplicate-code,
-    undefined-variable
+    undefined-variable,
+    # Walrus is not part of this codebase's style; the suggestion fires on every
+    # `x = f(); if x:` pair.
+    consider-using-assignment-expr,
+    # The frontend/backend/schedule packages are mutually recursive by design;
+    # the cycles are broken with deferred imports (import-outside-toplevel above).
+    cyclic-import,
+    # `type(x) is T` is used deliberately where an exact type is required, e.g. to
+    # reject `bool` for an `int` parameter; `isinstance` is used where it is meant.
+    unidiomatic-typecheck,
+    # Compiler boundaries and tool probes catch Exception on purpose, to turn any
+    # downstream failure into a diagnostic or a False rather than a traceback.
+    broad-exception-caught
 
 
 [REPORTS]
@@ -346,7 +361,9 @@ mixin-class-rgx=.*MixIn
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis). It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=
+# allo._mlir re-exports the nanobind extension modules and the tablegen-generated
+# op builders, neither of which pylint can introspect statically.
+ignored-modules=allo._mlir
 
 # List of class names for which member attributes should not be checked (useful
 # for classes with dynamically set attributes). This supports the use of

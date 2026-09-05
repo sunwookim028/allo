@@ -13,6 +13,7 @@ add_mlir_library(MLIRAlloTransformOps
 
     LINK_LIBS PUBLIC
     MLIRIR
+    MLIRAlloSupport
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRFuncDialect

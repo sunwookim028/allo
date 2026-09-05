@@ -31,7 +31,6 @@ from .._mlir.ir import (
     AffineDimExpr,
     AffineSymbolExpr,
     AffineConstantExpr,
-    UnitAttr,
     IntegerAttr,
     IntegerType,
 )
@@ -248,10 +247,10 @@ def _resolve_src(builder: AlloOpBuilder, src, node):
             )
         dtype = torch_dtype_map[dtype_name]
         shape = tuple(int(d) for d in src.shape)
-        from ..compiler.mlir_codegen import _global_symbol
+        from ..compiler.utils import global_symbol
 
         func_name = _enclosing_kernel_name(builder)
-        global_name = _global_symbol(func_name, _bufferize_var_id(node), "const", node)
+        global_name = global_symbol(func_name, _bufferize_var_id(node), "const", node)
         src_value = builder.make_shaped_constant(
             src.reshape(-1).tolist(), BufferType(shape, dtype), global_name
         )
@@ -343,13 +342,13 @@ def _(builder: AlloOpBuilder, src, offsets=None, sizes=None, strides=None):
     load_map = AffineMap.get(rank, len(dyn_offsets), load_exprs, ctx)
     store_map = AffineMap.get_identity(rank, ctx)
 
-    from ..compiler.mlir_codegen import (
-        _global_symbol,
+    from ..compiler.utils import (
+        global_symbol,
         generate_function_type,
         generate_signedness_marker,
     )
 
-    kernel_name = _global_symbol(
+    kernel_name = global_symbol(
         _enclosing_kernel_name(builder), _bufferize_var_id(node), "bufferize", node
     )[
         1:

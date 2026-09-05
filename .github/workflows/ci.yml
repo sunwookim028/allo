@@ -1,0 +1,161 @@
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: "CI"
+
+on:
+  push:
+    branches:
+      - allov2
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  XILINX_VITIS: /nonexistent
+  ORTOOLS_VERSION: "9.15.6755"
+
+jobs:
+  # Cheap enough to gate the build on: catches a stray format or license slip
+  # before anything pays for LLVM.
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Pinned to the same versions `.[dev]` pins
+      - name: Install formatters
+        run: pip install 'black==24.8.0' 'clang-format==22.1.8'
+
+      - name: Check license headers and formatting
+        run: bash scripts/lint/task_lint.sh format
+
+  toolchain:
+    needs: format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang lld ccache
+
+      # The run id in the key makes every run write a fresh entry that the
+      # prefix match picks up next time, since a cache entry is immutable once
+      # written.
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-toolchain-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-toolchain-${{ runner.arch }}-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=2G
+          ccache --zero-stats
+
+      - name: Build MLIR and CIRCT
+        uses: ./.github/actions/build-mlir-circt
+
+      - name: Report ccache stats
+        run: ccache --show-stats
+
+  build-and-test:
+    needs: [format, toolchain]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang lld ccache verilator
+          verilator --version
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-allo-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-allo-${{ runner.arch }}-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=2G
+          ccache --set-config=sloppiness=time_macros
+          ccache --zero-stats
+
+      - name: Restore OR-Tools
+        id: ortools-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/or-tools-${{ env.ORTOOLS_VERSION }}
+          key: ortools-${{ runner.os }}-${{ runner.arch }}-${{ env.ORTOOLS_VERSION }}
+
+      - name: Download OR-Tools
+        if: steps.ortools-cache.outputs.cache-hit != 'true'
+        run: |
+          ver="${ORTOOLS_VERSION}"
+          url="https://github.com/google/or-tools/releases/download/v${ver%.*}"
+          tarball="or-tools_amd64_ubuntu-24.04_cpp_v${ver}.tar.gz"
+          curl -fsSL -o /tmp/ortools.tar.gz "${url}/${tarball}"
+          # The directory inside the tarball spells the platform differently
+          # from the asset name, so strip it rather than guess.
+          mkdir -p /tmp/ortools "$HOME/.local/share"
+          tar -xzf /tmp/ortools.tar.gz -C /tmp/ortools --strip-components=1
+          mv /tmp/ortools "$HOME/.local/share/or-tools-${ver}"
+
+      - name: Build MLIR and CIRCT
+        uses: ./.github/actions/build-mlir-circt
+
+      - name: Install Allo
+        run: |
+          export CMAKE_PREFIX_PATH="$HOME/.local/share/or-tools-${ORTOOLS_VERSION}"
+          pip install -v -e '.[dev]' \
+            --config-settings=cmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache \
+            --config-settings=cmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Report ccache stats
+        run: ccache --show-stats
+
+      - name: Lint
+        run: bash scripts/lint/task_lint.sh pylint
+
+      - name: Run Allo tests
+        run: python -m pytest tests/ --ignore=tests/rtl -v
+
+      # Cosim is the slow half and is safe to fan out; the runner has 4 vCPUs.
+      - name: Run Allo RTL backend tests
+        run: python -m pytest tests/rtl/ -n 4 -v

@@ -1,17 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Runtime logging and subprocess helpers.
-
-All user-facing status, warnings and fatal errors funnel through this module
-so the style and the process-exit behavior stay consistent across the backends.
-
-Notebook mode (auto-detected under Jupyter, overridable via the
-``ALLO_NOTEBOOK`` environment variable or :func:`set_notebook_mode`) renders to
-stdout, replaces the live ``rich`` spinner -- which flickers as a widget in
-notebooks -- with a static status line, and raises :class:`AlloFatalError`
-instead of calling ``SystemExit`` so a stray failure does not stop the kernel.
-"""
+"""Runtime logging and subprocess helpers."""
 
 from __future__ import annotations
 
@@ -19,12 +9,12 @@ import os
 import shlex
 import subprocess
 
-from collections.abc import Mapping, Sequence, Generator
+from collections.abc import Callable, Mapping, Sequence, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, NoReturn, TypeVar, cast
+from typing import Any, NoReturn, TypeVar, cast
 
 from rich.console import Console
 from rich.markup import escape
@@ -75,7 +65,8 @@ console = _make_console()
 
 def set_notebook_mode(enabled: bool | None) -> None:
     """Force notebook output on/off; pass ``None`` to restore auto-detection."""
-    global _notebook_override, console
+    # this module owns the console singleton and the override it is built from
+    global _notebook_override, console  # pylint: disable=global-statement
     _notebook_override = enabled
     console = _make_console()
 

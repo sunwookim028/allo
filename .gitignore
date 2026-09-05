@@ -99,4 +99,8 @@ tests/xlscc_tests/**/test
 *.pyi
 
 /allo/_mlir
+.cache
 drafts
+
+# Benchmark synthesis bed artifacts
+benchmark/synth_work/

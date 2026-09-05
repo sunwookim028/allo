@@ -7,6 +7,8 @@ from typing import Any, Generic, Literal, ParamSpec, TypeVar, overload
 
 from ..backend.cpu import CPU
 from ..backend.vitis.core import Vitis
+from ..backend.rtl.core import RTL
+from .._mlir.ir import Module
 from .model import Ref, LoopRef, OpRef, BufferRef
 from .query import Query
 
@@ -25,6 +27,7 @@ class Schedule(Generic[P, R]):
     Complete: int
     Block: int
     Cyclic: int
+    Skew: int
 
     # bind_storage enums
     BRAM = ...
@@ -83,6 +86,13 @@ class Schedule(Generic[P, R]):
         """Apply pending transforms and hand the scheduled kernel to the CPU
         (LLVM JIT) backend, returning a ``CPU`` handle."""
 
+    @overload
+    def export(self, backend: Literal["rtl"], **kwargs: Any) -> RTL[P, R]:
+        """Apply pending transforms and hand the scheduled kernel to the RTL
+        backend (open-source, cocotb-first), returning an ``RTL`` handle
+        (``csim`` / ``cosim`` / ``synth``). ``kwargs`` are forwarded
+        (``device``/``library``, ``freq_mhz``, ``simulator``, ...)."""
+
     def export_cpu(self, **kwargs: Any) -> CPU[P, R]:
         """Shorthand for ``export("cpu", **kwargs)``."""
 
@@ -90,8 +100,12 @@ class Schedule(Generic[P, R]):
         """Shorthand for ``export("vitis", **kwargs)``."""
     # --- gated real-IR access -------------------------------------------
     @property
-    def payload(self) -> Any:
+    def payload(self) -> Module:
         """The materialized MLIR module; auto-applies any pending transforms."""
+
+    @property
+    def module(self) -> Module:
+        """Alias for payload"""
 
     @property
     def snapshot(self) -> Any:
@@ -147,9 +161,10 @@ class Schedule(Generic[P, R]):
         factor: int = 0,
     ) -> Schedule[P, R]:
         """Array-partition the target buffers (``transform.allo.partition``).
-        ``kind`` is ``Complete``/``Block``/``Cyclic``; ``dim`` selects the
-        dimension (0 = all dims); ``factor`` is the block/cyclic factor (must stay
-        0 for ``Complete``)."""
+        ``kind`` is ``Complete``/``Block``/``Cyclic``/``Skew``; ``dim`` selects
+        the dimension (0 = all dims, but a ``Skew`` must name its distribution
+        dimension); ``factor`` is the bank count (must stay 0 for
+        ``Complete``)."""
 
     def bind_storage(
         self,

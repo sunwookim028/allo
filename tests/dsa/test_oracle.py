@@ -1,11 +1,11 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Functional simulation of hand-written CornellTPU assembly via @tpu.oracle."""
+"""Functional simulation of hand-written TinyTPU assembly via @tpu.oracle."""
 
 import numpy as np
 
-from examples.accelerator.cornell_tpu.isa import (
+from examples.accelerator.tinytpu.isa import (
     bram,
     matmul,
     tpu,

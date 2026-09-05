@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import copy
 from collections.abc import Iterable, Sequence
-from typing import Literal, Generic, TypeVar, ParamSpec
+from typing import Literal, Generic, TypeVar, ParamSpec, TYPE_CHECKING
 from enum import Enum
 
 from ..lang.kernel import Kernel
@@ -52,6 +52,9 @@ from .._mlir.dialects.transform import allo as ta
 from .._mlir.dialects.transform import interpreter
 from ..logging import log_debug, text_tail
 
+if TYPE_CHECKING:
+    from ..backend.rtl.device import Storage
+
 
 def _within_context(method):
     """Run a schedule primitive under ``with self.context`` so upstream ODS attr
@@ -70,10 +73,14 @@ R = TypeVar("R")
 
 
 class BindStorageImpl(Enum):
+    """The storage realizations every Allo device declares, spelled for the
+    common case. A device's own `add_storage` handle is equally acceptable
+    wherever one of these is: both name a `dcp.storage` by symbol."""
+
     BRAM = "bram"
     LUTRAM = "lutram"
     URAM = "uram"
-    SRL = "srl"
+    ROM = "rom"
 
 
 class BindStorageType(Enum):
@@ -88,6 +95,8 @@ class BindStorageType(Enum):
     FIFO = "fifo"
 
 
+# one public method per schedule primitive
+# pylint: disable-next=too-many-public-methods
 class Schedule(Generic[P, R]):
     """Lazy schedule frontend: primitives accumulate a reusable transform program
     (``@sched(%root)``) and a predicted snapshot; ``apply()`` runs the program once.
@@ -101,12 +110,17 @@ class Schedule(Generic[P, R]):
     Complete = 0
     Block = 1
     Cyclic = 2
+    # Skew: the bank is the SUM of every subscript modulo the factor, where
+    # block and cyclic each read one. `dim` names the distribution dimension,
+    # the one divided down to make room. It is the layout for an array read
+    # both by row and by column, which no per-axis one can serve.
+    Skew = 3
 
     # --- bind_storage enums ---
     BRAM = BindStorageImpl.BRAM
     LUTRAM = BindStorageImpl.LUTRAM
     URAM = BindStorageImpl.URAM
-    SRL = BindStorageImpl.SRL
+    ROM = BindStorageImpl.ROM
 
     RAM_1P = BindStorageType.RAM_1P
     RAM_1WNR = BindStorageType.RAM_1WNR
@@ -159,6 +173,8 @@ class Schedule(Generic[P, R]):
     def __str__(self) -> str:
         return self.payload.__str__()
 
+    # `backend` leads the kernel arguments; that is the documented call shape.
+    # pylint: disable-next=keyword-arg-before-vararg
     def __call__(self, backend: str = "cpu", *args: P.args, **kwargs: P.kwargs) -> R:
         if self.kernel is None:
             raise ScheduleError("Cannot call a schedule without a source kernel")
@@ -209,7 +225,7 @@ class Schedule(Generic[P, R]):
             return cls.from_string(handle.read())
 
     # --- export to backend ----------------------------------------------
-    def export(self, backend: Literal["cpu", "vitis"], **kwargs):
+    def export(self, backend: Literal["cpu", "vitis", "rtl"], **kwargs):
         if not self.kernel:
             raise ScheduleError("Cannot export to backends without a source kernel")
         self.apply()
@@ -228,10 +244,14 @@ class Schedule(Generic[P, R]):
             from ..backend import CPU
 
             return CPU(kernel, **kwargs)
-        elif backend == "vitis":
+        if backend == "vitis":
             from ..backend.vitis import Vitis
 
             return Vitis(kernel, **kwargs)
+        if backend == "rtl":
+            from ..backend.rtl import RTL
+
+            return RTL(kernel, **kwargs)
 
         raise ScheduleError(f"unsupported backend '{backend}' for export()")
 
@@ -247,6 +267,11 @@ class Schedule(Generic[P, R]):
     def payload(self) -> Module:
         self.apply()  # auto-apply pending transforms for user convenience
         return self._payload
+
+    @property
+    def module(self) -> Module:
+        """Alias for payload"""
+        return self.payload
 
     @property
     def snapshot(self) -> ScheduleSnapshot:
@@ -445,10 +470,10 @@ class Schedule(Generic[P, R]):
             raise InvalidScheduleArgumentError(
                 f"partition dim must be non-negative, got {dim}"
             )
-        if kind not in (self.Complete, self.Block, self.Cyclic):
+        if kind not in (self.Complete, self.Block, self.Cyclic, self.Skew):
             raise InvalidScheduleArgumentError(
                 "partition kind must be Schedule.Complete, Schedule.Block, "
-                "or Schedule.Cyclic"
+                "Schedule.Cyclic, or Schedule.Skew"
             )
         if kind == self.Complete:
             if factor != 0:
@@ -459,6 +484,13 @@ class Schedule(Generic[P, R]):
             raise InvalidScheduleArgumentError(
                 f"{self._partition_kind_name(kind)} partition factor must be "
                 f"greater than 1, got {factor}"
+            )
+        # A skew's bank already reads every subscript, so `dim` cannot mean
+        # "every dimension" the way it does for block and cyclic: it names the
+        # one dimension divided down to make room for the banks.
+        if kind == self.Skew and dim == 0:
+            raise InvalidScheduleArgumentError(
+                "skew partition needs dim to name its distribution dimension"
             )
 
         buffers = self._resolve_buffer_targets(targets, "partition")
@@ -476,12 +508,24 @@ class Schedule(Generic[P, R]):
         self,
         targets: Targets,
         *,
-        impl: BindStorageImpl,
+        impl: BindStorageImpl | Storage,
         mem_type: BindStorageType,
     ) -> Schedule:
-        if not isinstance(impl, BindStorageImpl):
+        """Bind an array to a storage REALIZATION, by one of the standard names
+        or by a handle the device's ``add_storage`` returned. A
+        :class:`~allo.backend.rtl.device.Resource` is neither, so binding to one
+        is a type error rather than a name that fails to resolve at export."""
+        # Imported here: the RTL backend imports the schedule frontend.
+        from ..backend.rtl.device import Storage
+
+        if isinstance(impl, Storage):
+            name = impl.name
+        elif isinstance(impl, BindStorageImpl):
+            name = impl.value
+        else:
             raise InvalidScheduleArgumentError(
-                f"bind_storage impl must be one of {', '.join(e.name for e in BindStorageImpl)}, "
+                "bind_storage impl must be a device storage realization or one of "
+                f"{', '.join(e.name for e in BindStorageImpl)}, got {impl!r}"
             )
         if not isinstance(mem_type, BindStorageType):
             raise InvalidScheduleArgumentError(
@@ -491,7 +535,7 @@ class Schedule(Generic[P, R]):
         self.script.set_callsite_loc()
         for buf in buffers:
             handle = self.script.match_value(buf.owner_key, buf.number, buf.source)
-            ta.BindStorageOp(handle, mem_type.value, impl.value, **self.script.kw)
+            ta.BindStorageOp(handle, mem_type.value, name, **self.script.kw)
         self._mark_dirty()
         return self
 
@@ -556,7 +600,7 @@ class Schedule(Generic[P, R]):
             raise InvalidScheduleArgumentError("reorder targets must be unique")
 
         desired_pred = [self._pred(loop) for loop in desired]
-        current = sorted(desired_pred, key=lambda op: self.predicted.depth(op))
+        current = sorted(desired_pred, key=self.predicted.depth)
         current_keys = [(op.scope, op.key) for op in current]
         permutation = [current_keys.index((op.scope, op.key)) for op in desired_pred]
 
@@ -804,6 +848,7 @@ class Schedule(Generic[P, R]):
 
     materialize = apply
 
+    # pylint: disable-next=redefined-builtin
     def _copy_symbol(self, name: str, id=None) -> str:
         """Callee-copy symbol for a stage kernel: ``{primary}.{name}[.{id}]``
         (the same scheme ``compose`` uses for repeat copies)."""
@@ -878,6 +923,8 @@ class Schedule(Generic[P, R]):
         self._mark_dirty()
         return self
 
+    # `id` names the callee copy; it is part of the documented schedule API.
+    # pylint: disable-next=redefined-builtin
     def compose(self, *callees: Schedule, id=None) -> Schedule:
         """Apply each ``callee``'s whole schedule to the specialized copy of that kernel
         inside this kernel. Pass several direct callees to compose them in one call:
@@ -901,6 +948,7 @@ class Schedule(Generic[P, R]):
             self._compose(callee, id)
         return self
 
+    # pylint: disable-next=redefined-builtin
     def _compose(self, callee: Schedule, id) -> None:
         copy_key = self._copy_symbol(callee._primary_name, id)
         # Resolve the top-level copy up front so a missing callee always reports, even
@@ -1149,4 +1197,5 @@ class Schedule(Generic[P, R]):
             self.Complete: "complete",
             self.Block: "block",
             self.Cyclic: "cyclic",
+            self.Skew: "skew",
         }.get(kind, str(kind))

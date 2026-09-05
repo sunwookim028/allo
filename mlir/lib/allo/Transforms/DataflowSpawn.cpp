@@ -26,20 +26,12 @@ constexpr llvm::StringLiteral kAlloDataflowJoinFnName = "allo_df_join";
 constexpr llvm::StringLiteral kAlloDataflowOpenFnName = "allo_df_open";
 constexpr llvm::StringLiteral kAlloDataflowCloseFnName = "allo_df_close";
 // Rewrites the (already LLVM-lowered) sequential calls to dataflow PEs into
-// concurrent fiber spawns onto the marl runtime:
-//
-//   %sched = call @allo_df_open(0)            ; one worker per core
-//   ... store the PE's operands into an alloca'd context struct ...
-//   call @allo_df_spawn(%sched, @pe_thunk_k, %ctx)   ; one per PE
-//   call @allo_df_join(%sched)                ; block until all fibers exit
-//   call @allo_df_close(%sched)
-//
-// Each generated @pe_thunk_k reloads the operands from %ctx and tail-calls PE
-// k. lower-dataflow tags the PE callees with `allo.dataflow.pe`. PEs in a
-// region may have different signatures (e.g. a producer kernel vs. a consumer
-// kernel), so every fiber captures its own call's operands into a dedicated
-// context; the allocas live on the launcher frame, which allo_df_join keeps
-// alive until the fibers finish.
+// concurrent fiber spawns onto the marl runtime: open a scheduler, store each
+// PE's operands into an alloca'd context, spawn a thunk per PE, then join and
+// close. lower-dataflow tags the PE callees with `allo.dataflow.pe`. PEs in a
+// region may have different signatures, so every fiber captures its own call's
+// operands into a dedicated context; the allocas live on the launcher frame,
+// which allo_df_join keeps alive until the fibers finish.
 struct DataflowSpawnPass
     : public allo::impl::DataflowSpawnPassBase<DataflowSpawnPass> {
 
@@ -74,6 +66,8 @@ struct DataflowSpawnPass
     return LLVM::LLVMFuncOp::create(b, module.getLoc(), name, type);
   }
 
+  // The fiber entry point for \p callee: reloads the operands from the context
+  // struct and calls it. One thunk per callee, shared by its spawns.
   LLVM::LLVMFuncOp getOrCreateThunk(ModuleOp module, LLVM::LLVMFuncOp callee,
                                     LLVM::LLVMStructType ctxTy,
                                     ArrayRef<Type> opTypes, Type ptrTy,
@@ -123,7 +117,8 @@ struct DataflowSpawnPass
     LLVM::CallOp first = peCalls.front();
     LLVM::CallOp last = peCalls.back();
 
-    // Open one scheduler for the whole region, before the first PE call.
+    // Open one scheduler for the whole region, before the first PE call; a
+    // worker count of 0 asks the runtime for one worker per core.
     r.setInsertionPoint(first);
     Value sched = LLVM::CallOp::create(
                       r, first.getLoc(), openFn,

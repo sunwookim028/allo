@@ -188,6 +188,7 @@ class Oracle:
 def simulate(isa, program: OracleProgram, config: OracleConfig) -> dict:
     context = ir.Context()
     allo_d.register_dialect(context)
+    allo_d.register_extensions(context)
     with context, Location.unknown(context):
         module = Module.create()
         with InsertionPoint(module.body):

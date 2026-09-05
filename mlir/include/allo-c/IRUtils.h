@@ -2,9 +2,7 @@
  * Copyright Allo authors. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
- * Block-surgery + KernelOp helpers that the upstream MLIR Python bindings do
- * not expose but the Allo code generator relies on (these need C++
- * Block/Operation mutation that the CAPI/python layer lacks).
+ * Block and module surgery the upstream MLIR Python bindings do not expose.
  */
 
 #ifndef ALLO_C_IRUTILS_H
