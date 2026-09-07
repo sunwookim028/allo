@@ -117,11 +117,19 @@ gcloud auth application-default login
 gcloud auth application-default set-quota-project <PROJECT_ID>
 
 # 6. environment, in one file
-cp scripts/chia.env.example chia.env && $EDITOR chia.env    # set GOOGLE_CLOUD_PROJECT
+cp scripts/chia.env.example chia.env && $EDITOR chia.env
+#    set GOOGLE_CLOUD_PROJECT, and TINYTPU_ENV if you named the conda env
+#    something other than `allo`
 
 # 7. check
 ./scripts/claims.sh --fast
 ```
+
+`claims.sh` refuses to run if the conda environment imports `allo` from a
+different checkout than the one you are standing in. An editable install
+resolves through a meta-path finder that outranks `PYTHONPATH`, so without that
+check every claim passes while exercising someone else's tree — a failure that
+looks green. Set `TINYTPU_ENV` to the environment you built *this* checkout into.
 
 **Build with gcc, not clang.** Under clang, the `enable_if` attribute on
 `llvm::StringLiteral` makes it non-convertible for `std::optional`'s converting
@@ -131,7 +139,7 @@ constructor, so the HLS emitters fail to compile. `pyproject.toml` selects gcc.
 
 | | |
 | --- | --- |
-| Build from scratch | ~40 min (LLVM 12, CIRCT 15, OR-Tools 10, Allo 2) |
+| Build from scratch | 11–40 min, mostly LLVM; varies with machine load |
 | Disk, built tree | **9.2 GB** — see the breakdown below |
 | Disk, peak during build | ~19 GB (a fresh clone before `ninja` prunes intermediates) |
 | Disk, conda envs | 1.5 GB (`allo`) + 0.6 GB (`chia_env`) + 0.7 GB (CHIA + opencode) |

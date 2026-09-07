@@ -1,5 +1,5 @@
 # Building
-- Always run `conda activate allo-rtlgen` before building or running tests
+- Always run `conda activate allo` before building or running tests
 - Run `ninja -C build [target]` to build specific targets when only using C++ side tools (e.g. `allo-opt`)
 - Always run `pip install -e .` to synchronize python packages when modifying both Python side and C++ side
   (it also rebuilds C++ side automatically). `ninja -C build` **will not** synchronize Python packages.
@@ -15,7 +15,7 @@
 - Run the RTL cosim tests in parallel with `pytest tests/rtl -n [jobs]` (pytest-xdist).
 
 # Running
-- Use `conda run -n allo-rtlgen <command>` to run commands in the conda environment
+- Use `conda run -n allo <command>` to run commands in the conda environment
 - When the host system is not compatible with a specific Vitis version,
   use `docker/run-vitis.sh <command>` to run commands in a docker container.
 

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -82,7 +83,7 @@ def score(worktree: Path, project: Path, frozen: bool) -> dict:
     if frozen:
         command.append("--frozen")
     env = {
-        **dict(__import__("os").environ),
+        **dict(os.environ),
         "PYTHONPATH": str(worktree),
         "SKBUILD_EDITABLE_SKIP": str(REPO_ROOT / "build"),
     }

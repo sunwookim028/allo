@@ -39,7 +39,7 @@ conda activate allo
 Clone the repository and fetch submodules:
 
 ```bash
-git clone https://github.com/kkkaishao/allo.git
+git clone git@github.com:sunwookim028/allo.git   # branch: chia-codesign
 cd allo
 git submodule update --init --recursive
 ```
@@ -63,16 +63,9 @@ ninja
 ```
 
 ```bash
-cd externals/circt
-mkdir build && cd build
-cmake -G Ninja ../ \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DLLVM_DIR=$PWD/../../llvm-project/build/lib/cmake/llvm \
-  -DMLIR_DIR=$PWD/../../llvm-project/build/lib/cmake/mlir \
-  -DLLVM_USE_LINKER=lld
-ninja
+# Use the script: it fetches and installs OR-Tools (required by RTL
+# scheduling) before configuring, which a hand-written cmake invocation does not.
+bash scripts/build-circt.sh externals/circt externals/llvm-project/build Release gcc g++
 ```
 
 Return to the root directory and install Allo with pip:

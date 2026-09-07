@@ -27,7 +27,27 @@ step () {  # step <id> <description> <command...>
     printf 'FAIL  %3ss  (/tmp/claims_%s.log)\n' "$(( $(date +%s) - t0 ))" "$id"; FAIL=$((FAIL+1))
   fi
 }
-allo () { conda run -n allo "$@"; }
+TINYTPU_ENV="${TINYTPU_ENV:-allo}"
+allo () { conda run -n "$TINYTPU_ENV" "$@"; }
+
+# An editable install resolves `allo` through a meta-path finder that outranks
+# PYTHONPATH, so an environment built from another checkout imports THAT
+# checkout -- and every claim below would pass while testing someone else's
+# code. Refuse to run rather than report a green result for the wrong tree.
+RESOLVED="$(allo python -c 'import allo,os;print(os.path.realpath(allo.__file__))' 2>/dev/null | tail -1)"
+case "$RESOLVED" in
+  "$(cd "$ROOT" && pwd -P)"/*) : ;;
+  *) cat >&2 <<MSG
+FATAL: conda env '$TINYTPU_ENV' imports allo from
+    $RESOLVED
+which is not inside this checkout
+    $(cd "$ROOT" && pwd -P)
+Every claim would pass while exercising a different tree. Build this checkout
+into that environment, or set TINYTPU_ENV to the one you built it into.
+MSG
+     exit 2 ;;
+esac
+echo "  allo resolves to $RESOLVED"
 
 START=$(date +%s)
 echo "== Idea 2: the verifier must be the real tool"
@@ -56,10 +76,10 @@ fi
 if [ "$TIER" = "--full" ]; then
   echo "== Idea 1: one specification, three artifacts"
   step C1.1 "same schedule lowers to CPU, Vitis HLS, and RTL" \
-    make -C examples/accelerator/tinytpu oracle compiler cpu hls rtl
+    make -C examples/accelerator/tinytpu ENV="$TINYTPU_ENV" oracle compiler cpu hls rtl
   echo "== Idea 5: evaluation is cheap relative to proposal  (billed)"
   step C5.0 "CHIA round-trip: ADC -> Vertex -> opencode -> MCP -> allo" \
-    conda run -n chia_env python examples/accelerator/tinytpu/chia_agent/smoke.py
+    conda run -n "${TINYTPU_CHIA_ENV:-chia_env}" python examples/accelerator/tinytpu/chia_agent/smoke.py
 fi
 
 echo

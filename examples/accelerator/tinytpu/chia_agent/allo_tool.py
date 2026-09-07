@@ -205,7 +205,8 @@ class AlloSpecTool(ChiaTool):
             "PYTHONPATH": str(root),
             "SKBUILD_EDITABLE_SKIP": str(root / "build"),
         }
-        command = [self.conda_exe, "run", "-n", "allo", "python", "-m", module, *args]
+        command = [self.conda_exe, "run", "-n", os.environ.get("TINYTPU_ENV", "allo"),
+         "python", "-m", module, *args]
         if vitis and os.path.exists(VITIS_SETTINGS):
             # ``conda run`` does not read a profile, so Vitis has to be put on
             # PATH explicitly for the synthesis gate.

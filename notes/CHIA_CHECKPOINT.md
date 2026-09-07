@@ -95,15 +95,22 @@ reproduction is currently push-button.
 | C7 | An agent-authored spec that rewrites files at import is refused, and the shipped spec satisfies the same policy | `pytest tests/dsa/test_tinytpu_agent_policy.py` | ✅ |
 | C8 | One full evaluation (synthesize + re-measure + score) takes ~41 s | timed `make ppa` | ✅ |
 
-### Reproducible in principle, not yet push-button
+### Reproducible, via replay
 
-| # | Claim | Evidence held | Gap |
+`verify_variant.py` rebuilds a recorded variant in a clean worktree, applies the
+accepted diffs in order, re-synthesizes, and asserts the recorded cycle count.
+Independently confirmed 2026-09-07: both replay bit-exact at zero tolerance.
+
+| # | Claim | Reproduce | Status |
 | --- | --- | --- | --- |
-| C9 | An agent autonomously found a **4.07×** cycle reduction (126,432 → 31,056), numerically exact | `chia_runs/swarm-20260905-063857/dram/variants.jsonl` + `best.diff` | Re-verified once by replaying diffs into a clean worktree; that replay is manual. Needs a `verify_variant.py`. |
-| C10 | A second angle found **1.98×** (63,864) independently | `.../granularity-retry/variants.jsonl` | same |
-| C11 | The 4× costs 4.7× BRAM (26 → 122) and +67% LUT at unchanged Fmax — i.e. cycles-only scoring hides real area | same JSONL `synthesis` field | same |
-| C12 | Yield varies ~100× across hypotheses (4.07× vs 3.2%) | run logs | Single sample per angle; no replication. |
-| C13 | Cost is ~$19/agent-hour | opencode session DB | DB is in `~/.local/share/opencode`, **not backed up**, and is per-machine. |
+| C9 | An agent found **4.07×** (126,432 → 31,056), numerics exact | `verify_variant.py --run chia_runs/swarm-20260905-063857 --worker dram` | ✅ 42 s |
+| C10 | A second angle found **1.98×** (63,864) independently | `... --worker granularity-retry` | ✅ 43 s |
+| C11 | The 4× costs 4.7× BRAM (26 → 122) and +67% LUT at flat Fmax; per BRAM it is *worse* than baseline | printed by either replay | ✅ |
+| C12 | Yield varies ~100× across hypotheses | `chia_runs/*/[worker]/variants.jsonl` | ⚠️ n=1 per angle; needs ≥3 seeds |
+| C13 | Cost is ~$19/agent-hour | `chia_runs/opencode_sessions.db` | ✅ archived with the run |
+
+The winning diffs are `chia_runs/<run>/swarm_best.diff` (best across workers) and
+the `diff` field of each accepted entry in a worker's `variants.jsonl`.
 
 ### Observed once, not yet a defensible claim
 
