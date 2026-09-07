@@ -92,7 +92,13 @@ cannot move the score — only building different hardware can.
 - `synth.py`: runs Vitis HLS C-synthesis and rebuilds the per-unit `(ii, depth)`
   table from the measured report.
 - `ppa.py`: the co-design objective — synthesize, re-measure, score cycles.
+- `verify_variant.py`: replays a recorded variant into a clean worktree,
+  re-synthesizes it, and asserts the recorded cycle count.
 - `chia_agent/`: the generate -> synthesize -> score -> keep-or-rewind loop.
+
+To check the project's claims rather than a single design, run
+`../../../scripts/claims.sh` from the repository root; see
+[CODESIGN.md](../../../CODESIGN.md).
 
 The backend switch is explicit and contains no device-specific compiler fork:
 

@@ -1,5 +1,12 @@
 # Vitis/Alveo U55C Environment
 
+> **For the CHIA co-design flow, ignore the Docker path below.** Everything in
+> [CODESIGN.md](CODESIGN.md) sources Vitis directly from the host:
+> `. /opt/xilinx/Vitis_HLS/2023.2/settings64.sh`. C-synthesis needs no licence
+> and no container. The `/tools/Xilinx/...` path below does not exist on this
+> machine; the Docker flow is for `hw_emu`/`hw` builds, which this project does
+> not run.
+
 **Default version:** Vitis 2023.2 (best Alveo U55C compatibility).
 **Always use Docker** for Vitis commands to avoid host library conflicts:
 ```bash

@@ -77,73 +77,25 @@ re-downloadable model blobs were dropped.
 | Auth | user ADC (`~/.config/gcloud/application_default_credentials.json`) |
 | Spend to date | $186.44 |
 
-## 2. Claims register
+## 2. Claims
 
-Every claim we make or want to make, with how it is reproduced and whether that
-reproduction is currently push-button.
+[CODESIGN.md](../CODESIGN.md) is the canonical claim register: `C1`–`C8` for the
+deterministic claims, each with the command that checks it, and `S1`–`S3` for
+the stochastic ones a search cannot promise to repeat. Cite those identifiers.
+This file deliberately does not restate them — two registers drift, and an
+earlier draft of this one had already gone stale while `CODESIGN.md` was
+correct.
 
-### Reproducible today (command given; needs the built tree)
+What belongs here instead is the residue: things this effort observed once,
+which are not claims because nothing reproduces them on demand.
 
-| # | Claim | Reproduce | Status |
-| --- | --- | --- | --- |
-| C1 | The `chia-tinytpu-rtlgen` flow runs end to end: 8/8 oracle programs, direct-TOSA compiler checks, and CPU / Vitis-HLS / RTLGen backends all pass | `cd examples/accelerator/tinytpu && make oracle compiler cpu hls rtl` | ✅ |
-| C2 | Vitis HLS C-synthesis of the composed design succeeds at 411 MHz, 8515 LUT / 9111 FF / 20 DSP / 26 BRAM18K on `xcu55c` | `make synth` | ✅ |
-| C3 | Per-unit `(ii, depth)` derived from the csynth report reproduces the tool's measured call latency exactly for every statically-bounded unit | `pytest tests/dsa/test_tinytpu_synth.py` | ✅ (unit-tested against a recorded report) |
-| C4 | The pre-existing frozen cost model was optimistic by 5.7× — 22,160 modeled vs 126,432 synthesis-grounded cycles | `python -m examples.accelerator.tinytpu.ppa --frozen` vs `ppa` | ✅ |
-| C5 | `mxu` costs 72 cycles at II=2 (two sequential passes), not the declared 36 | `make synth`, read `latency_table.mxu` | ✅ |
-| C6 | `dma_load` pays depth 75 — the real `m_axi` read latency — not the declared 8 | `make synth`, read `latency_table.dma_load` | ✅ |
-| C7 | An agent-authored spec that rewrites files at import is refused, and the shipped spec satisfies the same policy | `pytest tests/dsa/test_tinytpu_agent_policy.py` | ✅ |
-| C8 | One full evaluation (synthesize + re-measure + score) takes ~41 s | timed `make ppa` | ✅ |
-
-### Reproducible, via replay
-
-`verify_variant.py` rebuilds a recorded variant in a clean worktree, applies the
-accepted diffs in order, re-synthesizes, and asserts the recorded cycle count.
-Independently confirmed 2026-09-07: both replay bit-exact at zero tolerance.
-
-| # | Claim | Reproduce | Status |
-| --- | --- | --- | --- |
-| C9 | An agent found **4.07×** (126,432 → 31,056), numerics exact | `verify_variant.py --run chia_runs/swarm-20260905-063857 --worker dram` | ✅ 42 s |
-| C10 | A second angle found **1.98×** (63,864) independently | `... --worker granularity-retry` | ✅ 43 s |
-| C11 | The 4× costs 4.7× BRAM (26 → 122) and +67% LUT at flat Fmax; per BRAM it is *worse* than baseline | printed by either replay | ✅ |
-| C12 | Yield varies ~100× across hypotheses | `chia_runs/*/[worker]/variants.jsonl` | ⚠️ n=1 per angle; needs ≥3 seeds |
-| C13 | Cost is ~$19/agent-hour | `chia_runs/opencode_sessions.db` | ✅ archived with the run |
-
-The winning diffs are `chia_runs/<run>/swarm_best.diff` (best across workers) and
-the `diff` field of each accepted entry in a worker's `variants.jsonl`.
-
-### Observed once, not yet a defensible claim
-
-| # | Observation | Why it is not yet a claim |
+| # | Observation | Why it is not a claim |
 | --- | --- | --- |
-| C14 | A live agent wrote self-modifying code into the spec, which the evaluator then imported and executed | Real and now guarded (C7), but the original artifact was reverted by `git checkout`. **Not captured.** Would need re-eliciting to demonstrate. |
-| C15 | CHIA serializes all LLM calls on `opencode_creds`; one unit caps the whole cluster | Verified by observation (`4.0/4.0` after the fix). Not asserted by a test. |
-| C16 | Vertex preview-model quota, not the harness, is the parallelism ceiling — 3 of 4 workers died on `RateLimitError` | Observed in worker logs; quota API does not expose the effective preview limit, so not independently confirmable. |
+| O1 | A live agent wrote self-modifying code into the spec, which the evaluator then imported and executed | Real, and now guarded (`C6`) — but the original artifact was reverted by `git checkout` and never captured. Demonstrating it again would mean re-eliciting it. |
+| O2 | CHIA serializes every LLM call on `opencode_creds`; one unit caps the whole cluster | Verified by observation (`4.0/4.0` after raising it). No test asserts it. |
+| O3 | Vertex preview-model quota, not the harness, is the parallelism ceiling — 3 of 4 workers died on `RateLimitError` before proposing anything | Seen in worker logs. The quota API does not expose the effective preview limit, so it cannot be confirmed independently. |
 
-## 3. Maintenance gaps, by risk
-
-1. **No remote backup** (§0). Everything else is downstream of this.
-2. **Run artifacts partly in `/tmp`.** `chia_runs/` lives in the repo (good), but
-   the swarm worktrees are at `/tmp/tinytpu_swarm_trees/worker-*` and are
-   registered git worktrees. `/tmp` is wiped; this already destroyed the CHIA
-   install and opencode CLI once this week (they were at `/tmp/chia` and
-   `/tmp/chia-opencode-cli` per the original README). Stale worktree entries
-   also accumulate: `git worktree list` currently shows two dead
-   `/tmp/claude-*` paths.
-3. **`~/allo-act` unrepresented.** 1 unpushed commit + 127 dirty files.
-4. **Environments not captured.** Neither conda env is exported; rebuilding
-   `allo` (3.12) and `chia_env` (3.10.19 + ray 2.54.0 + CHIA editable) is
-   currently tribal knowledge.
-5. **Cost telemetry is per-machine.** opencode's SQLite DB is the only record of
-   spend and token usage; it is not in any backup.
-6. **ADC is user-scoped and expires.** A service account would make unattended
-   runs survivable.
-7. **Billing is on the trial account.** Must be relinked to
-   `0148AB-064407-7A5F3C` once the $300 is consumed, or awarded credit sits
-   unused.
-8. **No single bootstrap.** §4 is written out but not scripted.
-
-## 4. Bootstrap from scratch (the three non-obvious fixes)
+## 3. Bootstrap from scratch (the three non-obvious fixes)
 
 These are committed in `1f746005` but are the parts that break a naive rebuild:
 
@@ -164,7 +116,7 @@ CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PWD/externals/circt/ext" pip install -v -e .
 Wall time on a 144-core host: LLVM ~12 min, CIRCT ~15 min, OR-Tools ~10 min,
 Allo ~2 min.
 
-## 5. Maintenance work
+## 4. Maintenance work
 
 **Done**
 
@@ -189,7 +141,7 @@ Allo ~2 min.
    Until then only the replay path is deterministic.
 3. Fix `scripts/claims.sh`'s hardcoded `conda run -n allo`: a reader who follows
    the docs into a differently-named environment cannot run the claims.
-4. `scripts/bootstrap_chia.sh` doing §4 end to end, plus `environment-*.yml`
+4. `scripts/bootstrap_chia.sh` doing §3 end to end, plus `environment-*.yml`
    exports so the two conda environments are captured rather than tribal.
 5. Move swarm worktrees off `/tmp` (they survive there only by luck; `/tmp` is a
    separate 15 GB filesystem and has already been wiped once this week, taking
