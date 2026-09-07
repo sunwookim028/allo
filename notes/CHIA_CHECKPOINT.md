@@ -22,11 +22,17 @@ DOI. A git branch alone does not satisfy it.
 
 | Item | Size | Regenerable |
 | --- | --- | --- |
+| `~/allo` (integration worktree, `main`) | 41 MB | holds the shared `.git` — see below |
 | `~/allo-chia` built tree | 9.2 GB | all but `chia_runs` |
 | ↳ `chia_runs` | 85 MB | **no — the evidence behind every result** |
 | conda `allo` / `chia_env` | 1.5 GB / 0.6 GB | yes |
 | `~/chia-tools` (CHIA + opencode) | 736 MB | yes |
 | peak during a fresh build | ~19 GB | — |
+
+`~/allo` and `~/allo-chia` are **one repository, two worktrees** —
+`~/allo-chia/.git` is a file pointing into `~/allo/.git/worktrees/`. The 41 MB
+is the object store both read; deleting `~/allo` would break `~/allo-chia`. The
+two are not duplicate clones and cost nothing to keep.
 
 Reclaimed 2026-09-07: **21 GB** — 16 GB of `~/.cache` (HuggingFace model blobs,
 pip, conda tarballs, pre-commit) plus 2 GB of `~/allo-act`, and 5 GB of conda and
@@ -125,12 +131,20 @@ Allo ~2 min.
 - `verify_variant.py`: replays a recorded variant into a clean worktree,
   re-synthesizes, and asserts the recorded cycle count. Both headline results
   reproduce exactly in ~42 s each.
-- `scripts/claims.sh`: runs the claims in three tiers (13 s / 133 s / 196 s),
+- `scripts/claims.sh`: runs the claims in three tiers (14 s / 141 s / 195 s on an
+  idle 144-core host; they move with load),
   each step timing itself.
 - `scripts/chia.env.example`: one home for the environment every script needs.
 - The opencode session database is archived into `chia_runs/`, so cost telemetry
   is versioned with the results it explains.
 - Reclaimed 21 GB (§0b).
+- `scripts/claims.sh` takes the environment from `TINYTPU_ENV` and refuses to
+  run when that environment imports `allo` from a different checkout, so a green
+  result cannot come from someone else's tree.
+- Worker scratch moved off `/tmp` to `~/.cache/tinytpu`, and `swarm.py` prunes
+  stale registrations on entry and unregisters its worktrees on exit
+  (`--keep-worktrees` opts out). `verify_variant.py` already removed its own in a
+  `finally`.
 
 **Outstanding, in priority order**
 
@@ -139,13 +153,7 @@ Allo ~2 min.
    highest-value use of further budget (~$300–600).
 2. **Seed the search**, so a run is repeatable rather than merely re-runnable.
    Until then only the replay path is deterministic.
-3. Fix `scripts/claims.sh`'s hardcoded `conda run -n allo`: a reader who follows
-   the docs into a differently-named environment cannot run the claims.
-4. `scripts/bootstrap_chia.sh` doing §3 end to end, plus `environment-*.yml`
+3. `scripts/bootstrap_chia.sh` doing §3 end to end, plus `environment-*.yml`
    exports so the two conda environments are captured rather than tribal.
-5. Move swarm worktrees off `/tmp` (they survive there only by luck; `/tmp` is a
-   separate 15 GB filesystem and has already been wiped once this week, taking
-   the CHIA install and opencode CLI with it). Have `verify_variant.py` prune its
-   temporary worktree in a `finally`.
-6. Deposit an archive with a DOI (Zenodo) for *Artifacts Available*.
-7. Switch to a service account for unattended runs; user ADC expires.
+4. Deposit an archive with a DOI (Zenodo) for *Artifacts Available*.
+5. Switch to a service account for unattended runs; user ADC expires.
