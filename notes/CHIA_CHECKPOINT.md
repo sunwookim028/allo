@@ -25,7 +25,7 @@ DOI. A git branch alone does not satisfy it.
 | `~/allo` built tree (single checkout) | 9.2 GB | all but `chia_runs` |
 | ↳ `chia_runs` | 85 MB | **no — the evidence behind every result** |
 | conda `allo` / `chia_env` | 1.5 GB / 0.6 GB | yes |
-| `~/chia-tools` (CHIA + opencode) | 736 MB | yes |
+| ↳ `chia_agent/node_modules` (opencode, gitignored) | 725 MB | yes |
 | peak during a fresh build | ~19 GB | — |
 
 `~/allo-chia` was a git worktree of `~/allo`, not a second clone. Consolidated
@@ -48,8 +48,8 @@ re-downloadable model blobs were dropped.
 | Allo + ACT (Kai) | *removed 2026-09-07* | `0b5fef7` — reachable from `chia-codesign` and on `origin/chia-tinytpu-rtlgen` | `kkkaishao/allo` | yes, via this fork |
 | Allo + ACT + RTLGen + CHIA | `~/allo` | `chia-codesign` | `sunwookim028/allo` | **yes — pushed** |
 | ↳ commit it forks from | — | `882f7dd6`, tag `tinytpu-rtlgen-base` | `sunwookim028/allo` | yes |
-| CHIA framework | `~/chia-tools/chia` | `16c35e9` | `ucb-bar/chia` | upstream only |
-| opencode CLI | `~/chia-tools/opencode-cli` | `opencode-ai@1.18.25` | npm | pinned |
+| CHIA framework | `chia_env` site-packages | `16c35e9` | `ucb-bar/chia` | pinned in `chia_agent/requirements.txt` |
+| opencode CLI | `chia_agent/node_modules` | `opencode-ai@1.18.25` | npm | pinned in `chia_agent/package-lock.json` |
 
 **Submodule pins** (`~/allo/externals/`), all built and present:
 
@@ -155,6 +155,9 @@ Allo ~2 min.
 2. **Seed the search**, so a run is repeatable rather than merely re-runnable.
    Until then only the replay path is deterministic.
 3. `scripts/bootstrap_chia.sh` doing §3 end to end, plus `environment-*.yml`
-   exports so the two conda environments are captured rather than tribal.
+   exports so the two conda environments are captured rather than tribal. The
+   two former out-of-repo dependencies are now pinned by tracked manifests
+   (`chia_agent/requirements.txt`, `chia_agent/package-lock.json`) and install
+   into the checkout; what remains is the driver script and the conda exports.
 4. Deposit an archive with a DOI (Zenodo) for *Artifacts Available*.
 5. Switch to a service account for unattended runs; user ADC expires.

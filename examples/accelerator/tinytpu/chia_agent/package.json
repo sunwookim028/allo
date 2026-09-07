@@ -1,0 +1,9 @@
+{
+  "name": "tinytpu-chia-agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "opencode CLI, pinned to the version CHIA drives the agent through",
+  "dependencies": {
+    "opencode-ai": "1.18.25"
+  }
+}

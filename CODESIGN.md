@@ -104,10 +104,10 @@ SKBUILD_CMAKE_DEFINE="CMAKE_C_COMPILER=gcc;CMAKE_CXX_COMPILER=g++" \
 CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PWD/externals/circt/ext" pip install -v -e .
 
 # 4. CHIA host (only needed to *run* agents; not needed to verify claims)
-git clone https://github.com/ucb-bar/chia ~/chia-tools/chia
+#    Both dependencies are pinned by manifests tracked in the branch.
 conda create -y -n chia_env python=3.10.19
-conda run -n chia_env pip install -e ~/chia-tools/chia
-npm install --prefix ~/chia-tools/opencode-cli opencode-ai@1.18.25
+conda run -n chia_env pip install -r examples/accelerator/tinytpu/chia_agent/requirements.txt
+npm ci --prefix examples/accelerator/tinytpu/chia_agent
 
 # 5. Google Cloud (only needed to run agents)
 gcloud auth login && gcloud config set project <PROJECT_ID>
@@ -142,7 +142,7 @@ constructor, so the HLS emitters fail to compile. `pyproject.toml` selects gcc.
 | Build from scratch | 11–40 min, mostly LLVM; varies with machine load |
 | Disk, built tree | **9.2 GB** — see the breakdown below |
 | Disk, peak during build | ~19 GB (a fresh clone before `ninja` prunes intermediates) |
-| Disk, conda envs | 1.5 GB (`allo`) + 0.6 GB (`chia_env`) + 0.7 GB (CHIA + opencode) |
+| Disk, conda envs | 1.5 GB (`allo`) + 0.6 GB (`chia_env`); opencode adds 0.7 GB in-tree |
 | Verify all deterministic claims | 196 s, $0.03 |
 | One agent candidate | ~8–15 min, ~$2–3 |
 | One 4-worker × 5-iteration search | ~3 h, ~$100–190 |

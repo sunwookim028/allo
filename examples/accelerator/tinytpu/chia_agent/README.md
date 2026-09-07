@@ -55,26 +55,26 @@ The repository is left holding the best design found.
 
 ## Running it
 
-Prerequisites are installed under `/home/sk3463/chia-tools` (deliberately not
-`/tmp`, which gets wiped):
+Both prerequisites are pinned by manifests tracked beside this file:
+`requirements.txt` holds the CHIA commit, `package.json`/`package-lock.json`
+hold the opencode version. Nothing lives outside the checkout.
+
+From the repository root:
 
 ```bash
-git clone https://github.com/ucb-bar/chia.git /home/sk3463/chia-tools/chia
 conda create -n chia_env python=3.10.19
-conda run -n chia_env pip install -e /home/sk3463/chia-tools/chia
-npm install --prefix /home/sk3463/chia-tools/opencode-cli opencode-ai@1.18.25
+conda run -n chia_env pip install -r examples/accelerator/tinytpu/chia_agent/requirements.txt
+npm ci --prefix examples/accelerator/tinytpu/chia_agent   # ~725 MB, gitignored
 ```
 
-Then:
+Then, from the repository root:
 
 ```bash
-export GOOGLE_CLOUD_PROJECT=test-adrs
+source chia.env                                # OPENCODE_BIN, PATH, GCP project
 . /opt/xilinx/Vitis_HLS/2023.2/settings64.sh   # the score gate needs Vitis
-
-source /home/sk3463/miniconda3/etc/profile.d/conda.sh
+source "$(dirname "$TINYTPU_CONDA")/../etc/profile.d/conda.sh"
 conda activate chia_env
-export PATH=/home/sk3463/chia-tools/opencode-cli/node_modules/.bin:$PATH
-export TINYTPU_CONDA="$(command -v conda)"
+cd examples/accelerator/tinytpu
 
 ray stop
 ray start --head --resources='{"opencode_creds": 1}' --include-dashboard=false

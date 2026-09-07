@@ -106,3 +106,6 @@ drafts
 benchmark/synth_work/
 chia.env
 tinytpu_*_prj/
+
+# opencode CLI, installed by `npm ci` from the tracked manifests
+examples/accelerator/tinytpu/chia_agent/node_modules/
