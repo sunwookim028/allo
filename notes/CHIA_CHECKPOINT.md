@@ -157,18 +157,36 @@ CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PWD/externals/circt/ext" pip install -v -e .
 Wall time on a 144-core host: LLVM ~12 min, CIRCT ~15 min, OR-Tools ~10 min,
 Allo ~2 min.
 
-## 5. Proposed maintenance work, ordered
+## 5. Maintenance work
 
-1. Push `chia-tinytpu-synth-objective`; commit or discard `~/allo-act`'s working
-   tree and push it.
-2. Move swarm worktrees off `/tmp` (e.g. `~/chia-work/trees`); prune the dead
-   `/tmp/claude-*` worktree entries.
-3. Add `scripts/bootstrap_chia.sh` doing §4 end to end, and
-   `environment-allo.yml` / `environment-chia.yml` exports.
-4. Add `verify_variant.py`: given a `variants.jsonl` entry, replay its diff into
-   a clean worktree, re-synthesize, and assert the recorded cycle count. Turns
-   C9–C11 push-button.
-5. Copy the opencode session DB into `chia_runs/` at the end of each run so cost
-   telemetry is versioned with results.
-6. Replicate each angle ≥3× to convert C12 from anecdote to measurement.
-7. Switch to a service account for unattended runs.
+**Done**
+
+- Pushed `chia-codesign` to `sunwookim028/allo`; removed the redundant
+  `~/allo-act`. (§0)
+- `verify_variant.py`: replays a recorded variant into a clean worktree,
+  re-synthesizes, and asserts the recorded cycle count. Both headline results
+  reproduce exactly in ~42 s each.
+- `scripts/claims.sh`: runs the claims in three tiers (13 s / 133 s / 196 s),
+  each step timing itself.
+- `scripts/chia.env.example`: one home for the environment every script needs.
+- The opencode session database is archived into `chia_runs/`, so cost telemetry
+  is versioned with the results it explains.
+- Reclaimed 21 GB (§0b).
+
+**Outstanding, in priority order**
+
+1. **Replicate each hypothesis ≥3×.** Every angle is n=1, which makes idea 4 —
+   the project's most interesting claim — its least evidenced. This is the single
+   highest-value use of further budget (~$300–600).
+2. **Seed the search**, so a run is repeatable rather than merely re-runnable.
+   Until then only the replay path is deterministic.
+3. Fix `scripts/claims.sh`'s hardcoded `conda run -n allo`: a reader who follows
+   the docs into a differently-named environment cannot run the claims.
+4. `scripts/bootstrap_chia.sh` doing §4 end to end, plus `environment-*.yml`
+   exports so the two conda environments are captured rather than tribal.
+5. Move swarm worktrees off `/tmp` (they survive there only by luck; `/tmp` is a
+   separate 15 GB filesystem and has already been wiped once this week, taking
+   the CHIA install and opencode CLI with it). Have `verify_variant.py` prune its
+   temporary worktree in a `finally`.
+6. Deposit an archive with a DOI (Zenodo) for *Artifacts Available*.
+7. Switch to a service account for unattended runs; user ADC expires.
