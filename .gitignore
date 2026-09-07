@@ -105,3 +105,4 @@ drafts
 # Benchmark synthesis bed artifacts
 benchmark/synth_work/
 chia.env
+tinytpu_*_prj/
