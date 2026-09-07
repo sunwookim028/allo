@@ -76,6 +76,12 @@ Your assigned angle for this search:
 """
 
 
+# Worker scratch lives outside the repository, but not under /tmp: a reboot
+# wipes /tmp while leaving the worktree *registrations* behind, so every
+# `git worktree list` afterwards shows checkouts that no longer exist.
+SCRATCH = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "tinytpu"
+
+
 def make_worktree(base: Path, worker: str) -> Path:
     """A private checkout for one worker, at the current commit."""
     path = base / f"worker-{worker}"
@@ -90,13 +96,23 @@ def make_worktree(base: Path, worker: str) -> Path:
     return path
 
 
+def drop_worktree(path: Path) -> None:
+    """Unregister a worker checkout. Its findings are already in the run dir."""
+    subprocess.run(
+        ["git", "worktree", "remove", "--force", str(path)],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+    )
+
+
 def launch(
     worker: str, angle: str, workspace: Path, log_dir: Path, iterations: int
 ) -> subprocess.Popen:
     env = os.environ | {
         # Each worker evaluates its own copy of the spec.
         "PYTHONPATH": str(workspace),
-        "TINYTPU_SYNTH_PROJECT": f"/tmp/tinytpu_swarm/{worker}",
+        "TINYTPU_SYNTH_PROJECT": str(SCRATCH / "synth" / worker),
     }
     command = [
         sys.executable,
@@ -183,8 +199,11 @@ def main() -> None:
         type=Path,
         default=REPO_ROOT / "chia_runs" / f"swarm-{time.strftime('%Y%m%d-%H%M%S')}",
     )
+    parser.add_argument("--worktree-base", type=Path, default=SCRATCH / "worktrees")
     parser.add_argument(
-        "--worktree-base", type=Path, default=Path("/tmp/tinytpu_swarm_trees")
+        "--keep-worktrees",
+        action="store_true",
+        help="leave the per-worker checkouts in place instead of unregistering them",
     )
     parser.add_argument(
         "--stagger",
@@ -195,24 +214,46 @@ def main() -> None:
     args = parser.parse_args()
 
     strategies = list(STRATEGIES)[: args.workers]
+    # Clear registrations whose checkout a previous cleanup or reboot removed,
+    # so `worktree add` below cannot collide with a stale name.
+    subprocess.run(
+        ["git", "worktree", "prune"], cwd=REPO_ROOT, check=False, capture_output=True
+    )
     args.worktree_base.mkdir(parents=True, exist_ok=True)
     args.run_dir.mkdir(parents=True, exist_ok=True)
 
-    running = []
-    for worker, angle in strategies:
-        workspace = make_worktree(args.worktree_base, worker)
-        log_dir = args.run_dir / worker
-        print(f"launching worker '{worker}' in {workspace}")
-        running.append(
-            (worker, launch(worker, angle, workspace, log_dir, args.iterations))
-        )
+    running: list[tuple[str, subprocess.Popen]] = []
+    trees: list[Path] = []
+    try:
+        for worker, angle in strategies:
+            if running and args.stagger:
+                # Every worker opens with the same large context, so launching
+                # them together is what trips the provider's rate limit.
+                print(f"  waiting {args.stagger:.0f}s before the next launch")
+                time.sleep(args.stagger)
+            workspace = make_worktree(args.worktree_base, worker)
+            trees.append(workspace)
+            log_dir = args.run_dir / worker
+            print(f"launching worker '{worker}' in {workspace}")
+            running.append(
+                (worker, launch(worker, angle, workspace, log_dir, args.iterations))
+            )
 
-    print(f"\n{len(running)} searches running; logs under {args.run_dir}")
-    for worker, process in running:
-        code = process.wait()
-        print(f"worker '{worker}' exited with {code}")
+        print(f"\n{len(running)} searches running; logs under {args.run_dir}")
+        for worker, process in running:
+            code = process.wait()
+            print(f"worker '{worker}' exited with {code}")
 
-    raise SystemExit(report(args.run_dir, [worker for worker, _ in strategies]))
+        code = report(args.run_dir, [worker for worker, _ in strategies])
+    finally:
+        for _, process in running:
+            if process.poll() is None:
+                process.terminate()
+        if not args.keep_worktrees:
+            for tree in trees:
+                drop_worktree(tree)
+
+    raise SystemExit(code)
 
 
 if __name__ == "__main__":
