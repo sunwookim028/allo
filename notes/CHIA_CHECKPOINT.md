@@ -22,10 +22,10 @@ DOI. A git branch alone does not satisfy it.
 
 | Item | Size | Regenerable |
 | --- | --- | --- |
-| `~/allo` built tree (single checkout) | 9.2 GB | all but `chia_runs` |
-| ↳ `chia_runs` | 85 MB | **no — the evidence behind every result** |
+| `~/allo` built tree (single checkout) | 10 GB | all but `chia_runs` |
+| ↳ `chia_runs` | 84 MB | **no — the evidence behind every result** |
+| ↳ `chia_agent/node_modules` (opencode, gitignored) | 725 MB | yes, `npm ci` |
 | conda `allo` / `chia_env` | 1.5 GB / 0.6 GB | yes |
-| ↳ `chia_agent/node_modules` (opencode, gitignored) | 725 MB | yes |
 | peak during a fresh build | ~19 GB | — |
 
 `~/allo-chia` was a git worktree of `~/allo`, not a second clone. Consolidated
@@ -35,10 +35,15 @@ toolchain's hardcoded paths were rewritten (7 cmake exports, 2 CMakeCache.txt,
 `chia-codesign`. Switching it to `main` gives a different codebase (see §1) and
 invalidates the built extension.
 
-Reclaimed 2026-09-07: **21 GB** — 16 GB of `~/.cache` (HuggingFace model blobs,
+Reclaimed 2026-09-07: **22 GB** — 16 GB of `~/.cache` (HuggingFace model blobs,
 pip, conda tarballs, pre-commit) plus 2 GB of `~/allo-act`, and 5 GB of conda and
 pip caches earlier. HuggingFace auth tokens were preserved; only the
 re-downloadable model blobs were dropped.
+
+`~/chia-tools` (736 MB) was removed the same day, once both dependencies it held
+were pinned by tracked manifests and installing into the checkout. The C8 smoke
+was re-run with it gone to confirm nothing still resolved through it. Its CHIA
+clone carried no local commits and matched `origin/main`, so nothing was lost.
 
 ## 1. Component inventory
 
