@@ -92,8 +92,8 @@ export PATH=~/.local/allo-bin:$PATH        # cmake wants `ld.lld`; Ubuntu ships 
 # 2. Vitis HLS 2023.2 at /opt/xilinx/Vitis_HLS/2023.2 (C-synthesis needs no licence)
 
 # 3. source and build  (~40 min on 144 cores, ~35 GB)
-git clone git@github.com:sunwookim028/allo.git ~/allo-chia
-cd ~/allo-chia && git checkout chia-codesign && git submodule update --init --recursive
+git clone git@github.com:sunwookim028/allo.git ~/allo
+cd ~/allo && git checkout chia-codesign && git submodule update --init --recursive
 conda create -y -n allo python=3.12 && conda activate allo
 pip install "nanobind>=2.10,<3" "PyYAML<=6.0.1" typing_extensions \
             "scikit-build-core>=0.10" "setuptools_scm>=8" pytest numpy ml_dtypes rich sympy

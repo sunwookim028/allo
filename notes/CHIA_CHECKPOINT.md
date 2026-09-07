@@ -11,7 +11,7 @@ is push-button reproducible from a remote backup.
 that exists on a remote.
 
 `~/allo-act` has been removed. It was safe: its `HEAD` (`0b5fef7`) is reachable
-from `chia-codesign` and present on `origin/chia-tinytpu-rtlgen`, its working
+from `chia-codesign` and present at tag `tinytpu-rtlgen-base`, its working
 tree held only deletions, and its one untracked file (a `vadd_relu` fused
 instruction on an older TinyTPU ancestor) was judged not worth keeping.
 
@@ -22,17 +22,18 @@ DOI. A git branch alone does not satisfy it.
 
 | Item | Size | Regenerable |
 | --- | --- | --- |
-| `~/allo` (integration worktree, `main`) | 41 MB | holds the shared `.git` — see below |
-| `~/allo-chia` built tree | 9.2 GB | all but `chia_runs` |
+| `~/allo` built tree (single checkout) | 9.2 GB | all but `chia_runs` |
 | ↳ `chia_runs` | 85 MB | **no — the evidence behind every result** |
 | conda `allo` / `chia_env` | 1.5 GB / 0.6 GB | yes |
 | `~/chia-tools` (CHIA + opencode) | 736 MB | yes |
 | peak during a fresh build | ~19 GB | — |
 
-`~/allo` and `~/allo-chia` are **one repository, two worktrees** —
-`~/allo-chia/.git` is a file pointing into `~/allo/.git/worktrees/`. The 41 MB
-is the object store both read; deleting `~/allo` would break `~/allo-chia`. The
-two are not duplicate clones and cost nothing to keep.
+`~/allo-chia` was a git worktree of `~/allo`, not a second clone. Consolidated
+2026-09-07: the build moved into `~/allo`, the worktree was dropped, and the
+toolchain's hardcoded paths were rewritten (7 cmake exports, 2 CMakeCache.txt,
+978 files under `build/`). `~/allo` is now the single checkout, on
+`chia-codesign`. Switching it to `main` gives a different codebase (see §1) and
+invalidates the built extension.
 
 Reclaimed 2026-09-07: **21 GB** — 16 GB of `~/.cache` (HuggingFace model blobs,
 pip, conda tarballs, pre-commit) plus 2 GB of `~/allo-act`, and 5 GB of conda and
@@ -45,12 +46,12 @@ re-downloadable model blobs were dropped.
 | --- | --- | --- | --- | --- |
 | Allo fork (integration HEAD) | `~/allo` | `e78bf9b5` on `main` | `sunwookim028/allo` | yes |
 | Allo + ACT (Kai) | *removed 2026-09-07* | `0b5fef7` — reachable from `chia-codesign` and on `origin/chia-tinytpu-rtlgen` | `kkkaishao/allo` | yes, via this fork |
-| Allo + ACT + RTLGen + CHIA | `~/allo-chia` | `chia-codesign` | `sunwookim028/allo` | **yes — pushed** |
-| ↳ base branch it forks | — | `882f7dd6` `chia-tinytpu-rtlgen` | `sunwookim028/allo` | yes |
+| Allo + ACT + RTLGen + CHIA | `~/allo` | `chia-codesign` | `sunwookim028/allo` | **yes — pushed** |
+| ↳ commit it forks from | — | `882f7dd6`, tag `tinytpu-rtlgen-base` | `sunwookim028/allo` | yes |
 | CHIA framework | `~/chia-tools/chia` | `16c35e9` | `ucb-bar/chia` | upstream only |
 | opencode CLI | `~/chia-tools/opencode-cli` | `opencode-ai@1.18.25` | npm | pinned |
 
-**Submodule pins** (`~/allo-chia/externals/`), all built and present:
+**Submodule pins** (`~/allo/externals/`), all built and present:
 
 | Submodule | Commit | Build artifact |
 | --- | --- | --- |
@@ -69,7 +70,7 @@ re-downloadable model blobs were dropped.
 | gcc / clang | 13.3.0 / 18.1.3 | **build with gcc** (see §4) |
 | cmake / ninja | 4.2.1 / 1.11.1 | cmake 4 needs the OR-Tools policy shim |
 | lld | `ld.lld-18` | shimmed to `ld.lld` in `~/.local/allo-bin` |
-| conda env `allo` | Python 3.12.13 | editable install → `~/allo-chia` |
+| conda env `allo` | Python 3.12.13 | editable install → `~/allo` |
 | conda env `chia_env` | Python 3.10.19, ray 2.54.0 | CHIA host |
 
 **Cloud**
