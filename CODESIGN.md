@@ -132,11 +132,29 @@ constructor, so the HLS emitters fail to compile. `pyproject.toml` selects gcc.
 | | |
 | --- | --- |
 | Build from scratch | ~40 min (LLVM 12, CIRCT 15, OR-Tools 10, Allo 2) |
-| Disk | ~35 GB with build trees |
+| Disk, built tree | **9.2 GB** — see the breakdown below |
+| Disk, peak during build | ~19 GB (a fresh clone before `ninja` prunes intermediates) |
+| Disk, conda envs | 1.5 GB (`allo`) + 0.6 GB (`chia_env`) + 0.7 GB (CHIA + opencode) |
 | Verify all deterministic claims | 196 s, $0.03 |
 | One agent candidate | ~8–15 min, ~$2–3 |
 | One 4-worker × 5-iteration search | ~3 h, ~$100–190 |
 | Rate | **$19 / agent-hour** (Vertex, `gemini-3.1-pro-preview`) |
+
+Where the disk goes, once built:
+
+| Path | Size | Regenerable? |
+| --- | --- | --- |
+| `externals/llvm-project/build` | 3.9 GB | yes — `scripts/build-mlir.sh` |
+| `externals/circt/build` | 1.3 GB | yes — `scripts/build-circt.sh` |
+| `externals/circt/ext` (OR-Tools) | 951 MB | yes — fetched by `build-circt.sh` |
+| source + submodule checkouts | 3.1 GB | yes — `git submodule update` |
+| `build` (allo extension) | 104 MB | yes — `pip install -e .` |
+| `chia_runs` | **85 MB** | **no** — the evidence behind every result |
+
+Everything except `chia_runs` is reproducible from the repository, so a machine
+short on space can delete the build trees and rebuild in ~40 minutes. `chia_runs`
+is the one directory that cannot be regenerated: it holds each candidate's diff,
+synthesis report, and cost telemetry, and it is what `verify_variant.py` replays.
 
 Preview-model **quota**, not credit, is the concurrency ceiling: an early
 4-worker run lost 3 workers to `RateLimitError` before any proposed a candidate.

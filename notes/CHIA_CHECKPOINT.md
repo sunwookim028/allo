@@ -5,29 +5,41 @@ Stack with CHIA" effort. Two purposes: pin what version of everything produced
 the results, and track every claim we make (or want to make) against whether it
 is push-button reproducible from a remote backup.
 
-## 0. The one thing to fix first
+## 0. Backup status — resolved 2026-09-07
 
-**None of this work exists anywhere but this machine's local disk.**
+`chia-codesign` is pushed to `sunwookim028/allo`. Everything below traces to code
+that exists on a remote.
 
-`chia-tinytpu-synth-objective` has 4 commits, no upstream, and no remote branch
-contains `HEAD`. Every result below traces to code that is one disk failure from
-gone. Nothing else in this document matters until that is fixed:
+`~/allo-act` has been removed. It was safe: its `HEAD` (`0b5fef7`) is reachable
+from `chia-codesign` and present on `origin/chia-tinytpu-rtlgen`, its working
+tree held only deletions, and its one untracked file (a `vadd_relu` fused
+instruction on an older TinyTPU ancestor) was judged not worth keeping.
 
-```bash
-git -C ~/allo-chia push -u origin chia-tinytpu-synth-objective
-```
+Still outstanding for an *Artifacts Available* badge: a permanent archive with a
+DOI. A git branch alone does not satisfy it.
 
-`~/allo-act` is separately at risk: 1 unpushed commit and 127 dirty files
-(largely deletions of `examples/accelerator/cornell_tpu/`), on a *different*
-remote (`kkkaishao/allo`). Its state is not represented in any commit anywhere.
+## 0b. Disk footprint
+
+| Item | Size | Regenerable |
+| --- | --- | --- |
+| `~/allo-chia` built tree | 9.2 GB | all but `chia_runs` |
+| ↳ `chia_runs` | 85 MB | **no — the evidence behind every result** |
+| conda `allo` / `chia_env` | 1.5 GB / 0.6 GB | yes |
+| `~/chia-tools` (CHIA + opencode) | 736 MB | yes |
+| peak during a fresh build | ~19 GB | — |
+
+Reclaimed 2026-09-07: **21 GB** — 16 GB of `~/.cache` (HuggingFace model blobs,
+pip, conda tarballs, pre-commit) plus 2 GB of `~/allo-act`, and 5 GB of conda and
+pip caches earlier. HuggingFace auth tokens were preserved; only the
+re-downloadable model blobs were dropped.
 
 ## 1. Component inventory
 
 | Component | Location | Version / pin | Remote | Backed up |
 | --- | --- | --- | --- | --- |
 | Allo fork (integration HEAD) | `~/allo` | `e78bf9b5` on `main` | `sunwookim028/allo` | yes |
-| Allo + ACT (Kai) | `~/allo-act` | `0b5fef7` on `act`, **127 dirty** | `kkkaishao/allo` | **no** |
-| Allo + ACT + RTLGen + CHIA | `~/allo-chia` | `56280ea1` on `chia-tinytpu-synth-objective` | `sunwookim028/allo` | **no** |
+| Allo + ACT (Kai) | *removed 2026-09-07* | `0b5fef7` — reachable from `chia-codesign` and on `origin/chia-tinytpu-rtlgen` | `kkkaishao/allo` | yes, via this fork |
+| Allo + ACT + RTLGen + CHIA | `~/allo-chia` | `chia-codesign` | `sunwookim028/allo` | **yes — pushed** |
 | ↳ base branch it forks | — | `882f7dd6` `chia-tinytpu-rtlgen` | `sunwookim028/allo` | yes |
 | CHIA framework | `~/chia-tools/chia` | `16c35e9` | `ucb-bar/chia` | upstream only |
 | opencode CLI | `~/chia-tools/opencode-cli` | `opencode-ai@1.18.25` | npm | pinned |
