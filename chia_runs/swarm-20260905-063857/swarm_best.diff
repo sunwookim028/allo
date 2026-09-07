@@ -1,0 +1,314 @@
+--- a/isa.py
++++ b/isa.py
+@@ -62,11 +62,33 @@
+         return primitive.identity(a)
+ 
+ 
++@tpu.instruction(src=dram, dst=bram)
++def dma_load_tile(I):
++    @I.access
++    def _(s, d, stride):
++        return (contiguous(dram, s + stride * 0, 16), contiguous(bram, d, 16))
++
++    @I.compute
++    def _(a, o):
++        return primitive.identity(a)
++
++
+ @tpu.instruction(src=bram, dst=dram)
+ def dma_store(I):
+     @I.access
+     def _(s, d, n):
+         return (contiguous(bram, s, n), contiguous(dram, d, n))
++
++    @I.compute
++    def _(a, o):
++        return primitive.identity(a)
++
++
++@tpu.instruction(src=bram, dst=dram)
++def dma_store_tile(I):
++    @I.access
++    def _(s, d, stride):
++        return (contiguous(bram, s, 16), contiguous(dram, d + stride * 0, 16))
+ 
+     @I.compute
+     def _(a, o):
+@@ -203,7 +225,7 @@
+ @tpu.instruction(
+     src=[dram, dram],
+     dst=dram,
+-    cost=lambda M, K, N: 0,
++    cost=lambda M, K, N: 1000,
+ )
+ def gemm(I):
+     @I.access
+@@ -337,7 +359,7 @@
+ @tpu.instruction(
+     src=[dram, dram],
+     dst=dram,
+-    cost=lambda M, K, N: 0,
++    cost=lambda M, K, N: 1000,
+ )
+ def gemm_best(I):
+     """Best GEMM, lowered to 4x4 Cornell-TPU instructions."""
+@@ -376,3 +398,169 @@
+                 z_tile = z_tiles[n // MATMUL_TILE]
+                 for row in range(MATMUL_TILE):
+                     dma_store(s=z_tile + row * MATMUL_TILE, d=c + (m + row) * N + n, n=MATMUL_TILE)
++
++
++@tpu.instruction(
++    src=[dram, dram],
++    dst=dram,
++    cost=lambda M, K, N: 1000,
++)
++def gemm_bad(I):
++    """Best GEMM, lowered to 4x4 Cornell-TPU instructions."""
++
++    @I.access
++    def _(a, b, c, M, K, N):
++        return (
++            view(dram, a, (1, M, K)),
++            view(dram, b, (1, K, N)),
++            view(dram, c, (1, M, N)),
++        )
++
++    @I.compute
++    def _(a, b, c):
++        return primitive.matmul(a, b)
++
++    @I.expand
++    def _(a, b, c, M, K, N):
++        x_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        w_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++
++        for m in range(0, M, MATMUL_TILE):
++            z_tiles = [scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(N // MATMUL_TILE)]
++            for k in range(0, K, MATMUL_TILE):
++                dma_load_tile(s=a + m * K + k, d=x_tile, stride=K)
++                for n in range(0, N, MATMUL_TILE):
++                    z_tile = z_tiles[n // MATMUL_TILE]
++                    dma_load_tile(s=b + k * N + n, d=w_tile, stride=N)
++                    if k == 0:
++                        matmul(w=w_tile, x=x_tile, z=z_tile)
++                    else:
++                        macc(w=w_tile, x=x_tile, z_in=z_tile, z_out=z_tile)
++            for n in range(0, N, MATMUL_TILE):
++                z_tile = z_tiles[n // MATMUL_TILE]
++                dma_store_tile(s=z_tile, d=c + m * N + n, stride=N)
++
++
++@tpu.instruction(
++    src=[dram, dram],
++    dst=dram,
++    cost=lambda M, K, N: 1000,
++)
++def gemm_best2(I):
++    """Best GEMM, lowered to 4x4 Cornell-TPU instructions."""
++    @I.access
++    def _(a, b, c, M, K, N):
++        return (
++            view(dram, a, (1, M, K)),
++            view(dram, b, (1, K, N)),
++            view(dram, c, (1, M, N)),
++        )
++    @I.compute
++    def _(a, b, c):
++        return primitive.matmul(a, b)
++    @I.expand
++    def _(a, b, c, M, K, N):
++        x_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        w_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        partial_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        z_lo, z_hi, partial_lo, partial_hi = (
++            scratch((VEC_LANES,)) for _ in range(4)
++        )
++        for m in range(0, M, MATMUL_TILE):
++            z_tiles = [scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(N // MATMUL_TILE)]
++            for n in range(0, N, MATMUL_TILE):
++                z_tile = z_tiles[n // MATMUL_TILE]
++                for k in range(0, K, MATMUL_TILE):
++                    dma_load_tile(s=a + m * K + k, d=x_tile, stride=K)
++                    dma_load_tile(s=b + k * N + n, d=w_tile, stride=N)
++                    if k == 0:
++                        matmul(w=w_tile, x=x_tile, z=z_tile)
++                    else:
++                        matmul(w=w_tile, x=x_tile, z=partial_tile)
++                        vload(s=z_tile, d=z_lo)
++                        vload(s=partial_tile, d=partial_lo)
++                        vadd(a=z_lo, b=partial_lo, d=z_lo)
++                        vstore(s=z_lo, d=z_tile)
++                        vload(s=z_tile + VEC_LANES, d=z_hi)
++                        vload(s=partial_tile + VEC_LANES, d=partial_hi)
++                        vadd(a=z_hi, b=partial_hi, d=z_hi)
++                        vstore(s=z_hi, d=z_tile + VEC_LANES)
++                dma_store_tile(s=z_tile, d=c + m * N + n, stride=N)
++
++
++@tpu.instruction(
++    src=[dram, dram],
++    dst=dram,
++    cost=lambda M, K, N: 0,
++)
++def gemm_perfect(I):
++    """Cached GEMM, lowered to 4x4 Cornell-TPU instructions."""
++    @I.access
++    def _(a, b, c, M, K, N):
++        return (
++            view(dram, a, (1, M, K)),
++            view(dram, b, (1, K, N)),
++            view(dram, c, (1, M, N)),
++        )
++
++    @I.compute
++    def _(a, b, c):
++        return primitive.matmul(a, b)
++
++    @I.expand
++    def _(a, b, c, M, K, N):
++        for extent, name in ((M, "M"), (K, "K"), (N, "N")):
++            if extent % MATMUL_TILE:
++                raise ShapeError(
++                    f"gemm: {name}={extent} is not divisible by the "
++                    f"{MATMUL_TILE}x{MATMUL_TILE} systolic tile"
++                )
++
++        x_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        w_tiles = [scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(N // MATMUL_TILE)]
++        z_tiles = [[scratch((MATMUL_TILE, MATMUL_TILE)) for _ in range(N // MATMUL_TILE)] for _ in range(M // MATMUL_TILE)]
++        partial_tile = scratch((MATMUL_TILE, MATMUL_TILE))
++        z_lo, z_hi, partial_lo, partial_hi = (
++            scratch((VEC_LANES,)) for _ in range(4)
++        )
++
++        for k in range(0, K, MATMUL_TILE):
++            for n in range(0, N, MATMUL_TILE):
++                w_tile = w_tiles[n // MATMUL_TILE]
++                for row in range(MATMUL_TILE):
++                    dma_load(
++                        s=b + (k + row) * N + n,
++                        d=w_tile + row * MATMUL_TILE,
++                        n=MATMUL_TILE,
++                    )
++            for m in range(0, M, MATMUL_TILE):
++                for row in range(MATMUL_TILE):
++                    dma_load(
++                        s=a + (m + row) * K + k,
++                        d=x_tile + row * MATMUL_TILE,
++                        n=MATMUL_TILE,
++                    )
++                for n in range(0, N, MATMUL_TILE):
++                    w_tile = w_tiles[n // MATMUL_TILE]
++                    z_tile = z_tiles[m // MATMUL_TILE][n // MATMUL_TILE]
++                    if k == 0:
++                        matmul(w=w_tile, x=x_tile, z=z_tile)
++                    else:
++                        matmul(w=w_tile, x=x_tile, z=partial_tile)
++                        vload(s=z_tile, d=z_lo)
++                        vload(s=partial_tile, d=partial_lo)
++                        vadd(a=z_lo, b=partial_lo, d=z_lo)
++                        vstore(s=z_lo, d=z_tile)
++                        vload(s=z_tile + VEC_LANES, d=z_hi)
++                        vload(s=partial_tile + VEC_LANES, d=partial_hi)
++                        vadd(a=z_hi, b=partial_hi, d=z_hi)
++                        vstore(s=z_hi, d=z_tile + VEC_LANES)
++        for m in range(0, M, MATMUL_TILE):
++            for n in range(0, N, MATMUL_TILE):
++                z_tile = z_tiles[m // MATMUL_TILE][n // MATMUL_TILE]
++                for row in range(MATMUL_TILE):
++                    dma_store(
++                        s=z_tile + row * MATMUL_TILE,
++                        d=c + (m + row) * N + n,
++                        n=MATMUL_TILE,
++                    )
+--- a/microarch.py
++++ b/microarch.py
+@@ -54,6 +54,8 @@
+ OP_MATMUL = 8
+ OP_VNEG = 9
+ 
++OP_DMA_LOAD_TILE = 10
++OP_DMA_STORE_TILE = 11
+ 
+ # --- DRAM <-> BRAM block movers (dma) -------------------------------------- #
+ @tpu.unit
+@@ -81,6 +83,30 @@
+     for i in arange(length, name="i"):
+         dmem[dram_addr + i] = bram[bram_addr + i]
+ 
++
++@tpu.unit
++def dma_load_tile(
++    dmem: f32[DRAM_SIZE],
++    bram: f32[BRAM_SIZE],
++    dram_addr: i32,
++    bram_addr: i32,
++    stride: i32,
++):
++    for i in arange(SYS_DIM, name="i"):
++        for j in arange(SYS_DIM, name="j"):
++            bram[bram_addr + i * SYS_DIM + j] = dmem[dram_addr + i * stride + j]
++
++@tpu.unit
++def dma_store_tile(
++    dmem: f32[DRAM_SIZE],
++    bram: f32[BRAM_SIZE],
++    dram_addr: i32,
++    bram_addr: i32,
++    stride: i32,
++):
++    for i in arange(SYS_DIM, name="i"):
++        for j in arange(SYS_DIM, name="j"):
++            dmem[dram_addr + i * stride + j] = bram[bram_addr + i * SYS_DIM + j]
+ 
+ # --- BRAM <-> VREG movers -------------------------------------------------- #
+ @tpu.unit
+@@ -176,6 +202,10 @@
+         elif opcode == OP_MATMUL:
+             mxu(bram, a0, a1, a2)
+ 
++        elif opcode == OP_DMA_LOAD_TILE:
++            dma_load_tile(dmem, bram, a0, a1, a2)
++        elif opcode == OP_DMA_STORE_TILE:
++            dma_store_tile(dmem, bram, a1, a0, a2)
+ 
+ # ==========================================================================#
+ # Scheduling. The optimizations are modest -- this is a simple machine -- but
+@@ -190,6 +220,14 @@
+ ds_s = dma_store.schedule()
+ ds_s.pipeline("i")  # burst-copy BRAM -> DRAM at II=1
+ 
++
++dlt_s = dma_load_tile.schedule()
++dlt_s.unroll("j")
++dlt_s.pipeline("i")
++
++dst_s = dma_store_tile.schedule()
++dst_s.unroll("j")
++dst_s.pipeline("i")
+ # vreg is the vector register file: partition dim=1 (the slot dim) completely so it
+ # becomes 8 independently-ported registers. vpu reads two operands and writes one
+ # result per cycle (3 accesses) -- only with this partition can its lane loop hold
+@@ -218,7 +256,7 @@
+ top_s.pipeline("fetch")
+ top_s.partition(top_s.buffer("bram"), kind=top_s.Cyclic, factor=4)
+ top_s.partition(top_s.buffer("vreg"), dim=1, kind=top_s.Complete)  # on-chip reg file
+-top_s.compose(dl_s, ds_s, vl_s, vs_s, vpu_s, mxu_s)
++top_s.compose(dl_s, ds_s, dlt_s, dst_s, vl_s, vs_s, vpu_s, mxu_s)
+ 
+ # Frozen pre-synthesis latency constants. A synthesis-derived table can replace
+ # these declarations without changing the ISA/compiler interface.
+@@ -229,8 +267,12 @@
+ tpu.latency(vpu, ii=1, depth=5)
+ tpu.latency(mxu, ii=1, depth=20)
+ 
++tpu.latency(dma_load_tile, ii=1, depth=8)
++tpu.latency(dma_store_tile, ii=1, depth=8)
+ tpu.bind(_isa.dma_load, dma_load, trips=lambda n: n)
+ tpu.bind(_isa.dma_store, dma_store, trips=lambda n: n)
++tpu.bind(_isa.dma_load_tile, dma_load_tile, trips=lambda stride: 4)
++tpu.bind(_isa.dma_store_tile, dma_store_tile, trips=lambda stride: 4)
+ tpu.bind(_isa.vload, vload, trips=lambda: VEC_LANES)
+ tpu.bind(_isa.vstore, vstore, trips=lambda: VEC_LANES)
+ for _op in (_isa.vadd, _isa.vsub, _isa.vmul, _isa.vrelu, _isa.vneg):

@@ -100,6 +100,7 @@ def launch(
     }
     command = [
         sys.executable,
+        "-u",  # unbuffered, so a long run's progress is visible while it runs
         str(AGENT_DIR / "loop.py"),
         "--task",
         BASE_TASK.format(angle=angle),
@@ -184,6 +185,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--worktree-base", type=Path, default=Path("/tmp/tinytpu_swarm_trees")
+    )
+    parser.add_argument(
+        "--stagger",
+        type=float,
+        default=90.0,
+        help="seconds between worker launches, to spread the initial burst",
     )
     args = parser.parse_args()
 

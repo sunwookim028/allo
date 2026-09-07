@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import shutil
 import time
 from pathlib import Path
@@ -25,7 +26,7 @@ from pathlib import Path
 import ray
 
 from chia.base.ChiaFunction import get
-from chia.models.opencode import AdditionalModelProvider, OpenCodeLLM
+from chia.models.opencode import AdditionalModelProvider, OpenCodeLLM, RateLimitError
 
 from allo_tool import AlloSpecTool
 
@@ -81,12 +82,34 @@ def make_llm(tool: AlloSpecTool) -> OpenCodeLLM:
     )
 
 
+#: A preview model's capacity is shared and bursty, and several searches running
+#: at once will collide on it. A refused request says "later", not "stop": left
+#: uncaught it kills a worker outright, which is how one earlier run lost three
+#: of its four searches without any of them proposing a candidate.
+RATE_LIMIT_RETRIES = 6
+RATE_LIMIT_BACKOFF = 45.0
+
+
 def ask(llm: OpenCodeLLM, tool: AlloSpecTool, prompt: str):
-    return get(
-        llm.prompt.options(resources={"opencode_creds": 1}).chia_remote(
-            llm, prompt, [tool]
-        )
-    )
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            return get(
+                llm.prompt.options(resources={"opencode_creds": 1}).chia_remote(
+                    llm, prompt, [tool]
+                )
+            )
+        except RateLimitError:
+            if attempt == RATE_LIMIT_RETRIES:
+                raise
+            # Exponential, with jitter so colliding workers do not resynchronize.
+            delay = RATE_LIMIT_BACKOFF * (2**attempt) * (0.5 + random.random())
+            print(
+                f"  rate limited; retrying in {delay:.0f}s "
+                f"(attempt {attempt + 1}/{RATE_LIMIT_RETRIES})",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise RuntimeError("unreachable")
 
 
 def parse_score(output: str) -> dict | None:
