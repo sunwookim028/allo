@@ -1,3 +1,5 @@
+> **This branch is a research project.** See [CODESIGN.md](CODESIGN.md) — agentic hardware/software co-design with synthesis in the loop.
+
 <!--- Copyright Allo authors. All Rights Reserved. -->
 <!--- SPDX-License-Identifier: Apache-2.0  -->
 
