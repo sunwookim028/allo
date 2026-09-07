@@ -50,35 +50,36 @@ esac
 echo "  allo resolves to $RESOLVED"
 
 START=$(date +%s)
+# Identifiers and idea titles below are CODESIGN.md's. Keep them in step.
 echo "== Idea 2: the verifier must be the real tool"
-step C2.3 "derived (ii,depth) reproduces measured latency" \
+step C4 "derived (ii,depth) reproduces measured latency" \
   allo python -m pytest tests/dsa/test_tinytpu_synth.py -q
-step C2.1 "frozen cost model scores 22,160 cycles" \
+step C2 "frozen model scores 22,160; synthesis-grounded 126,432" \
   allo python -m examples.accelerator.tinytpu.ppa --frozen
 
-echo "== Idea 3: agent-editable code is an execution surface"
-step C3.1 "self-modifying spec refused; real spec accepted" \
+echo "== Containment (see CODESIGN.md, Repository map)"
+step C5 "self-modifying spec refused; real spec accepted" \
   allo python -m pytest tests/dsa/test_tinytpu_agent_policy.py -q
 
 if [ "$TIER" != "--fast" ]; then
   # shellcheck disable=SC1090
   source "$TINYTPU_VITIS_SETTINGS" >/dev/null
-  echo "== Idea 2 (with synthesis)"
-  step C2.2 "synthesis measures mxu=72 II=2, dma_load depth 75" \
+  echo "== Idea 2, with synthesis"
+  step C3 "synthesis measures mxu=72 II=2, dma_load depth 75" \
     allo python -m examples.accelerator.tinytpu.synth --project /tmp/claims_synth
-  echo "== Idea 4: breadth beats depth"
-  step C4.1 "replay the 4.07x variant and re-derive its score" \
+  echo "== Ideas 3 and 4: breadth beats depth, and cycles-only ranks backwards"
+  step C6 "replay the 4.07x variant and re-derive its score" \
     allo python -m examples.accelerator.tinytpu.verify_variant --run "$RUN_DIR" --worker dram
-  step C4.2 "replay the 1.98x variant from another hypothesis" \
+  step C7 "replay the 1.98x variant, which costs no extra BRAM" \
     allo python -m examples.accelerator.tinytpu.verify_variant --run "$RUN_DIR" --worker granularity-retry
 fi
 
 if [ "$TIER" = "--full" ]; then
   echo "== Idea 1: one specification, three artifacts"
-  step C1.1 "same schedule lowers to CPU, Vitis HLS, and RTL" \
+  step C1 "same schedule lowers to CPU, Vitis HLS, and RTL" \
     make -C examples/accelerator/tinytpu ENV="$TINYTPU_ENV" oracle compiler cpu hls rtl
   echo "== Idea 5: evaluation is cheap relative to proposal  (billed)"
-  step C5.0 "CHIA round-trip: ADC -> Vertex -> opencode -> MCP -> allo" \
+  step C8 "CHIA round-trip: ADC -> Vertex -> opencode -> MCP -> allo" \
     conda run -n "${TINYTPU_CHIA_ENV:-chia_env}" python examples/accelerator/tinytpu/chia_agent/smoke.py
 fi
 
