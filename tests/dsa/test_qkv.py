@@ -23,8 +23,7 @@ from examples.accelerator.qkv.isa import d2, qkv, softmax
 
 def _attention_tosa() -> str:
     """torch attention (S=Q@Kᵀ, naive row softmax, O=P@V) exported to TOSA text."""
-    import torch
-
+    torch = pytest.importorskip("torch")
     fx = pytest.importorskip("torch_mlir.fx")
 
     class Attn(torch.nn.Module):

@@ -21,8 +21,7 @@ from examples.accelerator.tinytpu.isa import tpu, VEC_LANES
 
 
 def _torch_relu_add(a, b) -> str:
-    import torch
-
+    torch = pytest.importorskip("torch")
     fx = pytest.importorskip("torch_mlir.fx")
 
     class M(torch.nn.Module):
@@ -127,8 +126,7 @@ def test_spilling_moves_the_bottleneck_onto_the_mover():
 
     This is the reason the bound exists: a tiling that trades recompute for traffic is
     scored wrongly by a sum over instructions and correctly by the busiest unit."""
-    import torch
-
+    torch = pytest.importorskip("torch")
     fx = pytest.importorskip("torch_mlir.fx")
 
     class M(torch.nn.Module):
