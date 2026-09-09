@@ -61,7 +61,7 @@ strictly in-order and does not pretend otherwise.
 | 8x8x8   (Kt=2, Nt=2) | 20 / 22 | yes | **exact**, `wrong=0/64` |
 | 8x16x8  (Kt=4, Nt=2) | 40 / 42 | yes | **exact**, `wrong=0/64` |
 | 16x16x16(Kt=4, Nt=4) | 76 / 80 | yes | **exact**, `wrong=0/256` |
-| 32x16x16(Kt=4, Nt=4) | 88      | -   | **hangs** (queue depth, below) |
+| 32x16x16(Kt=4, Nt=4) | 88      | yes | **exact**, `wrong=0/512` |
 
 Both `gemm` and `gemm.relu` are bit-exact against a numpy reference *including
 the int8 clip* at every passing shape. Kt>=2 is the interesting case: it is the
@@ -130,29 +130,104 @@ int8 `microarch_ws.py` build because int8 multiplies mapped into LUTs here;
 that is a mapping difference, not a missing array (all 16 `pe_i_j` modules are
 present in the report).
 
-These remain **estimates with a caveat**: the FIFOs are sized from the program
-(below), so the area figure is not one a real build would have.
+The FIFOs are a constant depth 8, so unlike earlier revisions of this file the
+area figure is one a real build would have.
 
-## The queue-depth problem: unresolved, with four theories disproved
+## Cosim: a real cycle count
 
-The required stream depth grows with the program -- 16 at 4x4x4, 64 at 8x8x8,
-256 at 16x16x16 -- so `QD` is sized from `NPROG` to make the design run. **That
-is a workaround, not a fix.** Depth proportional to the program means
-back-pressure never fully engages, and it is why no area number below should be
-read as final: FIFOs sized to the program are not a real machine.
+The flow is wired in `cosim.py` and **passes** at 8x8x8:
 
-Four theories, each tested and **disproved**, recorded so they are not re-tried:
+```
++----------+--------+------------------+
+|   RTL    | Status | Latency (cycles) |
+|  Verilog |  Pass  |       1449       |
++----------+--------+------------------+
+TB: 8x8x8 gemm mismatches = 0 / 64
+C/RTL co-simulation finished: PASS
+```
 
-| theory | test | result |
-|---|---|---|
-| the PE's `put` order closes a cycle through the drainer's fixed read order | swap the two puts in `microarch_ws.py` | minimum depth stayed exactly 32 -- **no effect** |
-| a cycle in the process graph deadlocks | `repro_cycle.py`, and `repro_cycle2.py` with real traffic on every edge of a `mem -> use -> acc -> mem` loop | **both ran** -- a cyclic region is fine |
-| the `vld` burst (`Kt*M` words into one channel) is the cause | chunk it to `VLD_CHUNK=8` rows per instruction | 8x8x8 at QD=16 **still hung** |
-| the sequencer's broadcast puts every unit in a cycle with it | rewrite control as a forwarding chain, each unit forwarding before executing | exact at the same depths, but **required depth unchanged** |
+**1449 cycles at 8x8x8, int8, on a 4x4 array**, and the RTL is functionally
+exact against the same numpy reference the KPN simulator uses. `csim` passes
+too, which is the first functional check of the *emitted HLS code* rather than
+of the Allo simulator's interpretation of the design.
 
-The chain is kept anyway -- control following the data path is the better
-structure, and it is how a real decode pipeline is built -- but it is recorded
-here as *not* the fix.
+Three things had to be built or fixed to get here, none of them design changes:
+
+1. **A real testbench.** `df.build(target="vitis_hls", mode=...)` handles `csim`
+   and `csyn`; anything else routes to the `XDEVICE` Makefile flow, and the
+   emitted `host.cpp` is an OpenCL/XRT host. Cosim needs a plain C++ `main`
+   calling the top directly, so `cosim.py` generates one -- from the same
+   `gemm_program()` and numpy reference the simulator uses, so the vectors
+   cannot drift from the design.
+2. **`-B/usr/bin`.** Vitis 2023.2 ships binutils 2.37, which cannot read this
+   system's glibc: `unknown type [0x13] section '.relr.dyn'`, then
+   `cannot find libm.so.6`. Both the csim and cosim links fail without pointing
+   the compiler driver at the system linker (2.42).
+3. **Explicit `m_axi` depths.** `A depth specification is required for MAXI
+   interface port 'gmem0' for cosimulation` -- cosim has to know how much memory
+   to model behind each port, and Allo emits the pragmas without a depth, so
+   `cosim.py` patches them in the port order of the top function.
+
+One incidental finding worth acting on: cosim compiles an
+`AESL_deadlock_detect_unit` into the RTL testbench, so **Vitis cosim already has
+the deadlock reporting the Allo simulator lacks** -- which makes it a useful
+oracle for the class of bug the next section is about.
+
+## The FIFO problem, exactly: it was the simulator's thread count
+
+**Resolved, and it was not the design.** Earlier revisions of this file called
+this "the design's one unresolved problem" and sized `QD` from the program to
+work around it. That was wrong, and here is the actual answer.
+
+**The design's channel graph needs depth 4.** `kpn_model.py` models the exact
+channel structure -- every unit as a generator yielding blocking `get`/`put`,
+bounded FIFOs, a cooperative scheduler, and a deadlock report naming each
+blocked process and the occupancy of the channel it waits on. It is the
+instrumentation the Allo simulator does not provide. It completes at **depth 4
+for every shape**, 4x4x4 through 16x16x16. So there is no circular wait in the
+architecture at all.
+
+**The Allo simulator needs one thread per process.** It appears to give each
+`df.kernel` instance an OMP thread and to block that thread on an empty or full
+stream. With fewer threads than processes, a blocked process can hold a thread
+that its own producer needed, and the region wedges. This design has
+`T*T + 6 = 22` processes. At 16x16x16 with `QD=16`:
+
+| `OMP_NUM_THREADS` | result |
+|---|---|
+| 8  (the value in `CLAUDE.md`) | **hang** |
+| 16 | **hang** |
+| 24 | pass |
+| 32 | pass |
+
+The threshold sits exactly at the process count. And with 32 threads the depth
+requirement disappears: **16x16x16 passes at `QD=4`** -- matching the model --
+and **32x16x16, which had never passed at any depth, passes at `QD=8`**.
+
+So the "required depth grows with the program" law was an artifact throughout.
+Deep FIFOs were masking a thread-starvation deadlock by letting each producer
+run to completion before anyone had to block; the more instructions, the more
+buffering that took. `QD` is now a constant **8**.
+
+Two consequences worth carrying elsewhere:
+
+- **`CLAUDE.md`'s `OMP_NUM_THREADS=8` is not a safe default.** It is fine for
+  the small regions in `tests/dataflow`, but a design with more processes than
+  threads can deadlock with no diagnostic. The rule is
+  `OMP_NUM_THREADS >= number of kernel instances`.
+- **The simulator should say this.** The symptom is a silent hang; there is no
+  message, no indication of which process is blocked on which channel. A
+  deadlock report -- or simply a warning when a region has more processes than
+  threads -- would have saved this entire investigation. `kpn_model.py` shows
+  the report is about thirty lines of bookkeeping.
+
+**Four theories I tested and disproved along the way**, kept so they are not
+re-tried: the PE's `put` order (swapping changed nothing), a cycle in the
+process graph (two repros, one with real traffic on every edge, both ran), the
+`vld` burst length (chunking did not help), and the sequencer's control
+broadcast (rewritten as a forwarding chain; exact, depth unchanged). The
+forwarding chain is kept because control following the data path is the better
+structure, not because it fixed anything.
 
 ## What did fix a real deadlock, twice
 
@@ -191,21 +266,21 @@ with one run.
 
 ```bash
 export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # not set by the env
-export PYTHONPATH=/home/sk3463/allo OMP_NUM_THREADS=8
+export PYTHONPATH=/home/sk3463/allo
+export OMP_NUM_THREADS=32     # >= 22 processes; 8 deadlocks, see above
 
-TPU_M=4 TPU_K=4 TPU_N=4               python bench_isa.py simulator   # exact
-TPU_M=8 TPU_K=8 TPU_N=8 TPU_QD=64     python bench_isa.py simulator   # exact
+TPU_M=8  TPU_K=8  TPU_N=8  python bench_isa.py simulator   # exact, QD=8
+TPU_M=32 TPU_K=16 TPU_N=16 python bench_isa.py simulator   # exact, QD=8
+python kpn_model.py                                       # channel-graph model
+python cosim.py                                           # csim + csynth + cosim
 ```
 
 ## Next
 
-1. **The queue depth.** Four theories are dead (table above), so the next step
-   is instrumentation rather than another guess: a per-channel occupancy trace,
-   or a simulator deadlock report naming blocked processes and full channels.
-   Everything else is gated on this -- an area or cycle number measured with
-   FIFOs sized to the program would not mean anything.
-2. `cosim` -- the only thing that yields a real cycle count for a programmable
-   design, for the reason in the synthesis section above.
+1. `cosim` -- the only thing that yields a real cycle count for a programmable
+   design, for the reason in the synthesis section above. `cosim.py` drives it;
+   two toolchain fixes were needed and are documented there (`-B/usr/bin` for
+   the binutils/glibc mismatch, and explicit `m_axi` depths).
 3. A Gemmini int8 DIM=4 build so the comparison is dtype- and mesh-matched;
    `allo_cmp.c` needs no source change since it is written against `elem_t`.
 4. Scale T to 16 to match Gemmini's int8 default mesh.

@@ -15,7 +15,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     tinytpu_isa, gemm_program, schedule, M, K, N, T, NPROG, Kt, Nt,
 )
 
-IMEM_WORDS = 1024
+from examples.accelerator.tinytpu_vitis.microarch_isa import IMEM_SIZE as IMEM_WORDS  # noqa: E402
 
 
 def inputs(relu, seed=0):

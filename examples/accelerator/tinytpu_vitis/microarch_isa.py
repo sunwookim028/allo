@@ -210,20 +210,40 @@ def gemm_program(relu=False):
 # so it is fixed at build time from the longest program the design must run.
 NPROG = max(len(gemm_program(False)), len(gemm_program(True)))
 
-# Stream depth. This is the design's one unresolved problem: the required
-# depth grows with the program (measured: 16 at 4x4x4, 64 at 8x8x8, 256 at
-# 16x16x16), which means back-pressure never fully engages and this is not yet
-# a synthesizable-as-is machine. `RESULTS_ISA.md` records what was ruled out --
-# it is not the vld burst length (chunking did not help), not a cycle in the
-# process graph (two repros both ran), and not the control broadcast (making
-# control a forwarding chain did not reduce it). Sized from the program here so
-# the design runs; fixing it is the next task, not a tuning exercise.
-QD = int(os.environ.get("TPU_QD", max(16, 4 * NPROG)))
+# Stream depth. A constant, and a small one: the design's channel graph needs
+# depth 4, verified two ways -- a KPN model of the exact channel structure
+# (`scratchpad/kpn_model.py`) completes at depth 4 for every shape, and the Allo
+# simulator agrees once it has enough threads.
+#
+# That thread caveat is the whole story behind what looked for a long time like
+# a design problem. The simulator appears to give each process an OMP thread and
+# to block the thread on an empty/full stream, so with fewer threads than
+# processes a blocked process can hold a thread its own producer needed, and the
+# region deadlocks. This design has T*T + 6 = 22 processes. Measured at
+# 16x16x16 with QD=16:
+#
+#     OMP_NUM_THREADS=8   hang        OMP_NUM_THREADS=24  pass
+#     OMP_NUM_THREADS=16  hang        OMP_NUM_THREADS=32  pass
+#
+# and with 32 threads, 16x16x16 passes at QD=4 while 32x16x16 -- which had never
+# passed at any depth -- passes at QD=8. Deep FIFOs were only ever masking it,
+# by letting producers finish before anyone had to block. **Run this design with
+# OMP_NUM_THREADS >= 22**, not the 8 in CLAUDE.md.
+QD = int(os.environ.get("TPU_QD", 8))
+
+# Instruction memory, sized to the program rather than to a round number.
+# Allo's `wrap_io` copies each m_axi argument into a local buffer before the
+# region runs, so imem's *declared* length is paid as startup latency whether or
+# not the program uses it. Declared as [1024] it cost 1034 cycles of the
+# measured 1449 at 8x8x8 -- 71% of the runtime spent copying 1002 unused NOPs
+# (`load_buf0` in the csynth report). This is an artifact of the declaration,
+# not of the architecture, and the fix is to declare what the program needs.
+IMEM_SIZE = max(64, NPROG)
 
 
 @df.region()
 def tinytpu_isa(
-    imem: UInt(64)[1024],
+    imem: UInt(64)[IMEM_SIZE],
     A: int8[M, K],
     B: int8[K, N],
     C: int8[M, N],
@@ -263,7 +283,7 @@ def tinytpu_isa(
     cw: Stream[UInt(AW), QD][T]         # bottom row packs T psums going east
 
     @df.kernel(mapping=[1], args=[imem])
-    def sequencer(l_imem: UInt(64)[1024]):
+    def sequencer(l_imem: UInt(64)[IMEM_SIZE]):
         """Fetch and broadcast the decoded word. Consumes nothing, so it cannot
         be in a dependence cycle with any data path.
 
@@ -309,24 +329,6 @@ def tinytpu_isa(
                             v = lB[f1 + r, f2 * T + e]
                         pw[8 * e : 8 * (e + 1)] = v
                     dma2sp.put(pw)
-
-    @df.kernel(mapping=[1], args=[C])
-    def dma_st(lC: int8[M, N]):
-        """Scratchpad -> DRAM. Sole writer of C, and it reads nothing the
-        scratchpad unit needs back, so the cycle described above is broken."""
-        for c in range(NPROG):
-            w0: UInt(64) = c_dst.get()
-            op: int32 = w0[0:6]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
-            if op == OP_MVOUT:
-                for r in range(nr):
-                    qw: UInt(VW) = ac2sp.get()
-                    with allo.meta_for(T) as e:
-                        ov: int8 = qw[8 * e : 8 * (e + 1)]
-                        lC[f1 + r, f2 * T + e] = ov
 
     @df.kernel(mapping=[1])
     def spm():
@@ -528,6 +530,32 @@ def tinytpu_isa(
 
 
 
+
+    @df.kernel(mapping=[1], args=[C])
+    def dma_st(lC: int8[M, N]):
+        """Accumulator -> DRAM. Sole writer of C.
+
+        Declared **last on purpose**. Allo emits the process calls in
+        declaration order, and Vitis `csim` executes a dataflow region in that
+        order, so a consumer declared before its producer reads an empty stream:
+            ERROR [HLS SIM]: an hls::stream is read while empty
+        `dma_st` consumes what `accu` produces, so it has to come after it. The
+        order has no effect on the generated hardware -- in RTL the processes
+        are concurrent -- but it decides whether `csim` works, and `csim` is the
+        fast functional check."""
+        for c in range(NPROG):
+            w0: UInt(64) = c_dst.get()
+            op: int32 = w0[0:6]
+            f1: int32 = w0[18:30]
+            f2: int32 = w0[30:42]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
+            if op == OP_MVOUT:
+                for r in range(nr):
+                    qw: UInt(VW) = ac2sp.get()
+                    with allo.meta_for(T) as e:
+                        ov: int8 = qw[8 * e : 8 * (e + 1)]
+                        lC[f1 + r, f2 * T + e] = ov
 
 def schedule(s):
     """Ports where the design needs them.
