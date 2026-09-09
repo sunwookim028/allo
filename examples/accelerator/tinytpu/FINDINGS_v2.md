@@ -151,6 +151,40 @@ transfer and each `mm` is only `2*rows + SKEW` cycles of work, so the loader is
 now the critical stage. A strided/2D DMA descriptor, and streaming several
 weight tiles per credit, are where the next factor is.
 
+## F.2 Retested: can the accumulate walk be folded back in? No.
+
+Section A blamed the split output buffer on a dependence test that could not
+separate an accumulator read-modify-write. That diagnosis was made when the
+accumulator was one 2-D array indexed by the *unrolled* column, so it was worth
+retesting after the banking rewrite made `ac0..ac3` four separate 1-D arrays
+with the subscript affine in `t`.
+
+It still fails, identically: `II=4`, binding recurrence
+`arith.addf -(2,d0)-> memref.store -(0,d1)-> memref.load -(2,d0)->`,
+`total latency 4 over distance 1`. The MAC count also *drops* to 12, because
+the binder folds units once the loop has that much slack -- so the array stops
+being an array.
+
+The ops are `memref.load`/`memref.store`, not `affine.*`, even though
+`ac0[APAD + t - SKEW]` is syntactically affine in the loop variable. So this is
+not the "distance 1 assumed because non-affine" case of section A: the access
+never reaches affine form at all. A store and a load to the *same* address in
+one iteration, with an FP add between them, is a recurrence of latency 4 over
+distance 1 no matter what the dependence test can prove -- the value written at
+`t` is read at `t` and the adder takes longer than a cycle.
+
+The real conclusion is stronger than section A's: **a systolic array whose
+accumulation is in-place cannot hold II=1 in this backend at all**, because the
+accumulator RMW is a genuine single-iteration recurrence. Gemmini does not have
+this problem because its accumulator is a real dual-ported RMW memory with the
+add in the memory's own write path (`AccumulatorMem.scala`), not an add between
+a load and a store in the datapath. The split buffer plus a second pass is
+therefore the correct structure for this backend, and its cost (one extra
+cycle per row, 256 of 1072 marginal cycles at 16x16x16) is the price of not
+having an accumulating memory primitive. That is a missing *storage
+realization*, not a scheduler weakness -- `bind_storage` offers RAM_1P /
+RAM_2P / RAM_S2P / RAM_T2P and no accumulating variant.
+
 ## G. Where the residual gap to Gemmini actually is (it is not OoO)
 
 The v1-vs-v2 table invites the reading that v2 is structurally worse and falls
