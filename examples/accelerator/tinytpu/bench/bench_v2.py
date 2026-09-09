@@ -203,11 +203,75 @@ def run(mode, M, K, N, relu=False, stall=None):
 
 SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
 
+
+def stage_isolate(M, K, N):
+    """Run each pipeline stage alone, to find the perfect-overlap bound.
+
+    Take the real instruction stream, keep only the instructions one unit owns,
+    and clear every dependency bit. Nothing then blocks, so the cycle count is
+    that stage's own throughput on this workload. `max` over the three is what
+    the machine would cost with a perfect scheduler; `sum` is what it would cost
+    with none. Comparing the real number against both says how much is left on
+    the table by *scheduling* as opposed to by throughput.
+
+    Results are timing-only -- the isolated streams read uninitialized memory,
+    so they are not checked against numpy and must not be read as correctness.
+    """
+    prog, _, _, _, _ = gemm_program(M, K, N)
+    recs = prog.reshape(-1, IW)
+    dmem0, imem0, ni, n_ld, n_ex, n_st, C_B, _ = build_image(M, K, N)
+    out = {}
+    sel = {
+        "loader": ({m2.OP_DMA_LOAD}, lambda n: (n, 0, 0)),
+        "storer": ({m2.OP_DMA_STORE}, lambda n: (0, 0, n)),
+        "executor": (None, lambda n: (0, n, 0)),
+    }
+    for name, (ops, counts) in sel.items():
+        if ops is None:
+            keep = recs[~np.isin(recs[:, 0],
+                                 [m2.OP_DMA_LOAD, m2.OP_DMA_STORE])].copy()
+        else:
+            keep = recs[np.isin(recs[:, 0], list(ops))].copy()
+        keep[:, 4] = 0                      # clear every dependency bit
+        imem = np.zeros(m2.IMEM_SIZE, np.int32)
+        imem[:keep.size] = keep.ravel()
+        dmem = dmem0.copy()
+        a, b, c = counts(len(keep))
+        res = rtl().cosim(dmem, imem, len(keep), a, b, c)
+        out[name] = res.cycles
+        print(f"  {name:9s} {len(keep):3d} instrs  {res.cycles:6d} cycles")
+    seq = ni * m2.IWIDTH
+    out["sequencer"] = seq
+    print(f"  {'sequencer':9s} {ni:3d} instrs  {seq:6d} cycles (II={m2.IWIDTH}, computed)")
+    return out
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "cpu"
     if len(sys.argv) > 2 and sys.argv[2] == "all":
         for sh in SHAPES:
             run(mode, *sh)
+    elif len(sys.argv) > 2 and sys.argv[2] == "tall":
+        # The per-instruction fixed cost of `mm` is 35 cycles against 2/row, so
+        # it is amortized by streaming a longer panel. MAXROWS caps the panel,
+        # and MAXROWS is set by the accumulator sitting at a compile-time
+        # offset -- which is what bought the array II=1. This measures what
+        # raising it is worth.
+        for sh in [(16, 16, 16), (32, 16, 16), (64, 16, 16)]:
+            c = run(mode, *sh)
+            n = sh[0] * sh[1] * sh[2]
+            print(f"    -> {c / n:.3f} cyc/MAC   ({0.0625 / (c / n) * 100:.0f}% "
+                  f"of the 16-MAC/cycle roofline)")
+    elif len(sys.argv) > 2 and sys.argv[2] == "stages":
+        for sh in [(8, 8, 8), (16, 16, 16)]:
+            real = run(mode, *sh)
+            print(f"gemm {sh[0]}x{sh[1]}x{sh[2]}  measured {real}")
+            st = stage_isolate(*sh)
+            busy = {k: v for k, v in st.items()}
+            mx, sm = max(busy.values()), sum(busy.values())
+            print(f"  -> perfect-overlap bound (max stage) = {mx}")
+            print(f"  -> zero-overlap bound   (sum stages) = {sm}")
+            print(f"  -> measured {real}: {(sm - real) / max(sm - mx, 1) * 100:.0f}% "
+                  f"of the available overlap captured\n")
     elif len(sys.argv) > 2 and sys.argv[2] == "mlp":
         for sh in [(4, 8, 8), (8, 8, 8), (8, 16, 16)]:
             run(mode, *sh, relu=True)

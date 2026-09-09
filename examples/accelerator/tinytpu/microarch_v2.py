@@ -110,7 +110,7 @@ IWIDTH = 5               # words per instruction: [opcode, a0, a1, a2, dep]
 DRAM_SIZE = 8192
 SPAD_ROWS = 512          # rows per scratchpad bank
 IMEM_SIZE = 8192         # -> IMEM_SIZE / IWIDTH instructions
-MAXROWS = 16             # longest activation panel one `mm` may stream
+MAXROWS = 64             # longest activation panel one `mm` may stream
 AROWS = MAXROWS + 2 * APAD   # sized for the output buffer, whose pad rows
                              # absorb the array's unguarded fill/drain writes;
                              # the accumulator proper uses rows [0, MAXROWS)

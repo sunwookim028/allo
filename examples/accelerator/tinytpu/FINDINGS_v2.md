@@ -150,3 +150,141 @@ dominates -- what is left is the DMA. Each weight tile is a separate 16-word
 transfer and each `mm` is only `2*rows + SKEW` cycles of work, so the loader is
 now the critical stage. A strided/2D DMA descriptor, and streaming several
 weight tiles per credit, are where the next factor is.
+
+## G. Where the residual gap to Gemmini actually is (it is not OoO)
+
+The v1-vs-v2 table invites the reading that v2 is structurally worse and falls
+further behind as the workload grows. Both halves of that are wrong, and the
+measurements that show it are worth more than the ratio itself.
+
+### G.1 The gap does not widen; Gemmini's fixed cost amortizes
+
+Removing each machine's own fixed overhead (its 4x4x4 cost) leaves a **flat**
+marginal ratio:
+
+| shape | v2 cyc/MAC | Gemmini cyc/MAC | ratio |
+|---|---|---|---|
+| 8x8x8 | 0.712 | 0.239 | 2.98x |
+| 12x12x12 | 0.530 | 0.168 | 3.15x |
+| 16x16x8 | 0.512 | 0.165 | 3.09x |
+| 16x16x16 | 0.442 | 0.131 | 3.38x |
+
+A flat ratio is a *throughput* difference. The apparent widening in the raw
+table is Gemmini amortizing ~600 cycles of RoCC/tiling overhead that v2 never
+pays -- which is also why v2 wins outright at 4x4x4.
+
+### G.2 An upper bound on what any scheduler could recover
+
+Each stage was run alone on the real instruction stream with every dependency
+bit cleared, so nothing blocks (`bench_v2.py cosim stages`; timing only, the
+isolated streams read uninitialized memory and are not checked). The sum
+reproduces the sequential control to 1%, which validates the method.
+
+| | 8x8x8 | 16x16x16 |
+|---|---|---|
+| loader alone | 214 | 806 |
+| **executor alone** | **318** | **1448** |
+| storer alone | 84 | 292 |
+| sequencer (II=5) | 90 | 300 |
+| sum (zero overlap) | 706 | 2846 |
+| *serial control, measured* | *683* | *2869* |
+| **measured** | **472** | **1936** |
+| max (perfect overlap) | 318 | 1448 |
+| Gemmini | 720 | 1141 |
+
+So at 16x16x16 the 1.70x splits into **1.34x scheduling** (the most any issue
+policy could recover) and **1.27x throughput** (unreachable by any scheduler).
+At 8x8x8 perfect overlap would be 0.44x, i.e. 2.3x faster than Gemmini.
+
+### G.3 It is not run-ahead depth either
+
+Sweeping the credits and queue depth: NBUF 2 -> 4 gains 2.4% (1936 -> 1890) and
+NBUF 4 -> 8 gains nothing. The loader has slack (806 against the executor's
+1448) but is nearly balanced *per weight tile*, so there is no independent work
+to hoist -- which is also why out-of-order issue would buy little here.
+
+### G.4 What it is: a per-instruction fixed cost
+
+Streams of K identical instructions, dependency bits cleared, K varied. Exactly
+linear at every point:
+
+    mm  = 2.00 cyc/row + 35.0 fixed per instruction     (fit at rows = 4, 8, 16)
+    loadw = 15.0 cyc/instruction, of which 4 is work    -> ~11 cyc dispatch
+
+That decomposes the executor's 1448 completely (model 1420, 2% low):
+
+| | cycles | % of executor |
+|---|---|---|
+| array actually streaming (`t` loop, rows+SKEW) | 352 | 25% |
+| **accumulate walk (the second cyc/row)** | **256** | **18%** |
+| `mm` pipeline fill/drain | 288 | 20% |
+| instruction dispatch (36 x ~11) | 396 | 28% |
+| `loadw` + `accst` work | 128 | 9% |
+
+**Only a quarter of the executor is the array doing work.** The 35-cycle fixed
+cost per `mm` was being amortized over `MAXROWS = 16` rows, and `MAXROWS` was 16
+because the accumulator sits at a compile-time offset -- the thing that bought
+the array II=1 in the first place.
+
+### G.5 Confirming it: longer panels, same 60 instructions
+
+Raising `MAXROWS` to 64 and streaming a longer panel, on both machines at
+matched shapes:
+
+| M (x16x16) | v2 | Gemmini | ratio | v2 cyc/MAC | Gem cyc/MAC |
+|---|---|---|---|---|---|
+| 16 | 1936 | 1163 | 1.66x | 0.473 | 0.284 |
+| 32 | 3008 | 1710 | 1.76x | 0.367 | 0.209 |
+| 64 | 5152 | 2835 | 1.82x | 0.314 | 0.173 |
+
+v2's cyc/MAC improves 1.51x (0.473 -> 0.314, 13% -> 20% of roofline) with the
+instruction count unchanged at 60. Both machines amortize, so the *ratio* barely
+moves -- but the **marginal** ratio falls from ~3.4x to **1.92x**, and the
+marginal cycles are now fully accounted for. Per +16 rows of M, measured delta
+1072, model 1072 exactly:
+
+| | cycles | attributable to |
+|---|---|---|
+| `mm` array streaming, 1 cyc/row | 256 | the design working correctly |
+| `mm` accumulate walk, the 2nd cyc/row | 256 | **the compiler** (section A) |
+| loader, A panel at 1 word/cycle | 256 | DMA bus width |
+| storer, C tile at 1 word/cycle | 256 | DMA bus width |
+| `accst` drain | 48 | |
+| **total** | **1072** | vs Gemmini's 557 |
+
+### G.6 The projection
+
+Arithmetic on the measured coefficients above -- **not itself measured**:
+
+| | marginal cyc | vs Gemmini |
+|---|---|---|
+| as built | 1072 | 1.92x |
+| without the accumulate walk | 816 | 1.46x |
+| ... and with Gemmini's 128-bit DMA bus | 432 | **0.78x** |
+
+Half the remaining marginal gap is one compiler limitation (the dependence test
+could not separate an accumulator read-modify-write, so accumulation had to
+become a second pass over the data) and half is a bus width. Neither is a
+property of generating the accelerator from Allo, and neither is issue policy.
+
+### G.7 On measuring the OoO contribution directly
+
+Restricting the comparison to "programs with no OoO opportunity" is both harder
+and weaker than the stage isolation in G.2. Tiled GEMM is dense with hazards --
+RAW on every weight load, WAR on every buffer reuse -- so hazard-free programs
+barely exist; what differs is *who* resolves them, and Gemmini's ROB is the
+mechanism that gives it any overlap at all, so removing the opportunity measures
+"Gemmini fully serialized" rather than "Gemmini without OoO". G.2 bounds what an
+*ideal* scheduler achieves, which upper-bounds OoO's value without constructing
+anything or rebuilding Gemmini.
+
+What static resolution does cost, and it is not cycles: a mis-scheduled program
+returns a plausible wrong answer. Two such bugs appeared during this work -- a
+dependency-token off-by-one (correct at 4x4x4 and 8x8x8, wrong from 12x12x12)
+and a write-after-read on the output staging area across processes (correct at
+Nt <= 2, wrong at Nt >= 3). Both were silent, and neither was visible on the CPU
+backend, which runs the processes sequentially. Gemmini cannot produce either.
+The fix is an assembler-side hazard checker -- the same RAW/WAR/WAW
+address-overlap rules as `ReservationStation.scala:308-340`, run offline -- so
+that unguarded hazards are *rejected at assembly time* rather than detected in
+hardware.
