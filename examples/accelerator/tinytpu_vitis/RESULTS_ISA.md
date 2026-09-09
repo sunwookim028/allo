@@ -146,7 +146,21 @@ TB: 8x8x8 gemm mismatches = 0 / 64
 C/RTL co-simulation finished: PASS
 ```
 
-**1449 cycles at 8x8x8, int8, on a 4x4 array**, and the RTL is functionally
+(That 1449 was measured with `imem` declared `[1024]`; sized to the program it
+is **1003**. See the fixed-cost note below.) Final measured numbers, all exact:
+
+| shape | cosim cycles |
+|---|---|
+| 4x4x4    |  717 |
+| 8x8x8    | 1003 |
+| 16x16x16 | 2395 |
+
+The matched Gemmini comparison and the gap decomposition are in
+`COMPARISON.md`. In short: identical fixed cost (573 vs 539 cycles), but 24.0
+cycles/instruction against Gemmini's 5.9, and the report names why -- every
+unit's per-instruction loop is `pipelined = no`.
+
+**1003 cycles at 8x8x8, int8, on a 4x4 array**, and the RTL is functionally
 exact against the same numpy reference the KPN simulator uses. `csim` passes
 too, which is the first functional check of the *emitted HLS code* rather than
 of the Allo simulator's interpretation of the design.
