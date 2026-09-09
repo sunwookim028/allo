@@ -322,3 +322,57 @@ The fix is an assembler-side hazard checker -- the same RAW/WAR/WAW
 address-overlap rules as `ReservationStation.scala:308-340`, run offline -- so
 that unguarded hazards are *rejected at assembly time* rather than detected in
 hardware.
+
+## H. Fusing the weight latch into `mm`: the fix that follows from G.4
+
+G.4 measured that consecutive instructions overlap by **exactly zero** cycles --
+K back-to-back `mm`s cost `43.0*K + 4`, and 43 is one instruction's own latency.
+The compiler states the mechanism:
+
+    WARN: [PREP] Conditional left as an opaque scheduling unit because
+                 'func.call' cannot be predicated; the enclosing loop cannot
+                 pipeline across it
+    INFO: [SCHED] Detected imperfect nest, decomposing into sub-regions
+                  scheduled in program order.   (at loop 'c')
+
+Every TinyTPU instruction is a `func.call` inside the dispatch loop, so the unit
+starts empty, fills, streams, drains, and only then does the next instruction
+begin. The array is II=1 -- cold-started once per instruction.
+
+Gemmini does not have this: its units are persistent state machines.
+`ExecuteController.scala` re-enters `compute` from three arrival sites without
+passing through `flush`, and `MeshWithDelays` carries `tags_in_progress`, a
+*queue* of in-flight matmul tags, so several matmuls occupy the mesh at once and
+`pause` is per-cycle backpressure rather than a per-command drain. Fill/drain is
+paid once per sequence there, once per command here.
+
+The available fix without leaving the calling convention is to make each
+instruction do more, so fewer calls are made. `loadw` and `mm` were adjacent by
+construction -- every weight tile is latched then immediately streamed -- and
+`mm`'s `a1` operand was unused, so they fuse into one instruction at no ISA
+cost. `loadw` is deleted; `mmu` latches the tile itself.
+
+| shape | before | after | gain | instrs |
+|---|---|---|---|---|
+| 4x4x4 | 153 | **137** | 1.12x | 6 -> 5 |
+| 8x8x8 | 472 | **412** | 1.15x | 18 -> 14 |
+| 12x12x12 | 1035 | **903** | 1.15x | 36 -> 27 |
+| 16x16x8 | 1168 | **1052** | 1.11x | 32 -> 24 |
+| 16x16x16 | 1936 | **1734** | 1.12x | 60 -> 44 |
+| 32x16x16 | 3008 | **2806** | 1.07x | 60 -> 44 |
+| 64x16x16 | 5152 | **4950** | 1.04x | 60 -> 44 |
+
+ReLU MLP: 376/472/1410 -> **316/412/1198**. Array unchanged at 16 multipliers,
+20 adders, `t` loop II=1. At `stall_prob=0.3`, 16x16x16 returns the same 1734
+cycles and the same correct result.
+
+Roofline utilization: 15% at 16x16x16, **21%** at 64x16x16 (v1 was 1.7%).
+Against Gemmini: **1.49x** at 16x16x16 (from 1.70x), and 0.22x at 4x4x4 --
+4.4x *faster* where fixed overhead dominates.
+
+The gain shrinks as the panel lengthens (1.12x at M=16, 1.04x at M=64), which is
+the signature of a per-instruction cost being amortized rather than removed: at
+M=64 there are the same 44 instructions against 3.4x more streaming. Removing
+the rest needs persistent units -- each unit its own `async` process draining a
+command queue, so the array is never cold-started -- which is a restructure of
+`executor` alone and is the next step, not a limitation of the ISA.

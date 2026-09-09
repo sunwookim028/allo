@@ -42,12 +42,15 @@ emitted Verilog is where that is checked, not here.
 
 Three consequences of the array being real, each of which shapes the ISA:
 
-  * *Weights are state.* ``wst`` persists across instructions, so latching a
-    weight tile is its own instruction (``loadw``) and one latch is followed by a
-    long streaming ``mm`` -- the fill/drain skew amortises over the rows instead
-    of being paid per 4x4 tile. This is Gemmini's ``preload``/``matmul`` split,
-    and it is why a systolic array is worth having at all: on a single 4x4 tile
-    the skew makes it *slower* than an unrolled dot product.
+  * *Weights are stationary while a panel streams.* One ``mm`` latches a weight
+    tile and streams a whole M-row panel of activations past it, so the array's
+    fill/drain skew amortises over the rows instead of being paid per 4x4 tile.
+    That is why a systolic array is worth having at all: on a single 4x4 tile
+    the skew makes it *slower* than an unrolled dot product. Gemmini splits this
+    into ``preload`` + ``matmul``; here the latch is fused into the one
+    instruction, because in this backend a second instruction means a second
+    unit call and a unit call costs a full pipeline fill and drain (see
+    ``mmu``).
   * *The array needs DIM activations per cycle*, one per PE row, so the
     scratchpad is DIM independent banks -- ``sp0..sp3``, written out as separate
     arrays because that is the only way to get separate memories (see
@@ -131,7 +134,6 @@ OP_VSTORE = 5
 OP_DMA_LOAD = 6
 OP_DMA_STORE = 7
 OP_VNEG = 9
-OP_LOADW = 10            # latch a DIM x DIM weight tile into the PEs
 OP_MM0 = 11              # stream a2 rows through the array, starting a new sum
 OP_MM = 12               # ... accumulating onto the existing sum
 OP_ACCST = 13            # accumulator -> scratchpad
@@ -154,17 +156,29 @@ def mmu(
     sp1: f32[SPAD_ROWS],
     sp2: f32[SPAD_ROWS],
     sp3: f32[SPAD_ROWS],
-    wst: f32[DIM, DIM],
     ac0: f32[AROWS],
     ac1: f32[AROWS],
     ac2: f32[AROWS],
     ac3: f32[AROWS],
+    w_row: i32,
     x_row: i32,
     rows: i32,
     zero_first: i32,
 ):
-    """Stream ``rows`` rows of X through the array against the stationary
-    weights, then add the pass into the accumulator.
+    """Latch a weight tile, stream ``rows`` rows of X through the array against
+    it, then add the pass into the accumulator.
+
+    The weight latch is *inside* this unit rather than its own instruction, and
+    that is the point of the fusion. A unit is a `func.call`, and the compiler
+    will not pipeline a loop across one -- "[PREP] Conditional left as an opaque
+    scheduling unit because 'func.call' cannot be predicated; the enclosing loop
+    cannot pipeline across it". So every instruction pays its unit's full
+    latency: the pipeline starts empty, fills, streams, drains, and only then
+    does the next instruction begin. Measured directly (bench/dispatch_cost.py),
+    K back-to-back `mm`s with nothing to wait on cost 43.0*K + 4 cycles, and 43
+    *is* one instruction's latency -- consecutive instructions overlap by
+    exactly zero. Each unit call is therefore worth ~11 cycles of pure
+    fill/drain, and folding two calls into one removes one of them per tile.
 
     ``a_reg`` is each PE's activation register and ``ps_dl`` its partial-sum
     pipeline, so one iteration of ``t`` is one clock of the whole array.
@@ -188,6 +202,7 @@ def mmu(
     # other), this is load-bearing: a `j == 0` / `i > 0` select inside the PE
     # body makes the body a hyperblock, and if-conversion over the unrolled
     # DIM*DIM copies of it segfaults the compiler outright.
+    wst: f32[DIM, DIM]      # the stationary weights, latched below
     a_reg: f32[DIM, DIM + 1]
     a_nxt: f32[DIM, DIM + 1]
     ps_dl: f32[DIM + 1, DIM, PHOP]
@@ -197,6 +212,12 @@ def mmu(
     zb1: f32[AROWS]
     zb2: f32[AROWS]
     zb3: f32[AROWS]
+
+    for n in arange(DIM, name="wn"):
+        wst[0, n] = sp0[w_row + n]
+        wst[1, n] = sp1[w_row + n]
+        wst[2, n] = sp2[w_row + n]
+        wst[3, n] = sp3[w_row + n]
 
     for zi in arange(DIM + 1, name="zi"):
         for zj in arange(DIM, name="zj"):
@@ -283,25 +304,6 @@ def mmu(
         ac1[ar] = b1 + zb1[APAD + ar]
         ac2[ar] = b2 + zb2[APAD + ar]
         ac3[ar] = b3 + zb3[APAD + ar]
-
-
-@tpu2.unit
-def loadw(
-    sp0: f32[SPAD_ROWS],
-    sp1: f32[SPAD_ROWS],
-    sp2: f32[SPAD_ROWS],
-    sp3: f32[SPAD_ROWS],
-    wst: f32[DIM, DIM],
-    w_row: i32,
-):
-    """Latch a DIM x DIM weight tile into the stationary PE registers. The tile
-    is stored as rows W[n][*] and consumed transposed, so PE[i][j] holds W[j][i];
-    reading one W row per cycle puts the DIM accesses in DIM distinct banks."""
-    for n in arange(DIM, name="wn"):
-        wst[0, n] = sp0[w_row + n]
-        wst[1, n] = sp1[w_row + n]
-        wst[2, n] = sp2[w_row + n]
-        wst[3, n] = sp3[w_row + n]
 
 
 @tpu2.unit
@@ -481,15 +483,15 @@ async def executor(
     ex_tok: Stream[i32, QD],
 ):
     """The compute side: the systolic array, its weight latch, the accumulator
-    drain and the vector unit. ``wst`` / ``ac*`` / ``vreg`` are private to this
-    process and persist across instructions -- that persistence is what makes
-    the array weight-stationary and the accumulator an accumulator.
+    drain and the vector unit. ``ac*`` / ``vreg`` are private to this process and
+    persist across instructions, which is what makes the accumulator an
+    accumulator. (The weights are stationary *within* one ``mm``, which is where
+    the streaming happens; see ``mmu`` for why the latch is fused in.)
 
     There is one call site per unit, deliberately: a unit called from two places
     gets two copies in the RTL and ``compose`` reaches only the first, so the
     second is emitted unscheduled -- time-multiplexed onto a single MAC instead
     of the array. The mode therefore travels as a value."""
-    wst: f32[DIM, DIM]
     ac0: f32[AROWS]
     ac1: f32[AROWS]
     ac2: f32[AROWS]
@@ -510,10 +512,8 @@ async def executor(
         rl: i32 = 0
         if op == OP_ACCRELU:
             rl = 1
-        if op == OP_LOADW:
-            loadw(sp0, sp1, sp2, sp3, wst, a0)
-        elif op == OP_MM0 or op == OP_MM:
-            mmu(sp0, sp1, sp2, sp3, wst, ac0, ac1, ac2, ac3, a0, a2, zf)
+        if op == OP_MM0 or op == OP_MM:
+            mmu(sp0, sp1, sp2, sp3, ac0, ac1, ac2, ac3, a1, a0, a2, zf)
         elif op == OP_ACCST or op == OP_ACCRELU:
             accst(ac0, ac1, ac2, ac3, sp0, sp1, sp2, sp3, a1, a2, rl)
         elif op == OP_VLOAD:
@@ -605,15 +605,13 @@ async def tinytpu2(
 # directive: they are already separate arrays.
 # ==========================================================================#
 mmu_s = mmu.schedule()
-for _b in ("a_reg", "a_nxt", "ps_dl", "ps_new", "odl"):
+for _b in ("a_reg", "a_nxt", "ps_dl", "ps_new", "odl", "wst"):
     mmu_s.partition(mmu_s.buffer(_b), kind=mmu_s.Complete)  # PE registers
 for _ln in ("pi", "pj", "sj", "sd", "ci", "cj", "cd", "zi", "zj", "zd", "za"):
     mmu_s.unroll(_ln)                                        # -> DIM*DIM MACs
+mmu_s.pipeline("wn")                                         # latch the tile
 mmu_s.pipeline("t")                                          # one clock / cycle
 mmu_s.pipeline("ar")                                         # the accumulate walk
-
-lw_s = loadw.schedule()
-lw_s.pipeline("wn")
 
 as_s = accst.schedule()
 as_s.pipeline("am")
@@ -636,8 +634,7 @@ st_s.pipeline("e")      # burst spad -> DRAM
 
 ex_s = executor.schedule()
 ex_s.partition(ex_s.buffer("vreg"), dim=1, kind=ex_s.Complete)
-ex_s.partition(ex_s.buffer("wst"), kind=ex_s.Complete)            # PE registers
-ex_s.compose(mmu_s, lw_s, as_s, vpu_s, vl_s, vs_s)
+ex_s.compose(mmu_s, as_s, vpu_s, vl_s, vs_s)
 
 top_s = tinytpu2.schedule()
 top_s.compose(seq_s, ld_s, ex_s, st_s)

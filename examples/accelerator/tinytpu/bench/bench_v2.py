@@ -104,10 +104,9 @@ def gemm_program(M, K, N, relu=False):
             emit(m2.OP_DMA_LOAD, B_BASE + (k * Nt + j) * T * T, wslot[b], T,
                  m2.DEP_WAIT_FREE | m2.DEP_SIG_LOAD)
             n_ld += 1
-            emit(m2.OP_LOADW, wslot[b], 0, 0, m2.DEP_WAIT_LOAD)
-            n_ex += 1
-            emit(m2.OP_MM0 if k == 0 else m2.OP_MM, apanel[k], 0, M,
-                 m2.DEP_SIG_FREE)
+            # one instruction per tile: latch the weight and stream the panel
+            emit(m2.OP_MM0 if k == 0 else m2.OP_MM, apanel[k], wslot[b], M,
+                 m2.DEP_WAIT_LOAD | m2.DEP_SIG_FREE)
             n_ex += 1
         # Each output column block drains to its own staging area. Sharing one
         # would be a write-after-read across processes -- the executor's next
