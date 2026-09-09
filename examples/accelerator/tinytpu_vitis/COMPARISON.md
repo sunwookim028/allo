@@ -24,51 +24,72 @@ Both numbers are **measured on RTL**: ours by Vitis `cosim` (xsim), Gemmini's by
 RoCC dispatch from Rocket and its own tiling loop, which favours us slightly and
 is noted rather than corrected for.
 
-## The numbers (after the fixes; see "What was fixed" below)
+## One hardware build, workload swept as data
 
-| shape | before | ours now | Gemmini int8 4x4 | ratio was | ratio now | instrs |
-|---|---|---|---|---|---|---|
-| 4x4x4    |  717 |  **760** | 574 | 1.25x | 1.32x |  6 -> 6  |
-| 8x8x8    | 1003 |  **945** | 615 | 1.63x | 1.54x | 20 -> 15 |
-| 16x16x16 | 2395 | **1721** | 986 | 2.43x | **1.75x** | 76 -> 45 |
+**This is the correction that matters most.** Earlier revisions of this file
+compared per-workload builds against Gemmini's single elaboration: `M`, `K`,
+`N`, the instruction count and every unit's loop bound were compile-time
+constants, so 4x4x4 and 16x16x16 were *different accelerators*. That is not a
+comparison an instruction-programmable claim can rest on.
 
-**1.39x faster at 16x16x16**, and utilization there went 10.7% -> 14.9%
-(Gemmini 26.0%). 4x4x4 got 6% *slower*: with only 6 instructions there is
-nothing to save, and the accumulate-select added a multiplexer to the
-accumulator's write path. That is the right trade -- it is the one shape where
-fixed cost is everything -- but it is a regression and is not hidden here.
+The design is now built **once** -- `T=4`, `MAXDIM=16`, fixed scratchpad, vregs
+and imem -- and the shape arrives as data:
 
-Functionally exact at every shape (`mismatches = 0`) for `gemm`, `gemm.relu`,
-**and** a vector-unit program, verified in RTL by cosim rather than only in the
-dataflow simulator.
+* the imem header carries the instruction count and a per-unit count, so every
+  loop bound in the design is runtime data;
+* `A`, `B`, `C` are flat `int8[MAXDIM*MAXDIM]` at the fixed `MAXDIM` stride,
+  exactly as `allo_cmp.c` does for Gemmini (`MAXDIM, MAXDIM, 0, MAXDIM`);
+* `gemm_program(M, K, N)` assembles the stream; the RTL never changes.
 
-## What was fixed, and what was not
+Verified: **11 programs on one build, all bit-exact** -- `gemm` and `gemm.relu`
+at five shapes plus a vector-unit program. Two of those shapes (12x12x12,
+16x16x8) could not be run at all before, because each would have needed its own
+accelerator.
 
-Three changes, in the order they were measured:
+## The numbers (one build, cosim, one csynth)
 
-| change | 16x16x16 | what it did |
-|---|---|---|
-| selective dispatch | 2395 -> 2163 | the sequencer sends each instruction only to the units that act on it, so a unit's loop counts *its* instructions. The PEs saw 80 and needed 16; `dma_st` saw 80 and needed 4; 76% of all decode work in the design was for instructions the unit would ignore. |
-| accumulate in `mm` | 2163 -> 1801 | `mm` takes an accumulate bit, so a Kt-deep contraction is Kt `mm`s and **no `vadd`**. `accu` had been doing 576 row-ops for 256 wavefronts of work -- 2.25x oversubscribed -- because psum collection *and* `vadd` both ran there, serially. It was the critical unit (csynth interval 10772 vs ~6000 elsewhere). This is Gemmini's structure: `AccumulatorMem.scala` puts the add in the memory's write path and the matmul carries an accumulate bit. |
-| consolidate loads | 1801 -> 1721 | one `dma_ld` per column block of B instead of one per (nb, kb) tile, and one `vld` for all of A. Pure program changes. |
+| shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
+|---|---|---|---|---|---|
+| 4x4x4    | 1037 | 574 | 1.81x |  0.4% |  0.7% |
+| 8x8x8    | 1165 | 615 | 1.89x |  2.7% |  5.2% |
+| 12x12x12 | 1389 | 740 | 1.88x |  7.8% | 14.6% |
+| 16x16x8  | 1437 | 784 | 1.83x |  8.9% | 16.3% |
+| 16x16x16 | **1733** | 986 | **1.76x** | 14.8% | 26.0% |
 
-**What was *not* fixed, and this is the honest headline:** the per-instruction
-cost did not improve at all.
+**The ratio is flat at ~1.8x and falls slightly with size.** That is a
+qualitatively different result from the per-workload measurement, whose ratio
+*grew* (1.32x -> 1.54x -> 1.75x). Fixing the hardware exposed that the earlier
+growth was partly an artifact of specialization, and the real remaining gap is
+close to a constant factor.
 
-| | fixed cost | marginal cost |
-|---|---|---|
-| before | 506 cycles | 24.9 cycles/instruction |
-| **after** | 557 cycles | **25.9 cycles/instruction** |
-| Gemmini | 539 cycles | **5.9 cycles/instruction** |
+## The I/O trade, measured
 
-The whole 1.39x came from *executing fewer instructions* (76 -> 45), not from
-making an instruction cheaper. The unpipelined per-instruction loop named in the
-original analysis is **still unpipelined**: a unit's body branches on the
-opcode, so it is one large multiplexed region and Vitis will not pipeline it as
-written. Splitting each unit's `if op == ...` arms into separate always-running
-inner loops fed by per-opcode queues is still the 4x, and it is still the next
-thing to do. What the work above did was remove the *count* the 26 cycles is
-multiplied by, which is real but is a different lever.
+`wrap_io` is not a default to accept -- it is an architectural choice with a
+crossover, and neither setting is what Gemmini has:
+
+| config | marginal | fixed | 4x4x4 | 16x16x16 |
+|---|---|---|---|---|
+| `wrap_io=True`, imem 256 | 18.1 cyc/instr | 1102 | 2.12x | 1.94x |
+| `wrap_io=False` | **39.8** | **481** | **1.21x** | 2.25x |
+| `wrap_io=True`, imem 76 | **18.1** | 922 | 1.81x | **1.76x** |
+| Gemmini | **10.8** | **483** | 1.00x | 1.00x |
+
+* `wrap_io=True` copies each argument into a local buffer before the region
+  runs, so the units read BRAM -- cheap per access, but the copy is the
+  *declared* length regardless of the shape being run.
+* `wrap_io=False` lets the units read `m_axi` directly. The fixed cost drops to
+  481, essentially equal to Gemmini's 483 -- but every access now pays bus
+  latency instead of hitting a buffer, and the marginal cost **doubles**. It
+  also requires flat arguments ("Top-level multi-dimensional arrays are
+  linearized to 1D pointers"), which is why `A`/`B`/`C` are 1-D.
+* Crossover is ~29 instructions, so buffering wins across this benchmark set
+  once the imem is trimmed to the longest admissible program (256 -> 76 words,
+  worth 180 cycles at every shape).
+
+**Gemmini has the third option and Allo does not expose it: a bursted DMA the
+program controls, giving low fixed cost *and* low marginal cost.** `mvin`
+transfers exactly the tiles the program names. That, not the array and not the
+data type, is the largest single remaining item.
 
 ## Where the gap was, originally
 
@@ -118,11 +139,13 @@ what caps the throughput.
 
 ## What would close the rest
 
-1. **Pipeline the per-instruction loop** -- unchanged from the original
-   analysis and still worth the remaining ~4x on the marginal term. Split each
+1. **Pipeline the per-instruction loop** -- worth the 1.7x marginal term. Split each
    unit's `if op == ...` arms into separate always-running inner loops fed by
    per-opcode queues so instruction *n+1* starts while *n* drains.
-2. **Then multiple instructions in flight.** A credit/scoreboard scheme over
+2. **A program-controlled burst DMA** -- worth the 1.9x fixed term, and the
+   one item that needs something Allo does not currently expose (see the I/O
+   trade above).
+3. **Then multiple instructions in flight.** A credit/scoreboard scheme over
    the in-order units would approach Gemmini's 48-entry reservation station
    without its complexity. Doing it before (1) optimizes the wrong term.
 
@@ -154,18 +177,23 @@ functional check that had been passing all session.
 
 ## Honest reading
 
-At 4x4x4 we are within ~32% of a matched Gemmini; at 16x16x16, 1.75x behind,
-down from 2.43x. The remaining gap is one named, located property -- an
-unpipelined per-instruction loop -- and not anything about the array, the data
-type, or the dataflow, all of which are correct and RTL-verified. The array
-holds one MAC per PE per cycle, and `microarch_ws.py` reached exactly 100% of
-roofline with the same PE structure, so the compute is not the limit.
+On one fixed build, matched in data type and array size, the design is a **flat
+~1.8x behind Gemmini** across five shapes, and the ratio does not degrade with
+problem size (1.81x at 4x4x4, 1.76x at 16x16x16). Utilization tracks at roughly
+half Gemmini's at every point.
 
-Worth being precise about the trend: the ratio still *grows* with problem size
-(1.32x, 1.54x, 1.75x), which is the signature of a per-instruction cost gap
-rather than a fixed-cost one. Reducing the instruction count moved every point
-down but did not change that slope. Only pipelining the per-instruction loop
-will.
+Two terms make up the 1.8x, and both are named:
+
+1. **Marginal, 18.1 vs 10.8 cycles/instruction (1.7x).** The per-instruction
+   loop in each unit is `pipelined = no`, so a unit finishes instruction *n*
+   before starting *n+1*. Gemmini's 48-entry reservation station is what buys
+   the difference.
+2. **Fixed, 922 vs 483 cycles (1.9x).** Allo's argument handling: bulk-copy the
+   declared arrays, or unbuffered `m_axi`, but no program-controlled burst DMA.
+
+Neither term is about the array, the data type, or the dataflow -- all three are
+correct and RTL-verified, and `microarch_ws.py` reached exactly 100% of roofline
+with the same PE structure. The compute is not the limit.
 
 Both utilizations are low in absolute terms because these are tiny problems on
 a 4x4 array where fixed costs dominate; Gemmini's 26% at 16x16x16 is the number
@@ -174,10 +202,12 @@ to chase, and item (1) above is worth most of the distance.
 ## Reproducing
 
 ```bash
-# ours
+# ours -- one build, all shapes
 export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
-export PYTHONPATH=/home/sk3463/allo OMP_NUM_THREADS=32
-TPU_M=16 TPU_K=16 TPU_N=16 python cosim.py
+export PYTHONPATH=/home/sk3463/allo OMP_NUM_THREADS=32   # >= 22 processes
+python bench_isa.py          # functional sweep, one build
+python cosim.py              # one csynth, cosim per shape
+TPU_WRAP=0 python cosim.py   # the unbuffered m_axi variant
 
 # Gemmini, matched
 cd ~/chipyard && source env.sh

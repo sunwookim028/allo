@@ -1,7 +1,16 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Verify and measure TinyTPU-isa: the instruction-programmable tiled GEMM."""
+"""Verify TinyTPU-isa across workload sizes on ONE fixed hardware build.
+
+The point of this driver is that `tinytpu_isa` is built once. Shapes are swept
+as *data*: `gemm_program(M, K, N)` assembles a different instruction stream and
+the same RTL runs it. Earlier revisions rebuilt the accelerator per shape, which
+made a comparison against Gemmini's single elaboration meaningless.
+
+    python bench_isa.py                # sweep every shape up to MAXDIM
+    python bench_isa.py 8 8 8          # one shape
+"""
 
 import os
 import sys
@@ -10,78 +19,72 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 import allo.dataflow as df  # noqa: E402
-from allo.dataflow import customize  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, gemm_program, vadd_program, schedule, M, K, N, T, NPROG,
-    Kt, Nt,
+    tinytpu_isa, gemm_program, vadd_program, assemble, MAXDIM, T, IMEM_SIZE,
 )
 
-from examples.accelerator.tinytpu_vitis.microarch_isa import IMEM_SIZE as IMEM_WORDS  # noqa: E402
+SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
 
 
-def inputs(relu, seed=0):
-    """Operands in [-4, 4], the range `allo_cmp.c` fills for Gemmini."""
+def buffers(seed=0):
+    """Host buffers at the fixed MAXDIM stride, as `allo_cmp.c` uses for
+    Gemmini. Operands in [-4, 4], the same distribution it fills."""
     rng = np.random.default_rng(seed)
-    A = rng.integers(-4, 5, (M, K)).astype(np.int8)
-    B = rng.integers(-4, 5, (K, N)).astype(np.int8)
-    C = np.zeros((M, N), np.int8)
-    prog = gemm_program(relu)
-    imem = np.zeros(IMEM_WORDS, np.uint64)          # 0 == OP_NOP
-    imem[: len(prog)] = np.array(prog, np.uint64)
-    gold = A.astype(np.int64) @ B.astype(np.int64)
+    A = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
+    B = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
+    return A, B
+
+
+def imem_of(prog):
+    w = assemble(prog)
+    m = np.zeros(IMEM_SIZE, np.uint64)
+    m[: len(w)] = np.array(w, np.uint64)
+    return m, len(w)
+
+
+def check(mod, M, K, N, relu):
+    A, B = buffers()
+    C = np.zeros(MAXDIM * MAXDIM, np.int8)
+    prog = gemm_program(M, K, N, relu)
+    imem, _ = imem_of(prog)
+    mod(imem, A.reshape(-1), B.reshape(-1), C)
+    C = C.reshape(MAXDIM, MAXDIM)
+    gold = A[:M, :K].astype(np.int64) @ B[:K, :N].astype(np.int64)
     if relu:
         gold = np.maximum(gold, 0)
-    gold = np.clip(gold, -128, 127)                  # Gemmini mvout clips
-    return imem, A, B, C, gold.astype(np.int8), len(prog)
-
-
-def run_sim(relu=False):
-    imem, A, B, C, gold, n = inputs(relu)
-    df.build(tinytpu_isa, target="simulator")(imem, A, B, C)
-    bad = int((C.astype(np.int64) != gold.astype(np.int64)).sum())
-    print(f"  {'gemm.relu' if relu else 'gemm':9s} {M}x{K}x{N}  "
-          f"{n}/{NPROG} instrs  wrong={bad}/{M*N}")
-    if bad:
-        print("   got\n", C, "\n   want\n", gold)
+    gold = np.clip(gold, -128, 127).astype(np.int8)
+    bad = int((C[:M, :N] != gold).sum())
+    print(f"  {'gemm.relu' if relu else 'gemm':9s} {M:2d}x{K:2d}x{N:2d}  "
+          f"{len(prog):3d} instrs  wrong={bad}/{M*N}")
     return bad == 0
 
 
-def run_vadd():
-    """Exercise the vector unit itself.
-
-    Tiled GEMM no longer needs `vadd` on its inner loop -- `mm` accumulates,
-    as Gemmini's does -- so the vector unit needs its own program to stay
-    verified. `vadd_program()` computes A@B into two accumulator regions, adds
-    them, ReLUs, and retires, i.e. relu(2 * (A @ B)) on the first output tile."""
-    rng = np.random.default_rng(0)
-    A = rng.integers(-4, 5, (M, K)).astype(np.int8)
-    B = rng.integers(-4, 5, (K, N)).astype(np.int8)
-    C = np.zeros((M, N), np.int8)
-    prog = vadd_program()
-    imem = np.zeros(IMEM_WORDS, np.uint64)
-    imem[: len(prog)] = np.array(prog, np.uint64)
-    df.build(tinytpu_isa, target="simulator")(imem, A, B, C)
-    gold = 2 * (A[:, :T].astype(np.int64) @ B[:T, :T].astype(np.int64))
+def check_vadd(mod, M, K, N):
+    A, B = buffers()
+    C = np.zeros(MAXDIM * MAXDIM, np.int8)
+    prog = vadd_program(M, K, N)
+    imem, _ = imem_of(prog)
+    mod(imem, A.reshape(-1), B.reshape(-1), C)
+    C = C.reshape(MAXDIM, MAXDIM)
+    gold = 2 * (A[:M, :T].astype(np.int64) @ B[:T, :T].astype(np.int64))
     gold = np.clip(np.maximum(gold, 0), -128, 127).astype(np.int8)
-    bad = int((C[:, :T] != gold).sum())
-    print(f"  {'vadd+vrelu':9s} {M}x{K}x{N}  {len(prog)}/{NPROG} instrs  "
+    bad = int((C[:M, :T] != gold).sum())
+    print(f"  {'vadd+relu':9s} {M:2d}x{K:2d}x{N:2d}  {len(prog):3d} instrs  "
           f"wrong={bad}/{M*T}")
     return bad == 0
 
 
-def run_hls(mode):
-    project = os.path.abspath(f"isa_{mode}_{M}x{K}x{N}.prj")
-    s = customize(tinytpu_isa)
-    schedule(s)
-    s.build(target="vitis_hls", mode=mode, project=project)
-    print(f"  scaffolded {mode} -> {project}")
-
-
 if __name__ == "__main__":
-    what = sys.argv[1] if len(sys.argv) > 1 else "simulator"
-    print(f"TinyTPU-isa: {T}x{T} WS array + vector unit + SIMD scratchpad, "
-          f"{M}x{K}x{N} (Kt={Kt}, Nt={Nt}), {NPROG} instruction slots")
-    if what == "simulator":
-        ok = run_sim(False) and run_sim(True) and run_vadd()
-        sys.exit(0 if ok else 1)
-    run_hls(what)
+    shapes = SHAPES
+    if len(sys.argv) == 4:
+        shapes = [tuple(int(a) for a in sys.argv[1:4])]
+    print(f"TinyTPU-isa: ONE build -- {T}x{T} array, MAXDIM={MAXDIM}, "
+          f"imem {IMEM_SIZE}; sweeping {len(shapes)} shape(s)")
+    mod = df.build(tinytpu_isa, target="simulator")     # built once
+    ok = True
+    for (M, K, N) in shapes:
+        ok &= check(mod, M, K, N, False)
+        ok &= check(mod, M, K, N, True)
+    ok &= check_vadd(mod, *shapes[-1])
+    print("  ALL EXACT" if ok else "  FAILURES")
+    sys.exit(0 if ok else 1)
