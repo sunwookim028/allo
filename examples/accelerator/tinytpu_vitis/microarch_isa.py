@@ -102,13 +102,30 @@ Mt, Kt, Nt = M // T, K // T, N // T
 SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))   # rows, each one packed word
 NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
 NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
-MAXROWS = 127                                      # the `nr` field is 7 bits
-VLD_CHUNK = int(os.environ.get("TPU_CHUNK", 8))    # max rows per vld burst
+MAXROWS = 127                                      # `nr` is 8 bits, top bit signed
+VLD_CHUNK = int(os.environ.get("TPU_CHUNK", 127))  # max rows per vld burst
 
 # ---------------------------------------------------------------- the ISA ----
 # One 64-bit instruction word: a 6-bit opcode and five fields. The fields are
 # deliberately wide enough that the encoding is not the limit on problem size.
-#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:61]
+#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
+#
+# **Every field carries one more bit than its value range needs, because a
+# bit-slice is extracted into a *signed* `ap_int<N>` in the emitted HLS:**
+#
+#     ap_int<7> v268;  v268 = w02(60, 54);   // nr
+#     int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
+#
+# so a field whose top bit is set reads back negative, and a loop bounded by it
+# runs zero times. This cost a real bug: `nr = 64` for a 64-row `vld` silently
+# loaded nothing, and the design produced zeros. The Allo dataflow simulator
+# treats the slice as unsigned and passed, so **only cosim/csim caught it** --
+# a genuine simulator/RTL divergence, and the reason `cosim.py` is worth having
+# in the loop rather than at the end.
+#
+# The rule this imposes: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
+# is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
+# a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
 #
 # `nr` is the row count for *every* instruction that has one, and it is only 7
 # bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
@@ -122,7 +139,7 @@ OP_NOP = 0
 OP_DMA_LD = 1     # f0=src(0=A,1=B) f1=dram_row0 f2=col_block f3=spad0  nr=rows
 OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
 OP_VLD = 3        # f0=vr0  f1=spad0                            nr=rows
-OP_MM = 4         # f0=vr_a f1=ar0   f3=vr_w             nr=rows
+OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=vr_w       nr=rows
 OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
 OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
@@ -132,8 +149,12 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
     """Assemble one instruction word. The compiler backend that lowers a TOSA
     matmul into these lives only on `chia-codesign`, so programs are written by
     hand -- `gemm_program()` below is the tiled-GEMM one."""
-    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 7)):
-        assert 0 <= v < (1 << w), f"field {v} does not fit in {w} bits"
+    # `< (1 << (w - 1))`, not `< (1 << w)`: the top bit is the sign bit once the
+    # field is extracted, see the encoding note above.
+    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 8)):
+        assert 0 <= v < (1 << (w - 1)), (
+            f"field {v} does not fit in {w - 1} usable bits "
+            f"(bit {w - 1} is the sign bit after extraction)")
     return (
         (op & 0x3F)
         | (f0 << 6)
@@ -173,17 +194,18 @@ def gemm_program(relu=False):
     # A and B into the scratchpad, one column-block at a time.
     for kb in range(Kt):
         p.append(enc(OP_DMA_LD, f0=0, f1=0, f2=kb, f3=A_SP + kb * M, nr=M))
+    # One `dma_ld` per column block of B, not one per (nb, kb) tile: rows
+    # 0..K-1 of column block nb are contiguous at `B_SP + nb*K`, so `nr = K`
+    # fetches the lot. Instruction count is the term that matters -- each one
+    # costs ~18 cycles of unpipelined loop overhead on top of its rows -- so
+    # folding Nt*Kt instructions into Nt is worth more than it looks.
     for nb in range(Nt):
-        for kb in range(Kt):
-            p.append(enc(OP_DMA_LD, f0=1, f1=kb * T, f2=nb,
-                         f3=B_SP + nb * K + kb * T, nr=T))
-    # Every A word into vregs once, and it stays there for the whole run --
-    # but issued in bounded chunks. One `vld` of `Kt*M` rows is a *burst* of
-    # that many words into `sp2vr`, and a channel shallower than the burst only
-    # works if the consumer drains concurrently; measured, the design needed
-    # depth >= Kt*M (64 words at 16x16x16, 128 at 32x16x16). Chunking is a
-    # program change, not a hardware change -- the ISA already takes a row
-    # count -- and it bounds every channel by a constant.
+        p.append(enc(OP_DMA_LD, f0=1, f1=0, f2=nb, f3=B_SP + nb * K, nr=K))
+    # Every A word into vregs once, and it stays there for the whole run.
+    # Chunked only by the row-count field's range: the burst-length theory that
+    # motivated small chunks was disproved (the depth requirement was the
+    # simulator's thread count, see RESULTS_ISA.md), so the chunk is now as
+    # large as the ISA allows and this is one instruction at every shape here.
     for c0 in range(0, Kt * M, VLD_CHUNK):
         n = min(VLD_CHUNK, Kt * M - c0)
         p.append(enc(OP_VLD, f0=A_VR + c0, f1=A_SP + c0, nr=n))
@@ -192,13 +214,12 @@ def gemm_program(relu=False):
         for kb in range(Kt):
             # This k-tile's weights: T words, rows kb*T .. kb*T+T of column nb.
             p.append(enc(OP_VLD, f0=W_VR, f1=B_SP + nb * K + kb * T, nr=T))
-            if kb == 0:
-                # First k-tile lands straight in the accumulator, so no vadd
-                # and no zeroing instruction is needed.
-                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_C, f3=W_VR, nr=M))
-            else:
-                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_P, f3=W_VR, nr=M))
-                p.append(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M))
+            # One instruction per k-tile: the first overwrites the
+            # accumulator, the rest accumulate into it. No `vadd`, no zeroing
+            # instruction, and nothing on the critical unit but the psums the
+            # array actually produced.
+            p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_C, f2=(1 if kb else 0),
+                         f3=W_VR, nr=M))
         if relu:
             p.append(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
         # One instruction retires the tile: accumulator -> DRAM, clipped.
@@ -208,7 +229,27 @@ def gemm_program(relu=False):
 
 # The instruction count is a hardware parameter (every unit's outer loop bound),
 # so it is fixed at build time from the longest program the design must run.
-NPROG = max(len(gemm_program(False)), len(gemm_program(True)))
+def vadd_program():
+    """A program for the vector unit itself, so `vadd`/`vrelu` stay exercised
+    now that tiled GEMM no longer needs them on its inner loop.
+
+    Computes A@B twice into two accumulator regions, adds them, ReLUs the sum,
+    and retires it -- so the result is `relu(2 * (A @ B))` on the first output
+    tile, which the bench checks."""
+    p = [enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_SP, nr=M),
+         enc(OP_DMA_LD, f0=1, f1=0, f2=0, f3=B_SP, nr=T),
+         enc(OP_VLD, f0=A_VR, f1=A_SP, nr=M),
+         enc(OP_VLD, f0=W_VR, f1=B_SP, nr=T),
+         enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=W_VR, nr=M),
+         enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=W_VR, nr=M),
+         enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
+         enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
+         enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]
+    return p
+
+
+NPROG = max(len(gemm_program(False)), len(gemm_program(True)),
+            len(vadd_program()))
 
 # Stream depth. A constant, and a small one: the design's channel graph needs
 # depth 4, verified two ways -- a KPN model of the exact channel structure
@@ -239,6 +280,42 @@ QD = int(os.environ.get("TPU_QD", 8))
 # (`load_buf0` in the csynth report). This is an artifact of the declaration,
 # not of the architecture, and the fix is to declare what the program needs.
 IMEM_SIZE = max(64, NPROG)
+
+
+def _unit_counts():
+    """How many instructions each unit actually acts on.
+
+    Every unit used to see all `NPROG` instructions and decode each one, even
+    when it had nothing to do with it -- the PEs saw 80 and needed 16, `dma_st`
+    saw 80 and needed 4, and 76% of all decode work in the design was for
+    instructions the unit would ignore. Since a unit's per-instruction loop is
+    not pipelined (`RESULTS_ISA.md`), that decode is not free: it is the
+    dominant term in the 24 cycles/instruction measured against Gemmini's 5.9
+    (`COMPARISON.md`).
+
+    So the sequencer now dispatches each instruction only to the units that
+    must act on it, and each unit's loop runs for its own count. Taken over
+    both programs, since the same hardware runs `gemm` and `gemm.relu`."""
+    import collections
+    n = collections.Counter()
+    progs = [gemm_program(False), gemm_program(True), vadd_program()]
+    for prog in progs:
+        c = collections.Counter(int(w) & 0x3F for w in prog)
+        for k, v in (
+            ("dld", c[OP_DMA_LD]),
+            ("spm", c[OP_DMA_LD] + c[OP_VLD]),
+            ("vru", c[OP_VLD] + c[OP_MM]),
+            ("mm",  c[OP_MM]),
+            ("acc", c[OP_MM] + c[OP_VADD] + c[OP_VRELU] + c[OP_MVOUT]),
+            ("dst", c[OP_MVOUT]),
+        ):
+            n[k] = max(n[k], v)
+    return n
+
+
+_N = _unit_counts()
+N_DLD, N_SPM, N_VRU = _N["dld"], _N["spm"], _N["vru"]
+N_MM, N_ACC, N_DST = _N["mm"], _N["acc"], _N["dst"]
 
 
 @df.region()
@@ -284,16 +361,69 @@ def tinytpu_isa(
 
     @df.kernel(mapping=[1], args=[imem])
     def sequencer(l_imem: UInt(64)[IMEM_SIZE]):
-        """Fetch and broadcast the decoded word. Consumes nothing, so it cannot
-        be in a dependence cycle with any data path.
+        """Fetch, decode, and dispatch each instruction to the units that act
+        on it -- and to no others.
 
-        Four puts to four distinct FIFOs are four distinct ports, so this is one
-        cycle per instruction -- the fetch/issue rate is not the bottleneck the
-        way it was on `chia-codesign`, where a unit was a `func.call` and the
-        compiler would not pipeline across one."""
+        Consumes nothing, so it cannot be in a dependence cycle with any data
+        path. Its own loop is the only one in the design Vitis pipelines (II=1),
+        because its body is a decode and a few puts with no inner loop.
+
+        **The dispatch order is dataflow order** (`dma_ld`, `spm`, `vru`,
+        `accu`, `dma_st`) and that is load-bearing. If the sequencer blocks on a
+        full queue, every unit *upstream* of that one already holds this
+        instruction and can keep producing the data the blocked unit is waiting
+        for, so it drains and the block clears. Dispatching downstream-first
+        deadlocks: a unit would sit waiting for operands from an upstream unit
+        that had not yet been given the instruction that produces them.
+
+        The trailing pads matter for the same reason the counts do: `gemm` and
+        `gemm.relu` contain different numbers of `vrelu`, so a queue is topped
+        up with NOPs to the fixed count its unit loops over."""
+        n_dld: int32 = 0
+        n_spm: int32 = 0
+        n_vru: int32 = 0
+        n_acc: int32 = 0
+        n_dst: int32 = 0
         for c in range(NPROG):
             w0: UInt(64) = l_imem[c]
-            c_dld.put(w0)
+            op: int32 = w0[0:6]
+            if op == OP_DMA_LD:
+                c_dld.put(w0)
+                n_dld += 1
+                c_spm.put(w0)
+                n_spm += 1
+            if op == OP_VLD:
+                c_spm.put(w0)
+                n_spm += 1
+                c_vru.put(w0)
+                n_vru += 1
+            if op == OP_MM:
+                c_vru.put(w0)
+                n_vru += 1
+                c_acc.put(w0)
+                n_acc += 1
+            if op == OP_VADD:
+                c_acc.put(w0)
+                n_acc += 1
+            if op == OP_VRELU:
+                c_acc.put(w0)
+                n_acc += 1
+            if op == OP_MVOUT:
+                c_acc.put(w0)
+                n_acc += 1
+                c_dst.put(w0)
+                n_dst += 1
+        # Top each queue up to the count its unit loops over.
+        for _p in range(N_DLD - n_dld):
+            c_dld.put(0)
+        for _p in range(N_SPM - n_spm):
+            c_spm.put(0)
+        for _p in range(N_VRU - n_vru):
+            c_vru.put(0)
+        for _p in range(N_ACC - n_acc):
+            c_acc.put(0)
+        for _p in range(N_DST - n_dst):
+            c_dst.put(0)
 
     @df.kernel(mapping=[1], args=[A, B])
     def dma_ld(lA: int8[M, K], lB: int8[K, N]):
@@ -309,15 +439,14 @@ def tinytpu_isa(
 
         Packs T lanes per cycle, so the scratchpad only ever sees whole words.
         The T reads land in T banks because `schedule()` partitions A and B."""
-        for c in range(NPROG):
+        for c in range(N_DLD):
             w0: UInt(64) = c_dld.get()
-            c_spm.put(w0)          # forward before executing
             op: int32 = w0[0:6]
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
+            nr: int32 = w0[54:62]
             if op == OP_DMA_LD:
                 for r in range(nr):
                     pw: UInt(VW) = 0
@@ -339,15 +468,14 @@ def tinytpu_isa(
         T lanes per cycle, and it is why `HLS 200-779` (single reader, single
         writer) is satisfied without a pragma."""
         spad: UInt(VW)[SPAD_ROWS] = 0
-        for c in range(NPROG):
+        for c in range(N_SPM):
             w0: UInt(64) = c_spm.get()
-            c_vru.put(w0)          # forward before executing
             op: int32 = w0[0:6]
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
+            nr: int32 = w0[54:62]
             if op == OP_DMA_LD:
                 for r in range(nr):
                     spad[f3 + r] = dma2sp.get()
@@ -366,28 +494,28 @@ def tinytpu_isa(
         The header word it emits ahead of every instruction is the array's only
         control input -- `is_mm` and `nrows`, nothing else."""
         vr: UInt(VW)[NVR] = 0
-        for c in range(NPROG):
+        n_mm: int32 = 0
+        for c in range(N_VRU):
             w0: UInt(64) = c_vru.get()
-            c_acc.put(w0)          # forward before executing
             op: int32 = w0[0:6]
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
-
-            # The header leads every instruction, so the array's outer loop
-            # stays in lockstep with the program without decoding it.
-            hdr: UInt(VW) = 0
-            if op == OP_MM:
-                hdr[0:1] = 1
-                hdr[8:15] = nr
-            wcol[0].put(hdr)
+            nr: int32 = w0[54:62]
 
             if op == OP_VLD:
                 for r in range(nr):
                     vr[f0 + r] = sp2vr.get()
             if op == OP_MM:
+                n_mm += 1
+                # The header carries the row count, and it is sent **only for
+                # `mm`** -- the array's loop counts `mm` instructions, not
+                # program instructions, so there is nothing for it to skip and
+                # no opcode in the array at all.
+                hdr: UInt(VW) = 0
+                hdr[0:12] = nr
+                wcol[0].put(hdr)
                 # T weight words, row 0 first: each PE keeps the first word it
                 # sees and forwards the rest, so row i keeps word i.
                 with allo.meta_for(T) as k:
@@ -397,9 +525,27 @@ def tinytpu_isa(
                     rw: UInt(VW) = vr[f0 + r]
                     acol[0].put(rw)
 
+        # Pad the array to `N_MM`. The PEs count `mm` instructions, so a
+        # program with fewer than the maximum would leave them waiting for
+        # headers that never arrive. A pad is a complete but empty `mm`: a
+        # header with nrows = 0 and the T weight words the shift-in consumes,
+        # after which the wavefront loop runs zero times. That keeps the PE
+        # body branch-free, which is the point of counting `mm`s there.
+        for _q in range(N_MM - n_mm):
+            zh: UInt(VW) = 0
+            wcol[0].put(zh)
+            with allo.meta_for(T) as k2:
+                zw: UInt(VW) = 0
+                wcol[0].put(zw)
+
     @df.kernel(mapping=[T, T])
     def pe():
         """One processing element. Weight-stationary, and it decodes nothing.
+
+        Its loop counts **`mm` instructions**, not program instructions: the
+        sequencer sends `mm` only to the units that execute it, so the array
+        never sees -- and never spends a cycle decoding -- a `vld`, `vadd` or
+        `mvout`. At 16x16x16 that is 16 iterations instead of 80.
 
         The compute loop has **no loop-carried value**: tap a lane, take the
         partial sum from the north, multiply-add, pass both on. The multiplier
@@ -408,7 +554,7 @@ def tinytpu_isa(
         array is built deep."""
         i, j = df.get_pid()
         w: int8 = 0
-        for c in range(NPROG):
+        for c in range(N_MM):
             # --- header: down column 0, then east along the row ---
             hdr: UInt(VW) = 0
             with allo.meta_if(j == 0):
@@ -419,53 +565,51 @@ def tinytpu_isa(
                 hdr = wrow[i, j - 1].get()
             with allo.meta_if(j != T - 1):
                 wrow[i, j].put(hdr)
-            is_mm: int32 = hdr[0:1]
-            nrows: int32 = hdr[8:15]
+            nrows: int32 = hdr[0:12]
 
-            if is_mm == 1:
-                # --- latch my row's weight word, forward the rows below ---
-                ww: UInt(VW) = 0
+            # --- latch my row's weight word, forward the rows below ---
+            ww: UInt(VW) = 0
+            with allo.meta_if(j == 0):
+                ww = wcol[i].get()
+                with allo.meta_for(T - 1 - i) as _f:
+                    wcol[i + 1].put(wcol[i].get())
+            with allo.meta_else():
+                ww = wrow[i, j - 1].get()
+            with allo.meta_if(j != T - 1):
+                wrow[i, j].put(ww)
+            w = ww[8 * j : 8 * (j + 1)]
+
+            # --- one wavefront per cycle ---
+            for m in range(nrows):
+                a: int8 = 0
                 with allo.meta_if(j == 0):
-                    ww = wcol[i].get()
-                    with allo.meta_for(T - 1 - i) as _f:
-                        wcol[i + 1].put(wcol[i].get())
-                with allo.meta_else():
-                    ww = wrow[i, j - 1].get()
-                with allo.meta_if(j != T - 1):
-                    wrow[i, j].put(ww)
-                w = ww[8 * j : 8 * (j + 1)]
-
-                # --- one wavefront per cycle ---
-                for m in range(nrows):
-                    a: int8 = 0
-                    with allo.meta_if(j == 0):
-                        aw: UInt(VW) = acol[i].get()
-                        with allo.meta_if(i != T - 1):
-                            acol[i + 1].put(aw)
-                        a = aw[8 * i : 8 * (i + 1)]
-                    with allo.meta_else():
-                        a = a_fwd[i, j - 1].get()
-                    p: int32 = 0
-                    with allo.meta_if(i > 0):
-                        p = p_fwd[i - 1, j].get()
-                    # int8 x int8 -> int16 keeps this a narrow multiply; the
-                    # operands bound the product at 127*127 = 16129.
-                    av: int16 = a
-                    wv: int16 = w
-                    o: int32 = p + av * wv
+                    aw: UInt(VW) = acol[i].get()
                     with allo.meta_if(i != T - 1):
-                        p_fwd[i, j].put(o)
-                    with allo.meta_else():
-                        # The bottom row assembles the packed result word as it
-                        # travels east, so the accumulator sees whole words and
-                        # there is no T-way fan-in.
-                        cv: UInt(AW) = 0
-                        with allo.meta_if(j > 0):
-                            cv = cw[j - 1].get()
-                        cv[32 * j : 32 * (j + 1)] = o
-                        cw[j].put(cv)
-                    with allo.meta_if(j != T - 1):
-                        a_fwd[i, j].put(a)
+                        acol[i + 1].put(aw)
+                    a = aw[8 * i : 8 * (i + 1)]
+                with allo.meta_else():
+                    a = a_fwd[i, j - 1].get()
+                p: int32 = 0
+                with allo.meta_if(i > 0):
+                    p = p_fwd[i - 1, j].get()
+                # int8 x int8 -> int16 keeps this a narrow multiply; the
+                # operands bound the product at 127*127 = 16129.
+                av: int16 = a
+                wv: int16 = w
+                o: int32 = p + av * wv
+                with allo.meta_if(i != T - 1):
+                    p_fwd[i, j].put(o)
+                with allo.meta_else():
+                    # The bottom row assembles the packed result word as it
+                    # travels east, so the accumulator sees whole words and
+                    # there is no T-way fan-in.
+                    cv: UInt(AW) = 0
+                    with allo.meta_if(j > 0):
+                        cv = cw[j - 1].get()
+                    cv[32 * j : 32 * (j + 1)] = o
+                    cw[j].put(cv)
+                with allo.meta_if(j != T - 1):
+                    a_fwd[i, j].put(a)
 
     @df.kernel(mapping=[1])
     def accu():
@@ -479,19 +623,46 @@ def tinytpu_isa(
         `vst` clips to int8 on the way out, which is Gemmini's `mvout` under
         ACC_SCALE_IDENTITY with shift 0."""
         ar: UInt(AW)[NAR] = 0
-        for c in range(NPROG):
+        for c in range(N_ACC):
             w0: UInt(64) = c_acc.get()
-            c_dst.put(w0)          # forward before executing
             op: int32 = w0[0:6]
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
+            nr: int32 = w0[54:62]
 
             if op == OP_MM:
+                # `f2` selects overwrite (0) or accumulate (1). Accumulating
+                # here is what makes the k-contraction free: with it, a Kt-deep
+                # contraction is Kt `mm`s and no `vadd` at all, where before it
+                # was Kt `mm`s *and* Kt-1 `vadd`s -- and both ran in this one
+                # unit, so `accu` was doing 2.25 row-ops for every wavefront the
+                # array produced and was the critical unit in the design
+                # (csynth interval 10772 against ~6000 for every other unit).
+                #
+                # This is Gemmini's structure, not a shortcut around the ISA:
+                # `AccumulatorMem.scala` puts the add in the memory's write
+                # path and the matmul carries an accumulate bit. `vadd` remains
+                # a real instruction for elementwise work -- `vadd_program()`
+                # exercises it -- it is just no longer on the GEMM inner loop.
+                #
+                # It also cannot recur: consecutive iterations touch different
+                # addresses (`f1 + r` for successive r), so the add is pipeline
+                # depth rather than initiation interval. That is the same reason
+                # `microarch_ws.py`'s drainer accumulated at II=1.
                 for r in range(nr):
-                    ar[f1 + r] = cw[T - 1].get()
+                    v: UInt(AW) = cw[T - 1].get()
+                    base: UInt(AW) = 0
+                    if f2 == 1:
+                        base = ar[f1 + r]
+                    z: UInt(AW) = 0
+                    with allo.meta_for(T) as e:
+                        be: int32 = base[32 * e : 32 * (e + 1)]
+                        ve: int32 = v[32 * e : 32 * (e + 1)]
+                        se: int32 = be + ve
+                        z[32 * e : 32 * (e + 1)] = se
+                    ar[f1 + r] = z
             if op == OP_VADD:
                 for r in range(nr):
                     x: UInt(AW) = ar[f1 + r]
@@ -543,13 +714,13 @@ def tinytpu_isa(
         order has no effect on the generated hardware -- in RTL the processes
         are concurrent -- but it decides whether `csim` works, and `csim` is the
         fast functional check."""
-        for c in range(NPROG):
+        for c in range(N_DST):
             w0: UInt(64) = c_dst.get()
             op: int32 = w0[0:6]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
-            nr: int32 = w0[54:61]
+            nr: int32 = w0[54:62]
             if op == OP_MVOUT:
                 for r in range(nr):
                     qw: UInt(VW) = ac2sp.get()

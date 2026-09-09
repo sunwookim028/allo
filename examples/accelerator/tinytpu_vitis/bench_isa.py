@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 import allo.dataflow as df  # noqa: E402
 from allo.dataflow import customize  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, gemm_program, schedule, M, K, N, T, NPROG, Kt, Nt,
+    tinytpu_isa, gemm_program, vadd_program, schedule, M, K, N, T, NPROG,
+    Kt, Nt,
 )
 
 from examples.accelerator.tinytpu_vitis.microarch_isa import IMEM_SIZE as IMEM_WORDS  # noqa: E402
@@ -45,6 +46,29 @@ def run_sim(relu=False):
     return bad == 0
 
 
+def run_vadd():
+    """Exercise the vector unit itself.
+
+    Tiled GEMM no longer needs `vadd` on its inner loop -- `mm` accumulates,
+    as Gemmini's does -- so the vector unit needs its own program to stay
+    verified. `vadd_program()` computes A@B into two accumulator regions, adds
+    them, ReLUs, and retires, i.e. relu(2 * (A @ B)) on the first output tile."""
+    rng = np.random.default_rng(0)
+    A = rng.integers(-4, 5, (M, K)).astype(np.int8)
+    B = rng.integers(-4, 5, (K, N)).astype(np.int8)
+    C = np.zeros((M, N), np.int8)
+    prog = vadd_program()
+    imem = np.zeros(IMEM_WORDS, np.uint64)
+    imem[: len(prog)] = np.array(prog, np.uint64)
+    df.build(tinytpu_isa, target="simulator")(imem, A, B, C)
+    gold = 2 * (A[:, :T].astype(np.int64) @ B[:T, :T].astype(np.int64))
+    gold = np.clip(np.maximum(gold, 0), -128, 127).astype(np.int8)
+    bad = int((C[:, :T] != gold).sum())
+    print(f"  {'vadd+vrelu':9s} {M}x{K}x{N}  {len(prog)}/{NPROG} instrs  "
+          f"wrong={bad}/{M*T}")
+    return bad == 0
+
+
 def run_hls(mode):
     project = os.path.abspath(f"isa_{mode}_{M}x{K}x{N}.prj")
     s = customize(tinytpu_isa)
@@ -58,6 +82,6 @@ if __name__ == "__main__":
     print(f"TinyTPU-isa: {T}x{T} WS array + vector unit + SIMD scratchpad, "
           f"{M}x{K}x{N} (Kt={Kt}, Nt={Nt}), {NPROG} instruction slots")
     if what == "simulator":
-        ok = run_sim(False) and run_sim(True)
+        ok = run_sim(False) and run_sim(True) and run_vadd()
         sys.exit(0 if ok else 1)
     run_hls(what)
