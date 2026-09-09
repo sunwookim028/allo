@@ -102,27 +102,37 @@ Mt, Kt, Nt = M // T, K // T, N // T
 SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))   # rows, each one packed word
 NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
 NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
+MAXROWS = 127                                      # the `nr` field is 7 bits
 VLD_CHUNK = int(os.environ.get("TPU_CHUNK", 8))    # max rows per vld burst
 
 # ---------------------------------------------------------------- the ISA ----
 # One 64-bit instruction word: a 6-bit opcode and five fields. The fields are
 # deliberately wide enough that the encoding is not the limit on problem size.
-#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:53]  f4 [53:64]
+#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:61]
+#
+# `nr` is the row count for *every* instruction that has one, and it is only 7
+# bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
+# synthesis tool bounds a runtime-bounded loop by the *range of the index*, so
+# when the row count came out of a 12-bit field Vitis assumed up to 4095 rows
+# per instruction and reported `Trip = 1023 / 2049` with a top-level latency of
+# 91407 cycles -- a worst-case bound from the encoding, not a property of the
+# design. Narrowing the field narrows the bound. Gemmini does the same thing:
+# its mvin/mvout carry an explicit, bounded row count.
 OP_NOP = 0
-OP_DMA_LD = 1     # f0=src(0=A,1=B) f1=dram_row0 f2=col_block f3=nrows f4=spad0
-OP_DMA_ST = 2     # (unused: results leave via OP_MVOUT)
-OP_VLD = 3        # f0=vr0    f1=spad0 f2=nrows      spad -> operand vregs
-OP_MM = 4         # f0=vr_a   f1=ar0   f2=nrows f3=vr_w   one k-tile of psums
-OP_VADD = 5       # f0=ar_d   f1=ar_s1 f2=ar_s2 f3=nrows  SIMD add, T lanes
-OP_VRELU = 6      # f0=ar_d   f1=ar_s  f2=nrows
-OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block f3=nrows  acc -> DRAM
+OP_DMA_LD = 1     # f0=src(0=A,1=B) f1=dram_row0 f2=col_block f3=spad0  nr=rows
+OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
+OP_VLD = 3        # f0=vr0  f1=spad0                            nr=rows
+OP_MM = 4         # f0=vr_a f1=ar0   f3=vr_w             nr=rows
+OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
+OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
+OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
 
 
-def enc(op, f0=0, f1=0, f2=0, f3=0, f4=0):
+def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
     """Assemble one instruction word. The compiler backend that lowers a TOSA
     matmul into these lives only on `chia-codesign`, so programs are written by
     hand -- `gemm_program()` below is the tiled-GEMM one."""
-    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 11), (f4, 11)):
+    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 7)):
         assert 0 <= v < (1 << w), f"field {v} does not fit in {w} bits"
     return (
         (op & 0x3F)
@@ -130,7 +140,7 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, f4=0):
         | (f1 << 18)
         | (f2 << 30)
         | (f3 << 42)
-        | (f4 << 53)
+        | (nr << 54)
     )
 
 
@@ -162,11 +172,11 @@ def gemm_program(relu=False):
     p = []
     # A and B into the scratchpad, one column-block at a time.
     for kb in range(Kt):
-        p.append(enc(OP_DMA_LD, f0=0, f1=0, f2=kb, f3=M, f4=A_SP + kb * M))
+        p.append(enc(OP_DMA_LD, f0=0, f1=0, f2=kb, f3=A_SP + kb * M, nr=M))
     for nb in range(Nt):
         for kb in range(Kt):
-            p.append(enc(OP_DMA_LD, f0=1, f1=kb * T, f2=nb, f3=T,
-                         f4=B_SP + nb * K + kb * T))
+            p.append(enc(OP_DMA_LD, f0=1, f1=kb * T, f2=nb,
+                         f3=B_SP + nb * K + kb * T, nr=T))
     # Every A word into vregs once, and it stays there for the whole run --
     # but issued in bounded chunks. One `vld` of `Kt*M` rows is a *burst* of
     # that many words into `sp2vr`, and a channel shallower than the burst only
@@ -176,23 +186,23 @@ def gemm_program(relu=False):
     # count -- and it bounds every channel by a constant.
     for c0 in range(0, Kt * M, VLD_CHUNK):
         n = min(VLD_CHUNK, Kt * M - c0)
-        p.append(enc(OP_VLD, f0=A_VR + c0, f1=A_SP + c0, f2=n))
+        p.append(enc(OP_VLD, f0=A_VR + c0, f1=A_SP + c0, nr=n))
 
     for nb in range(Nt):
         for kb in range(Kt):
             # This k-tile's weights: T words, rows kb*T .. kb*T+T of column nb.
-            p.append(enc(OP_VLD, f0=W_VR, f1=B_SP + nb * K + kb * T, f2=T))
+            p.append(enc(OP_VLD, f0=W_VR, f1=B_SP + nb * K + kb * T, nr=T))
             if kb == 0:
                 # First k-tile lands straight in the accumulator, so no vadd
                 # and no zeroing instruction is needed.
-                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_C, f2=M, f3=W_VR))
+                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_C, f3=W_VR, nr=M))
             else:
-                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_P, f2=M, f3=W_VR))
-                p.append(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, f3=M))
+                p.append(enc(OP_MM, f0=A_VR + kb * M, f1=AR_P, f3=W_VR, nr=M))
+                p.append(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M))
         if relu:
-            p.append(enc(OP_VRELU, f0=AR_C, f1=AR_C, f2=M))
+            p.append(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
         # One instruction retires the tile: accumulator -> DRAM, clipped.
-        p.append(enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, f3=M))
+        p.append(enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M))
     return p
 
 
@@ -286,9 +296,10 @@ def tinytpu_isa(
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
-            f3: int32 = w0[42:53]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
             if op == OP_DMA_LD:
-                for r in range(f3):
+                for r in range(nr):
                     pw: UInt(VW) = 0
                     with allo.meta_for(T) as e:
                         v: int8 = 0
@@ -308,9 +319,10 @@ def tinytpu_isa(
             op: int32 = w0[0:6]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
-            f3: int32 = w0[42:53]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
             if op == OP_MVOUT:
-                for r in range(f3):
+                for r in range(nr):
                     qw: UInt(VW) = ac2sp.get()
                     with allo.meta_for(T) as e:
                         ov: int8 = qw[8 * e : 8 * (e + 1)]
@@ -332,16 +344,13 @@ def tinytpu_isa(
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
-            f3: int32 = w0[42:53]
-            f4: int32 = w0[53:64]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
             if op == OP_DMA_LD:
-                for r in range(f3):
-                    spad[f4 + r] = dma2sp.get()
-            if op == OP_DMA_ST:
-                for r in range(f3):
-                    sw: UInt(VW) = spad[f0 + r]
+                for r in range(nr):
+                    spad[f3 + r] = dma2sp.get()
             if op == OP_VLD:
-                for r in range(f2):
+                for r in range(nr):
                     lw: UInt(VW) = spad[f1 + r]
                     sp2vr.put(lw)
             # No write-back branch: the scratchpad is input-only. Results
@@ -362,18 +371,19 @@ def tinytpu_isa(
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
-            f3: int32 = w0[42:53]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
 
             # The header leads every instruction, so the array's outer loop
             # stays in lockstep with the program without decoding it.
             hdr: UInt(VW) = 0
             if op == OP_MM:
                 hdr[0:1] = 1
-                hdr[8:20] = f2
+                hdr[8:15] = nr
             wcol[0].put(hdr)
 
             if op == OP_VLD:
-                for r in range(f2):
+                for r in range(nr):
                     vr[f0 + r] = sp2vr.get()
             if op == OP_MM:
                 # T weight words, row 0 first: each PE keeps the first word it
@@ -381,7 +391,7 @@ def tinytpu_isa(
                 with allo.meta_for(T) as k:
                     kw: UInt(VW) = vr[f3 + k]
                     wcol[0].put(kw)
-                for r in range(f2):
+                for r in range(nr):
                     rw: UInt(VW) = vr[f0 + r]
                     acol[0].put(rw)
 
@@ -408,7 +418,7 @@ def tinytpu_isa(
             with allo.meta_if(j != T - 1):
                 wrow[i, j].put(hdr)
             is_mm: int32 = hdr[0:1]
-            nrows: int32 = hdr[8:20]
+            nrows: int32 = hdr[8:15]
 
             if is_mm == 1:
                 # --- latch my row's weight word, forward the rows below ---
@@ -474,13 +484,14 @@ def tinytpu_isa(
             f0: int32 = w0[6:18]
             f1: int32 = w0[18:30]
             f2: int32 = w0[30:42]
-            f3: int32 = w0[42:53]
+            f3: int32 = w0[42:54]
+            nr: int32 = w0[54:61]
 
             if op == OP_MM:
-                for r in range(f2):
+                for r in range(nr):
                     ar[f1 + r] = cw[T - 1].get()
             if op == OP_VADD:
-                for r in range(f3):
+                for r in range(nr):
                     x: UInt(AW) = ar[f1 + r]
                     y: UInt(AW) = ar[f2 + r]
                     z: UInt(AW) = 0
@@ -491,7 +502,7 @@ def tinytpu_isa(
                         z[32 * e : 32 * (e + 1)] = se
                     ar[f0 + r] = z
             if op == OP_VRELU:
-                for r in range(f2):
+                for r in range(nr):
                     u: UInt(AW) = ar[f1 + r]
                     zr: UInt(AW) = 0
                     with allo.meta_for(T) as e:
@@ -502,7 +513,7 @@ def tinytpu_isa(
                         zr[32 * e : 32 * (e + 1)] = re
                     ar[f0 + r] = zr
             if op == OP_MVOUT:
-                for r in range(f3):
+                for r in range(nr):
                     t: UInt(AW) = ar[f0 + r]
                     ow: UInt(VW) = 0
                     with allo.meta_for(T) as e:

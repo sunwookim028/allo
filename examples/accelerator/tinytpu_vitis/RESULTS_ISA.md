@@ -72,9 +72,66 @@ first one where `mm` alone cannot finish a tile and `vadd` actually runs.
 `gemm` and `gemm.relu` are bit-exact against a numpy reference including the
 int8 clip.
 
-**Not yet done: no synthesis run, no cycle count.** Every number here is
-functional. `csyn`/`cosim` come after the queue-depth problem below, because
-sizing FIFOs to the program would make an area number meaningless.
+## Synthesis, and why a programmable design's csynth number is not a cycle count
+
+`vitis_hls` at 8x8x8: **0 errors**, `dataflow` at the top, all 16 PEs
+instantiated as separate modules. But the first run reported a top-level
+latency of **91407 cycles**, against 74 for the fixed-function
+`microarch_ws.py`, and the report says why:
+
+```
+o VITIS_LOOP_300_1   Trip = 1023   Pipelined = yes
+o VITIS_LOOP_474_4   Trip = 2049
+```
+
+Nothing is slow. **Vitis bounds a runtime-bounded loop by the range of its
+index**, and the row count was arriving in a 12-bit instruction field, so it
+assumed up to 4095 rows per instruction. The number is a worst-case bound
+derived from the *encoding*, not a property of the machine.
+
+That is a real consequence of programmability, and it is worth stating plainly
+as an evaluation finding: for a fixed-function design, csynth's interval *is*
+the answer (`microarch_ws.py` hit its roofline exactly and could be checked
+statically). For an instruction-programmable design, **trip counts are data**,
+so static estimates become bounds and only `cosim` gives a cycle count. Any
+comparison against Gemmini's measured `rdcycle` has to be a cosim comparison.
+
+The bound is still worth tightening, because it is the ISA's fault rather than
+the tool's: `nr` is now a dedicated **7-bit** row-count field (`MAXROWS = 127`)
+used by every instruction, instead of a 12-bit general field, and the header
+that carries the row count into the array was narrowed to match. Gemmini does
+the same -- its mvin/mvout carry an explicit bounded row count.
+
+**Narrowing one field, with no change to any datapath, moved the bound 22x:**
+
+| | before (12-bit count) | after (7-bit `nr`) |
+|---|---|---|
+| top-level latency | 91407 | **4133** |
+| top-level interval | 90333 | **3059** |
+| reported trip counts | 1023, 2049 | **63** |
+
+Re-verified exact at 4x4x4, 8x8x8 and 16x16x16 after the change. Per unit at
+8x8x8 (`logs/csynth_isa_8x8x8.rpt`), 0 errors, `dataflow`, 22 processes:
+
+```
+| + tinytpu_isa*  | latency 4133 | interval 3059 | dataflow | BRAM 42 | DSP 12 | FF 16247 | LUT 21918 |
+|  + sequencer_0  |         24   |               |          |
+|  + dma_ld_0     |       1519   |               |          |
+|  + spm_0        |       2034   |               |          |
+|  + vru_0        |       1866   |               |          |
+|  + pe_0_0       |       1629   |  ... 16 PEs, each its own module
+|  + accu_0       |       3058   |  <- the critical unit
+|  + dma_st_0     |       1497   |               |          |
+```
+
+`accu_0` at 3058 is the whole top-level interval, so the vector unit -- not the
+array -- is the thing to optimize next. DSP is 12 rather than the 96 of the
+int8 `microarch_ws.py` build because int8 multiplies mapped into LUTs here;
+that is a mapping difference, not a missing array (all 16 `pe_i_j` modules are
+present in the report).
+
+These remain **estimates with a caveat**: the FIFOs are sized from the program
+(below), so the area figure is not one a real build would have.
 
 ## The queue-depth problem: unresolved, with four theories disproved
 
@@ -147,8 +204,8 @@ TPU_M=8 TPU_K=8 TPU_N=8 TPU_QD=64     python bench_isa.py simulator   # exact
    or a simulator deadlock report naming blocked processes and full channels.
    Everything else is gated on this -- an area or cycle number measured with
    FIFOs sized to the program would not mean anything.
-2. `cosim` -- the first real cycle count from this design, against Gemmini's
-   measured `rdcycle`.
+2. `cosim` -- the only thing that yields a real cycle count for a programmable
+   design, for the reason in the synthesis section above.
 3. A Gemmini int8 DIM=4 build so the comparison is dtype- and mesh-matched;
    `allo_cmp.c` needs no source change since it is written against `elem_t`.
 4. Scale T to 16 to match Gemmini's int8 default mesh.
