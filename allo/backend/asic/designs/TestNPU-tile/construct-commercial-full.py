@@ -21,7 +21,6 @@ def construct():
 
   adk_name = 'freepdk-45nm'
   adk_view = 'view-standard'
-  openram_python = os.environ.get('OPENRAM_PYTHON', 'python')
 
   parameters = {
     'construct_path'      : __file__,
@@ -29,40 +28,16 @@ def construct():
     'clock_period'        : 10.0,
     'adk'                 : adk_name,
     'adk_view'            : adk_view,
-    # Enable GUIs
-    'enable_gui'          : True,
-    # GLS Testbench
-    'saif_instance'       : 'ComputeTileTb/compute_tile_inst',
-    # Synthesis
-    # Flatten effort 0 is strict hierarchy, 3 is full flattening
-    'flatten_effort'      : 3,
     'topographical'       : False,
-    # Postroute timing target slack
-    'setup_target_slack'  : 0.000,
     'hold_target_slack'   : 0.050,
-    # Utilization target
-    'core_density_target' : 0.70,
-    # SV2V params
     'top_module'        : 'compute_tile',
     'design_path'       : '../../../mininpu/npu/src',
     'sv2v_include_dirs' : '.:common:compute_tile:compute_tile/fpu',
-    # OpenRAM params
-    'sram_manifest'  : 'rtl/sram_manifest.yml',
-    'python_bin'     : openram_python,
-    'openram_script' : '',
-    'tech_name'      : 'freepdk45',
-    'process_corner' : 'TT',
-    'supply_voltage' : 1.1,
-    'temperature'    : 25,
-    'check_lvsdrc'   : False,
-    'route_supplies' : True,     ## shortcut to skip power routing
-    'analytical_delay' : True,
-    #'use_sram_cache' : True,
-    #'sram_cache_path': 'srams',
+    'sram_mode'         : 'provided',
+    'provided_sram_path': '../../srams',
     'consume_upstream_testbench' : True,
     'testbench_top'       : 'ComputeTileTb',
     'dut_instance'        : 'compute_tile_inst',
-    'activity_source'     : 'bagl_vcd',
     'pass_marker'         : 'PASS',
   }
 
@@ -82,9 +57,8 @@ def construct():
 
   testbench      = Node( this_dir + '/testbench'   )
   testbench_collect = Node( os.path.join(nodes_dir, 'testbench-collector')        )
-  constraints    = Node( this_dir + '/constraints' )
 
-  openram        = Node( os.path.join(nodes_dir, 'openram-sram-generation')       )
+  sram           = Node( os.path.join(nodes_dir, 'sram-collateral')               )
   sv2v           = Node( os.path.join(nodes_dir, 'sv2v-design-collector')         )
   synth          = Node( os.path.join(nodes_dir, 'synopsys-dc-synthesis')         )
   pnr            = Node( os.path.join(nodes_dir, 'cadence-innovus-pnr')           )
@@ -111,8 +85,7 @@ def construct():
 
   g.add_node( sv2v              )
   g.add_node( testbench         )
-  g.add_node( openram           )
-  g.add_node( constraints       )
+  g.add_node( sram              )
   g.add_node( synth             )
   g.add_node( pnr               )
   g.add_node( gdsmerge          )
@@ -139,11 +112,10 @@ def construct():
                ffgl_sim, bagl_sim, power_est]:
     g.connect_by_name( adk, node )
   for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, lvs,
-               rtl_sim, ffgl_sim, bagl_sim, power_est]:
-    g.connect_by_name( openram, node )
+               rtl_sim, ffgl_sim, bagl_sim, power_est, summary]:
+    g.connect_by_name( sram, node )
   g.connect_by_name( sv2v,           synth          )
   g.connect_by_name( sv2v,           rtl_sim        )
-  g.connect_by_name( constraints,    synth          )
   g.connect_by_name( synth,          pnr            )
   g.connect_by_name( synth,          ffgl_sim       )
   for node in [pt_signoff, genlibdb, gdsmerge, drc, lvs, bagl_sim, power_est]:
@@ -153,7 +125,8 @@ def construct():
   g.connect_by_name( testbench,      testbench_collect )
   for node in [rtl_sim, ffgl_sim, bagl_sim, power_est]:
     g.connect_by_name( testbench_collect, node )
-  for node in [rtl_sim, ffgl_sim, bagl_sim, lvs]:
+  for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, lvs,
+               rtl_sim, ffgl_sim, bagl_sim, power_est]:
     g.connect_by_name( utilities, node )
   g.connect_by_name( bagl_sim,       power_est      )
   for source, output, target in [

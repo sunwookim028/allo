@@ -15,6 +15,8 @@ inputs:
   - design.gds.gz
   - adk
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
 
 outputs:
   - design_merged.gds
@@ -53,6 +55,9 @@ preconditions:
   - assert File( 'inputs/design.gds.gz' )
   - assert File( 'inputs/adk' )
   - assert File( 'run.sh' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
 
@@ -79,4 +84,3 @@ postconditions:
 
   - "assert 'WARNING: Ignoring duplicate structure'
       not in File( 'merge.log' )"
-

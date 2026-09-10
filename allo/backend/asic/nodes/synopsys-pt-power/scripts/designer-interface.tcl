@@ -42,7 +42,12 @@ set ptpx_extra_link_libraries     [join "
                                       [lsort [glob -nocomplain inputs/adk/*.db]]
                                   "]
 
-set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+if {[file exists sram-views.tcl]} {
+  source sram-views.tcl
+  set ptpx_sram_db_files $sram_database_files
+} else {
+  set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+}
 
 # Hardened Allo macro timing/power models are published one directory per
 # macro class. An absent or empty registry contributes no extra libraries.

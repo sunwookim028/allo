@@ -76,7 +76,12 @@ set dc_target_libraries         stdcells.db
 
 # add srams
 
-set dc_sram_db_files [glob -nocomplain inputs/srams/*/*.db]
+if {[file exists sram-views.tcl]} {
+  source sram-views.tcl
+  set dc_sram_db_files $sram_database_files
+} else {
+  set dc_sram_db_files [glob -nocomplain inputs/srams/*/*.db]
+}
 
 if {[llength $dc_sram_db_files] > 0} {
   puts "Info: Found SRAM db files: $dc_sram_db_files"
@@ -95,5 +100,4 @@ set dc_additional_search_path   $adk_dir
 set dc_reports_dir              reports
 set dc_results_dir              results
 set dc_alib_dir                 alib
-
 

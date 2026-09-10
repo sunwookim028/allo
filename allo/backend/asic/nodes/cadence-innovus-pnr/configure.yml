@@ -13,6 +13,8 @@ inputs:
   - design.v
   - design.sdc
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
 
 outputs:
   - design.checkpoint
@@ -41,6 +43,7 @@ outputs:
 #-------------------------------------------------------------------------
 
 commands:
+  - if [[ -f inputs/sram-contract.json ]]; then python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json --root inputs/srams --tcl-output sram-views.tcl; fi
   - flow_start_epoch=$(date +%s)
   - if [[ "x$enable_gui" == "xTrue" ]]; then gui_flag=""; else gui_flag="-nowin"; fi
   - innovus -overwrite -64 $gui_flag -init START.tcl -log logs/run.log
@@ -147,6 +150,9 @@ preconditions:
   - assert File( 'inputs/design.sdc' )
   - assert File( 'collect_pnr_metrics.py' )
   - assert File( 'scripts/plan-welltap-cuts.py' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
   - assert File( 'outputs/design.checkpoint' )

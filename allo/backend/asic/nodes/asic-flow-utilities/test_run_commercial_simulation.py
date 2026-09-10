@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -99,3 +100,54 @@ def test_run_logged_preserves_timeout_status(tmp_path, capsys):
     assert result == 124
     assert "before timeout" in capsys.readouterr().out
     assert "SIMULATION_TIMEOUT after 0.2 seconds" in log.read_text()
+
+
+def test_sram_models_follow_registered_verilog_views(tmp_path, monkeypatch):
+    module = load_module()
+    inputs = tmp_path / "inputs"
+    macro = inputs / "srams/mem"
+    macro.mkdir(parents=True)
+    views = {}
+    for view, suffix in {
+        "verilog": "v", "liberty": "lib", "database": "db",
+        "lef": "lef", "gds": "gds", "spice": "sp",
+    }.items():
+        path = macro / f"mem.{suffix}"
+        path.write_text(view)
+        views[view] = [f"mem/mem.{suffix}"]
+    (macro / "unregistered.v").write_text("module unregistered; endmodule\n")
+    (inputs / "sram-contract.json").write_text(json.dumps({
+        "schema": "sram-collateral-contract", "schema_version": 1,
+        "num_srams": 1, "srams": [{"name": "mem", "views": views}],
+    }))
+    shutil.copy2(
+        Path(__file__).with_name("resolve_sram_contract.py"),
+        inputs / "resolve-sram-contract.py",
+    )
+    monkeypatch.setattr(module, "INPUTS", inputs)
+
+    assert module.sram_model_sources() == [str((macro / "mem.v").resolve())]
+
+
+def test_adk_compile_args_are_process_owned(tmp_path, monkeypatch):
+    module = load_module()
+    adk = tmp_path / "inputs" / "adk"
+    adk.mkdir(parents=True)
+    (adk / "vcs-compile.args").write_text(
+        "# Process-specific model switches\n"
+        "+define+TETRAMAX\n"
+    )
+    (adk / "vcs-bagl.args").write_text("+define+NTC +define+RECREM\n")
+    monkeypatch.setattr(module, "INPUTS", tmp_path / "inputs")
+
+    assert module.adk_compile_args("ffgl") == ["+define+TETRAMAX"]
+    assert module.adk_compile_args("bagl") == [
+        "+define+TETRAMAX", "+define+NTC", "+define+RECREM",
+    ]
+
+
+def test_adk_compile_args_are_optional(tmp_path, monkeypatch):
+    module = load_module()
+    monkeypatch.setattr(module, "INPUTS", tmp_path / "inputs")
+
+    assert module.adk_compile_args("bagl") == []

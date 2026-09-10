@@ -28,6 +28,8 @@ inputs:
   - design.namemap
   - macro-registry
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
   - testbench-contract.json
 
 outputs:
@@ -43,6 +45,7 @@ outputs:
 #-------------------------------------------------------------------------
 
 commands:
+  - if [[ -f inputs/sram-contract.json ]]; then python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json --root inputs/srams --tcl-output sram-views.tcl; fi
   - python3 prepare_activity.py
   - python3 prepare_pt_sdc.py inputs/design.pt.sdc prepared-design.pt.sdc
   - source run.sh
@@ -96,6 +99,9 @@ preconditions:
     assert '{activity_source}' != 'rtl_vcd' or File( 'inputs/design.namemap' )
   - >-
     assert '{saif_instance}' != 'auto' or File( 'inputs/testbench-contract.json' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
   - assert File( 'outputs/primetime.session' )

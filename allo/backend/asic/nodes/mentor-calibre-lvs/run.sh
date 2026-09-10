@@ -26,9 +26,19 @@ envsubst < lvs.runset.template > lvs.runset
 touch inputs/rules.svrf
 cp inputs/design.lvs.v merged.lvs.v
 args=(-v merged.lvs.v -o source.lvs.sp -s0 "$lvs_ground_name" -s1 "$lvs_power_name" -w 2)
-for pattern in inputs/adk/*.cdl inputs/adk/*.spi inputs/adk/*.sp inputs/adk/*source.added inputs/srams/*/*.cdl inputs/srams/*/*.spi inputs/srams/*/*.sp; do
+for pattern in inputs/adk/*.cdl inputs/adk/*.spi inputs/adk/*.sp inputs/adk/*source.added; do
   for file in $pattern; do [[ -e "$file" ]] && args+=( -s "$file" ); done
 done
+if [[ -f inputs/sram-contract.json ]]; then
+  python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json \
+    --root inputs/srams --view spice > sram-spice-files.list
+  mapfile -t sram_spice_files < sram-spice-files.list
+  for file in "${sram_spice_files[@]}"; do args+=( -s "$file" ); done
+else
+  for pattern in inputs/srams/*/*.cdl inputs/srams/*/*.spi inputs/srams/*/*.sp; do
+    for file in $pattern; do [[ -e "$file" ]] && args+=( -s "$file" ); done
+  done
+fi
 if [[ -n "$lvs_extra_spice_include" ]]; then
   read -r -a extras <<< "$lvs_extra_spice_include"
   for file in "${extras[@]}"; do [[ -f "$file" ]] || exit 1; args+=( -s "$file" ); done

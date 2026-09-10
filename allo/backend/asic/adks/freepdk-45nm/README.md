@@ -15,4 +15,9 @@ design through synthesis and place and route but not further (e.g.,
 DRC, LVS). The standard base kit contains the technology and library
 files to run through synthesis, place and route, and signoff steps.
 
-
+`vcs-compile.args` is published with either view and selects the Nangate
+library's common gate-level behavior with `TETRAMAX`. BAGL additionally reads
+`vcs-bagl.args`; its `NTC` and `RECREM` defines make the model's combined
+negative timing checks match the `SETUPHOLD` and `RECREM` records emitted in
+Innovus SDF. Keeping timing-only defines in the BAGL file preserves the prior
+zero-delay FFGL behavior.

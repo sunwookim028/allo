@@ -24,7 +24,12 @@ set ptpx_extra_link_libraries     [join "
 
 # add srams
 
-set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+if {[file exists sram-views.tcl]} {
+  source sram-views.tcl
+  set ptpx_sram_db_files $sram_database_files
+} else {
+  set ptpx_sram_db_files [lsort [glob -nocomplain inputs/srams/*/*.db]]
+}
 
 set ptpx_extra_link_libraries [join "
   $ptpx_extra_link_libraries
@@ -48,4 +53,3 @@ set ptpx_sdc                      [lsort [glob -nocomplain inputs/*.pt.sdc]]
 set ptpx_spef                     [lsort [glob -nocomplain inputs/*.spef.gz]]
 
 puts "done"
-

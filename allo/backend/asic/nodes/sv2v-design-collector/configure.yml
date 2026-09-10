@@ -42,7 +42,7 @@ parameters:
   sv2v_bin: sv2v
   sv2v_defines: "TARGET_ASIC=1"
   sv2v_include_dirs: "."
-  normalize_rtl: True
+  normalize_rtl: False
   construct_path: undefined
 
 #-------------------------------------------------------------------------

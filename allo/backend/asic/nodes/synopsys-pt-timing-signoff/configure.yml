@@ -19,6 +19,8 @@ inputs:
   - design.pt.sdc
   - design.spef.gz
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
 
 outputs:
   - design.sdf
@@ -50,6 +52,9 @@ preconditions:
   - assert File( 'inputs/design.vcs.v' )
   - assert File( 'inputs/design.pt.sdc' )
   - assert File( 'inputs/design.spef.gz' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
   - assert File( 'outputs/design.sdf' )

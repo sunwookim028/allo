@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 start=$(date +%s); mkdir -p reports outputs
+if [[ -f inputs/sram-contract.json ]]; then
+  python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json \
+    --root inputs/srams --tcl-output sram-views.tcl
+fi
 pt_shell -file pt.tcl
 ln -sf ../design.sdf outputs/design.sdf
 ln -sfn ../reports outputs/timing-reports

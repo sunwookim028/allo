@@ -21,6 +21,8 @@ inputs:
   - run.saif
   - design.upf
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
 
 outputs:
   - design.v
@@ -37,6 +39,7 @@ outputs:
 #-------------------------------------------------------------------------
 
 commands:
+  - if [[ -f inputs/sram-contract.json ]]; then python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json --root inputs/srams --tcl-output sram-views.tcl; fi
   - bash timed-run.sh
 
 #-------------------------------------------------------------------------
@@ -113,6 +116,9 @@ preconditions:
     (File( 'inputs/rtl-source-package' ) and File( 'inputs/rtl-sources.tcl' ))
   - assert File( 'inputs/constraints.tcl' )  # must exist
   - assert File( 'timed-run.sh' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
 

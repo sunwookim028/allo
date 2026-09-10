@@ -28,6 +28,8 @@ commands:
   # Wrap the selected upstream view with project-specific cell policy.
   - mv {adk_view}/adk.tcl {adk_view}/adk-base.tcl
   - cp adk-overlay.tcl {adk_view}/adk.tcl
+  - cp vcs-compile.args {adk_view}/vcs-compile.args
+  - cp vcs-bagl.args {adk_view}/vcs-bagl.args
   # Set up the outputs
   - mkdir -p outputs && cd outputs
   - ln -sf ../{adk_view} adk
@@ -45,4 +47,3 @@ parameters:
 #-------------------------------------------------------------------------
 
 sandbox: False
-

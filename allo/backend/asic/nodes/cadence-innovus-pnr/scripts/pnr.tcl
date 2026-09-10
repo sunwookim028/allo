@@ -278,7 +278,12 @@ proc report_metrics {phase} {
 
 set init_layout_view ""
 set init_abstract_name ""
-set sram_lef_files [lsort [glob -nocomplain inputs/srams/*/*.lef]]
+if {[file exists sram-views.tcl]} {
+  source sram-views.tcl
+} else {
+  set sram_lef_files [lsort [glob -nocomplain inputs/srams/*/*.lef]]
+  set sram_gds_files [lsort [glob -nocomplain inputs/srams/*/*.gds*]]
+}
 
 set init_verilog "./inputs/design.v"
 set init_mmmc_file "scripts/mmmc.tcl"
@@ -612,6 +617,12 @@ if { $M2_direction == "Vertical" } {
     -start [expr $pmesh_top_str_pitch/2]
 }
 
+# The initial sroute creates standard-cell rails before the mesh exists.  Once
+# the ring and stripes are present, connect hard-macro PG pins to that mesh.
+if {$blocks_exist && [llength $pwr_net_list] > 0} {
+  sroute -nets $pwr_net_list
+}
+
 maybe_stop_after power
 
 #-------------------------------------------------------------------------
@@ -886,7 +897,7 @@ set merge_files \
   [concat \
     [lsort [glob -nocomplain inputs/adk/*.gds*]] \
     [lsort [glob -nocomplain inputs/*.gds*]] \
-    [lsort [glob -nocomplain inputs/srams/*/*.gds*]] \
+    $sram_gds_files \
   ]
 
 streamOut $results_dir/$design_name-merged.gds \

@@ -28,23 +28,12 @@ def construct():
     'clock_period'        : 2.0,
     'adk'                 : adk_name,
     'adk_view'            : adk_view,
-    # Enable GUIs
-    'enable_gui'          : True,
-    # GLS Testbench
-    'saif_instance'       : 'GcdUnitTb/GcdUnit_inst',
-    # Synthesis
-    # Flatten effort 0 is strict hierarchy, 3 is full flattening
-    'flatten_effort'      : 3,
-    'topographical'       : True,
-    # Postroute timing target slack
-    'setup_target_slack'  : 0.000,
     'hold_target_slack'   : 0.050,
-    # Utilization target
-    'core_density_target' : 0.70,
+    'top_module'          : 'GcdUnit',
+    'design_path'         : 'rtl',
     'consume_upstream_testbench' : True,
     'testbench_top'       : 'GcdUnitTb',
     'dut_instance'        : 'GcdUnit_inst',
-    'activity_source'     : 'bagl_vcd',
     'pass_marker'         : 'PASS',
   }
 
@@ -64,13 +53,13 @@ def construct():
 
   # Custom nodes
 
-  rtl            = Node( this_dir + '/rtl'         )
   testbench      = Node( this_dir + '/testbench'   )
   testbench_collect = Node( os.path.join(nodes_dir, 'testbench-collector')        )
-  constraints    = Node( this_dir + '/constraints' )
 
   # Default nodes
 
+  sram           = Node( os.path.join(nodes_dir, 'sram-collateral')               )
+  sv2v           = Node( os.path.join(nodes_dir, 'sv2v-design-collector')         )
   synth          = Node( os.path.join(nodes_dir, 'synopsys-dc-synthesis')         )
   pnr            = Node( os.path.join(nodes_dir, 'cadence-innovus-pnr')           )
   pt_signoff     = Node( os.path.join(nodes_dir, 'synopsys-pt-timing-signoff'))
@@ -94,10 +83,13 @@ def construct():
   # Graph -- Add nodes
   #-----------------------------------------------------------------------
 
-  g.add_node( rtl               )
-  g.add_node( constraints       )
+  g.add_node( sv2v              )
+  g.add_node( sram              )
+  g.add_node( rtl_sim           )
   g.add_node( synth             )
+  g.add_node( ffgl_sim          )
   g.add_node( pnr               )
+  g.add_node( bagl_sim          )
   g.add_node( pt_signoff        )
   g.add_node( genlibdb          )
   g.add_node( gdsmerge          )
@@ -106,9 +98,6 @@ def construct():
   g.add_node( testbench         )
   g.add_node( testbench_collect )
   g.add_node( utilities         )
-  g.add_node( rtl_sim           )
-  g.add_node( ffgl_sim          )
-  g.add_node( bagl_sim          )
   g.add_node( power_est         )
   g.add_node( summary           )
   g.add_node( finalize          )
@@ -129,8 +118,7 @@ def construct():
   g.connect_by_name( adk,            ffgl_sim       )
   g.connect_by_name( adk,            bagl_sim       )
 
-  g.connect_by_name( rtl,            synth          )
-  g.connect_by_name( constraints,    synth          )
+  g.connect_by_name( sv2v,           synth          )
 
   g.connect_by_name( synth,          pnr            )
   g.connect_by_name( synth,          ffgl_sim       )
@@ -140,11 +128,15 @@ def construct():
   g.connect_by_name( gdsmerge,       drc            )
   g.connect_by_name( gdsmerge,       lvs            )
 
-  g.connect_by_name( rtl,            rtl_sim        )
+  g.connect_by_name( sv2v,           rtl_sim        )
+  for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, lvs,
+               rtl_sim, ffgl_sim, bagl_sim, power_est, summary]:
+    g.connect_by_name( sram, node )
   g.connect_by_name( testbench,      testbench_collect )
   for node in [rtl_sim, ffgl_sim, bagl_sim, power_est]:
     g.connect_by_name( testbench_collect, node )
-  for node in [rtl_sim, ffgl_sim, bagl_sim, lvs]:
+  for node in [synth, pnr, pt_signoff, genlibdb, gdsmerge, lvs,
+               rtl_sim, ffgl_sim, bagl_sim, power_est]:
     g.connect_by_name( utilities, node )
 
   g.connect_by_name( adk,            power_est      )

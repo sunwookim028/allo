@@ -1,10 +1,9 @@
 #! /usr/bin/env bash
 #=========================================================================
-# run.sh
+# OpenRAM backend
 #=========================================================================
-# Author : Julian Bushlow
-# Date   : June 17, 2026
-#
+# Preserved from openram-sram-generation/run.sh. Mode selection, preflight,
+# validation, and contract publication are owned by manage_srams.py.
 
 set -euo pipefail
 
@@ -105,8 +104,14 @@ for cfg in "${cfgs[@]}"; do
   cp "work/$name"/*.lef "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.gds "$outdir/" 2>/dev/null || true
   cp "work/$name"/*.lib "$outdir/" 2>/dev/null || true
-  cp "work/$name"/*.sp  "$outdir/" 2>/dev/null || true
-  cp "work/$name"/*.cdl "$outdir/" 2>/dev/null || true
+  # Publish only the self-contained netlist intended for LVS. OpenRAM's other
+  # SPICE files are characterization artifacts and can contain temporary paths.
+  lvs_spice="work/$name/$name.lvs.sp"
+  if [ ! -f "$lvs_spice" ]; then
+    echo "ERROR: OpenRAM did not produce the LVS netlist: $lvs_spice"
+    exit 1
+  fi
+  cp "$lvs_spice" "$outdir/"
 
   voltage_tag="${supply_voltage/./p}"
   lib_files=("$outdir"/*_"$process_corner"_"${voltage_tag}"V_"${temperature}"C.lib)

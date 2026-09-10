@@ -44,14 +44,18 @@ def main():
         'stages': stages, 'power': power,
         'activity_source': optional_json('activity-source.json'),
         'drc_policy': optional_json('drc-policy.json'),
+        'sram_contract': optional_json('sram-contract.json'),
+        'sram_metadata': optional_json('sram-metadata.json'),
     }
     OUTPUTS.joinpath('flow-summary.json').write_text(json.dumps(result, indent=2) + '\n')
     lines = [f"ASIC flow summary: {result['run']['design_name']}", 'Implementation: flat']
     lines += [f"{name}: {data.get('status', 'unknown')}" for name, data in stages.items()]
     lines.append(f"Power: {power.get('total_reported_power', 'unavailable')}")
+    lines.append(f"SRAMs: {result['sram_contract'].get('num_srams', 'unavailable')}")
     OUTPUTS.joinpath('flow-summary.txt').write_text('\n'.join(lines) + '\n')
     tcl = [f"set asic_flow_design_name {{{result['run']['design_name']}}}", 'set asic_flow_implementation_style flat']
     tcl += [f"set asic_flow_{name}_status {{{data.get('status', 'unknown')}}}" for name, data in stages.items()]
+    tcl.append(f"set asic_flow_num_srams {{{result['sram_contract'].get('num_srams', 'unavailable')}}}")
     OUTPUTS.joinpath('flow-summary.tcl').write_text('\n'.join(tcl) + '\n')
 
 if __name__ == '__main__': main()

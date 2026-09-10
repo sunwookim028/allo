@@ -17,6 +17,8 @@ inputs:
   - design.lvs.v
   - rules.svrf
   - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
   - cleanup-node.py
 
 outputs:
@@ -101,6 +103,9 @@ preconditions:
   - assert File( 'inputs/design_merged.gds' )
   - assert File( 'inputs/design.lvs.v' )
   - assert File( 'inputs/cleanup-node.py' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
 
 postconditions:
 

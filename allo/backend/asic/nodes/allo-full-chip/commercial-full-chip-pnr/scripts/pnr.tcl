@@ -641,6 +641,12 @@ if { $M2_direction == "Vertical" } {
     -start [expr $pmesh_top_str_pitch/2]
 }
 
+# The initial sroute creates standard-cell rails before the mesh exists.  Once
+# the ring and stripes are present, connect hard-macro PG pins to that mesh.
+if {$blocks_exist && [llength $pwr_net_list] > 0} {
+  sroute -nets $pwr_net_list
+}
+
 maybe_stop_after power
 
 #-------------------------------------------------------------------------

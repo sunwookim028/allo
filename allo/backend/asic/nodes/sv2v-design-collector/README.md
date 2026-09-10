@@ -10,13 +10,17 @@ constructor. The node packages selected sources and include headers under
 `source-rtl`, emits one canonical `design.v`, and records resolved paths,
 defines, hashes, modules, and the sv2v version in `rtl-collection.json`.
 
-With `normalize_rtl=True`, sv2v emits the canonical single-file `design.v`.
-With `normalize_rtl=False`, the node does not invoke sv2v: it publishes the
+Every flat design uses this collector, including designs whose RTL already
+works directly in VCS and Design Compiler. The default `normalize_rtl=False`
+mode does not invoke sv2v: it publishes the
 ordered Verilog/SystemVerilog closure, packaged headers, defines, and include
 directories through `rtl-source-package` and the downstream-ready
 `rtl-sources.f`/`rtl-sources.tcl` manifests. The compatibility `design.v`
 remains available, but synthesis and RTL simulation consume the source package
 so SystemVerilog include and compile-order semantics are preserved.
+
+Set `normalize_rtl=True` only when a design deliberately needs sv2v to emit a
+canonical single-file `design.v`.
 
 Packaged copies receive one narrow Design Compiler compatibility rewrite:
 `parameter string` and `localparam string` become untyped parameters because

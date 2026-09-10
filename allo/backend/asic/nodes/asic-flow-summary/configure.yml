@@ -13,6 +13,8 @@ inputs:
   - rtl-simulation-report.json
   - ffgl-simulation-report.json
   - bagl-simulation-report.json
+  - sram-contract.json
+  - sram-metadata.json
 
 outputs:
   - flow-summary.json

@@ -4,7 +4,12 @@
 # MMMC setup for the single-node Innovus PNR flow. Innovus requires
 # set_analysis_view to run as part of init_design's MMMC processing.
 
-set sram_lib_files [lsort [glob -nocomplain inputs/srams/*/*.lib]]
+if {[file exists sram-views.tcl]} {
+  source sram-views.tcl
+  set sram_lib_files $sram_liberty_files
+} else {
+  set sram_lib_files [lsort [glob -nocomplain inputs/srams/*/*.lib]]
+}
 
 if {![info exists env(adk_cap_table)]} {
   set env(adk_cap_table) inputs/adk/rtk-typical.captable

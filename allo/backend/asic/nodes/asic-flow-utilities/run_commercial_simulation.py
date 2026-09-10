@@ -47,6 +47,31 @@ def model_sources(root: Path) -> list[str]:
     ]
 
 
+def adk_compile_args(mode: str) -> list[str]:
+    """Return common and mode-specific process-owned simulator arguments."""
+    result = []
+    for name in ("vcs-compile.args", f"vcs-{mode}.args"):
+        path = INPUTS / "adk" / name
+        if path.is_file():
+            result.extend(shlex.split(path.read_text(), comments=True))
+    return result
+
+
+def sram_model_sources() -> list[str]:
+    contract_path = INPUTS / "sram-contract.json"
+    if not contract_path.is_file():
+        return model_sources(INPUTS / "srams")
+    resolver = INPUTS / "resolve-sram-contract.py"
+    if not resolver.is_file():
+        raise FileNotFoundError("SRAM contract is present but resolve-sram-contract.py is missing")
+    result = subprocess.run(
+        [sys.executable, str(resolver), "--contract", str(contract_path),
+         "--root", str(INPUTS / "srams"), "--view", "verilog"],
+        check=True, text=True, capture_output=True,
+    )
+    return [line for line in result.stdout.splitlines() if line]
+
+
 def run_logged(command: list[str], log: Path, timeout: float | None = None) -> int:
     with log.open("w") as stream:
         invocation = "Running: " + shlex.join(command) + "\n"
@@ -201,8 +226,9 @@ def main() -> None:
     if boolean_parameter("xprop_enabled", True):
         command.append("-xprop=tmerge")
     if mode in {"ffgl", "bagl"}:
+        command.extend(adk_compile_args(mode))
         command.extend(model_sources(INPUTS / "adk"))
-        command.extend(model_sources(INPUTS / "srams"))
+    command.extend(sram_model_sources())
     design = INPUTS / ("design.vcs.v" if mode == "bagl" else "design.v")
     rtl_filelist = INPUTS / "rtl-sources.f"
     if mode == "rtl" and rtl_filelist.is_file():
@@ -214,14 +240,14 @@ def main() -> None:
     if compile_args.is_file():
         command.extend(shlex.split(compile_args.read_text(), comments=True))
     if mode == "ffgl":
-        command.extend(["+delay_mode_zero", "+define+TETRAMAX"])
+        command.append("+delay_mode_zero")
     if mode == "bagl":
         corner = os.environ.get("sdf_corner", "typ")
         if corner not in {"typ", "min", "max"}:
             raise ValueError("sdf_corner must be typ, min, or max")
         scope = f'{tb["testbench_top"]}.{tb["dut_instance"]}'
         command.extend(["+neg_tchk", "+no_notifier",
-                        "+sdfverbose", "+define+NTC", "+define+TETRAMAX",
+                        "+sdfverbose",
                         "-sdf", f"{corner}:{scope}:inputs/design.sdf"])
 
     compile_rc = run_logged(command, OUTPUTS / "compile.log")
