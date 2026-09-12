@@ -35,7 +35,7 @@ designs/MyDesign/
 
 #### RTL/SRAMs
 
-SV2V automatically parses RTL into a single readable file for the synthesis tools (resolving dependencies, converting SystemVerilog into Verilog, etc). This step requires knowing which files/directories are being used in the design, which directories to look for them in, and which order to compile them (some tools complain about modules/constructs being used before being defined). The sv2v manifest file contains the ordering information, with other information being found in the [constructor file](#constructors). An example SV2V manifest is below. Note that a package can explicitly be excluded from compilation by adding "!" in front of it (this is useful for when a logical memory implementation is needed but unwanted for ASIC synthesis).
+sv2v automatically parses RTL into a single readable file for the synthesis tools (resolving dependencies, converting SystemVerilog into Verilog, etc). This step requires knowing which files/directories are being used in the design, which directories to look for them in, and which order to compile them (some tools complain about modules/constructs being used before being defined). The sv2v manifest file contains the ordering information, with other information being found in the [constructor file](#constructors). An example sv2v manifest is below. Note that a package can explicitly be excluded from compilation by adding "!" in front of it (this is useful for when a logical memory implementation is needed but unwanted for ASIC synthesis).
 
 ```
 # Packages
@@ -154,7 +154,7 @@ parameters = {
     'testbench_manifest': '',                # if multiple files need compilation
     'testbench_top': 'tb',
     'dut_instance': 'dut',
-    'testbench_include_dirs': '.',           # same format as SV2V
+    'testbench_include_dirs': '.',           # same format as sv2v
     'testbench_defines': '',
     'simulation_args_file': '',
     'pass_marker': 'TEST_PASS',
@@ -437,7 +437,7 @@ I set up the flat flow to have certain nodes and connections ahead of time, so t
 	- SRAM used in this design is a rectangular shape, so if the chip was set to a square aspect ratio it would protrude off the side. This is usually not a problem for larger designs, but a fixed floorplan can also be used.
 - The flow uses Synopsys Design Compiler for synthesis. When `topographical` is set to True, the tool will estimate physical information and results. However, the estimates crash when black box macros (like SRAMs) are in use
 
-##### RTL Path & SV2V
+##### RTL Path & sv2v
 
 ```
 'design_path': 'path/to/unzipped/rtl/here',
@@ -447,15 +447,15 @@ I set up the flat flow to have certain nodes and connections ahead of time, so t
 ```
 
 - `design_path` is where the path to the RTL is specified - one of the few parameters required to use the flow!
-- The flow uses SV2V to convert large many-file designs into one neat file that can be parsed easily by Synopsys DC. It can also convert SystemVerilog to Verilog
-	- 'normalize_rtl' determines whether SV2V is actually run - if set to False, translation is skipped
+- The flow uses sv2v to convert large many-file designs into one neat file that can be parsed easily by Synopsys DC. It can also convert SystemVerilog to Verilog
+	- 'normalize_rtl' determines whether sv2v is actually run - if set to False, translation is skipped
 	- `manifest` gives the path to the sv2v manifest (see elsewhere in this guide for details) where the order in which the tool should parse and write files is given. 
 		- Make sure that files are listed in the right order so that modules are not instantiated before being defined, synthesis tools may error
 		- A manifest file should be written in the design directory, so this input should be able to stay the same
 	- `sv2v_include_dirs` indicates where other files used in `include` statements can be found. In this example design, the only other file that needs to be included is where some design parameters are given
 		- paths to files/directories that have to be included are separated by ':'
 
-This example design has the following file tree which gets normalized into one file by SV2V:
+This example design has the following file tree which gets normalized into one file by sv2v:
 
 ```
 vvadd-example-rtl/
@@ -506,4 +506,13 @@ vvadd-example-rtl/
 - When you don't fully care if your design has  DRC or LVS issues (may be preferred if PDK is flawed in some way/not set up well for tools to correctly find issues) and want to let the flow fully finish without stopping for errors, the DRC and LVS checking policies can be changed from error to report.
 - Also include all parameters to describe the testbench being used for the design. Make sure to follow the testbench contract designed elsewhere in this file.
 
+##### Build design
+
+Update the paths in the [`designs/tutorial-vvadd/construct-commercial.py`](designs/tutorial-vvadd/construct-commercial.py) file to "point" the flow at wherever you placed the unzipped RTL and SRAM directories. After making sure all tools are available (use provided setup script if given one), make a build directory and run:
+
+```
+mflowgen run --design ~/allo-asic/designs/tutorial-vvadd/construct-commercial.py
+```
+
+Run `make list` to see all the steps in the flow and `make status` to see which steps have yet to be completed. `make <step >` will run the flow up through that step (including all steps required to build that step) while simply running `make` will run the complete flow.
 
