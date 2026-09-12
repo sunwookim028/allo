@@ -33,7 +33,7 @@ designs/MyDesign/
     └── other used files
 ```
 
-##### RTL/SRAMs
+#### RTL/SRAMs
 
 SV2V automatically parses RTL into a single readable file for the synthesis tools (resolving dependencies, converting SystemVerilog into Verilog, etc). This step requires knowing which files/directories are being used in the design, which directories to look for them in, and which order to compile them (some tools complain about modules/constructs being used before being defined). The sv2v manifest file contains the ordering information, with other information being found in the [constructor file](#constructors). An example SV2V manifest is below. Note that a package can explicitly be excluded from compilation by adding "!" in front of it (this is useful for when a logical memory implementation is needed but unwanted for ASIC synthesis).
 
@@ -86,7 +86,7 @@ srams:
 	write_size: 64
 ```
 
-##### Testbenches
+#### Testbenches
 
 Unlike in the Allo-ASIC flow where testbench RTL files can be automatically generated, pure-RTL designs need a testbench to be provided by the user to allow for thorough simulation (the flow directly uses RTL, FFGL, and BAGL simulation for verification at each step) as well as downstream power simulation. To standardize, the following contract is used. 
 
@@ -104,7 +104,7 @@ endmodule
 
 Additionally, the testbench must also print `<pass_marker>` if all checks pass and `<failure_marker>` if any fail. The DUT should be placed at `<testbench_top.dut_instance>` for SDF annotation. The testbench collector packages the given testbench and provides information required by downstream nodes in JSON files.
 
-##### Constructors
+#### Constructors
 
 Constructor files are where most of the important parameters are tuned, including more physical information like clock period density targets, run settings like whether to generate SRAMs or how many cores to use, and logistical paths to RTL and pre-generated SRAMs. The constructor file is also where nodes are actually connected into a graph to make a flow. For an example, look at [`designs/tutorial-vvadd/construct-commercial.py`](designs/tutorial-vvadd/construct-commercial.py). 
 
@@ -396,7 +396,7 @@ mflowgen run --design ~/allo-asic/designs/<design name>/construct-commercial.py
 
 From there, the graph will be built. Run `make list` or `make status` to see which steps there are to be run. From there, running `make 2` will run all the steps required to build step 2, and so on. Running `make` will run all of them. The flow will fail if any step along the way fails its pre or postconditions
 
-##### Vector Vector Add Example
+#### Vector Vector Add Example
 
 To show an example of how a full design (with SRAMs and RTL outside of the repo) works, I used an agent to build a simple example with a vector vector adder which contains an SRAM. The actual design is a little contrived, but all that matters for this tutorial is that we have a functioning design complete with its own testbench. Zipped folders for both the RTL and the SRAMs are included at [this link](https://drive.google.com/drive/folders/1jt2y0ilfUMVtYLf1GeZU8Cxo9bmzvmZO?usp=drive_link) (SRAMs were generated using OpenRAM). Unzip and put these files anywhere in your file system.
 
@@ -410,7 +410,7 @@ The file is what defines the flow graph and instantiates predefined nodes (found
 
 I set up the flat flow to have certain nodes and connections ahead of time, so the only thing to edit is the parameters. A full list of parameters can be found elsewhere in this doc, leaving them unset keeps them at their default values. Some parameters, including paths to RTL, need to be set for the design to work. I added annotations here for clarity.
 
-###### Design & ADK
+##### Design & ADK
 
 ```
 'construct_path': __file__,
@@ -422,7 +422,7 @@ I set up the flat flow to have certain nodes and connections ahead of time, so t
 
 - these parameters give the path to the constructor file, as well as design names and ADK names 
 
-###### Physical Parameters
+##### Physical Parameters
 
 ```
 'clock_period': 10.0,
@@ -437,7 +437,7 @@ I set up the flat flow to have certain nodes and connections ahead of time, so t
 	- SRAM used in this design is a rectangular shape, so if the chip was set to a square aspect ratio it would protrude off the side. This is usually not a problem for larger designs, but a fixed floorplan can also be used.
 - The flow uses Synopsys Design Compiler for synthesis. When `topographical` is set to True, the tool will estimate physical information and results. However, the estimates crash when black box macros (like SRAMs) are in use
 
-###### RTL Path & SV2V
+##### RTL Path & SV2V
 
 ```
 'design_path': 'path/to/unzipped/rtl/here',
@@ -472,7 +472,7 @@ vvadd-example-rtl/
     └── vvadd.v
 ```
 
-###### SRAMs
+##### SRAMs
 
 ```
 'sram_mode': 'provided',
@@ -491,7 +491,7 @@ vvadd-example-rtl/
 	- Setting up OpenRAM for this flow required much pain and requires a separate conda environment, so I included the required parameters (commented out) for using OpenRAM while using FreePDK45
 	- Generated SRAMs will often have differently-named power and ground pins, so include those names along with the standard VDD and VSS in `power_pin_names` and `ground_pin_names`
 
-###### DRC, LVS, & Simulation
+##### DRC, LVS, & Simulation
 
 ```
 'drc_check_policy': 'report',
