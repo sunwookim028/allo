@@ -1,0 +1,10 @@
+srams:
+  - name: <fill in if using SRAMs - name as used in design>
+    word_size: <fill in if using SRAMs>
+    num_words: <fill in if using SRAMs>
+    num_rw_ports: <fill in if using SRAMs>
+    num_r_ports: <fill in if using SRAMs>
+    num_w_ports: <fill in if using SRAMs>
+    num_banks: <fill in if using SRAMs>
+    words_per_row: <fill in if using SRAMs>
+    write_size: <fill in if using SRAMs>
