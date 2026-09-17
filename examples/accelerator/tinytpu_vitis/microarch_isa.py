@@ -163,7 +163,12 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
 # and every unit's loop bound were compile-time constants, so 4x4x4 and
 # 16x16x16 were *different accelerators*. They are now the same one.
 # ---------------------------------------------------------------------------
-T = 4                          # SIMD width == array dimension
+T = int(os.environ.get("TPU_T", 4))   # SIMD width == array dimension
+# T is the one parameter that changes the *shape* of the generated region:
+# the array is T*T kernel instances and the chains are T and T*T stream
+# arrays, so T=16 is 262 instances and ~800 streams. That was unrunnable
+# until the simulator's OpenMP team was sized to the section count
+# (notes/ALLO_SHORTCOMINGS.md #11); before that fix it hung with no output.
 VW = T * 8                     # packed operand word: T int8 lanes
 AW = T * 32                    # packed accumulator word: T int32 lanes
 

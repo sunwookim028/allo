@@ -146,6 +146,48 @@ efficiency at "essentially 100% of peak" from the two-point difference
 MACs is 9.79 MAC/cycle, i.e. **61.2%**. The overhead-vs-ceiling distinction
 survives the correction, but at 1.7x rather than 2.7x.
 
+## T=16: scaling the array 16x bought 1.47x, and that settles the priority
+
+The 16x16 build became possible only after the simulator's OpenMP team was
+sized to the section count (`notes/ALLO_SHORTCOMINGS.md` #11); before that fix
+a 262-instance region hung silently. It builds and runs in **50 s**, 821
+streams, all three programs bit-exact, and cosim measures:
+
+| | cycles @16x16x16 | PEs | roofline | utilization |
+|---|---|---|---|---|
+| ours T=4 | 1733 | 16 | 256 cyc | 14.8% |
+| **ours T=16** | **1176** | **256** | **16 cyc** | **1.36%** |
+| MiniTPU 16x16 | 168 | 256 | 16 cyc | 9.5% |
+| Gemmini 4x4 | 986 | 16 | 256 cyc | 26.0% |
+
+**16x the PEs bought 1.47x the speed, and utilization fell 14.8% -> 1.36%.**
+
+That is the cleanest evidence in this whole comparison for where the problem
+is, and it is worth more than the ratio it produces:
+
+- Array time fell from 256 cycles to 16. **Overhead went 1477 -> 1160, i.e.
+  barely moved.** The overhead is the same absolute quantity at both array
+  sizes, because it is data movement over a 16x16 operand set, which does not
+  depend on T.
+- At T=16 the program is **6 instructions**, not 45, so the marginal term --
+  18.1 vs Gemmini's 10.8 cycles/instruction -- is almost entirely absent from
+  this measurement. 1176 cycles for 6 instructions is not an issue-rate
+  problem.
+- Therefore **the fixed term is not one of two roughly equal problems; at a
+  useful array size it is essentially the only problem.** An earlier revision
+  of this file listed "pipeline the per-instruction loop" and "program-
+  controlled burst DMA" as comparable next steps. They are not. At T=4 the
+  marginal term is visible because 45 instructions multiply it; at T=16 it
+  nearly vanishes and 98.6% of the machine sits idle waiting for operands.
+
+Resources at T=16: 240 DSP, 111,776 FF, 144,329 LUT (11% of the xcu280), 34
+BRAM. All 256 PEs instantiated.
+
+A methodological note that repeats a lesson from earlier in this file: csynth
+reports a top-level latency of **2.259e+08** for this build, because the loop
+trip counts are runtime data and it must bound them by the ISA's field widths.
+The real number is cosim's 1176. A bound is not a measurement.
+
 ## The I/O trade, measured
 
 `wrap_io` is not a default to accept -- it is an architectural choice with a

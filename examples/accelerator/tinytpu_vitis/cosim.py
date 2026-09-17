@@ -41,7 +41,10 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"
-SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+_ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+# Only shapes the built array can express: every dimension must be a multiple
+# of T, since one vmatpush-equivalent is a whole packed word of T lanes.
+SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]
 
 
 def vectors(M, K, N, relu=False, seed=0):
