@@ -62,6 +62,43 @@ qualitatively different result from the per-workload measurement, whose ratio
 growth was partly an artifact of specialization, and the real remaining gap is
 close to a constant factor.
 
+## Marginal cost across the sweep — three different kinds of machine
+
+Fitting only two points hides the shape. Successive marginal efficiency across
+all five shapes (MAC/cycle between adjacent shapes, as a fraction of each
+machine's own peak):
+
+| step | Gemmini | ours |
+|---|---|---|
+| 4x4x4 -> 8x8x8 | 10.93 MAC/cyc (**68.3%**) | 3.50 (**21.9%**) |
+| 8x8x8 -> 12x12x12 | 9.73 (**60.8%**) | 5.43 (**33.9%**) |
+| 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 6.67 (41.7%) |
+| 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 6.92 (**43.2%**) |
+| least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.92 (**37.0%**), fixed 1067 |
+
+The 12x12x12 -> 16x16x8 step dips for both machines because it changes aspect
+ratio rather than growing uniformly; it is not a clean sweep point.
+
+**Gemmini's marginal efficiency is roughly flat at ~61%. Ours rises
+monotonically, 21.9% -> 43.2%.** That rise is the signature of a large fixed
+cost being amortised, and it agrees with the 1067-cycle intercept -- which is
+`wrap_io` bulk-copying whole declared arrays (see the I/O trade below). So our
+gap is not a constant factor on the work; it is a fixed charge that the sweep
+is slowly paying off, and it would keep closing at larger shapes.
+
+For contrast, the MiniTPU target measures a **36.4% ceiling** that does *not*
+move with size: one `mxu_matrix_ctrl` FSM cannot hold a push and a pop at once,
+so the array gets 4 output rows per 11 cycles regardless of amortisation. Our
+37.0% and its 36.4% are nearly the same number arrived at completely
+differently, and should not be compared as if they were the same quantity --
+ours keeps climbing, its does not.
+
+**A correction worth recording:** an earlier analysis put Gemmini's marginal
+efficiency at "essentially 100% of peak" from the two-point difference
+`986 - 574 = 412` cycles. That is wrong: 412 cycles for the 4032 additional
+MACs is 9.79 MAC/cycle, i.e. **61.2%**. The overhead-vs-ceiling distinction
+survives the correction, but at 1.7x rather than 2.7x.
+
 ## The I/O trade, measured
 
 `wrap_io` is not a default to accept -- it is an architectural choice with a
