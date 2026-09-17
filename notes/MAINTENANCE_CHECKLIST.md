@@ -21,19 +21,30 @@ https://github.com/sunwookim028/allo/issues/13.
    commits; check `git branch -a` for the current set (branches come and go,
    so do not hardcode names here).
 
-## Branch layout (as of 2026-09-07)
+## Branch layout (as of 2026-09-17)
 
 | Branch | Lineage | Role |
 | --- | --- | --- |
-| `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 68 ahead, 8 behind as of this writing. |
+| `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 81 ahead, 0 behind `upstream/main` (`8bafb0dc`) as of this writing. |
 | `upstream` | cornell-zhang | Mirror of `upstream/main`, tracking the `upstream` remote. Refresh it to see what has landed; diff `main` against it to see what the fork carries. **Rebasing `main` onto it is never automatic — it is an explicit call.** |
 | `chia-codesign` | `kkkaishao/allo` (ACT) | The CHIA / TinyTPU co-design artifact. A separate codebase, not a feature branch — see below. |
-| `fix/vhls-mlir-percent-alloc-csim` | cornell-zhang | Live: upstream PR #554, open since Feb 2026. |
+
+`main` and `chia-codesign` are the only working branches; `upstream` is just
+the mirror.
+`fix/vhls-mlir-percent-alloc-csim` is gone: upstream PR #554 merged and is now
+the tip of `upstream/main`.
+
+Read-only lineages on the `kai` remote, for reference rather than merging:
+`kai/main` (has `dataflow.py`, plus `frontend/ harness/ primitives/`),
+`kai/allov2` (`compiler/ lang/ operators/ schedule`, no `dataflow.py`, no ACT),
+and `kai/act` (the allov2 lineage plus `exp/dsa` — the ACT compiler flow that
+`chia-codesign` descends from).
 
 Tags, in place of branches that were retired because their history is reachable
-elsewhere: `tinytpu-rtlgen-base` (`882f7dd6`, the commit `chia-codesign` forks
-from) and `wip-u280-rescue` (`1bd3c5a6`, an unreviewed u280 / nb-stream / fp16
-rescue point from 2026-07-06).
+elsewhere: `tinytpu-rtlgen-base` (`882f7dd6`, the retired branch tip, now an
+ancestor of `chia-codesign`; the actual fork point between `main` and
+`chia-codesign` is `76130c63`) and `wip-u280-rescue` (`1bd3c5a6`, an unreviewed
+u280 / nb-stream / fp16 rescue point from 2026-07-06).
 
 ### `chia-codesign` is a different codebase, not a feature branch
 

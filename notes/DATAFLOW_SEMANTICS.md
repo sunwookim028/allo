@@ -33,6 +33,15 @@ Thread 2: compute_tile_2x1_1()  ──→ runs concurrently
 waits for CT while CT waits for MT with no buffers). The OMP thread scheduler
 does NOT magically resolve deadlocks.
 
+> **Correction (2026-09-17).** A correct protocol is not sufficient. A blocked
+> kernel holds its OMP thread, so a region with more kernel instances than
+> threads wedges silently even when the protocol is right. The rule is
+> `OMP_NUM_THREADS >= number of kernel instances`; deep FIFOs mask the symptom
+> and make it look like a design problem. Measured in
+> `ALLO_SHORTCOMINGS.md` §11 (22-process region: hang at 8 and 16 threads,
+> pass at 24 and 32). Every "✓" in the Allo-simulator column of §2 below is
+> conditional on that rule.
+
 **Use when**: Functional verification of any design — blocking, non-blocking,
 or handshake protocols. This is the primary correctness oracle.
 
@@ -56,6 +65,12 @@ store_res();          // 5th
 
 > **Reference**: Vitis HLS UG1399: "C simulation runs the testbench and the
 > C model of the DUT. The dataflow processes are executed sequentially."
+
+Because the order is source order, **kernel declaration order inside a
+`@df.region()` is load-bearing for `csim`** (not for RTL): a consumer declared
+before its producer reads an empty stream and `csim` aborts with
+`ERROR [HLS SIM]: an hls::stream is read while empty`. See
+`ALLO_SHORTCOMINGS.md` §15.
 
 **Stream semantics** (`hls::stream<T>` in CSIM mode):
 - `stream.write(v)`: If FIFO is **full** → **blocks** (spin-waits in a while loop)
@@ -135,6 +150,14 @@ that the RTL behaves identically to the C model. Supports ALL protocols includin
 bidirectional handshake.
 
 **Cost**: ~10-100× slower than CSIM. Requires successful synthesis first.
+
+> **Correction (2026-09-17).** `df.build(target="vitis_hls", mode=...)` only
+> routes `csim` and `csyn`; `mode="cosim"` is **not** wired into the backend and
+> falls through to the `XDEVICE` Makefile / OpenCL-host flow, which is not what
+> `cosim_design` wants. Running cosim today needs an external driver —
+> `examples/accelerator/tinytpu_vitis/cosim.py` (~180 lines) generates a plain
+> C++ testbench and patches the `m_axi` depths Allo does not emit. See
+> `ALLO_SHORTCOMINGS.md` §16.
 
 ---
 
@@ -226,5 +249,9 @@ For the mesh accelerator project:
 
 1. **Develop and debug** with `target="simulator"` — fast iteration, correct concurrency
 2. **Verify synthesizability** with `target="vitis_hls", mode="csyn"` — gets LUT/FF/II
-3. **Cycle-accurate validation** with `mode="cosim"` after synthesis — for timing-critical paths
+3. **Cycle-accurate validation** with cosim after synthesis — for
+   timing-critical paths, and for any design whose loop bounds are data (where
+   `csynth` can only report a worst-case bound; measured at 22× the real
+   figure in `ALLO_SHORTCOMINGS.md` §16). This needs an external driver;
+   `mode="cosim"` is not wired into `df.build` (see §1.3).
 4. **Avoid HLS CSIM** for any design with bidirectional stream dependencies

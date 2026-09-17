@@ -9,12 +9,17 @@ primary backend. CIRCT is the recommended long-term direction for ASIC targets.
 ## Catapult HLS (Siemens EDA)
 
 ### What was built
-- `mlir/lib/Translation/EmitCatapultHLS.cpp` (~561 lines): full C++ emitter, subclassing
-  the Vivado emitter and overriding type names, stream API calls, and float handling.
-- `allo/backend/catapult.py`: Python-side TCL script generation and host code codegen.
+- The Catapult backend itself (`mlir/lib/Translation/EmitCatapultHLS.cpp`,
+  `allo/backend/catapult.py`) came from upstream PR #543 (Feb 2026). What this
+  fork added on top is non-blocking stream support for it (commit of
+  2026-04-14), plus the synthesis bring-up below. The emitter is 683 lines
+  today.
 - Key overrides vs Vivado:
   - F32 → `ac_ieee_float<binary32>` (nangate-45nm requires this, not plain `float`)
-  - `ac_channel<T>` for streams with `.nb_read()`, `.nb_write()`, `.empty()`
+  - `ac_channel<T>` for streams. Note the `try_*` ops deliberately emit
+    *blocking* `read()` / `write()`: `nb_read` / `nb_write` inside a spin-while
+    loop segfaults Catapult's go compile (LOOP-19). `empty()` is emitted as
+    `!ch.available(1)`.
   - `static` prefix on local channel declarations (fixes HIER-6)
   - Block synthesis mode to allow channels to cross hierarchical boundaries
 
@@ -42,7 +47,7 @@ Design: `top_decoupled_2x1` (1 MT + 2 CTs, M=N=K=2, 16 elements)
 ### What was added
 - `emitStreamTryGet`, `emitStreamTryPut`, `emitStreamEmpty`, `emitStreamFull` overrides
   in `EmitTapaHLS.cpp`: maps to `.try_read()`, `.try_write()` (Tapa API)
-- One test: `test_nb_ops_tapa_codegen` in `tests/dataflow/test_stream_nb_simple.py`
+- One test (`test_nb_ops_tapa_codegen`), since removed as well
 
 ### Why removed
 - Tapa is not used in our mesh research flow
@@ -50,5 +55,18 @@ Design: `top_decoupled_2x1` (1 MT + 2 CTs, M=N=K=2, 16 elements)
 - Keeping dead codepath creates maintenance burden in EmitTapaHLS.cpp
 
 ## Reference
-- Full synthesis report: see git history, commit `01f25e2`
-- HLS_SYNTH_REPORT.md in notes/ has Vitis HLS numbers for comparison
+- Full Catapult synthesis findings: `notes/archive/CATAPULT.md` (retired
+  2026-09-17; the earlier pointer to commit `01f25e2` is dead — no such
+  revision exists in this repo).
+- `notes/archive/HLS_SYNTH_REPORT.md` has the Vitis HLS numbers for comparison.
+- Tool setup and error cookbook for anyone who does re-run Catapult:
+  `notes/CATAPULT_QUICKSTART.md`; `ppa` mode is documented in
+  `notes/ppa_analysis.md` and still lives in `allo/backend/catapult.py`.
+
+## Status of the removal (verified 2026-09-17)
+- `mlir/lib/Translation/EmitTapaHLS.cpp` has no `try_write` / `try_read`
+  emission and its visitor dispatches only construct/get/put. The base-class
+  hooks in `EmitBaseHLS.h` are empty, so a non-blocking op on the `tapa`
+  target is not diagnosed — it simply produces nothing.
+  `tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb` still exists and
+  is stale against that.

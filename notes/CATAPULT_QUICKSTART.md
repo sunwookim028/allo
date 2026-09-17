@@ -319,5 +319,6 @@ Project output goes to `catapult_decoupled_2x1.prj/` (put under `/scratch/` to a
 |----------|----------|
 | AC datatypes headers | `$MGC_HOME/shared/include/` |
 | Catapult 2024.2 install | `/opt/siemens/catapult/2024.2/` |
-| Synthesis results & analysis | `notes/CATAPULT.md` |
+| Synthesis results & analysis | `notes/archive/CATAPULT.md` (retired 2026-09-17) |
+| Why Catapult is not being pursued | `notes/ASIC_HLS_EXPLORATION.md` |
 | Allo Catapult backend | `allo/backend/catapult.py` |

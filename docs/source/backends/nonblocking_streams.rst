@@ -100,7 +100,8 @@ All examples live in the ``tests/dataflow/`` directory on the fork's ``main``.
      - Simulator-level round-trip tests (producer → consumer via ``try_put`` / ``try_get``).
    * - ``tests/dataflow/test_stream_ops_hls.py``
      - HLS codegen checks — verifies ``nb_write()`` / ``nb_read()`` / ``.empty()`` appear in the
-       emitted Vivado HLS C++ and TAPA C++.
+       emitted Vivado HLS C++. (Its ``test_tapa_stream_nb`` case is stale: TAPA
+       non-blocking support was removed, see *Layer 4b* below.)
 
 Running the Simulator Tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,28 +200,26 @@ Layer 4b — HLS backends
    // empty / full → hls::stream::empty() / full()
    os << streamName << ".empty()";
 
-**TAPA** (``mlir/lib/Translation/EmitTapaHLS.cpp``):
-
-.. code-block:: cpp
-
-   // try_put → tapa::ostream::try_write()
-   os << streamName << ".try_write(" << dataArg << ")";
-
-   // try_get → tapa::istream::try_read()
-   os << streamName << ".try_read(" << dataArg << ")";
+**TAPA**: not supported. The TAPA overrides (``try_write`` / ``try_read``) were
+removed in 2026-07 — TAPA is not used in the mesh flow and the dead codepath was a
+maintenance burden (see ``notes/ASIC_HLS_EXPLORATION.md``). Because the hooks in
+``EmitBaseHLS.h`` have empty default bodies, a non-blocking op built for
+``target="tapa"`` is **not diagnosed**; it simply emits nothing. Use the Vitis HLS
+target for non-blocking streams.
 
 **Catapult HLS** (``mlir/lib/Translation/EmitCatapultHLS.cpp``):
 
 .. code-block:: cpp
 
-   // try_put → ac_channel::nb_write()
-   os << streamName << ".nb_write(" << dataArg << ")";
+   // try_put → blocking ac_channel::write(); try_get → blocking ac_channel::read()
+   // nb_write / nb_read inside a spin-while loop segfault Catapult's go compile
+   // (LOOP-19), so the non-blocking ops are emitted as blocking calls and the
+   // success flag is hard-coded to true.
+   os << streamName << ".write(" << dataArg << ")";
 
-   // try_get → ac_channel::nb_read()
-   os << streamName << ".nb_read(" << dataArg << ")";
-
-   // empty → ac_channel::empty()
-   os << streamName << ".empty()";
+   // empty → !ac_channel::available(1)  (ac_channel has no .empty() in the
+   // synthesizable subset, EDG CIN-59)
+   os << "!" << streamName << ".available(1)";
 
 HLS Synthesis Cost (Vitis HLS, U280, estimated)
 -----------------------------------------------
@@ -270,7 +269,7 @@ Files Modified (PR Scope)
    * - ``mlir/lib/Translation/EmitVivadoHLS.cpp``
      - Vivado HLS: emit ``write_nb`` / ``read_nb`` / ``empty`` / ``full``
    * - ``mlir/lib/Translation/EmitTapaHLS.cpp``
-     - TAPA: emit ``try_write`` / ``try_read`` / ``empty``
+     - TAPA: ``try_write`` / ``try_read`` were added here and **later removed** (2026-07)
    * - ``allo/backend/simulator.py``
      - Interpret non-blocking ops; OMP flush; recursive kernel injection
    * - ``tests/dataflow/test_stream_nb_simple.py``
