@@ -295,9 +295,24 @@ OpenCL/XRT host, which is not what `cosim_design` wants.
 
 - For an *instruction-programmable* design this matters more than it looks: the
   loop trip counts are data, so `csynth` can only report a worst-case bound
-  derived from the ISA's field widths -- measured at **22x** the real figure
-  (91407 vs 4133 cycles) before a row-count field was narrowed. Cosim is the
-  only number comparable to a real accelerator's cycle count.
+  derived from the ISA's field widths. Measured, same design, two builds:
+
+  | build | csynth | cosim | ratio |
+  |---|---|---|---|
+  | 16x16 array, 262 instances | **2.259e+08** | **1,176** | **~192,000x** |
+  | 4x4 array, before narrowing a row-count field | 91,407 | 4,133 | 22x |
+
+  The five-order-of-magnitude case is the headline; the 22x is the one that was
+  *fixed*, by giving the row count its own 7-bit field instead of a 12-bit one
+  (no datapath change). Cosim is the only number comparable to a real
+  accelerator's cycle count.
+- **The general rule, which cost two projects time independently:** a model and
+  a measurement that disagree are usually answering different questions, and the
+  question the model is answering is often about the *design space* rather than
+  the *program*. csynth was not broken either time -- it was correctly bounding
+  the machine the encoding permitted. The mirror-image case is a model that
+  predicts a *schedule* being read as a prediction about the emitter you
+  actually shipped.
 - `examples/accelerator/tinytpu_vitis/cosim.py` is a working driver: it
   generates a plain C++ testbench from the same program and reference the
   simulator uses, patches `m_axi` depths (cosim requires them; Allo emits none),
@@ -323,6 +338,28 @@ Each cost real time; none is a bug exactly, but none is discoverable:
   Also undocumented, and load-bearing: partitioning the feeders and the
   accumulator took the top-level interval from 168 to 74 cycles.
 - **Priority: Low individually, Medium as a "dataflow gotchas" page.**
+
+## A failure mode worth naming: an unused capability measures as a worthless one
+
+Two independent instances, one from this project and one from the MiniTPU
+project, and the trap is sharper than "profile before optimising":
+
+- MiniTPU split a controller FSM to remove a serialisation bound and measured
+  **719 cycles before, 719 after** -- because their emitter issues eight pushes
+  then eight pops, so the two halves never hold work at the same time.
+- We scaled the array from 4x4 to 16x16 and measured **1.47x for 16x the PEs**
+  -- because the design is fixed-cost bound and the data path cannot feed it.
+
+In both cases the measurement is correct and the obvious reading of it is
+wrong. "Splitting the controller does not help" and "a bigger array does not
+pay" are what the numbers literally say, and both conclusions are false: the
+capability was *unused*, not *worthless*. Nothing in the measurement
+distinguishes those two, which is what makes it dangerous -- a null result
+normally retires a hypothesis, and here it silently retires the wrong one.
+
+Practical rule: before changing a mechanism, confirm the workload can present
+the mechanism with work it could exploit. If it cannot, fix the schedule or the
+feed first, or the experiment will tell you the mechanism is useless.
 
 ## Theories tested and disproved
 
