@@ -160,3 +160,168 @@ relates to item 3).
   (`LLVM ERROR: Option 'fast' already exists!`),
   so debugging via "build twice and diff" doesn't work.
 - **Priority: Low.**
+
+---
+
+# Allo shortcomings — surfaced while building an instruction-programmable TPU (2026-09)
+
+A second pass, from building `examples/accelerator/tinytpu_vitis/` on `main`:
+an int8 instruction-programmable tiled-GEMM accelerator taken through the
+Vitis dataflow path to **RTL co-simulation**, and compared against a data-type-
+and mesh-matched Gemmini (`COMPARISON.md`).
+
+The findings below were previously scattered across `examples/accelerator/*/`
+markdown and **none of them had reached `notes/`**, which is why they are
+consolidated here. They are ordered by what they would cost an Allo user, not
+by when they were found.
+
+## 11. The dataflow simulator deadlocks when processes outnumber OMP threads
+
+The simulator appears to give each `df.kernel` instance an OMP thread and to
+block that thread on an empty/full stream. With fewer threads than processes, a
+blocked process can hold a thread its own producer needed, and the region
+wedges **silently** -- no message, no indication of which process is blocked on
+which channel.
+
+Measured on a 22-process region (`T*T + 6`) at 16x16x16 with stream depth 16:
+
+| `OMP_NUM_THREADS` | 8 | 16 | 24 | 32 |
+|---|---|---|---|---|
+| | hang | hang | pass | pass |
+
+The threshold is exactly the process count. With 32 threads the design runs at
+**depth 4**, and a shape that had never passed at *any* depth passed at depth 8.
+
+- Deep FIFOs mask it, by letting producers finish before anyone must block, so
+  the symptom presents as "required stream depth grows with the program" -- a
+  plausible-looking *design* problem. This cost multiple sessions.
+- `CLAUDE.md` currently advises `OMP_NUM_THREADS=8`, which is fine for the small
+  regions in `tests/dataflow` but is **not a safe default**. The rule is
+  `OMP_NUM_THREADS >= number of kernel instances`.
+- `examples/accelerator/tinytpu_vitis/kpn_model.py` is a ~140-line model of a
+  channel graph that reports which processes are blocked on which channels and
+  at what occupancy. It found this in one run. That report is cheap.
+- **Priority: High.** Two fixes, either sufficient: warn (or raise) when a
+  region has more kernel instances than threads; and/or emit a deadlock report
+  instead of hanging.
+
+## 12. Bit-slices lower to *signed* `ap_int<N>`, silently, and the simulator disagrees
+
+`w[54:61]` on an unsigned value emits:
+
+```cpp
+ap_int<7> v268;  v268 = w02(60, 54);
+int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
+```
+
+so any field whose top bit is set reads back **negative**. A loop bounded by it
+runs zero times.
+
+- Cost: an ISA row-count field of 64 silently loaded nothing and the design
+  produced zeros -- **251 of 256 outputs wrong**. It failed exactly at the
+  sign-bit boundary (63 fine, 64 not).
+- **The dataflow simulator treats the slice as unsigned and passed the same
+  program.** This is a genuine simulator/RTL divergence, and it is the reason
+  this bug survived every functional check that had been passing.
+- Workaround: an N-bit field safely carries `0 .. 2^(N-1) - 1`; budget one
+  spare bit per field and assert it at the assembler.
+- **Priority: High.** Either lower unsigned slices to `ap_uint<N>`, or make the
+  simulator model the sign so the two agree.
+
+## 13. No program-controlled DMA: bulk copy or unbuffered `m_axi`, nothing between
+
+`wrap_io=True` copies each argument into a local buffer before the region runs,
+sized to the **declared** array rather than to what the program touches.
+`wrap_io=False` drops the copy but every access then pays bus latency.
+
+Measured, same design, one build each (cycles, cosim):
+
+| config | marginal | fixed | 4x4x4 | 16x16x16 |
+|---|---|---|---|---|
+| `wrap_io=True` | 18.1 cyc/instr | 1102 | 2.12x | 1.94x |
+| `wrap_io=False` | **39.8** | **481** | **1.21x** | 2.25x |
+| Gemmini | **10.8** | **483** | 1.00x | 1.00x |
+
+- `wrap_io=False` reaches Gemmini's *fixed* cost (481 vs 483) but doubles the
+  marginal cost. Crossover is ~29 instructions.
+- Gemmini has the third option and Allo does not expose it: a bursted DMA the
+  program controls (`mvin` moves exactly the tiles named), which is low on
+  *both* terms. **This is the single largest structural gap** to a
+  Gemmini-class design, worth ~1.9x of a measured 1.8x total.
+- **Priority: High** for any accelerator work.
+
+## 14. `wrap_io=False` rejects multi-dimensional arguments to nested kernels
+
+> Top-level multi-dimensional arrays are linearized to 1D pointers ... which
+> cannot be passed to nested functions expecting multi-dimensional arrays
+
+- The message is good and names the fix. Flat `int8[M*N]` arguments with manual
+  `row * stride + col` addressing work, and are arguably the honest shape for
+  DRAM anyway.
+- **Priority: Low** (documentation), but it interacts with #13: taking the
+  low-fixed-cost option forces flat arguments.
+
+## 15. Vitis `csim` executes dataflow processes in declaration order
+
+A consumer declared before its producer reads an empty stream:
+
+```
+ERROR [HLS SIM]: an hls::stream is read while empty
+```
+
+- Kernel declaration order in a `@df.region()` is therefore **load-bearing** for
+  `csim` (not for RTL, where processes are concurrent). Nothing documents this.
+- Cost here: `dma_st` was declared third and consumed what `accu`, declared
+  last, produced. Reordering fixed it with no hardware change.
+- **Priority: Medium.** A note in the dataflow docs would be enough.
+
+## 16. `cosim` is not wired into `df.build`
+
+`df.build(target="vitis_hls", mode=...)` handles `csim` and `csyn`; every other
+mode routes to the `XDEVICE` Makefile flow, and the emitted `host.cpp` is an
+OpenCL/XRT host, which is not what `cosim_design` wants.
+
+- For an *instruction-programmable* design this matters more than it looks: the
+  loop trip counts are data, so `csynth` can only report a worst-case bound
+  derived from the ISA's field widths -- measured at **22x** the real figure
+  (91407 vs 4133 cycles) before a row-count field was narrowed. Cosim is the
+  only number comparable to a real accelerator's cycle count.
+- `examples/accelerator/tinytpu_vitis/cosim.py` is a working driver: it
+  generates a plain C++ testbench from the same program and reference the
+  simulator uses, patches `m_axi` depths (cosim requires them; Allo emits none),
+  and drives `vitis_hls`. It is ~180 lines and could be folded into the backend.
+- **Priority: Medium.**
+
+## 17. Frontend constraints worth documenting
+
+Each cost real time; none is a bug exactly, but none is discoverable:
+
+- **Stream-array subscripts must be compile-time.** A runtime index fails with
+  "Fail to resolve the expression as symbolic expression" -- correct, but it
+  does not mention streams. Use `allo.meta_for`.
+- **Nested `meta_for` over a 2-D stream array fails** where a single `meta_for`
+  over a 1-D one is fine. Forces flat `[T*T]` stream arrays indexed `i*T + j`.
+- **Names bound inside `meta_if` are not visible after it** ("Unsupported Name
+  `a`"). Declare before, assign inside.
+- **Runtime loop bounds *do* work** in a `df.kernel`, including with stream ops
+  in the body. This is the capability that makes a workload-independent design
+  possible at all -- one build, shape as data -- and it is undocumented.
+- **`df.build` is `customize(func)` + `s.build(...)`**, so the schedule
+  primitives (`s.partition`, `MockBuffer`) are reachable on the Vitis path.
+  Also undocumented, and load-bearing: partitioning the feeders and the
+  accumulator took the top-level interval from 168 to 74 cycles.
+- **Priority: Low individually, Medium as a "dataflow gotchas" page.**
+
+## Theories tested and disproved
+
+Recorded so nobody re-runs them. Each looked plausible and each cost a cycle of
+investigation:
+
+| theory | test | result |
+|---|---|---|
+| PE `put` order closes a cycle through the drainer's read order | swap the two puts | minimum depth unchanged |
+| a cycle in the process graph deadlocks | two repros, one with real traffic on every edge | **both ran** -- cyclic regions are fine |
+| the `vld` burst length is the cause | chunk it | still hung |
+| the sequencer's control broadcast is the cause | rewrite as a forwarding chain | exact, depth unchanged |
+
+The actual cause was #11, in the simulator, not in any of these.
