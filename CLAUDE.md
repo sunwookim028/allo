@@ -13,14 +13,12 @@
 conda activate allo
 export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # the env does NOT set this
 
-# OMP_NUM_THREADS must be >= the number of df.kernel INSTANCES in the region.
-# The simulator appears to give each instance a thread and to block that thread
-# on an empty/full stream, so with fewer threads than processes a blocked
-# process can hold a thread its own producer needed and the region deadlocks
-# SILENTLY -- no message, no indication of which process is stuck.
-# Measured: a 22-process region hangs at 8 and 16, passes at 24 and 32.
-# Deep FIFOs mask it, so it presents as a design bug. See notes/ALLO_SHORTCOMINGS.md #11.
-export OMP_NUM_THREADS=32  # 8 is enough only for the small regions in tests/dataflow
+# OMP_NUM_THREADS no longer has to exceed the kernel-instance count: the
+# simulator now sets the OpenMP team size to the section count itself.
+# Before that fix a PE blocked on a stream spun in its section, so a team
+# smaller than the section count never started the sections that would
+# unblock it and the region hung SILENTLY. See notes/ALLO_SHORTCOMINGS.md #11.
+export OMP_NUM_THREADS=8
 ```
 
 ## Golden test for dataflow simulator
@@ -28,7 +26,7 @@ export OMP_NUM_THREADS=32  # 8 is enough only for the small regions in tests/dat
 ```bash
 # `conda run` does not source the activate scripts, so export the env first.
 source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=32
+export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
 python tests/dataflow/test_df_unit.py
 python tests/dataflow/test_region_stateful.py
 ```

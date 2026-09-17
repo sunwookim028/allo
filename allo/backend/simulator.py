@@ -1400,10 +1400,23 @@ def _process_function_streams(
 
 
 def _inject_omp_parallel_sections(pe_call_define_ops):
-    """Wrap a set of func.call ops in omp.parallel > omp.sections > omp.section blocks."""
+    """Wrap a set of func.call ops in omp.parallel > omp.sections > omp.section blocks.
+
+    The team is as many threads as there are sections. A PE blocked on a
+    stream spins in its section, so a team smaller than the section count
+    (the OpenMP default is the core count) never starts the sections that
+    would unblock it: a dataflow graph of more PEs than cores hung forever,
+    silently, with no indication of which process was blocked on which
+    channel. See notes/ALLO_SHORTCOMINGS.md #11.
+    """
     assert len(pe_call_define_ops) > 0
     omp_ip = InsertionPoint(beforeOperation=list(pe_call_define_ops.keys())[0])
-    omp_parallel_op = openmp_d.ParallelOp([], [], [], [], ip=omp_ip)
+    num_threads = arith_d.ConstantOp(
+        IntegerType.get_signless(32), len(pe_call_define_ops), ip=omp_ip
+    )
+    omp_parallel_op = openmp_d.ParallelOp(
+        [], [], [], [], num_threads=num_threads.result, ip=omp_ip
+    )
     assert isinstance(omp_parallel_op.region, Region)
     omp_parallel_block = Block.create_at_start(omp_parallel_op.region, [])
 

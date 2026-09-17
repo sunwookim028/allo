@@ -175,7 +175,7 @@ markdown and **none of them had reached `notes/`**, which is why they are
 consolidated here. They are ordered by what they would cost an Allo user, not
 by when they were found.
 
-## 11. The dataflow simulator deadlocks when processes outnumber OMP threads
+## 11. The dataflow simulator deadlocks when processes outnumber OMP threads — **FIXED**
 
 The simulator appears to give each `df.kernel` instance an OMP thread and to
 block that thread on an empty/full stream. With fewer threads than processes, a
@@ -201,9 +201,21 @@ The threshold is exactly the process count. With 32 threads the design runs at
 - `examples/accelerator/tinytpu_vitis/kpn_model.py` is a ~140-line model of a
   channel graph that reports which processes are blocked on which channels and
   at what occupancy. It found this in one run. That report is cheap.
-- **Priority: High.** Two fixes, either sufficient: warn (or raise) when a
-  region has more kernel instances than threads; and/or emit a deadlock report
-  instead of hanging.
+- **FIXED 2026-09-17** in `allo/backend/simulator.py`
+  `_inject_omp_parallel_sections`: the OpenMP team is now sized to the section
+  count (`num_threads = len(pe_call_define_ops)`) instead of defaulting to the
+  core count. Our 22-process design now runs every shape exactly at
+  `OMP_NUM_THREADS=8`, the value that used to hang; the golden tests and the
+  upstream dataflow suite still pass.
+- Credit: independently found and fixed by `chhzh123` on the SPMW branch
+  (`a03edb85`, 2026-09-05) from the other direction -- "56 at 8x8 FEATHER on a
+  48-core host". Two unrelated projects hitting the same wall is the argument
+  for it being upstreamed rather than carried.
+- **Still open, and still worth doing:** the *diagnosis* remains absent. The
+  symptom was a silent hang with no indication of which process was blocked on
+  which channel, and that is what cost the sessions -- not the deadlock itself.
+  `examples/accelerator/tinytpu_vitis/kpn_model.py` shows the report is ~30
+  lines of bookkeeping.
 
 ## 12. Bit-slices lower to *signed* `ap_int<N>`, silently, and the simulator disagrees
 
