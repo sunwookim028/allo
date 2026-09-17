@@ -86,12 +86,31 @@ cost being amortised, and it agrees with the 1067-cycle intercept -- which is
 gap is not a constant factor on the work; it is a fixed charge that the sweep
 is slowly paying off, and it would keep closing at larger shapes.
 
-For contrast, the MiniTPU target measures a **36.4% ceiling** that does *not*
-move with size: one `mxu_matrix_ctrl` FSM cannot hold a push and a pop at once,
-so the array gets 4 output rows per 11 cycles regardless of amortisation. Our
-37.0% and its 36.4% are nearly the same number arrived at completely
-differently, and should not be compared as if they were the same quantity --
-ours keeps climbing, its does not.
+For contrast, the MiniTPU target's marginal efficiency is **flat at 19.0%** and
+does not move with size. Measured on its own RTL over a 12x sweep of output
+column tiles (`[32,192]@[192,16 / 64 / 192]`: 2,455 / 8,524 / 24,708 cycles for
+98,304 / 393,216 / 1,179,648 useful MACs), it is 48.6 MAC/cycle = 19.0% at both
+steps, to three digits.
+
+Two distinctions that matter here, and an earlier revision of this file got the
+first one wrong:
+
+- **19.0% is the measured marginal; 36.4% is a bound.** One `mxu_matrix_ctrl`
+  FSM cannot hold a `vmatpush` and a `vmatpop` at once, which permits 4 output
+  rows per 11 cycles = 93.1 MAC/cycle = 36.4% of its 256 peak. The emitter
+  delivers 48.6 of those 93.1 -- **52% of the bound** -- so roughly half the
+  distance to peak is the FSM and the other half is elsewhere in the schedule
+  and is, as of this writing, unattributed. Quoting 36.4% as the machine's
+  marginal conflates a bound with a measurement.
+- **Flat versus rising is the real difference, not the number.** Our 37.0% and
+  its 36.4% looked like the same quantity and are not: ours rises 21.9% ->
+  43.2% and would keep climbing, theirs sits at 19.0% and does not move. With
+  the corrected figure the two no longer even look alike, which is the more
+  honest presentation.
+
+A ceiling and an overhead are different objects. Ours is an overhead: a fixed
+charge the sweep is paying off. Theirs is a ceiling: no amount of amortisation
+reaches past it without changing the emitter.
 
 **A correction worth recording:** an earlier analysis put Gemmini's marginal
 efficiency at "essentially 100% of peak" from the two-point difference
