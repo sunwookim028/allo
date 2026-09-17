@@ -76,6 +76,34 @@ machine's own peak):
 | 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 6.92 (**43.2%**) |
 | least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.92 (**37.0%**), fixed 1067 |
 
+The cube sweep varies all three dimensions at once and spans only 2.4x in
+cycles, which makes each marginal a difference of two similar numbers. The
+**tall sweep is the better-conditioned measurement** -- `allo_cmp.c`'s
+`gemm_tall` (TALLM=64) holds K=N=16 and sweeps M, so exactly one dimension
+moves, and it ran in the same int8 DIM=4 pass:
+
+| M | cycles | d cycles | d MACs | marginal |
+|---|---|---|---|---|
+| 16 |   986 |  -- |    -- | -- |
+| 32 | 1,393 | 407 | 4,096 | 10.06 MAC/cyc (**62.9%**) |
+| 64 | 2,219 | 826 | 8,192 |  9.92 MAC/cyc (**62.0%**) |
+
+Closed form: **`cycles = 573 + 25.71 * M`**, maximum error **0.18%** across the
+three points. Marginal = 256 MAC/row / 25.71 cyc = **62.2% of peak**.
+
+Two independent sweeps agreeing is the point: the 5-point cube fit gives 60.7%
+with fixed 566, the clean 1-D sweep gives 62.2% with fixed 573. **Quote 62.2%**
+-- it varies one dimension rather than three.
+
+The residual is structural rather than noise (this simulator is deterministic):
+it is `tiled_matmul_auto` re-deciding its tile split as M grows, plus RoCC
+dispatch that does not divide evenly. Worth contrasting with the MiniTPU target,
+whose marginal is *exact* -- `cycles = 432 + 2023 * column_tiles`, zero deviation
+over a 39.7x range -- because nothing in it arbitrates or backpressures, so there
+is no mechanism by which two runs could differ. **A machine whose compiler
+carries the whole hazard burden is a machine whose performance is a closed form.**
+Gemmini has a reservation station and a tiling heuristic and both leave a trace.
+
 The 12x12x12 -> 16x16x8 step dips for both machines because it changes aspect
 ratio rather than growing uniformly; it is not a clean sweep point.
 
