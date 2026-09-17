@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 import allo.dataflow as df  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, gemm_program, vadd_program, assemble, MAXDIM, T, IMEM_SIZE,
+    tinytpu_isa, gemm_program, gemm_program_flat, vadd_program, assemble,
+    expand, MAXDIM, T, IMEM_SIZE, NHDR, IWORDS,
 )
 
 SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
@@ -42,10 +43,19 @@ def imem_of(prog):
     return m, len(w)
 
 
-def check(mod, M, K, N, relu):
+def check(mod, M, K, N, relu, looped=True):
     A, B = buffers()
     C = np.zeros(MAXDIM * MAXDIM, np.int8)
-    prog = gemm_program(M, K, N, relu)
+    prog = (gemm_program if looped else gemm_program_flat)(M, K, N, relu)
+    # imem is sized to the LOOPED program, which is the one the machine ships.
+    # The unrolled reference outgrows it at the larger shapes -- that is the
+    # point of having control flow, not a problem with the test -- so it runs
+    # where it fits and the static `expand` equivalence covers the rest.
+    if NHDR + IWORDS * len(prog) > IMEM_SIZE:
+        print(f"  {'gemm.relu' if relu else 'gemm':9s} {M:2d}x{K:2d}x{N:2d} flat  "
+              f"{len(prog):3d} static  SKIP (needs "
+              f"{NHDR + IWORDS * len(prog)} words > imem {IMEM_SIZE})")
+        return True
     imem, _ = imem_of(prog)
     mod(imem, A.reshape(-1), B.reshape(-1), C)
     C = C.reshape(MAXDIM, MAXDIM)
@@ -54,8 +64,10 @@ def check(mod, M, K, N, relu):
         gold = np.maximum(gold, 0)
     gold = np.clip(gold, -128, 127).astype(np.int8)
     bad = int((C[:M, :N] != gold).sum())
-    print(f"  {'gemm.relu' if relu else 'gemm':9s} {M:2d}x{K:2d}x{N:2d}  "
-          f"{len(prog):3d} instrs  wrong={bad}/{M*N}")
+    tag = "loop" if looped else "flat"
+    print(f"  {'gemm.relu' if relu else 'gemm':9s} {M:2d}x{K:2d}x{N:2d} {tag}  "
+          f"{len(prog):3d} static -> {len(expand(prog)):3d} dynamic  "
+          f"wrong={bad}/{M*N}")
     return bad == 0
 
 
@@ -80,11 +92,24 @@ if __name__ == "__main__":
         shapes = [tuple(int(a) for a in sys.argv[1:4])]
     print(f"TinyTPU-isa: ONE build -- {T}x{T} array, MAXDIM={MAXDIM}, "
           f"imem {IMEM_SIZE}; sweeping {len(shapes)} shape(s)")
+    # The strong equivalence check, and it covers every shape: the looped and
+    # unrolled programs must issue the identical dynamic opcode stream.
+    for (M, K, N) in shapes:
+        for r in (False, True):
+            a = expand(gemm_program(M, K, N, r))
+            b = expand(gemm_program_flat(M, K, N, r))
+            assert a == b, f"loop/flat dynamic streams differ at {M}x{K}x{N}"
+    print(f"  loop == flat dynamic opcode stream at all {len(shapes)} shapes")
     mod = df.build(tinytpu_isa, target="simulator")     # built once
     ok = True
+    # The flat program is the reference: same shape, same result, no control
+    # flow. Running both is the cheap way to test a PC and an AGU -- any
+    # disagreement is the loop or the address resolution, nothing else.
     for (M, K, N) in shapes:
-        ok &= check(mod, M, K, N, False)
-        ok &= check(mod, M, K, N, True)
+        ok &= check(mod, M, K, N, False, looped=False)
+        ok &= check(mod, M, K, N, False, looped=True)
+        ok &= check(mod, M, K, N, True, looped=False)
+        ok &= check(mod, M, K, N, True, looped=True)
     ok &= check_vadd(mod, *shapes[-1])
     print("  ALL EXACT" if ok else "  FAILURES")
     sys.exit(0 if ok else 1)

@@ -128,6 +128,43 @@ OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=vr_w       nr=rows
 OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
 OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
+OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
+OP_ENDLOOP = 9    # close the innermost loop
+
+
+LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's loop stack
+IWORDS = 2                     # an instruction is two 64-bit words
+
+
+AGU_TERMS = 3                  # address terms per instruction
+AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
+
+
+def enc_agu(*terms):
+    """The second instruction word: up to `AGU_TERMS` address terms.
+
+    Each term is `(target, level, stride)` and resolves to
+    `field[target] += iv[level] * stride`, so an address can be relative to any
+    enclosing loop's induction variable. Terms name their target rather than
+    being fixed one-per-field, because a single field often needs two: the
+    weight `vld` inside the k loop is offset by both the n tile and the k tile,
+    `B_SP + nb*MAXDIM + kb*T`, and a one-term-per-field encoding cannot say it.
+
+    Without this a loop body would reissue identical addresses every iteration
+    and simply redo the same work, which is why MiniTPU exports its induction
+    variables to `sequencer_agu_resolve` instead of keeping them in the stack.
+
+    Field widths carry a spare bit each: a slice extracts to a signed
+    `ap_int<N>` (see the encoding note above), so target is 4 bits for 0..4,
+    level 3 bits for 0..3, stride 12 bits for 0..2047."""
+    assert len(terms) <= AGU_TERMS, f"at most {AGU_TERMS} address terms"
+    w = 0
+    for i, (target, level, stride) in enumerate(terms):
+        assert 0 <= target <= 4 and 0 <= level < LOOP_DEPTH
+        assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"
+        base = 19 * i
+        w |= (target << base) | (level << (base + 4)) | (stride << (base + 7))
+    return w
 
 
 def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
@@ -197,8 +234,18 @@ NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 # gemm(MAXDIM,MAXDIM,MAXDIM) with relu -- Kt + Nt dma_lds, Kt vlds for A,
 # Nt*(Kt vld + Kt mm) + Nt relu + Nt mvout -- plus the NHDR header.
 _KB = MAXDIM // T
-IMEM_SIZE = int(os.environ.get(
-    "TPU_IMEM", NHDR + 2 * _KB + _KB + _KB * (2 * _KB) + 2 * _KB + 16))
+# With control flow the program is O(nesting), not O(tiles): the looped GEMM is
+# 17 instructions at every shape where the unrolled one reaches 49. So imem is
+# sized to the longest program shipped rather than to the largest problem.
+#
+# This is not cosmetic. `wrap_io` copies each argument into a local buffer
+# before the region runs, sized to the DECLARED length, so every imem word is a
+# startup cycle whether the program uses it or not. Measured: moving to a
+# 2-word instruction format cost exactly +68 cycles at all five shapes, which
+# is exactly the 68 extra words it added -- the loop logic itself cost nothing.
+# Sizing imem to the looped program is where the hardware loop actually pays.
+_MAX_STATIC = 24               # longest program shipped, plus headroom
+IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
 # Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
 # largest supported shape rather than for the shape being run.
@@ -254,57 +301,116 @@ def tinytpu_isa(
 
     @df.kernel(mapping=[1], args=[imem])
     def sequencer(l_imem: UInt(64)[IMEM_SIZE]):
-        """Fetch, decode, and dispatch each instruction to the units that act
-        on it -- and to no others.
+        """Fetch, decode, resolve addresses, dispatch.
 
-        **The loop bounds come from the program, not from the build.** The
-        header `imem[0:NHDR]` carries the instruction count and the per-unit
-        counts, so this one RTL build runs any shape: the sequencer forwards
-        each unit its own count as the first word on its queue, and each unit
-        loops that many times. Runtime trip counts are what make the design
-        workload-independent, and their cost is that synthesis can only report
-        a worst-case bound (`RESULTS_ISA.md`), which is why cosim is the
-        measurement that counts.
+        **This unit has a program counter and a loop stack.** Before, every
+        tiling loop was unrolled in Python at assembly time, so the static
+        program grew with the problem and the machine had no control flow at
+        all -- which is not an instruction-programmable accelerator in any
+        useful sense. Now `loop`/`endloop` bound a body and the PC branches
+        backward, so the *static* program is O(nesting) while the *dynamic*
+        instruction stream is O(tiles). Modelled on MiniTPU's
+        `sequencer_loop_ctrl`: a LIFO of `{body_start, iv, trip}` frames,
+        `LOOP_DEPTH` levels deep.
 
-        Consumes nothing, so it cannot be in a dependence cycle with any data
-        path. Its own loop is the only one Vitis pipelines (II=1), because its
-        body is a decode and a few puts with no inner loop.
+        **Addresses resolve here, not in the units.** Each instruction's second
+        word carries up to three `(level, stride)` terms, and this loop adds
+        `iv[level] * stride` to the corresponding field before dispatching. That
+        is the whole reason the loop is worth having -- a body that reissued the
+        same addresses every iteration would just redo the same work -- and it
+        keeps every other unit unchanged, since what they receive is a resolved
+        instruction word in the format they already decode.
 
-        **The dispatch order is dataflow order** (`dma_ld`, `spm`, `vru`,
-        `accu`, `dma_st`) and that is load-bearing. If the sequencer blocks on a
-        full queue, every unit *upstream* of that one already holds this
-        instruction and can keep producing what the blocked unit waits for, so
-        it drains and the block clears. Dispatching downstream-first deadlocks:
-        a unit would wait for operands from an upstream unit that had not yet
-        been given the instruction that produces them."""
+        The dispatch order is dataflow order and that is load-bearing: if this
+        blocks on a full queue, every unit upstream of that one already holds
+        the instruction and can keep producing what the blocked unit waits for.
+        Dispatching downstream-first deadlocks."""
         iw: UInt(64) = l_imem[0]
         n_instr: int32 = iw[0:16]
-        # Each unit's count travels ahead of its instructions.
+
         c_dld.put(l_imem[1])
         c_spm.put(l_imem[2])
         c_vru.put(l_imem[3])
-        c_vru.put(l_imem[4])   # ... and the `mm` count, for the array
+        c_vru.put(l_imem[4])
         c_acc.put(l_imem[5])
         c_dst.put(l_imem[6])
-        for c in range(n_instr):
-            w0: UInt(64) = l_imem[NHDR + c]
+
+        lp_start: int32[LOOP_DEPTH] = 0
+        lp_iv: int32[LOOP_DEPTH] = 0
+        lp_trip: int32[LOOP_DEPTH] = 0
+        iv_now: int32[LOOP_DEPTH] = 0
+        sp: int32 = 0
+        pc: int32 = 0
+        running: int32 = 1
+
+        while running == 1:
+            w0: UInt(64) = l_imem[NHDR + pc * IWORDS]
+            w1: UInt(64) = l_imem[NHDR + pc * IWORDS + 1]
             op: int32 = w0[0:6]
-            if op == OP_DMA_LD:
-                c_dld.put(w0)
-                c_spm.put(w0)
-            if op == OP_VLD:
-                c_spm.put(w0)
-                c_vru.put(w0)
-            if op == OP_MM:
-                c_vru.put(w0)
-                c_acc.put(w0)
-            if op == OP_VADD:
-                c_acc.put(w0)
-            if op == OP_VRELU:
-                c_acc.put(w0)
-            if op == OP_MVOUT:
-                c_acc.put(w0)
-                c_dst.put(w0)
+            nr: int32 = w0[54:62]
+
+            if op == OP_LOOP:
+                lp_start[sp] = pc + 1
+                lp_iv[sp] = 0
+                lp_trip[sp] = nr
+                iv_now[sp] = 0
+                sp += 1
+                pc += 1
+            elif op == OP_ENDLOOP:
+                nxt: int32 = lp_iv[sp - 1] + 1
+                if nxt < lp_trip[sp - 1]:
+                    lp_iv[sp - 1] = nxt
+                    iv_now[sp - 1] = nxt
+                    pc = lp_start[sp - 1]
+                else:
+                    sp -= 1
+                    pc += 1
+            else:
+                # --- resolve the address terms against the live IVs ---
+                f0: int32 = w0[6:18]
+                f1: int32 = w0[18:30]
+                f2: int32 = w0[30:42]
+                f3: int32 = w0[42:54]
+                with allo.meta_for(AGU_TERMS) as _t:
+                    tw: int32 = w1[19 * _t : 19 * _t + 4]
+                    lw: int32 = w1[19 * _t + 4 : 19 * _t + 7]
+                    sw: int32 = w1[19 * _t + 7 : 19 * _t + 19]
+                    d: int32 = iv_now[lw] * sw
+                    if tw == AGU_F0:
+                        f0 = f0 + d
+                    if tw == AGU_F1:
+                        f1 = f1 + d
+                    if tw == AGU_F2:
+                        f2 = f2 + d
+                    if tw == AGU_F3:
+                        f3 = f3 + d
+
+                rw: UInt(64) = w0
+                rw[6:18] = f0
+                rw[18:30] = f1
+                rw[30:42] = f2
+                rw[42:54] = f3
+
+                if op == OP_DMA_LD:
+                    c_dld.put(rw)
+                    c_spm.put(rw)
+                if op == OP_VLD:
+                    c_spm.put(rw)
+                    c_vru.put(rw)
+                if op == OP_MM:
+                    c_vru.put(rw)
+                    c_acc.put(rw)
+                if op == OP_VADD:
+                    c_acc.put(rw)
+                if op == OP_VRELU:
+                    c_acc.put(rw)
+                if op == OP_MVOUT:
+                    c_acc.put(rw)
+                    c_dst.put(rw)
+                pc += 1
+
+            if pc >= n_instr:
+                running = 0
 
     @df.kernel(mapping=[1], args=[A, B])
     def dma_ld(lA: int8[MAXDIM * MAXDIM], lB: int8[MAXDIM * MAXDIM]):
@@ -634,16 +740,18 @@ def tinytpu_isa(
                         lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
 
 def gemm_program(M, K, N, relu=False):
-    """Tiled GEMM for *any* shape, on fixed hardware.
+    """Tiled GEMM as a program with **control flow**, for any shape.
 
-    M, K and N are arguments, not build constants: this returns an instruction
-    stream and the same RTL runs it. `mm` carries an accumulate bit, so a
-    Kt-deep contraction is Kt `mm`s and no `vadd` -- Gemmini's split, with the
-    add in the accumulator's write path (`AccumulatorMem.scala`).
+    The static program is O(nesting), not O(tiles): the n and k loops are
+    `loop`/`endloop` pairs and the addresses that used to be baked into each
+    unrolled instruction are AGU terms against the induction variables. The
+    instruction count stops growing with the problem, which is the property
+    that makes this a programmable machine rather than a very long tape.
 
-    Operands sit in DRAM at the fixed `MAXDIM` stride, which is what
-    `allo_cmp.c` does for Gemmini too (`MAXDIM, MAXDIM, 0, MAXDIM`), so one set
-    of host buffers serves every shape.
+    The first k-tile is peeled out of the k loop deliberately: it carries
+    `f2=0` (overwrite the accumulator) where the looped tiles carry `f2=1`
+    (accumulate), and peeling is how you say that without a predicate on the
+    induction variable.
     """
     assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
         f"{M}x{K}x{N} exceeds the built MAXDIM={MAXDIM}")
@@ -651,22 +759,76 @@ def gemm_program(M, K, N, relu=False):
     assert M <= MAXROWS and K <= MAXROWS
     Kt, Nt = K // T, N // T
     p = []
+    ins = lambda w, agu=0: p.append((w, agu))
+
+    # --- A: one dma_ld per column block, kb on the loop ---
+    ins(enc(OP_LOOP, nr=Kt))
+    ins(enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_SP, nr=M),
+        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_ENDLOOP))
+    # --- B: one per column block, nb on the loop ---
+    ins(enc(OP_LOOP, nr=Nt))
+    ins(enc(OP_DMA_LD, f0=1, f1=0, f2=0, f3=B_SP, nr=K),
+        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_ENDLOOP))
+    # --- every A word into vregs once ---
+    total_a = Kt * MAXDIM
+    assert total_a <= MAXROWS, "A vld exceeds the row-count field"
+    ins(enc(OP_VLD, f0=A_VR, f1=A_SP, nr=total_a))
+
+    # --- the output loop: level 0 is nb, level 1 is kb ---
+    ins(enc(OP_LOOP, nr=Nt))
+    #   peeled first k-tile: overwrite the accumulator
+    ins(enc(OP_VLD, f0=W_VR, f1=B_SP, nr=T),
+        enc_agu((AGU_F1, 0, MAXDIM)))
+    ins(enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=W_VR, nr=M))
+    if Kt > 1:
+        ins(enc(OP_LOOP, nr=Kt - 1))
+        #   f1 needs BOTH tiles: B_SP + nb*MAXDIM + (kb+1)*T
+        ins(enc(OP_VLD, f0=W_VR, f1=B_SP + T, nr=T),
+            enc_agu((AGU_F1, 0, MAXDIM), (AGU_F1, 1, T)))
+        ins(enc(OP_MM, f0=A_VR + MAXDIM, f1=AR_C, f2=1, f3=W_VR, nr=M),
+            enc_agu((AGU_F0, 1, MAXDIM)))
+        ins(enc(OP_ENDLOOP))
+    if relu:
+        ins(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
+    ins(enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M),
+        enc_agu((AGU_F2, 0, 1)))
+    ins(enc(OP_ENDLOOP))
+    return p
+
+
+def gemm_program_flat(M, K, N, relu=False):
+    """The fully unrolled form, kept as the differential reference.
+
+    Every instruction carries absolute addresses and there is no control flow,
+    so this is what the looped program must reproduce exactly. Keeping it is
+    the cheap way to test a PC and an AGU: same shape, same result, two
+    encodings."""
+    assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM
+    assert M % T == 0 and K % T == 0 and N % T == 0
+    assert M <= MAXROWS and K <= MAXROWS
+    Kt, Nt = K // T, N // T
+    p = []
     for kb in range(Kt):
-        p.append(enc(OP_DMA_LD, f0=0, f1=0, f2=kb, f3=A_SP + kb * MAXDIM, nr=M))
+        p.append((enc(OP_DMA_LD, f0=0, f1=0, f2=kb, f3=A_SP + kb * MAXDIM,
+                      nr=M), 0))
     for nb in range(Nt):
-        p.append(enc(OP_DMA_LD, f0=1, f1=0, f2=nb, f3=B_SP + nb * MAXDIM, nr=K))
+        p.append((enc(OP_DMA_LD, f0=1, f1=0, f2=nb, f3=B_SP + nb * MAXDIM,
+                      nr=K), 0))
     total_a = Kt * MAXDIM
     for c0 in range(0, total_a, MAXROWS):
         n = min(MAXROWS, total_a - c0)
-        p.append(enc(OP_VLD, f0=A_VR + c0, f1=A_SP + c0, nr=n))
+        p.append((enc(OP_VLD, f0=A_VR + c0, f1=A_SP + c0, nr=n), 0))
     for nb in range(Nt):
         for kb in range(Kt):
-            p.append(enc(OP_VLD, f0=W_VR, f1=B_SP + nb * MAXDIM + kb * T, nr=T))
-            p.append(enc(OP_MM, f0=A_VR + kb * MAXDIM, f1=AR_C,
-                         f2=(1 if kb else 0), f3=W_VR, nr=M))
+            p.append((enc(OP_VLD, f0=W_VR, f1=B_SP + nb * MAXDIM + kb * T,
+                          nr=T), 0))
+            p.append((enc(OP_MM, f0=A_VR + kb * MAXDIM, f1=AR_C,
+                          f2=(1 if kb else 0), f3=W_VR, nr=M), 0))
         if relu:
-            p.append(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
-        p.append(enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M))
+            p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
+        p.append((enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M), 0))
     return p
 
 
@@ -676,34 +838,68 @@ def vadd_program(M, K, N):
 
     Computes A@B twice into two accumulator regions, adds them, ReLUs the sum
     and retires it: `relu(2 * (A @ B))` on the first output tile."""
-    return [enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_SP, nr=M),
-            enc(OP_DMA_LD, f0=1, f1=0, f2=0, f3=B_SP, nr=T),
-            enc(OP_VLD, f0=A_VR, f1=A_SP, nr=M),
-            enc(OP_VLD, f0=W_VR, f1=B_SP, nr=T),
-            enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=W_VR, nr=M),
-            enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=W_VR, nr=M),
-            enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
-            enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
-            enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]
+    return [(w, 0) for w in [
+        enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_SP, nr=M),
+        enc(OP_DMA_LD, f0=1, f1=0, f2=0, f3=B_SP, nr=T),
+        enc(OP_VLD, f0=A_VR, f1=A_SP, nr=M),
+        enc(OP_VLD, f0=W_VR, f1=B_SP, nr=T),
+        enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=W_VR, nr=M),
+        enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=W_VR, nr=M),
+        enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
+        enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
+        enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]]
+
+
+def expand(prog):
+    """Run the program's control flow at assembly time, yielding the opcode of
+    every instruction the sequencer will actually issue.
+
+    The units loop over *their own* instruction count, so the header must carry
+    the DYNAMIC count -- how many instructions each unit is really sent -- not
+    the static one. With a hardware loop those differ, and a unit promised more
+    than it receives waits forever. This is the assembler's obligation, and it
+    is the price of putting control flow in the sequencer.
+    """
+    ops = []
+    pc = 0
+    stack = []
+    guard = 0
+    while pc < len(prog):
+        guard += 1
+        if guard > 1 << 22:
+            raise AssertionError("program does not terminate")
+        op = prog[pc][0] & 0x3F
+        if op == OP_LOOP:
+            trip = (prog[pc][0] >> 54) & 0xFF
+            stack.append([pc + 1, 0, trip])
+            pc += 1
+        elif op == OP_ENDLOOP:
+            fr = stack[-1]
+            fr[1] += 1
+            if fr[1] < fr[2]:
+                pc = fr[0]
+            else:
+                stack.pop()
+                pc += 1
+        else:
+            ops.append(op)
+            pc += 1
+    return ops
 
 
 def assemble(prog):
-    """Prepend the header the sequencer reads.
+    """Two words per instruction, behind a header of dynamic per-unit counts.
 
-    The header is how one fixed build runs a variable program: each unit is
-    told how many instructions *it* will receive, so every loop bound in the
-    design is data rather than a build constant. The counts must match the
-    sequencer's dispatch rules exactly -- a unit promised more than it is sent
-    waits forever -- so they are derived here from the same opcode
-    classification the sequencer applies.
+        imem[0] static instruction count   imem[4] mm  (the array)
+        imem[1] dma_ld                     imem[5] accu
+        imem[2] spm                        imem[6] dma_st
+        imem[3] vru                        imem[7] unused
 
-        imem[0] instruction count      imem[4] mm  (the array)
-        imem[1] dma_ld                 imem[5] accu
-        imem[2] spm                    imem[6] dma_st
-        imem[3] vru                    imem[7] unused
+    imem[0] bounds the sequencer's fetch; every other count is dynamic, from
+    `expand`. They must match the sequencer's dispatch rules exactly.
     """
     import collections
-    c = collections.Counter(int(w) & 0x3F for w in prog)
+    c = collections.Counter(expand(prog))
     hdr = [len(prog),
            c[OP_DMA_LD],
            c[OP_DMA_LD] + c[OP_VLD],
@@ -713,7 +909,10 @@ def assemble(prog):
            c[OP_MVOUT],
            0]
     assert len(hdr) == NHDR
-    words = hdr + [int(w) for w in prog]
+    words = list(hdr)
+    for w0, w1 in prog:
+        words.append(int(w0))
+        words.append(int(w1))
     assert len(words) <= IMEM_SIZE, f"{len(words)} words > IMEM_SIZE={IMEM_SIZE}"
     return words
 
