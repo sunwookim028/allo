@@ -74,6 +74,100 @@ That is the whole of the hazard logic. Gemmini spends a 48-entry reservation
 station (`ReservationStation.scala`) to get out-of-order issue on top of this;
 this design is strictly in-order and does not pretend otherwise.
 
+## ROW-FLATTENING: why every unit is one loop and not two
+
+Each unit used to be a loop over *instructions* containing a loop over *rows*:
+
+    for c in range(n_own):          # instructions this unit is sent
+        w0 = c_unit.get(); <decode>
+        if op == OP_A:
+            for r in range(nr): <work>
+        if op == OP_B:
+            for r in range(nr): <work>
+
+Vitis reported `Pipelined = no` on every one of those outer loops, with an
+iteration latency of 69-74 cycles, and the reason is structural rather than a
+tool defect: modulo scheduling needs a fixed II, an inner loop whose trip count
+arrives in an instruction field cannot be unrolled to give one, and so the outer
+loop has no II at all. An independent check found Catapult will not pipeline it
+either. The sequencer was the only unit that pipelined at all, because its body
+has no inner loop -- and even it closes at II=5, on the loop-stack recurrence.
+
+The consequence was measured against Gemmini: 18.1 cycles per instruction
+against its 10.8, with `vru` -- 33 instructions and 464 words at 16x16x16 --
+as the critical process. A unit finished instruction *n* before starting *n+1*,
+so every instruction boundary cost a pipeline fill and drain plus the call
+overhead of the sub-function Vitis extracts each inner loop into.
+
+**Every unit but the accumulator is now one flat loop over the work items it
+will process**, with the instruction fetched on the iteration that needs it:
+
+    r = -1
+    for x in range(n_work):         # ROWS (or words), from the header
+        r += 1
+        if r >= cnt:                # this row starts a new instruction
+            w0 = c_unit.get(); <decode>; cnt = <work items>; r = 0
+        <straight-line body, indexed by r>
+
+There is no inner loop left, so the body is straight-line and schedules with a
+real II; the conditional stream read is legal in a pipelined region and simply
+back-pressures. The header carries the dynamic *work* count per unit instead of
+the dynamic instruction count -- `assemble()` already expanded the control flow
+to compute the latter, so this is the same mechanism with `nr` summed rather
+than counted.
+
+**What could not be split, and why the arms stay in one process.** The obvious
+alternative -- one process per opcode, fed by per-opcode queues -- founders on
+one owner per memory. `spad` lives in `spm` and is written by `dma_ld` and read
+by `vld`; `vr` lives in `vru` and is written by `vld` and read by `mm`; `ar`
+lives in `accu` and is touched by all four of its opcodes. Allo enforces single
+reader and single writer, and Vitis rejects the violation outright
+(HLS 200-779 / 200-979), so those three units keep every arm. Flattening gets
+what the split was wanted for without moving a memory: the opcode test survives
+as a mux inside a pipelined body instead of as sub-loops the scheduler must
+serialize. The two units that own no memory -- `dma_ld` and `dma_st` -- serve
+one opcode each already, so there was nothing to split there either.
+
+Two places where a naive flattening would have cost more than it saved, and
+what each does instead:
+
+  * `vru` emits a header word and T weight words per `mm`. In the fetch branch
+    that is T+1 writes to one FIFO in one iteration, and a FIFO takes one write
+    per cycle, so the whole loop would schedule at II=T+1. It charges the
+    prologue T+1 *iterations* instead -- the same cycles, II=1 everywhere else.
+  * the row counter is incremented at the TOP of the body. With `r += 1` at
+    the bottom Vitis put the add in the last stage and the next iteration's
+    conditional queue read depends on it, which is a distance-1 recurrence that
+    does not close in one cycle: `Final II = 2` on every unit. Hoisting the
+    increment is worth exactly a factor of two here and costs nothing.
+  * the memory is read ONCE per iteration, at an address the branch selects.
+    Written as a read in each arm -- the obvious transcription -- it
+    synthesized to one read port per arm on one memory, and `vru` came back at
+    II=2 and `accu` at II=3. Muxing the address rather than the data fixes it.
+
+**`accu` did not flatten, and it is not flattened here.** Its four arms all
+touch `ar`, and once `r` is a carried register rather than the loop's own
+induction variable, Vitis can no longer prove that iteration *n*'s store and
+iteration *n+1*'s load touch different rows: `Final II = 3`. Completely
+partitioning `ar` into registers removes the aliasing question entirely and
+gets II=2, no further -- read, add, write, and the next iteration may read what
+this one wrote is a real recurrence. Both versions were built and both were
+bit-exact; both were also slower than the nested loop, which keeps `mm` at II=1
+and pays a pipeline fill per instruction instead. `accu`'s docstring has the
+detail.
+
+That is the general rule this pass ran into: **flattening trades a fixed
+per-instruction cost for a permanent per-row II, and only pays where the II
+stays at 1.** Four units kept the flat loop; one did not, and did not.
+
+The array is left alone by this pass: a PE's loop counts `mm` instructions,
+not rows, and its per-`mm` prologue (latch a weight, forward the rest down the
+column) is a different shape from its MAC body, so folding the two would set
+the II of the MAC path -- the one loop in the design that is already II=1 and
+carries the actual arithmetic -- from the worst of the two. `vru` hands the
+array its total wavefront-row count alongside the `mm` count so that a later
+pass can flatten a PE without another header change.
+
 ## Data type
 
 int8 lanes, int32 accumulation, `vst` clipping to int8 -- Gemmini's default
@@ -201,6 +295,9 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
 # 16x16x16 were *different accelerators*. They are now the same one.
 # ---------------------------------------------------------------------------
 T = int(os.environ.get("TPU_T", 4))   # SIMD width == array dimension
+# T >= 4 so that a packed word has room for the two 16-bit counts `vru` sends
+# down `wcol` to the array (`mm` count, wavefront rows).
+assert T >= 4, "a packed operand word must be at least 32 bits"
 # T is the one parameter that changes the *shape* of the generated region:
 # the array is T*T kernel instances and the chains are T and T*T stream
 # arrays, so T=16 is 262 instances and ~800 streams. That was unrunnable
@@ -425,30 +522,39 @@ def tinytpu_isa(
         `StoreController.scala`.
 
         Packs T lanes per cycle, so the scratchpad only ever sees whole words.
-        The T reads land in T banks because `schedule()` partitions A and B."""
+        The T reads land in T banks because `schedule()` partitions A and B.
+
+        **One flat loop over rows, not a loop over instructions containing a
+        loop over rows** -- see the ROW-FLATTENING note above. The instruction
+        is fetched on the iteration that needs it."""
         nw: UInt(64) = c_dld.get()
-        n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+        n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
-        for c in range(n_own):
-            w0: UInt(64) = c_dld.get()
-            op: int32 = w0[0:6]
-            f0: int32 = w0[6:18]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:62]
-            if op == OP_DMA_LD:
-                for r in range(nr):
-                    pw: UInt(VW) = 0
-                    with allo.meta_for(T) as e:
-                        v: int8 = 0
-                        if f0 == 0:
-                            v = lA[(f1 + r) * MAXDIM + f2 * T + e]
-                        else:
-                            v = lB[(f1 + r) * MAXDIM + f2 * T + e]
-                        pw[8 * e : 8 * (e + 1)] = v
-                    dma2sp.put(pw)
+        f0: int32 = 0
+        f1: int32 = 0
+        f2: int32 = 0
+        cnt: int32 = 0
+        r: int32 = -1               # advanced at the TOP: see the II note
+        for x in range(n_row):
+            r += 1
+            if r >= cnt:
+                # Only `dma_ld` reaches this queue, so there is no opcode test.
+                w0: UInt(64) = c_dld.get()
+                f0 = w0[6:18]
+                f1 = w0[18:30]
+                f2 = w0[30:42]
+                cnt = w0[54:62]
+                r = 0
+            pw: UInt(VW) = 0
+            with allo.meta_for(T) as e:
+                v: int8 = 0
+                if f0 == 0:
+                    v = lA[(f1 + r) * MAXDIM + f2 * T + e]
+                else:
+                    v = lB[(f1 + r) * MAXDIM + f2 * T + e]
+                pw[8 * e : 8 * (e + 1)] = v
+            dma2sp.put(pw)
 
     @df.kernel(mapping=[1])
     def spm():
@@ -457,27 +563,39 @@ def tinytpu_isa(
         Pure SIMD access: an address names a whole `UInt(T*8)` row and there is
         no way to address a lane. That is what lets a single-ported memory feed
         T lanes per cycle, and it is why `HLS 200-779` (single reader, single
-        writer) is satisfied without a pragma."""
+        writer) is satisfied without a pragma.
+
+        **This unit cannot be split by opcode** -- `dma_ld` writes `spad` and
+        `vld` reads it, and Allo enforces one owner per memory, so the two arms
+        have to stay in one process. What they can do is share one flat row
+        loop: the opcode test survives, but as a mux inside a pipelined body
+        rather than as two sub-loops the scheduler has to serialize. One
+        `spad` read and one `spad` write per iteration is what a dual-port
+        BRAM gives, so this still schedules at II=1."""
         spad: UInt(VW)[SPAD_ROWS] = 0
         nw: UInt(64) = c_spm.get()
-        n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+        n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
-        for c in range(n_own):
-            w0: UInt(64) = c_spm.get()
-            op: int32 = w0[0:6]
-            f0: int32 = w0[6:18]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:62]
+        op: int32 = 0
+        f1: int32 = 0
+        f3: int32 = 0
+        cnt: int32 = 0
+        r: int32 = -1               # advanced at the TOP: see the II note
+        for x in range(n_row):
+            r += 1
+            if r >= cnt:
+                w0: UInt(64) = c_spm.get()
+                op = w0[0:6]
+                f1 = w0[18:30]
+                f3 = w0[42:54]
+                cnt = w0[54:62]
+                r = 0
             if op == OP_DMA_LD:
-                for r in range(nr):
-                    spad[f3 + r] = dma2sp.get()
-            if op == OP_VLD:
-                for r in range(nr):
-                    lw: UInt(VW) = spad[f1 + r]
-                    sp2vr.put(lw)
+                spad[f3 + r] = dma2sp.get()
+            else:
+                lw: UInt(VW) = spad[f1 + r]
+                sp2vr.put(lw)
             # No write-back branch: the scratchpad is input-only. Results
             # leave through the accumulator, which is a separate memory.
 
@@ -488,31 +606,57 @@ def tinytpu_isa(
         `vld` fills them from the scratchpad; `mm` streams them into the array.
         The only control the array ever receives is the `mm` count, once, then
         one header per `mm` carrying its row count -- no opcode reaches the
-        array at all."""
+        array at all.
+
+        **This is the unit the flattening was for.** It was the critical
+        process in the design: at 16x16x16 it issues 33 instructions and 464
+        words, so 33 un-overlapped instruction boundaries cost more than the
+        words did. Like `spm` it cannot be split -- `vld` writes `vr` and `mm`
+        reads it -- so it gets one flat loop instead.
+
+        The `mm` prologue (one header word plus T weight words) is the reason
+        this is a *word* loop and not a row loop. Emitting it inside the fetch
+        branch would put T+1 writes to `wcol[0]` in one iteration, and a FIFO
+        takes one write per cycle, so the whole loop would schedule at II=T+1.
+        Charging the prologue T+1 *iterations* instead costs exactly the same
+        T+1 cycles and leaves every other iteration at II=1."""
         nw: UInt(64) = c_vru.get()
-        n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+        n_word: int32 = nw[0:16]    # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
         mw: UInt(64) = c_vru.get()
         n_mm_in: int32 = mw[0:16]
+        n_mr_in: int32 = mw[16:32]
         vr: UInt(VW)[NVR] = 0
-        # Hand the array its own count before anything else, on the chain it
-        # already uses for headers and weights.
-        nmo: UInt(VW) = n_mm_in
+        # Hand the array its own counts before anything else, on the chain it
+        # already uses for headers and weights: how many `mm`s, and how many
+        # wavefront rows they carry between them. The second is what lets a PE
+        # flatten its own loop the same way (see `pe`).
+        nmo: UInt(VW) = 0
+        nmo[0:16] = n_mm_in
+        nmo[16:32] = n_mr_in
         wcol[0].put(nmo)
-        for c in range(n_own):
-            w0: UInt(64) = c_vru.get()
-            op: int32 = w0[0:6]
-            f0: int32 = w0[6:18]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:62]
-
+        op: int32 = 0
+        f0: int32 = 0
+        f3: int32 = 0
+        nr: int32 = 0
+        cnt: int32 = 0
+        r: int32 = -1               # advanced at the TOP: see the II note
+        for x in range(n_word):
+            r += 1
+            if r >= cnt:
+                w0: UInt(64) = c_vru.get()
+                op = w0[0:6]
+                f0 = w0[6:18]
+                f3 = w0[42:54]
+                nr = w0[54:62]
+                cnt = nr
+                if op == OP_MM:
+                    cnt = nr + T + 1
+                r = 0
             if op == OP_VLD:
-                for r in range(nr):
-                    vr[f0 + r] = sp2vr.get()
-            if op == OP_MM:
+                vr[f0 + r] = sp2vr.get()
+            elif r == 0:
                 # The header carries the row count, and it is sent **only for
                 # `mm`** -- the array's loop counts `mm` instructions, not
                 # program instructions, so there is nothing for it to skip and
@@ -520,14 +664,25 @@ def tinytpu_isa(
                 hdr: UInt(VW) = 0
                 hdr[0:12] = nr
                 wcol[0].put(hdr)
-                # T weight words, row 0 first: each PE keeps the first word it
-                # sees and forwards the rest, so row i keeps word i.
-                with allo.meta_for(T) as k:
-                    kw: UInt(VW) = vr[f3 + k]
-                    wcol[0].put(kw)
-                for r in range(nr):
-                    rw: UInt(VW) = vr[f0 + r]
-                    acol[0].put(rw)
+            else:
+                # ONE read of `vr`, at an address the branch selects. Written
+                # as two reads in two arms it synthesized to two read ports on
+                # the same memory, and with the `vld` write that is three
+                # accesses to a dual-port BRAM: measured `Final II = 2`, which
+                # would have doubled the cost of the wavefront stream. Muxing
+                # the address instead of the data costs an adder and holds the
+                # loop at II=1.
+                va: int32 = f0 + r - T - 1
+                if r <= T:
+                    # T weight words, row 0 first: each PE keeps the first
+                    # word it sees and forwards the rest, so row i keeps
+                    # word i.
+                    va = f3 + r - 1
+                vv: UInt(VW) = vr[va]
+                if r <= T:
+                    wcol[0].put(vv)
+                else:
+                    acol[0].put(vv)
 
     @df.kernel(mapping=[T, T])
     def pe():
@@ -624,7 +779,50 @@ def tinytpu_isa(
         way -- adds in `AccumulatorMem`'s write path, not in the mesh.
 
         `vst` clips to int8 on the way out, which is Gemmini's `mvout` under
-        ACC_SCALE_IDENTITY with shift 0."""
+        ACC_SCALE_IDENTITY with shift 0.
+
+        **THIS IS THE UNIT THAT WOULD NOT FLATTEN.** Four opcodes and one
+        memory: `ar` is written by `mm`, read-modify-written by `vadd` and
+        `vrelu`, and read by `mvout`. One owner per memory rules out splitting
+        it, so the flat row loop the other four units got was the only route.
+        It was built twice, was bit-exact both times, and was slower both
+        times, so it is not here. The two attempts and what each hit:
+
+          * **`ar` in BRAM: `Final II = 3`.** Muxing the four arms down to one
+            `ar` read and one `ar` write fixed the port count, and hoisting the
+            row counter fixed the queue recurrence -- both of which worked for
+            the other units. What remained was a memory dependence:
+
+                Unable to enforce a carried dependence constraint
+                (II = 1, distance = 1) between 'store' on array 'ar'
+                and 'load' ('rv') on array 'ar'
+
+            In the nested form the index is `f1 + r` with `r` the inner loop's
+            own induction variable, so Vitis proves iteration *n*'s store and
+            iteration *n+1*'s load touch different rows and schedules `mm` at
+            II=1. Flattening makes `r` a carried register, the index stops
+            being affine in the loop index, and the proof fails. Deferring the
+            write by one iteration -- the textbook fix -- only moves the
+            violation onto the enable register.
+          * **`ar` completely partitioned into registers: `Final II = 2`.** A
+            register file has no port to arbitrate and nothing to prove about
+            aliasing, and it did take the II from 3 to 2 (at 33k FF and 12k
+            LUT, and 10 minutes of synthesis). The remainder is not an
+            artifact: read `ar[ra]`, add, write `ar[wa]`, and the next
+            iteration may read what this one wrote. That is a genuine
+            read-modify-write recurrence through a register file and it does
+            not close in one cycle.
+
+        So II=2 per row is the floor for a flattened accumulator, and at
+        16x16x16 that is 384 iterations at 2 cycles against 20 instruction
+        boundaries plus 384 rows at 1 -- the nested loop wins, and keeps `mm`
+        at II=1 where the GEMM actually lives. `vadd`'s own loop is II=2 (two
+        `ar` reads and a write is three accesses to a dual-port BRAM), which is
+        real but off the GEMM path.
+
+        The general rule, and the reason four units flattened and this one did
+        not: **flattening trades a fixed per-instruction cost for a permanent
+        per-row II, and only pays where the II stays at 1.**"""
         ar: UInt(AW)[NAR] = 0
         nw: UInt(64) = c_acc.get()
         n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
@@ -707,8 +905,6 @@ def tinytpu_isa(
                     ac2sp.put(ow)
 
 
-
-
     @df.kernel(mapping=[1], args=[C])
     def dma_st(lC: int8[MAXDIM * MAXDIM]):
         """Accumulator -> DRAM. Sole writer of C.
@@ -722,22 +918,26 @@ def tinytpu_isa(
         are concurrent -- but it decides whether `csim` works, and `csim` is the
         fast functional check."""
         nw: UInt(64) = c_dst.get()
-        n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+        n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
-        for c in range(n_own):
-            w0: UInt(64) = c_dst.get()
-            op: int32 = w0[0:6]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:62]
-            if op == OP_MVOUT:
-                for r in range(nr):
-                    qw: UInt(VW) = ac2sp.get()
-                    with allo.meta_for(T) as e:
-                        ov: int8 = qw[8 * e : 8 * (e + 1)]
-                        lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
+        f1: int32 = 0
+        f2: int32 = 0
+        cnt: int32 = 0
+        r: int32 = -1               # advanced at the TOP: see the II note
+        for x in range(n_row):
+            r += 1
+            if r >= cnt:
+                # Only `mvout` reaches this queue, so there is no opcode test.
+                w0: UInt(64) = c_dst.get()
+                f1 = w0[18:30]
+                f2 = w0[30:42]
+                cnt = w0[54:62]
+                r = 0
+            qw: UInt(VW) = ac2sp.get()
+            with allo.meta_for(T) as e:
+                ov: int8 = qw[8 * e : 8 * (e + 1)]
+                lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
 
 def gemm_program(M, K, N, relu=False):
     """Tiled GEMM as a program with **control flow**, for any shape.
@@ -851,14 +1051,20 @@ def vadd_program(M, K, N):
 
 
 def expand(prog):
-    """Run the program's control flow at assembly time, yielding the opcode of
-    every instruction the sequencer will actually issue.
+    """Run the program's control flow at assembly time, yielding the
+    `(opcode, row count)` of every instruction the sequencer will actually
+    issue.
 
-    The units loop over *their own* instruction count, so the header must carry
-    the DYNAMIC count -- how many instructions each unit is really sent -- not
-    the static one. With a hardware loop those differ, and a unit promised more
-    than it receives waits forever. This is the assembler's obligation, and it
-    is the price of putting control flow in the sequencer.
+    The units loop over *their own* work count, so the header must carry the
+    DYNAMIC count -- how much work each unit is really sent -- not the static
+    one. With a hardware loop those differ, and a unit promised more than it
+    receives waits forever. This is the assembler's obligation, and it is the
+    price of putting control flow in the sequencer.
+
+    The row count comes along because the units now count ROWS rather than
+    instructions (see the flattening note at the top of the file). `nr` is
+    never an AGU target, so it is the same for every dynamic issue of a given
+    static instruction and can be read straight off the encoding.
     """
     ops = []
     pc = 0
@@ -882,7 +1088,7 @@ def expand(prog):
                 stack.pop()
                 pc += 1
         else:
-            ops.append(op)
+            ops.append((op, (prog[pc][0] >> 54) & 0xFF))
             pc += 1
     return ops
 
@@ -890,25 +1096,56 @@ def expand(prog):
 def assemble(prog):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
-        imem[0] static instruction count   imem[4] mm  (the array)
-        imem[1] dma_ld                     imem[5] accu
-        imem[2] spm                        imem[6] dma_st
-        imem[3] vru                        imem[7] unused
+        imem[0] static instruction count   imem[4] mm count | mm rows << 16
+        imem[1] dma_ld  rows               imem[5] accu   INSTRUCTIONS
+        imem[2] spm     rows               imem[6] dma_st rows
+        imem[3] vru     words              imem[7] unused
+
+    `accu` is the exception, and the only one: it is the one unit still
+    counting instructions, because it is the one unit that stayed nested (see
+    its docstring).
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
     `expand`. They must match the sequencer's dispatch rules exactly.
+
+    **These are work counts, not instruction counts.** Each unit runs one flat
+    loop over the rows (or words, or iterations) it will actually process, so
+    what it is promised has to be the sum of `nr` over the instructions it is
+    sent, with the two per-unit adjustments the flattened bodies make:
+
+      * `vru` charges an `mm` an extra `T + 1` words for the header and the T
+        weight words it pushes down `wcol`, because they are iterations of the
+        same loop rather than a prologue outside it;
+
+    A unit promised the wrong number here does not produce a wrong answer, it
+    hangs -- which is worth stating, because it is the one place where the
+    assembler and the microarchitecture are coupled.
     """
-    import collections
-    c = collections.Counter(expand(prog))
+    ev = expand(prog)
+
+    def rows(*ops):
+        return sum(nr for op, nr in ev if op in ops)
+
+    def count(*ops):
+        return sum(1 for op, nr in ev if op in ops)
+
+    n_mm = count(OP_MM)
+    mm_rows = rows(OP_MM)
+    assert n_mm < (1 << 15) and mm_rows < (1 << 15), "array counts overflow"
     hdr = [len(prog),
-           c[OP_DMA_LD],
-           c[OP_DMA_LD] + c[OP_VLD],
-           c[OP_VLD] + c[OP_MM],
-           c[OP_MM],
-           c[OP_MM] + c[OP_VADD] + c[OP_VRELU] + c[OP_MVOUT],
-           c[OP_MVOUT],
+           rows(OP_DMA_LD),
+           rows(OP_DMA_LD, OP_VLD),
+           rows(OP_VLD) + mm_rows + n_mm * (T + 1),
+           n_mm | (mm_rows << 16),
+           count(OP_MM, OP_VADD, OP_VRELU, OP_MVOUT),
+           rows(OP_MVOUT),
            0]
     assert len(hdr) == NHDR
+    # Every count is read back through a 16-bit slice, which extracts to a
+    # signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
+    # encoding note at the top of the file).
+    for h in hdr[1:4] + hdr[5:]:
+        assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
     words = list(hdr)
     for w0, w1 in prog:
         words.append(int(w0))

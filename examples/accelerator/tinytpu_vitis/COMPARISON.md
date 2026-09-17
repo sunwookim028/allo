@@ -50,13 +50,17 @@ accelerator.
 
 | shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
 |---|---|---|---|---|---|
-| 4x4x4    | 1037 | 574 | 1.81x |  0.4% |  0.7% |
-| 8x8x8    | 1165 | 615 | 1.89x |  2.7% |  5.2% |
-| 12x12x12 | 1389 | 740 | 1.88x |  7.8% | 14.6% |
-| 16x16x8  | 1437 | 784 | 1.83x |  8.9% | 16.3% |
-| 16x16x16 | **1733** | 986 | **1.76x** | 14.8% | 26.0% |
+| 4x4x4    | 1004 | 574 | 1.75x |  0.4% |  0.7% |
+| 8x8x8    | 1108 | 615 | 1.80x |  2.9% |  5.2% |
+| 12x12x12 | 1294 | 740 | 1.75x |  8.3% | 14.6% |
+| 16x16x8  | 1344 | 784 | 1.71x |  9.4% | 16.3% |
+| 16x16x16 | **1586** | 986 | **1.61x** | 16.1% | 26.0% |
 
-**The ratio is flat at ~1.8x and falls slightly with size.** That is a
+(Our column is after the row-flattening pass; the section on it below has the
+before/after and the 20-cycle correction that an earlier revision of this table
+predates.)
+
+**The ratio is flat at ~1.7x and falls with size.** That is a
 qualitatively different result from the per-workload measurement, whose ratio
 *grew* (1.32x -> 1.54x -> 1.75x). Fixing the hardware exposed that the earlier
 growth was partly an artifact of specialization, and the real remaining gap is
@@ -70,11 +74,14 @@ machine's own peak):
 
 | step | Gemmini | ours |
 |---|---|---|
-| 4x4x4 -> 8x8x8 | 10.93 MAC/cyc (**68.3%**) | 3.50 (**21.9%**) |
-| 8x8x8 -> 12x12x12 | 9.73 (**60.8%**) | 5.43 (**33.9%**) |
-| 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 6.67 (41.7%) |
-| 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 6.92 (**43.2%**) |
-| least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.92 (**37.0%**), fixed 1067 |
+| 4x4x4 -> 8x8x8 | 10.93 MAC/cyc (**68.3%**) | 4.31 (**26.9%**) |
+| 8x8x8 -> 12x12x12 | 9.73 (**60.8%**) | 6.54 (**40.9%**) |
+| 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 6.40 (40.0%) |
+| 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 8.46 (**52.9%**) |
+| least squares, all five | 9.71 (**60.7%**), fixed 566 | 7.05 (**44.1%**), fixed 1028 |
+
+(Our column is post-flattening; it read 3.50 / 5.43 / 6.67 / 6.92 and 37.0%
+with fixed 1067 before.)
 
 The cube sweep varies all three dimensions at once and spans only 2.4x in
 cycles, which makes each marginal a difference of two similar numbers. The
@@ -108,11 +115,14 @@ The 12x12x12 -> 16x16x8 step dips for both machines because it changes aspect
 ratio rather than growing uniformly; it is not a clean sweep point.
 
 **Gemmini's marginal efficiency is roughly flat at ~61%. Ours rises
-monotonically, 21.9% -> 43.2%.** That rise is the signature of a large fixed
-cost being amortised, and it agrees with the 1067-cycle intercept -- which is
+monotonically, 26.9% -> 52.9%.** That rise is the signature of a large fixed
+cost being amortised, and it agrees with the 1028-cycle intercept -- which is
 `wrap_io` bulk-copying whole declared arrays (see the I/O trade below). So our
 gap is not a constant factor on the work; it is a fixed charge that the sweep
-is slowly paying off, and it would keep closing at larger shapes.
+is slowly paying off, and it would keep closing at larger shapes. Flattening
+the per-instruction loops lifted the whole curve (it was 21.9% -> 43.2%) and
+left the intercept where it was, which is the same story the instruction-count
+fit tells.
 
 For contrast, the MiniTPU target's marginal efficiency is **flat at 19.0%** and
 does not move with size. Measured on its own RTL over a 12x sweep of output
@@ -131,8 +141,8 @@ first one wrong:
   and is, as of this writing, unattributed. Quoting 36.4% as the machine's
   marginal conflates a bound with a measurement.
 - **Flat versus rising is the real difference, not the number.** Our 37.0% and
-  its 36.4% looked like the same quantity and are not: ours rises 21.9% ->
-  43.2% and would keep climbing, theirs sits at 19.0% and does not move. With
+  its 36.4% looked like the same quantity and are not: ours rises 26.9% ->
+  52.9% and would keep climbing, theirs sits at 19.0% and does not move. With
   the corrected figure the two no longer even look alike, which is the more
   honest presentation.
 
@@ -159,6 +169,10 @@ streams, all three programs bit-exact, and cosim measures:
 | **ours T=16** | **1176** | **256** | **16 cyc** | **1.36%** |
 | MiniTPU 16x16 | 168 | 256 | 16 cyc | 9.5% |
 | Gemmini 4x4 | 986 | 16 | 256 cyc | 26.0% |
+
+(Both "ours" rows predate the row-flattening pass below, which took the T=4
+number to 1586. T=16 has not been re-measured since; the argument this section
+makes is about the fixed term, which flattening did not move.)
 
 **16x the PEs bought 1.47x the speed, and utilization fell 14.8% -> 1.36%.**
 
@@ -263,17 +277,136 @@ construction: each unit consumes the instruction stream in order and every
 channel is point-to-point, which is what makes the hazard logic free, and also
 what caps the throughput.
 
+**Since fixed, in part.** Four of the five units now run one flat loop over
+rows that pipelines at II=1; `accu` and the array do not, for reasons the
+row-flattening section above sets out. Marginal cost went 18.07 -> 15.12
+cycles/instruction, worth 1.08x at 16x16x16.
+
+## Row-flattening the per-instruction loop: 1.08x, not the 1.7x it looked like
+
+This was item 1 on the list below, and the estimate attached to it -- "worth
+the 1.7x marginal term" -- was wrong in a way worth recording, because the
+arithmetic that produced it is the kind that is easy to repeat.
+
+**The change.** Every unit was a loop over *instructions* containing a loop
+over *rows*, and Vitis reported `Pipelined = no` on all five outer loops. Four
+of them are now a single flat loop over rows (or words), with the instruction
+fetched on the iteration that needs it and the opcode test surviving as a mux
+inside a pipelined body. The header carries a per-unit dynamic *work* count
+instead of a dynamic instruction count; `assemble()` already expanded the
+control flow to compute the latter, so this is `nr` summed rather than counted.
+
+**Measured, same flow, same testbenches, all five shapes bit-exact:**
+
+| shape | before | after | speedup |
+|---|---|---|---|
+| 4x4x4    | 1017 | **1004** | 1.013x |
+| 8x8x8    | 1145 | **1108** | 1.033x |
+| 12x12x12 | 1369 | **1294** | 1.058x |
+| 16x16x8  | 1417 | **1344** | 1.054x |
+| 16x16x16 | 1713 | **1586** | **1.080x** |
+
+Fitting against dynamic instruction count (6, 15, 28, 25, 45):
+
+| | marginal | fixed |
+|---|---|---|
+| before | 18.07 cyc/instr | 902 |
+| after | **15.12 cyc/instr** | 907 |
+| Gemmini | 10.8 | 483 |
+
+**The marginal term moved 1.20x, not 1.7x, and the fixed term did not move at
+all** (5 cycles is fit noise). Two things account for the gap between the
+estimate and the result:
+
+1. **1.7x was the ratio of our marginal to Gemmini's, not the headroom in the
+   change.** 18.1/10.8 = 1.68 is what closing the whole marginal gap would buy;
+   pipelining the loop only removes the part of the marginal cost that is
+   per-instruction pipeline fill, and the rest is real per-row work that no
+   scheduling change touches.
+2. **Amdahl.** At 16x16x16 the marginal term is 811 of 1713 cycles, 47%; at
+   4x4x4 it is 108 of 1017, 11%. Even a marginal term driven to zero could not
+   have given 1.7x overall at any shape in this sweep, and the measured
+   speedups track that share exactly -- 1.3% at the smallest shape rising
+   monotonically to 8.0% at the largest.
+
+**Per-unit, before and after** (csynth, the loop over instructions):
+
+| unit | before | after |
+|---|---|---|
+| `sequencer` | 1 loop, II=5 | unchanged |
+| `dma_ld` | iter latency 133, **Pipelined = no** | one loop, **yes, II=1**, iter latency 4 |
+| `spm` | iter latency 133, **no** | one loop, **yes, II=1**, iter latency 5 |
+| `vru` | iter latency 137, **no** | one loop, **yes, II=1**, iter latency 5 |
+| `accu` | iter latency 261, **no** | **unchanged -- see below** |
+| `pe` x16 | iter latency 2055-2058, **no** | unchanged |
+| `dma_st` | iter latency 132, **no** | one loop, **yes, II=1**, iter latency 3 |
+
+Area is essentially unchanged: BRAM 16, DSP 15, FF 12432 -> 12835, LUT
+18416 -> 18968.
+
+### What would not split, and what would not flatten
+
+The plan was per-opcode queues and one process per opcode. **One owner per
+memory rules that out for exactly the units that matter.** `spad` is written by
+`dma_ld` and read by `vld`; `vr` is written by `vld` and read by `mm`; `ar` is
+touched by all four of `accu`'s opcodes. Allo enforces single reader and single
+writer and Vitis rejects the violation outright (HLS 200-779 / 200-979). The
+two units that own no memory, `dma_ld` and `dma_st`, serve one opcode each, so
+there was nothing to split there either -- the splitting half of the plan had
+no legal instance anywhere in the design. Flattening turned out to get what the
+split was wanted for without moving a memory, which is why it is the change
+that shipped.
+
+**`accu` resisted the flattening too, and that is the honest limit of this
+pass.** It was built twice and was bit-exact both times, and both times it was
+slower than the nested loop it replaced:
+
+* With `ar` in BRAM, `Final II = 3`. Once `r` is a carried register rather than
+  the inner loop's induction variable, `ar[f1+r]` stops being affine in the
+  loop index, and Vitis can no longer prove that iteration *n*'s store and
+  iteration *n+1*'s load touch different rows. Deferring the write by one
+  iteration, the textbook fix, only moves the violation onto the enable
+  register.
+* With `ar` completely partitioned into registers -- no ports to arbitrate, no
+  aliasing to prove -- `Final II = 2`, and no further. Read, add, write, and the
+  next iteration may read what this one wrote is a genuine recurrence through a
+  register file. It also cost 33k FF, 12k LUT and ten minutes of synthesis.
+
+Two cycles a row for 384 rows is worse than 20 instruction boundaries plus 384
+rows at one, so `accu` keeps the nested loop and keeps `mm` at II=1. The array
+was left alone deliberately: a PE's per-`mm` prologue is a different shape from
+its MAC body, and folding them would set the II of the one loop in the design
+that is already II=1 and carries the actual arithmetic.
+
+**The general rule, which is the transferable result here:** flattening trades
+a fixed per-instruction cost for a permanent per-row II, and only pays where
+the II stays at 1. Four units kept it; one did not, and did not.
+
+Two Vitis-specific things were worth a factor of two each and are not obvious
+from the source:
+
+* **increment the row counter at the TOP of the body.** With `r += 1` at the
+  bottom, Vitis schedules the add in the last stage and the next iteration's
+  conditional queue read depends on it -- a distance-1 recurrence that does not
+  close in one cycle, `Final II = 2` on every unit. Hoisting it costs nothing.
+* **read the memory once, at an address the branch selects.** A read written
+  into each arm -- the obvious transcription -- synthesizes to one read port per
+  arm on one memory: `vru` came back at II=2 and `accu` at II=3.
+
 ## What would close the rest
 
-1. **Pipeline the per-instruction loop** -- worth the 1.7x marginal term. Split each
-   unit's `if op == ...` arms into separate always-running inner loops fed by
-   per-opcode queues so instruction *n+1* starts while *n* drains.
+1. ~~**Pipeline the per-instruction loop**~~ -- done, and measured at 1.08x
+   rather than the 1.7x estimated; see the section above. What remains of the
+   marginal term (15.1 against Gemmini's 10.8) is in `accu` and the array,
+   neither of which flattens for the reasons given there.
 2. **A program-controlled burst DMA** -- worth the 1.9x fixed term, and the
    one item that needs something Allo does not currently expose (see the I/O
-   trade above).
+   trade above). **This is now unambiguously the largest remaining item**: the
+   fixed term did not move at all above, and at 907 cycles it is 57% of
+   16x16x16 and 90% of 4x4x4.
 3. **Then multiple instructions in flight.** A credit/scoreboard scheme over
    the in-order units would approach Gemmini's 48-entry reservation station
-   without its complexity. Doing it before (1) optimizes the wrong term.
+   without its complexity.
 
 Item 2 of the original list -- splitting `accu` -- was addressed differently and
 better: rather than giving the vector ALU its own issue slot, the GEMM inner
@@ -304,18 +437,20 @@ functional check that had been passing all session.
 ## Honest reading
 
 On one fixed build, matched in data type and array size, the design is a **flat
-~1.8x behind Gemmini** across five shapes, and the ratio does not degrade with
-problem size (1.81x at 4x4x4, 1.76x at 16x16x16). Utilization tracks at roughly
-half Gemmini's at every point.
+~1.7x behind Gemmini** across five shapes, and the ratio improves slightly with
+problem size (1.75x at 4x4x4, 1.61x at 16x16x16). Utilization tracks at roughly
+two thirds of Gemmini's at the largest shape.
 
 Two terms make up the 1.8x, and both are named:
 
-1. **Marginal, 18.1 vs 10.8 cycles/instruction (1.7x).** The per-instruction
-   loop in each unit is `pipelined = no`, so a unit finishes instruction *n*
-   before starting *n+1*. Gemmini's 48-entry reservation station is what buys
-   the difference.
-2. **Fixed, 922 vs 483 cycles (1.9x).** Allo's argument handling: bulk-copy the
+1. **Marginal, now 15.1 vs 10.8 cycles/instruction (1.4x).** It was 18.1 until
+   four of the five units were row-flattened so their loops pipeline at II=1;
+   that was worth 1.08x overall and is written up above. What is left is
+   `accu`, whose accumulate is a read-modify-write recurrence that does not
+   flatten below II=2, and the array's per-`mm` prologue.
+2. **Fixed, 907 vs 483 cycles (1.9x).** Allo's argument handling: bulk-copy the
    declared arrays, or unbuffered `m_axi`, but no program-controlled burst DMA.
+   **Untouched by the above, and therefore now the bigger of the two.**
 
 Neither term is about the array, the data type, or the dataflow -- all three are
 correct and RTL-verified, and `microarch_ws.py` reached exactly 100% of roofline

@@ -289,6 +289,63 @@ python kpn_model.py                                       # channel-graph model
 python cosim.py                                           # csim + csynth + cosim
 ```
 
+## Row-flattening: every unit is one loop now, except the accumulator
+
+Each unit was a loop over *instructions* containing a loop over *rows*, and
+Vitis reported `Pipelined = no` on all five of those outer loops. That is not a
+tool defect: modulo scheduling needs a fixed II, an inner loop whose trip count
+arrives in an instruction field cannot be unrolled to give one, and so the outer
+loop has no II at all.
+
+`dma_ld`, `spm`, `vru` and `dma_st` are now **one flat loop over rows** (words,
+for `vru`), with the instruction fetched on the iteration that needs it and the
+opcode test surviving as a mux inside a pipelined body. The header carries a
+per-unit dynamic *work* count instead of an instruction count; `assemble()`
+already expanded the control flow with `expand()`, so this is `nr` summed
+rather than counted.
+
+| unit | before | after |
+|---|---|---|
+| `sequencer` | 1 loop, II=5 | unchanged |
+| `dma_ld` | iter latency 133, `Pipelined = no` | one loop, **yes, II=1** |
+| `spm` | 133, `no` | one loop, **yes, II=1** |
+| `vru` | 137, `no` | one loop, **yes, II=1** |
+| `accu` | 261, `no` | **unchanged** |
+| `pe` x16 | 2055-2058, `no` | unchanged |
+| `dma_st` | 132, `no` | one loop, **yes, II=1** |
+
+Cosim, one build, all shapes bit-exact:
+
+| shape | before | after |
+|---|---|---|
+| 4x4x4    | 1017 | **1004** |
+| 8x8x8    | 1145 | **1108** |
+| 12x12x12 | 1369 | **1294** |
+| 16x16x8  | 1417 | **1344** |
+| 16x16x16 | 1713 | **1586** (1.08x) |
+
+Marginal cost 18.07 -> 15.12 cycles/instruction; fixed cost 902 -> 907, i.e.
+unmoved. Area: BRAM 16, DSP 15, FF 12432 -> 12835, LUT 18416 -> 18968.
+
+**The 1.7x this was estimated at was the ratio of our marginal cost to
+Gemmini's, not the headroom in the change**, and at 16x16x16 the marginal term
+is only 47% of the cycles. `COMPARISON.md` has that arithmetic and the two
+Vitis-specific tricks (increment the row counter at the *top* of the body; read
+the memory *once*, at an address the branch selects) that were each worth a
+factor of two in II.
+
+**What resisted.** The plan was per-opcode queues and one process per opcode,
+and one owner per memory rules that out for every unit where it would have
+mattered: `spad`, `vr` and `ar` each have arms on both sides. `accu` would not
+even flatten -- with `ar` in BRAM the flat loop is `Final II = 3`, because `r`
+stops being affine in the loop index and Vitis can no longer prove that
+iteration *n*'s store and *n+1*'s load differ; with `ar` completely partitioned
+into registers it is II=2, and no further, because read-add-write into a
+register file is a real recurrence. Both versions were built and bit-exact and
+both were slower than the nested loop, which keeps `mm` at II=1. The array was
+left alone on purpose: folding a PE's per-`mm` prologue into its MAC body would
+set the II of the one loop in the design that already runs at 1.
+
 ## Next
 
 1. `cosim` -- the only thing that yields a real cycle count for a programmable
