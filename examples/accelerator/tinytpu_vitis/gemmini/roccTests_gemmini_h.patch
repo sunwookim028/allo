@@ -1,0 +1,38 @@
+diff --git a/include/gemmini.h b/include/gemmini.h
+index 8eb89cb..877b90a 100644
+--- a/include/gemmini.h
++++ b/include/gemmini.h
+@@ -14,6 +14,20 @@
+ 
+ #include "include/gemmini_params.h"
+ 
++// The BERT integer-softmax path below right-shifts acc_t values. That is
++// well-defined only when acc_t is an integer type; under a floating-point
++// Gemmini config (ELEM_T_IS_FLOAT) it fails to compile, which blocks every
++// test in the suite, not just the softmax ones. Route those two shifts through
++// a macro that keeps the integer path byte-for-byte identical and gives the
++// float path something that at least compiles (the path is integer-only by
++// construction and is not exercised under a float config).
++#ifdef ELEM_T_IS_FLOAT
++#define GEMMINI_ACC_SHR(x, n) ((acc_t)((int64_t)(x) >> (int64_t)(n)))
++#else
++#define GEMMINI_ACC_SHR(x, n) ((x) >> (n))
++#endif
++
++
+ #define GEMMINI_ASSERTIONS
+ 
+ // Accelerator interface
+@@ -1076,10 +1090,10 @@ static void matmul_cpu(bool transA, bool transB, size_t DIM_I, size_t DIM_J, siz
+         acc_t sum_exp = 0;
+         for (size_t j = 0; j < DIM_J; j++) {
+           acc_t q = c_buffer[j] - max_q;
+-          acc_t z = (acc_t) (-q * qln2_inv) >> 16;
++          acc_t z = GEMMINI_ACC_SHR((acc_t) (-q * qln2_inv), 16);
+           acc_t qp = q + z * qln2;
+           acc_t q_exp = (qp + qb)*(qp + qb) + qc;
+-          c_buffer[j] = q_exp >> z;
++          c_buffer[j] = GEMMINI_ACC_SHR(q_exp, z);
+           sum_exp += c_buffer[j];
+         }
+ 

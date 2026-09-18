@@ -1,0 +1,20 @@
+diff --git a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
+index 7b2de98c..8fbd8c1a 100644
+--- a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
++++ b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
+@@ -14,6 +14,15 @@ class GemminiRocketConfig extends Config(
+   new chipyard.config.AbstractConfig)
+ // DOC include end: GemminiRocketConfig
+ 
++
++// int8/int32 Gemmini at DIM=4 -- the data-type- and mesh-matched baseline for
++// the Allo TinyTPU comparison (see gemmini.GemminiCustomConfigs.int8Dim4Config).
++class Int8Dim4GemminiRocketConfig extends Config(
++  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim4Config) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new chipyard.config.AbstractConfig)
++
+ class FPGemminiRocketConfig extends Config(
+   new gemmini.GemminiFP32DefaultConfig ++                         // use FP32Gemmini systolic array GEMM accelerator
+   new freechips.rocketchip.rocket.WithNHugeCores(1) ++

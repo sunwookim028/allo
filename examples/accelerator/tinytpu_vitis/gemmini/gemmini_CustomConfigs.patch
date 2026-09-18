@@ -1,0 +1,27 @@
+diff --git a/src/main/scala/gemmini/CustomConfigs.scala b/src/main/scala/gemmini/CustomConfigs.scala
+index 011d7ce..5f7a71b 100644
+--- a/src/main/scala/gemmini/CustomConfigs.scala
++++ b/src/main/scala/gemmini/CustomConfigs.scala
+@@ -49,6 +49,22 @@ object GemminiCustomConfigs {
+     acc_capacity = CapacityInKilobytes(128),
+   )
+ 
++
++  // int8 / int32 on a 4x4 mesh: Gemmini's *default* data type, at the array
++  // size the Allo TinyTPU generates (T = 4). The stock GemminiRocketConfig is
++  // int8 at 16x16 and FPGemminiRocketConfig is fp32 at 4x4, so neither is a
++  // matched baseline -- one differs in mesh size, the other in data type.
++  // This one differs in neither, which is what makes a cycle comparison mean
++  // something. Everything else is left at defaultConfig, including
++  // dataflow = BOTH (allo_cmp.c passes WS to tiled_matmul_auto).
++  val int8Dim4Config = defaultConfig.copy(
++    meshRows = 4,
++    meshColumns = 4,
++    tileRows = 1,
++    tileColumns = 1,
++    has_training_convs = false,
++  )
++
+   // Specify which of your custom configs you want to build here
+   val customConfig = baselineInferenceConfig
+ }

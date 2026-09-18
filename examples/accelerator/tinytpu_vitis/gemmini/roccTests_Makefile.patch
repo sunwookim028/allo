@@ -1,0 +1,12 @@
+diff --git a/bareMetalC/Makefile b/bareMetalC/Makefile
+index 5ba463c..6611c67 100644
+--- a/bareMetalC/Makefile
++++ b/bareMetalC/Makefile
+@@ -1,6 +1,7 @@
+ include $(abs_top_srcdir)/Makefrag
+ 
+ tests = \
++	allo_cmp \
+ 	mvin_mvout \
+ 	mvin_mvout_zeros \
+ 	mvin_mvout_stride \

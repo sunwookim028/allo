@@ -1,0 +1,1138 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2023.2 (64-bit)
+  **** SW Build 4023990 on Oct 11 2023
+  **** IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+  **** SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /opt/xilinx/Vitis_HLS/2023.2/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] Running '/opt/xilinx/Vitis_HLS/2023.2/bin/unwrapped/lnx64.o/vitis_hls'
+INFO: [HLS 200-10] For user 'sk3463' on host 'en-ec-ace-01.coecis.cornell.edu' (Linux_x86_64 version 6.8.0-138-generic) on Wed Sep 09 05:46:19 UTC 2026
+INFO: [HLS 200-10] On os Ubuntu 24.04.4 LTS
+INFO: [HLS 200-10] In directory '/tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj'
+INFO: [HLS 200-2053] The vitis_hls executable is being deprecated. Consider using vitis-run --mode hls --tcl
+Sourcing Tcl script 'run.tcl'
+INFO: [HLS 200-1510] Running: open_project out.prj -reset 
+INFO: [HLS 200-10] Creating and opening project '/tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj'.
+INFO: [HLS 200-1510] Running: open_solution -reset solution1 -flow_target vivado 
+INFO: [HLS 200-10] Creating and opening solution '/tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1'.
+INFO: [HLS 200-10] Cleaning up the solution database.
+INFO: [HLS 200-1505] Using flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_top tinytpu_vitis 
+INFO: [HLS 200-1510] Running: add_files kernel.cpp 
+INFO: [HLS 200-10] Adding design file 'kernel.cpp' to the project
+INFO: [HLS 200-1510] Running: add_files -tb host.cpp -cflags -std=gnu++0x 
+WARNING: [HLS 200-40] Cannot find test bench file 'host.cpp'
+INFO: [HLS 200-1510] Running: open_solution solution1 
+INFO: [HLS 200-10] Opening solution '/tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1'.
+INFO: [HLS 200-1505] Using flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_part xcu280-fsvh2892-2L-e 
+INFO: [HLS 200-1611] Setting target device to 'xcu280-fsvh2892-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 3.33 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 3.33ns.
+INFO: [HLS 200-1510] Running: csynth_design 
+WARNING: [HLS 200-1998] cannot find relative file path '../../host.cpp' in directory(s): /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj
+INFO: [HLS 200-111] Finished File checks and directory preparation: CPU user time: 0.05 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.07 seconds; current allocated memory: 256.727 MB.
+INFO: [HLS 200-10] Analyzing design file 'kernel.cpp' ... 
+INFO: [HLS 200-111] Finished Source Code Analysis and Preprocessing: CPU user time: 18.1 seconds. CPU system time: 1.31 seconds. Elapsed time: 19.4 seconds; current allocated memory: 264.941 MB.
+INFO: [HLS 200-777] Using interface defaults for 'Vivado' flow target.
+INFO: [HLS 200-1995] There were 8,705 instructions in the design after the 'Compile/Link' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,454 instructions in the design after the 'Unroll/Inline (step 1)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,060 instructions in the design after the 'Unroll/Inline (step 2)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,027 instructions in the design after the 'Unroll/Inline (step 3)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 995 instructions in the design after the 'Unroll/Inline (step 4)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 638 instructions in the design after the 'Array/Struct (step 1)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Array/Struct (step 2)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Array/Struct (step 3)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Array/Struct (step 4)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 622 instructions in the design after the 'Array/Struct (step 5)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Performance (step 1)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Performance (step 2)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Performance (step 3)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 606 instructions in the design after the 'Performance (step 4)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 774 instructions in the design after the 'HW Transforms (step 1)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,101 instructions in the design after the 'HW Transforms (step 2)' phase of compilation. See the Design Size Report for more details: /tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/vitis/vitis_csyn.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_0_0(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:165:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_0_1(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:214:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_0_2(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:263:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_0_3(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:311:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_1_0(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:358:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_1_1(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:407:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_1_2(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:456:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_1_3(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:504:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_2_0(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:551:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_2_1(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:600:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_2_2(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:649:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_2_3(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:697:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_3_0(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:743:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_3_1(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:789:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_3_2(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:835:0)
+INFO: [HLS 214-178] Inlining function 'float const& std::max<float>(float const&, float const&)' into 'pe_3_3(hls::stream<int, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&, hls::stream<float, 0>&)' (kernel.cpp:880:0)
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k16> at kernel.cpp:887:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k15> at kernel.cpp:842:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k14> at kernel.cpp:796:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k13> at kernel.cpp:750:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k12> at kernel.cpp:704:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k11> at kernel.cpp:656:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k10> at kernel.cpp:607:18 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k9> at kernel.cpp:558:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k8> at kernel.cpp:511:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k7> at kernel.cpp:463:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k6> at kernel.cpp:414:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k5> at kernel.cpp:365:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k4> at kernel.cpp:318:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k3> at kernel.cpp:270:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k2> at kernel.cpp:221:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k1> at kernel.cpp:172:17 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_k_0_k> at kernel.cpp:93:16 
+INFO: [HLS 200-111] Finished Compiling Optimization and Transform: CPU user time: 2.29 seconds. CPU system time: 0.55 seconds. Elapsed time: 7 seconds; current allocated memory: 265.816 MB.
+INFO: [HLS 200-111] Finished Checking Pragmas: CPU user time: 0 seconds. CPU system time: 0 seconds. Elapsed time: 0 seconds; current allocated memory: 265.816 MB.
+INFO: [HLS 200-10] Starting code transformations ...
+INFO: [HLS 200-111] Finished Standard Transforms: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 267.391 MB.
+INFO: [HLS 200-10] Checking synthesizability ...
+INFO: [HLS 200-111] Finished Checking Synthesizability: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 269.785 MB.
+INFO: [XFORM 203-712] Applying dataflow to function 'tinytpu_vitis' (kernel.cpp:1155:1), detected/extracted 19 process function(s): 
+	 'sequencer_0'
+	 'loader_0'
+	 'pe_0_0'
+	 'pe_0_1'
+	 'pe_0_2'
+	 'pe_0_3'
+	 'pe_1_0'
+	 'pe_1_1'
+	 'pe_1_2'
+	 'pe_1_3'
+	 'pe_2_0'
+	 'pe_2_1'
+	 'pe_2_2'
+	 'pe_2_3'
+	 'pe_3_0'
+	 'pe_3_1'
+	 'pe_3_2'
+	 'pe_3_3'
+	 'drainer_0'.
+INFO: [HLS 200-111] Finished Loop, function and other optimizations: CPU user time: 0.23 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.25 seconds; current allocated memory: 295.043 MB.
+INFO: [HLS 200-111] Finished Architecture Synthesis: CPU user time: 0.23 seconds. CPU system time: 0.1 seconds. Elapsed time: 0.34 seconds; current allocated memory: 628.129 MB.
+INFO: [HLS 200-10] Starting hardware synthesis ...
+INFO: [HLS 200-10] Synthesizing 'tinytpu_vitis' ...
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0.03 seconds. Elapsed time: 0.09 seconds; current allocated memory: 629.742 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 629.742 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'loader_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k'.
+WARNING: [HLS 200-885] The II Violation in module 'loader_0' (loop 'l_S_k_0_k'): Unable to schedule 'load' operation 32 bit ('v62', kernel.cpp:106) on array 'v765' due to limited memory ports (II = 1). Please consider using a memory core with more ports or partitioning the array 'v765'.
+Resolution: For help on HLS 200-885 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-885.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 2, Depth = 3, loop 'l_S_k_0_k'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 630.461 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 630.461 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_0_Pipeline_l_S_k_0_k1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k1'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_0_Pipeline_l_S_k_0_k1' (loop 'l_S_k_0_k1'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v121_write_ln184', kernel.cpp:184) of variable 'v122', kernel.cpp:185 on local variable 'v121', kernel.cpp:184 and 'load' operation 32 bit ('v121_load_1', kernel.cpp:185) on local variable 'v121', kernel.cpp:184.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 630.996 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 630.996 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 631.230 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 631.230 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_1_Pipeline_l_S_k_0_k2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k2'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_1_Pipeline_l_S_k_0_k2' (loop 'l_S_k_0_k2'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v150_write_ln233', kernel.cpp:233) of variable 'v151', kernel.cpp:234 on local variable 'v150', kernel.cpp:233 and 'load' operation 32 bit ('v150_load_1', kernel.cpp:234) on local variable 'v150', kernel.cpp:233.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 631.773 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 631.773 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 631.996 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.01 seconds; current allocated memory: 631.996 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_2_Pipeline_l_S_k_0_k3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k3'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_2_Pipeline_l_S_k_0_k3' (loop 'l_S_k_0_k3'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v179_write_ln282', kernel.cpp:282) of variable 'v180', kernel.cpp:283 on local variable 'v179', kernel.cpp:282 and 'load' operation 32 bit ('v179_load_1', kernel.cpp:283) on local variable 'v179', kernel.cpp:282.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k3'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 632.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 632.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 632.809 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 632.809 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_3_Pipeline_l_S_k_0_k4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k4'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_0_3_Pipeline_l_S_k_0_k4' (loop 'l_S_k_0_k4'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v207_write_ln330', kernel.cpp:330) of variable 'v208', kernel.cpp:331 on local variable 'v207', kernel.cpp:330 and 'load' operation 32 bit ('v207_load_1', kernel.cpp:331) on local variable 'v207', kernel.cpp:330.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k4'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 633.320 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 633.320 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 633.555 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 633.555 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_0_Pipeline_l_S_k_0_k5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k5'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_0_Pipeline_l_S_k_0_k5' (loop 'l_S_k_0_k5'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v235_write_ln377', kernel.cpp:377) of variable 'v236', kernel.cpp:378 on local variable 'v235', kernel.cpp:377 and 'load' operation 32 bit ('v235_load_1', kernel.cpp:378) on local variable 'v235', kernel.cpp:377.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k5'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 634.031 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 634.031 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 634.293 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.01 seconds; current allocated memory: 634.293 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_1_Pipeline_l_S_k_0_k6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k6'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_1_Pipeline_l_S_k_0_k6' (loop 'l_S_k_0_k6'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v264_write_ln426', kernel.cpp:426) of variable 'v265', kernel.cpp:427 on local variable 'v264', kernel.cpp:426 and 'load' operation 32 bit ('v264_load_1', kernel.cpp:427) on local variable 'v264', kernel.cpp:426.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k6'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 634.844 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 634.844 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 635.078 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 635.078 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_2_Pipeline_l_S_k_0_k7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k7'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_2_Pipeline_l_S_k_0_k7' (loop 'l_S_k_0_k7'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v293_write_ln475', kernel.cpp:475) of variable 'v294', kernel.cpp:476 on local variable 'v293', kernel.cpp:475 and 'load' operation 32 bit ('v293_load_1', kernel.cpp:476) on local variable 'v293', kernel.cpp:475.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k7'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 635.527 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 635.527 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 635.922 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 635.922 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_3_Pipeline_l_S_k_0_k8' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k8'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_1_3_Pipeline_l_S_k_0_k8' (loop 'l_S_k_0_k8'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v321_write_ln523', kernel.cpp:523) of variable 'v322', kernel.cpp:524 on local variable 'v321', kernel.cpp:523 and 'load' operation 32 bit ('v321_load_1', kernel.cpp:524) on local variable 'v321', kernel.cpp:523.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k8'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 636.445 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 636.445 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 636.707 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 636.707 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_0_Pipeline_l_S_k_0_k9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k9'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_0_Pipeline_l_S_k_0_k9' (loop 'l_S_k_0_k9'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v349_write_ln570', kernel.cpp:570) of variable 'v350', kernel.cpp:571 on local variable 'v349', kernel.cpp:570 and 'load' operation 32 bit ('v349_load_1', kernel.cpp:571) on local variable 'v349', kernel.cpp:570.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k9'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 637.191 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 637.191 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 637.453 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 637.453 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_1_Pipeline_l_S_k_0_k10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k10'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_1_Pipeline_l_S_k_0_k10' (loop 'l_S_k_0_k10'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v378_write_ln619', kernel.cpp:619) of variable 'v379', kernel.cpp:620 on local variable 'v378', kernel.cpp:619 and 'load' operation 32 bit ('v378_load_1', kernel.cpp:620) on local variable 'v378', kernel.cpp:619.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k10'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 637.898 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 637.898 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 638.129 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 638.129 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_2_Pipeline_l_S_k_0_k11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k11'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_2_Pipeline_l_S_k_0_k11' (loop 'l_S_k_0_k11'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v407_write_ln668', kernel.cpp:668) of variable 'v408', kernel.cpp:669 on local variable 'v407', kernel.cpp:668 and 'load' operation 32 bit ('v407_load_1', kernel.cpp:669) on local variable 'v407', kernel.cpp:668.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k11'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 638.738 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 638.738 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 639.035 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 639.035 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_3_Pipeline_l_S_k_0_k12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k12'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_2_3_Pipeline_l_S_k_0_k12' (loop 'l_S_k_0_k12'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v435_write_ln716', kernel.cpp:716) of variable 'v436', kernel.cpp:717 on local variable 'v435', kernel.cpp:716 and 'load' operation 32 bit ('v435_load_1', kernel.cpp:717) on local variable 'v435', kernel.cpp:716.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k12'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 639.449 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 639.449 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 639.695 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 639.695 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_0_Pipeline_l_S_k_0_k13' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k13'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_0_Pipeline_l_S_k_0_k13' (loop 'l_S_k_0_k13'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v462_write_ln762', kernel.cpp:762) of variable 'v463', kernel.cpp:763 on local variable 'v462', kernel.cpp:762 and 'load' operation 32 bit ('v462_load_1', kernel.cpp:763) on local variable 'v462', kernel.cpp:762.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k13'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 640.352 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 640.352 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 640.574 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 640.574 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_1_Pipeline_l_S_k_0_k14' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k14'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_1_Pipeline_l_S_k_0_k14' (loop 'l_S_k_0_k14'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v489_write_ln808', kernel.cpp:808) of variable 'v490', kernel.cpp:809 on local variable 'v489', kernel.cpp:808 and 'load' operation 32 bit ('v489_load_1', kernel.cpp:809) on local variable 'v489', kernel.cpp:808.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k14'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 641.031 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 641.031 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 641.227 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 641.227 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_2_Pipeline_l_S_k_0_k15' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k15'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_2_Pipeline_l_S_k_0_k15' (loop 'l_S_k_0_k15'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v516_write_ln854', kernel.cpp:854) of variable 'v517', kernel.cpp:855 on local variable 'v516', kernel.cpp:854 and 'load' operation 32 bit ('v516_load_1', kernel.cpp:855) on local variable 'v516', kernel.cpp:854.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k15'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 641.859 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 641.859 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 642.129 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 642.129 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_3_Pipeline_l_S_k_0_k16' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_k_0_k16'.
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 5, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'pe_3_3_Pipeline_l_S_k_0_k16' (loop 'l_S_k_0_k16'): Unable to enforce a carried dependence constraint (II = 6, distance = 1, offset = 0) between 'store' operation 0 bit ('v542_write_ln899', kernel.cpp:899) of variable 'v543', kernel.cpp:900 on local variable 'v542', kernel.cpp:899 and 'load' operation 32 bit ('v542_load_1', kernel.cpp:900) on local variable 'v542', kernel.cpp:899.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 7, Depth = 14, loop 'l_S_k_0_k16'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 642.562 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 642.562 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 642.750 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 642.750 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'drainer_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 643.207 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 643.207 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'tinytpu_vitis' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_0_1_U0 (from sequencer_0_U0 to pe_0_1_U0) to 3 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_0_2_U0 (from sequencer_0_U0 to pe_0_2_U0) to 4 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_0_3_U0 (from sequencer_0_U0 to pe_0_3_U0) to 5 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_1_0_U0 (from sequencer_0_U0 to pe_1_0_U0) to 3 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_1_1_U0 (from sequencer_0_U0 to pe_1_1_U0) to 4 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_1_2_U0 (from sequencer_0_U0 to pe_1_2_U0) to 5 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_1_3_U0 (from sequencer_0_U0 to pe_1_3_U0) to 6 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_2_0_U0 (from sequencer_0_U0 to pe_2_0_U0) to 4 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_2_1_U0 (from sequencer_0_U0 to pe_2_1_U0) to 5 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_2_2_U0 (from sequencer_0_U0 to pe_2_2_U0) to 6 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_2_3_U0 (from sequencer_0_U0 to pe_2_3_U0) to 7 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_3_0_U0 (from sequencer_0_U0 to pe_3_0_U0) to 5 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_3_1_U0 (from sequencer_0_U0 to pe_3_1_U0) to 6 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_3_2_U0 (from sequencer_0_U0 to pe_3_2_U0) to 7 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_pe_3_3_U0 (from sequencer_0_U0 to pe_3_3_U0) to 8 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_drainer_0_U0 (from pe_0_0_U0 to drainer_0_U0) to 8 to improve performance and/or avoid deadlocks.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.13 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.14 seconds; current allocated memory: 644.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 644.977 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 645.430 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'loader_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'loader_0' pipeline 'l_S_k_0_k' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'loader_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 646.613 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_0_Pipeline_l_S_k_0_k1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_0_Pipeline_l_S_k_0_k1' pipeline 'l_S_k_0_k1' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_0_Pipeline_l_S_k_0_k1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 648.164 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 649.254 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_1_Pipeline_l_S_k_0_k2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_1_Pipeline_l_S_k_0_k2' pipeline 'l_S_k_0_k2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_1_Pipeline_l_S_k_0_k2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 650.328 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 651.398 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_2_Pipeline_l_S_k_0_k3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_2_Pipeline_l_S_k_0_k3' pipeline 'l_S_k_0_k3' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_2_Pipeline_l_S_k_0_k3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 652.441 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 653.516 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_3_Pipeline_l_S_k_0_k4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_3_Pipeline_l_S_k_0_k4' pipeline 'l_S_k_0_k4' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_3_Pipeline_l_S_k_0_k4'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 654.543 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 655.555 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_0_Pipeline_l_S_k_0_k5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_0_Pipeline_l_S_k_0_k5' pipeline 'l_S_k_0_k5' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_0_Pipeline_l_S_k_0_k5'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 656.621 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 657.664 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_1_Pipeline_l_S_k_0_k6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_1_Pipeline_l_S_k_0_k6' pipeline 'l_S_k_0_k6' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_1_Pipeline_l_S_k_0_k6'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 658.840 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 659.879 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_2_Pipeline_l_S_k_0_k7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_2_Pipeline_l_S_k_0_k7' pipeline 'l_S_k_0_k7' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_2_Pipeline_l_S_k_0_k7'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 660.953 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 661.996 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_3_Pipeline_l_S_k_0_k8' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_3_Pipeline_l_S_k_0_k8' pipeline 'l_S_k_0_k8' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_3_Pipeline_l_S_k_0_k8'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 663.086 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 664.098 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_0_Pipeline_l_S_k_0_k9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_0_Pipeline_l_S_k_0_k9' pipeline 'l_S_k_0_k9' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_0_Pipeline_l_S_k_0_k9'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 665.168 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 666.207 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_1_Pipeline_l_S_k_0_k10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_1_Pipeline_l_S_k_0_k10' pipeline 'l_S_k_0_k10' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_1_Pipeline_l_S_k_0_k10'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 667.281 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 668.324 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_2_Pipeline_l_S_k_0_k11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_2_Pipeline_l_S_k_0_k11' pipeline 'l_S_k_0_k11' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_2_Pipeline_l_S_k_0_k11'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 669.395 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 670.438 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_3_Pipeline_l_S_k_0_k12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_3_Pipeline_l_S_k_0_k12' pipeline 'l_S_k_0_k12' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_3_Pipeline_l_S_k_0_k12'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 671.500 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 672.480 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_0_Pipeline_l_S_k_0_k13' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_0_Pipeline_l_S_k_0_k13' pipeline 'l_S_k_0_k13' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_0_Pipeline_l_S_k_0_k13'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 673.551 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 674.566 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_1_Pipeline_l_S_k_0_k14' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_1_Pipeline_l_S_k_0_k14' pipeline 'l_S_k_0_k14' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_1_Pipeline_l_S_k_0_k14'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 675.590 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 676.602 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_2_Pipeline_l_S_k_0_k15' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_2_Pipeline_l_S_k_0_k15' pipeline 'l_S_k_0_k15' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_2_Pipeline_l_S_k_0_k15'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 677.645 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 678.656 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_3_Pipeline_l_S_k_0_k16' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_3_Pipeline_l_S_k_0_k16' pipeline 'l_S_k_0_k16' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'fadd_32ns_32ns_32_7_full_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Generating core module 'fmul_32ns_32ns_32_4_max_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_3_Pipeline_l_S_k_0_k16'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 679.664 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Generating core module 'fcmp_32ns_32ns_1_2_no_dsp_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 680.613 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'drainer_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'drainer_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 681.625 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'tinytpu_vitis' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_vitis/v764' to 'ap_memory'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_vitis/v765' to 'ap_memory'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_vitis/v766' to 'ap_memory'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_vitis/v767' to 'ap_memory'.
+INFO: [RTGEN 206-500] Setting interface mode on function 'tinytpu_vitis' to 'ap_ctrl_hs'.
+WARNING: [HLS 200-656] Deadlocks can occur since process loader_0 is instantiated in a dataflow region with ap_ctrl_none or without start propagation and contains an auto-rewind pipeline.
+Resolution: For help on HLS 200-656 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-656.html
+INFO: [RTGEN 206-100] Finished creating RTL model for 'tinytpu_vitis'.
+INFO: [RTMG 210-285] Implementing FIFO 'v768_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v769_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v770_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v771_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v772_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v773_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v774_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v775_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v776_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v777_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v778_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v779_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v780_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v781_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v782_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v783_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v784_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v785_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v786_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v787_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v788_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v789_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v790_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v791_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v792_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v808_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v824_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v793_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v809_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v825_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v794_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v810_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v826_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v811_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v827_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v796_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v812_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v828_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v797_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v813_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v829_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v798_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v814_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v830_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v815_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v831_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v800_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v816_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v832_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v801_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v817_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v833_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v802_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v818_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v834_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v819_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v835_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v804_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v836_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v805_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v837_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v806_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v838_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v839_U(tinytpu_vitis_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_0_U0_U(tinytpu_vitis_start_for_pe_0_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_1_U0_U(tinytpu_vitis_start_for_pe_0_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_2_U0_U(tinytpu_vitis_start_for_pe_0_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_3_U0_U(tinytpu_vitis_start_for_pe_0_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_0_U0_U(tinytpu_vitis_start_for_pe_1_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_1_U0_U(tinytpu_vitis_start_for_pe_1_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_2_U0_U(tinytpu_vitis_start_for_pe_1_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_3_U0_U(tinytpu_vitis_start_for_pe_1_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_0_U0_U(tinytpu_vitis_start_for_pe_2_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_1_U0_U(tinytpu_vitis_start_for_pe_2_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_2_U0_U(tinytpu_vitis_start_for_pe_2_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_3_U0_U(tinytpu_vitis_start_for_pe_2_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_0_U0_U(tinytpu_vitis_start_for_pe_3_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_1_U0_U(tinytpu_vitis_start_for_pe_3_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_2_U0_U(tinytpu_vitis_start_for_pe_3_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_3_U0_U(tinytpu_vitis_start_for_pe_3_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_drainer_0_U0_U(tinytpu_vitis_start_for_drainer_0_U0)' using Shift Registers.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.51 seconds. CPU system time: 0.04 seconds. Elapsed time: 0.55 seconds; current allocated memory: 687.855 MB.
+INFO: [HLS 200-111] Finished Generating all RTL models: CPU user time: 0.22 seconds. CPU system time: 0.05 seconds. Elapsed time: 0.28 seconds; current allocated memory: 691.023 MB.
+INFO: [HLS 200-111] Finished Updating report files: CPU user time: 1.16 seconds. CPU system time: 0.03 seconds. Elapsed time: 1.19 seconds; current allocated memory: 701.285 MB.
+INFO: [VHDL 208-304] Generating VHDL RTL for tinytpu_vitis.
+INFO: [VLOG 209-307] Generating Verilog RTL for tinytpu_vitis.
+INFO: [HLS 200-790] **** Loop Constraint Status: All loop constraints were NOT satisfied.
+INFO: [HLS 200-789] **** Estimated Fmax: 411.37 MHz
+INFO: [HLS 200-111] Finished Command csynth_design CPU user time: 26.96 seconds. CPU system time: 2.54 seconds. Elapsed time: 33.67 seconds; current allocated memory: 447.098 MB.
+INFO: [HLS 200-112] Total CPU user time: 29.01 seconds. Total CPU system time: 2.87 seconds. Total elapsed time: 35.76 seconds; peak allocated memory: 703.824 MB.
+INFO: [Common 17-206] Exiting vitis_hls at Wed Sep  9 05:46:54 2026...

@@ -1,0 +1,17 @@
+GEMMINI DIM=4 elem_t_bytes=1
+GEMM 4x4x4 574
+GEMM 8x8x8 615
+GEMM 12x12x12 740
+GEMM 16x16x8 784
+GEMM 16x16x16 986
+MLP 4.8.8.4 1146
+MLP 8.8.8.8 1202
+MLP 8.16.16.8 1432
+GEMM 32x16x16 1393
+GEMM 64x16x16 2219
+DONE
+[UART] UART0 is here (stdin/stdout).
+- /home/sk3463/chipyard/sims/verilator/generated-src/chipyard.harness.TestHarness.Int8Dim4GemminiRocketConfig/gen-collateral/TestDriver.v:158: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.051 devel
+- Verilator: $finish at 1ms; walltime 85.786 s; speed 13.101 us/s
+- Verilator: cpu 85.742 s on 1 threads; allocated 14 MB
