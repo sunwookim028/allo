@@ -97,3 +97,6 @@ sg_execution_times.rst
 tests/xlscc_tests/**/test.cpp
 tests/xlscc_tests/**/test_block.cpp
 tests/xlscc_tests/**/test
+
+# Filled-in CHIA credentials template (GCP project/keys) -- never commit
+chia.env
