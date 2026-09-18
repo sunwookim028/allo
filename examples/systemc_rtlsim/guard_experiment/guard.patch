@@ -1,0 +1,21 @@
+diff --git a/mlir/lib/Translation/EmitSystemC.cpp b/mlir/lib/Translation/EmitSystemC.cpp
+index 59cb5e0d..af6a8f37 100644
+--- a/mlir/lib/Translation/EmitSystemC.cpp
++++ b/mlir/lib/Translation/EmitSystemC.cpp
+@@ -852,7 +852,15 @@ bool SystemCModuleEmitter::isSteadyStateLoop(affine::AffineForOp op) {  // new (
+     if (isa<BlockArgument>(src))
+       loadsFromPortInLoop = true;
+   });
+-  return !loadsFromPortInLoop;
++  if (loadsFromPortInLoop)
++    return false;
++
++  // A Wire read has no handshake, so nothing throttles a free-running consumer: it
++  // runs ahead of its producer and samples stale values. Stream and Channel reads
++  // block on valid, which is what makes the transform safe for them.
++  bool readsWireInLoop = false;
++  op.walk([&](WireGetOp) { readsWireInLoop = true; });
++  return !readsWireInLoop;
+ }
+ 
+ void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override (base emitter)

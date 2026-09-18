@@ -20,7 +20,10 @@ rm -rf "$W"; mkdir -p "$W"; cd "$W"
 unset LD_PRELOAD
 export CDS_LIC_FILE="${CDS_LIC_FILE:-5280@en-license-05.coecis.cornell.edu}"
 XRUN="${XRUN:-/opt/cadence/XCELIUM2403/tools.lnx86/bin/xrun}"
-"$XRUN" -q -timescale 1ns/1ps -top tb +define+$B "+define+TAG=\"$V$TAGEXTRA\"" "${DEFS[@]}" \
+# Catapult library cells (ccs_in_wait_v1, ...) that newer netlists instantiate.
+SIFLIBS="${MGC_HOME:-/opt/siemens/catapult/2024.2/Mgc_home}/pkgs/siflibs"
+"$XRUN" -q -timescale 1ns/1ps -top tb -y "$SIFLIBS" +libext+.v \
+      +define+$B "+define+TAG=\"$V$TAGEXTRA\"" "${DEFS[@]}" \
       "$RTLDIR/$V/rtl.v" "$S/mgc_shim.v" "$S/tb_mulacc.v" > xrun.log 2>&1 \
   || { echo "XRUN FAILED"; grep -E '\*[EF],' xrun.log | head -20; exit 1; }
 grep -E "^==|C\[|RESULT:" xrun.log

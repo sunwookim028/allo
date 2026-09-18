@@ -13,6 +13,7 @@
 // -d BOUNDARY_WIRE     : mul.v8 -> plain wire -> acc.v22        (pe_wire)
 // -d BOUNDARY_HS       : mul.v8_* -> vld/rdy/dat -> acc.v22_*   (pe_channel)
 // -d BOUNDARY_FIFO     : ... through AlloFifo_ac_int_32_true_2  (pe_stream)
+// -d CONNECTIONS_FIFO  : ... through the Connections::Fifo module current emitters produce
 // -d STALL_IN=<n>      : feed a new A/B pair only every n-th cycle (n>=1)
 // -d STALL_OUT=<n>     : sink accepts a result only every n-th cycle (n>=1)
 // -d BREAK_WIRE        : deliberate breakage -- register the wire (1 cycle late)
@@ -122,13 +123,20 @@ module tb;
   wire p_vld, p_rdy;  wire [31:0] p_dat;
  `ifdef BOUNDARY_FIFO
   wire q_vld, q_rdy;  wire [31:0] q_dat;
-  AlloFifo_ac_int_32_true_2 u_fifo (.clk(clk), .rst(rst),
 `ifdef BREAK_DATA
-      .in_vld(p_vld), .in_rdy(p_rdy), .in_dat(p_dat ^ 32'd1),
+  wire [31:0] p_in = p_dat ^ 32'd1;
 `else
-      .in_vld(p_vld), .in_rdy(p_rdy), .in_dat(p_dat),
+  wire [31:0] p_in = p_dat;
 `endif
+ `ifdef CONNECTIONS_FIFO
+  Connections_Fifo_ac_int_32_true_2U_Connections_SYN_PORT u_fifo (.clk(clk), .rst(rst),
+      .enq_vld(p_vld), .enq_rdy(p_rdy), .enq_dat(p_in),
+      .deq_vld(q_vld), .deq_rdy(q_rdy), .deq_dat(q_dat));
+ `else
+  AlloFifo_ac_int_32_true_2 u_fifo (.clk(clk), .rst(rst),
+      .in_vld(p_vld), .in_rdy(p_rdy), .in_dat(p_in),
       .out_vld(q_vld), .out_rdy(q_rdy), .out_dat(q_dat));
+ `endif
  `else
   wire q_vld;
   wire q_rdy;

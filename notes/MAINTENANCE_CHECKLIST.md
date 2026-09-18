@@ -28,7 +28,7 @@ https://github.com/sunwookim028/allo/issues/13.
 | `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 81 ahead, 0 behind `upstream/main` (`8bafb0dc`) as of this writing. |
 | `upstream` | cornell-zhang | Mirror of `upstream/main`, tracking the `upstream` remote. Refresh it to see what has landed; diff `main` against it to see what the fork carries. **Rebasing `main` onto it is never automatic — it is an explicit call.** |
 | `chia-codesign` | `kkkaishao/allo` (ACT) | The CHIA / TinyTPU co-design artifact. A separate codebase, not a feature branch — see below. |
-| `sc-wire-guard` | `choonsik1/allo` `SystemC-emitter` | Exploration: does extending the free-running-loop guard to Wire/Channel reads fix `pe_wire` in RTL (`notes/ALLO_SHORTCOMINGS.md` #22)? Lands on `main` together with the SystemC-emitter integration. |
+| `upstream-omp-team-size` | cornell-zhang | One commit on `upstream/main`: upstream draft PR #611 (simulator OpenMP team sized to the section count). Delete after it merges, per the procedure above. |
 
 `main` and `chia-codesign` are the long-lived working branches; `upstream` is
 just the mirror. Exploration branches come and go under the rule in
@@ -41,6 +41,15 @@ Read-only lineages on the `kai` remote, for reference rather than merging:
 `kai/allov2` (`compiler/ lang/ operators/ schedule`, no `dataflow.py`, no ACT),
 and `kai/act` (the allov2 lineage plus `exp/dsa` — the ACT compiler flow that
 `chia-codesign` descends from).
+
+The `choonsik1` remote (`https://github.com/choonsik1/allo.git`) carries the
+SystemC/Catapult emitter, which is to be integrated rather than only read.
+`SystemC-emitter` is its most complete branch. `systemc-ip-integration` lacks
+the RAM-pin memory interface (`b92077f5`) and the free-running-loop fix
+(`72c70dcb`), so an integration must start from `SystemC-emitter`. The
+`pe_wire`/`pe_stream`/`pe_channel` netlists used by
+`examples/systemc_rtlsim/` survive only in its history, at
+`0eff4888:agents/noc/rtl/<design>/rtl.v`.
 
 Tags, in place of branches that were retired because their history is reachable
 elsewhere: `tinytpu-rtlgen-base` (`882f7dd6`, the retired branch tip, now an
@@ -60,8 +69,11 @@ u280 / nb-stream / fp16 rescue point from 2026-07-06).
 - An exploration branch lands on `main` once its result is solid, together
   with whatever reproduces it. A dead end is deleted, and its conclusion is
   recorded in `notes/` on `main`.
-- Name the branch after the question it answers (e.g. `sc-wire-guard`), and
-  list live ones in the table above while they exist.
+- Name the branch after the question it answers, and list live ones in the
+  table above while they exist. For example, `sc-wire-guard` asked whether
+  extending the free-running-loop guard fixes `pe_wire`. The answer was no;
+  it is recorded in `examples/systemc_rtlsim/guard_experiment/`, and the
+  branch is deleted.
 
 ### `chia-codesign` is a different codebase, not a feature branch
 

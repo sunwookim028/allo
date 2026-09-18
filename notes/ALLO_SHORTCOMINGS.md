@@ -561,27 +561,32 @@ only pragmas it generates are the `m_axi` / `s_axilite` interface lines in
 
 ## 22. The SystemC fork's `Wire` is semantically incomplete -- and wrong in RTL, not just in simulation
 
-> **Update 2026-09-18, and it changes the recommended action.** The
-> measurements below stand. The *cause* is probably not a semantic gap in
-> `Wire` but a known emitter rewrite, `72c70dcb` on
-> `choonsik1/SystemC-emitter`: `isSteadyStateLoop` treats an unused induction
-> variable as proof a kernel runs forever and rewrites its outermost loop to
-> `while (1)` **under `__SYNTHESIS__`** -- a bug shaped exactly like "correct in
-> csim, wrong in RTL". The netlists measured here predate it by 19 days.
+> **Tested 2026-09-18: it is not the free-running rewrite; the conclusion
+> below stands.** The hypothesis was that `isSteadyStateLoop` (which turns a
+> kernel's outermost loop into `while (1)` under `__SYNTHESIS__` when its
+> induction variable is unused) made `acc` run unthrottled, and that
+> `72c70dcb`'s guard missed it because `acc` has no memory port. The guard was
+> extended to any loop body containing a `WireGetOp` (`guard_experiment/` under
+> `examples/systemc_rtlsim/`), `pe_split.py` was re-emitted from
+> `choonsik1/SystemC-emitter` with and without it, synthesised with Catapult
+> 2024.2, and simulated under Xcelium 24.03:
 >
-> Re-emitting does not fix it. `pe_split.py`'s `acc` is `args=[]`, so it has no
-> memory port, while `72c70dcb`'s guard requires a load from a memory port
-> inside the loop body -- **the guard structurally cannot fire here**. `mul` is
-> rewritten too, and that is the insight: its Streams have a handshake, so a
-> free-running loop blocks harmlessly on the FIFO; `acc`'s `Wire` has none, so
-> nothing throttles it. Same rewrite, fatal only on the unhandshaked edge.
+> - The emitted code changed exactly as intended. `acc_0` lost its
+>   free-running loop and its done-on-entry. `mul_0` (Stream reads) kept its
+>   free-running loop. `pe_stream` and `pe_channel` emitted **byte-identical**
+>   code.
+> - `pe_wire` still fails **8/8 at all 18 pacings, with and without the guard,
+>   in identical cycle counts** (20 cycles at unit pacing; values
+>   `0 8 40 112 240 368 496 624`: `acc` samples every other product and then
+>   holds the last one).
+> - The current emitter's `pe_stream` and `pe_channel` pass all 36 pacings,
+>   and `BREAK_DATA` turns both red.
 >
-> So the next step is **extending that guard** -- a `get()` from a `Wire` or
-> `Channel` is evidence of finite streaming just as a memory load is -- not
-> building a scheduling model. Consequently the sentence below about the
-> MiniTPU direction being "blocked further back" is on hold pending that test.
-> Harness and full reasoning: `examples/systemc_rtlsim/`. **Hypothesis from
-> source, not measured.**
+> Removing `while (1)` bounds `acc`'s trip count but gives it nothing to wait
+> on. Its loop still advances on its consumer's `Push`, never on the
+> producer. The missing piece is synchronisation, as stated below. The
+> August-netlist matrix further down also reproduces case-for-case under
+> Xcelium (`RUNNER=run_mulacc_xrun.sh ./REPRO.sh`).
 
 Recorded here because it closes a question this project spent real time on: whether
 the SystemC path (`choonsik1/allo:SystemC-emitter`) offers the **non-handshaked
