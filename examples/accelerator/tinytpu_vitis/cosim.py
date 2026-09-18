@@ -153,19 +153,26 @@ def main():
 
     s = customize(tinytpu_isa)
     schedule(s)
-    # `wrap_io` is a measured architectural trade, not a default to accept:
-    #   True  -- Allo copies each argument into a local buffer first, so the
-    #            units read BRAM. Fixed cost = the declared sizes (imem + A +
-    #            B + C), marginal cost 18.1 cyc/instr.
-    #   False -- units read m_axi directly. Fixed cost 481 cycles, matching
-    #            Gemmini's 483, but marginal cost 39.8 cyc/instr because every
-    #            access pays bus latency instead of hitting a buffer.
-    # Crossover is ~29 instructions, so True wins across this benchmark set
-    # once `IMEM_SIZE` is trimmed to the longest admissible program.
-    # Neither is what Gemmini has, which is a bursted DMA the program controls:
-    # low fixed cost AND low marginal cost. That is the gap.
+    # `wrap_io=False` is the build, and it is now the right one rather than
+    # half of a trade:
+    #   True  -- Allo hoists every `m_axi` argument into a local buffer before
+    #            the region starts, with `wrap_data_movement`'s extent taken
+    #            from the STATIC type. At MAXDIM=16 that is imem 56 + A 256 +
+    #            B 256 + C 256 = 824 words copied whether the program touches
+    #            them or not, and it is 907 of the 1586 cycles at 16x16x16 and
+    #            90% of them at 4x4x4.
+    #   False -- the units address `m_axi` themselves, so each one bursts
+    #            exactly what its program names. Measured fixed cost 557,
+    #            marginal 20.1 cyc/instr, and faster at all five shapes.
+    # An earlier measurement of `wrap_io=False` (fixed 481, marginal 39.8) is
+    # what made this look like a trade. It was measured with the STRIDED access
+    # pattern, which Vitis turns into a four-beat AXI transaction per row, and
+    # with instruction fetch going to `m_axi` at a data-dependent address,
+    # which it can only burst two words at a time. Both are properties of the
+    # access pattern, not of the configuration; `microarch_isa` now avoids
+    # both. `TPU_WRAP=1` still builds the hoisted variant for comparison.
     s.build(target="vitis_hls", mode="csyn", project=prj,
-            wrap_io=(os.environ.get("TPU_WRAP", "1") == "1"))
+            wrap_io=(os.environ.get("TPU_WRAP", "0") == "1"))
     patch_axi_depths(prj)
     open(os.path.join(prj, "tb.cpp"), "w").write(testbench(*SHAPES[0]))
     print("  synthesizing once ...", flush=True)

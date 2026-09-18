@@ -168,6 +168,90 @@ carries the actual arithmetic -- from the worst of the two. `vru` hands the
 array its total wavefront-row count alongside the `mm` count so that a later
 pass can flatten a PE without another header change.
 
+## THE DMA: `wrap_io=False`, and one burst per thing the program names
+
+The design is built `wrap_io=False`, so nothing is hoisted for it and every
+unit addresses `m_axi` itself. That was not a free switch: with `wrap_io=True`
+Allo wraps each argument in a bulk copy before the region starts
+(`wrap_data_movement`, `allo/ir/transform.py`), and the extent it copies is
+`MemRefType(arg.type).shape` -- the STATIC type, with no offset and no length.
+At MAXDIM=16 that is imem 56 + A 256 + B 256 + C 256 = **824 words copied
+whether the program touches them or not**, at II=1, which cosim charges as a
+fixed 907 cycles: 57% of 16x16x16 and 90% of 4x4x4, and it did not move for the
+whole of the array's development. It is not a DMA; it is an argument-passing
+convention.
+
+Turning it off alone makes things worse, and an earlier measurement
+(fixed 481, marginal 39.8 against 15.1) concluded from that that `m_axi` is
+inherently slow. It is not. Two access patterns were put to Vitis and they
+synthesize to completely different hardware:
+
+  * **strided** -- `lA[(f1 + r) * MAXDIM + f2 * T + e]`, `e` unrolled over the
+    T lanes, one row per iteration:
+    `[HLS 214-115] Multiple burst reads of length 4 and bit width 8`.
+    A separate four-beat AXI transaction per row, `Final II = 4` on the loop
+    and nearer 9 cycles a row once request latency is counted.
+  * **contiguous with a RUNTIME trip count** -- `for i in range(n): b[i] = lA[i]`:
+    `[HLS 214-115] Multiple burst reads of variable length and bit width 8`.
+    One real AXI burst, and the loop closes at the port's own limit.
+
+So Allo can express a program-controlled burst DMA today; the old measurement
+condemned the access pattern, not the configuration. Both of the design's
+`m_axi` readers were restructured around the second pattern:
+
+  * `sequencer` pulls the whole program on-chip with one `IMEM_SIZE`-word burst
+    and fetches from BRAM afterwards. Fetched in place,
+    `imem[NHDR + pc * IWORDS]` is a data-dependent address that Vitis can only
+    burst **two words at a time**, and the fetch loop closes at II=13 instead
+    of 5. This, not the operand path, was most of the 39.8.
+  * `dma_ld` opens with one variable-length burst per operand matrix, covering
+    exactly the DRAM rows the program will name -- the assembler resolves the
+    control flow and the AGU and passes the two spans in the header. Every
+    instruction afterwards is one BRAM read, and the flat row loop is back to
+    II=1 from II=4.
+
+Measured over the five shapes, one build each:
+
+| shape | `wrap_io=True` | `wrap_io=False`, bursts |
+|---|---|---|
+| 4x4x4    | 1004 | **680**  (1.48x) |
+| 8x8x8    | 1108 | **831**  (1.33x) |
+| 12x12x12 | 1294 | **1066** (1.21x) |
+| 16x16x8  | 1344 | **1139** (1.18x) |
+| 16x16x16 | 1586 | **1457** (1.09x) |
+
+Fixed cost 907 -> 557, marginal cost 15.12 -> 20.07 cycles/instruction. That
+is a real trade and it is stated as one: the win is the fixed term and it is
+largest where the fixed term dominates. The crossover is at 71 dynamic
+instructions, which is past the longest program this MAXDIM admits (45), so the
+burst build wins everywhere it can be run -- but it would not at a larger
+MAXDIM without also fixing what the marginal term buys.
+
+**What the remaining +5 cycles/instruction is.** `dma_st` still writes `C` with
+the strided pattern -- `[HLS 214-115] Multiple burst writes of length 4 and bit
+width 8`, II=4 -- because a contiguous write-back would have to either clobber
+the columns the program never named or be deferred to the end of the run, where
+it would serialize behind the last `mvout` instead of overlapping the compute
+it currently overlaps. That is the next thing to measure, not an oversight.
+
+**What the operand burst is NOT worth.** Merging the A and B bursts into one
+loop bounded by `max(na, nb)` halves the burst time -- they are separate
+bundles and Vitis attributes a variable-length burst on each to the one loop --
+and it was built, measured, and changed the cosim count at all five shapes by
+exactly **zero cycles**. The operand burst is already entirely hidden behind
+the sequencer's dispatch and the units' pipeline fill, so the version that
+reads the fewest bytes is the one kept. Halving something off the critical path
+buys nothing, which is worth writing down.
+
+**One toolchain avenue that is closed.** `config_interface
+-m_axi_max_widen_bitwidth 512` would let Vitis widen the 8-bit `m_axi` ports so
+a long burst moves 64 bytes a beat instead of one, which would make the operand
+traffic nearly free. It does nothing here:
+`[HLS 214-307] Could not widen since type i8 size is greater than or equal to
+alignment 1(bytes)` -- Allo emits the argument pointers with no alignment
+attribute, so Vitis must assume 1 and refuses. That is an Allo codegen gap, not
+a design one.
+
 ## Data type
 
 int8 lanes, int32 accumulation, `vst` clipping to int8 -- Gemmini's default
@@ -310,14 +394,13 @@ AW = T * 32                    # packed accumulator word: T int32 lanes
 
 MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
 # A, B and C are **flat** at the region boundary, addressed `row * MAXDIM + col`.
-# That is what DRAM is, and it is also what lets the design be built with
-# `wrap_io=False`: with 2-D arguments Allo wraps each one in a bulk copy into a
-# local buffer before the region starts, sized to the *declared* array rather
-# than to the shape being run -- four copies of 256 words, 1024 cycles, which
-# was the entire fixed-cost gap against Gemmini (which DMAs only the tiles it
-# touches). `wrap_io=False` refuses multi-dimensional arguments to nested
-# kernels ("Top-level multi-dimensional arrays are linearized to 1D pointers"),
-# so flat is the shape that makes it legal.
+# That is what DRAM is, and it is what makes `wrap_io=False` legal -- it refuses
+# multi-dimensional arguments to nested kernels ("Top-level multi-dimensional
+# arrays are linearized to 1D pointers"). The design is built that way, and the
+# reason is the DMA note at the top of this file: with `wrap_io=True` Allo
+# hoists every argument into a local buffer before the region starts, sized to
+# the *declared* array rather than to the shape being run, and that copy was
+# 907 of the 1586 cycles at 16x16x16 and 90% of them at 4x4x4.
 SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))   # rows, each one packed word
 NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
 NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
@@ -327,9 +410,10 @@ MAXROWS = 127                                      # `nr` is 8 bits, top bit sig
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 
 # Instruction slots. Sized to the longest program the built MAXDIM admits, not
-# to a round number: with `wrap_io=True` Allo copies each argument into a local
-# buffer before the region starts, and the copy is the *declared* length, so
-# every unused slot is a wasted startup cycle. The worst case is
+# to a round number: the sequencer's prefetch burst is `IMEM_SIZE` words long
+# whatever the program, so every unused slot is a wasted startup cycle -- the
+# same arithmetic as under `wrap_io=True`, which copied the declared length for
+# the same reason. The worst case is
 # gemm(MAXDIM,MAXDIM,MAXDIM) with relu -- Kt + Nt dma_lds, Kt vlds for A,
 # Nt*(Kt vld + Kt mm) + Nt relu + Nt mvout -- plus the NHDR header.
 _KB = MAXDIM // T
@@ -337,9 +421,10 @@ _KB = MAXDIM // T
 # 17 instructions at every shape where the unrolled one reaches 49. So imem is
 # sized to the longest program shipped rather than to the largest problem.
 #
-# This is not cosmetic. `wrap_io` copies each argument into a local buffer
-# before the region runs, sized to the DECLARED length, so every imem word is a
-# startup cycle whether the program uses it or not. Measured: moving to a
+# This is not cosmetic. The program is pulled on-chip by one burst of
+# `IMEM_SIZE` words, so every imem word is a startup cycle whether the program
+# uses it or not -- 56 cycles today, and it is the only fixed charge left that
+# does not scale with the shape. Measured: moving to a
 # 2-word instruction format cost exactly +68 cycles at all five shapes, which
 # is exactly the 68 extra words it added -- the loop logic itself cost nothing.
 # Sizing imem to the looped program is where the hardware loop actually pays.
@@ -349,6 +434,8 @@ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 # Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
 # largest supported shape rather than for the shape being run.
 KB_MAX = MAXDIM // T           # column blocks in the widest matrix
+assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
+WPR = MAXDIM // T              # packed words per DRAM row
 A_SP = 0                       # A words:  kb * MAXDIM + m
 B_SP = KB_MAX * MAXDIM         # B words:  nb * MAXDIM + k
 A_VR = 0                       # A vregs mirror the A scratchpad region
@@ -424,15 +511,37 @@ def tinytpu_isa(
         blocks on a full queue, every unit upstream of that one already holds
         the instruction and can keep producing what the blocked unit waits for.
         Dispatching downstream-first deadlocks."""
-        iw: UInt(64) = l_imem[0]
+        # --- ONE contiguous burst pulls the whole program on-chip ---
+        # `l_imem` is an `m_axi` port: the design is built `wrap_io=False`, so
+        # nothing is hoisted on our behalf. Fetched in place,
+        # `l_imem[NHDR + pc * IWORDS]` is a data-dependent address and Vitis can
+        # only turn it into a **two-word burst per instruction** -- measured,
+        # `[HLS 214-115] Multiple burst reads of length 2 and bit width 64 ...
+        # on bundle 'gmem0'` -- so the fetch loop closes at `Final II = 13`
+        # instead of 5, and ~76 dynamic sequencer iterations each pay full bus
+        # latency. That, not the operand path, was the whole of the marginal
+        # cost that made an earlier `wrap_io=False` measurement look like a
+        # loss.
+        #
+        # A constant-trip contiguous copy is the pattern Vitis turns into one
+        # real AXI burst, so the program arrives as a single `IMEM_SIZE`-word
+        # transfer and every fetch after it is a BRAM read. Instructions are
+        # the one stream in this design whose access pattern is random, so they
+        # are the one stream that has to be prefetched rather than streamed.
+        ib: UInt(64)[IMEM_SIZE] = 0
+        for i in range(IMEM_SIZE):
+            ib[i] = l_imem[i]
+
+        iw: UInt(64) = ib[0]
         n_instr: int32 = iw[0:16]
 
-        c_dld.put(l_imem[1])
-        c_spm.put(l_imem[2])
-        c_vru.put(l_imem[3])
-        c_vru.put(l_imem[4])
-        c_acc.put(l_imem[5])
-        c_dst.put(l_imem[6])
+        c_dld.put(ib[1])
+        c_dld.put(ib[7])
+        c_spm.put(ib[2])
+        c_vru.put(ib[3])
+        c_vru.put(ib[4])
+        c_acc.put(ib[5])
+        c_dst.put(ib[6])
 
         lp_start: int32[LOOP_DEPTH] = 0
         lp_iv: int32[LOOP_DEPTH] = 0
@@ -443,8 +552,8 @@ def tinytpu_isa(
         running: int32 = 1
 
         while running == 1:
-            w0: UInt(64) = l_imem[NHDR + pc * IWORDS]
-            w1: UInt(64) = l_imem[NHDR + pc * IWORDS + 1]
+            w0: UInt(64) = ib[NHDR + pc * IWORDS]
+            w1: UInt(64) = ib[NHDR + pc * IWORDS + 1]
             op: int32 = w0[0:6]
             nr: int32 = w0[54:62]
 
@@ -523,16 +632,76 @@ def tinytpu_isa(
         no cycle. Gemmini splits the same way, into `LoadController.scala` and
         `StoreController.scala`.
 
-        Packs T lanes per cycle, so the scratchpad only ever sees whole words.
-        The T reads land in T banks because `schedule()` partitions A and B.
+        **TWO VARIABLE-LENGTH BURSTS, THEN EVERY INSTRUCTION RUNS FROM BRAM.**
+        This unit reads `m_axi` directly -- the design is built
+        `wrap_io=False`, so nothing is hoisted for it -- and *what* it reads is
+        the whole of the fixed cost the design was carrying. Two access
+        patterns were measured against Vitis:
+
+          * the per-instruction strided read this unit used to do,
+            `lA[(f1 + r) * MAXDIM + f2 * T + e]` with `e` unrolled over the T
+            lanes, yields `[HLS 214-115] Multiple burst reads of length 4 and
+            bit width 8` -- a separate four-beat AXI transaction per row, and
+            the flat loop closes at `Final II = 4` with the real cost nearer
+            9 cycles a row once request latency is counted.
+          * a contiguous sweep whose trip count is a RUNTIME value yields
+            `[HLS 214-115] ... of VARIABLE LENGTH`, i.e. one real AXI burst.
+
+        So the unit opens with one burst per operand matrix, covering exactly
+        the DRAM rows the program will name -- `na` and `nb` come from the
+        assembler, which resolves the control flow and the AGU and takes the
+        maximum `f1 + nr` over the `dma_ld`s of each source. Nothing is fetched
+        for a shape that does not touch it, which is the property `wrap_io`
+        could not have: its copy is the DECLARED length, always 256 words per
+        argument, whatever is being run -- 824 words of argument copying before
+        the region starts, which was 907 of the 1586 cycles at 16x16x16 and 90%
+        of them at 4x4x4.
+
+        The bytes arrive packed: the burst loop assembles each `UInt(T*8)` word
+        as it sweeps, so the instruction loop after it does ONE BRAM read per
+        row and no packing at all. `rbA` and `rbB` are separate memories, so
+        the source mux costs one read port on each rather than two on one --
+        the same rule `vru` and `accu` are written to (see the II note above),
+        arrived at from the other direction.
 
         **One flat loop over rows, not a loop over instructions containing a
         loop over rows** -- see the ROW-FLATTENING note above. The instruction
-        is fetched on the iteration that needs it."""
+        is fetched on the iteration that needs it. The burst loops sit OUTSIDE
+        that loop on purpose: a conditional prefetch inside the body would put
+        a runtime-bounded inner loop back into it and take the flat loop out of
+        pipelining altogether, which is the trade that flattening bought."""
         nw: UInt(64) = c_dld.get()
         n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
+        sw: UInt(64) = c_dld.get()  # the DRAM row span of each source matrix
+        na: int32 = sw[0:16]
+        nb: int32 = sw[16:32]
+
+        # One burst per matrix, each covering exactly that matrix's own span.
+        # Merging the two into a single loop bounded by `max(na, nb)` was built
+        # and measured: it does halve the burst time, because A and B are
+        # separate `m_axi` bundles and their bursts then overlap (`[HLS
+        # 214-115] ... variable length ... on gmem1` and `... on gmem2`, both
+        # attributed to the one loop), and it changed the cosim count at all
+        # five shapes by exactly ZERO cycles. The operand burst is already
+        # entirely hidden behind the sequencer's dispatch and the units' fill,
+        # so the version that reads the fewest bytes is the one to keep.
+        rbA: UInt(VW)[MAXDIM * WPR] = 0
+        rbB: UInt(VW)[MAXDIM * WPR] = 0
+        for ia in range(na * WPR):
+            pa: UInt(VW) = 0
+            with allo.meta_for(T) as e:
+                av: int8 = lA[ia * T + e]
+                pa[8 * e : 8 * (e + 1)] = av
+            rbA[ia] = pa
+        for ic in range(nb * WPR):
+            pb: UInt(VW) = 0
+            with allo.meta_for(T) as e2:
+                bv: int8 = lB[ic * T + e2]
+                pb[8 * e2 : 8 * (e2 + 1)] = bv
+            rbB[ic] = pb
+
         f0: int32 = 0
         f1: int32 = 0
         f2: int32 = 0
@@ -549,13 +718,10 @@ def tinytpu_isa(
                 cnt = w0[54:62]
                 r = 0
             pw: UInt(VW) = 0
-            with allo.meta_for(T) as e:
-                v: int8 = 0
-                if f0 == 0:
-                    v = lA[(f1 + r) * MAXDIM + f2 * T + e]
-                else:
-                    v = lB[(f1 + r) * MAXDIM + f2 * T + e]
-                pw[8 * e : 8 * (e + 1)] = v
+            if f0 == 0:
+                pw = rbA[(f1 + r) * WPR + f2]
+            else:
+                pw = rbB[(f1 + r) * WPR + f2]
             dma2sp.put(pw)
 
     @df.kernel(mapping=[1])
@@ -1061,9 +1227,10 @@ def vadd_program(M, K, N):
 
 
 def expand(prog):
-    """Run the program's control flow at assembly time, yielding the
-    `(opcode, row count)` of every instruction the sequencer will actually
-    issue.
+    """Run the program's control flow at assembly time, yielding one
+    `(opcode, row count, f0, f1, f2, f3)` tuple per instruction the sequencer
+    will actually issue -- with the AGU resolved exactly as the sequencer
+    resolves it.
 
     The units loop over *their own* work count, so the header must carry the
     DYNAMIC count -- how much work each unit is really sent -- not the static
@@ -1075,30 +1242,51 @@ def expand(prog):
     instructions (see the flattening note at the top of the file). `nr` is
     never an AGU target, so it is the same for every dynamic issue of a given
     static instruction and can be read straight off the encoding.
+
+    **The resolved address fields come along because `dma_ld` now bursts.** It
+    needs to know, before the first instruction arrives, how many DRAM rows of
+    A and of B the program will name, and `f1` is an AGU target in the general
+    case -- so the assembler has to run the same resolution the sequencer runs
+    rather than read `f1` off the static encoding. Mirroring the sequencer here
+    is also what makes `bench_isa`'s loop-vs-flat equivalence check strict: the
+    two forms must now agree on every resolved address, not just on the opcode
+    and row-count stream.
     """
     ops = []
     pc = 0
     stack = []
+    iv_now = [0] * LOOP_DEPTH
     guard = 0
     while pc < len(prog):
         guard += 1
         if guard > 1 << 22:
             raise AssertionError("program does not terminate")
-        op = prog[pc][0] & 0x3F
+        w0, w1 = prog[pc]
+        op = w0 & 0x3F
         if op == OP_LOOP:
-            trip = (prog[pc][0] >> 54) & 0xFF
+            trip = (w0 >> 54) & 0xFF
+            iv_now[len(stack)] = 0
             stack.append([pc + 1, 0, trip])
             pc += 1
         elif op == OP_ENDLOOP:
             fr = stack[-1]
             fr[1] += 1
             if fr[1] < fr[2]:
+                iv_now[len(stack) - 1] = fr[1]
                 pc = fr[0]
             else:
                 stack.pop()
                 pc += 1
         else:
-            ops.append((op, (prog[pc][0] >> 54) & 0xFF))
+            f = [(w0 >> sh) & 0xFFF for sh in (6, 18, 30, 42)]
+            for t in range(AGU_TERMS):
+                base = 19 * t
+                tw = (w1 >> base) & 0xF
+                lw = (w1 >> (base + 4)) & 0x7
+                st = (w1 >> (base + 7)) & 0xFFF
+                if tw != 0:
+                    f[tw - 1] += iv_now[lw] * st
+            ops.append((op, (w0 >> 54) & 0xFF, f[0], f[1], f[2], f[3]))
             pc += 1
     return ops
 
@@ -1109,7 +1297,7 @@ def assemble(prog):
         imem[0] static instruction count   imem[4] mm count | mm rows << 16
         imem[1] dma_ld  rows               imem[5] accu   INSTRUCTIONS
         imem[2] spm     rows               imem[6] dma_st rows
-        imem[3] vru     words              imem[7] unused
+        imem[3] vru     words              imem[7] A rows | B rows << 16
 
     `accu` is the exception, and the only one: it is the one unit still
     counting instructions, because it is the one unit that stayed nested (see
@@ -1134,10 +1322,20 @@ def assemble(prog):
     ev = expand(prog)
 
     def rows(*ops):
-        return sum(nr for op, nr in ev if op in ops)
+        return sum(e[1] for e in ev if e[0] in ops)
 
     def count(*ops):
-        return sum(1 for op, nr in ev if op in ops)
+        return sum(1 for e in ev if e[0] in ops)
+
+    def span(src):
+        # The DRAM row span `dma_ld` must burst for one source matrix: the
+        # highest row any of its `dma_ld`s names, after the AGU is resolved.
+        return max([e[3] + e[1] for e in ev
+                    if e[0] == OP_DMA_LD and e[2] == src] + [0])
+
+    a_span, b_span = span(0), span(1)
+    assert a_span <= MAXDIM and b_span <= MAXDIM, (
+        f"dma_ld row span {a_span}/{b_span} exceeds MAXDIM={MAXDIM}")
 
     n_mm = count(OP_MM)
     mm_rows = rows(OP_MM)
@@ -1149,12 +1347,12 @@ def assemble(prog):
            n_mm | (mm_rows << 16),
            count(OP_MM, OP_VADD, OP_VRELU, OP_MVOUT),
            rows(OP_MVOUT),
-           0]
+           a_span | (b_span << 16)]
     assert len(hdr) == NHDR
     # Every count is read back through a 16-bit slice, which extracts to a
     # signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
     # encoding note at the top of the file).
-    for h in hdr[1:4] + hdr[5:]:
+    for h in hdr[1:4] + hdr[5:7]:
         assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
     words = list(hdr)
     for w0, w1 in prog:

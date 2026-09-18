@@ -50,21 +50,22 @@ accelerator.
 
 | shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
 |---|---|---|---|---|---|
-| 4x4x4    | 1004 | 574 | 1.75x |  0.4% |  0.7% |
-| 8x8x8    | 1108 | 615 | 1.80x |  2.9% |  5.2% |
-| 12x12x12 | 1294 | 740 | 1.75x |  8.3% | 14.6% |
-| 16x16x8  | 1344 | 784 | 1.71x |  9.4% | 16.3% |
-| 16x16x16 | **1586** | 986 | **1.61x** | 16.1% | 26.0% |
+| 4x4x4    | **680**  | 574 | **1.18x** |  0.6% |  0.7% |
+| 8x8x8    | **831**  | 615 | **1.35x** |  3.9% |  5.2% |
+| 12x12x12 | **1066** | 740 | **1.44x** | 10.1% | 14.6% |
+| 16x16x8  | **1139** | 784 | **1.45x** | 11.2% | 16.3% |
+| 16x16x16 | **1457** | 986 | **1.48x** | 17.6% | 26.0% |
 
-(Our column is after the row-flattening pass; the section on it below has the
-before/after and the 20-cycle correction that an earlier revision of this table
-predates.)
+(Our column is after the burst-DMA pass -- see the I/O section below. It read
+1004 / 1108 / 1294 / 1344 / 1586 at 1.75x / 1.80x / 1.75x / 1.71x / 1.61x
+before, which is what an earlier revision of this table quoted.)
 
-**The ratio is flat at ~1.7x and falls with size.** That is a
-qualitatively different result from the per-workload measurement, whose ratio
-*grew* (1.32x -> 1.54x -> 1.75x). Fixing the hardware exposed that the earlier
-growth was partly an artifact of specialization, and the real remaining gap is
-close to a constant factor.
+**The shape of the gap has inverted, and that is the result.** It used to be
+flat at ~1.7x and *falling* with size -- the signature of a fixed charge being
+amortised. With the argument-copying gone the ratio *rises*, 1.18x -> 1.48x:
+at 4x4x4 we are now within 18% of Gemmini, and what is left is a per-work gap
+rather than a per-run one. That is a smaller total gap and a harder one, and it
+is the honest reading: the easy 350 cycles have been taken.
 
 ## Marginal cost across the sweep — three different kinds of machine
 
@@ -78,10 +79,13 @@ machine's own peak):
 | 8x8x8 -> 12x12x12 | 9.73 (**60.8%**) | 6.54 (**40.9%**) |
 | 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 6.40 (40.0%) |
 | 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 8.46 (**52.9%**) |
-| least squares, all five | 9.71 (**60.7%**), fixed 566 | 7.05 (**44.1%**), fixed 1028 |
+| least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.32 (**33.2%**), fixed 717 |
 
-(Our column is post-flattening; it read 3.50 / 5.43 / 6.67 / 6.92 and 37.0%
-with fixed 1067 before.)
+(Our column is post-burst-DMA. It read 4.31 / 6.54 / 6.40 / 8.46 and 44.1% with
+fixed 1028 after flattening, and 3.50 / 5.43 / 6.67 / 6.92 and 37.0% with fixed
+1067 before that. **The marginal efficiency went DOWN, 44.1% -> 33.2%, and the
+fixed cost went down further, 1028 -> 717.** That is the trade stated in its own
+terms, and at every shape in this table the second term wins.)
 
 The cube sweep varies all three dimensions at once and spans only 2.4x in
 cycles, which makes each marginal a difference of two similar numbers. The
@@ -114,15 +118,16 @@ Gemmini has a reservation station and a tiling heuristic and both leave a trace.
 The 12x12x12 -> 16x16x8 step dips for both machines because it changes aspect
 ratio rather than growing uniformly; it is not a clean sweep point.
 
-**Gemmini's marginal efficiency is roughly flat at ~61%. Ours rises
-monotonically, 26.9% -> 52.9%.** That rise is the signature of a large fixed
-cost being amortised, and it agrees with the 1028-cycle intercept -- which is
-`wrap_io` bulk-copying whole declared arrays (see the I/O trade below). So our
-gap is not a constant factor on the work; it is a fixed charge that the sweep
-is slowly paying off, and it would keep closing at larger shapes. Flattening
-the per-instruction loops lifted the whole curve (it was 21.9% -> 43.2%) and
-left the intercept where it was, which is the same story the instruction-count
-fit tells.
+**Gemmini's marginal efficiency is roughly flat at ~61%. Ours still rises,
+18.5% -> 40.3%, but far less steeply than it did.** The rise is the signature
+of a fixed cost being amortised, and shrinking the fixed cost is exactly what
+flattens the curve: the intercept fell 1028 -> 717 when the argument copying
+was replaced by program-controlled bursts (see the I/O section below), and the
+curve came down with it. What is left is closer to a constant factor on the
+work, which is the harder kind of gap and the honest description of where the
+design now stands. Flattening the per-instruction loops had lifted the whole
+curve (21.9% -> 43.2% became 26.9% -> 52.9%) and left the intercept where it
+was; the burst DMA did the opposite, and the burst DMA was worth more.
 
 For contrast, the MiniTPU target's marginal efficiency is **flat at 19.0%** and
 does not move with size. Measured on its own RTL over a 12x sweep of output
@@ -202,34 +207,60 @@ reports a top-level latency of **2.259e+08** for this build, because the loop
 trip counts are runtime data and it must bound them by the ISA's field widths.
 The real number is cosim's 1176. A bound is not a measurement.
 
-## The I/O trade, measured
+## The I/O trade, measured -- and then removed
 
-`wrap_io` is not a default to accept -- it is an architectural choice with a
-crossover, and neither setting is what Gemmini has:
+`wrap_io` was for a long time an architectural choice with a crossover, and
+neither setting was what Gemmini has:
 
 | config | marginal | fixed | 4x4x4 | 16x16x16 |
 |---|---|---|---|---|
 | `wrap_io=True`, imem 256 | 18.1 cyc/instr | 1102 | 2.12x | 1.94x |
-| `wrap_io=False` | **39.8** | **481** | **1.21x** | 2.25x |
-| `wrap_io=True`, imem 76 | **18.1** | 922 | 1.81x | **1.76x** |
+| `wrap_io=False`, strided | 39.8 | 481 | 1.21x | 2.25x |
+| `wrap_io=True`, imem 56 | 15.1 | 907 | 1.75x | 1.61x |
+| **`wrap_io=False`, bursts** | **20.1** | **557** | **1.18x** | **1.48x** |
 | Gemmini | **10.8** | **483** | 1.00x | 1.00x |
 
 * `wrap_io=True` copies each argument into a local buffer before the region
   runs, so the units read BRAM -- cheap per access, but the copy is the
-  *declared* length regardless of the shape being run.
-* `wrap_io=False` lets the units read `m_axi` directly. The fixed cost drops to
-  481, essentially equal to Gemmini's 483 -- but every access now pays bus
-  latency instead of hitting a buffer, and the marginal cost **doubles**. It
-  also requires flat arguments ("Top-level multi-dimensional arrays are
-  linearized to 1D pointers"), which is why `A`/`B`/`C` are 1-D.
-* Crossover is ~29 instructions, so buffering wins across this benchmark set
-  once the imem is trimmed to the longest admissible program (256 -> 76 words,
-  worth 180 cycles at every shape).
+  *declared* length regardless of the shape being run. At MAXDIM=16 that is
+  imem 56 + A 256 + B 256 + C 256 = **824 words**, and cosim charges it as a
+  fixed 907 cycles: 57% of 16x16x16 and 90% of 4x4x4.
+* `wrap_io=False` lets the units read `m_axi` directly, and the row above it is
+  the measurement that made this look like a dead end: fixed 481, essentially
+  Gemmini's 483, but the marginal cost more than doubled.
+* **That row measured an access pattern, not a configuration.** Vitis turns
+  `lA[(f1 + r) * MAXDIM + f2 * T + e]` into `[HLS 214-115] Multiple burst reads
+  of length 4 and bit width 8` -- a four-beat AXI transaction per row -- and it
+  turns `imem[NHDR + pc * IWORDS]` into a **two-word** burst per instruction,
+  which alone takes the sequencer's fetch loop from II=5 to II=13. A contiguous
+  sweep with a runtime trip count gets `... of variable length`, one real burst,
+  at the port's own limit.
+* The bottom row is the design built around that: the sequencer pulls the whole
+  program on-chip in one burst, and `dma_ld` opens with one variable-length
+  burst per operand matrix covering exactly the DRAM rows the program names.
+  **Fixed cost 907 -> 557 and faster at all five shapes**, 1.48x at the
+  smallest and 1.09x at the largest.
 
-**Gemmini has the third option and Allo does not expose it: a bursted DMA the
-program controls, giving low fixed cost *and* low marginal cost.** `mvin`
-transfers exactly the tiles the program names. That, not the array and not the
-data type, is the largest single remaining item.
+The crossover between the last two rows is at **71 dynamic instructions**,
+which is past the longest program this MAXDIM admits (45) -- so the burst build
+wins everywhere it can be run, and would stop winning at a larger MAXDIM
+without also fixing what the marginal term buys. What that +5 cycles/instruction
+is: `dma_st` still writes `C` with the strided pattern
+(`[HLS 214-115] Multiple burst writes of length 4 and bit width 8`, II=4). A
+contiguous write-back would have to either clobber the columns the program never
+named or be deferred to the end of the run, where it would serialize behind the
+last `mvout` instead of overlapping the compute it currently overlaps. It is the
+next thing to measure.
+
+**Gemmini still has the better version of this**, and the residual marginal gap
+is where it now shows: `mvin`/`mvout` transfer exactly the tiles the program
+names in both directions, at a bus width that is not 8 bits.
+`config_interface -m_axi_max_widen_bitwidth 512` would give us the second half
+of that and does nothing today -- `[HLS 214-307] Could not widen since type i8
+size is greater than or equal to alignment 1(bytes)`, because Allo emits the
+argument pointers with no alignment attribute. That is an Allo codegen gap
+rather than a design one, and it is worth roughly the whole operand-traffic
+term if it were closed.
 
 ## Where the gap was, originally
 
@@ -399,12 +430,21 @@ from the source:
    rather than the 1.7x estimated; see the section above. What remains of the
    marginal term (15.1 against Gemmini's 10.8) is in `accu` and the array,
    neither of which flattens for the reasons given there.
-2. **A program-controlled burst DMA** -- worth the 1.9x fixed term, and the
-   one item that needs something Allo does not currently expose (see the I/O
-   trade above). **This is now unambiguously the largest remaining item**: the
-   fixed term did not move at all above, and at 907 cycles it is 57% of
-   16x16x16 and 90% of 4x4x4.
-3. **Then multiple instructions in flight.** A credit/scoreboard scheme over
+2. ~~**A program-controlled burst DMA**~~ -- done, and measured at 1.48x at
+   4x4x4 falling to 1.09x at 16x16x16 (fixed 907 -> 557). Allo did not need
+   extending after all: the mechanism was already there and the previous
+   measurement had condemned the access pattern rather than the configuration.
+   See the I/O section above.
+3. **The write path.** `dma_st` still writes `C` four bytes at a time, which is
+   most of what separates the new 20.1 cyc/instr from the 15.1 the buffered
+   build got, and the reason the crossover sits at 71 instructions rather than
+   further out. Both ways of bursting it (clobber the unnamed columns, or defer
+   the write-back to the end) cost something real, so this one has to be
+   measured rather than assumed.
+4. **A wider bus.** The `m_axi` ports are 8 bits, so a perfectly bursted
+   operand set still costs one cycle per byte. `m_axi_max_widen_bitwidth` is
+   blocked on Allo emitting an alignment attribute on the argument pointers.
+5. **Then multiple instructions in flight.** A credit/scoreboard scheme over
    the in-order units would approach Gemmini's 48-entry reservation station
    without its complexity.
 
@@ -436,21 +476,31 @@ functional check that had been passing all session.
 
 ## Honest reading
 
-On one fixed build, matched in data type and array size, the design is a **flat
-~1.7x behind Gemmini** across five shapes, and the ratio improves slightly with
-problem size (1.75x at 4x4x4, 1.61x at 16x16x16). Utilization tracks at roughly
-two thirds of Gemmini's at the largest shape.
+On one fixed build, matched in data type and array size, the design is **1.18x
+behind Gemmini at 4x4x4 and 1.48x at 16x16x16** across five shapes. The ratio
+now *rises* with problem size, where it used to fall: the fixed charge that
+dominated the small shapes has been removed, and what is left is a per-work
+gap. Utilization tracks at roughly two thirds of Gemmini's at the largest shape.
 
-Two terms make up the 1.8x, and both are named:
+Two terms make up the gap, and both are named:
 
-1. **Marginal, now 15.1 vs 10.8 cycles/instruction (1.4x).** It was 18.1 until
-   four of the five units were row-flattened so their loops pipeline at II=1;
-   that was worth 1.08x overall and is written up above. What is left is
-   `accu`, whose accumulate is a read-modify-write recurrence that does not
-   flatten below II=2, and the array's per-`mm` prologue.
-2. **Fixed, 907 vs 483 cycles (1.9x).** Allo's argument handling: bulk-copy the
-   declared arrays, or unbuffered `m_axi`, but no program-controlled burst DMA.
-   **Untouched by the above, and therefore now the bigger of the two.**
+1. **Marginal, 20.1 vs 10.8 cycles/instruction (1.9x), and it went UP.** It was
+   18.1 until four of the five units were row-flattened so their loops pipeline
+   at II=1 (worth 1.08x), then 15.1, and the burst DMA traded 5 of those cycles
+   back for 350 off the fixed term. Three things hold it there: `dma_st`'s
+   four-byte writes to `C`, `accu`'s read-modify-write accumulate, which does
+   not flatten below II=2, and the array's per-`mm` prologue.
+2. **Fixed, 557 vs 483 cycles (1.15x).** This was 907 vs 483 and was the whole
+   story of this comparison for most of the project. What remains is the
+   region's own start-up and drain plus the 56-word instruction prefetch, and
+   it is close enough to Gemmini's that it is no longer where the work is.
+
+**The priority has genuinely inverted.** For most of this project the argument
+was that the fixed term was the only problem -- 16x the PEs bought 1.47x, and
+at T=16 the marginal term was almost absent from the measurement. That argument
+was correct and it has now been acted on; the fixed term is 1.15x and the
+marginal term is 1.9x, so the next pass belongs on the marginal side, starting
+with the write path.
 
 Neither term is about the array, the data type, or the dataflow -- all three are
 correct and RTL-verified, and `microarch_ws.py` reached exactly 100% of roofline
@@ -458,7 +508,7 @@ with the same PE structure. The compute is not the limit.
 
 Both utilizations are low in absolute terms because these are tiny problems on
 a 4x4 array where fixed costs dominate; Gemmini's 26% at 16x16x16 is the number
-to chase, and item (1) above is worth most of the distance.
+to chase, and at 17.6% we are now two thirds of the way there.
 
 ## Reproducing
 
@@ -468,7 +518,7 @@ export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
 export PYTHONPATH=/home/sk3463/allo OMP_NUM_THREADS=32   # >= 22 processes
 python bench_isa.py          # functional sweep, one build
 python cosim.py              # one csynth, cosim per shape
-TPU_WRAP=0 python cosim.py   # the unbuffered m_axi variant
+TPU_WRAP=1 python cosim.py   # the old hoisted-argument variant, for comparison
 
 # Gemmini, matched
 cd ~/chipyard && source env.sh

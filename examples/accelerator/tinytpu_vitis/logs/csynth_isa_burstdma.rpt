@@ -1,0 +1,644 @@
+
+
+================================================================
+== Synthesis Summary Report of 'tinytpu_isa'
+================================================================
++ General Information: 
+    * Date:           Fri Sep 18 15:17:54 2026
+    * Version:        2023.2 (Build 4023990 on Oct 11 2023)
+    * Project:        out.prj
+    * Solution:       solution1 (Vivado IP Flow Target)
+    * Product family: virtexuplusHBM
+    * Target device:  xcu280-fsvh2892-2L-e
+    
+
++ Performance & Resource Estimates: 
+    
+    PS: '+' for module; 'o' for loop; '*' for dataflow
+    +--------------------------------------------+--------+-------+-----------+-----------+----------+----------+--------+----------+----------+----------+-------------+------------+-----+
+    |                   Modules                  |  Issue |       |  Latency  |  Latency  | Iteration|          |  Trip  |          |          |          |             |            |     |
+    |                   & Loops                  |  Type  | Slack |  (cycles) |    (ns)   |  Latency | Interval |  Count | Pipelined|   BRAM   |    DSP   |      FF     |     LUT    | URAM|
+    +--------------------------------------------+--------+-------+-----------+-----------+----------+----------+--------+----------+----------+----------+-------------+------------+-----+
+    |+ tinytpu_isa*                              |  Timing|  -0.00|          -|          -|         -|         -|       -|  dataflow|  16 (~0%)|  15 (~0%)|  11524 (~0%)|  19235 (1%)|    -|
+    | + entry_proc                               |       -|   1.22|          0|      0.000|         -|         0|       -|        no|         -|         -|      3 (~0%)|    29 (~0%)|    -|
+    | + sequencer_0_1                            |  Timing|  -0.00|          -|          -|         -|         -|       -|        no|         -|   3 (~0%)|   1186 (~0%)|  2359 (~0%)|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_29_1  |       -|   0.62|         58|    193.140|         -|        58|       -|        no|         -|         -|      8 (~0%)|    53 (~0%)|    -|
+    |   o VITIS_LOOP_29_1                        |       -|   2.43|         56|    186.480|         1|         1|      56|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_61_2  |       -|   0.77|          6|     19.980|         -|         6|       -|        no|         -|         -|      5 (~0%)|    49 (~0%)|    -|
+    |   o VITIS_LOOP_61_2                        |       -|   2.43|          4|     13.320|         1|         1|       4|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_65_3  |       -|   0.77|          6|     19.980|         -|         6|       -|        no|         -|         -|      5 (~0%)|    49 (~0%)|    -|
+    |   o VITIS_LOOP_65_3                        |       -|   2.43|          4|     13.320|         1|         1|       4|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_69_4  |       -|   0.80|          6|     19.980|         -|         6|       -|        no|         -|         -|      5 (~0%)|    49 (~0%)|    -|
+    |   o VITIS_LOOP_69_4                        |       -|   2.43|          4|     13.320|         1|         1|       4|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_73_5  |       -|   0.79|          6|     19.980|         -|         6|       -|        no|         -|         -|      5 (~0%)|    49 (~0%)|    -|
+    |   o VITIS_LOOP_73_5                        |       -|   2.43|          4|     13.320|         1|         1|       4|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_l_S_i_0_i        |  Timing|  -0.00|         59|    196.470|         -|        59|       -|        no|         -|         -|     87 (~0%)|    75 (~0%)|    -|
+    |   o l_S_i_0_i                              |       -|   2.43|         57|    189.810|         3|         1|      56|       yes|         -|         -|            -|           -|    -|
+    |  + sequencer_0_1_Pipeline_VITIS_LOOP_82_6  |       -|   0.17|          -|          -|         -|         -|       -|        no|         -|   3 (~0%)|    495 (~0%)|  1075 (~0%)|    -|
+    |   o VITIS_LOOP_82_6                        |      II|   2.43|          -|          -|         7|         5|       -|       yes|         -|         -|            -|           -|    -|
+    | + dma_ld_0_1                               |  Timing|  -0.00|     557125|  1.855e+06|         -|    557125|       -|        no|         -|         -|    584 (~0%)|  1437 (~0%)|    -|
+    |  + dma_ld_0_1_Pipeline_VITIS_LOOP_585_1    |       -|   0.64|         66|    219.780|         -|        66|       -|        no|         -|         -|      9 (~0%)|    56 (~0%)|    -|
+    |   o VITIS_LOOP_585_1                       |       -|   2.43|         64|    213.120|         1|         1|      64|       yes|         -|         -|            -|           -|    -|
+    |  + dma_ld_0_1_Pipeline_VITIS_LOOP_589_2    |       -|   0.64|         66|    219.780|         -|        66|       -|        no|         -|         -|      9 (~0%)|    56 (~0%)|    -|
+    |   o VITIS_LOOP_589_2                       |       -|   2.43|         64|    213.120|         1|         1|      64|       yes|         -|         -|            -|           -|    -|
+    |  + dma_ld_0_1_Pipeline_VITIS_LOOP_596_3    |  Timing|  -0.00|     524275|  1.746e+06|         -|    524275|       -|        no|         -|         -|     91 (~0%)|   150 (~0%)|    -|
+    |   o VITIS_LOOP_596_3                       |      II|   2.43|     524273|  1.746e+06|         6|         4|  131068|       yes|         -|         -|            -|           -|    -|
+    |  + dma_ld_0_1_Pipeline_VITIS_LOOP_656_4    |  Timing|  -0.00|     524275|  1.746e+06|         -|    524275|       -|        no|         -|         -|     91 (~0%)|   150 (~0%)|    -|
+    |   o VITIS_LOOP_656_4                       |      II|   2.43|     524273|  1.746e+06|         6|         4|  131068|       yes|         -|         -|            -|           -|    -|
+    |  + dma_ld_0_1_Pipeline_VITIS_LOOP_724_5    |       -|   0.13|      32771|  1.091e+05|         -|     32771|       -|        no|         -|         -|    189 (~0%)|   342 (~0%)|    -|
+    |   o VITIS_LOOP_724_5                       |       -|   2.43|      32769|  1.091e+05|         4|         1|   32767|       yes|         -|         -|            -|           -|    -|
+    | + spm_0                                    |       -|   0.02|      33289|  1.109e+05|         -|     33289|       -|        no|   1 (~0%)|         -|    250 (~0%)|   540 (~0%)|    -|
+    |  + spm_0_Pipeline_VITIS_LOOP_809_1         |       -|   0.12|        514|  1.712e+03|         -|       514|       -|        no|         -|         -|     12 (~0%)|    62 (~0%)|    -|
+    |   o VITIS_LOOP_809_1                       |       -|   2.43|        512|  1.705e+03|         1|         1|     512|       yes|         -|         -|            -|           -|    -|
+    |  + spm_0_Pipeline_VITIS_LOOP_834_2         |       -|   0.02|      32772|  1.091e+05|         -|     32772|       -|        no|         -|         -|    215 (~0%)|   344 (~0%)|    -|
+    |   o VITIS_LOOP_834_2                       |       -|   2.43|      32770|  1.091e+05|         5|         1|   32767|       yes|         -|         -|            -|           -|    -|
+    | + vru_0                                    |  Timing|  -0.00|      33033|  1.100e+05|         -|     33033|       -|        no|   1 (~0%)|         -|    349 (~0%)|   840 (~0%)|    -|
+    |  + vru_0_Pipeline_VITIS_LOOP_934_1         |       -|   0.13|        258|    859.140|         -|       258|       -|        no|         -|         -|     11 (~0%)|    60 (~0%)|    -|
+    |   o VITIS_LOOP_934_1                       |       -|   2.43|        256|    852.480|         1|         1|     256|       yes|         -|         -|            -|           -|    -|
+    |  + vru_0_Pipeline_VITIS_LOOP_971_2         |       -|   0.02|      32772|  1.091e+05|         -|     32772|       -|        no|         -|         -|    314 (~0%)|   603 (~0%)|    -|
+    |   o VITIS_LOOP_971_2                       |       -|   2.43|      32770|  1.091e+05|         5|         1|   32767|       yes|         -|         -|            -|           -|    -|
+    | + pe_0_0                                   |  Timing|  -0.00|   67434487|  2.246e+08|         -|  67434487|       -|        no|         -|         -|    224 (~0%)|   375 (~0%)|    -|
+    |  o VITIS_LOOP_1123_1                       |       -|   2.43|   67434486|  2.246e+08|      2058|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_0_0_Pipeline_VITIS_LOOP_1158_2      |       -|   0.88|       2051|  6.830e+03|         -|      2051|       -|        no|         -|         -|    130 (~0%)|   155 (~0%)|    -|
+    |    o VITIS_LOOP_1158_2                     |       -|   2.43|       2049|  6.823e+03|         4|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_0_1                                   |  Timing|  -0.00|   67368953|  2.243e+08|         -|  67368953|       -|        no|         -|         -|    126 (~0%)|   304 (~0%)|    -|
+    |  o VITIS_LOOP_1225_1                       |       -|   2.43|   67368952|  2.243e+08|      2056|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_0_1_Pipeline_VITIS_LOOP_1252_2      |       -|   0.88|       2051|  6.830e+03|         -|      2051|       -|        no|         -|         -|     66 (~0%)|   146 (~0%)|    -|
+    |    o VITIS_LOOP_1252_2                     |       -|   2.43|       2049|  6.823e+03|         4|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_1_0                                   |  Timing|  -0.00|   67434487|  2.246e+08|         -|  67434487|       -|        no|         -|   1 (~0%)|    361 (~0%)|   413 (~0%)|    -|
+    |  o VITIS_LOOP_1478_1                       |       -|   2.43|   67434486|  2.246e+08|      2058|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_1_0_Pipeline_VITIS_LOOP_1511_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    268 (~0%)|   190 (~0%)|    -|
+    |    o VITIS_LOOP_1511_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_0_2                                   |  Timing|  -0.00|   67368953|  2.243e+08|         -|  67368953|       -|        no|         -|         -|    126 (~0%)|   304 (~0%)|    -|
+    |  o VITIS_LOOP_1311_1                       |       -|   2.43|   67368952|  2.243e+08|      2056|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_0_2_Pipeline_VITIS_LOOP_1338_2      |       -|   0.88|       2051|  6.830e+03|         -|      2051|       -|        no|         -|         -|     66 (~0%)|   146 (~0%)|    -|
+    |    o VITIS_LOOP_1338_2                     |       -|   2.43|       2049|  6.823e+03|         4|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_1_1                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    232 (~0%)|   316 (~0%)|    -|
+    |  o VITIS_LOOP_1581_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_1_1_Pipeline_VITIS_LOOP_1608_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    172 (~0%)|   149 (~0%)|    -|
+    |    o VITIS_LOOP_1608_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_2_0                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    360 (~0%)|   405 (~0%)|    -|
+    |  o VITIS_LOOP_1842_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_2_0_Pipeline_VITIS_LOOP_1873_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    268 (~0%)|   190 (~0%)|    -|
+    |    o VITIS_LOOP_1873_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_0_3                                   |       -|   0.43|   67336186|  2.242e+08|         -|  67336186|       -|        no|         -|         -|    117 (~0%)|   269 (~0%)|    -|
+    |  o VITIS_LOOP_1393_1                       |       -|   2.43|   67336185|  2.242e+08|      2055|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_0_3_Pipeline_VITIS_LOOP_1416_2      |       -|   0.88|       2051|  6.830e+03|         -|      2051|       -|        no|         -|         -|     58 (~0%)|   135 (~0%)|    -|
+    |    o VITIS_LOOP_1416_2                     |       -|   2.43|       2049|  6.823e+03|         4|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_1_2                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    232 (~0%)|   316 (~0%)|    -|
+    |  o VITIS_LOOP_1670_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_1_2_Pipeline_VITIS_LOOP_1697_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    172 (~0%)|   149 (~0%)|    -|
+    |    o VITIS_LOOP_1697_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_2_1                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    232 (~0%)|   316 (~0%)|    -|
+    |  o VITIS_LOOP_1943_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_2_1_Pipeline_VITIS_LOOP_1970_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    172 (~0%)|   149 (~0%)|    -|
+    |    o VITIS_LOOP_1970_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_3_0                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    231 (~0%)|   307 (~0%)|    -|
+    |  o VITIS_LOOP_2200_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_3_0_Pipeline_VITIS_LOOP_2227_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    172 (~0%)|   149 (~0%)|    -|
+    |    o VITIS_LOOP_2227_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_1_3                                   |       -|   0.22|   67368953|  2.243e+08|         -|  67368953|       -|        no|         -|   1 (~0%)|    159 (~0%)|   249 (~0%)|    -|
+    |  o VITIS_LOOP_1755_1                       |       -|   2.43|   67368952|  2.243e+08|      2056|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_1_3_Pipeline_VITIS_LOOP_1778_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    100 (~0%)|   106 (~0%)|    -|
+    |    o VITIS_LOOP_1778_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_2_2                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    232 (~0%)|   316 (~0%)|    -|
+    |  o VITIS_LOOP_2032_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_2_2_Pipeline_VITIS_LOOP_2059_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    172 (~0%)|   149 (~0%)|    -|
+    |    o VITIS_LOOP_2059_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_3_1                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    423 (~0%)|   357 (~0%)|    -|
+    |  o VITIS_LOOP_2305_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_3_1_Pipeline_VITIS_LOOP_2332_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    364 (~0%)|   190 (~0%)|    -|
+    |    o VITIS_LOOP_2332_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_2_3                                   |       -|   0.22|   67368953|  2.243e+08|         -|  67368953|       -|        no|         -|   1 (~0%)|    159 (~0%)|   249 (~0%)|    -|
+    |  o VITIS_LOOP_2117_1                       |       -|   2.43|   67368952|  2.243e+08|      2056|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_2_3_Pipeline_VITIS_LOOP_2140_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    100 (~0%)|   106 (~0%)|    -|
+    |    o VITIS_LOOP_2140_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_3_2                                   |  Timing|  -0.00|   67401720|  2.244e+08|         -|  67401720|       -|        no|         -|   1 (~0%)|    423 (~0%)|   357 (~0%)|    -|
+    |  o VITIS_LOOP_2406_1                       |       -|   2.43|   67401719|  2.244e+08|      2057|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_3_2_Pipeline_VITIS_LOOP_2433_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    364 (~0%)|   190 (~0%)|    -|
+    |    o VITIS_LOOP_2433_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + pe_3_3                                   |       -|   0.22|   67368953|  2.243e+08|         -|  67368953|       -|        no|         -|   1 (~0%)|    350 (~0%)|   290 (~0%)|    -|
+    |  o VITIS_LOOP_2503_1                       |       -|   2.43|   67368952|  2.243e+08|      2056|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + pe_3_3_Pipeline_VITIS_LOOP_2526_2      |       -|   0.22|       2052|  6.833e+03|         -|      2052|       -|        no|         -|   1 (~0%)|    292 (~0%)|   147 (~0%)|    -|
+    |    o VITIS_LOOP_2526_2                     |       -|   2.43|       2050|  6.826e+03|         5|         1|    2047|       yes|         -|         -|            -|           -|    -|
+    | + accu_0                                   |       -|   0.00|    8552319|  2.848e+07|         -|   8552319|       -|        no|   4 (~0%)|         -|   1270 (~0%)|  2465 (~0%)|    -|
+    |  + accu_0_Pipeline_VITIS_LOOP_2578_1       |       -|   0.14|        130|    432.900|         -|       130|       -|        no|         -|         -|     10 (~0%)|    58 (~0%)|    -|
+    |   o VITIS_LOOP_2578_1                      |       -|   2.43|        128|    426.240|         1|         1|     128|       yes|         -|         -|            -|           -|    -|
+    |  o VITIS_LOOP_2593_2                       |       -|   2.43|    8552187|  2.848e+07|       261|         -|   32767|        no|         -|         -|            -|           -|    -|
+    |   + accu_0_Pipeline_VITIS_LOOP_2785_4      |       -|   0.00|        257|    855.810|         -|       257|       -|        no|         -|         -|    492 (~0%)|   726 (~0%)|    -|
+    |    o VITIS_LOOP_2785_4                     |      II|   2.43|        255|    849.150|         4|         2|     127|       yes|         -|         -|            -|           -|    -|
+    |   + accu_0_Pipeline_VITIS_LOOP_3032_6      |       -|   0.03|        130|    432.900|         -|       130|       -|        no|         -|         -|    172 (~0%)|   540 (~0%)|    -|
+    |    o VITIS_LOOP_3032_6                     |       -|   2.43|        128|    426.240|         3|         1|     127|       yes|         -|         -|            -|           -|    -|
+    |   + accu_0_Pipeline_VITIS_LOOP_2924_5      |       -|   0.14|        257|    855.810|         -|       257|       -|        no|         -|         -|    346 (~0%)|   454 (~0%)|    -|
+    |    o VITIS_LOOP_2924_5                     |      II|   2.43|        255|    849.150|         3|         2|     127|       yes|         -|         -|            -|           -|    -|
+    |   + accu_0_Pipeline_VITIS_LOOP_2644_3      |       -|   0.00|        130|    432.900|         -|       130|       -|        no|         -|         -|    154 (~0%)|   371 (~0%)|    -|
+    |    o VITIS_LOOP_2644_3                     |       -|   2.43|        128|    426.240|         3|         1|     127|       yes|         -|         -|            -|           -|    -|
+    | + dma_st_0_1                               |  Timing|  -0.00|     131081|  4.365e+05|         -|    131081|       -|        no|         -|         -|    444 (~0%)|   618 (~0%)|    -|
+    |  + dma_st_0_1_Pipeline_VITIS_LOOP_3183_1   |  Timing|  -0.00|     131079|  4.365e+05|         -|    131079|       -|        no|         -|         -|    359 (~0%)|   519 (~0%)|    -|
+    |   o VITIS_LOOP_3183_1                      |      II|   2.43|     131077|  4.365e+05|        14|         4|   32767|       yes|         -|         -|            -|           -|    -|
+    +--------------------------------------------+--------+-------+-----------+-----------+----------+----------+--------+----------+----------+----------+-------------+------------+-----+
+
+
+================================================================
+== HW Interfaces
+================================================================
+* M_AXI
++-------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+| Interface   | Data Width | Address Width | Latency | Offset | Register | Max Widen | Max Read     | Max Write    | Num Read    | Num Write   | Resource Estimate |
+|             | (SW->HW)   |               |         |        |          | Bitwidth  | Burst Length | Burst Length | Outstanding | Outstanding |                   |
++-------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+| m_axi_gmem0 | 64 -> 64   | 64            | 0       | slave  | 0        | 0         | 16           | 16           | 16          | 16          | BRAM=4            |
+| m_axi_gmem1 | 8 -> 8     | 64            | 0       | slave  | 0        | 0         | 16           | 16           | 16          | 16          | BRAM=2            |
+| m_axi_gmem2 | 8 -> 8     | 64            | 0       | slave  | 0        | 0         | 16           | 16           | 16          | 16          | BRAM=2            |
+| m_axi_gmem3 | 8 -> 8     | 64            | 0       | slave  | 0        | 0         | 16           | 16           | 16          | 16          | BRAM=2            |
++-------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+
+* S_AXILITE Interfaces
++---------------+------------+---------------+--------+----------+
+| Interface     | Data Width | Address Width | Offset | Register |
++---------------+------------+---------------+--------+----------+
+| s_axi_control | 32         | 6             | 16     | 0        |
++---------------+------------+---------------+--------+----------+
+
+* S_AXILITE Registers
++---------------+----------+--------+-------+--------+----------------------+
+| Interface     | Register | Offset | Width | Access | Description          |
++---------------+----------+--------+-------+--------+----------------------+
+| s_axi_control | v2036_1  | 0x10   | 32    | W      | Data signal of v2036 |
+| s_axi_control | v2036_2  | 0x14   | 32    | W      | Data signal of v2036 |
+| s_axi_control | v2037_1  | 0x1c   | 32    | W      | Data signal of v2037 |
+| s_axi_control | v2037_2  | 0x20   | 32    | W      | Data signal of v2037 |
+| s_axi_control | v2038_1  | 0x28   | 32    | W      | Data signal of v2038 |
+| s_axi_control | v2038_2  | 0x2c   | 32    | W      | Data signal of v2038 |
+| s_axi_control | v2039_1  | 0x34   | 32    | W      | Data signal of v2039 |
+| s_axi_control | v2039_2  | 0x38   | 32    | W      | Data signal of v2039 |
++---------------+----------+--------+-------+--------+----------------------+
+
+* TOP LEVEL CONTROL
++-----------+------------+-----------------------------------+
+| Interface | Type       | Ports                             |
++-----------+------------+-----------------------------------+
+| ap_clk    | clock      | ap_clk                            |
+| ap_rst_n  | reset      | ap_rst_n                          |
+| ap_ctrl   | ap_ctrl_hs | ap_done ap_idle ap_ready ap_start |
++-----------+------------+-----------------------------------+
+
+
+================================================================
+== SW I/O Information
+================================================================
+* Top Function Arguments
++----------+-----------+--------------------+
+| Argument | Direction | Datatype           |
++----------+-----------+--------------------+
+| v2036    | in        | long unsigned int* |
+| v2037    | in        | signed char*       |
+| v2038    | in        | signed char*       |
+| v2039    | out       | signed char*       |
++----------+-----------+--------------------+
+
+* SW-to-HW Mapping
++----------+---------------+-----------+----------+-----------------------------------+
+| Argument | HW Interface  | HW Type   | HW Usage | HW Info                           |
++----------+---------------+-----------+----------+-----------------------------------+
+| v2036    | m_axi_gmem0   | interface |          |                                   |
+| v2036    | s_axi_control | register  | offset   | name=v2036_1 offset=0x10 range=32 |
+| v2036    | s_axi_control | register  | offset   | name=v2036_2 offset=0x14 range=32 |
+| v2037    | m_axi_gmem1   | interface |          |                                   |
+| v2037    | s_axi_control | register  | offset   | name=v2037_1 offset=0x1c range=32 |
+| v2037    | s_axi_control | register  | offset   | name=v2037_2 offset=0x20 range=32 |
+| v2038    | m_axi_gmem2   | interface |          |                                   |
+| v2038    | s_axi_control | register  | offset   | name=v2038_1 offset=0x28 range=32 |
+| v2038    | s_axi_control | register  | offset   | name=v2038_2 offset=0x2c range=32 |
+| v2039    | m_axi_gmem3   | interface |          |                                   |
+| v2039    | s_axi_control | register  | offset   | name=v2039_1 offset=0x34 range=32 |
+| v2039    | s_axi_control | register  | offset   | name=v2039_2 offset=0x38 range=32 |
++----------+---------------+-----------+----------+-----------------------------------+
+
+
+================================================================
+== M_AXI Burst Information
+================================================================
+ Note: All burst requests might be further partitioned into multiple requests during RTL generation based on max_read_burst_length or max_write_burst_length settings.
+
+* Inferred Burst Summary
++--------------+-----------+----------+-------+------------------+-------------------+
+| HW Interface | Direction | Length   | Width | Loop             | Loop Location     |
++--------------+-----------+----------+-------+------------------+-------------------+
+| m_axi_gmem0  | read      | 56       | 64    | l_S_i_0_i        | kernel.cpp:32:14  |
+| m_axi_gmem1  | read      | variable | 8     | VITIS_LOOP_596_3 | kernel.cpp:596:21 |
+| m_axi_gmem2  | read      | variable | 8     | VITIS_LOOP_656_4 | kernel.cpp:656:21 |
+| m_axi_gmem3  | write     | 4        | 8     |                  |                   |
++--------------+-----------+----------+-------+------------------+-------------------+
+
+* All M_AXI Variable Accesses
++--------------+----------+--------------------+-----------+--------------+----------+-------------------+--------------------+------------+-------------------------------------------------------------------------------------------------------+
+| HW Interface | Variable | Access Location    | Direction | Burst Status | Length   | Loop              | Loop Location      | Resolution | Problem                                                                                               |
++--------------+----------+--------------------+-----------+--------------+----------+-------------------+--------------------+------------+-------------------------------------------------------------------------------------------------------+
+| m_axi_gmem0  | v0       | kernel.cpp:33:19   | read      | Widen Fail   |          | l_S_i_0_i         | kernel.cpp:32:14   | 214-353    | Could not widen since type i64 size is greater than or equal to the max_widen_bitwidth threshold of 0 |
+| m_axi_gmem0  | v0       | kernel.cpp:33:19   | read      | Inferred     | 56       | l_S_i_0_i         | kernel.cpp:32:14   |            |                                                                                                       |
+| m_axi_gmem1  | v348     | kernel.cpp:602:19  | read      | Widen Fail   |          | VITIS_LOOP_596_3  | kernel.cpp:596:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem1  | v348     | kernel.cpp:602:19  | read      | Inferred     | variable | VITIS_LOOP_596_3  | kernel.cpp:596:21  |            |                                                                                                       |
+| m_axi_gmem1  | v348     | kernel.cpp:615:19  | read      | Widen Fail   |          | VITIS_LOOP_596_3  | kernel.cpp:596:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem1  | v348     | kernel.cpp:615:19  | read      | Inferred     | variable | VITIS_LOOP_596_3  | kernel.cpp:596:21  |            |                                                                                                       |
+| m_axi_gmem1  | v348     | kernel.cpp:627:19  | read      | Widen Fail   |          | VITIS_LOOP_596_3  | kernel.cpp:596:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem1  | v348     | kernel.cpp:627:19  | read      | Inferred     | variable | VITIS_LOOP_596_3  | kernel.cpp:596:21  |            |                                                                                                       |
+| m_axi_gmem1  | v348     | kernel.cpp:639:19  | read      | Widen Fail   |          | VITIS_LOOP_596_3  | kernel.cpp:596:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem1  | v348     | kernel.cpp:639:19  | read      | Inferred     | variable | VITIS_LOOP_596_3  | kernel.cpp:596:21  |            |                                                                                                       |
+| m_axi_gmem2  | v349     | kernel.cpp:662:19  | read      | Widen Fail   |          | VITIS_LOOP_656_4  | kernel.cpp:656:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem2  | v349     | kernel.cpp:662:19  | read      | Inferred     | variable | VITIS_LOOP_656_4  | kernel.cpp:656:21  |            |                                                                                                       |
+| m_axi_gmem2  | v349     | kernel.cpp:675:19  | read      | Widen Fail   |          | VITIS_LOOP_656_4  | kernel.cpp:656:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem2  | v349     | kernel.cpp:675:19  | read      | Inferred     | variable | VITIS_LOOP_656_4  | kernel.cpp:656:21  |            |                                                                                                       |
+| m_axi_gmem2  | v349     | kernel.cpp:687:19  | read      | Widen Fail   |          | VITIS_LOOP_656_4  | kernel.cpp:656:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem2  | v349     | kernel.cpp:687:19  | read      | Inferred     | variable | VITIS_LOOP_656_4  | kernel.cpp:656:21  |            |                                                                                                       |
+| m_axi_gmem2  | v349     | kernel.cpp:699:19  | read      | Widen Fail   |          | VITIS_LOOP_656_4  | kernel.cpp:656:21  | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem2  | v349     | kernel.cpp:699:19  | read      | Inferred     | variable | VITIS_LOOP_656_4  | kernel.cpp:656:21  |            |                                                                                                       |
+| m_axi_gmem3  | v1922    | kernel.cpp:3240:18 | write     | Widen Fail   |          |                   |                    | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem3  | v1922    | kernel.cpp:3240:18 | write     | Fail         |          | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 | 214-229    | Could not analyze pattern                                                                             |
+| m_axi_gmem3  | v1922    | kernel.cpp:3240:18 | write     | Inferred     | 4        | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 |            |                                                                                                       |
+| m_axi_gmem3  | v1922    | kernel.cpp:3264:18 | write     | Widen Fail   |          |                   |                    | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem3  | v1922    | kernel.cpp:3264:18 | write     | Fail         |          | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 | 214-229    | Could not analyze pattern                                                                             |
+| m_axi_gmem3  | v1922    | kernel.cpp:3264:18 | write     | Inferred     | 4        | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 |            |                                                                                                       |
+| m_axi_gmem3  | v1922    | kernel.cpp:3288:18 | write     | Widen Fail   |          |                   |                    | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem3  | v1922    | kernel.cpp:3288:18 | write     | Fail         |          | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 | 214-229    | Could not analyze pattern                                                                             |
+| m_axi_gmem3  | v1922    | kernel.cpp:3288:18 | write     | Inferred     | 4        | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 |            |                                                                                                       |
+| m_axi_gmem3  | v1922    | kernel.cpp:3312:18 | write     | Widen Fail   |          |                   |                    | 214-353    | Could not widen since type i8 size is greater than or equal to the max_widen_bitwidth threshold of 0  |
+| m_axi_gmem3  | v1922    | kernel.cpp:3312:18 | write     | Fail         |          | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 | 214-229    | Could not analyze pattern                                                                             |
+| m_axi_gmem3  | v1922    | kernel.cpp:3312:18 | write     | Inferred     | 4        | VITIS_LOOP_3183_1 | kernel.cpp:3183:22 |            |                                                                                                       |
++--------------+----------+--------------------+-----------+--------------+----------+-------------------+--------------------+------------+-------------------------------------------------------------------------------------------------------+
+
+    * Resolution URL: docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=XXX-YYY.html (replace XXX-YYY with column value)
+
+================================================================
+== Bind Op Report
+================================================================
++--------------------------------------------+-----+--------+--------------+-----+-----------+---------+
+| Name                                       | DSP | Pragma | Variable     | Op  | Impl      | Latency |
++--------------------------------------------+-----+--------+--------------+-----+-----------+---------+
+| + tinytpu_isa                              | 15  |        |              |     |           |         |
+|  + sequencer_0_1                           | 3   |        |              |     |           |         |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_29_1 | 0   |        |              |     |           |         |
+|     add_ln29_fu_60_p2                      |     |        | add_ln29     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_61_2 | 0   |        |              |     |           |         |
+|     add_ln61_fu_60_p2                      |     |        | add_ln61     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_65_3 | 0   |        |              |     |           |         |
+|     add_ln65_fu_60_p2                      |     |        | add_ln65     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_69_4 | 0   |        |              |     |           |         |
+|     add_ln69_fu_62_p2                      |     |        | add_ln69     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_73_5 | 0   |        |              |     |           |         |
+|     add_ln73_fu_62_p2                      |     |        | add_ln73     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_l_S_i_0_i       | 0   |        |              |     |           |         |
+|     add_ln32_fu_94_p2                      |     |        | add_ln32     | add | fabric    | 0       |
+|   + sequencer_0_1_Pipeline_VITIS_LOOP_82_6 | 3   |        |              |     |           |         |
+|     v41_fu_373_p2                          |     |        | v41          | add | fabric    | 0       |
+|     v107_fu_413_p2                         |     |        | v107         | add | fabric    | 0       |
+|     v103_fu_543_p2                         |     |        | v103         | add | fabric    | 0       |
+|     lp_start_d0                            |     |        | v125         | add | fabric    | 0       |
+|     lp_start_d0                            |     |        | v67          | add | fabric    | 0       |
+|     v80_fu_433_p2                          |     |        | v80          | add | fabric    | 0       |
+|     mul_12s_12s_12_1_1_U11                 | 1   |        | v161         | mul | auto      | 0       |
+|     v170_fu_634_p2                         |     |        | v170         | add | fabric    | 0       |
+|     v178_fu_652_p2                         |     |        | v178         | add | fabric    | 0       |
+|     v186_fu_670_p2                         |     |        | v186         | add | fabric    | 0       |
+|     v194_fu_688_p2                         |     |        | v194         | add | fabric    | 0       |
+|     mul_12s_12s_12_1_1_U12                 | 1   |        | v243         | mul | auto      | 0       |
+|     v223_fu_706_p2                         |     |        | v223         | add | fabric    | 0       |
+|     f1_6_fu_724_p2                         |     |        | f1_6         | add | fabric    | 0       |
+|     v239_fu_742_p2                         |     |        | v239         | add | fabric    | 0       |
+|     f3_6_fu_760_p2                         |     |        | f3_6         | add | fabric    | 0       |
+|     mul_12s_12s_12_1_1_U13                 | 1   |        | v296         | mul | auto      | 0       |
+|     v276_fu_791_p2                         |     |        | v276         | add | fabric    | 0       |
+|     f1_7_fu_807_p2                         |     |        | f1_7         | add | fabric    | 0       |
+|     v292_fu_823_p2                         |     |        | v292         | add | fabric    | 0       |
+|     f3_7_fu_839_p2                         |     |        | f3_7         | add | fabric    | 0       |
+|     lp_start_d0                            |     |        | v344         | add | fabric    | 0       |
+|  + dma_ld_0_1                              | 0   |        |              |     |           |         |
+|   + dma_ld_0_1_Pipeline_VITIS_LOOP_585_1   | 0   |        |              |     |           |         |
+|     add_ln585_fu_60_p2                     |     |        | add_ln585    | add | fabric    | 0       |
+|   + dma_ld_0_1_Pipeline_VITIS_LOOP_589_2   | 0   |        |              |     |           |         |
+|     add_ln589_fu_60_p2                     |     |        | add_ln589    | add | fabric    | 0       |
+|   + dma_ld_0_1_Pipeline_VITIS_LOOP_596_3   | 0   |        |              |     |           |         |
+|     add_ln596_fu_106_p2                    |     |        | add_ln596    | add | fabric    | 0       |
+|   + dma_ld_0_1_Pipeline_VITIS_LOOP_656_4   | 0   |        |              |     |           |         |
+|     add_ln656_fu_106_p2                    |     |        | add_ln656    | add | fabric    | 0       |
+|   + dma_ld_0_1_Pipeline_VITIS_LOOP_724_5   | 0   |        |              |     |           |         |
+|     add_ln724_fu_181_p2                    |     |        | add_ln724    | add | fabric    | 0       |
+|     v457_fu_193_p2                         |     |        | v457         | add | fabric    | 0       |
+|     add_ln794_fu_326_p2                    |     |        | add_ln794    | add | fabric    | 0       |
+|     v489_fu_339_p2                         |     |        | v489         | add | fabric    | 0       |
+|  + spm_0                                   | 0   |        |              |     |           |         |
+|   + spm_0_Pipeline_VITIS_LOOP_809_1        | 0   |        |              |     |           |         |
+|     add_ln809_fu_60_p2                     |     |        | add_ln809    | add | fabric    | 0       |
+|   + spm_0_Pipeline_VITIS_LOOP_834_2        | 0   |        |              |     |           |         |
+|     add_ln834_fu_178_p2                    |     |        | add_ln834    | add | fabric    | 0       |
+|     v527_fu_190_p2                         |     |        | v527         | add | fabric    | 0       |
+|     v559_fu_317_p2                         |     |        | v559         | add | fabric    | 0       |
+|     v553_fu_322_p2                         |     |        | v553         | add | fabric    | 0       |
+|  + vru_0                                   | 0   |        |              |     |           |         |
+|   + vru_0_Pipeline_VITIS_LOOP_934_1        | 0   |        |              |     |           |         |
+|     add_ln934_fu_60_p2                     |     |        | add_ln934    | add | fabric    | 0       |
+|   + vru_0_Pipeline_VITIS_LOOP_971_2        | 0   |        |              |     |           |         |
+|     add_ln971_fu_219_p2                    |     |        | add_ln971    | add | fabric    | 0       |
+|     v607_fu_228_p2                         |     |        | v607         | add | fabric    | 0       |
+|     v633_fu_335_p2                         |     |        | v633         | add | fabric    | 0       |
+|     v642_fu_436_p2                         |     |        | v642         | add | fabric    | 0       |
+|  + pe_0_0                                  | 0   |        |              |     |           |         |
+|    add_ln1123_fu_117_p2                    |     |        | add_ln1123   | add | fabric    | 0       |
+|   + pe_0_0_Pipeline_VITIS_LOOP_1158_2      | 0   |        |              |     |           |         |
+|     add_ln1158_fu_117_p2                   |     |        | add_ln1158   | add | fabric    | 0       |
+|     mul_8s_8s_16_1_1_U81                   |     |        | v736         | mul | auto      | 0       |
+|  + pe_0_1                                  | 0   |        |              |     |           |         |
+|    add_ln1225_fu_103_p2                    |     |        | add_ln1225   | add | fabric    | 0       |
+|   + pe_0_1_Pipeline_VITIS_LOOP_1252_2      | 0   |        |              |     |           |         |
+|     add_ln1252_fu_108_p2                   |     |        | add_ln1252   | add | fabric    | 0       |
+|     mul_8s_8s_16_1_1_U96                   |     |        | v789         | mul | auto      | 0       |
+|  + pe_1_0                                  | 1   |        |              |     |           |         |
+|    add_ln1478_fu_121_p2                    |     |        | add_ln1478   | add | fabric    | 0       |
+|   + pe_1_0_Pipeline_VITIS_LOOP_1511_2      | 1   |        |              |     |           |         |
+|     add_ln1511_fu_131_p2                   |     |        | add_ln1511   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U126       | 1   |        | v954         | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U126       | 1   |        | v958         | add | dsp_slice | 3       |
+|  + pe_0_2                                  | 0   |        |              |     |           |         |
+|    add_ln1311_fu_103_p2                    |     |        | add_ln1311   | add | fabric    | 0       |
+|   + pe_0_2_Pipeline_VITIS_LOOP_1338_2      | 0   |        |              |     |           |         |
+|     add_ln1338_fu_108_p2                   |     |        | add_ln1338   | add | fabric    | 0       |
+|     mul_8s_8s_16_1_1_U107                  |     |        | v842         | mul | auto      | 0       |
+|  + pe_1_1                                  | 1   |        |              |     |           |         |
+|    add_ln1581_fu_107_p2                    |     |        | add_ln1581   | add | fabric    | 0       |
+|   + pe_1_1_Pipeline_VITIS_LOOP_1608_2      | 1   |        |              |     |           |         |
+|     add_ln1608_fu_118_p2                   |     |        | add_ln1608   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U143       | 1   |        | v1009        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U143       | 1   |        | v1013        | add | dsp_slice | 3       |
+|  + pe_2_0                                  | 1   |        |              |     |           |         |
+|    add_ln1842_fu_121_p2                    |     |        | add_ln1842   | add | fabric    | 0       |
+|   + pe_2_0_Pipeline_VITIS_LOOP_1873_2      | 1   |        |              |     |           |         |
+|     add_ln1873_fu_131_p2                   |     |        | add_ln1873   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U179       | 1   |        | v1177        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U179       | 1   |        | v1181        | add | dsp_slice | 3       |
+|  + pe_0_3                                  | 0   |        |              |     |           |         |
+|    add_ln1393_fu_87_p2                     |     |        | add_ln1393   | add | fabric    | 0       |
+|   + pe_0_3_Pipeline_VITIS_LOOP_1416_2      | 0   |        |              |     |           |         |
+|     add_ln1416_fu_97_p2                    |     |        | add_ln1416   | add | fabric    | 0       |
+|     mul_8s_8s_16_1_1_U118                  |     |        | v890         | mul | auto      | 0       |
+|  + pe_1_2                                  | 1   |        |              |     |           |         |
+|    add_ln1670_fu_107_p2                    |     |        | add_ln1670   | add | fabric    | 0       |
+|   + pe_1_2_Pipeline_VITIS_LOOP_1697_2      | 1   |        |              |     |           |         |
+|     add_ln1697_fu_118_p2                   |     |        | add_ln1697   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U156       | 1   |        | v1064        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U156       | 1   |        | v1068        | add | dsp_slice | 3       |
+|  + pe_2_1                                  | 1   |        |              |     |           |         |
+|    add_ln1943_fu_107_p2                    |     |        | add_ln1943   | add | fabric    | 0       |
+|   + pe_2_1_Pipeline_VITIS_LOOP_1970_2      | 1   |        |              |     |           |         |
+|     add_ln1970_fu_118_p2                   |     |        | add_ln1970   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U195       | 1   |        | v1232        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U195       | 1   |        | v1236        | add | dsp_slice | 3       |
+|  + pe_3_0                                  | 1   |        |              |     |           |         |
+|    add_ln2200_fu_101_p2                    |     |        | add_ln2200   | add | fabric    | 0       |
+|   + pe_3_0_Pipeline_VITIS_LOOP_2227_2      | 1   |        |              |     |           |         |
+|     add_ln2227_fu_122_p2                   |     |        | add_ln2227   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U231       | 1   |        | v1394        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U231       | 1   |        | v1398        | add | dsp_slice | 3       |
+|  + pe_1_3                                  | 1   |        |              |     |           |         |
+|    add_ln1755_fu_91_p2                     |     |        | add_ln1755   | add | fabric    | 0       |
+|   + pe_1_3_Pipeline_VITIS_LOOP_1778_2      | 1   |        |              |     |           |         |
+|     add_ln1778_fu_107_p2                   |     |        | add_ln1778   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U169       | 1   |        | v1114        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U169       | 1   |        | v1118        | add | dsp_slice | 3       |
+|  + pe_2_2                                  | 1   |        |              |     |           |         |
+|    add_ln2032_fu_107_p2                    |     |        | add_ln2032   | add | fabric    | 0       |
+|   + pe_2_2_Pipeline_VITIS_LOOP_2059_2      | 1   |        |              |     |           |         |
+|     add_ln2059_fu_118_p2                   |     |        | add_ln2059   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U208       | 1   |        | v1287        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U208       | 1   |        | v1291        | add | dsp_slice | 3       |
+|  + pe_3_1                                  | 1   |        |              |     |           |         |
+|    add_ln2305_fu_111_p2                    |     |        | add_ln2305   | add | fabric    | 0       |
+|   + pe_3_1_Pipeline_VITIS_LOOP_2332_2      | 1   |        |              |     |           |         |
+|     add_ln2332_fu_134_p2                   |     |        | add_ln2332   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U244       | 1   |        | v1454        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U244       | 1   |        | v1458        | add | dsp_slice | 3       |
+|  + pe_2_3                                  | 1   |        |              |     |           |         |
+|    add_ln2117_fu_91_p2                     |     |        | add_ln2117   | add | fabric    | 0       |
+|   + pe_2_3_Pipeline_VITIS_LOOP_2140_2      | 1   |        |              |     |           |         |
+|     add_ln2140_fu_107_p2                   |     |        | add_ln2140   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U221       | 1   |        | v1337        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U221       | 1   |        | v1341        | add | dsp_slice | 3       |
+|  + pe_3_2                                  | 1   |        |              |     |           |         |
+|    add_ln2406_fu_111_p2                    |     |        | add_ln2406   | add | fabric    | 0       |
+|   + pe_3_2_Pipeline_VITIS_LOOP_2433_2      | 1   |        |              |     |           |         |
+|     add_ln2433_fu_134_p2                   |     |        | add_ln2433   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U259       | 1   |        | v1515        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U259       | 1   |        | v1519        | add | dsp_slice | 3       |
+|  + pe_3_3                                  | 1   |        |              |     |           |         |
+|    add_ln2503_fu_95_p2                     |     |        | add_ln2503   | add | fabric    | 0       |
+|   + pe_3_3_Pipeline_VITIS_LOOP_2526_2      | 1   |        |              |     |           |         |
+|     add_ln2526_fu_123_p2                   |     |        | add_ln2526   | add | fabric    | 0       |
+|     mac_muladd_8s_8s_32s_32_4_1_U274       | 1   |        | v1571        | mul | dsp_slice | 3       |
+|     mac_muladd_8s_8s_32s_32_4_1_U274       | 1   |        | v1575        | add | dsp_slice | 3       |
+|  + accu_0                                  | 0   |        |              |     |           |         |
+|    add_ln2593_fu_197_p2                    |     |        | add_ln2593   | add | fabric    | 0       |
+|   + accu_0_Pipeline_VITIS_LOOP_2578_1      | 0   |        |              |     |           |         |
+|     add_ln2578_fu_62_p2                    |     |        | add_ln2578   | add | fabric    | 0       |
+|   + accu_0_Pipeline_VITIS_LOOP_2785_4      | 0   |        |              |     |           |         |
+|     v1714_2_fu_185_p2                      |     |        | v1714_2      | add | fabric    | 0       |
+|     v1719_fu_156_p2                        |     |        | v1719        | add | fabric    | 0       |
+|     v1725_fu_166_p2                        |     |        | v1725        | add | fabric    | 0       |
+|     v1740_fu_227_p2                        |     |        | v1740        | add | fabric    | 0       |
+|     v1756_fu_253_p2                        |     |        | v1756        | add | fabric    | 0       |
+|     v1772_fu_279_p2                        |     |        | v1772        | add | fabric    | 0       |
+|     v1788_fu_305_p2                        |     |        | v1788        | add | fabric    | 0       |
+|     v1797_fu_311_p2                        |     |        | v1797        | add | fabric    | 0       |
+|   + accu_0_Pipeline_VITIS_LOOP_3032_6      | 0   |        |              |     |           |         |
+|     v1860_2_fu_132_p2                      |     |        | v1860_2      | add | fabric    | 0       |
+|     v1865_fu_138_p2                        |     |        | v1865        | add | fabric    | 0       |
+|   + accu_0_Pipeline_VITIS_LOOP_2924_5      | 0   |        |              |     |           |         |
+|     v1802_2_fu_164_p2                      |     |        | v1802_2      | add | fabric    | 0       |
+|     v1807_fu_153_p2                        |     |        | v1807        | add | fabric    | 0       |
+|     v1855_fu_314_p2                        |     |        | v1855        | add | fabric    | 0       |
+|   + accu_0_Pipeline_VITIS_LOOP_2644_3      | 0   |        |              |     |           |         |
+|     v1627_2_fu_129_p2                      |     |        | v1627_2      | add | fabric    | 0       |
+|     v1637_fu_135_p2                        |     |        | v1637        | add | fabric    | 0       |
+|     v1651_fu_166_p2                        |     |        | v1651        | add | fabric    | 0       |
+|     v1667_fu_192_p2                        |     |        | v1667        | add | fabric    | 0       |
+|     v1683_fu_218_p2                        |     |        | v1683        | add | fabric    | 0       |
+|     v1699_fu_244_p2                        |     |        | v1699        | add | fabric    | 0       |
+|  + dma_st_0_1                              | 0   |        |              |     |           |         |
+|   + dma_st_0_1_Pipeline_VITIS_LOOP_3183_1  | 0   |        |              |     |           |         |
+|     add_ln3183_fu_226_p2                   |     |        | add_ln3183   | add | fabric    | 0       |
+|     v1941_fu_235_p2                        |     |        | v1941        | add | fabric    | 0       |
+|     add_ln3240_fu_325_p2                   |     |        | add_ln3240   | add | fabric    | 0       |
+|     add_ln3240_1_fu_351_p2                 |     |        | add_ln3240_1 | add | fabric    | 0       |
+|     add_ln3240_2_fu_361_p2                 |     |        | add_ln3240_2 | add | fabric    | 0       |
++--------------------------------------------+-----+--------+--------------+-----+-----------+---------+
+
+
+================================================================
+== Storage Report
+================================================================
++-------------------+---------------+-------------+------+------+--------+----------+------+---------+------------------+
+| Name              | Usage         | Type        | BRAM | URAM | Pragma | Variable | Impl | Latency | Bitwidth, Depth, |
+|                   |               |             |      |      |        |          |      |         | Banks            |
++-------------------+---------------+-------------+------+------+--------+----------+------+---------+------------------+
+| + tinytpu_isa     |               |             | 16   | 0    |        |          |      |         |                  |
+|   control_s_axi_U | interface     | s_axilite   |      |      |        |          |      |         |                  |
+|   gmem0_m_axi_U   | interface     | m_axi       | 4    |      |        |          |      |         |                  |
+|   gmem1_m_axi_U   | interface     | m_axi       | 2    |      |        |          |      |         |                  |
+|   gmem2_m_axi_U   | interface     | m_axi       | 2    |      |        |          |      |         |                  |
+|   gmem3_m_axi_U   | interface     | m_axi       | 2    |      |        |          |      |         |                  |
+|   v2039_c_U       | fifo channel  | scalar prop |      |      |        | v2039_c  | srl  | 0       | 64, 14, 1        |
+|   v2040_U         | fifo channel  | stream      |      |      |        | v2040    | srl  | 0       | 64, 8, 1         |
+|   v2041_U         | fifo channel  | stream      |      |      |        | v2041    | srl  | 0       | 64, 8, 1         |
+|   v2042_U         | fifo channel  | stream      |      |      |        | v2042    | srl  | 0       | 64, 8, 1         |
+|   v2043_U         | fifo channel  | stream      |      |      |        | v2043    | srl  | 0       | 64, 8, 1         |
+|   v2044_U         | fifo channel  | stream      |      |      |        | v2044    | srl  | 0       | 64, 8, 1         |
+|   v2045_U         | fifo channel  | stream      |      |      |        | v2045    | srl  | 0       | 32, 8, 1         |
+|   v2046_U         | fifo channel  | stream      |      |      |        | v2046    | srl  | 0       | 32, 8, 1         |
+|   v2048_U         | fifo channel  | stream      |      |      |        | v2048    | srl  | 0       | 32, 8, 1         |
+|   v2068_U         | fifo channel  | stream      |      |      |        | v2068    | srl  | 0       | 32, 8, 1         |
+|   v2049_U         | fifo channel  | stream      |      |      |        | v2049    | srl  | 0       | 32, 8, 1         |
+|   v2052_U         | fifo channel  | stream      |      |      |        | v2052    | srl  | 0       | 32, 8, 1         |
+|   v2069_U         | fifo channel  | stream      |      |      |        | v2069    | srl  | 0       | 32, 8, 1         |
+|   v2088_U         | fifo channel  | stream      |      |      |        | v2088    | srl  | 0       | 32, 8, 1         |
+|   v2072_U         | fifo channel  | stream      |      |      |        | v2072    | srl  | 0       | 8, 8, 1          |
+|   v2053_U         | fifo channel  | stream      |      |      |        | v2053    | srl  | 0       | 32, 8, 1         |
+|   v2089_U         | fifo channel  | stream      |      |      |        | v2089    | srl  | 0       | 32, 8, 1         |
+|   v2073_U         | fifo channel  | stream      |      |      |        | v2073    | srl  | 0       | 8, 8, 1          |
+|   v2054_U         | fifo channel  | stream      |      |      |        | v2054    | srl  | 0       | 32, 8, 1         |
+|   v2090_U         | fifo channel  | stream      |      |      |        | v2090    | srl  | 0       | 32, 8, 1         |
+|   v2074_U         | fifo channel  | stream      |      |      |        | v2074    | srl  | 0       | 8, 8, 1          |
+|   v2091_U         | fifo channel  | stream      |      |      |        | v2091    | srl  | 0       | 32, 8, 1         |
+|   v2050_U         | fifo channel  | stream      |      |      |        | v2050    | srl  | 0       | 32, 8, 1         |
+|   v2056_U         | fifo channel  | stream      |      |      |        | v2056    | srl  | 0       | 32, 8, 1         |
+|   v2070_U         | fifo channel  | stream      |      |      |        | v2070    | srl  | 0       | 32, 8, 1         |
+|   v2092_U         | fifo channel  | stream      |      |      |        | v2092    | srl  | 0       | 32, 8, 1         |
+|   v2076_U         | fifo channel  | stream      |      |      |        | v2076    | srl  | 0       | 8, 8, 1          |
+|   v2057_U         | fifo channel  | stream      |      |      |        | v2057    | srl  | 0       | 32, 8, 1         |
+|   v2093_U         | fifo channel  | stream      |      |      |        | v2093    | srl  | 0       | 32, 8, 1         |
+|   v2077_U         | fifo channel  | stream      |      |      |        | v2077    | srl  | 0       | 8, 8, 1          |
+|   v2058_U         | fifo channel  | stream      |      |      |        | v2058    | srl  | 0       | 32, 8, 1         |
+|   v2094_U         | fifo channel  | stream      |      |      |        | v2094    | srl  | 0       | 32, 8, 1         |
+|   v2078_U         | fifo channel  | stream      |      |      |        | v2078    | srl  | 0       | 8, 8, 1          |
+|   v2095_U         | fifo channel  | stream      |      |      |        | v2095    | srl  | 0       | 32, 8, 1         |
+|   v2051_U         | fifo channel  | stream      |      |      |        | v2051    | srl  | 0       | 32, 8, 1         |
+|   v2060_U         | fifo channel  | stream      |      |      |        | v2060    | srl  | 0       | 32, 8, 1         |
+|   v2071_U         | fifo channel  | stream      |      |      |        | v2071    | srl  | 0       | 32, 8, 1         |
+|   v2096_U         | fifo channel  | stream      |      |      |        | v2096    | srl  | 0       | 32, 8, 1         |
+|   v2080_U         | fifo channel  | stream      |      |      |        | v2080    | srl  | 0       | 8, 8, 1          |
+|   v2061_U         | fifo channel  | stream      |      |      |        | v2061    | srl  | 0       | 32, 8, 1         |
+|   v2097_U         | fifo channel  | stream      |      |      |        | v2097    | srl  | 0       | 32, 8, 1         |
+|   v2081_U         | fifo channel  | stream      |      |      |        | v2081    | srl  | 0       | 8, 8, 1          |
+|   v2062_U         | fifo channel  | stream      |      |      |        | v2062    | srl  | 0       | 32, 8, 1         |
+|   v2098_U         | fifo channel  | stream      |      |      |        | v2098    | srl  | 0       | 32, 8, 1         |
+|   v2082_U         | fifo channel  | stream      |      |      |        | v2082    | srl  | 0       | 8, 8, 1          |
+|   v2099_U         | fifo channel  | stream      |      |      |        | v2099    | srl  | 0       | 32, 8, 1         |
+|   v2064_U         | fifo channel  | stream      |      |      |        | v2064    | srl  | 0       | 32, 8, 1         |
+|   v2104_U         | fifo channel  | stream      |      |      |        | v2104    | srl  | 0       | 128, 8, 1        |
+|   v2084_U         | fifo channel  | stream      |      |      |        | v2084    | srl  | 0       | 8, 8, 1          |
+|   v2065_U         | fifo channel  | stream      |      |      |        | v2065    | srl  | 0       | 32, 8, 1         |
+|   v2105_U         | fifo channel  | stream      |      |      |        | v2105    | srl  | 0       | 128, 8, 1        |
+|   v2085_U         | fifo channel  | stream      |      |      |        | v2085    | srl  | 0       | 8, 8, 1          |
+|   v2066_U         | fifo channel  | stream      |      |      |        | v2066    | srl  | 0       | 32, 8, 1         |
+|   v2106_U         | fifo channel  | stream      |      |      |        | v2106    | srl  | 0       | 128, 8, 1        |
+|   v2086_U         | fifo channel  | stream      |      |      |        | v2086    | srl  | 0       | 8, 8, 1          |
+|   v2107_U         | fifo channel  | stream      |      |      |        | v2107    | srl  | 0       | 128, 8, 1        |
+|   v2047_U         | fifo channel  | stream      |      |      |        | v2047    | srl  | 0       | 32, 8, 1         |
+|  + sequencer_0_1  |               |             | 0    | 0    |        |          |      |         |                  |
+|    ib_U           | ram_s2p array |             |      |      |        | ib       | auto | 1       | 64, 56, 1        |
+|    lp_start_U     | ram_1p array  |             |      |      |        | lp_start | auto | 1       | 32, 4, 1         |
+|    lp_iv_U        | ram_1p array  |             |      |      |        | lp_iv    | auto | 1       | 32, 4, 1         |
+|    lp_trip_U      | ram_1p array  |             |      |      |        | lp_trip  | auto | 1       | 8, 4, 1          |
+|    iv_now_U       | rom_np array  |             |      |      |        | iv_now   | auto | 1       | 12, 4, 1         |
+|  + dma_ld_0_1     |               |             | 0    | 0    |        |          |      |         |                  |
+|    rbA_U          | ram_1p array  |             |      |      |        | rbA      | auto | 1       | 32, 64, 1        |
+|    rbB_U          | ram_1p array  |             |      |      |        | rbB      | auto | 1       | 32, 64, 1        |
+|  + spm_0          |               |             | 1    | 0    |        |          |      |         |                  |
+|    spad_U         | ram_1p array  |             | 1    |      |        | spad     | auto | 1       | 32, 512, 1       |
+|  + vru_0          |               |             | 1    | 0    |        |          |      |         |                  |
+|    vr_U           | ram_1p array  |             | 1    |      |        | vr       | auto | 1       | 32, 256, 1       |
+|  + accu_0         |               |             | 4    | 0    |        |          |      |         |                  |
+|    ar_U           | rom_np array  |             | 4    |      |        | ar       | auto | 1       | 128, 128, 1      |
++-------------------+---------------+-------------+------+------+--------+----------+------+---------+------------------+
+
+
+================================================================
+== Pragma Report
+================================================================
+* Valid Pragma Syntax
++-----------+------------------------------------------------------+---------------------------------------+
+| Type      | Options                                              | Location                              |
++-----------+------------------------------------------------------+---------------------------------------+
+| interface | m_axi port=v2036 offset=slave bundle=gmem0 depth=56  | kernel.cpp:3323 in tinytpu_isa, v2036 |
+| interface | m_axi port=v2037 offset=slave bundle=gmem1 depth=256 | kernel.cpp:3324 in tinytpu_isa, v2037 |
+| interface | m_axi port=v2038 offset=slave bundle=gmem2 depth=256 | kernel.cpp:3325 in tinytpu_isa, v2038 |
+| interface | m_axi port=v2039 offset=slave bundle=gmem3 depth=256 | kernel.cpp:3326 in tinytpu_isa, v2039 |
+| dataflow  |                                                      | kernel.cpp:3327 in tinytpu_isa        |
+| stream    | variable=v2040 depth=8                               | kernel.cpp:3329 in tinytpu_isa, v2040 |
+| stream    | variable=v2041 depth=8                               | kernel.cpp:3331 in tinytpu_isa, v2041 |
+| stream    | variable=v2042 depth=8                               | kernel.cpp:3333 in tinytpu_isa, v2042 |
+| stream    | variable=v2043 depth=8                               | kernel.cpp:3335 in tinytpu_isa, v2043 |
+| stream    | variable=v2044 depth=8                               | kernel.cpp:3337 in tinytpu_isa, v2044 |
+| stream    | variable=v2045 depth=8                               | kernel.cpp:3339 in tinytpu_isa, v2045 |
+| stream    | variable=v2046 depth=8                               | kernel.cpp:3341 in tinytpu_isa, v2046 |
+| stream    | variable=v2047 depth=8                               | kernel.cpp:3343 in tinytpu_isa, v2047 |
+| stream    | variable=v2048 depth=8                               | kernel.cpp:3345 in tinytpu_isa, v2048 |
+| stream    | variable=v2049 depth=8                               | kernel.cpp:3347 in tinytpu_isa, v2049 |
+| stream    | variable=v2050 depth=8                               | kernel.cpp:3349 in tinytpu_isa, v2050 |
+| stream    | variable=v2051 depth=8                               | kernel.cpp:3351 in tinytpu_isa, v2051 |
+| stream    | variable=v2052 depth=8                               | kernel.cpp:3353 in tinytpu_isa, v2052 |
+| stream    | variable=v2053 depth=8                               | kernel.cpp:3355 in tinytpu_isa, v2053 |
+| stream    | variable=v2054 depth=8                               | kernel.cpp:3357 in tinytpu_isa, v2054 |
+| stream    | variable=v2055 depth=8                               | kernel.cpp:3359 in tinytpu_isa, v2055 |
+| stream    | variable=v2056 depth=8                               | kernel.cpp:3361 in tinytpu_isa, v2056 |
+| stream    | variable=v2057 depth=8                               | kernel.cpp:3363 in tinytpu_isa, v2057 |
+| stream    | variable=v2058 depth=8                               | kernel.cpp:3365 in tinytpu_isa, v2058 |
+| stream    | variable=v2059 depth=8                               | kernel.cpp:3367 in tinytpu_isa, v2059 |
+| stream    | variable=v2060 depth=8                               | kernel.cpp:3369 in tinytpu_isa, v2060 |
+| stream    | variable=v2061 depth=8                               | kernel.cpp:3371 in tinytpu_isa, v2061 |
+| stream    | variable=v2062 depth=8                               | kernel.cpp:3373 in tinytpu_isa, v2062 |
+| stream    | variable=v2063 depth=8                               | kernel.cpp:3375 in tinytpu_isa, v2063 |
+| stream    | variable=v2064 depth=8                               | kernel.cpp:3377 in tinytpu_isa, v2064 |
+| stream    | variable=v2065 depth=8                               | kernel.cpp:3379 in tinytpu_isa, v2065 |
+| stream    | variable=v2066 depth=8                               | kernel.cpp:3381 in tinytpu_isa, v2066 |
+| stream    | variable=v2067 depth=8                               | kernel.cpp:3383 in tinytpu_isa, v2067 |
+| stream    | variable=v2068 depth=8                               | kernel.cpp:3385 in tinytpu_isa, v2068 |
+| stream    | variable=v2069 depth=8                               | kernel.cpp:3387 in tinytpu_isa, v2069 |
+| stream    | variable=v2070 depth=8                               | kernel.cpp:3389 in tinytpu_isa, v2070 |
+| stream    | variable=v2071 depth=8                               | kernel.cpp:3391 in tinytpu_isa, v2071 |
+| stream    | variable=v2072 depth=8                               | kernel.cpp:3393 in tinytpu_isa, v2072 |
+| stream    | variable=v2073 depth=8                               | kernel.cpp:3395 in tinytpu_isa, v2073 |
+| stream    | variable=v2074 depth=8                               | kernel.cpp:3397 in tinytpu_isa, v2074 |
+| stream    | variable=v2075 depth=8                               | kernel.cpp:3399 in tinytpu_isa, v2075 |
+| stream    | variable=v2076 depth=8                               | kernel.cpp:3401 in tinytpu_isa, v2076 |
+| stream    | variable=v2077 depth=8                               | kernel.cpp:3403 in tinytpu_isa, v2077 |
+| stream    | variable=v2078 depth=8                               | kernel.cpp:3405 in tinytpu_isa, v2078 |
+| stream    | variable=v2079 depth=8                               | kernel.cpp:3407 in tinytpu_isa, v2079 |
+| stream    | variable=v2080 depth=8                               | kernel.cpp:3409 in tinytpu_isa, v2080 |
+| stream    | variable=v2081 depth=8                               | kernel.cpp:3411 in tinytpu_isa, v2081 |
+| stream    | variable=v2082 depth=8                               | kernel.cpp:3413 in tinytpu_isa, v2082 |
+| stream    | variable=v2083 depth=8                               | kernel.cpp:3415 in tinytpu_isa, v2083 |
+| stream    | variable=v2084 depth=8                               | kernel.cpp:3417 in tinytpu_isa, v2084 |
+| stream    | variable=v2085 depth=8                               | kernel.cpp:3419 in tinytpu_isa, v2085 |
+| stream    | variable=v2086 depth=8                               | kernel.cpp:3421 in tinytpu_isa, v2086 |
+| stream    | variable=v2087 depth=8                               | kernel.cpp:3423 in tinytpu_isa, v2087 |
+| stream    | variable=v2088 depth=8                               | kernel.cpp:3425 in tinytpu_isa, v2088 |
+| stream    | variable=v2089 depth=8                               | kernel.cpp:3427 in tinytpu_isa, v2089 |
+| stream    | variable=v2090 depth=8                               | kernel.cpp:3429 in tinytpu_isa, v2090 |
+| stream    | variable=v2091 depth=8                               | kernel.cpp:3431 in tinytpu_isa, v2091 |
+| stream    | variable=v2092 depth=8                               | kernel.cpp:3433 in tinytpu_isa, v2092 |
+| stream    | variable=v2093 depth=8                               | kernel.cpp:3435 in tinytpu_isa, v2093 |
+| stream    | variable=v2094 depth=8                               | kernel.cpp:3437 in tinytpu_isa, v2094 |
+| stream    | variable=v2095 depth=8                               | kernel.cpp:3439 in tinytpu_isa, v2095 |
+| stream    | variable=v2096 depth=8                               | kernel.cpp:3441 in tinytpu_isa, v2096 |
+| stream    | variable=v2097 depth=8                               | kernel.cpp:3443 in tinytpu_isa, v2097 |
+| stream    | variable=v2098 depth=8                               | kernel.cpp:3445 in tinytpu_isa, v2098 |
+| stream    | variable=v2099 depth=8                               | kernel.cpp:3447 in tinytpu_isa, v2099 |
+| stream    | variable=v2100 depth=8                               | kernel.cpp:3449 in tinytpu_isa, v2100 |
+| stream    | variable=v2101 depth=8                               | kernel.cpp:3451 in tinytpu_isa, v2101 |
+| stream    | variable=v2102 depth=8                               | kernel.cpp:3453 in tinytpu_isa, v2102 |
+| stream    | variable=v2103 depth=8                               | kernel.cpp:3455 in tinytpu_isa, v2103 |
+| stream    | variable=v2104 depth=8                               | kernel.cpp:3457 in tinytpu_isa, v2104 |
+| stream    | variable=v2105 depth=8                               | kernel.cpp:3459 in tinytpu_isa, v2105 |
+| stream    | variable=v2106 depth=8                               | kernel.cpp:3461 in tinytpu_isa, v2106 |
+| stream    | variable=v2107 depth=8                               | kernel.cpp:3463 in tinytpu_isa, v2107 |
++-----------+------------------------------------------------------+---------------------------------------+
+
+

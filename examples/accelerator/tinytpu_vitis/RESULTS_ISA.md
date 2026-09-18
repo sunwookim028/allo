@@ -346,6 +346,141 @@ both were slower than the nested loop, which keeps `mm` at II=1. The array was
 left alone on purpose: folding a PE's per-`mm` prologue into its MAC body would
 set the II of the one loop in the design that already runs at 1.
 
+## The burst DMA: the 907-cycle fixed charge, and what it actually was
+
+The fixed term had not moved all project: 907 cycles, 57% of 16x16x16 and 90%
+of 4x4x4, and row-flattening left it at 907 from 902. It was not a DMA cost at
+all -- it was an argument-passing convention. `wrap_io=True` makes Allo hoist
+every `m_axi` argument into a local buffer before the region starts, via
+`wrap_data_movement` (`allo/ir/transform.py`), whose extent is
+`MemRefType(arg.type).shape` -- the STATIC type, with no offset and no length.
+The csynth report names all four copies:
+
+```
+| m_axi_gmem0 | read  |  56 | 64 | l_S_load_buf0_load_buf0_l_0   |   # imem
+| m_axi_gmem1 | read  | 256 |  8 | l_S_load_buf1_load_buf1_l_0   |   # A
+| m_axi_gmem2 | read  | 256 |  8 | l_S_load_buf2_load_buf2_l_0   |   # B
+| m_axi_gmem3 | write | 256 |  8 | l_S_store_res3_store_res3_l_0 |   # C
+```
+
+824 words at II=1, copied whether the program touches them or not.
+
+**The earlier verdict on `wrap_io=False` was wrong, and wrong in an instructive
+way.** It measured fixed 481 / marginal 39.8 and concluded that `m_axi` is
+inherently slow. It was measured with the strided access pattern, and the two
+patterns synthesize to completely different hardware:
+
+| pattern | `[HLS 214-115]` says | loop II |
+|---|---|---|
+| `lA[(f1 + r) * MAXDIM + f2 * T + e]`, `e` unrolled | `burst reads of length 4 and bit width 8` | 4 |
+| `imem[NHDR + pc * IWORDS]`, `pc` a register | `burst reads of length 2 and bit width 64` | 13 (was 5) |
+| `for i in range(n): b[i] = lA[i]`, `n` a runtime value | `burst reads of variable length` | port-limited |
+
+So Allo could express a program-controlled burst DMA the whole time. Two
+changes, both to access patterns rather than to Allo:
+
+* **`sequencer` prefetches the program.** One `IMEM_SIZE`-word contiguous burst
+  at start-up, then every fetch is a BRAM read. The fetch loop goes back to
+  II=5. This was most of the old 39.8 -- ~76 dynamic sequencer iterations each
+  paying full bus latency for two words.
+* **`dma_ld` bursts each operand matrix once**, covering exactly the DRAM rows
+  the program will name. The spans come from the assembler: `expand()` now
+  resolves the AGU exactly as the sequencer does and `assemble()` takes the
+  maximum `f1 + nr` over the `dma_ld`s of each source into `imem[7]`. The bytes
+  are packed into `UInt(T*8)` words as the burst sweeps, so the instruction
+  loop does one BRAM read per row and no packing at all, back at II=1.
+
+Resolving the AGU in `expand()` also made `bench_isa`'s loop-vs-flat check
+strict: the two program forms must now agree on every resolved address field,
+not just on the opcode and row-count stream. They do, at all five shapes.
+
+### Measured
+
+Bursts inferred, which is the thing to check -- a change that does not change
+the 214-115 message has not worked:
+
+```
+| m_axi_gmem0 | read  | 56       | 64 | l_S_i_0_i        |   # imem, one burst
+| m_axi_gmem1 | read  | variable |  8 | VITIS_LOOP_596_3 |   # A,    one burst
+| m_axi_gmem2 | read  | variable |  8 | VITIS_LOOP_656_4 |   # B,    one burst
+| m_axi_gmem3 | write | 4        |  8 |                  |   # C,    unchanged
+```
+
+Per-unit `Pipelined` / II, one csynth each, `wrap_io=True` before against
+`wrap_io=False` + bursts after:
+
+| unit | loop | before | after |
+|---|---|---|---|
+| `sequencer` | fetch/dispatch | yes, II=5 | yes, **II=5** |
+| `sequencer` | imem prefetch | (hoisted, II=1) | yes, **II=1**, trip 56 |
+| `dma_ld` | operand prefetch | -- | yes, **II=4** (8-bit port) |
+| `dma_ld` | instruction rows | yes, II=1 | yes, **II=1** |
+| `spm` | rows | yes, II=1 | yes, II=1 |
+| `vru` | words | yes, II=1 | yes, II=1 |
+| `pe` x16 | per-`mm` | no, iter 2058 | no, iter 2058 |
+| `pe` x16 | MAC | yes, II=1 | yes, II=1 |
+| `accu` | per-instruction | no, iter 261 | no, iter 261 |
+| `accu` | `mm` / `vadd` / `vrelu` / `mvout` | II=1 / 2 / 2 / 1 | unchanged |
+| `dma_st` | rows | yes, II=1 | yes, **II=4** |
+
+**Nothing lost its pipelining.** `dma_ld`'s instruction loop keeps II=1 because
+the burst is a separate loop outside it -- a conditional prefetch inside the
+flat body would have put a runtime-bounded inner loop back in and taken the
+whole loop out of pipelining, which is the trade row-flattening had bought.
+`dma_st` is the one regression, II 1 -> 4, and it is the bus rather than the
+schedule: it now writes `C` over `m_axi` four bytes at a time instead of into a
+buffer someone else stores back.
+
+M_AXI table, unchanged by any of this: all four ports 8/64-bit, Max Read and
+Write Burst Length 16, Num Read and Write Outstanding 16. A 56- or 256-beat
+burst is issued as requests of 16, at II=1 each.
+
+Cosim, one build, all five shapes bit-exact:
+
+| shape | dyn. instrs | before | after | |
+|---|---|---|---|---|
+| 4x4x4    |  6 | 1004 | **680**  | 1.48x |
+| 8x8x8    | 15 | 1108 | **831**  | 1.33x |
+| 12x12x12 | 28 | 1294 | **1066** | 1.21x |
+| 16x16x8  | 25 | 1344 | **1139** | 1.18x |
+| 16x16x16 | 45 | 1586 | **1457** | 1.09x |
+
+Least squares against dynamic instruction count over the five shapes:
+**fixed 907 -> 557, marginal 15.12 -> 20.07 cycles/instruction.**
+
+That is a trade, and it is stated as one. The crossover is at
+`350 / 4.95 = 71` dynamic instructions, past the longest program this MAXDIM
+admits (45), so the burst build wins everywhere it can be run -- but at a larger
+MAXDIM it would not, without also fixing what the marginal term buys.
+
+### Two negative results worth the space
+
+* **Halving the operand burst bought nothing.** Merging the A and B bursts into
+  one loop bounded by `max(na, nb)` does halve the burst time -- they are
+  separate bundles, and Vitis attributes a variable-length burst on *each* to
+  the one loop -- and it changed the cosim count at all five shapes by exactly
+  **zero cycles**. The operand burst is already entirely hidden behind the
+  sequencer's dispatch and the units' fill. It was built, measured, and reverted
+  to the version that reads the fewest bytes.
+* **Port widening is blocked in Allo, not in Vitis.** The `m_axi` ports are 8
+  bits, so even a perfect burst moves one byte per cycle;
+  `config_interface -m_axi_max_widen_bitwidth 512` is the fix and it does
+  nothing: `[HLS 214-307] Could not widen since type i8 size is greater than or
+  equal to alignment 1(bytes)`. Allo emits the argument pointers with no
+  alignment attribute, so Vitis must assume 1 byte and refuses. Closing that in
+  the emitter is worth roughly the whole operand-traffic term.
+
+### What is left, and it is not the fixed term any more
+
+`dma_st` is most of the +5 cycles/instruction. Bursting it contiguously has to
+either clobber the columns the program never named -- the accumulator holds one
+column block per `mvout`, so a whole-row write-back invents the rest -- or
+defer the write-back to the end of the run, where it serializes behind the last
+`mvout` instead of overlapping the compute it currently overlaps. Both cost
+something real, so it is the next thing to *measure*, not to assume. Fixed 557
+against Gemmini's 483 is 1.15x; marginal 20.1 against 10.8 is 1.9x. After a
+project spent arguing that the fixed term was the only problem, it is not.
+
 ## The loop levels are derived now, not typed (`isa_dsl.py`)
 
 `gemm_program` was hand-emitting its AGU *levels*: a comment reading "level 0
@@ -405,10 +540,15 @@ has no opinion about peeling and could not form one.
 
 ## Next
 
-1. `cosim` -- the only thing that yields a real cycle count for a programmable
-   design, for the reason in the synthesis section above. `cosim.py` drives it;
-   two toolchain fixes were needed and are documented there (`-B/usr/bin` for
-   the binutils/glibc mismatch, and explicit `m_axi` depths).
-3. A Gemmini int8 DIM=4 build so the comparison is dtype- and mesh-matched;
-   `allo_cmp.c` needs no source change since it is written against `elem_t`.
-4. Scale T to 16 to match Gemmini's int8 default mesh.
+1. **The write path.** `dma_st` is the last strided `m_axi` access and most of
+   what separates 20.1 cyc/instr from the 15.1 the buffered build reached. Both
+   ways of bursting it cost something; measure rather than assume.
+2. **An alignment attribute on the emitted argument pointers**, so
+   `m_axi_max_widen_bitwidth` can take the 8-bit ports wider. This is an Allo
+   codegen change, not a design one.
+3. **Re-measure T=16.** The last T=16 number (1176 at 16x16x16) predates both
+   row-flattening and the burst DMA, and the burst DMA is the change that
+   argument was asking for -- at T=16 a DRAM row is one packed word, so the
+   operand burst is the whole matrix with no column overfetch at all.
+4. **Then multiple instructions in flight**, which is the remaining structural
+   difference from Gemmini's reservation station.
