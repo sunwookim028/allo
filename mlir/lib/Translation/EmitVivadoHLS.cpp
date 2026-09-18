@@ -1558,7 +1558,14 @@ void allo::hls::VhlsModuleEmitter::emitGetGlobal(memref::GetGlobalOp op) {
   os << "// placeholder for const ";
   Value result = op.getResult();
   fixUnsignedType(result, op->hasAttr("unsigned"));
-  emitValue(result, 0, false /*isPtr*/, op.getName().str());
+  // The result *is* the global, so it has to print as the global's symbol.
+  // Going through addName would disambiguate it into a fresh identifier
+  // (__stateful_x -> __stateful_x1) that was never declared anywhere.
+  if (!isDeclared(result)) {
+    os << getTypeName(result) << " ";
+    bindName(result, op.getName());
+  }
+  os << getName(result);
   emitInfoAndNewLine(op);
 }
 
@@ -1568,7 +1575,11 @@ void allo::hls::VhlsModuleEmitter::emitGetGlobalFixed(
   os << "// const ";
   Value result = op.getResult();
   fixUnsignedType(result, op->hasAttr("unsigned"));
-  emitValue(result, 0, false /*isPtr*/, op.getName().str());
+  if (!isDeclared(result)) {
+    os << getTypeName(result) << " ";
+    bindName(result, op.getName());
+  }
+  os << getName(result);
   os << "; /* placeholder */ ";
   emitInfoAndNewLine(op);
 }
@@ -1600,6 +1611,9 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
       os << "const ";
     }
     emitStatefulGlobalElementType(type);
+    // The symbol is printed raw, bypassing the name table; reserve it so a
+    // generated identifier cannot later collide with it.
+    reserveName(op.getSymName());
     os << " " << op.getSymName();
     for (auto &shape : arrayType.getShape())
       os << "[" << shape << "]";
@@ -2965,13 +2979,21 @@ void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {
 void allo::hls::VhlsModuleEmitter::emitFunctionDeclaration(func::FuncOp func) {
   if (func.getBlocks().empty())
     return;
-  // save state
+  // Save the whole naming state, not just part of it: the forward declaration
+  // names the same values the definition will, and restoring only some of the
+  // tables leaves the generators disagreeing about what is still free.
   auto savedNames = state.nameTable;
   auto savedConflicts = state.nameConflictCnt;
+  llvm::StringSet<> savedUsed;
+  for (auto &entry : state.usedNames)
+    savedUsed.insert(entry.getKey());
+  auto savedDefaultName = state.nextDefaultName;
   emitFunctionSignature(func);
   // restore state.
   state.nameTable = savedNames;
   state.nameConflictCnt = savedConflicts;
+  state.usedNames = std::move(savedUsed);
+  state.nextDefaultName = savedDefaultName;
   os << "\n);\n\n";
 }
 
@@ -3084,6 +3106,9 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
         os << "const ";
       }
       emitStatefulGlobalElementType(type);
+      // As in emitGlobal: printed raw, so reserve it against the generated
+      // identifiers.
+      reserveName(globalOp.getSymName());
       os << " " << globalOp.getSymName();
       for (auto &shape : arrayType.getShape())
         os << "[" << shape << "]";

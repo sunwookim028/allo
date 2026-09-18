@@ -675,6 +675,44 @@ def _vitis_include_dir():
     return None
 
 
+def test_generated_names_do_not_collide():
+    """The emitter's two name generators share one namespace.
+
+    Explicit names (``loop_name``, function ``inputs``/``outputs``) and the
+    default ``v%d`` names used to be tracked separately, so naming a loop
+    variable ``v1`` handed ``v1`` out twice: the loop counter shadowed the
+    array parameter the emitter had already called ``v1``, and the body then
+    read ``v1[v1] = ...``, which does not compile (HLS 207-3746).
+    """
+
+    def kernel(A: int32[8], B: int32[8]):
+        for v1 in allo.grid(8):
+            B[v1] = A[v1] + 1
+
+    s = allo.customize(kernel)
+    hls_code = str(s.build(target="vhls"))
+    print(hls_code)
+
+    params = set(re.findall(r"^\s+\w+ (\w+)\[\d+\],?$", hls_code, re.M))
+    loop_vars = set(re.findall(r"for \(int (\w+) = ", hls_code))
+    assert params and loop_vars, hls_code
+    assert not params & loop_vars, (
+        "loop variable shadows a parameter of the same function: "
+        f"{sorted(params & loop_vars)}\n{hls_code}"
+    )
+
+    inc = _vitis_include_dir()
+    if inc is None or shutil.which("g++") is None:
+        return
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src = os.path.join(tmpdir, "kernel.cpp")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write(hls_code)
+        subprocess.run(
+            ["g++", "-w", "-fsyntax-only", "-std=c++14", f"-I{inc}", src], check=True
+        )
+
+
 def test_bit_slice_is_unsigned():
     """A bit slice must reach HLS as an *unsigned* field.
 

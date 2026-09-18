@@ -12,6 +12,7 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "allo/Dialect/AlloDialect.h"
@@ -39,6 +40,16 @@ public:
   // This table contains all declared values.
   DenseMap<Value, SmallString<8>> nameTable;
   std::map<std::string, int> nameConflictCnt;
+
+  // Every identifier handed out so far, whatever produced it: explicit names
+  // (loop_name, function inputs/outputs), default "v%d" names, and symbols
+  // reserved by the emitter (globals). One namespace, so the two generators
+  // cannot hand the same identifier to two different values.
+  llvm::StringSet<> usedNames;
+  // Counter for default names. Unlike nameTable.size() this only ever grows,
+  // so a value that is renamed rather than newly declared cannot make the
+  // next value reuse a name.
+  unsigned nextDefaultName = 0;
 
   // Configuration flags
   bool linearize_pointers = false;
@@ -75,6 +86,19 @@ public:
 
   /// Value name management methods.
   SmallString<8> addName(Value val, bool isPtr = false, std::string name = "");
+
+  /// Reserve `name` so no identifier generated later can collide with it.
+  /// Used for symbols the emitter prints directly (globals), which otherwise
+  /// bypass the name table entirely.
+  void reserveName(StringRef name) { state.usedNames.insert(name); }
+
+  /// Bind `val` to an existing, externally-owned identifier. Unlike addName
+  /// this never disambiguates: every value denoting the same symbol has to
+  /// print the same identifier, or the reference is undeclared.
+  void bindName(Value val, StringRef symbol) {
+    reserveName(symbol);
+    state.nameTable[val] = SmallString<8>(symbol);
+  }
 
   SmallString<8> getName(Value val);
 

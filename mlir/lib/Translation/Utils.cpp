@@ -9,26 +9,34 @@
 using namespace mlir;
 using namespace allo;
 
-// TODO: update naming rule.
+// Hands out a C identifier for `val`. Explicit names (loop_name, function
+// inputs/outputs) and default "v%d" names share a single reserved-name set, so
+// neither generator can hand the same identifier to two different values: a
+// local that shadows a parameter does not compile (HLS 207-3746), and a
+// reference that drifts away from its declaration is an undeclared identifier.
 SmallString<8> AlloEmitterBase::addName(Value val, bool isPtr,
                                         std::string name) {
   assert(!isDeclared(val) && "has been declared before.");
 
+  std::string candidate;
+  if (name != "") {
+    // Use the requested name verbatim the first time, then keep bumping the
+    // suffix until we land on one nobody holds.
+    candidate = name;
+    int &cnt = state.nameConflictCnt[name];
+    while (!state.usedNames.insert(candidate).second)
+      candidate = name + std::to_string(++cnt);
+  } else {
+    // A monotonic counter, skipping anything already taken.
+    do {
+      candidate = "v" + std::to_string(state.nextDefaultName++);
+    } while (!state.usedNames.insert(candidate).second);
+  }
+
   SmallString<8> valName;
   if (isPtr)
     valName += "*";
-
-  if (name != "") {
-    if (state.nameConflictCnt.count(name) > 0) {
-      state.nameConflictCnt[name]++;
-      valName += StringRef(name + std::to_string(state.nameConflictCnt[name]));
-    } else { // first time
-      state.nameConflictCnt[name] = 0;
-      valName += name;
-    }
-  } else {
-    valName += StringRef("v" + std::to_string(state.nameTable.size()));
-  }
+  valName += candidate;
   state.nameTable[val] = valName;
 
   return valName;
