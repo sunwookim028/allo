@@ -346,6 +346,63 @@ both were slower than the nested loop, which keeps `mm` at II=1. The array was
 left alone on purpose: folding a PE's per-`mm` prologue into its MAC body would
 set the II of the one loop in the design that already runs at 1.
 
+## The loop levels are derived now, not typed (`isa_dsl.py`)
+
+`gemm_program` was hand-emitting its AGU *levels*: a comment reading "level 0
+is nb, level 1 is kb" and four `enc_agu((AGU_F1, 0, MAXDIM), ...)` calls that
+had to agree with where the `loop`/`endloop` pairs happened to sit. That is the
+failure mode MiniTPU's kernels have -- theirs carry
+`level = (1 if grouped else 0) + 2` and keep a trip-count-1 loop alive so the
+number does not shift. The loop structure is stated twice and nothing checks
+that the two statements agree.
+
+`isa_dsl.py` ports MiniTPU's mechanism (`board_package/dsl.py:126-141`, its
+`loop()`): **nesting depth IS the AGU level**, and the only handle on a level
+is the induction variable the `with` yields.
+
+```python
+with k.loop(Nt, "n") as nb:                       # level 0, derived
+    k.vld(W_VR, Ref(B_SP).at(nb, MAXDIM), rows=T)
+    k.mm(A_VR, AR_C, W_VR, rows=M, acc=False)     # peeled: overwrite
+    with k.loop(Kt - 1, "k") as kb:               # level 1, derived
+        k.vld(W_VR, Ref(B_SP + T).at(nb, MAXDIM).at(kb, T), rows=T)
+```
+
+Generalised to our AGU rather than copied from theirs: theirs is one term on
+one field as a power-of-two shift, ours is three `(target, level, stride)`
+terms with arbitrary 11-bit strides, any number of which may land on the same
+field -- `B_SP + nb*MAXDIM + kb*T` is two terms on `f1` and their encoding
+cannot say it. So `Ref` is a base plus an ordered list of `(iv, stride)` terms
+and any field may be one.
+
+**It emits the identical instruction stream, and that is the whole test.**
+`isa_dsl.assert_matches_handwritten` compares both 64-bit words of every
+instruction against `gemm_program_handwritten` (kept, unchanged, as the
+reference) at all five shapes and both relu settings; `bench_isa.py` runs it
+before it builds anything. Bit-identical means cosim cannot move, so it was not
+re-run. Bench: ALL EXACT, unchanged.
+
+**What it bought.** Three errors that were previously expressible are not:
+a level that disagrees with the nest, an induction variable used after its loop
+closed (the sequencer would resolve it against a stale `iv_now[level]`), and a
+`loop` whose `endloop` was forgotten. Two more are now caught at the point of
+writing rather than at `enc_agu`: a nest deeper than `LOOP_DEPTH`, named
+("the nest is n > k > m > j > i"), and a trip count of 0, which the do-while
+sequencer would run **once**.
+
+**What it cost, honestly.** It is ~120 lines of machinery to remove four typed
+integers from a 40-line program, and at this size the hand-written form was not
+actually hard to keep right -- the trade only pays once there is more than one
+program. It also trades one hand-maintained correspondence for another: the
+instruction methods (`vld(vr, spad, rows)`) restate the field layout that the
+opcode table comments give, where the hand-written form wrote `f0=`/`f1=`
+against that table directly. The new correspondence is stated once per opcode
+instead of once per instruction and the bit-identity assertion checks it, which
+is why it is the better of the two, but it is not free. And the genuinely
+subtle part of this program -- the peeled first k-tile, and the `B_SP + T` base
+that encodes "kb starts at 1" -- is exactly as subtle as it was; the generator
+has no opinion about peeling and could not form one.
+
 ## Next
 
 1. `cosim` -- the only thing that yields a real cycle count for a programmable

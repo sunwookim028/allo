@@ -263,8 +263,10 @@ def enc_agu(*terms):
 
 def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
     """Assemble one instruction word. The compiler backend that lowers a TOSA
-    matmul into these lives only on `chia-codesign`, so programs are written by
-    hand -- `gemm_program()` below is the tiled-GEMM one."""
+    matmul into these lives only on `chia-codesign`, so programs are written
+    against this encoder -- by hand in `gemm_program_handwritten()` below, or
+    through the loop-nest generator in `isa_dsl.py`, which derives the AGU
+    levels from nesting instead of having them typed."""
     # `< (1 << (w - 1))`, not `< (1 << w)`: the top bit is the sign bit once the
     # field is extracted, see the encoding note above.
     for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 8)):
@@ -939,8 +941,16 @@ def tinytpu_isa(
                 ov: int8 = qw[8 * e : 8 * (e + 1)]
                 lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
 
-def gemm_program(M, K, N, relu=False):
-    """Tiled GEMM as a program with **control flow**, for any shape.
+def gemm_program_handwritten(M, K, N, relu=False):
+    """Tiled GEMM as a program with **control flow**, hand-emitted.
+
+    **Superseded as the shipped program by `isa_dsl.gemm_program`, and kept as
+    its reference.** The two must emit bit-identical words at every shape --
+    `isa_dsl.assert_matches_handwritten` checks every word of every instruction
+    and `bench_isa.py` runs it. What the generated form removes is the last two
+    lines of this docstring: the AGU *levels* below are hand-typed integers
+    that have to agree with where the `loop`/`endloop` pairs happen to sit, and
+    nothing here checks that they do.
 
     The static program is O(nesting), not O(tiles): the n and k loops are
     `loop`/`endloop` pairs and the addresses that used to be baked into each

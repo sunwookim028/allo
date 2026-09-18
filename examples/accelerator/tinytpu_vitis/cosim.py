@@ -36,8 +36,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from allo.dataflow import customize  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, gemm_program, assemble, schedule, MAXDIM, T, IMEM_SIZE,
+    tinytpu_isa, assemble, schedule, MAXDIM, T, IMEM_SIZE,
 )
+from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"

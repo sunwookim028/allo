@@ -4,7 +4,7 @@
 """Verify TinyTPU-isa across workload sizes on ONE fixed hardware build.
 
 The point of this driver is that `tinytpu_isa` is built once. Shapes are swept
-as *data*: `gemm_program(M, K, N)` assembles a different instruction stream and
+as *data*: `gemm_program(M, K, N)` generates a different instruction stream and
 the same RTL runs it. Earlier revisions rebuilt the accelerator per shape, which
 made a comparison against Gemmini's single elaboration meaningless.
 
@@ -20,8 +20,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 import allo.dataflow as df  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, gemm_program, gemm_program_flat, vadd_program, assemble,
+    tinytpu_isa, gemm_program_flat, vadd_program, assemble,
     expand, MAXDIM, T, IMEM_SIZE, NHDR, IWORDS,
+)
+# The shipped GEMM program is GENERATED: the loop levels come from the nesting
+# of `with k.loop(...)`, not from integers typed into `enc_agu`. The
+# hand-emitted form it replaced stays in `microarch_isa` as the reference the
+# assertion below holds it against, word for word.
+from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+    gemm_program, assert_matches_handwritten,
 )
 
 SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
@@ -92,6 +99,13 @@ if __name__ == "__main__":
         shapes = [tuple(int(a) for a in sys.argv[1:4])]
     print(f"TinyTPU-isa: ONE build -- {T}x{T} array, MAXDIM={MAXDIM}, "
           f"imem {IMEM_SIZE}; sweeping {len(shapes)} shape(s)")
+    # The generator's own check, and it is the strict one: the generated
+    # program must be BIT-IDENTICAL to the hand-emitted reference, both words
+    # of every instruction, at every shape and both relu settings. Nothing
+    # about cycles can change if the words do not.
+    assert_matches_handwritten(shapes)
+    print(f"  generated == hand-written word-for-word at all {len(shapes)} "
+          f"shapes x {{gemm, gemm.relu}}")
     # The strong equivalence check, and it covers every shape: the looped and
     # unrolled programs must issue the identical dynamic opcode stream.
     for (M, K, N) in shapes:
