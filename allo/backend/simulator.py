@@ -4,6 +4,9 @@
 # pylint: disable=consider-using-enumerate, no-value-for-parameter, too-many-function-args, redefined-variable-type
 
 import os
+import sys
+import threading
+import time
 from ..backend.llvm import LLVMModule
 from .._mlir.ir import (
     Location,
@@ -1481,6 +1484,14 @@ def build_dataflow_simulator(module: Module, top_func_name: str):
             if func_pe_calls:
                 _inject_omp_parallel_sections(func_pe_calls)
 
+        # {function name: number of concurrent PE instances it runs}. The op
+        # handles inside `all_pe_calls_by_func` do not survive lowering, so the
+        # counts are taken now: they are the only build-time fact the hang
+        # report in `LLVMOMPModule.__call__` has to work with.
+        return {
+            name: len(calls) for name, calls in all_pe_calls_by_func.items() if calls
+        }
+
 
 # This pass is only meant to run on fully lowered MLIR code
 # Note: OpenMP operations in lowered IR are not the original operation types anymore
@@ -1514,8 +1525,117 @@ def convert_critical_write_to_atomic_write(module: Module):
             critical_op.operation.erase()
 
 
+# Ten minutes: outside any legitimate runtime in `tests/dataflow` (the whole
+# suite is ~80s), inside the window in which a person staring at a silent
+# terminal has already concluded something is wrong. See
+# `LLVMOMPModule.__call__` for why this is on by default.
+_DEFAULT_SIM_TIMEOUT = 600.0
+_warned_bad_timeout = False
+
+
+def _read_sim_timeout():
+    """Seconds after which a running region is reported, or None to disable.
+
+    `ALLO_SIM_TIMEOUT` overrides the default; `0` or a negative value turns
+    the report off entirely.
+    """
+    global _warned_bad_timeout  # pylint: disable=global-statement
+    raw = os.environ.get("ALLO_SIM_TIMEOUT", "").strip()
+    if not raw:
+        return _DEFAULT_SIM_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        if not _warned_bad_timeout:
+            _warned_bad_timeout = True
+            print(
+                f"allo: ignoring ALLO_SIM_TIMEOUT={raw!r} (not a number of "
+                "seconds); the simulator hang report is disabled",
+                file=sys.stderr,
+                flush=True,
+            )
+        return None
+    return value if value > 0 else None
+
+
+class _HangWatchdog:
+    """One reusable thread that reports a run which has not finished in time.
+
+    A `threading.Timer` per call is the obvious implementation, and was the
+    first one here, but a `Timer` *is* a `Thread`: arming and cancelling one
+    costs ~170us. That is a fifth of the wall-clock time of a small region,
+    and it lands inside the window `tests/dataflow/mesh_perf.py` measures
+    throughput over -- a watchdog must not perturb what it watches. One
+    thread, parked on a `Condition`, costs a lock acquire per call instead.
+
+    One watchdog per module, created on the first run that wants one and
+    parked on the condition variable whenever no run is in flight.
+
+    `arm()` starts the clock, `disarm()` stops it. While armed, the thread
+    calls `report(elapsed)` after `timeout` seconds and then again at
+    geometrically growing intervals, so a legitimately long run costs a
+    handful of lines over an hour rather than a stream of them. The report
+    runs while holding the lock, which is what keeps a run that finishes
+    mid-report from also being reported as stuck.
+    """
+
+    def __init__(self, report):
+        self._report = report
+        self._cv = threading.Condition()
+        self._armed = False
+        # Bumped by every arm/disarm; the watching loop uses it to notice
+        # that the run it was timing is over.
+        self._generation = 0
+        self._timeout = None
+        self._thread = None
+
+    def arm(self, timeout: float):
+        with self._cv:
+            self._timeout = timeout
+            self._armed = True
+            self._generation += 1
+            if self._thread is None:
+                self._thread = threading.Thread(
+                    target=self._watch, name="allo-sim-watchdog", daemon=True
+                )
+                self._thread.start()
+            self._cv.notify_all()
+
+    def disarm(self):
+        with self._cv:
+            self._armed = False
+            self._generation += 1
+            self._cv.notify_all()
+
+    def _watch(self):
+        with self._cv:
+            while True:
+                while not self._armed:
+                    self._cv.wait()
+                generation = self._generation
+                delay = self._timeout
+                started = time.monotonic()
+                deadline = started + delay
+                while self._generation == generation:
+                    remaining = deadline - time.monotonic()
+                    if remaining > 0:
+                        # A spurious or early wakeup just re-checks the clock.
+                        self._cv.wait(remaining)
+                        continue
+                    try:
+                        self._report(time.monotonic() - started)
+                    except Exception:  # pylint: disable=broad-except
+                        # A diagnostic must never take the run down with it,
+                        # and stderr can legitimately be gone by now.
+                        pass
+                    delay *= 2
+                    deadline = time.monotonic() + delay
+
+
 class LLVMOMPModule(LLVMModule):
     def __init__(self, mod: Module, top_func_name: str, ext_libs=None):
+        # Created on the first run that wants one; see `__call__`.
+        self._watchdog = None
         with Context() as ctx:
             allo_d.register_dialect(ctx)
             self.module = Module.parse(str(mod), ctx)
@@ -1526,7 +1646,7 @@ class LLVMOMPModule(LLVMModule):
             self.in_types, self.out_types = get_func_inputs_outputs(func)
             self.module = decompose_library_function(self.module)
 
-            build_dataflow_simulator(self.module, self.top_func_name)
+            self.pe_counts = build_dataflow_simulator(self.module, self.top_func_name)
             # Attach necessary attributes
             func = find_func_in_module(self.module, top_func_name)
             if func is None:
@@ -1581,3 +1701,116 @@ class LLVMOMPModule(LLVMModule):
             self.execution_engine = ExecutionEngine(
                 self.module, opt_level=2, shared_libs=shared_libs
             )
+
+    def _hang_report(self, elapsed: float) -> str:
+        """The text printed when the region has not finished in time."""
+        explicit = bool(os.environ.get("ALLO_SIM_TIMEOUT", "").strip())
+        total_pes = sum(self.pe_counts.values())
+        if len(self.pe_counts) > 1:
+            breakdown = (
+                "  ("
+                + ", ".join(f"{name}: {n}" for name, n in self.pe_counts.items())
+                + ")"
+            )
+        else:
+            breakdown = ""
+        source = (
+            "ALLO_SIM_TIMEOUT"
+            if explicit
+            else "default; ALLO_SIM_TIMEOUT=<seconds> to change, =0 to silence"
+        )
+        omp_threads = os.environ.get("OMP_NUM_THREADS", "<unset: OpenMP default>")
+        waited = f"{elapsed:.1f}s" if elapsed < 90 else f"{elapsed / 60:.0f}min"
+        rule = "=" * 72
+        return f"""
+{rule}
+allo simulator: `{self.top_func_name}` has not finished after {waited} ({source})
+{rule}
+  top function          : {self.top_func_name}
+  kernel instances      : {total_pes}{breakdown}
+  OMP_NUM_THREADS       : {omp_threads}
+  OMP_MAX_ACTIVE_LEVELS : {os.environ.get("OMP_MAX_ACTIVE_LEVELS", "<unset>")}
+  process id            : {os.getpid()}
+
+The region is STILL RUNNING and this process is NOT being killed: the
+simulator is inside a blocking C call that cannot be interrupted from
+Python, so Ctrl-C will not end it either. To stop it: kill -9 {os.getpid()}
+
+It may simply be slow -- a large region legitimately runs for minutes. If
+it is stuck, the cause is one of:
+  * a circular wait: two PEs each blocked putting to a full stream that
+    only the other can drain;
+  * unbalanced put/get counts: a consumer gets N times from a stream its
+    producer puts to fewer than N times (a `meta_if` branch that skips a
+    put is the usual way this happens);
+  * a stream nobody ever puts to, got from by a PE that therefore never
+    returns.
+The OpenMP team is sized to the instance count ({total_pes}), so this is not
+the team-too-small deadlock of notes/ALLO_SHORTCOMINGS.md #11.
+
+A native backtrace names the kernel function each thread is spinning in,
+which is the closest thing to a per-channel answer available today. It
+needs gdb, and permission to attach to a process that is not the
+debugger's own child (kernel.yama.ptrace_scope=0, or sudo):
+    gdb -p {os.getpid()} -batch -ex "thread apply all bt"
+
+This report says THAT the region is stuck, not WHICH process is stuck on
+WHICH stream. A per-channel report needs the generated spin loop
+(`_build_spin_wait_loop`) to call into a runtime library that records
+stream occupancy; that is the next tier, not this one.
+{rule}
+"""
+
+    def __call__(self, *args):
+        """Run the region, reporting if it does not finish in time.
+
+        A deadlocked region used to hang forever in silence: no message, no
+        indication of which process was blocked on which channel, and a
+        symptom indistinguishable from a design bug. This arms a
+        watchdog thread (`_HangWatchdog`) around the blocking
+        `execution_engine.invoke` in `LLVMModule.__call__`. The invoke
+        releases the GIL, so the watchdog really does run while the region is
+        wedged, and it costs a lock acquire per call rather than a thread
+        spawn -- it must not show up in the numbers `mesh_perf.py` reports.
+
+        Timeout in seconds from `ALLO_SIM_TIMEOUT`; `0` (or anything
+        unparseable) disables it. The default is 600s and it is ON, which is
+        a deliberate trade:
+
+        * The person this helps is precisely the one who does not know the
+          env var exists -- the failure it addresses cost multiple sessions
+          to diagnose because nothing ever printed. An opt-in switch is only
+          found by someone who has already guessed the answer.
+        * Firing on healthy code is cheap here because the report is
+          advisory: nothing is killed, nothing is raised, the run continues
+          to a correct result. The text says so in its first line. A
+          too-eager timeout would be unacceptable if it aborted the run;
+          it does not.
+        * 600s is far outside any legitimate `tests/dataflow` runtime (the
+          whole suite is ~80s) while staying inside the "I have been staring
+          at a blank terminal and something is wrong" window.
+        * Repeats back off geometrically (10min, 20min, 40min, ...), so a
+          genuinely long region costs a handful of lines over an hour rather
+          than a stream of them.
+
+        What this does NOT do: it says the region is stuck, not who is stuck
+        or on which stream. The per-channel report would mean instrumenting
+        the generated spin loop (`_build_spin_wait_loop`) to record stream
+        occupancy through a runtime shared library -- a much larger change
+        with real linkage risk. This is the cheap tier that turns silence
+        into a starting point.
+        """
+        timeout = _read_sim_timeout()
+        if timeout is None:
+            return super().__call__(*args)
+        if self._watchdog is None:
+            self._watchdog = _HangWatchdog(
+                lambda elapsed: print(
+                    self._hang_report(elapsed), file=sys.stderr, flush=True
+                )
+            )
+        self._watchdog.arm(timeout)
+        try:
+            return super().__call__(*args)
+        finally:
+            self._watchdog.disarm()
