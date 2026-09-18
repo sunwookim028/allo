@@ -183,7 +183,7 @@ its numbers, the honest pairing at 4x4x4 is 252 against ~161: **we are roughly
 excludes the driver at every shape, or our number re-measured with an equivalent
 host-side cost included. The first is the cheaper of the two and is in progress.
 
-## The memory model, and the condition our lead depends on
+## The memory model, and our sensitivity to it
 
 **Everything above was measured with `-m_axi_latency 0`** -- a memory that
 answers immediately. That is Vitis's default and it was never stated, so it is
@@ -191,32 +191,25 @@ stated here, along with what happens when it is not true.
 
 Rebuilding the design at a given read latency and cosimulating it there:
 
-| `m_axi_latency` | 4x4x4 | vs Gemmini 574 | 16x16x16 | vs Gemmini 986 |
-| --- | --- | --- | --- | --- |
-| **0** (the table above) | 252 | **2.28x ahead** | 919 | **1.07x ahead** |
-| 16 | 297 | 1.93x ahead | 935 | 1.05x ahead |
-| 64 | 441 | 1.30x ahead | **1127** | **0.87x -- BEHIND** |
+| `m_axi_latency` | 4x4x4 | 16x16x16 |
+| --- | --- | --- |
+| **0** (the table above) | 252 | 919 |
+| 16 | 297 (+18%) | 935 (+2%) |
+| 64 | 441 (+75%) | 1127 (+23%) |
+
+(An earlier revision of this table set these against Gemmini's end-to-end 574
+and 986 as a margin of lead. Those Gemmini numbers include about 395 cycles of
+Rocket driver software, so that margin was withdrawn with the headline. Gemmini's
+own harness is also near-zero latency (SimDRAM without `+dramsim`), so latency 0
+is the matched setting. The sweep is a property of our design, not a fairness
+correction.)
 
 Bit-exact at every point (0/16 and 0/256 mismatches). `logs/cosim_isa_axi_latency_sweep.log`.
 
-Two things follow, and the second one is a limit on the headline.
-
-* **The large shape amortises latency and the small one does not.** 16x16x16
-  moves 1.7% at latency 16; 4x4x4 moves 18%, and 75% at latency 64. Latency
-  lands on the *fixed* term -- which is exactly the term this file claims a 3.2x
-  win on (151 vs 483). A good part of that win is the memory model, not the
-  design.
-* **At 64 cycles of read latency we lose at 16x16x16**, 1127 against 986. So
-  "faster at all five shapes" is true at latency 0 and 16 and false at 64. The
-  claim is conditional, and the condition is now written down.
-
-**What this does not yet settle is whether the comparison is fair**, because it
-depends on what Gemmini's harness charges for memory. If its backing store is
-also effectively zero-latency, both sides are idealised and the table above is a
-like-for-like comparison. If Gemmini is driving a realistic DRAM model while we
-are not, then our fixed-cost advantage is an artifact and should be withdrawn
-rather than footnoted. That is being established from the elaborated chipyard
-sources; **until it is, treat the fixed-cost win as unverified.**
+**The large shape amortises latency and the small one does not.** 16x16x16
+moves 1.7% at latency 16, while 4x4x4 moves 18% at latency 16 and 75% at
+latency 64. Latency lands on the fixed term, so a real memory system would
+widen the like-for-like deficit above at small shapes.
 
 ## Marginal cost across the sweep — three different kinds of machine
 
