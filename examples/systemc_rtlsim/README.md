@@ -67,3 +67,43 @@ netlists, which are **not** in this repo -- they are Catapult output from the
 Both print one `RESULT: PASS|FAIL <tag>` line per run; `results.txt` is that
 output, sorted. The 76 xsim work directories are not kept -- they are ~29 MB and
 regenerable, and the `RESULT:` lines are the evidence.
+
+## Update 2026-09-18: the cause is probably a known emitter rewrite
+
+**The measurements above are unchanged.** What changed is the explanation, and
+it moves the fix from "design a scheduling model" to "extend one guard".
+
+`choonsik1/SystemC-emitter` carries `72c70dcb` (2026-08-20), *"SystemC: do not
+make a port-reading driver loop free-running"*. `isSteadyStateLoop` treated an
+unused induction variable as proof a kernel runs forever and rewrote its
+outermost loop to `while (1)` **under `__SYNTHESIS__`** -- which is precisely a
+bug that leaves a design correct in csim and wrong in RTL. The netlists tested
+here are from `0eff4888` (2026-08-01), **19 days older**.
+
+But re-emitting will not fix it, and `pe_split.py` (kept here now) says why.
+`acc` is declared `args=[]` -- no function arguments, so no memory port anywhere
+in the kernel -- while `72c70dcb`'s guard requires *a load from a memory port
+inside the loop body*. **The guard structurally cannot fire for this kernel.**
+And `i` is never referenced in the body, so the heuristic that triggers the
+rewrite does fire.
+
+The same is true of `mul`, whose counter is also unused -- and that is the
+point:
+
+> The free-running rewrite is applied to **both** kernels. `mul` reads Streams,
+> whose handshake makes a free-running loop harmless because it blocks on the
+> FIFO. `acc` reads a `Wire`, which by construction has no handshake, so nothing
+> throttles it.
+
+That accounts for every measurement: `acc` running the whole loop before `mul`
+produces anything, 8/8 wrong at all 18 pacings, and the identical RTL going
+correct the moment the testbench imposes lockstep from outside.
+
+If it holds, the fix is to extend `72c70dcb`'s guard -- a `get()` from a `Wire`
+or `Channel` in the loop body is evidence of finite streaming just as a memory
+load is, and arguably stronger, since a `Wire` consumer has no other way to
+terminate.
+
+**This is a hypothesis from reading source, not a measurement.** It is testable
+with this harness: patch the guard, re-emit `pe_wire`, re-run the matrix, and
+keep the fault injections as proof the harness still bites.

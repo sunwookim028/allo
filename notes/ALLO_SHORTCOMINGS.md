@@ -561,6 +561,28 @@ only pragmas it generates are the `m_axi` / `s_axilite` interface lines in
 
 ## 22. The SystemC fork's `Wire` is semantically incomplete -- and wrong in RTL, not just in simulation
 
+> **Update 2026-09-18, and it changes the recommended action.** The
+> measurements below stand. The *cause* is probably not a semantic gap in
+> `Wire` but a known emitter rewrite, `72c70dcb` on
+> `choonsik1/SystemC-emitter`: `isSteadyStateLoop` treats an unused induction
+> variable as proof a kernel runs forever and rewrites its outermost loop to
+> `while (1)` **under `__SYNTHESIS__`** -- a bug shaped exactly like "correct in
+> csim, wrong in RTL". The netlists measured here predate it by 19 days.
+>
+> Re-emitting does not fix it. `pe_split.py`'s `acc` is `args=[]`, so it has no
+> memory port, while `72c70dcb`'s guard requires a load from a memory port
+> inside the loop body -- **the guard structurally cannot fire here**. `mul` is
+> rewritten too, and that is the insight: its Streams have a handshake, so a
+> free-running loop blocks harmlessly on the FIFO; `acc`'s `Wire` has none, so
+> nothing throttles it. Same rewrite, fatal only on the unhandshaked edge.
+>
+> So the next step is **extending that guard** -- a `get()` from a `Wire` or
+> `Channel` is evidence of finite streaming just as a memory load is -- not
+> building a scheduling model. Consequently the sentence below about the
+> MiniTPU direction being "blocked further back" is on hold pending that test.
+> Harness and full reasoning: `examples/systemc_rtlsim/`. **Hypothesis from
+> source, not measured.**
+
 Recorded here because it closes a question this project spent real time on: whether
 the SystemC path (`choonsik1/allo:SystemC-emitter`) offers the **non-handshaked
 fixed-latency edge** that a no-interlock machine needs and Allo's `Stream` cannot
