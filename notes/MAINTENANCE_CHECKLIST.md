@@ -28,9 +28,11 @@ https://github.com/sunwookim028/allo/issues/13.
 | `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 81 ahead, 0 behind `upstream/main` (`8bafb0dc`) as of this writing. |
 | `upstream` | cornell-zhang | Mirror of `upstream/main`, tracking the `upstream` remote. Refresh it to see what has landed; diff `main` against it to see what the fork carries. **Rebasing `main` onto it is never automatic — it is an explicit call.** |
 | `chia-codesign` | `kkkaishao/allo` (ACT) | The CHIA / TinyTPU co-design artifact. A separate codebase, not a feature branch — see below. |
+| `sc-wire-guard` | `choonsik1/allo` `SystemC-emitter` | Exploration: does extending the free-running-loop guard to Wire/Channel reads fix `pe_wire` in RTL (`notes/ALLO_SHORTCOMINGS.md` #22)? Lands on `main` together with the SystemC-emitter integration. |
 
-`main` and `chia-codesign` are the only working branches; `upstream` is just
-the mirror.
+`main` and `chia-codesign` are the long-lived working branches; `upstream` is
+just the mirror. Exploration branches come and go under the rule in
+"Where work lands" below.
 `fix/vhls-mlir-percent-alloc-csim` is gone: upstream PR #554 merged and is now
 the tip of `upstream/main`.
 
@@ -45,6 +47,21 @@ elsewhere: `tinytpu-rtlgen-base` (`882f7dd6`, the retired branch tip, now an
 ancestor of `chia-codesign`; the actual fork point between `main` and
 `chia-codesign` is `76130c63`) and `wip-u280-rescue` (`1bd3c5a6`, an unreviewed
 u280 / nb-stream / fp16 rescue point from 2026-07-06).
+
+### Where work lands
+
+- `main` holds every solid frontier and must reproduce the headline results
+  on its own. A result is solid once it has been re-derived independently
+  (e.g. a second cosim run, or a replay into a clean tree); an agent's
+  unverified number does not qualify.
+- Exploration, whether tooling or design, goes on its own branch when it is
+  expected to take more than about 6 meaningful commits. Smaller changes go
+  straight to `main`.
+- An exploration branch lands on `main` once its result is solid, together
+  with whatever reproduces it. A dead end is deleted, and its conclusion is
+  recorded in `notes/` on `main`.
+- Name the branch after the question it answers (e.g. `sc-wire-guard`), and
+  list live ones in the table above while they exist.
 
 ### `chia-codesign` is a different codebase, not a feature branch
 
