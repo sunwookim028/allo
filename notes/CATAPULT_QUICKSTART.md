@@ -50,12 +50,17 @@ export CDS_LIC_FILE=5280@en-license-05.coecis.cornell.edu        # Cadence / Xce
 unset LD_PRELOAD                                                 # the login env breaks xrun
 ```
 
-Provenance: both exports come from the commits that produced the Catapult
-synthesis and Xcelium cosim results on record (`c7402f9f`, `0eff4888`,
-`67559cad` on `choonsik1/SystemC-emitter`; `git log --all -S"MGLS_LICENSE_FILE"`
-finds them). So this is the configuration that demonstrably worked, rather than
-a guess -- but it predates 2026-09-18 and had not been re-verified as of this
-writing.
+**Verified on zhang-21, 2026-09-18.** Catapult 2024.2 prints "Connected to
+license server (LIC-13)" and "Catapult product license successfully checked out
+(LIC-14)"; `xrun` 24.03 compiles and runs a module to `$finish`. `LD_PRELOAD`
+was already unset in that login environment, so the `unset` above is
+belt-and-braces rather than required -- keep it, since the note that flagged it
+(`67559cad`) says some login environments do set it.
+
+Provenance, for when these stop working: both exports were recovered from the
+commits that produced the Catapult synthesis and Xcelium cosim results on
+record (`c7402f9f`, `0eff4888`, `67559cad` on `choonsik1/SystemC-emitter`;
+`git log --all -S"MGLS_LICENSE_FILE"` finds them).
 
 **Both tools run `-version` without checking a licence out**, so a successful
 `-version` proves nothing. Check a real checkout before concluding the host is
