@@ -10,12 +10,13 @@
 # Reference model: C[i] = sum_{j<=i} A[j]*B[j], A=1..8, B=2..16 step 2
 #                  -> 2 10 28 60 110 182 280 408   (numpy cumsum, hardcoded in the tb)
 #
-# Prereqs: Vivado 2023.2 xsim on PATH (source settings64.sh). No SystemC needed.
+# Prereqs: Vivado 2023.2 xsim on PATH (source settings64.sh), or Xcelium with
+#          RUNNER=run_mulacc_xrun.sh. No SystemC needed.
 # Runtime: ~6 s per case.
 # ============================================================================
 set -u
 S="$(cd "$(dirname "$0")" && pwd)"
-r() { printf '%-58s ' "$1"; shift; "$S/run_mulacc.sh" "$@" 2>&1 | grep -oE 'PASS|FAIL .*' ; }
+r() { printf '%-58s ' "$1"; shift; "$S/${RUNNER:-run_mulacc.sh}" "$@" 2>&1 | grep -oE 'PASS|FAIL .*' ; }
 
 echo "--- 1. the three boundaries, no pacing games -------------------------------"
 r "Stream[int32,2] boundary (control)"          pe_stream
