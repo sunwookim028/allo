@@ -738,19 +738,26 @@ gmem0 **bit width 512**, gmem1/2 32, and takes `dma_ld`'s burst loop and
 
 ### Measured, one build, bit-exact at every shape
 
-| shape | before | after | Gemmini | ratio |
-| --- | --- | --- | --- | --- |
-| 4x4x4    | 680  | **252** | 574 | **0.44x** |
-| 8x8x8    | 831  | **383** | 615 | **0.62x** |
-| 12x12x12 | 1066 | **591** | 740 | **0.80x** |
-| 16x16x8  | 1139 | **667** | 784 | **0.85x** |
-| 16x16x16 | 1457 | **919** | 986 | **0.93x** |
+| shape | before | after |
+| --- | --- | --- |
+| 4x4x4    | 680  | **252** |
+| 8x8x8    | 831  | **383** |
+| 12x12x12 | 1066 | **591** |
+| 16x16x8  | 1139 | **667** |
+| 16x16x16 | 1457 | **919** |
 
-Mismatches 0/16, 0/64, 0/144, 0/128, 0/256. Fixed cost **557 -> 151** (Gemmini
-483); marginal **20.07 -> 17.28** cycles per dynamic instruction (Gemmini
-10.81). We are 3.2x cheaper to start and still 1.60x more expensive per unit of
-work, so the lead is largest at the smallest shape and narrows with size. It is
-a real result at these sizes and not a claim about arbitrarily large GEMMs.
+Mismatches 0/16, 0/64, 0/144, 0/128, 0/256. Fixed cost **557 -> 151**;
+marginal **20.07 -> 17.28** cycles per dynamic instruction. Cosim ran with
+`-m_axi_latency 0`; the latency sensitivity is in `COMPARISON.md`.
+
+**These are not faster than Gemmini.** An earlier revision of this section
+set this table against Gemmini's 574 / 615 / 740 / 784 / 986 and called it a
+lead at all five shapes, with a 3.2x fixed-cost win. Both claims are
+withdrawn. Gemmini's `rdcycle` window brackets all of `tiled_matmul_auto`,
+and at 4x4x4 about 413 of its 574 cycles are Rocket driver software. Its
+accelerator-plus-dispatch cost there is about 161 cycles, against our 252.
+Our window is `ap_start` to `ap_done` with the program already in DRAM. See
+`COMPARISON.md` for the decomposition.
 
 ### What `dma_st`'s II=4 actually was
 
