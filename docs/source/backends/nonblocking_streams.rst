@@ -100,8 +100,9 @@ All examples live in the ``tests/dataflow/`` directory on the fork's ``main``.
      - Simulator-level round-trip tests (producer → consumer via ``try_put`` / ``try_get``).
    * - ``tests/dataflow/test_stream_ops_hls.py``
      - HLS codegen checks — verifies ``nb_write()`` / ``nb_read()`` / ``.empty()`` appear in the
-       emitted Vivado HLS C++. (Its ``test_tapa_stream_nb`` case is stale: TAPA
-       non-blocking support was removed, see *Layer 4b* below.)
+       emitted Vivado HLS C++. (Its ``test_tapa_stream_nb`` case is marked
+       ``xfail(strict=True)``: TAPA non-blocking support was removed, so that
+       build raises ``RuntimeError``. See *Layer 4b* below.)
 
 Running the Simulator Tests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,10 +203,13 @@ Layer 4b — HLS backends
 
 **TAPA**: not supported. The TAPA overrides (``try_write`` / ``try_read``) were
 removed in 2026-07 — TAPA is not used in the mesh flow and the dead codepath was a
-maintenance burden (see ``notes/ASIC_HLS_EXPLORATION.md``). Because the hooks in
-``EmitBaseHLS.h`` have empty default bodies, a non-blocking op built for
-``target="tapa"`` is **not diagnosed**; it simply emits nothing. Use the Vitis HLS
-target for non-blocking streams.
+maintenance burden (see ``notes/ASIC_HLS_EXPLORATION.md``). The hooks in
+``EmitBaseHLS.h`` have empty default bodies, but they are never reached: the op
+falls through to ``visitUnhandledOp`` and the emitter reports "can't be correctly
+emitted", so a non-blocking op built for ``target="tapa"`` **fails the build**
+with ``RuntimeError: Failed to emit HLS code``. Note the message it prints blames
+``wrap_io``, which is unrelated to the actual cause. Use the Vitis HLS target for
+non-blocking streams.
 
 **Catapult HLS** (``mlir/lib/Translation/EmitCatapultHLS.cpp``):
 

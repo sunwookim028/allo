@@ -339,6 +339,73 @@ Each cost real time; none is a bug exactly, but none is discoverable:
   accumulator took the top-level interval from 168 to 74 cycles.
 - **Priority: Low individually, Medium as a "dataflow gotchas" page.**
 
+## 18. Catapult lowers `try_get`/`try_put` to *blocking* reads with `success` hard-coded true
+
+`mlir/lib/Translation/EmitCatapultHLS.cpp` emits `ch.read(v)` for
+`StreamTryGetOp` and `ch.write(v)` for `StreamTryPutOp`, then emits
+`bool success = true;` unconditionally. The comment says why: `nb_read` /
+`nb_write` inside a spin-while loop segfaults Catapult's go compile (LOOP-19),
+and a blocking op "always succeeds → spin-while exits in 1 iteration →
+bounded".
+
+The workaround is defensible; what is not is that it is silent, and that the
+comment understates it. "Scheduling semantics differ only at runtime" is true
+for the `while not S.try_put(x): pass` idiom, which is what the bring-up
+designs used. It is false for the reason non-blocking ops exist:
+
+- Any design that **branches on failure** -- try this channel, else try the
+  next; poll a control channel and do other work if empty; arbitrate between
+  requesters -- has its else-branch turned into dead code, because `success` is
+  a compile-time `true`. The RTL is silently a different design from the one
+  written: a decoupled, backpressured graph becomes lock-step blocking.
+- It is not diagnosed. No warning, no `#error`, nothing in the emitted C++
+  marking the substitution. The first sign is a Catapult schedule that does not
+  match the intended architecture, or a deadlock in a design the simulator runs
+  fine.
+- The three backends now disagree on the same frontend op, which is the deeper
+  problem: **Vivado** emits honest `.read_nb(` / `.write_nb(`
+  (`EmitVivadoHLS.cpp`); **Catapult** emits blocking + `true`; **TAPA** emits
+  nothing and hard-fails the build (see #19 below, and
+  `tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb`). A frontend
+  primitive whose meaning changes per target is a correctness trap, not a
+  portability inconvenience.
+- Related Catapult deviation, same file: `empty()` is emitted as
+  `!ch.available(1)` because `ac_channel` has no `.empty()` in the
+  synthesizable subset (EDG CIN-59). That one is a faithful translation.
+- Documented today only in `notes/ASIC_HLS_EXPLORATION.md` (as a backend note,
+  not as a correctness risk) and `docs/source/backends/nonblocking_streams.rst`.
+- **Priority: Medium** as it stands, **High** for anyone building arbitration
+  on the Catapult path. The cheap fix is to refuse: raise on
+  `StreamTryGetOp`/`StreamTryPutOp` for `target="catapult"` unless an explicit
+  opt-in attribute says the blocking substitution is acceptable. Failing to
+  build beats silently building the wrong circuit.
+
+## 19. `try_get`/`try_put` on the TAPA target fail to emit, with a generic message
+
+`EmitTapaHLS.cpp`'s visitor dispatches only `StreamConstructOp` /
+`StreamGetOp` / `StreamPutOp`. The base hooks `emitStreamTryGet`,
+`emitStreamTryPut`, `emitStreamEmpty`, `emitStreamFull` in
+`mlir/include/allo/Translation/EmitBaseHLS.h` are empty bodies and are never
+reached: the op falls through to `visitUnhandledOp`, and `emitBlock` reports
+`"can't be correctly emitted"`, which surfaces as
+`RuntimeError: Failed to emit HLS code. ... Common issues: nested functions
+with multi-dimensional arrays when wrap_io=False.`
+
+Failing is the right call -- this is strictly better than #18. But the message
+names a cause that has nothing to do with the actual one, so the user is sent
+looking at `wrap_io` instead of at an unsupported op. TAPA has `try_read` /
+`try_write`, so the gap is implementable, not fundamental.
+
+- `tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb` asserted
+  `.try_read(` / `.try_write(` and so had been failing outright. Marked
+  `xfail(strict=True, raises=RuntimeError)` with the mechanism named, so the
+  gap is recorded and the test turns red the moment the codegen lands.
+- History worth noting: `3723e817` deleted this test as dead, and merge
+  `cdac5e68` resurrected it. A test can come back from the dead in a merge
+  without anyone noticing it is red.
+- **Priority: Low** for the codegen, **Medium** for the error message --
+  `emitError` should name the op it could not emit.
+
 ## A failure mode worth naming: an unused capability measures as a worthless one
 
 Two independent instances, one from this project and one from the MiniTPU

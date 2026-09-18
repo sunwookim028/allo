@@ -66,7 +66,13 @@ Design: `top_decoupled_2x1` (1 MT + 2 CTs, M=N=K=2, 16 elements)
 ## Status of the removal (verified 2026-09-17)
 - `mlir/lib/Translation/EmitTapaHLS.cpp` has no `try_write` / `try_read`
   emission and its visitor dispatches only construct/get/put. The base-class
-  hooks in `EmitBaseHLS.h` are empty, so a non-blocking op on the `tapa`
-  target is not diagnosed — it simply produces nothing.
-  `tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb` still exists and
-  is stale against that.
+  hooks in `EmitBaseHLS.h` are empty, but they are never reached: the op falls
+  through to `visitUnhandledOp` and `emitBlock` reports "can't be correctly
+  emitted", so `build(target="tapa")` raises `RuntimeError` rather than
+  silently producing nothing. (Corrected 2026-09-18; the earlier "not
+  diagnosed — it simply produces nothing" reading was wrong. The message it
+  does print blames `wrap_io`, which is unrelated — see
+  `notes/ALLO_SHORTCOMINGS.md` #19.)
+  `tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb` asserted
+  `.try_read(` / `.try_write(` and was therefore failing outright; it is now
+  `xfail(strict=True, raises=RuntimeError)`.
