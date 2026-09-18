@@ -108,6 +108,10 @@ solution file add kernel.cpp -type C++
 directive set -DESIGN_HIERARCHY top_function_name
 directive set -CLOCKS {clk {-CLOCK_PERIOD 2.0}}   ;# 2.0 ns = 500 MHz
 
+# --- Interface scheduling (see §4, SCHD-67 / SCHD-30) ---
+directive set -IO_MODE super
+directive set -SPECULATE true
+
 # --- Target library ---
 solution options set /Output/OutputVerilog true
 solution library add nangate-45nm_beh
@@ -121,6 +125,11 @@ go extract
 ```
 
 Replace `top_function_name` with your actual top-level C++ function name.
+
+`-IO_MODE super` / `-SPECULATE true` are not cosmetic — see §4. The default
+`-IO_MODE fixed` is what makes multi-handshake designs unschedulable, so put these in
+before the first run rather than after the first failure. They are not free on large
+blocks; the §4 entry has the cost.
 
 **Block synthesis** (required when sub-functions pass `ac_channel` objects by reference):
 
@@ -225,6 +234,53 @@ Error CRD-415: Cannot convert 'double' to 'ac_ieee_float<binary32>'
 
 Use `f`-suffixed float literals: write `0.0f` not `0.0`, `1.5f` not `1.5`.
 
+### SCHD-67 / SCHD-30: will not schedule even with unlimited resources
+
+```
+Error SCHD-67: ... could not schedule even with unlimited resources
+Error SCHD-30: ... loop cannot be scheduled at the requested II
+```
+
+Not a resource problem. Catapult's **default `-IO_MODE fixed` pins each port's
+`vld`/`dat` to a fixed cycle offset**, so a kernel issuing more than one non-blocking
+handshake per loop body (every NoC router does) has its handshakes collide. The fix is
+two directives, not an emitter change:
+
+```tcl
+directive set -IO_MODE super
+directive set -SPECULATE true
+```
+
+`super` lets the scheduler place each handshake anywhere in the loop window;
+`-SPECULATE true` covers conditional pushes.
+
+**Measured effect: 2/32 → 22/32 dataflow designs csynth**, with 1 residual scheduling
+failure in the whole set. (The remaining 10 fail for reasons other than scheduling.)
+A 38-`PushNB` + 38-`PopNB` Channel router csynths clean with these two.
+
+**Cost — not a free win.** Under `super` the scheduler's placement space is far larger:
+`router_rvn_chan` ran **40 minutes at 49 GB RSS without finishing**. Small designs still
+finish in minutes. Budget accordingly on a shared machine, and reach for `super` on a
+block that will not schedule rather than applying it blanket.
+
+**Where this came from**, because it is the part that cost the most time: these are
+matchlib's own required settings, in `hls/run_hls_global_setup.tcl`. They are *not* in
+`eva_router/go_hls.tcl`, which is where one looks first — a MatchLib-style tcl copied
+from `go_hls.tcl` was tried, reported as "did not help", and sent the earlier diagnosis
+down a structural-conflict / `SC_METHOD`-emitter path that was the wrong remedy for a
+correctly identified mechanism. If a Connections design will not schedule, open
+`run_hls_global_setup.tcl` first.
+
+Provenance: measured on the `choonsik1/SystemC-emitter` fork (fetched in this clone as
+`remotes/choonsik1/SystemC-emitter`), on the **SystemC/Connections** flow —
+`allo/backend/catapult.py` there emits both lines under `platform == "systemc"`, and
+`docs/noc/FINDINGS_wire_channel.md` §7 carries the numbers. The directives themselves
+are solution-level and apply to any Catapult run; the 2/32 → 22/32 figure is specific to
+that Connections corpus and has not been re-measured for `ac_channel` designs.
+
+**This repo's `allo/backend/catapult.py` emits neither directive** (verified 2026-09-18),
+so a run driven from the in-tree Allo backend gets the default `fixed`.
+
 ### HIER-23: Possible deadlock (warning)
 
 Usually a false positive for valid try\_put/try\_get designs. Synthesis completes; RTL is correct.
@@ -320,5 +376,5 @@ Project output goes to `catapult_decoupled_2x1.prj/` (put under `/scratch/` to a
 | AC datatypes headers | `$MGC_HOME/shared/include/` |
 | Catapult 2024.2 install | `/opt/siemens/catapult/2024.2/` |
 | Synthesis results & analysis | `notes/archive/CATAPULT.md` (retired 2026-09-17) |
-| Why Catapult is not being pursued | `notes/ASIC_HLS_EXPLORATION.md` |
+| Why Catapult is being pursued again (reopened 2026-09-18) | `notes/ASIC_HLS_EXPLORATION.md` |
 | Allo Catapult backend | `allo/backend/catapult.py` |

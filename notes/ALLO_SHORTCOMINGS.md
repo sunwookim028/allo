@@ -600,9 +600,14 @@ one per step, so `acc` runs the entire loop before `mul` produces anything.
   checkable by the type system.
 - Making wires sound needs the emitter to give cycle-locked kernels a shared
   advance -- one enable driving every stage's counter, which is what a VLIW
-  delay line is. `notes/archive/SYSTEMC_COMB_MODE.md` scopes that as the
-  `SC_METHOD` "comb" mode in five phases, and its own top risk is whether such a
-  model simulates as well as it synthesises.
+  delay line is. That is scoped, in five phases, as an `SC_METHOD` "comb"
+  emission mode, and its own top risk is whether such a model simulates as well
+  as it synthesises. The scoping document is **not on `main`** -- it exists only
+  in commit `c7402f9f`, on `choonsik1/SystemC-emitter`:
+  `git show c7402f9f:notes/archive/SYSTEMC_COMB_MODE.md`. Deliberately left
+  there rather than restored into `notes/archive/`: it plans work on a branch
+  that is not in this checkout, and its repro anchors are `/tmp` paths that no
+  longer exist, so the two sentences above are what survives of it.
 
 **Consequence for the roadmap:** the SystemC path does not currently supply a
 usable non-handshaked edge, so the MiniTPU-class direction is blocked further
@@ -622,3 +627,81 @@ first.
   `systemc.h`, `connections.h` or `mc_connections.h` anywhere. csim cannot run
   here for any design. SystemC 2.3.x + NVlabs MatchLib would be a few hours and
   no licence.
+
+## 23. `m_axi` port widening is not reachable from user code -- `align_value` is necessary and **not** sufficient (a NEGATIVE result)
+
+The goal was one line of Tcl: `config_interface -m_axi_max_widen_bitwidth 512`,
+so that a long `int8` burst moves 64 bytes a beat instead of one and the operand
+traffic becomes nearly free. Vitis refuses:
+
+```
+[HLS 214-307] Could not widen since type i8 size is greater than or equal to
+alignment 1(bytes)
+```
+
+**Scope, and it is the point of this item: every result below was measured on
+PROBES** -- small standalone kernels written to provoke that message -- **not on
+the real design** (`examples/accelerator/tinytpu_vitis/microarch_isa.py`).
+Whether the real design reproduces `HLS 214-307` at all is an **open question**,
+under separate investigation as of 2026-09-18. Three files already assert the
+widening block as a whole-design fact --
+`examples/accelerator/tinytpu_vitis/microarch_isa.py:247`,
+`RESULTS_ISA.md:467`, `COMPARISON.md:280` -- and the probes do **not** establish
+that. Nothing here upgrades them; a probe result is not a design result.
+
+What the probes did settle:
+
+- **`__attribute__((aligned(N)))` on the element type is the wrong lever.** It
+  is the obvious first reach and it does not produce the alignment Vitis is
+  testing: the test is on the pointer *parameter*, not on the type behind it.
+- **`align_value` on the parameter is necessary.** It is what puts `align 64` on
+  the argument in the IR; nothing else tried did.
+- **And it is not sufficient.** No widening was observed in **six** probe
+  combinations. "Add `align_value` and the port widens" is false, and retiring
+  that is what this item is for -- it is worth six synthesis runs to whoever
+  reads "port widening is blocked in Allo" and sets out to unblock it.
+- **There is nowhere in the emitter to hang the attribute.** The `m_axi` pragma
+  that actually ships is a **regex rewrite of already-emitted C++**:
+  `postprocess_hls_code` (`allo/backend/vitis.py:381`) re-splits each parameter
+  line of the top function's *text*, rewrites arrays to `T *name`, and emits the
+  interface line at `allo/backend/vitis.py:410`. At that point there is no
+  MemRef, no memory space and no port in scope -- only a string -- so there is
+  nothing to derive an alignment from. The emitter's own interface path, which
+  would have had all three, is **dead-commented**:
+  `VhlsModuleEmitter::emitFunctionDirectives`
+  (`mlir/lib/Translation/EmitVivadoHLS.cpp:2777`) has its entire
+  `m_axi` / `s_axilite` body commented out at **2779-2837**; the live code from
+  2838 emits only `dataflow`, `inline`, and the per-array directives.
+
+### Pragma inventory (grep over `mlir/lib`, `mlir/include`, `allo/`, 2026-09-18)
+
+Live on the Vivado/Vitis path: `stream` (`EmitVivadoHLS.cpp:1775,1792,2621`),
+`pipeline` (2581), `unroll` (2595,2597), `bind_storage` (2696),
+`array_partition` (2719), `dataflow` (2838), `inline` (2843), and the `m_axi`
+line rewritten in `vitis.py:410`. That is the whole list.
+
+Not emitted by **any** emitter -- zero hits, not "hard to reach":
+
+- `ap_none` / `ap_stable` / `ap_fifo` interface modes.
+- `#pragma HLS latency` (the only `latency` hits in `allo/` are report
+  *parsing*, `allo/backend/report.py`, `catapult.py:286`).
+- `#pragma HLS protocol`.
+- `#pragma HLS dependence` -- see [item 21], where the cost of its absence is
+  measured; not restated here.
+- `#pragma HLS resource` survives only as dead comment
+  (`EmitVivadoHLS.cpp:2756`).
+
+**Correction to [item 21], in the open.** It states that the only pragmas Allo
+generates are "the `m_axi` / `s_axilite` interface lines in
+`allo/backend/vitis.py:410`". The `m_axi` half is right. `s_axilite` is **not**
+emitted on the Vitis path at all: the only live `s_axilite` in the tree is
+`allo/backend/pynq.py:173,176`, a different backend, and the emitter's copies
+are inside the dead comment above. Item 21's argument is unaffected -- it is
+strengthened, since the interface pragma set is one line narrower than claimed.
+
+- **Priority: Low as an action, Medium as a warning.** Nothing here asks for
+  work: the next honest step is the open real-design question, not more probes.
+  If the real design does reproduce `HLS 214-307`, the fix is in the emitter --
+  restore `emitFunctionDirectives` so the interface pragma is derived from the
+  MemRef instead of reconstructed from text -- and it becomes the same shape of
+  gap as [item 21]: a one-line HLS assertion that Allo has no way to reach.

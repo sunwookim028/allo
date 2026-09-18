@@ -71,11 +71,104 @@ Design: `top_decoupled_2x1` (1 MT + 2 CTs, M=N=K=2, 16 elements)
 - CRD-415/CRD-413: double literal / assignment issues → emit `0.000000f`
 - HIER-6: Non-static local channel → add `static` prefix
 
-### Why not continuing
+### Why not continuing (the 2026-09-17 reasoning; see Summary -- reopened)
 - Market niche (automotive/defense, Siemens-adjacent shops)
 - Not a standard research community reference tool
 - Cadence Stratus is stronger competitor for ASIC research citations
 - CIRCT (MLIR-native, Google/Intel-backed) has better long-term trajectory
+
+## The C++ path can express nothing Vitis cannot (2026-09-18)
+
+**Scope, and it is the whole point of this section:** this is about the **C++
+emitter path** (`EmitCatapultHLS.cpp` -> `ac_channel`). It is **not** about the
+SystemC path, which is a different fork (`choonsik1/allo:SystemC-emitter`) with
+a different type set -- `Stream` / `Channel` / `Wire` over MatchLib
+Connections -- and which is the actual reason Catapult is being pursued (see
+Summary, and `ALLO_SHORTCOMINGS.md` #22: the SystemC `Wire`, the one
+non-handshaked edge in play, is wrong in RTL rather than merely in csim, with
+the apparatus committed at `examples/systemc_rtlsim/`). Nothing below carries
+over to that path.
+
+### The measurement
+
+`CatapultModuleEmitter` is a subclass of the Vivado emitter --
+`class CatapultModuleEmitter : public allo::hls::VhlsModuleEmitter`
+(`EmitCatapultHLS.cpp:109`). Counted 2026-09-18:
+
+| | |
+|---|---|
+| `EmitCatapultHLS.cpp` | 683 lines |
+| `EmitVivadoHLS.cpp` | 3428 lines (Catapult is 20% of it) |
+| member functions `VhlsModuleEmitter` declares | 57 |
+| of those, overridden by Catapult | **14** (12 out-of-line, 2 inline in the class body) |
+
+The 14: `emitModule`, `emitFunction`, `emitFunctionDirectives`, `emitValue`,
+`emitArrayDecl`, `emitArrayDirectives`, `emitLoopDirectives`,
+`emitStreamConstruct`, `emitStreamTryGet`, `emitStreamTryPut`,
+`emitStreamEmpty`, `emitStreamFull`, `emitStatefulGlobalElementType`,
+`emitFloatArrayElement`.
+
+Every one substitutes *syntax* at a point where Vivado already emits something:
+type spellings (`ac_ieee_float<binary32>`, `ac_int<W,S>`), `ac_channel` for
+`hls::stream`, directive comments for pragmas, `static` on local channels, an
+`f` suffix on float literals. None adds a construct; the other 43 emitters are
+inherited verbatim. So whatever the frontend cannot say, both backends fail to
+say identically -- and where they differ, Catapult says *less* (#18:
+`try_get`/`try_put` degrade to blocking with `success` hard-coded `true`).
+
+### Consequence: a three-way classification
+
+Anything flagged as a limitation on this path is one of:
+
+- **(A)** genuinely Allo's own -- the frontend/IR cannot express it;
+- **(B)** *apparently* Vitis's, but (A) underneath -- Vitis has the construct,
+  Allo has no way to reach it;
+- **(C)** genuinely the tool's.
+
+**On the C++ path, (B) is nearly always really (A)**, because the emitter is a
+thin syntax layer: switching Vitis -> Catapult changes spelling, not
+expressiveness. A (B) diagnosis there should be treated as a claim to check,
+not a reason to change backend. Six flagged items:
+
+| item | class |
+|---|---|
+| shared multi-ported memory (two ports of one array to two kernels) | **(A)**, and the decision-relevant one -- below |
+| #21 no `#pragma HLS dependence`, so a false dependence cannot be asserted away | **(A)** -- Vitis has the pragma; Allo emits only `m_axi`/`s_axilite`/`bind_storage`/`array_partition` |
+| #13 "no program-controlled DMA" | **(B) -> neither** -- retracted: a contiguous runtime-length copy does infer a variable-length AXI burst. The cost had been charged to the configuration when the access pattern was the variable that differed |
+| #18 non-blocking `try_get`/`try_put` | **(C) + (A)** -- the LOOP-19 `go compile` segfault on `nb_read` is Catapult's; emitting `success = true` silently instead of refusing is ours |
+| native `float` unsynthesizable (CIN-291) | **(C)** -- `nangate-45nm_beh` genuinely lacks it, and the `ac_ieee_float` override is the entire fix |
+| #22 a non-handshaked fixed-latency edge | **(C)** *on this path* -- neither `hls::stream` nor `ac_channel` has one. That is precisely why the SystemC path exists, and why the spike is aimed there and not here |
+
+### The decision-relevant instance: shared multi-ported memory is (A), and blocked
+
+`AlloMemPins` **is** an unarbitrated 1R1W dual-port RAM, and it synthesizes.
+Allo simply will not hand out both ports to two kernels. So the shared-scratchpad
+gap is (A): no backend switch resolves it.
+
+Verified 2026-09-18, with the provenance stated because it matters: `AlloMemPins`
+is **not in this checkout's working tree**. It lives on the
+`choonsik1/SystemC-emitter` fork, which is fetched in this clone
+(`remotes/choonsik1/SystemC-emitter`), in
+`mlir/lib/Translation/EmitSystemC.cpp`. Read there, the module has separate read
+and write pin bundles (`radr`/`re`/`q` and `wadr`/`d`/`we`) over one `T mem[SIZE]`,
+with both accesses serviced in a single `wait()`-delimited cycle and both ready
+lines tied high; its own comment says "single-cycle, unarbitrated, no bank
+conflicts". It is instantiated on both sides of the boundary, the in-design case
+being described there as "a replicated, multi-client array", and it is emitted
+for synthesis (it carries a CIN-233 reset-write workaround for exactly that
+case). `#22`'s incidental valid/ready finding names the older `AlloMem`, which
+is a different module.
+
+Two caveats a reader on zhang-21 should keep: this is a **SystemC-path** artifact,
+so what it demonstrates is that the *hardware* is unobjectionable, not that the
+C++ path emits it; and "Allo refuses to hand out both ports" is the frontend/IR
+restriction, which is the (A) part and is common to both paths -- #22 already
+states it in passing ("blocked further back than 'Allo won't hand out two
+memory ports'"), but does not source the counter-evidence, which is what this
+entry adds. The
+multi-client claim is read from source and comments, not from a run -- no
+SystemC library or MatchLib exists on `ace-01` (Summary), so nothing here was
+csim'd or synthesized.
 
 ## Tapa HLS (non-blocking stream additions)
 
