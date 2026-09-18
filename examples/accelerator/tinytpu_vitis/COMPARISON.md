@@ -46,19 +46,27 @@ at five shapes plus a vector-unit program. Two of those shapes (12x12x12,
 16x16x8) could not be run at all before, because each would have needed its own
 accelerator.
 
-## The numbers (one build, cosim, one csynth)
+## The numbers, and why they are not a comparison
 
-| shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
-|---|---|---|---|---|---|
-| 4x4x4    | **252** | 574 | **0.44x** |  1.6% |  0.7% |
-| 8x8x8    | **383** | 615 | **0.62x** |  8.4% |  5.2% |
-| 12x12x12 | **591** | 740 | **0.80x** | 18.3% | 14.6% |
-| 16x16x8  | **667** | 784 | **0.85x** | 19.2% | 16.3% |
-| 16x16x16 | **919** | 986 | **0.93x** | 27.9% | 26.0% |
+> **WITHDRAWN 2026-09-18: "faster than Gemmini at all five shapes", and the
+> 3.2x fixed-cost win.** Both stood in this file and both are wrong -- not
+> imprecise, wrong -- because the two columns measure different things. They are
+> struck here rather than footnoted. What replaces them is below; the audit that
+> found it is in "What each number's window contains".
 
-The ratio column keeps its original sense -- ours divided by Gemmini's -- so
-**below 1.00 is us ahead**: 2.28x at the smallest shape and 1.07x at the
-largest, and ahead on array utilisation at every shape as well.
+| shape | ours (accelerator only) | Gemmini `tiled_matmul_auto` | our util |
+|---|---|---|---|
+| 4x4x4    | **252** | 574 |  1.6% |
+| 8x8x8    | **383** | 615 |  8.4% |
+| 12x12x12 | **591** | 740 | 18.3% |
+| 16x16x8  | **667** | 784 | 19.2% |
+| 16x16x16 | **919** | 986 | 27.9% |
+
+**Do not read a ratio off this table.** The right column is an accelerator plus
+a RISC-V software driver; the left is an accelerator alone. At 4x4x4, **72% of
+Gemmini's 574 cycles is Rocket driver code** (measured, below). The one shape
+where a like-for-like pairing exists puts us at **252 against ~161 -- about 1.6x
+slower**, which is the opposite of what this table used to be read as saying.
 
 (History of this column, since earlier revisions of this file quoted each in
 turn: 1004 / 1108 / 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 /
@@ -68,14 +76,20 @@ was **reverted**, costing 13.7x the flip-flops in that unit for 2.3%, kept in
 `RESULTS_ISA.md` and priced as audit item 21. The step to the numbers above is
 the memset and widening pass described below.)
 
-**We are ahead everywhere, and the shape of the remaining difference says
-exactly what kind of machine each one is.** The lead is largest at the smallest
-shape (2.28x) and narrows monotonically with size (1.07x at 16x16x16), which is
-the signature of winning on *fixed* cost and still losing on *marginal* cost.
-The fit says the same: fixed 151 against Gemmini's 483, so we start 3.2x
-cheaper; marginal 17.28 cycles per dynamic instruction against 10.81, so we
-still pay 1.60x for each unit of work. Extrapolate and the curves cross -- this
-lead is real at these sizes and is not a claim about arbitrarily large GEMMs.
+**What this file used to say here, and why it was wrong.** It read the
+narrowing gap -- 2.28x at 4x4x4 down to 1.07x at 16x16x16 -- as the signature of
+winning on fixed cost and losing on marginal cost, and quoted fixed 151 against
+Gemmini's 483 as a 3.2x cheaper start. The pattern was real; the explanation was
+not. Gemmini's fixed term is mostly its software driver, which our number has no
+counterpart for, so the gap narrows with size because the driver amortises --
+not because our machine starts cheaper.
+
+The marginal comparison, 17.28 cycles per dynamic instruction against 10.81, is
+**also not like-for-like** and is left standing only as our own figure. The two
+fits are against different x-axes (ours dynamic instructions, Gemmini's shapes),
+and the accelerator-only share of the 483 intercept is **unknown** -- estimated
+140-170, not measured. It is left unknown here rather than given a number nobody
+can defend.
 
 **The result that made this possible is a correction, not an optimisation.**
 This file previously said the fixed cost was "essentially closed" at 563 vs 483.
@@ -84,6 +98,53 @@ It was not closed, it was *hidden*: `spm` opened with a 514-cycle zero-fill of
 prefixes of nearly equal length masking each other. That is why fixing either
 alone measured as worthless, and why "merging the A and B bursts changed cycles
 by exactly zero" was a true measurement supporting a false conclusion.
+
+## What each number's window contains
+
+The audit that withdrew the claims above. Both sides re-measured on the
+elaborated chipyard tree, not argued from documentation.
+
+**The memory models match, so this is not the problem.** Gemmini's harness is
+`WithBlackBoxSimMem(additionalLatency=0)` (`AbstractConfig.scala:19` ->
+`HarnessBinders.scala:122-129`), confirmed in the elaborated `TestHarness.sv`.
+That `SimDRAM` fork only instantiates DRAMSim2 given `+dramsim`; otherwise it is
+`mm_magic_t` at ~1-2 cycle AXI latency. Re-running the existing simulator and
+ELF both ways gives `MLP 4.8.8.4` = 1146 without and 1174 with, and
+`logs/gemmini_int8_dim4.log` records 1146 with no DRAMSim banner. **All five
+headline shapes are bit-identical either way**, because `fill()` plus the
+warm-up leaves A/B/C resident in L1/L2. Both sides are idealised. Disclosed, not
+corrected for.
+
+**The windows do not match, and that is the problem.** `allo_cmp.c`'s `rdcycle`
+brackets exactly the `tiled_matmul_auto` call -- verified by disassembling the
+ELF (`rdcycle s4` / `jal tiled_matmul_auto` / `rdcycle a0`). Inside that window
+sit the tile-size search, padding and last-tile arithmetic, five `config` RoCC
+instructions, the `loop_ws` sequence, a closing full `fence`, and cache
+coherence for operands the CPU dirtied immediately before. Ours is `ap_start` to
+`ap_done` with the program already in DRAM.
+
+Measured on the existing simulator, operands refilled before every window
+exactly as `allo_cmp.c` does:
+
+| window | cycles |
+| --- | --- |
+| `rdcycle` pair alone | 1 |
+| 5 configs + `fence` | 44 |
+| **5 configs + one hardware `loop_ws` + `fence`** | **161** |
+| full `tiled_matmul_auto(4,4,4)` | 536 / 544 (published 574) |
+
+Decomposition of the 574: **44** RoCC config dispatch and fence, **117** actual
+accelerator work, **~413 (72%)** Rocket software driver. About 30 of that 413 is
+L1 coherence from the pre-window `fill()`.
+
+So Gemmini's accelerator-plus-dispatch fixed cost is about **161** against our
+**151** -- parity, not 3.2x. And because the same driver sits inside all five of
+its numbers, the honest pairing at 4x4x4 is 252 against ~161: **we are roughly
+1.6x slower**, not 2.28x faster.
+
+**What a real comparison needs**, and neither exists yet: a Gemmini window that
+excludes the driver at every shape, or our number re-measured with an equivalent
+host-side cost included. The first is the cheaper of the two and is in progress.
 
 ## The memory model, and the condition our lead depends on
 
