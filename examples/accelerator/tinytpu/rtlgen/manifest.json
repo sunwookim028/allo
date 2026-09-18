@@ -1,0 +1,770 @@
+{
+  "tinytpu_vstore": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "counted_static",
+    "latency": 9,
+    "latency_bound": false,
+    "module": "tinytpu_vstore",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "vreg_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "vreg_rd0",
+          "data": "vreg_rd0_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 2,
+        "name": "slot_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "bram_addr_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.vstore",
+    "writes": [
+      [
+        {
+          "addr": "bram_wr0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "bram_wr0",
+          "data": "bram_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "bram_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu_mxu": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "counted_static",
+    "latency": 41,
+    "latency_bound": false,
+    "module": "tinytpu_mxu",
+    "operators": [
+      {
+        "impl": "mul_f32_f32_f32_l2",
+        "module": "mul_f32_f32_f32_l2",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 32
+          }
+        ],
+        "predicate": ""
+      },
+      {
+        "impl": "add_f32_f32_f32_l2",
+        "module": "add_f32_f32_f32_l2",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 32
+          }
+        ],
+        "predicate": ""
+      }
+    ],
+    "reads": [
+      [
+        {
+          "addr": "bram_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "bram_rd0",
+          "data": "bram_rd0_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "bram_rd1_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "bram_rd1",
+          "data": "bram_rd1_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 1,
+        "name": "w_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 2,
+        "name": "x_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "z_addr_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.mxu",
+    "writes": [
+      [
+        {
+          "addr": "bram_wr0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "bram_wr0",
+          "data": "bram_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "bram_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "indeterminate",
+    "latency_bound": false,
+    "module": "tinytpu",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "imem_rd0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "imem_rd0",
+          "data": "imem_rd0_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "imem_rd1_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "imem_rd1",
+          "data": "imem_rd1_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "imem_rd2_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "imem_rd2",
+          "data": "imem_rd2_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "imem_rd3_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "imem_rd3",
+          "data": "imem_rd3_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "dmem_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "dmem_rd0",
+          "data": "dmem_rd0_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 2,
+        "name": "n_instr_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu",
+    "writes": [
+      [
+        {
+          "addr": "dmem_wr0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "dmem_wr0",
+          "data": "dmem_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "dmem_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu_dma_load": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "indeterminate",
+    "latency_bound": false,
+    "module": "tinytpu_dma_load",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "dmem_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "dmem_rd0",
+          "data": "dmem_rd0_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 2,
+        "name": "dram_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "bram_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 4,
+        "name": "length_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.dma_load",
+    "writes": [
+      [
+        {
+          "addr": "bram_wr0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "bram_wr0",
+          "data": "bram_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "bram_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu_dma_store": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "indeterminate",
+    "latency_bound": false,
+    "module": "tinytpu_dma_store",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "bram_rd0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "bram_rd0",
+          "data": "bram_rd0_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 2,
+        "name": "dram_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "bram_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 4,
+        "name": "length_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.dma_store",
+    "writes": [
+      [
+        {
+          "addr": "dmem_wr0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "dmem_wr0",
+          "data": "dmem_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "dmem_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu_vload": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "counted_static",
+    "latency": 9,
+    "latency_bound": false,
+    "module": "tinytpu_vload",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "bram_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "bram_rd0",
+          "data": "bram_rd0_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 2,
+        "name": "bram_addr_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "slot_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.vload",
+    "writes": [
+      [
+        {
+          "addr": "vreg_wr0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "vreg_wr0",
+          "data": "vreg_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "vreg_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  },
+  "tinytpu_vpu": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "counted_static",
+    "latency": 12,
+    "latency_bound": false,
+    "module": "tinytpu_vpu",
+    "operators": [
+      {
+        "impl": "add_f32_f32_f32_l2",
+        "module": "add_f32_f32_f32_l2",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 32
+          }
+        ],
+        "predicate": ""
+      },
+      {
+        "impl": "sub_f32_f32_f32_l2",
+        "module": "sub_f32_f32_f32_l2",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 32
+          }
+        ],
+        "predicate": ""
+      },
+      {
+        "impl": "mul_f32_f32_f32_l2",
+        "module": "mul_f32_f32_f32_l2",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 32
+          }
+        ],
+        "predicate": ""
+      },
+      {
+        "impl": "cmp_f32_f32_u1_l1",
+        "module": "cmp_f32_f32_u1_l1_ugt",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 1
+          }
+        ],
+        "predicate": "ugt"
+      },
+      {
+        "impl": "cmp_f32_f32_u1_l1",
+        "module": "cmp_f32_f32_u1_l1_uno",
+        "ports": [
+          {
+            "input": true,
+            "name": "a",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "b",
+            "role": "data",
+            "width": 32
+          },
+          {
+            "input": true,
+            "name": "clk",
+            "role": "clk",
+            "width": 1
+          },
+          {
+            "input": true,
+            "name": "ce",
+            "role": "ce",
+            "width": 1
+          },
+          {
+            "input": false,
+            "name": "y",
+            "role": "out",
+            "width": 1
+          }
+        ],
+        "predicate": "uno"
+      }
+    ],
+    "reads": [
+      [
+        {
+          "addr": "vreg_rd0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "vreg_rd0",
+          "data": "vreg_rd0_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "vreg_rd1_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "vreg_rd1",
+          "data": "vreg_rd1_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ],
+      [
+        {
+          "addr": "vreg_rd2_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "vreg_rd2",
+          "data": "vreg_rd2_data",
+          "factor": 1,
+          "latency": 0,
+          "width": 32
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [
+      {
+        "arg": 0,
+        "name": "opcode_in",
+        "width": 32
+      },
+      {
+        "arg": 2,
+        "name": "a_in",
+        "width": 32
+      },
+      {
+        "arg": 3,
+        "name": "b_in",
+        "width": 32
+      },
+      {
+        "arg": 4,
+        "name": "d_in",
+        "width": 32
+      }
+    ],
+    "streams": [],
+    "symbol": "tinytpu.vpu",
+    "writes": [
+      [
+        {
+          "addr": "vreg_wr0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "vreg_wr0",
+          "data": "vreg_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "vreg_wr0_we",
+          "width": 32
+        }
+      ]
+    ]
+  }
+}
