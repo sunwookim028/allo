@@ -528,3 +528,90 @@ void mover_0(int32_t v0[8], int8_t v1[256], hls::stream< int32_t >& v2) {
   do not meet -- which is to say, guess.
 - **Priority: Medium.** It is silent at the Allo level, and the diagnostic
   points nowhere near the cause.
+
+## 21. No `#pragma HLS dependence` primitive, so a false dependence cannot be asserted away
+
+Vitis takes `#pragma HLS dependence variable=x inter false` for exactly the case
+where the scheduler cannot prove two accesses are independent but the author
+can. **Allo emits no dependence pragmas and has no primitive for one** -- the
+only pragmas it generates are the `m_axi` / `s_axilite` interface lines in
+`allo/backend/vitis.py:410`, plus per-array `bind_storage` / `array_partition`.
+
+- Cost, measured: an accumulator doing `ar[f1+r] = ar[f1+r] + v` with `r`
+  carried schedules at `Final II = 3` in BRAM (store/load distance 1) and II=2
+  fully partitioned into registers. One pragma line would have said the reads
+  and writes never alias.
+- Without it the recurrence has to be engineered away in *hardware*: a
+  write-behind rotation (hold the last two rows in registers, write `ar` two
+  iterations late, answer reads in that window from a bypass mux) takes the
+  memory off the carried path and reaches II=1 -- at **13.7x the flip-flops in
+  that unit** (1,270 -> 17,450) for a 2.3% end-to-end gain.
+- So the missing primitive is not cosmetic: it is the difference between a
+  one-line assertion and a hardware redesign with a real area price.
+- **Priority: Medium-High.** It is the standard HLS escape hatch for II
+  problems and Allo cannot reach it. A `s.dependence(...)` primitive alongside
+  the existing `s.partition(...)` is the natural shape.
+
+## 22. The SystemC fork's `Wire` is semantically incomplete -- and wrong in RTL, not just in simulation
+
+Recorded here because it closes a question this project spent real time on: whether
+the SystemC path (`choonsik1/allo:SystemC-emitter`) offers the **non-handshaked
+fixed-latency edge** that a no-interlock machine needs and Allo's `Stream` cannot
+express. It does not.
+
+An earlier investigation reported `pe_wire` as *"synthesises clean and fails
+csim"* and concluded the SystemC thread model could not represent a wire --
+i.e. that the design was good and the simulator was lying. **That is backwards.**
+Simulating Catapult's own `pe_wire` netlist under xsim:
+
+```
+Stream[int32,2]  boundary   PASS   (all 18 producer/consumer pacings)
+Channel[vld_rdy] boundary   PASS   (all 18)
+Wire[int32]      boundary   FAIL   8/8 wrong, at all 18
+```
+
+Measured `0 0 0 2 2 10 10 28` against golden `2 10 28 60 110 182 280 408`. **The
+csim failure was a true positive.**
+
+Mechanism, from the netlist rather than the model: `acc_0` has no input
+handshake at all -- its only input is bare data -- and its loop counter advances
+on its *consumer's* ready. `mul_0` latches the wire on its *producers'* valid.
+Nothing couples the two counters, `mul` takes ~3 cycles per product and `acc`
+one per step, so `acc` runs the entire loop before `mul` produces anything.
+
+- **Positive control:** holding `acc_0` in reset 3-4 cycles longer and stepping
+  it once per product makes the *identical* wire RTL produce the exact golden
+  result. The wiring and arithmetic are right; only the lockstep is missing, and
+  the correct window is **2 cycles wide** (delays 2 and 5 both fail).
+- The construct names an edge without specifying when either end samples it. Its
+  correctness depends on a global cycle discipline that nothing in the emitter
+  establishes, checks, or documents. The one design previously cited as evidence
+  that wires work was already flagged as luck; this makes luck the general case.
+- **A wire design CAN be verified** -- xsim on the Catapult netlist against a
+  numpy golden, with four injected faults all going red, including a one-cycle
+  latency change. But it needs hand-built lockstep per design and is not
+  checkable by the type system.
+- Making wires sound needs the emitter to give cycle-locked kernels a shared
+  advance -- one enable driving every stage's counter, which is what a VLIW
+  delay line is. `notes/archive/SYSTEMC_COMB_MODE.md` scopes that as the
+  `SC_METHOD` "comb" mode in five phases, and its own top risk is whether such a
+  model simulates as well as it synthesises.
+
+**Consequence for the roadmap:** the SystemC path does not currently supply a
+usable non-handshaked edge, so the MiniTPU-class direction is blocked further
+back than "Allo won't hand out two memory ports". It needs a scheduling model
+first.
+
+### Two incidental findings
+
+- **A valid/ready protocol violation in the emitted memory port.** `feed_0`
+  asserts `v0_req_vld` from its reset state but books the acknowledgement two
+  FSM states later, while `AlloMem` consumes the request one cycle after reset
+  -- so the full `pe_wire` top deadlocks from reset at any reset length. It
+  affects `pe_stream` and `pe_channel` equally, **including the design the
+  branch reports as Xcelium-cosim bit-exact**, which suggests these netlists
+  were never simulated standalone.
+- **No SystemC library or MatchLib on this host** (`ace-01`): no `libsystemc*`,
+  `systemc.h`, `connections.h` or `mc_connections.h` anywhere. csim cannot run
+  here for any design. SystemC 2.3.x + NVlabs MatchLib would be a few hours and
+  no licence.
