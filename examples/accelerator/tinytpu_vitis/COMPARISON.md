@@ -189,9 +189,12 @@ So Gemmini's accelerator-plus-dispatch fixed cost is about **161** against our
 its numbers, the honest pairing at 4x4x4 is 252 against ~161: **we are roughly
 1.6x slower**, not 2.28x faster.
 
-**What a real comparison needs**, and neither exists yet: a Gemmini window that
-excludes the driver at every shape, or our number re-measured with an equivalent
-host-side cost included. The first is the cheaper of the two and is in progress.
+**What a real comparison needed** was one of two things: a Gemmini window that
+excludes the driver at every shape, or our number re-measured with an
+equivalent host-side cost included. The first was the cheaper and it is now
+done -- see the like-for-like table above, which is what the 1.55-1.8x result
+rests on. The second is still open, and is the honest way to measure what a
+*user* of each machine would see rather than what each machine's hardware does.
 
 ## The memory model, and our sensitivity to it
 
