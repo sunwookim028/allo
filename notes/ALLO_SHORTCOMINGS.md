@@ -240,7 +240,7 @@ runs zero times.
 - **Priority: High.** Either lower unsigned slices to `ap_uint<N>`, or make the
   simulator model the sign so the two agree.
 
-## 13. No program-controlled DMA: bulk copy or unbuffered `m_axi`, nothing between
+## 13. ~~No program-controlled DMA~~ -- **largely RETRACTED**; the gap is convenience, not capability
 
 `wrap_io=True` copies each argument into a local buffer before the region runs,
 sized to the **declared** array rather than to what the program touches.
@@ -254,13 +254,50 @@ Measured, same design, one build each (cycles, cosim):
 | `wrap_io=False` | **39.8** | **481** | **1.21x** | 2.25x |
 | Gemmini | **10.8** | **483** | 1.00x | 1.00x |
 
-- `wrap_io=False` reaches Gemmini's *fixed* cost (481 vs 483) but doubles the
-  marginal cost. Crossover is ~29 instructions.
-- Gemmini has the third option and Allo does not expose it: a bursted DMA the
-  program controls (`mvin` moves exactly the tiles named), which is low on
-  *both* terms. **This is the single largest structural gap** to a
-  Gemmini-class design, worth ~1.9x of a measured 1.8x total.
-- **Priority: High** for any accelerator work.
+### The retraction (2026-09-18)
+
+The conclusion drawn from that table -- "Gemmini has a third option and Allo
+does not expose it" -- **was wrong**, and the table itself is confounded.
+
+`wrap_io=False` was measured with a **strided** access pattern and no local
+buffer. Probing which patterns Vitis actually bursts, with `wrap_io=False` and
+flat arguments:
+
+```
+lA[(off + r) * MAXDIM + e], e over meta_for(T)      <- what our dma_ld does
+  [HLS 214-115] Multiple burst reads of length 4 and bit width 8
+
+for i in range(n): buf[i] = lA[off + i]   (n RUNTIME)
+  [HLS 214-115] Multiple burst reads of VARIABLE LENGTH and bit width 8
+```
+
+**A contiguous copy with a runtime length from a runtime offset infers a real
+variable-length AXI burst, at II=1.** That *is* `mvin`, and Allo expresses it
+today. The 39.8 cycles/instruction in the table above is the cost of 4-byte
+bursts, not of `m_axi`; it condemns the access pattern, not the configuration.
+
+What remains true, and what is actually left:
+
+- `wrap_io=True` genuinely is not a DMA. `wrap_data_movement`
+  (`allo/ir/transform.py:450`) takes its extent from
+  `shape = MemRefType(arg.type).shape` -- the **static type** -- with no offset
+  and no length anywhere in the generated function. It is a whole-argument
+  hoist run once at region entry, and every declared word is a startup cycle
+  whether the program touches it or not.
+- So the two options are "hoist everything" or "issue your own bursts", and the
+  second one works. What Allo lacks is only the *convenience* of an
+  `allo.dma(buf, ptr, offset, length)` intrinsic that makes the burst idiom
+  obvious rather than something you discover by reading HLS burst messages.
+- **Priority: Medium** (an ergonomics and documentation item), down from High.
+  The performance work it was blocking is ours, not Allo's.
+
+### The general lesson
+
+The measurement that produced the wrong conclusion was real and repeatable; it
+was the *attribution* that was wrong. Two configurations were compared while a
+third variable -- the access pattern -- differed between them, and the result
+was charged to the configuration. Before charging a cost to the toolchain,
+check that the thing being measured is the thing named.
 
 ## 14. `wrap_io=False` rejects multi-dimensional arguments to nested kernels
 
@@ -441,3 +478,31 @@ investigation:
 | the sequencer's control broadcast is the cause | rewrite as a forwarding chain | exact, depth unchanged |
 
 The actual cause was #11, in the simulator, not in any of these.
+
+## 20. The emitter can generate a local whose name collides with a parameter
+
+A kernel body that produces enough SSA temporaries can emit a local with the
+same name as one of the function's own parameters, giving C++ that does not
+compile:
+
+```cpp
+void mover_0(int32_t v0[8], int8_t v1[256], hls::stream< int32_t >& v2) {
+  ...
+  int8_t v2;          // shadows the stream parameter
+  v2 = v50;
+  ...                 // later use of v2 as a stream:
+}
+// ERROR: [HLS 207-3746] subscripted value is not an array, pointer, or vector
+```
+
+- Found while probing m_axi burst behaviour (item 13): a `@df.kernel` taking
+  three arguments, the third a `Stream`, with a `meta_for` body creating
+  several temporaries. The parameter list is numbered `v0, v1, v2` and the
+  body's temporaries restart into the same namespace.
+- The failure is late and the message is unhelpful: it surfaces from the C++
+  front end as a subscript error on a name the user never wrote, with no
+  indication that a collision happened. Nothing in Allo warns.
+- Workaround: change the kernel's arity or restructure the body so the counters
+  do not meet -- which is to say, guess.
+- **Priority: Medium.** It is silent at the Allo level, and the diagnostic
+  points nowhere near the cause.
