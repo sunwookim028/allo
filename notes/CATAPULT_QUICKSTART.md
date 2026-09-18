@@ -39,13 +39,39 @@ catapult -version
 
 ### 1.2 License
 
-The license server is pre-configured on zhang-21 via `CATAPULT_LICENSE_FILE`. Verify it is set:
+**Set these yourself. Do not assume the host is configured** -- an earlier
+revision of this section claimed the server was "pre-configured on zhang-21 via
+`CATAPULT_LICENSE_FILE`", and that was checked on zhang-21 on 2026-09-18 and is
+false: the variable is empty, and it is the wrong variable name besides.
 
 ```bash
-echo $CATAPULT_LICENSE_FILE
+export MGLS_LICENSE_FILE=1717@en-license-05.coecis.cornell.edu   # Siemens / Catapult
+export CDS_LIC_FILE=5280@en-license-05.coecis.cornell.edu        # Cadence / Xcelium
+unset LD_PRELOAD                                                 # the login env breaks xrun
 ```
 
-If empty, contact the server admin. Synthesis will fail immediately with a license checkout error if the license is not available.
+Provenance: both exports come from the commits that produced the Catapult
+synthesis and Xcelium cosim results on record (`c7402f9f`, `0eff4888`,
+`67559cad` on `choonsik1/SystemC-emitter`; `git log --all -S"MGLS_LICENSE_FILE"`
+finds them). So this is the configuration that demonstrably worked, rather than
+a guess -- but it predates 2026-09-18 and had not been re-verified as of this
+writing.
+
+**Both tools run `-version` without checking a licence out**, so a successful
+`-version` proves nothing. Check a real checkout before concluding the host is
+ready. Failure modes observed on zhang-21 on 2026-09-18, all with the *wrong*
+server:
+
+| symptom | meaning |
+| --- | --- |
+| Catapult `mgls_errno 515` | no Siemens licence reachable |
+| Xcelium `LMC-01902` | no `CDS_LIC_FILE` set at all |
+| Xcelium `LMF-03097` | server answered, but has no Xcelium feature |
+
+That last one is the trap: `27020@en-license-05` is the **Synopsys** vendor
+daemon on the same host. Right machine, wrong port -- so the server replies and
+the checkout still fails. Siemens is 1717, Cadence is 5280, Synopsys is 27020,
+all on `en-license-05.coecis.cornell.edu`.
 
 ### 1.3 AC Datatypes (Algorithmic C)
 
