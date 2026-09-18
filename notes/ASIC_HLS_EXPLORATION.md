@@ -3,8 +3,43 @@
 ## Summary
 
 Explored two commercial ASIC HLS backends (Catapult HLS, Tapa) as part of the
-mesh accelerator research. Decision: not pursuing further. Vitis HLS remains the
-primary backend. CIRCT is the recommended long-term direction for ASIC targets.
+mesh accelerator research. Vitis HLS is the primary backend and has the only
+end-to-end measured results (`examples/accelerator/tinytpu_vitis`).
+
+**The 2026-09-17 decision recorded here -- "not pursuing Catapult further,
+CIRCT is the recommended long-term direction" -- was reopened on 2026-09-18 and
+no longer describes the plan.** Both halves of it moved:
+
+* **Catapult is being pursued again**, as a bounded spike on `zhang-21` (the
+  host that has the tool). The reason is not the synthesis numbers below; it is
+  that the SystemC fork carries a `Wire` -- a non-handshaked edge -- and a
+  MiniTPU-class VLIW delay line needs one. That `Wire` is currently **wrong in
+  RTL, not merely in csim** (`ALLO_SHORTCOMINGS.md` #22): simulating Catapult's
+  own `pe_wire` netlist under xsim fails 8/8 at all 18 producer/consumer
+  pacings, while `Stream` and `Channel` pass all 18. The failure is diagnosed
+  rather than mysterious -- holding `acc_0` in reset 3-4 cycles longer and
+  stepping it once per product makes the *identical* RTL produce exact golden
+  output, so only the lockstep is missing and the correct window is 2 cycles
+  wide. The spike's first deliverable is that test passing under Catapult's own
+  scheduler, not a TPU. A second, independent reason to want the tool: it gives
+  **ASIC PPA**, and the Gemmini comparison is cycles-only today.
+  Note that no SystemC library or MatchLib exists on `ace-01`, so csim cannot
+  run here for any design -- which is itself part of why the move is worth
+  making.
+* **The CIRCT path is not currently reproducible in this checkout.** Its clone
+  (`externals/circt`, 2.3 GB with its build tree) was deleted on 2026-09-18 in
+  the pre-migration cleanup. It was untracked, not a submodule, and referenced
+  by nothing. The pin survives only because the generated RTL stamps it:
+  **CIRCT `af5369d`**. The generator lives on `chia-codesign`
+  (`examples/accelerator/tinytpu/microarch.py`), not here, and the artifacts
+  worth keeping -- the per-unit modules, `gen_ip.tcl`, and `manifest.json` --
+  are committed there under `examples/accelerator/tinytpu/rtlgen/`.
+  `manifest.json` is a per-module scheduling model (determinacy class, latency,
+  per-port bank/factor/latency/width) and so is directly relevant to #22's
+  conclusion that the SystemC path lacks one. It is a partial answer: the four
+  `counted_static` units carry latencies, while the top and both DMA units are
+  `indeterminate` with none -- the data-dependent units a delay line actually
+  has to schedule against.
 
 ## Catapult HLS (Siemens EDA)
 
