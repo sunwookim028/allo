@@ -75,6 +75,43 @@ def recursive_collect_ops_by_name(
                 recursive_collect_ops_by_name(op, target_op_name, res_list)
 
 
+def _build_spin_wait_loop(module: Module, replace_ip: InsertionPoint) -> InsertionPoint:
+    """Emit the `scf.while` that a blocking `stream_put` / `stream_get` spins in.
+
+    The loop is emitted without a condition: the caller inserts its own
+    `arith.cmpi` and the closing `scf.condition` into the returned "before"
+    insertion point.  The "after" region -- the body that runs while the PE is
+    stalled -- is complete here: an `omp.taskyield` so the OpenMP runtime may
+    schedule a peer section, and a `usleep(1)` so a stalled PE does not starve
+    the core its producer needs.
+
+    All three blocking stream sites (put and get, inside a PE function and at
+    region scope) were near-verbatim copies of this body; they now share it, so
+    the stall path exists in one place.  That matters because this is where a
+    per-channel deadlock report would hook in -- recording which PE is blocked
+    on which stream and at what occupancy, instead of the silent hang described
+    in notes/ALLO_SHORTCOMINGS.md #11.  Doing so needs a runtime shared library
+    to call into; the host-side timeout in `LLVMOMPModule.__call__` is the
+    cheap first tier.
+    """
+    spin_while_op = scf_d.WhileOp(results_=[], inits=[], ip=replace_ip)
+    assert isinstance(spin_while_op.before, Region)
+    assert isinstance(spin_while_op.after, Region)
+    before_block = Block.create_at_start(parent=spin_while_op.before, arg_types=[])
+    before_ip = InsertionPoint(before_block)
+    openmp_d.FlushOp([], ip=before_ip)
+    after_block = Block.create_at_start(parent=spin_while_op.after, arg_types=[])
+    after_ip = InsertionPoint(after_block)
+    openmp_d.TaskyieldOp(ip=after_ip)
+    # Inject usleep(1) to prevent CPU starvation
+    c1 = arith_d.ConstantOp(
+        IntegerType.get_signless(32, module.context), 1, ip=after_ip
+    )
+    func_d.CallOp([], FlatSymbolRefAttr.get("usleep"), [c1], ip=after_ip)
+    scf_d.YieldOp(results_=[], ip=after_ip)
+    return before_ip
+
+
 def _process_function_streams(
     module: Module,
     func: func_d.FuncOp,
@@ -636,25 +673,7 @@ def _process_function_streams(
                     rhs=const_fifo_depth.result,
                     ip=replace_ip,
                 )
-            spin_while_op = scf_d.WhileOp(results_=[], inits=[], ip=replace_ip)
-            assert isinstance(spin_while_op.before, Region)
-            assert isinstance(spin_while_op.after, Region)
-            before_block = Block.create_at_start(
-                parent=spin_while_op.before, arg_types=[]
-            )
-            before_ip = InsertionPoint(before_block)
-            openmp_d.FlushOp([], ip=before_ip)
-            after_block = Block.create_at_start(
-                parent=spin_while_op.after, arg_types=[]
-            )
-            after_ip = InsertionPoint(after_block)
-            openmp_d.TaskyieldOp(ip=after_ip)
-            # Inject usleep(1) to prevent CPU starvation
-            c1 = arith_d.ConstantOp(
-                IntegerType.get_signless(32, module.context), 1, ip=after_ip
-            )
-            func_d.CallOp([], FlatSymbolRefAttr.get("usleep"), [c1], ip=after_ip)
-            scf_d.YieldOp(results_=[], ip=after_ip)
+            before_ip = _build_spin_wait_loop(module, replace_ip)
             if isinstance(stream_access_op, allo_d.StreamPutOp):
                 head_val_op = memref_d.LoadOp(memref=head_ptr, indices=[], ip=before_ip)
                 cmp_op = arith_d.CmpIOp(
@@ -1173,25 +1192,7 @@ def _process_function_streams(
                 rhs=const_fifo_depth.result,
                 ip=replace_ip,
             )
-            spin_while_op = scf_d.WhileOp(results_=[], inits=[], ip=replace_ip)
-            assert isinstance(spin_while_op.before, Region)
-            assert isinstance(spin_while_op.after, Region)
-            before_block = Block.create_at_start(
-                parent=spin_while_op.before, arg_types=[]
-            )
-            before_ip = InsertionPoint(before_block)
-            openmp_d.FlushOp([], ip=before_ip)
-            after_block = Block.create_at_start(
-                parent=spin_while_op.after, arg_types=[]
-            )
-            after_ip = InsertionPoint(after_block)
-            openmp_d.TaskyieldOp(ip=after_ip)
-            # Inject usleep(1) to prevent CPU starvation
-            c1 = arith_d.ConstantOp(
-                IntegerType.get_signless(32, module.context), 1, ip=after_ip
-            )
-            func_d.CallOp([], FlatSymbolRefAttr.get("usleep"), [c1], ip=after_ip)
-            scf_d.YieldOp(results_=[], ip=after_ip)
+            before_ip = _build_spin_wait_loop(module, replace_ip)
             head_val_op = memref_d.LoadOp(memref=head_ptr, indices=[], ip=before_ip)
             cmp_op = arith_d.CmpIOp(
                 predicate=0, lhs=head_val_op, rhs=tail_next_op, ip=before_ip
@@ -1281,25 +1282,7 @@ def _process_function_streams(
                 rhs=const_fifo_depth.result,
                 ip=replace_ip,
             )
-            spin_while_op = scf_d.WhileOp(results_=[], inits=[], ip=replace_ip)
-            assert isinstance(spin_while_op.before, Region)
-            assert isinstance(spin_while_op.after, Region)
-            before_block = Block.create_at_start(
-                parent=spin_while_op.before, arg_types=[]
-            )
-            before_ip = InsertionPoint(before_block)
-            openmp_d.FlushOp([], ip=before_ip)
-            after_block = Block.create_at_start(
-                parent=spin_while_op.after, arg_types=[]
-            )
-            after_ip = InsertionPoint(after_block)
-            openmp_d.TaskyieldOp(ip=after_ip)
-            # Inject usleep(1) to prevent CPU starvation
-            c1 = arith_d.ConstantOp(
-                IntegerType.get_signless(32, module.context), 1, ip=after_ip
-            )
-            func_d.CallOp([], FlatSymbolRefAttr.get("usleep"), [c1], ip=after_ip)
-            scf_d.YieldOp(results_=[], ip=after_ip)
+            before_ip = _build_spin_wait_loop(module, replace_ip)
             tail_val_op = memref_d.LoadOp(memref=tail_ptr, indices=[], ip=before_ip)
             cmp_op = arith_d.CmpIOp(0, lhs=head_val_op, rhs=tail_val_op, ip=before_ip)
             scf_d.ConditionOp(condition=cmp_op, args=[], ip=before_ip)
