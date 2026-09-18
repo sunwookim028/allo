@@ -99,8 +99,8 @@ as the critical process. A unit finished instruction *n* before starting *n+1*,
 so every instruction boundary cost a pipeline fill and drain plus the call
 overhead of the sub-function Vitis extracts each inner loop into.
 
-**Every unit but the accumulator is now one flat loop over the work items it
-will process**, with the instruction fetched on the iteration that needs it:
+**Every unit is now one flat loop over the work items it will process**, with
+the instruction fetched on the iteration that needs it:
 
     r = -1
     for x in range(n_work):         # ROWS (or words), from the header
@@ -145,28 +145,36 @@ what each does instead:
     synthesized to one read port per arm on one memory, and `vru` came back at
     II=2 and `accu` at II=3. Muxing the address rather than the data fixes it.
 
-**`accu` did not flatten, and it is not flattened here.** Its four arms all
-touch `ar`, and once `r` is a carried register rather than the loop's own
-induction variable, Vitis can no longer prove that iteration *n*'s store and
-iteration *n+1*'s load touch different rows: `Final II = 3`. Completely
-partitioning `ar` into registers removes the aliasing question entirely and
-gets II=2, no further -- read, add, write, and the next iteration may read what
-this one wrote is a real recurrence. Both versions were built and both were
-bit-exact; both were also slower than the nested loop, which keeps `mm` at II=1
-and pays a pipeline fill per instruction instead. `accu`'s docstring has the
-detail.
+**`accu` resisted this twice and needed a fifth trick: a write-behind
+rotation.** Its four arms all touch `ar`, and once `r` is a carried register
+rather than the loop's own induction variable, Vitis can no longer prove that
+iteration *n*'s store and iteration *n+1*'s load touch different rows:
+`Final II = 3`. Completely partitioning `ar` into registers removes the
+aliasing question and gets II=2, no further -- read, add, write, and the next
+iteration may read what this one wrote is a real recurrence through the
+register file. Both were built, both were bit-exact, and both were slower than
+the nested loop.
+
+What closes it is to stop writing `ar` on the cycle the value is produced.
+`accu` now holds the last two computed rows in registers, writes `ar` two
+iterations late, and answers a read that lands inside that window from the
+registers instead. The recurrence is then register -> adder -> register with
+the memory off it, and the flat loop closes at **II=1**. Registers are still
+required -- the rotation removes the *recurrence*, not Vitis's conservative
+store/load dependence on a BRAM -- so `ar` is completely partitioned, which is
+what the 1270 -> 17450 FF in `accu` buys. Measured: 680/831/1066/1139/1457 ->
+**676/827/1062/1125/1423** at the five shapes, marginal 20.07 -> 19.32.
 
 That is the general rule this pass ran into: **flattening trades a fixed
 per-instruction cost for a permanent per-row II, and only pays where the II
-stays at 1.** Four units kept the flat loop; one did not, and did not.
+stays at 1** -- which for `accu` took breaking a recurrence, not just moving a
+loop.
 
-The array is left alone by this pass: a PE's loop counts `mm` instructions,
-not rows, and its per-`mm` prologue (latch a weight, forward the rest down the
-column) is a different shape from its MAC body, so folding the two would set
-the II of the MAC path -- the one loop in the design that is already II=1 and
-carries the actual arithmetic -- from the worst of the two. `vru` hands the
-array its total wavefront-row count alongside the `mm` count so that a later
-pass can flatten a PE without another header change.
+**The array was flattened the same way, reached II=1, and was measured
+SLOWER.** See `pe`'s docstring: the per-`mm` prologue is not on the critical
+path, because `vru` upstream spends the same `T + 1` words on it at II=1 either
+way, and the flat body's extra pipeline depth costs about 10 cycles through the
+chain. It is not here.
 
 ## THE DMA: `wrap_io=False`, and one burst per thing the program names
 
@@ -865,7 +873,50 @@ def tinytpu_isa(
         partial sum from the north, multiply-add, pass both on. The multiplier
         and adder latencies are pipeline *depth*, not initiation interval, which
         is the property `microarch.py` could not have and the reason a systolic
-        array is built deep."""
+        array is built deep.
+
+        **The per-`mm` prologue was flattened away, reached II=1, and measured
+        SLOWER. It is not here, and this is the record of why.**
+
+        The outer loop's 2058 iteration latency in the synthesis report is not
+        the prologue: the MAC sub-loop alone is 2051 (trip 2047 at II=1, a
+        worst-case bound from the 12-bit row count), so the chain walk and the
+        latch cost 4-7 cycles, and the sub-function call and the MAC loop's own
+        fill add about 5 more. Removing all of that is worth roughly 12 cycles
+        per `mm`, 190 at 16x16x16.
+
+        A PE flattens exactly the way `vru` does, charging itself one iteration
+        per word it receives -- `nw + 1` of them, where `nw` is `T - i` down
+        column 0 and 1 from the west -- so the body is straight-line and the
+        MAC path can stay at II=1. `vru` already sends the total wavefront-row
+        count beside the `mm` count for this. Three things had to be right:
+
+          1. **ONE `get` site per FIFO.** A get in the header arm and another
+             in the weight arm synthesizes a read port per arm on the same
+             FIFO: `Final II = 2`.
+          2. **The phase counter at the TOP of the body.** Rearmed at the
+             bottom, inside the compute arm, the select that produces it lands
+             in the last pipeline stage and the next iteration's FIFO read
+             waits on it: `Final II = 2` again, reported as a carried
+             dependence between a `select` and a `fifo read`.
+          3. **Latch the row count on the header word, arm the row counter on
+             the LAST prologue word.** Armed on the header, the FIFO output
+             feeds the counter that gates the next FIFO read. Split, and with
+             `nw` a compile-time constant >= 1, the two are provably different
+             iterations, so what arms the counter is a register.
+
+        With all three, all 16 PEs became one pipelined loop at **II=1** with
+        no `Pipelined = no` left in the array -- and cosim came back
+        **679 / 844 / 1076 / 1149 / 1467** against 680/831/1066/1139/1457, a
+        wash at 4x4x4 and about +10 everywhere else. The prologue is not on the
+        critical path: `vru` upstream spends the same `T + 1` words per `mm`
+        pushing it at II=1, so the PE was never the thing waiting, and the flat
+        body's deeper pipeline (5-6 stages against the MAC loop's 4) costs
+        about 10 cycles of extra latency through the T-deep chain. An
+        intermediate build that reached only II=2 measured 686/850/1133/1254/
+        **1664**, which is the other half of the same measurement: the array's
+        *throughput* is worth 0.8 cycles of runtime per cycle of MAC, its
+        per-instruction *overhead* is worth nothing."""
         i, j = df.get_pid()
         w: int8 = 0
         # The `mm` count arrives on the same chain the headers use, so the
@@ -946,18 +997,17 @@ def tinytpu_isa(
         psums, `vadd` sums them into the running total. Gemmini splits the same
         way -- adds in `AccumulatorMem`'s write path, not in the mesh.
 
-        `vst` clips to int8 on the way out, which is Gemmini's `mvout` under
+        `mvout` clips to int8 on the way out, which is Gemmini's `mvout` under
         ACC_SCALE_IDENTITY with shift 0.
 
-        **THIS IS THE UNIT THAT WOULD NOT FLATTEN.** Four opcodes and one
-        memory: `ar` is written by `mm`, read-modify-written by `vadd` and
-        `vrelu`, and read by `mvout`. One owner per memory rules out splitting
-        it, so the flat row loop the other four units got was the only route.
-        It was built twice, was bit-exact both times, and was slower both
-        times, so it is not here. The two attempts and what each hit:
+        **THIS IS THE UNIT THAT WOULD NOT FLATTEN, AND WHAT IT TOOK.** Four
+        opcodes and one memory: `ar` is written by `mm`, read-modify-written by
+        `vadd` and `vrelu`, and read by `mvout`. One owner per memory rules out
+        splitting it, so the flat row loop the other four units got was the only
+        route, and it was built twice before this and lost twice:
 
           * **`ar` in BRAM: `Final II = 3`.** Muxing the four arms down to one
-            `ar` read and one `ar` write fixed the port count, and hoisting the
+            `ar` read and one `ar` write fixed the port count and hoisting the
             row counter fixed the queue recurrence -- both of which worked for
             the other units. What remained was a memory dependence:
 
@@ -969,109 +1019,152 @@ def tinytpu_isa(
             own induction variable, so Vitis proves iteration *n*'s store and
             iteration *n+1*'s load touch different rows and schedules `mm` at
             II=1. Flattening makes `r` a carried register, the index stops
-            being affine in the loop index, and the proof fails. Deferring the
-            write by one iteration -- the textbook fix -- only moves the
-            violation onto the enable register.
+            being affine in the loop index, and the proof fails. Vitis will
+            take `#pragma HLS dependence ... inter false` for exactly this, and
+            **Allo emits no such pragma and has no primitive for one** -- the
+            only pragmas it emits are the `m_axi`/`s_axilite` interface ones
+            (`allo/backend/vitis.py`), with partition and pipeline carried as
+            MLIR attributes. So the proof has to be made unnecessary rather
+            than waived.
           * **`ar` completely partitioned into registers: `Final II = 2`.** A
             register file has no port to arbitrate and nothing to prove about
-            aliasing, and it did take the II from 3 to 2 (at 33k FF and 12k
-            LUT, and 10 minutes of synthesis). The remainder is not an
-            artifact: read `ar[ra]`, add, write `ar[wa]`, and the next
+            aliasing, and it did take the II from 3 to 2. The remainder is not
+            an artifact: read `ar[ra]`, add, write `ar[wa]`, and the next
             iteration may read what this one wrote. That is a genuine
-            read-modify-write recurrence through a register file and it does
-            not close in one cycle.
+            read-modify-write recurrence *through the register file* and it
+            does not close in one cycle.
 
-        So II=2 per row is the floor for a flattened accumulator, and at
-        16x16x16 that is 384 iterations at 2 cycles against 20 instruction
-        boundaries plus 384 rows at 1 -- the nested loop wins, and keeps `mm`
-        at II=1 where the GEMM actually lives. `vadd`'s own loop is II=2 (two
-        `ar` reads and a write is three accesses to a dual-port BRAM), which is
-        real but off the GEMM path.
+        **The write-behind rotation is what closes it.** `d0`/`a0` hold the row
+        computed one iteration ago and `d1`/`a1` the one from two; `ar` is
+        written two iterations late, and a read that lands inside that window
+        takes the register instead of the memory. The loop-carried path is then
 
-        The general rule, and the reason four units flattened and this one did
-        not: **flattening trades a fixed per-instruction cost for a permanent
-        per-row II, and only pays where the II stays at 1.**"""
+            adder -> rotation register -> bypass mux -> adder
+
+        with `ar` off it entirely -- the memory is written from `a1`/`d1`,
+        which are registers, and read at an address whose value is two
+        iterations stale by construction. `Final II = 1, Depth = 6`. Registers
+        are still required: the rotation removes the *recurrence*, not Vitis's
+        conservative store/load dependence on a BRAM, so `schedule()` still
+        partitions `ar` completely. That is the 1270 -> 17450 FF.
+
+        This is the shape Gemmini's output-stationary PE uses for the same
+        reason -- two accumulators, `c1` and `c2`, so that consecutive results
+        land in different storage -- applied to a register file rather than to
+        one PE.
+
+        **One iteration per row, for all four arms**, which is why the header
+        promises `accu` ROWS now rather than instructions. The nested form paid
+        a per-instruction boundary that the flat one does not: a decode, the
+        call into the sub-function Vitis extracts each inner loop into, and
+        that loop's fill and drain, about 8 cycles on top of `nr` rows of work.
+        Measured over the five shapes, 680/831/1066/1139/1457 ->
+        **676/827/1062/1125/1423**, all bit-exact: the boundary was real but
+        mostly hidden behind `vru` and `dma_st`, which is why 8 cycles times 20
+        instructions at 16x16x16 came back as 34 and not 160.
+
+        `vadd` reads `ar` twice in one iteration, which a BRAM could not have
+        given and the register file gives for free; its own loop used to be
+        II=2 for exactly that reason, so nothing was lost by folding it in.
+        """
         ar: UInt(AW)[NAR] = 0
         nw: UInt(64) = c_acc.get()
-        n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+        n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
                                     # so this carries 0..32767 counts.
-        for c in range(n_own):
-            w0: UInt(64) = c_acc.get()
-            op: int32 = w0[0:6]
-            f0: int32 = w0[6:18]
-            f1: int32 = w0[18:30]
-            f2: int32 = w0[30:42]
-            f3: int32 = w0[42:54]
-            nr: int32 = w0[54:62]
-
+        op: int32 = 0
+        f0: int32 = 0
+        f1: int32 = 0
+        f2: int32 = 0
+        cnt: int32 = 0
+        r: int32 = -1               # advanced at the TOP: see the II note
+        # The write-behind rotation. `d0`/`a0` is the row computed one
+        # iteration ago and `d1`/`a1` two; `ar` itself is written two
+        # iterations late, and a read that lands inside that window takes the
+        # register instead. An address of -1 is an empty slot (`mvout` writes
+        # nothing) and never matches a real row.
+        a0: int32 = -1
+        a1: int32 = -1
+        d0: UInt(AW) = 0
+        d1: UInt(AW) = 0
+        for x in range(n_row):
+            r += 1
+            if r >= cnt:
+                w0: UInt(64) = c_acc.get()
+                op = w0[0:6]
+                f0 = w0[6:18]
+                f1 = w0[18:30]
+                f2 = w0[30:42]
+                cnt = w0[54:62]
+                r = 0
+            # ONE read of `ar`, at an address the branch selects -- the same
+            # rule `vru` is written to -- then the rotation bypass.
+            ra: int32 = f1 + r
+            wa: int32 = f0 + r
             if op == OP_MM:
-                # `f2` selects overwrite (0) or accumulate (1). Accumulating
-                # here is what makes the k-contraction free: with it, a Kt-deep
-                # contraction is Kt `mm`s and no `vadd` at all, where before it
-                # was Kt `mm`s *and* Kt-1 `vadd`s -- and both ran in this one
-                # unit, so `accu` was doing 2.25 row-ops for every wavefront the
-                # array produced and was the critical unit in the design
-                # (csynth interval 10772 against ~6000 for every other unit).
-                #
-                # This is Gemmini's structure, not a shortcut around the ISA:
-                # `AccumulatorMem.scala` puts the add in the memory's write
-                # path and the matmul carries an accumulate bit. `vadd` remains
-                # a real instruction for elementwise work -- `vadd_program()`
-                # exercises it -- it is just no longer on the GEMM inner loop.
-                #
-                # It also cannot recur: consecutive iterations touch different
-                # addresses (`f1 + r` for successive r), so the add is pipeline
-                # depth rather than initiation interval. That is the same reason
-                # `microarch_ws.py`'s drainer accumulated at II=1.
-                for r in range(nr):
-                    v: UInt(AW) = cw[T - 1].get()
-                    base: UInt(AW) = 0
-                    if f2 == 1:
-                        base = ar[f1 + r]
-                    z: UInt(AW) = 0
-                    with allo.meta_for(T) as e:
-                        be: int32 = base[32 * e : 32 * (e + 1)]
-                        ve: int32 = v[32 * e : 32 * (e + 1)]
-                        se: int32 = be + ve
-                        z[32 * e : 32 * (e + 1)] = se
-                    ar[f1 + r] = z
-            if op == OP_VADD:
-                for r in range(nr):
-                    x: UInt(AW) = ar[f1 + r]
-                    y: UInt(AW) = ar[f2 + r]
-                    z: UInt(AW) = 0
-                    with allo.meta_for(T) as e:
-                        xe: int32 = x[32 * e : 32 * (e + 1)]
-                        ye: int32 = y[32 * e : 32 * (e + 1)]
-                        se: int32 = xe + ye
-                        z[32 * e : 32 * (e + 1)] = se
-                    ar[f0 + r] = z
-            if op == OP_VRELU:
-                for r in range(nr):
-                    u: UInt(AW) = ar[f1 + r]
-                    zr: UInt(AW) = 0
-                    with allo.meta_for(T) as e:
-                        ue: int32 = u[32 * e : 32 * (e + 1)]
-                        re: int32 = ue
-                        if re < 0:
-                            re = 0
-                        zr[32 * e : 32 * (e + 1)] = re
-                    ar[f0 + r] = zr
+                wa = f1 + r
             if op == OP_MVOUT:
-                for r in range(nr):
-                    t: UInt(AW) = ar[f0 + r]
-                    ow: UInt(VW) = 0
-                    with allo.meta_for(T) as e:
-                        te: int32 = t[32 * e : 32 * (e + 1)]
-                        if te > 127:
-                            te = 127
-                        if te < -128:
-                            te = -128
-                        tc: int8 = te
-                        ow[8 * e : 8 * (e + 1)] = tc
-                    ac2sp.put(ow)
-
+                ra = f0 + r
+            rv: UInt(AW) = ar[ra]
+            if ra == a1:
+                rv = d1
+            if ra == a0:
+                rv = d0
+            z: UInt(AW) = 0
+            if op == OP_MM:
+                v: UInt(AW) = cw[T - 1].get()
+                base: UInt(AW) = 0
+                if f2 == 1:
+                    base = rv
+                with allo.meta_for(T) as e:
+                    be: int32 = base[32 * e : 32 * (e + 1)]
+                    ve: int32 = v[32 * e : 32 * (e + 1)]
+                    se: int32 = be + ve
+                    z[32 * e : 32 * (e + 1)] = se
+            elif op == OP_VADD:
+                sa: int32 = f2 + r
+                sv: UInt(AW) = ar[sa]
+                if sa == a1:
+                    sv = d1
+                if sa == a0:
+                    sv = d0
+                with allo.meta_for(T) as e2:
+                    xe: int32 = rv[32 * e2 : 32 * (e2 + 1)]
+                    ye: int32 = sv[32 * e2 : 32 * (e2 + 1)]
+                    xy: int32 = xe + ye
+                    z[32 * e2 : 32 * (e2 + 1)] = xy
+            elif op == OP_VRELU:
+                with allo.meta_for(T) as e3:
+                    ue: int32 = rv[32 * e3 : 32 * (e3 + 1)]
+                    re: int32 = ue
+                    if re < 0:
+                        re = 0
+                    z[32 * e3 : 32 * (e3 + 1)] = re
+            else:
+                ow: UInt(VW) = 0
+                with allo.meta_for(T) as e4:
+                    te: int32 = rv[32 * e4 : 32 * (e4 + 1)]
+                    if te > 127:
+                        te = 127
+                    if te < -128:
+                        te = -128
+                    tc: int8 = te
+                    ow[8 * e4 : 8 * (e4 + 1)] = tc
+                ac2sp.put(ow)
+            # retire the row computed two iterations ago, then rotate
+            if a1 >= 0:
+                ar[a1] = d1
+            a1 = a0
+            d1 = d0
+            a0 = wa
+            if op == OP_MVOUT:
+                a0 = -1
+            d0 = z
+        # drain what is still in flight, oldest first
+        if a1 >= 0:
+            ar[a1] = d1
+        if a0 >= 0:
+            ar[a0] = d0
 
     @df.kernel(mapping=[1], args=[C])
     def dma_st(lC: int8[MAXDIM * MAXDIM]):
@@ -1295,13 +1388,9 @@ def assemble(prog):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
         imem[0] static instruction count   imem[4] mm count | mm rows << 16
-        imem[1] dma_ld  rows               imem[5] accu   INSTRUCTIONS
+        imem[1] dma_ld  rows               imem[5] accu   rows
         imem[2] spm     rows               imem[6] dma_st rows
         imem[3] vru     words              imem[7] A rows | B rows << 16
-
-    `accu` is the exception, and the only one: it is the one unit still
-    counting instructions, because it is the one unit that stayed nested (see
-    its docstring).
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
     `expand`. They must match the sequencer's dispatch rules exactly.
@@ -1345,7 +1434,7 @@ def assemble(prog):
            rows(OP_DMA_LD, OP_VLD),
            rows(OP_VLD) + mm_rows + n_mm * (T + 1),
            n_mm | (mm_rows << 16),
-           count(OP_MM, OP_VADD, OP_VRELU, OP_MVOUT),
+           rows(OP_MM, OP_VADD, OP_VRELU, OP_MVOUT),
            rows(OP_MVOUT),
            a_span | (b_span << 16)]
     assert len(hdr) == NHDR
@@ -1366,8 +1455,16 @@ def schedule(s):
     """Ports where the design needs them.
 
     A and B are read T lanes per cycle by the dma unit; C is written T lanes per
-    cycle. `ar` needs two reads and a write per cycle for `vadd`, and two banks
-    are enough given the odd `AR_P` base (see the comment there).
+    cycle.
+
+    `ar` is completely partitioned, i.e. it is a register file rather than a
+    BRAM, and that is load-bearing rather than tuning: `accu`'s flat row loop
+    reads and writes it every iteration, and Vitis will not schedule a BRAM
+    store and the next iteration's load one cycle apart at a runtime address it
+    cannot disambiguate (`Final II = 3`). Registers have no port to arbitrate
+    and nothing to prove about aliasing; the read-modify-write recurrence that
+    remains is broken by the write-behind rotation in `accu` itself. Two reads
+    per cycle for `vadd` come free from the same partition.
 
     Reachable because `df.build` is `customize(func)` followed by `s.build(...)`,
     so the schedule primitives apply on the Vitis path."""
@@ -1375,4 +1472,5 @@ def schedule(s):
     s.partition(f"{top}:A", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
+    s.partition("accu_0:ar", Partition.Complete)
     return s

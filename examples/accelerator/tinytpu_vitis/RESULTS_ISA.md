@@ -310,7 +310,7 @@ rather than counted.
 | `dma_ld` | iter latency 133, `Pipelined = no` | one loop, **yes, II=1** |
 | `spm` | 133, `no` | one loop, **yes, II=1** |
 | `vru` | 137, `no` | one loop, **yes, II=1** |
-| `accu` | 261, `no` | **unchanged** |
+| `accu` | 261, `no` | **unchanged then**; flat at II=1 now, see below |
 | `pe` x16 | 2055-2058, `no` | unchanged |
 | `dma_st` | 132, `no` | one loop, **yes, II=1** |
 
@@ -419,7 +419,7 @@ Per-unit `Pipelined` / II, one csynth each, `wrap_io=True` before against
 | `vru` | words | yes, II=1 | yes, II=1 |
 | `pe` x16 | per-`mm` | no, iter 2058 | no, iter 2058 |
 | `pe` x16 | MAC | yes, II=1 | yes, II=1 |
-| `accu` | per-instruction | no, iter 261 | no, iter 261 |
+| `accu` | per-instruction | no, iter 261 | no, iter 261 (now gone, below) |
 | `accu` | `mm` / `vadd` / `vrelu` / `mvout` | II=1 / 2 / 2 / 1 | unchanged |
 | `dma_st` | rows | yes, II=1 | yes, **II=4** |
 
@@ -537,6 +537,119 @@ is why it is the better of the two, but it is not free. And the genuinely
 subtle part of this program -- the peeled first k-tile, and the `B_SP + T` base
 that encodes "kb starts at 1" -- is exactly as subtle as it was; the generator
 has no opinion about peeling and could not form one.
+
+## The last two unpipelined loops, and which one paid
+
+After the burst DMA the only loops left with `Pipelined = no` were the array's
+per-`mm` loop and `accu`'s per-instruction loop. Both were attacked; **one paid
+and one did not**, and the one that did not is the more useful measurement.
+
+### `accu`: flat at II=1, and it took a write-behind rotation
+
+`accu` is the unit that resisted row-flattening twice (above). The obstacle was
+never the loop shape, it was one dependence: read `ar[f1 + r]`, add, write it
+back, with `r` a carried register. In BRAM that is
+
+```
+Unable to enforce a carried dependence constraint (II = 1, distance = 1)
+between 'store' on array 'ar' and 'load' ('rv') on array 'ar'
+```
+
+`Final II = 3`; completely partitioned into registers the aliasing question
+disappears and it is `Final II = 2`, no further, because read-add-write with
+the next iteration possibly reading what this one wrote is a real recurrence.
+Vitis will take `#pragma HLS dependence variable=ar inter false` for exactly
+the first of those, and **Allo has no primitive that emits one** -- the only
+pragmas it emits are the `m_axi`/`s_axilite` interface pragmas in
+`allo/backend/vitis.py`, with partition and pipeline carried as MLIR
+attributes. So the proof had to be made unnecessary instead of waived.
+
+What makes it unnecessary is to stop writing `ar` on the cycle the value is
+produced. `accu` now keeps the last two computed rows in registers, writes `ar`
+two iterations late, and answers a read that lands inside that window from the
+registers. The loop-carried path becomes
+
+```
+adder -> rotation register -> bypass mux -> adder
+```
+
+with the memory off it: `ar` is written from registers holding a value that is
+two iterations stale by construction. `Final II = 1, Depth = 6`, one iteration
+per row for all four opcodes. Registers are still needed -- the rotation
+removes the *recurrence*, not Vitis's conservative store/load dependence on a
+BRAM -- so `ar` stays completely partitioned. This is the shape Gemmini's
+output-stationary PE uses for the same reason (two accumulators `c1`/`c2`, so
+consecutive results land in different storage), applied to a register file.
+
+`vadd`'s second `ar` read, which forced its own loop to II=2 under a dual-port
+BRAM, comes free from the same partition.
+
+| shape | dyn. instrs | before | after | |
+|---|---|---|---|---|
+| 4x4x4    |  6 | 680  | **676**  | -4 |
+| 8x8x8    | 15 | 831  | **827**  | -4 |
+| 12x12x12 | 28 | 1066 | **1062** | -4 |
+| 16x16x8  | 25 | 1139 | **1125** | -14 |
+| 16x16x16 | 45 | 1457 | **1423** | -34 |
+
+Fixed cost 557 -> 563, marginal **20.07 -> 19.32** cycles/instruction. Area is
+the price and it is not small: `accu` FF 1270 -> 17450 and LUT 2465 -> 6430,
+top-level FF 11524 -> 27377, LUT 19235 -> 23239, BRAM 16 -> 12. All five shapes
+stay bit-exact, `vadd`/`vrelu` included.
+
+**The per-instruction boundary was real but mostly hidden.** It is about 8
+cycles -- a decode, the call into the sub-function Vitis extracts each inner
+loop into, and that loop's fill and drain -- so 20 accu instructions at
+16x16x16 predicted ~160 cycles and delivered 34. `vru` (464 words) and `dma_st`
+(II=4 on 64 rows) are in front of it.
+
+### The array: flattened to II=1, and measured SLOWER
+
+**First, the report was being misread.** The PE outer loop's 2058 iteration
+latency is not the prologue -- the MAC sub-loop alone is 2051 (trip 2047 at
+II=1, the worst case the 12-bit row count admits). The prologue is 4-7 cycles,
+and the sub-function call plus the MAC loop's own fill add ~5 more, so the
+per-`mm` cost really at stake was ~12 cycles, ~190 at 16x16x16.
+
+A PE flattens the way `vru` does: charge it one iteration per word it receives,
+`nw + 1` where `nw` is `T - i` down column 0 and 1 from the west, so the body
+is straight-line and the MAC path can stay at II=1. `vru` already sends the
+total wavefront-row count beside the `mm` count for exactly this. Three
+successive II=2 results had to be cleared, each a rule this design had already
+learned somewhere else:
+
+| build | `Final II` | why |
+|---|---|---|
+| a `get` in the header arm and another in the weight arm | 2 | a read port per arm on one FIFO |
+| phase counter rearmed at the bottom of the compute arm | 2 | carried dependence, `select`(`pro`) -> `fifo read` |
+| row counter armed on the header word | 2 | the FIFO output gates the next FIFO read |
+| latch on the header, arm on the LAST prologue word | **1** | `nw` is a constant >= 1, so the two are different iterations and what arms the counter is a register |
+
+All 16 PEs then pipeline at II=1 and no `Pipelined = no` is left in the array.
+Cosim:
+
+| shape | baseline | flat PE, II=2 | flat PE, II=1 |
+|---|---|---|---|
+| 4x4x4    | 680  | 686  | **679** |
+| 8x8x8    | 831  | 850  | 844 |
+| 12x12x12 | 1066 | 1133 | 1076 |
+| 16x16x8  | 1139 | 1254 | 1149 |
+| 16x16x16 | 1457 | 1664 | 1467 |
+
+**A wash at 4x4x4 and about +10 everywhere else, so it was not landed.** The
+mechanism is in the two columns together. The II=2 column costs +207 at
+16x16x16 for +256 array cycles, i.e. **the array's throughput is worth ~0.8
+cycles of runtime per cycle of MAC**. The II=1 column removes ~190 cycles of
+per-`mm` overhead and buys *nothing*, because `vru` upstream spends the same
+`T + 1` words per `mm` pushing the header and the weights at II=1 whatever the
+PE does -- the PE was never the thing waiting. What is left is the flat body's
+deeper pipeline, 5-6 stages against the MAC loop's 4, which costs about 10
+cycles of extra latency through the T-deep chain.
+
+So: **array throughput matters and array per-instruction overhead does not**,
+and the way to test that distinction was to build both and measure. The flat
+PE is written up in `pe`'s docstring in full, including the three II=2 traps,
+because the next person to look at that loop will otherwise re-derive them.
 
 ## Next
 
