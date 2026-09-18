@@ -462,13 +462,17 @@ MAXDIM it would not, without also fixing what the marginal term buys.
   **zero cycles**. The operand burst is already entirely hidden behind the
   sequencer's dispatch and the units' fill. It was built, measured, and reverted
   to the version that reads the fewest bytes.
-* **Port widening is blocked in Allo, not in Vitis.** The `m_axi` ports are 8
-  bits, so even a perfect burst moves one byte per cycle;
-  `config_interface -m_axi_max_widen_bitwidth 512` is the fix and it does
-  nothing: `[HLS 214-307] Could not widen since type i8 size is greater than or
-  equal to alignment 1(bytes)`. Allo emits the argument pointers with no
-  alignment attribute, so Vitis must assume 1 byte and refuses. Closing that in
-  the emitter is worth roughly the whole operand-traffic term.
+* **Port widening was blocked in Allo, and is now unblocked.** The `m_axi`
+  ports were 8 bits, so even a perfect burst moved one byte per cycle.
+  `config_interface -m_axi_max_widen_bitwidth 512` is the fix. This bullet used
+  to say it "does nothing" and cite `[HLS 214-307] Could not widen since type i8
+  size is greater than or equal to alignment 1(bytes)` -- **that message does
+  not appear on this design at all**; it was a probe artifact quoted as a
+  whole-design result. What actually happened was silent: the setting was
+  accepted and the ports stayed 8 bits. The diagnosis was still correct, so
+  emitting `align_value` on the pointers fixes it, and it was indeed worth
+  roughly the whole operand-traffic term -- see "The two hidden prefixes"
+  below.
 
 ### What is left, and it is not the fixed term any more
 
@@ -681,3 +685,85 @@ because the next person to look at that loop will otherwise re-derive them.
    operand burst is the whole matrix with no column overfetch at all.
 4. **Then multiple instructions in flight**, which is the remaining structural
    difference from Gemmini's reservation station.
+
+## The two hidden prefixes, and the silent refusal to widen
+
+The largest single step in this design's history, and it came from correcting
+two beliefs recorded in this file rather than from a new idea.
+
+### Belief 1: "the fixed cost is essentially closed"
+
+It was not closed, it was **hidden**. Two serial prefixes of nearly equal length
+ran beside each other, so removing either alone measured as nearly worthless:
+
+* `spm` opened with a **514-cycle zero-fill of `spad`**. Allo lowers
+  `spad: UInt(VW)[SPAD_ROWS] = 0` through `linalg.fill` (`allo/ir/builder.py`),
+  and that becomes a real memset loop in the RTL. A bare annotation with no
+  `= 0` emits none.
+* `dma_ld`'s operand burst ran **~512 cycles** at II=4 alongside it.
+
+This is the mechanism behind an earlier entry in this file that has confused
+every reading since: *"merging the A and B bursts changed the cycle count by
+exactly zero."* That measurement was true and the conclusion drawn from it --
+that operand traffic did not matter -- was false. The burst was hidden behind
+the memset, so halving it changed nothing.
+
+Removing the `= 0` from six arrays (`ib`, `rbA`, `rbB`, `spad`, `vr`, `ar`) is
+worth **-168 cycles alone**. Paired with widening it is worth **-538**, which
+is strongly super-additive and is the fingerprint of two hidden prefixes: you
+have to remove both before either shows up.
+
+**This is an ISA semantic change, not a six-character optimisation.** `ar` is
+the accumulator. Zero-filled, the hardware guaranteed a clean accumulator;
+un-filled, **the program must write before it reads**. Every program here does,
+and all five shapes are bit-exact -- but that is evidence about these programs,
+not a proof about all of them. Gemmini has the same property (`mvin` to the
+accumulator carries an overwrite/accumulate bit, so the program owns the
+initial state), so this moves us toward its semantics rather than away, but it
+is a contract change and belongs in the ISA documentation.
+
+### Belief 2: "HLS 214-307 blocks widening"
+
+**It does not reproduce on the real design.** `config_interface
+-m_axi_max_widen_bitwidth 512` is accepted, csynth completes, and there are
+*zero* 214-307 messages. The ports just stay at bit width 8 with no diagnostic
+-- which is worse than an error, because nothing tells you. 214-307 was a
+standalone probe's behaviour, quoted in three tracked files as a whole-design
+fact.
+
+The diagnosis under it was right: no alignment attribute, so Vitis assumes one
+byte and declines to widen. With `align_value` emitted, the same setting gives
+gmem0 **bit width 512**, gmem1/2 32, and takes `dma_ld`'s burst loop and
+`dma_st` from II=4 to II=1. Worth **-177 cycles alone**.
+
+### Measured, one build, bit-exact at every shape
+
+| shape | before | after | Gemmini | ratio |
+| --- | --- | --- | --- | --- |
+| 4x4x4    | 680  | **252** | 574 | **0.44x** |
+| 8x8x8    | 831  | **383** | 615 | **0.62x** |
+| 12x12x12 | 1066 | **591** | 740 | **0.80x** |
+| 16x16x8  | 1139 | **667** | 784 | **0.85x** |
+| 16x16x16 | 1457 | **919** | 986 | **0.93x** |
+
+Mismatches 0/16, 0/64, 0/144, 0/128, 0/256. Fixed cost **557 -> 151** (Gemmini
+483); marginal **20.07 -> 17.28** cycles per dynamic instruction (Gemmini
+10.81). We are 3.2x cheaper to start and still 1.60x more expensive per unit of
+work, so the lead is largest at the smallest shape and narrows with size. It is
+a real result at these sizes and not a claim about arbitrarily large GEMMs.
+
+### What `dma_st`'s II=4 actually was
+
+Answered by a unit-level probe matrix, and it was none of the usual suspects:
+
+| variant | II |
+| --- | --- |
+| strided int8 | 4 |
+| strided + widen pragma | 4 |
+| **contiguous int8** | **4** -- so the stride was never the cause |
+| strided + `align_value(64)` only | 4 |
+| strided + one 32-bit store per iteration | **1** |
+| strided int8 + align + widen | **1** |
+
+It was **element width**: four scalar byte accesses per iteration through a
+port serving one per cycle. Subsumed by the change above; no separate work.

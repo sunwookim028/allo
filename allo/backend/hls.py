@@ -353,7 +353,14 @@ class HLSModule:
                 header, self.args = separate_header(self.hls_code, self.top_func_name)
                 with open(f"{project}/kernel.h", "w", encoding="utf-8") as outfile:
                     outfile.write(header)
-                self.hls_code = postprocess_hls_code(self.hls_code, self.top_func_name)
+                # `align_value` promises Vitis the pointer is N-byte aligned,
+                # which is what lets `-m_axi_max_widen_bitwidth` actually widen
+                # the port. Opt-in: it is a promise the HOST must keep.
+                self.hls_code = postprocess_hls_code(
+                    self.hls_code,
+                    self.top_func_name,
+                    align_value=(configs or {}).get("align_value", None),
+                )
 
                 # Generate HBM/DDR configuration file if hbm_mapping is provided
                 # This must be done AFTER postprocess_hls_code to get correct arg names

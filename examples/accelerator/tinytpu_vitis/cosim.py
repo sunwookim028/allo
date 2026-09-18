@@ -62,7 +62,11 @@ def vectors(M, K, N, relu=False, seed=0):
 
 
 def carr(name, vals, ctype):
-    return f"static {ctype} {name}[{len(vals)}] = {{" + \
+    # `alignas(64)` is not cosmetic: the kernel is emitted with
+    # `align_value(64)` on its pointers, which is a PROMISE to Vitis. On real
+    # hardware XRT buffers are 4 KB aligned so it holds for free; in cosim the
+    # testbench is the host, so it has to keep the promise itself.
+    return f"static alignas(64) {ctype} {name}[{len(vals)}] = {{" + \
            ", ".join(str(int(v)) for v in vals) + "};\n"
 
 
@@ -86,7 +90,7 @@ int main() {{
            carr("A", A.reshape(-1), "int8_t"),
            carr("B", B.reshape(-1), "int8_t"),
            carr("gold", gold.reshape(-1), "int8_t"),
-           f"static int8_t C[{MAXDIM * MAXDIM}];\n",
+           f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n",
            body]
     return "".join(src)
 
@@ -113,6 +117,7 @@ add_files kernel.cpp
 add_files -tb tb.cpp -cflags "-std=gnu++0x"
 set_part {xcu280-fsvh2892-2L-e}
 create_clock -period 3.33
+config_interface -m_axi_max_widen_bitwidth 512
 csynth_design
 exit
 """
@@ -172,7 +177,8 @@ def main():
     # access pattern, not of the configuration; `microarch_isa` now avoids
     # both. `TPU_WRAP=1` still builds the hoisted variant for comparison.
     s.build(target="vitis_hls", mode="csyn", project=prj,
-            wrap_io=(os.environ.get("TPU_WRAP", "0") == "1"))
+            wrap_io=(os.environ.get("TPU_WRAP", "0") == "1"),
+            configs={"align_value": 64})
     patch_axi_depths(prj)
     open(os.path.join(prj, "tb.cpp"), "w").write(testbench(*SHAPES[0]))
     print("  synthesizing once ...", flush=True)

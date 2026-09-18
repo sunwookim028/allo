@@ -378,7 +378,7 @@ def codegen_host(top, module, num_output_args=0):
     return out_str
 
 
-def postprocess_hls_code(hls_code, top=None, pragma=True):
+def postprocess_hls_code(hls_code, top=None, pragma=True, align_value=None):
     # Strip MLIR SSA-name prefix '%' from all identifiers (e.g. %alloc -> alloc).
     # The VHLS emitter sometimes emits raw MLIR value names carrying the '%' sigil,
     # which is illegal in C++. '%' followed by a word char is exclusively the MLIR
@@ -414,7 +414,12 @@ def postprocess_hls_code(hls_code, top=None, pragma=True):
                 comma = "," if var[-1] == "," else ""
                 if "[" in var:  # array
                     var = var.split("[")[0]
-                    out_str += "  " + dtype + " *" + var + f"{comma}\n"
+                    align = (
+                        f"__attribute__((align_value({align_value}))) "
+                        if align_value
+                        else ""
+                    )
+                    out_str += "  " + dtype + " *" + align + var + f"{comma}\n"
                     # only add array to interface
                     func_args.append(var)
                 else:  # scalar

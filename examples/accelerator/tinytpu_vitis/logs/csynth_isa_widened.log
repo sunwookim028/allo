@@ -1,0 +1,1409 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2023.2 (64-bit)
+  **** SW Build 4023990 on Oct 11 2023
+  **** IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+  **** SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /opt/xilinx/Vitis_HLS/2023.2/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] Running '/opt/xilinx/Vitis_HLS/2023.2/bin/unwrapped/lnx64.o/vitis_hls'
+INFO: [HLS 200-10] For user 'sk3463' on host 'en-ec-ace-01.coecis.cornell.edu' (Linux_x86_64 version 6.8.0-138-generic) on Fri Sep 18 22:05:04 UTC 2026
+INFO: [HLS 200-10] On os Ubuntu 24.04.4 LTS
+INFO: [HLS 200-10] In directory '/home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj'
+INFO: [HLS 200-2053] The vitis_hls executable is being deprecated. Consider using vitis-run --mode hls --tcl
+Sourcing Tcl script 'run.tcl'
+INFO: [HLS 200-1510] Running: open_project out.prj -reset 
+INFO: [HLS 200-10] Opening and resetting project '/home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj'.
+INFO: [HLS 200-1510] Running: open_solution -reset solution1 -flow_target vivado 
+INFO: [HLS 200-10] Creating and opening solution '/home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1'.
+INFO: [HLS 200-10] Cleaning up the solution database.
+INFO: [HLS 200-1505] Using flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_top tinytpu_isa 
+INFO: [HLS 200-1510] Running: add_files kernel.cpp 
+INFO: [HLS 200-10] Adding design file 'kernel.cpp' to the project
+INFO: [HLS 200-1510] Running: add_files -tb tb.cpp -cflags -std=gnu++0x 
+INFO: [HLS 200-10] Adding test bench file 'tb.cpp' to the project
+INFO: [HLS 200-1510] Running: set_part xcu280-fsvh2892-2L-e 
+INFO: [HLS 200-1611] Setting target device to 'xcu280-fsvh2892-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 3.33 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 3.33ns.
+INFO: [HLS 200-1510] Running: config_interface -m_axi_max_widen_bitwidth 512 
+INFO: [HLS 200-1510] Running: csynth_design 
+INFO: [HLS 200-111] Finished File checks and directory preparation: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 256.559 MB.
+INFO: [HLS 200-10] Analyzing design file 'kernel.cpp' ... 
+INFO: [HLS 200-111] Finished Source Code Analysis and Preprocessing: CPU user time: 16.45 seconds. CPU system time: 1.08 seconds. Elapsed time: 17.52 seconds; current allocated memory: 264.523 MB.
+INFO: [HLS 200-777] Using interface defaults for 'Vivado' flow target.
+INFO: [HLS 200-1995] There were 37,268 instructions in the design after the 'Compile/Link' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,980 instructions in the design after the 'Unroll/Inline (step 1)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,412 instructions in the design after the 'Unroll/Inline (step 2)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,453 instructions in the design after the 'Unroll/Inline (step 3)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,407 instructions in the design after the 'Unroll/Inline (step 4)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,182 instructions in the design after the 'Array/Struct (step 1)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,182 instructions in the design after the 'Array/Struct (step 2)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,182 instructions in the design after the 'Array/Struct (step 3)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,182 instructions in the design after the 'Array/Struct (step 4)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,187 instructions in the design after the 'Array/Struct (step 5)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,182 instructions in the design after the 'Performance (step 1)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,141 instructions in the design after the 'Performance (step 2)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,141 instructions in the design after the 'Performance (step 3)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,141 instructions in the design after the 'Performance (step 4)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,205 instructions in the design after the 'HW Transforms (step 1)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,657 instructions in the design after the 'HW Transforms (step 2)' phase of compilation. See the Design Size Report for more details: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/isa_sweep.prj/out.prj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_3165_1> at kernel.cpp:3165:22 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2626_2> at kernel.cpp:2626:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2767_3> at kernel.cpp:2767:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2906_4> at kernel.cpp:2906:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_3014_5> at kernel.cpp:3014:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2511_2> at kernel.cpp:2511:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2418_2> at kernel.cpp:2418:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2317_2> at kernel.cpp:2317:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2212_2> at kernel.cpp:2212:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2125_2> at kernel.cpp:2125:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_2044_2> at kernel.cpp:2044:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1955_2> at kernel.cpp:1955:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1858_2> at kernel.cpp:1858:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1763_2> at kernel.cpp:1763:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1682_2> at kernel.cpp:1682:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1593_2> at kernel.cpp:1593:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1496_2> at kernel.cpp:1496:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1401_2> at kernel.cpp:1401:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1323_2> at kernel.cpp:1323:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1237_2> at kernel.cpp:1237:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_1143_2> at kernel.cpp:1143:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_956_1> at kernel.cpp:956:21 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_822_1> at kernel.cpp:822:21 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_587_1> at kernel.cpp:587:21 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_647_2> at kernel.cpp:647:21 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_715_3> at kernel.cpp:715:21 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< l_S_i_0_i> at kernel.cpp:29:14 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_58_1> at kernel.cpp:58:20 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_62_2> at kernel.cpp:62:20 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_66_3> at kernel.cpp:66:20 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_70_4> at kernel.cpp:70:20 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_79_5> at kernel.cpp:79:20 
+INFO: [HLS 214-115] Multiple burst reads of length 7 and bit width 512 has been inferred on bundle 'gmem0'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (kernel.cpp:29:14)
+INFO: [HLS 214-115] Multiple burst reads of variable length and bit width 32 in loop 'VITIS_LOOP_587_1'(kernel.cpp:587:21) has been inferred on bundle 'gmem1'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (kernel.cpp:587:21)
+INFO: [HLS 214-115] Multiple burst reads of variable length and bit width 32 in loop 'VITIS_LOOP_647_2'(kernel.cpp:647:21) has been inferred on bundle 'gmem2'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (kernel.cpp:647:21)
+INFO: [HLS 200-111] Finished Compiling Optimization and Transform: CPU user time: 3.43 seconds. CPU system time: 0.66 seconds. Elapsed time: 7.39 seconds; current allocated memory: 265.473 MB.
+INFO: [HLS 200-111] Finished Checking Pragmas: CPU user time: 0 seconds. CPU system time: 0 seconds. Elapsed time: 0 seconds; current allocated memory: 265.473 MB.
+INFO: [HLS 200-10] Starting code transformations ...
+INFO: [HLS 200-111] Finished Standard Transforms: CPU user time: 0.1 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.11 seconds; current allocated memory: 270.371 MB.
+INFO: [HLS 200-10] Checking synthesizability ...
+INFO: [HLS 200-111] Finished Checking Synthesizability: CPU user time: 0.12 seconds. CPU system time: 0 seconds. Elapsed time: 0.13 seconds; current allocated memory: 275.969 MB.
+INFO: [XFORM 203-712] Applying dataflow to function 'tinytpu_isa' (kernel.cpp:3299:1), detected/extracted 23 process function(s): 
+	 'entry_proc'
+	 'sequencer_0.1'
+	 'dma_ld_0.1'
+	 'spm_0'
+	 'vru_0'
+	 'pe_0_0'
+	 'pe_0_1'
+	 'pe_0_2'
+	 'pe_0_3'
+	 'pe_1_0'
+	 'pe_1_1'
+	 'pe_1_2'
+	 'pe_1_3'
+	 'pe_2_0'
+	 'pe_2_1'
+	 'pe_2_2'
+	 'pe_2_3'
+	 'pe_3_0'
+	 'pe_3_1'
+	 'pe_3_2'
+	 'pe_3_3'
+	 'accu_0'
+	 'dma_st_0.1'.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (kernel.cpp:756:13) to (kernel.cpp:715:21) in function 'dma_ld_0.1'... converting 4 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (kernel.cpp:2626:35) to (kernel.cpp:2626:26) in function 'accu_0'... converting 3 basic blocks.
+INFO: [HLS 200-111] Finished Loop, function and other optimizations: CPU user time: 0.51 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.53 seconds; current allocated memory: 304.988 MB.
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2488_1' (kernel.cpp:2488:22) in function 'pe_3_3' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2391_1' (kernel.cpp:2391:22) in function 'pe_3_2' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2290_1' (kernel.cpp:2290:22) in function 'pe_3_1' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2185_1' (kernel.cpp:2185:22) in function 'pe_3_0' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2102_1' (kernel.cpp:2102:22) in function 'pe_2_3' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_2017_1' (kernel.cpp:2017:22) in function 'pe_2_2' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1928_1' (kernel.cpp:1928:22) in function 'pe_2_1' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1827_1' (kernel.cpp:1827:22) in function 'pe_2_0' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1740_1' (kernel.cpp:1740:22) in function 'pe_1_3' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1655_1' (kernel.cpp:1655:22) in function 'pe_1_2' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1566_1' (kernel.cpp:1566:22) in function 'pe_1_1' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1463_1' (kernel.cpp:1463:22) in function 'pe_1_0' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1378_1' (kernel.cpp:1378:22) in function 'pe_0_3' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1296_1' (kernel.cpp:1296:22) in function 'pe_0_2' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1210_1' (kernel.cpp:1210:22) in function 'pe_0_1' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-960] Cannot flatten loop 'VITIS_LOOP_1108_1' (kernel.cpp:1108:22) in function 'pe_0_0' the outer loop is not a perfect loop.
+Resolution: For help on HLS 200-960 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-960.html
+WARNING: [HLS 200-1449] Process dma_ld_0.1 has both a predecessor and reads an input from its caller (see the GUI dataflow viewer). This may lead to lower throughput. Consider copying this input via a predecessor process.
+INFO: [HLS 200-111] Finished Architecture Synthesis: CPU user time: 0.51 seconds. CPU system time: 0.16 seconds. Elapsed time: 0.66 seconds; current allocated memory: 836.586 MB.
+INFO: [HLS 200-10] Starting hardware synthesis ...
+INFO: [HLS 200-10] Synthesizing 'tinytpu_isa' ...
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_l_S_i_0_i' to 'sequencer_0_1_Pipeline_l_S_i_0_i'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_VITIS_LOOP_58_1' to 'sequencer_0_1_Pipeline_VITIS_LOOP_58_1'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_VITIS_LOOP_62_2' to 'sequencer_0_1_Pipeline_VITIS_LOOP_62_2'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_VITIS_LOOP_66_3' to 'sequencer_0_1_Pipeline_VITIS_LOOP_66_3'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_VITIS_LOOP_70_4' to 'sequencer_0_1_Pipeline_VITIS_LOOP_70_4'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1_Pipeline_VITIS_LOOP_79_5' to 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5'.
+WARNING: [SYN 201-103] Legalizing function name 'sequencer_0.1' to 'sequencer_0_1'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_ld_0.1_Pipeline_VITIS_LOOP_587_1' to 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_ld_0.1_Pipeline_VITIS_LOOP_647_2' to 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_ld_0.1_Pipeline_VITIS_LOOP_715_3' to 'dma_ld_0_1_Pipeline_VITIS_LOOP_715_3'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_ld_0.1' to 'dma_ld_0_1'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_st_0.1_Pipeline_VITIS_LOOP_3165_1' to 'dma_st_0_1_Pipeline_VITIS_LOOP_3165_1'.
+WARNING: [SYN 201-103] Legalizing function name 'dma_st_0.1' to 'dma_st_0_1'.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'entry_proc' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.08 seconds. CPU system time: 0.04 seconds. Elapsed time: 0.12 seconds; current allocated memory: 837.371 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 837.410 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_l_S_i_0_i' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'l_S_i_0_i'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'l_S_i_0_i'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 838.684 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 838.684 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_VITIS_LOOP_58_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_58_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 1, loop 'VITIS_LOOP_58_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 838.996 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 838.996 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_VITIS_LOOP_62_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_62_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 1, loop 'VITIS_LOOP_62_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 839.281 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 839.281 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_VITIS_LOOP_66_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_66_3'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 1, loop 'VITIS_LOOP_66_3'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 839.430 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 839.430 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_VITIS_LOOP_70_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'iv_now'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_70_4'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 1, loop 'VITIS_LOOP_70_4'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 839.660 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 839.660 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'iv_now'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_79_5'.
+WARNING: [HLS 200-880] The II Violation in module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' (loop 'VITIS_LOOP_79_5'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 1) between 'add' operation 32 bit ('v108', kernel.cpp:196) and 'load' operation 64 bit ('v30', kernel.cpp:89) on array 'ib'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' (loop 'VITIS_LOOP_79_5'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 1) between 'add' operation 32 bit ('v108', kernel.cpp:196) and 'load' operation 64 bit ('v30', kernel.cpp:89) on array 'ib'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' (loop 'VITIS_LOOP_79_5'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 1) between 'add' operation 32 bit ('v108', kernel.cpp:196) and 'load' operation 64 bit ('v30', kernel.cpp:89) on array 'ib'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' (loop 'VITIS_LOOP_79_5'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 1) between 'load' operation 32 bit ('v100', kernel.cpp:185) on array 'lp_start' and 'load' operation 64 bit ('v30', kernel.cpp:89) on array 'ib'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 5, Depth = 7, loop 'VITIS_LOOP_79_5'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.12 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.13 seconds; current allocated memory: 841.863 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 841.863 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sequencer_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 841.863 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 841.863 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_587_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_587_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 841.863 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 841.863 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_647_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_647_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 842.074 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 842.074 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_ld_0_1_Pipeline_VITIS_LOOP_715_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_715_3'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_715_3'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 842.680 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 842.680 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_ld_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 842.988 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 842.988 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'spm_0_Pipeline_VITIS_LOOP_822_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_822_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 6, loop 'VITIS_LOOP_822_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 843.719 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 843.719 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'spm_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 844.027 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 844.027 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'vru_0_Pipeline_VITIS_LOOP_956_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_956_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 6, loop 'VITIS_LOOP_956_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 845.113 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 845.113 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'vru_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 845.113 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 845.113 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_0_Pipeline_VITIS_LOOP_1143_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1143_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 4, loop 'VITIS_LOOP_1143_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 845.199 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 845.199 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 845.590 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 845.590 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_1_Pipeline_VITIS_LOOP_1237_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1237_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 4, loop 'VITIS_LOOP_1237_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 845.965 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 845.965 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 846.258 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 846.258 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_2_Pipeline_VITIS_LOOP_1323_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1323_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 4, loop 'VITIS_LOOP_1323_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 846.605 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 846.605 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 846.992 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 846.992 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_3_Pipeline_VITIS_LOOP_1401_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1401_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 4, loop 'VITIS_LOOP_1401_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 847.254 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 847.254 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_0_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 847.539 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 847.539 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_0_Pipeline_VITIS_LOOP_1496_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v813) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1496_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1496_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 847.875 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 847.875 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 848.199 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 848.199 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_1_Pipeline_VITIS_LOOP_1593_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v857) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1593_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1593_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 848.645 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 848.645 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 848.988 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 848.988 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_2_Pipeline_VITIS_LOOP_1682_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v901) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1682_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1682_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 849.246 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 849.246 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 849.602 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 849.602 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_3_Pipeline_VITIS_LOOP_1763_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v940) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1763_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1763_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 849.938 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 849.938 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_1_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 850.285 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 850.285 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_0_Pipeline_VITIS_LOOP_1858_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v991) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1858_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1858_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 850.633 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 850.633 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 851.023 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 851.023 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_1_Pipeline_VITIS_LOOP_1955_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1035) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_1955_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_1955_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 851.527 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 851.527 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 851.660 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 851.660 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_2_Pipeline_VITIS_LOOP_2044_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1079) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2044_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2044_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 852.496 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 852.496 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 852.867 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 852.867 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_3_Pipeline_VITIS_LOOP_2125_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1118) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2125_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2125_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 853.207 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 853.207 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_2_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 853.480 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 853.480 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_0_Pipeline_VITIS_LOOP_2212_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1163) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2212_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2212_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 853.848 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 853.848 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 854.238 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 854.238 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_1_Pipeline_VITIS_LOOP_2317_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1211) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2317_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2317_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 854.551 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 854.551 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 854.828 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 854.828 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_2_Pipeline_VITIS_LOOP_2418_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1260) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2418_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2418_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 855.266 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 855.266 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 855.574 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 855.574 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_3_Pipeline_VITIS_LOOP_2511_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=v1304) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2511_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 5, loop 'VITIS_LOOP_2511_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 856.008 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 856.008 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'pe_3_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 856.387 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 856.387 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'accu_0_Pipeline_VITIS_LOOP_3014_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'ar'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_3014_5'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_3014_5'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 857.051 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 857.051 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'accu_0_Pipeline_VITIS_LOOP_2906_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'ar'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2906_4'.
+WARNING: [HLS 200-880] The II Violation in module 'accu_0_Pipeline_VITIS_LOOP_2906_4' (loop 'VITIS_LOOP_2906_4'): Unable to enforce a carried dependence constraint (II = 1, distance = 2, offset = 1) between 'store' operation 0 bit ('ar_addr_1_write_ln3006', kernel.cpp:3006) of variable 'zext_ln2997', kernel.cpp:2997 on array 'ar' and 'load' operation 128 bit ('ar_load', kernel.cpp:2914) on array 'ar'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 2, Depth = 3, loop 'VITIS_LOOP_2906_4'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 857.461 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 857.461 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'accu_0_Pipeline_VITIS_LOOP_2767_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'ar'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2767_3'.
+WARNING: [HLS 200-880] The II Violation in module 'accu_0_Pipeline_VITIS_LOOP_2767_3' (loop 'VITIS_LOOP_2767_3'): Unable to enforce a carried dependence constraint (II = 1, distance = 2, offset = 1) between 'store' operation 0 bit ('ar_addr_2_write_ln2898', kernel.cpp:2898) of variable 'v1478_tmp', kernel.cpp:2890 on array 'ar' and 'load' operation 128 bit ('ar_load', kernel.cpp:2775) on array 'ar'.
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 2, Depth = 5, loop 'VITIS_LOOP_2767_3'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 858.250 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 858.250 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'accu_0_Pipeline_VITIS_LOOP_2626_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-1457] Automatically inferring inferring RAM_1WNR storage type for array 'ar'. Use bind_storage pragma to override this type.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_2626_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_2626_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 858.410 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 858.410 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'accu_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 858.820 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 858.820 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_st_0_1_Pipeline_VITIS_LOOP_3165_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_3165_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_3165_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 859.449 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 859.449 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'dma_st_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 859.883 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 859.883 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'tinytpu_isa' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_spm_0_U0 (from sequencer_0_1_U0 to spm_0_U0) to 3 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_vru_0_U0 (from sequencer_0_1_U0 to vru_0_U0) to 4 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_accu_0_U0 (from sequencer_0_1_U0 to accu_0_U0) to 12 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1020] Increasing the depth of FIFO start_for_dma_st_0_1_U0 (from entry_proc_U0 to dma_st_0_1_U0) to 13 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1018] Consider increasing the depth of FIFO v1697 (from sequencer_0_1_U0 to accu_0_U0) to 12 to improve performance and/or avoid deadlocks.
+WARNING: [HLS 200-1018] Consider increasing the depth of FIFO v1698 (from sequencer_0_1_U0 to dma_st_0_1_U0) to 13 to improve performance and/or avoid deadlocks.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.1 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.11 seconds; current allocated memory: 860.852 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 861.230 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'entry_proc' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'entry_proc'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 861.590 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_l_S_i_0_i' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sequencer_0_1_Pipeline_l_S_i_0_i' pipeline 'l_S_i_0_i' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'sequencer_0_1_Pipeline_l_S_i_0_i/m_axi_gmem0_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_l_S_i_0_i'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.1 seconds; current allocated memory: 862.395 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_VITIS_LOOP_58_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_VITIS_LOOP_58_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 863.105 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_VITIS_LOOP_62_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_VITIS_LOOP_62_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 863.711 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_VITIS_LOOP_66_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_VITIS_LOOP_66_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 864.273 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_VITIS_LOOP_70_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_VITIS_LOOP_70_4'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 864.820 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5' pipeline 'VITIS_LOOP_79_5' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mul_12s_12s_12_1_1': 3 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1_Pipeline_VITIS_LOOP_79_5'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 866.578 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sequencer_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sequencer_0_1'.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_sequencer_0_1_ib_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_sequencer_0_1_lp_start_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_sequencer_0_1_lp_trip_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_sequencer_0_1_iv_now_RAM_1WNR_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.11 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.12 seconds; current allocated memory: 870.809 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1' pipeline 'VITIS_LOOP_587_1' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1/m_axi_gmem1_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_ld_0_1_Pipeline_VITIS_LOOP_587_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.11 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.12 seconds; current allocated memory: 872.348 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2' pipeline 'VITIS_LOOP_647_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2/m_axi_gmem2_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_ld_0_1_Pipeline_VITIS_LOOP_647_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.11 seconds; current allocated memory: 873.406 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_ld_0_1_Pipeline_VITIS_LOOP_715_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'dma_ld_0_1_Pipeline_VITIS_LOOP_715_3' pipeline 'VITIS_LOOP_715_3' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_ld_0_1_Pipeline_VITIS_LOOP_715_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 874.289 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_ld_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_ld_0_1'.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 876.602 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'spm_0_Pipeline_VITIS_LOOP_822_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'spm_0_Pipeline_VITIS_LOOP_822_1' pipeline 'VITIS_LOOP_822_1' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'spm_0_Pipeline_VITIS_LOOP_822_1'.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_822_1_spad_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 878.012 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'spm_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'spm_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 879.469 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'vru_0_Pipeline_VITIS_LOOP_956_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'vru_0_Pipeline_VITIS_LOOP_956_1' pipeline 'VITIS_LOOP_956_1' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'vru_0_Pipeline_VITIS_LOOP_956_1'.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_vru_0_Pipeline_VITIS_LOOP_956_1_vr_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 880.570 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'vru_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'vru_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 882.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_0_Pipeline_VITIS_LOOP_1143_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_0_Pipeline_VITIS_LOOP_1143_2' pipeline 'VITIS_LOOP_1143_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mul_8s_8s_16_1_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_0_Pipeline_VITIS_LOOP_1143_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 883.289 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 884.332 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_1_Pipeline_VITIS_LOOP_1237_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_1_Pipeline_VITIS_LOOP_1237_2' pipeline 'VITIS_LOOP_1237_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mul_8s_8s_16_1_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_1_Pipeline_VITIS_LOOP_1237_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 885.406 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 886.309 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_2_Pipeline_VITIS_LOOP_1323_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_2_Pipeline_VITIS_LOOP_1323_2' pipeline 'VITIS_LOOP_1323_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mul_8s_8s_16_1_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_2_Pipeline_VITIS_LOOP_1323_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 887.250 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 888.148 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_3_Pipeline_VITIS_LOOP_1401_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_0_3_Pipeline_VITIS_LOOP_1401_2' pipeline 'VITIS_LOOP_1401_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mul_8s_8s_16_1_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_3_Pipeline_VITIS_LOOP_1401_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 889.047 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_0_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_0_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 889.898 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_0_Pipeline_VITIS_LOOP_1496_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_0_Pipeline_VITIS_LOOP_1496_2' pipeline 'VITIS_LOOP_1496_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_0_Pipeline_VITIS_LOOP_1496_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 890.801 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 891.910 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_1_Pipeline_VITIS_LOOP_1593_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_1_Pipeline_VITIS_LOOP_1593_2' pipeline 'VITIS_LOOP_1593_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_1_Pipeline_VITIS_LOOP_1593_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 892.988 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 894.004 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_2_Pipeline_VITIS_LOOP_1682_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_2_Pipeline_VITIS_LOOP_1682_2' pipeline 'VITIS_LOOP_1682_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_2_Pipeline_VITIS_LOOP_1682_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 894.996 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 895.980 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_3_Pipeline_VITIS_LOOP_1763_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_1_3_Pipeline_VITIS_LOOP_1763_2' pipeline 'VITIS_LOOP_1763_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_3_Pipeline_VITIS_LOOP_1763_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 896.957 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_1_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_1_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 897.836 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_0_Pipeline_VITIS_LOOP_1858_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_0_Pipeline_VITIS_LOOP_1858_2' pipeline 'VITIS_LOOP_1858_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_0_Pipeline_VITIS_LOOP_1858_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 898.773 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 899.875 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_1_Pipeline_VITIS_LOOP_1955_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_1_Pipeline_VITIS_LOOP_1955_2' pipeline 'VITIS_LOOP_1955_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_1_Pipeline_VITIS_LOOP_1955_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 900.938 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 901.875 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_2_Pipeline_VITIS_LOOP_2044_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_2_Pipeline_VITIS_LOOP_2044_2' pipeline 'VITIS_LOOP_2044_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_2_Pipeline_VITIS_LOOP_2044_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 902.832 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 903.828 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_3_Pipeline_VITIS_LOOP_2125_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_2_3_Pipeline_VITIS_LOOP_2125_2' pipeline 'VITIS_LOOP_2125_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_3_Pipeline_VITIS_LOOP_2125_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 904.809 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_2_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_2_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 905.715 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_0_Pipeline_VITIS_LOOP_2212_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_0_Pipeline_VITIS_LOOP_2212_2' pipeline 'VITIS_LOOP_2212_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_0_Pipeline_VITIS_LOOP_2212_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 906.609 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_0'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 907.605 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_1_Pipeline_VITIS_LOOP_2317_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_1_Pipeline_VITIS_LOOP_2317_2' pipeline 'VITIS_LOOP_2317_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_1_Pipeline_VITIS_LOOP_2317_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 908.605 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 909.652 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_2_Pipeline_VITIS_LOOP_2418_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_2_Pipeline_VITIS_LOOP_2418_2' pipeline 'VITIS_LOOP_2418_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_2_Pipeline_VITIS_LOOP_2418_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 910.660 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 911.688 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_3_Pipeline_VITIS_LOOP_2511_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'pe_3_3_Pipeline_VITIS_LOOP_2511_2' pipeline 'VITIS_LOOP_2511_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_8s_8s_32s_32_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_3_Pipeline_VITIS_LOOP_2511_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 912.664 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'pe_3_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'pe_3_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 913.652 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'accu_0_Pipeline_VITIS_LOOP_3014_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'accu_0_Pipeline_VITIS_LOOP_3014_5' pipeline 'VITIS_LOOP_3014_5' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'accu_0_Pipeline_VITIS_LOOP_3014_5'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 914.656 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'accu_0_Pipeline_VITIS_LOOP_2906_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'accu_0_Pipeline_VITIS_LOOP_2906_4' pipeline 'VITIS_LOOP_2906_4' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'accu_0_Pipeline_VITIS_LOOP_2906_4'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 916.152 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'accu_0_Pipeline_VITIS_LOOP_2767_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'accu_0_Pipeline_VITIS_LOOP_2767_3' pipeline 'VITIS_LOOP_2767_3' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'accu_0_Pipeline_VITIS_LOOP_2767_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 917.691 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'accu_0_Pipeline_VITIS_LOOP_2626_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'accu_0_Pipeline_VITIS_LOOP_2626_2' pipeline 'VITIS_LOOP_2626_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'accu_0_Pipeline_VITIS_LOOP_2626_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.08 seconds; current allocated memory: 919.160 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'accu_0' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'accu_0'.
+INFO: [RTMG 210-278] Implementing memory 'tinytpu_isa_accu_0_ar_RAM_1WNR_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 920.684 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_st_0_1_Pipeline_VITIS_LOOP_3165_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'dma_st_0_1_Pipeline_VITIS_LOOP_3165_1' pipeline 'VITIS_LOOP_3165_1' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_st_0_1_Pipeline_VITIS_LOOP_3165_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 922.219 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'dma_st_0_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'dma_st_0_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 923.973 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'tinytpu_isa' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+WARNING: [RTGEN 206-101] Design contains AXI ports. Reset is fixed to synchronous and active low.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/gmem0' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/gmem1' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/gmem2' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/gmem3' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/v1690' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/v1691' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/v1692' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'tinytpu_isa/v1693' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on function 'tinytpu_isa' to 'ap_ctrl_hs'.
+INFO: [RTGEN 206-100] Bundling port 'v1690', 'v1691', 'v1692' and 'v1693' to AXI-Lite port control.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'tinytpu_isa'.
+INFO: [RTMG 210-285] Implementing FIFO 'v1693_c_U(tinytpu_isa_fifo_w64_d14_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1694_U(tinytpu_isa_fifo_w64_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1695_U(tinytpu_isa_fifo_w64_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1696_U(tinytpu_isa_fifo_w64_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1697_U(tinytpu_isa_fifo_w64_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1698_U(tinytpu_isa_fifo_w64_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1699_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1700_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1702_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1722_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1703_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1706_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1723_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1742_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1726_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1707_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1743_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1727_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1708_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1744_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1728_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1745_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1704_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1710_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1724_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1746_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1730_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1711_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1747_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1731_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1712_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1748_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1732_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1749_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1705_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1714_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1725_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1750_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1734_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1715_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1751_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1735_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1716_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1752_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1736_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1753_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1718_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1758_U(tinytpu_isa_fifo_w128_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1738_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1719_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1759_U(tinytpu_isa_fifo_w128_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1739_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1720_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1760_U(tinytpu_isa_fifo_w128_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1740_U(tinytpu_isa_fifo_w8_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1761_U(tinytpu_isa_fifo_w128_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'v1701_U(tinytpu_isa_fifo_w32_d8_S)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_dma_st_0_1_U0_U(tinytpu_isa_start_for_dma_st_0_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_spm_0_U0_U(tinytpu_isa_start_for_spm_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_vru_0_U0_U(tinytpu_isa_start_for_vru_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_accu_0_U0_U(tinytpu_isa_start_for_accu_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_0_U0_U(tinytpu_isa_start_for_pe_0_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_1_U0_U(tinytpu_isa_start_for_pe_0_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_0_U0_U(tinytpu_isa_start_for_pe_1_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_2_U0_U(tinytpu_isa_start_for_pe_0_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_1_U0_U(tinytpu_isa_start_for_pe_1_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_0_3_U0_U(tinytpu_isa_start_for_pe_0_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_2_U0_U(tinytpu_isa_start_for_pe_1_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_1_3_U0_U(tinytpu_isa_start_for_pe_1_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_0_U0_U(tinytpu_isa_start_for_pe_2_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_1_U0_U(tinytpu_isa_start_for_pe_2_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_2_U0_U(tinytpu_isa_start_for_pe_2_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_2_3_U0_U(tinytpu_isa_start_for_pe_2_3_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_0_U0_U(tinytpu_isa_start_for_pe_3_0_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_1_U0_U(tinytpu_isa_start_for_pe_3_1_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_2_U0_U(tinytpu_isa_start_for_pe_3_2_U0)' using Shift Registers.
+INFO: [RTMG 210-285] Implementing FIFO 'start_for_pe_3_3_U0_U(tinytpu_isa_start_for_pe_3_3_U0)' using Shift Registers.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.6 seconds. CPU system time: 0.07 seconds. Elapsed time: 0.68 seconds; current allocated memory: 930.906 MB.
+INFO: [HLS 200-111] Finished Generating all RTL models: CPU user time: 0.36 seconds. CPU system time: 0.07 seconds. Elapsed time: 0.44 seconds; current allocated memory: 933.957 MB.
+INFO: [HLS 200-1603] Design has inferred MAXI bursts and missed bursts, see Vitis HLS GUI synthesis summary report for detailed information.
+INFO: [HLS 200-111] Finished Updating report files: CPU user time: 3.81 seconds. CPU system time: 0.04 seconds. Elapsed time: 3.86 seconds; current allocated memory: 956.445 MB.
+INFO: [VHDL 208-304] Generating VHDL RTL for tinytpu_isa.
+INFO: [VLOG 209-307] Generating Verilog RTL for tinytpu_isa.
+INFO: [HLS 200-790] **** Loop Constraint Status: All loop constraints were NOT satisfied.
+INFO: [HLS 200-789] **** Estimated Fmax: 411.37 MHz
+INFO: [HLS 200-111] Finished Command csynth_design CPU user time: 32.9 seconds. CPU system time: 2.89 seconds. Elapsed time: 39.14 seconds; current allocated memory: 700.172 MB.
+INFO: [HLS 200-112] Total CPU user time: 34.44 seconds. Total CPU system time: 3.19 seconds. Total elapsed time: 40.8 seconds; peak allocated memory: 956.730 MB.
+INFO: [Common 17-206] Exiting vitis_hls at Fri Sep 18 22:05:44 2026...

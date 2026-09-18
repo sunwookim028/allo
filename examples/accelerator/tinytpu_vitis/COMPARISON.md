@@ -50,25 +50,40 @@ accelerator.
 
 | shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
 |---|---|---|---|---|---|
-| 4x4x4    | **680**  | 574 | **1.18x** |  0.6% |  0.7% |
-| 8x8x8    | **831**  | 615 | **1.35x** |  3.9% |  5.2% |
-| 12x12x12 | **1066** | 740 | **1.44x** | 10.1% | 14.6% |
-| 16x16x8  | **1139** | 784 | **1.45x** | 11.2% | 16.3% |
-| 16x16x16 | **1457** | 986 | **1.48x** | 17.6% | 26.0% |
+| 4x4x4    | **252** | 574 | **0.44x** |  1.6% |  0.7% |
+| 8x8x8    | **383** | 615 | **0.62x** |  8.4% |  5.2% |
+| 12x12x12 | **591** | 740 | **0.80x** | 18.3% | 14.6% |
+| 16x16x8  | **667** | 784 | **0.85x** | 19.2% | 16.3% |
+| 16x16x16 | **919** | 986 | **0.93x** | 27.9% | 26.0% |
 
-(Our column is after the burst-DMA pass -- see the I/O section below. It read
-1004 / 1108 / 1294 / 1344 / 1586 at 1.75x / 1.80x / 1.75x / 1.71x / 1.61x
-before the burst DMA, which is what earlier revisions of this table quoted. A
-flat accumulator was built after it, reached 676 / 827 / 1062 / 1125 / 1423,
-and was **reverted**: it cost 13.7x the flip-flops in that unit for 2.3%. The
-measurement is kept in `RESULTS_ISA.md` and the area trade is audit item 21.)
+The ratio column keeps its original sense -- ours divided by Gemmini's -- so
+**below 1.00 is us ahead**: 2.28x at the smallest shape and 1.07x at the
+largest, and ahead on array utilisation at every shape as well.
 
-**The shape of the gap has inverted, and that is the result.** It used to be
-flat at ~1.7x and *falling* with size -- the signature of a fixed charge being
-amortised. With the argument-copying gone the ratio *rises*, 1.18x -> 1.48x:
-at 4x4x4 we are now within 18% of Gemmini, and what is left is a per-work gap
-rather than a per-run one. That is a smaller total gap and a harder one, and it
-is the honest reading: the easy 350 cycles have been taken.
+(History of this column, since earlier revisions of this file quoted each in
+turn: 1004 / 1108 / 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 /
+1139 / 1457 after it, which is where this table sat for most of a day at 1.18x
+to 1.48x *behind*; 676 / 827 / 1062 / 1125 / 1423 with a flat accumulator that
+was **reverted**, costing 13.7x the flip-flops in that unit for 2.3%, kept in
+`RESULTS_ISA.md` and priced as audit item 21. The step to the numbers above is
+the memset and widening pass described below.)
+
+**We are ahead everywhere, and the shape of the remaining difference says
+exactly what kind of machine each one is.** The lead is largest at the smallest
+shape (2.28x) and narrows monotonically with size (1.07x at 16x16x16), which is
+the signature of winning on *fixed* cost and still losing on *marginal* cost.
+The fit says the same: fixed 151 against Gemmini's 483, so we start 3.2x
+cheaper; marginal 17.28 cycles per dynamic instruction against 10.81, so we
+still pay 1.60x for each unit of work. Extrapolate and the curves cross -- this
+lead is real at these sizes and is not a claim about arbitrarily large GEMMs.
+
+**The result that made this possible is a correction, not an optimisation.**
+This file previously said the fixed cost was "essentially closed" at 563 vs 483.
+It was not closed, it was *hidden*: `spm` opened with a 514-cycle zero-fill of
+`spad` and `dma_ld`'s operand burst ran ~512 cycles beside it, two serial
+prefixes of nearly equal length masking each other. That is why fixing either
+alone measured as worthless, and why "merging the A and B bursts changed cycles
+by exactly zero" was a true measurement supporting a false conclusion.
 
 ## Marginal cost across the sweep — three different kinds of machine
 
@@ -223,9 +238,10 @@ neither setting was what Gemmini has:
 | `wrap_io=True`, imem 256 | 18.1 cyc/instr | 1102 | 2.12x | 1.94x |
 | `wrap_io=False`, strided | 39.8 | 481 | 1.21x | 2.25x |
 | `wrap_io=True`, imem 56 | 15.1 | 907 | 1.75x | 1.61x |
-| **`wrap_io=False`, bursts** | **20.1** | **557** | **1.18x** | **1.48x** |
+| `wrap_io=False`, bursts | 20.1 | 557 | 1.18x | 1.48x |
 | (+ flat accumulator, reverted) | 19.3 | 563 | 1.18x | 1.44x |
-| Gemmini | **10.8** | **483** | 1.00x | 1.00x |
+| **+ no memset, + widened AXI** | **17.3** | **151** | **0.44x** | **0.93x** |
+| Gemmini | 10.8 | **483** | 1.00x | 1.00x |
 
 * `wrap_io=True` copies each argument into a local buffer before the region
   runs, so the units read BRAM -- cheap per access, but the copy is the
@@ -274,15 +290,29 @@ throughput is worth ~0.8 cycles of runtime per cycle of MAC while array
 per-instruction overhead is worth nothing**, because `vru` upstream pushes the
 same `T + 1` prologue words per `mm` whatever the PE does.
 
-**Gemmini still has the better version of this**, and the residual marginal gap
-is where it now shows: `mvin`/`mvout` transfer exactly the tiles the program
-names in both directions, at a bus width that is not 8 bits.
-`config_interface -m_axi_max_widen_bitwidth 512` would give us the second half
-of that and does nothing today -- `[HLS 214-307] Could not widen since type i8
-size is greater than or equal to alignment 1(bytes)`, because Allo emits the
-argument pointers with no alignment attribute. That is an Allo codegen gap
-rather than a design one, and it is worth roughly the whole operand-traffic
-term if it were closed.
+**That gap is now closed, and the diagnosis it rested on was half wrong.** This
+file used to say `config_interface -m_axi_max_widen_bitwidth 512` "does nothing
+today" and quote `[HLS 214-307] Could not widen since type i8 size is greater
+than or equal to alignment 1(bytes)` as the reason. **214-307 does not
+reproduce on the real design.** The setting is accepted, csynth completes, and
+there are *zero* 214-307 messages -- the bursts simply stay at bit width 8 with
+no diagnostic at all. 214-307 came from a standalone probe, and a probe result
+was quoted here as a whole-design fact.
+
+The underlying diagnosis was right even though its evidence was not: Allo
+emitted the argument pointers with no alignment, so Vitis assumed one byte and
+declined to widen -- silently. Allo now emits `align_value` on `m_axi` pointers
+(opt-in, `configs={"align_value": 64}`), and with it the same setting takes
+gmem0 to **bit width 512** and gmem1/gmem2 to 32, `dma_ld`'s burst loop from
+II=4 to II=1, and `dma_st` from II=4 to II=1. Verified in this build's
+`csynth.log`: one port at 512, two at 32, zero 214-307.
+
+`align_value` is a **promise**, which is why it is opt-in rather than always
+emitted: the host must actually align the buffer. XRT buffers are 4 KB aligned
+so it holds on hardware for free, and `cosim.py` declares its testbench arrays
+`alignas(64)` because in cosim the testbench *is* the host. A design that wants
+the same effect without an Allo change can declare the operands `UInt(32)`
+instead, which reaches II=1 with no alignment and no widen setting at all.
 
 ## Where the gap was, originally
 

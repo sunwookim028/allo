@@ -243,14 +243,20 @@ the sequencer's dispatch and the units' pipeline fill, so the version that
 reads the fewest bytes is the one kept. Halving something off the critical path
 buys nothing, which is worth writing down.
 
-**One toolchain avenue that is closed.** `config_interface
--m_axi_max_widen_bitwidth 512` would let Vitis widen the 8-bit `m_axi` ports so
-a long burst moves 64 bytes a beat instead of one, which would make the operand
-traffic nearly free. It does nothing here:
+**One toolchain avenue that was wrongly called closed, and is now open.**
+`config_interface -m_axi_max_widen_bitwidth 512` lets Vitis widen the 8-bit
+`m_axi` ports so a long burst moves 64 bytes a beat instead of one. This
+docstring used to say it "does nothing here" and blame
 `[HLS 214-307] Could not widen since type i8 size is greater than or equal to
-alignment 1(bytes)` -- Allo emits the argument pointers with no alignment
-attribute, so Vitis must assume 1 and refuses. That is an Allo codegen gap, not
-a design one.
+alignment 1(bytes)`. **That error does not occur on this design** -- it came
+from a standalone probe. Here the setting is simply accepted and the ports stay
+8 bits with no diagnostic, which is worse, because nothing tells you.
+
+The diagnosis underneath was right: Allo emitted the pointers with no alignment
+attribute, so Vitis assumed 1 byte and declined. With `align_value` emitted
+(`configs={"align_value": 64}`) the same setting gives gmem0 bit width 512,
+gmem1/2 32, and takes both `dma_ld`'s burst loop and `dma_st` from II=4 to
+II=1.
 
 ## Data type
 
@@ -528,7 +534,7 @@ def tinytpu_isa(
         # transfer and every fetch after it is a BRAM read. Instructions are
         # the one stream in this design whose access pattern is random, so they
         # are the one stream that has to be prefetched rather than streamed.
-        ib: UInt(64)[IMEM_SIZE] = 0
+        ib: UInt(64)[IMEM_SIZE]
         for i in range(IMEM_SIZE):
             ib[i] = l_imem[i]
 
@@ -687,8 +693,8 @@ def tinytpu_isa(
         # five shapes by exactly ZERO cycles. The operand burst is already
         # entirely hidden behind the sequencer's dispatch and the units' fill,
         # so the version that reads the fewest bytes is the one to keep.
-        rbA: UInt(VW)[MAXDIM * WPR] = 0
-        rbB: UInt(VW)[MAXDIM * WPR] = 0
+        rbA: UInt(VW)[MAXDIM * WPR]
+        rbB: UInt(VW)[MAXDIM * WPR]
         for ia in range(na * WPR):
             pa: UInt(VW) = 0
             with allo.meta_for(T) as e:
@@ -740,7 +746,7 @@ def tinytpu_isa(
         rather than as two sub-loops the scheduler has to serialize. One
         `spad` read and one `spad` write per iteration is what a dual-port
         BRAM gives, so this still schedules at II=1."""
-        spad: UInt(VW)[SPAD_ROWS] = 0
+        spad: UInt(VW)[SPAD_ROWS]
         nw: UInt(64) = c_spm.get()
         n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
@@ -795,7 +801,7 @@ def tinytpu_isa(
         mw: UInt(64) = c_vru.get()
         n_mm_in: int32 = mw[0:16]
         n_mr_in: int32 = mw[16:32]
-        vr: UInt(VW)[NVR] = 0
+        vr: UInt(VW)[NVR]
         # Hand the array its own counts before anything else, on the chain it
         # already uses for headers and weights: how many `mm`s, and how many
         # wavefront rows they carry between them. The second is what lets a PE
@@ -1003,7 +1009,7 @@ def tinytpu_isa(
         The general rule, and the reason four units flattened and this one did
         not: **flattening trades a fixed per-instruction cost for a permanent
         per-row II, and only pays where the II stays at 1.**"""
-        ar: UInt(AW)[NAR] = 0
+        ar: UInt(AW)[NAR]
         nw: UInt(64) = c_acc.get()
         n_own: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
                                     # and the top bit of a slice is its sign,
