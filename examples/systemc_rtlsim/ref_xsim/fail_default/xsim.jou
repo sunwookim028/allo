@@ -1,0 +1,15 @@
+#-----------------------------------------------------------
+# xsim v2023.2 (64-bit)
+# SW Build 4029153 on Fri Oct 13 20:13:54 MDT 2023
+# IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+# SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+# Start of session at: Fri Sep 18 17:49:27 2026
+# Process ID: 4104339
+# Current directory: <RUNDIR>/ma_pe_wire
+# Command line: xsim -mode tcl -source {xsim.dir/sim/xsim_script.tcl}
+# Log file: <RUNDIR>/ma_pe_wire/xsim.log
+# Journal file: <RUNDIR>/ma_pe_wire/xsim.jou
+# Running On: ace-01.ece.cornell.edu, OS: Linux, CPU Frequency: 2183.395 MHz, CPU Physical cores: 32, Host memory: 1081848 MB
+#-----------------------------------------------------------
+source xsim.dir/sim/xsim_script.tcl
+run -all

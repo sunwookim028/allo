@@ -1,0 +1,30 @@
+#-----------------------------------------------------------
+# xsim v2023.2 (64-bit)
+# SW Build 4029153 on Fri Oct 13 20:13:54 MDT 2023
+# IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+# SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+# Start of session at: Fri Sep 18 17:49:27 2026
+# Process ID: 4104339
+# Current directory: <RUNDIR>/ma_pe_wire
+# Command line: xsim -mode tcl -source {xsim.dir/sim/xsim_script.tcl}
+# Log file: <RUNDIR>/ma_pe_wire/xsim.log
+# Journal file: <RUNDIR>/ma_pe_wire/xsim.jou
+# Running On: ace-01.ece.cornell.edu, OS: Linux, CPU Frequency: 2183.395 MHz, CPU Physical cores: 32, Host memory: 1081848 MB
+#-----------------------------------------------------------
+source xsim.dir/sim/xsim_script.tcl
+# xsim {sim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+== pe_wire  stall_in=1 stall_out=1  captured=8/8  cycles=12
+   C[0] got=0 want=2 <== MISMATCH
+   C[1] got=0 want=10 <== MISMATCH
+   C[2] got=0 want=28 <== MISMATCH
+   C[3] got=2 want=60 <== MISMATCH
+   C[4] got=2 want=110 <== MISMATCH
+   C[5] got=10 want=182 <== MISMATCH
+   C[6] got=10 want=280 <== MISMATCH
+   C[7] got=28 want=408 <== MISMATCH
+RESULT: FAIL  pe_wire  (8/8 wrong)
+$finish called at time : 37 ns : File "<RUNDIR>/tb_mulacc.v" Line 174
+exit
+INFO: [Common 17-206] Exiting xsim at Fri Sep 18 17:49:30 2026...

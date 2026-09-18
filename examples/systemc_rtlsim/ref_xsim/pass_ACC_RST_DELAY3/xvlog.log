@@ -1,0 +1,27 @@
+INFO: [VRFC 10-2263] Analyzing Verilog file "/tmp/claude-1772902/-home-sk3463-allo/75a68fe0-6165-411e-b9f4-5d61a5202ca8/scratchpad/noc/rtl/pe_wire/rtl.v" into library work
+INFO: [VRFC 10-311] analyzing module pe_wire_comb
+INFO: [VRFC 10-311] analyzing module AlloFifo_ac_int_32_true_2_deq_thread_deq_thread_fsm
+INFO: [VRFC 10-311] analyzing module AlloFifo_ac_int_32_true_2_enq_thread_enq_thread_fsm
+INFO: [VRFC 10-311] analyzing module feed_0_run_run_fsm
+INFO: [VRFC 10-311] analyzing module mul_0_run_run_fsm
+INFO: [VRFC 10-311] analyzing module acc_0_run_run_fsm
+INFO: [VRFC 10-311] analyzing module sink_0_run_run_fsm
+INFO: [VRFC 10-311] analyzing module AlloMem_ac_int_32_true_16_4_32_run_run_fsm
+INFO: [VRFC 10-311] analyzing module AlloFifo_ac_int_32_true_2_deq_thread
+INFO: [VRFC 10-311] analyzing module AlloFifo_ac_int_32_true_2_enq_thread
+INFO: [VRFC 10-311] analyzing module feed_0_run
+INFO: [VRFC 10-311] analyzing module mul_0_run
+INFO: [VRFC 10-311] analyzing module acc_0_run
+INFO: [VRFC 10-311] analyzing module sink_0_run
+INFO: [VRFC 10-311] analyzing module AlloMem_ac_int_32_true_16_4_32_run
+INFO: [VRFC 10-311] analyzing module AlloFifo_ac_int_32_true_2
+INFO: [VRFC 10-311] analyzing module feed_0
+INFO: [VRFC 10-311] analyzing module mul_0
+INFO: [VRFC 10-311] analyzing module acc_0
+INFO: [VRFC 10-311] analyzing module sink_0
+INFO: [VRFC 10-311] analyzing module AlloMem_ac_int_32_true_16_4_32
+INFO: [VRFC 10-311] analyzing module pe_wire
+INFO: [VRFC 10-2263] Analyzing Verilog file "<RUNDIR>/mgc_shim.v" into library work
+INFO: [VRFC 10-311] analyzing module mgc_shift_r_v5
+INFO: [VRFC 10-2263] Analyzing Verilog file "<RUNDIR>/tb_mulacc.v" into library work
+INFO: [VRFC 10-311] analyzing module tb

@@ -1,0 +1,30 @@
+#-----------------------------------------------------------
+# xsim v2023.2 (64-bit)
+# SW Build 4029153 on Fri Oct 13 20:13:54 MDT 2023
+# IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+# SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+# Start of session at: Fri Sep 18 17:52:05 2026
+# Process ID: 4111778
+# Current directory: <RUNDIR>/ma_pe_wired_LOCKSTEP_d_ACC_RST_DELAY=3
+# Command line: xsim -mode tcl -source {xsim.dir/sim/xsim_script.tcl}
+# Log file: <RUNDIR>/ma_pe_wired_LOCKSTEP_d_ACC_RST_DELAY=3/xsim.log
+# Journal file: <RUNDIR>/ma_pe_wired_LOCKSTEP_d_ACC_RST_DELAY=3/xsim.jou
+# Running On: ace-01.ece.cornell.edu, OS: Linux, CPU Frequency: 2200.000 MHz, CPU Physical cores: 32, Host memory: 1081848 MB
+#-----------------------------------------------------------
+source xsim.dir/sim/xsim_script.tcl
+# xsim {sim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+== pe_wired_LOCKSTEP_d_ACC_RST_DELAY=3  stall_in=1 stall_out=1  captured=8/8  cycles=22
+   C[0] got=2 want=2             
+   C[1] got=10 want=10             
+   C[2] got=28 want=28             
+   C[3] got=60 want=60             
+   C[4] got=110 want=110             
+   C[5] got=182 want=182             
+   C[6] got=280 want=280             
+   C[7] got=408 want=408             
+RESULT: PASS  pe_wired_LOCKSTEP_d_ACC_RST_DELAY=3
+$finish called at time : 57 ns : File "<RUNDIR>/tb_mulacc.v" Line 174
+exit
+INFO: [Common 17-206] Exiting xsim at Fri Sep 18 17:52:08 2026...
