@@ -46,15 +46,36 @@ OMP thread-local storage teardown racing with the GC. Workaround: set
 `OMP_NUM_THREADS=N` explicitly and run each region in its own process. This
 is a Python/OpenMP interaction issue, not an Allo bug.
 
-## Observation: LLVM_BUILD_DIR must NOT be overridden
+## Observation: LLVM_BUILD_DIR must be set BY YOU -- corrected 2026-09-18
 
-The conda `allo` env already sets `LLVM_BUILD_DIR` to the RHEL8-compatible build
-(`/work/shared/common/llvm-project-main/build-rhel8`). Overriding it with the
-non-RHEL8 build (`build/`) causes a GLIBC_2.33 crash at simulator init.
+This section used to say the conda `allo` env "already sets `LLVM_BUILD_DIR`" to
+`/work/shared/common/llvm-project-main/build-rhel8` and must not be overridden.
+**That is false on this host and contradicted `CLAUDE.md`, which is right.**
+Checked directly:
+
+```
+$ conda activate allo && echo "${LLVM_BUILD_DIR:-<unset>}"
+<unset>
+```
+
+Neither `conda activate allo` nor `conda run` sets it, and the simulator asserts
+`LLVM_BUILD_DIR is not set` without it. Export it yourself:
+
+```bash
+export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
+```
+
+What survives of the original warning is the reason it was written: **which**
+build you point at matters. A build made against a newer glibc than the host's
+fails at simulator init with a GLIBC_2.33 error, which is why an RHEL8-compatible
+build was named here in the first place. The path above is the build every
+result in this repo was produced with.
 
 ## Inspecting MLIR: one process per dump
 
-(Extracted from the retired `ALLO_LESSONS.md` on 2026-09-17; still true.)
+(Extracted from the retired `ALLO_LESSONS.md` on 2026-09-17; still true. That
+file was deleted 2026-09-18 once this was the only part of it left standing --
+`git show f1c3aad1^:notes/ALLO_LESSONS.md`.)
 
 The MLIR context cannot be re-initialized in the same Python process — a second
 `customize()` in one interpreter aborts with
