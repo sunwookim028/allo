@@ -211,11 +211,33 @@ The threshold is exactly the process count. With 32 threads the design runs at
   (`a03edb85`, 2026-09-05) from the other direction -- "56 at 8x8 FEATHER on a
   48-core host". Two unrelated projects hitting the same wall is the argument
   for it being upstreamed rather than carried.
-- **Still open, and still worth doing:** the *diagnosis* remains absent. The
-  symptom was a silent hang with no indication of which process was blocked on
-  which channel, and that is what cost the sessions -- not the deadlock itself.
-  `examples/accelerator/tinytpu_vitis/kpn_model.py` shows the report is ~30
-  lines of bookkeeping.
+- **Diagnosis, tier 0 -- DONE 2026-09-18** (`7bc6d413`). `LLVMOMPModule.__call__`
+  now arms a watchdog around the blocking `execution_engine.invoke`, default ON
+  at 600 s (`ALLO_SIM_TIMEOUT=<sec>`, `=0` to silence). On a real deadlock it
+  prints the top function, the kernel-instance count, `OMP_NUM_THREADS`, the
+  pid, the likely causes, and an explicit note that the process is NOT being
+  killed and Ctrl-C will not work (the simulator is inside a blocking C call),
+  with the `kill -9` line. It repeats with geometric backoff.
+  - The watchdog is **one reused thread parked on a `Condition`**, not a
+    per-call `threading.Timer`: the Timer version was measured at **+170 us per
+    call**, a fifth of a small region's runtime and inside the window
+    `tests/dataflow/mesh_perf.py` measures throughput over -- a watchdog that
+    perturbs what it watches. The reused thread costs **+12.6 us**.
+  - It is advisory: nothing is killed, nothing is raised, and a healthy run that
+    trips the timeout still returns a correct result. There is a test asserting
+    exactly that, which is what makes defaulting it ON defensible.
+  - `tests/dataflow/test_sim_timeout.py`, 4 tests, 15 s, cannot hang the suite.
+- **Still open: tier 1, the per-channel report.** The watchdog says *that* the
+  region is stuck, not *who* is stuck on *which* channel. The natural hook now
+  exists: `fc08bb6b` collapsed three byte-identical spin-wait sites into one
+  `_build_spin_wait_loop`, so instrumenting the generated spin -- beside the
+  `usleep(1)` it already contains -- is a one-line change rather than three.
+  The remaining cost is a runtime shared library to receive the callback, and
+  its risk is linkage (see the `LLVM_BUILD_DIR` / GLIBC pitfall).
+  `examples/accelerator/tinytpu_vitis/kpn_model.py` shows the report format;
+  what does not transfer is its mechanism -- it is a single-threaded
+  cooperative scheduler that can observe "a full sweep advanced nobody", and
+  the real simulator's processes are opaque JIT'd code on OpenMP threads.
 
 ## 12. Bit-slices lower to *signed* `ap_int<N>`, silently, and the simulator disagrees
 
