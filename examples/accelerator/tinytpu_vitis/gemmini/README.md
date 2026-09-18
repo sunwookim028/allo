@@ -54,6 +54,21 @@ Then build the RTL (`make CONFIG=Int8Dim4GemminiRocketConfig` under
   an hour of work if a future comparison wants per-unit attribution rather than
   total cycles.
 
+## `allo_bare5.c` -- the accelerator-only window
+
+`allo_cmp.c` measures what a user gets: `tiled_matmul_auto`, driver and all.
+`allo_bare5.c` measures what the hardware does: `rdcycle` -> 5 `config`s -> one
+hardware `loop_ws` -> `fence` -> `rdcycle`, operands refilled by the CPU
+immediately before the window. Build it the same way and run it the same way; a
+single ~90 s run covers all five shapes.
+
+It exists because the comparison in `../COMPARISON.md` was wrong without it. At
+4x4x4, 72% of `allo_cmp.c`'s 574 cycles is Rocket software driver, which our
+Vitis `cosim` number has no counterpart for. The difference between the two
+benchmarks, per shape, is a flat ~395 cycles -- which is what a per-call driver
+overhead should look like across a 16x range of work, and is the cross-check
+that the split is real.
+
 ## Fairness note
 
 Ours is the accelerator alone under Vitis `cosim`; Gemmini's `rdcycle` figure

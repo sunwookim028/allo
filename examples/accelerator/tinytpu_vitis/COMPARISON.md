@@ -64,9 +64,46 @@ accelerator.
 
 **Do not read a ratio off this table.** The right column is an accelerator plus
 a RISC-V software driver; the left is an accelerator alone. At 4x4x4, **72% of
-Gemmini's 574 cycles is Rocket driver code** (measured, below). The one shape
-where a like-for-like pairing exists puts us at **252 against ~161 -- about 1.6x
-slower**, which is the opposite of what this table used to be read as saying.
+Gemmini's 574 cycles is Rocket driver code**. The like-for-like table is the
+next one.
+
+## The like-for-like comparison, and it goes against us
+
+Gemmini measured over the same window ours is: `rdcycle` -> 5 `config`s -> one
+hardware `loop_ws` -> `fence` -> `rdcycle`, with A and B refilled by the CPU
+immediately before, exactly as `allo_cmp.c` does. Two trials per shape, all
+measured in one ~90 s simulator run (`gemmini/allo_bare5.c`).
+
+| shape | driver's tile | `loop_ws` calls | Gemmini accel+dispatch | ours | **ours / Gemmini** |
+| --- | --- | --- | --- | --- | --- |
+| 4x4x4    | 1,1,1 | 1 | 161 / 144 | 252 | **1.6-1.8x slower** |
+| 8x8x8    | 2,2,2 | 1 | 220 / 218 | 383 | **1.74x slower** |
+| 12x12x12 | 3,3,3 | 1 | 347 / 344 | 591 | **1.70x slower** |
+| 16x16x8  | 4,2,4 | 1 | 391 / 390 | 667 | **1.71x slower** |
+| 16x16x16 | 4,4,4 | 1 | 593 / 590 | 919 | **1.55x slower** |
+
+**We are slower at all five shapes, by 1.55-1.8x, near-uniformly.** Every shape
+uses exactly one `loop_ws`, verified at runtime by replicating the driver's own
+tiling search rather than assuming it.
+
+The decomposition closes, which is the reason to trust this. `allo_cmp.c`'s
+total minus this window, per shape: **413, 396, 395, 394, 395**. A flat ~395
+cycles of Rocket software across a 16x range of work is exactly what a per-call
+driver overhead looks like, and it confirms the 72% figure independently.
+
+Three caveats, none of which flatter us:
+
+* **4x4x4 is noisy, 161 vs 144**, where the others are within +/-3. Published as
+  a range. The 17-cycle spread was not chased.
+* **This column is a lower bound on Gemmini's dispatch cost.** `loop_ws`
+  argument marshalling is compile-time-constant in the harness; the real driver
+  computes those operands at runtime, and that cost sits in the ~395. So the
+  true like-for-like number is at or above these, i.e. the conservative
+  direction *for us*.
+* **The intercepts are still not comparable** and are not paired here. This
+  column's fitted intercept (~154 on a tile-count axis) is not our 151 on a
+  dynamic-instruction axis, and pairing them would repeat the error this audit
+  found.
 
 (History of this column, since earlier revisions of this file quoted each in
 turn: 1004 / 1108 / 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 /
