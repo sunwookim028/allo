@@ -46,6 +46,17 @@ _ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
 # Only shapes the built array can express: every dimension must be a multiple
 # of T, since one vmatpush-equivalent is a whole packed word of T lanes.
 SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]
+if os.environ.get("TPU_SHAPES"):        # e.g. TPU_SHAPES=4x4x4,16x16x16
+    _want = {tuple(int(x) for x in t.split("x"))
+             for t in os.environ["TPU_SHAPES"].split(",")}
+    SHAPES = [s for s in SHAPES if s in _want]
+
+# Memory-model knobs, for asking how much of the result is an ideal AXI slave.
+# `-m_axi_latency` is the read latency HLS schedules against (DEFAULT 0, i.e. a
+# memory that answers immediately); `-random_stall` makes cosim stall the
+# top-level interfaces at random instead of never.
+AXI_LATENCY = os.environ.get("TPU_AXI_LATENCY", "")
+RANDOM_STALL = os.environ.get("TPU_RANDOM_STALL", "") == "1"
 
 
 def vectors(M, K, N, relu=False, seed=0):
@@ -110,6 +121,7 @@ def patch_axi_depths(prj):
     open(path, "w").write(out)
 
 
+_LAT = f"config_interface -m_axi_latency {AXI_LATENCY}" if AXI_LATENCY else ""
 TCL_SYN = """open_project out.prj -reset
 open_solution -reset solution1 -flow_target vivado
 set_top tinytpu_isa
@@ -118,16 +130,17 @@ add_files -tb tb.cpp -cflags "-std=gnu++0x"
 set_part {xcu280-fsvh2892-2L-e}
 create_clock -period 3.33
 config_interface -m_axi_max_widen_bitwidth 512
+%s
 csynth_design
 exit
-"""
+""" % _LAT
 
 TCL_COSIM = """open_project out.prj
 open_solution solution1
 set_top tinytpu_isa
-cosim_design -trace_level none -rtl verilog -ldflags "%s"
+cosim_design -trace_level none -rtl verilog -ldflags "%s"%s
 exit
-""" % LDFLAGS
+""" % (LDFLAGS, " -random_stall" if RANDOM_STALL else "")
 
 
 def vitis(prj, tcl, log):

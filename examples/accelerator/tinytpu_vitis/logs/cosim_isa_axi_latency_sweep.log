@@ -1,0 +1,9 @@
+######## m_axi_latency=0 ########
+   4x 4x 4  cycles=252   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=919   TB 16x16x16 mismatches = 0 / 256
+######## m_axi_latency=16 ########
+   4x 4x 4  cycles=297   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=935   TB 16x16x16 mismatches = 0 / 256
+######## m_axi_latency=64 ########
+   4x 4x 4  cycles=441   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=1127   TB 16x16x16 mismatches = 0 / 256
