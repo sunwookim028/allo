@@ -1,7 +1,17 @@
 # TinyTPU-isa vs Gemmini: a matched comparison
 
 Both sides measured, both int8/int32 on a 4x4 array, same shapes, same operand
-distribution. This is the comparison the headline claim rests on.
+distribution.
+
+**Result, 2026-09-18: we are 1.55-1.8x slower than Gemmini at all five shapes**
+when both sides are measured over the same window: the accelerator plus its
+dispatch, with near-zero memory latency on both. The earlier "faster at all
+five shapes" compared our accelerator-only count with Gemmini's
+`tiled_matmul_auto`, and about 395 cycles of that call is Rocket driver
+software. That claim is withdrawn. Ratios in the history sections further
+down (the I/O-trade and T=16 tables, and the marginal-cost fits) are against
+those end-to-end Gemmini numbers. They are kept as a record of our own
+progress, not as comparisons.
 
 ## Making the baseline matched
 
