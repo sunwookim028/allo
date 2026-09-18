@@ -546,6 +546,13 @@ only pragmas it generates are the `m_axi` / `s_axilite` interface lines in
   iterations late, answer reads in that window from a bypass mux) takes the
   memory off the carried path and reaches II=1 -- at **13.7x the flip-flops in
   that unit** (1,270 -> 17,450) for a 2.3% end-to-end gain.
+- **And the redesign did not survive its own price.** The rotation was built,
+  was bit-exact at all five shapes, and was reverted at the 2026-09-18
+  checkpoint: `ar` scales with the array dimension, so the flip-flop cost grows
+  with T while the 2.3% does not. The shipped design is back to the nested form
+  at II=2. So the measured cost of this missing pragma is not "16k flip-flops"
+  -- it is **the 2.3% itself, forgone**, because no affordable hardware
+  expresses what one line would have asserted.
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II

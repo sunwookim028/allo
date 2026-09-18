@@ -544,7 +544,17 @@ After the burst DMA the only loops left with `Pipelined = no` were the array's
 per-`mm` loop and `accu`'s per-instruction loop. Both were attacked; **one paid
 and one did not**, and the one that did not is the more useful measurement.
 
-### `accu`: flat at II=1, and it took a write-behind rotation
+### `accu`: flat at II=1, and it took a write-behind rotation -- REVERTED
+
+**Not in the design.** It was built, it was bit-exact, it was 2.3% faster, and
+it was reverted for area: the rotation costs `accu` 13.7x its flip-flops
+(1,270 -> 17,450), the trade gets worse as T grows, and one line of
+`#pragma HLS dependence` would have bought the same II for nothing. The whole
+measurement is kept below because it is what prices audit item 21 -- it is the
+number that says what the missing pragma is worth in silicon. `microarch_isa.py`
+is back at the nested form -- identical to the burst-DMA build (`9c6609e2`)
+except for the docstring that records this attempt, so the emitted HLS is the
+one already measured at 680 / 831 / 1066 / 1139 / 1457.
 
 `accu` is the unit that resisted row-flattening twice (above). The obstacle was
 never the loop shape, it was one dependence: read `ar[f1 + r]`, add, write it
@@ -584,18 +594,24 @@ consecutive results land in different storage), applied to a register file.
 `vadd`'s second `ar` read, which forced its own loop to II=2 under a dual-port
 BRAM, comes free from the same partition.
 
-| shape | dyn. instrs | before | after | |
+| shape | dyn. instrs | nested (**shipped**) | rotated (reverted) | |
 |---|---|---|---|---|
-| 4x4x4    |  6 | 680  | **676**  | -4 |
-| 8x8x8    | 15 | 831  | **827**  | -4 |
-| 12x12x12 | 28 | 1066 | **1062** | -4 |
-| 16x16x8  | 25 | 1139 | **1125** | -14 |
-| 16x16x16 | 45 | 1457 | **1423** | -34 |
+| 4x4x4    |  6 | **680**  | 676  | -4 |
+| 8x8x8    | 15 | **831**  | 827  | -4 |
+| 12x12x12 | 28 | **1066** | 1062 | -4 |
+| 16x16x8  | 25 | **1139** | 1125 | -14 |
+| 16x16x16 | 45 | **1457** | 1423 | -34 |
 
 Fixed cost 557 -> 563, marginal **20.07 -> 19.32** cycles/instruction. Area is
 the price and it is not small: `accu` FF 1270 -> 17450 and LUT 2465 -> 6430,
 top-level FF 11524 -> 27377, LUT 19235 -> 23239, BRAM 16 -> 12. All five shapes
 stay bit-exact, `vadd`/`vrelu` included.
+
+**The verdict: 2.3% for 13.7x the flip-flops in that unit, and 2.4x at the top
+level.** At T=4 that is already a bad trade, and `ar` is `T`-by-`MAXDIM`, so
+the register cost grows with the array while the 2.3% does not. Reverted at the
+checkpoint; the shipped column is the left one. What this priced is not the
+rotation -- it is the pragma Allo cannot emit.
 
 **The per-instruction boundary was real but mostly hidden.** It is about 8
 cycles -- a decode, the call into the sub-function Vitis extracts each inner

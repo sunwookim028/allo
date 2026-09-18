@@ -50,17 +50,18 @@ accelerator.
 
 | shape | ours | Gemmini int8 4x4 | ratio | our util | Gemmini util |
 |---|---|---|---|---|---|
-| 4x4x4    | **676**  | 574 | **1.18x** |  0.6% |  0.7% |
-| 8x8x8    | **827**  | 615 | **1.34x** |  3.9% |  5.2% |
-| 12x12x12 | **1062** | 740 | **1.44x** | 10.2% | 14.6% |
-| 16x16x8  | **1125** | 784 | **1.43x** | 11.4% | 16.3% |
-| 16x16x16 | **1423** | 986 | **1.44x** | 18.0% | 26.0% |
+| 4x4x4    | **680**  | 574 | **1.18x** |  0.6% |  0.7% |
+| 8x8x8    | **831**  | 615 | **1.35x** |  3.9% |  5.2% |
+| 12x12x12 | **1066** | 740 | **1.44x** | 10.1% | 14.6% |
+| 16x16x8  | **1139** | 784 | **1.45x** | 11.2% | 16.3% |
+| 16x16x16 | **1457** | 986 | **1.48x** | 17.6% | 26.0% |
 
-(Our column is after the burst-DMA pass and the flat accumulator -- see the I/O
-section below and `RESULTS_ISA.md`. It read 680 / 831 / 1066 / 1139 / 1457
-before the accumulator was flattened, and 1004 / 1108 / 1294 / 1344 / 1586 at
-1.75x / 1.80x / 1.75x / 1.71x / 1.61x before the burst DMA, which is what
-earlier revisions of this table quoted.)
+(Our column is after the burst-DMA pass -- see the I/O section below. It read
+1004 / 1108 / 1294 / 1344 / 1586 at 1.75x / 1.80x / 1.75x / 1.71x / 1.61x
+before the burst DMA, which is what earlier revisions of this table quoted. A
+flat accumulator was built after it, reached 676 / 827 / 1062 / 1125 / 1423,
+and was **reverted**: it cost 13.7x the flip-flops in that unit for 2.3%. The
+measurement is kept in `RESULTS_ISA.md` and the area trade is audit item 21.)
 
 **The shape of the gap has inverted, and that is the result.** It used to be
 flat at ~1.7x and *falling* with size -- the signature of a fixed charge being
@@ -79,19 +80,18 @@ machine's own peak):
 |---|---|---|
 | 4x4x4 -> 8x8x8 | 10.93 MAC/cyc (**68.3%**) | 2.97 (**18.5%**) |
 | 8x8x8 -> 12x12x12 | 9.73 (**60.8%**) | 5.17 (**32.3%**) |
-| 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 5.08 (31.7%) |
-| 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 6.87 (**43.0%**) |
-| least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.54 (**34.6%**), fixed 718 |
+| 12x12x12 -> 16x16x8 | 7.27 (45.5%) | 4.38 (27.4%) |
+| 16x16x8 -> 16x16x16 | 10.14 (**63.4%**) | 6.44 (**40.3%**) |
+| least squares, all five | 9.71 (**60.7%**), fixed 566 | 5.31 (**33.2%**), fixed 717 |
 
-(Our column is post-burst-DMA and post-flat-accumulator. It read 2.97 / 5.17 /
-4.38 / 6.44 and 33.2% with fixed 717 before the accumulator was flattened;
-4.31 / 6.54 / 6.40 / 8.46 and 44.1% with fixed 1028 after row-flattening and
-before the burst DMA; and 3.50 / 5.43 / 6.67 / 6.92 and 37.0% with fixed 1067
-before that. **The burst DMA took the marginal efficiency DOWN, 44.1% ->
-33.2%, and the fixed cost down further, 1028 -> 717**, which is the trade
-stated in its own terms and which at every shape in this table the second term
-wins. The flat accumulator is the first change since that moved the marginal
-term back up, 33.2% -> 34.6%, with the fixed term unchanged.)
+(Our column is post-burst-DMA. It read 4.31 / 6.54 / 6.40 / 8.46 and 44.1%
+with fixed 1028 after row-flattening and before the burst DMA, and 3.50 / 5.43
+/ 6.67 / 6.92 and 37.0% with fixed 1067 before that. **The burst DMA took the
+marginal efficiency DOWN, 44.1% -> 33.2%, and the fixed cost down further,
+1028 -> 717**, which is the trade stated in its own terms and which at every
+shape in this table the second term wins. The reverted flat accumulator was
+the only change since that moved the marginal term back up, and it moved it to
+34.6% -- 0.75 cycles/instruction for 16k flip-flops.)
 
 The cube sweep varies all three dimensions at once and spans only 2.4x in
 cycles, which makes each marginal a difference of two similar numbers. The
@@ -223,8 +223,8 @@ neither setting was what Gemmini has:
 | `wrap_io=True`, imem 256 | 18.1 cyc/instr | 1102 | 2.12x | 1.94x |
 | `wrap_io=False`, strided | 39.8 | 481 | 1.21x | 2.25x |
 | `wrap_io=True`, imem 56 | 15.1 | 907 | 1.75x | 1.61x |
-| `wrap_io=False`, bursts | 20.1 | 557 | 1.18x | 1.48x |
-| **+ flat accumulator** | **19.3** | **563** | **1.18x** | **1.44x** |
+| **`wrap_io=False`, bursts** | **20.1** | **557** | **1.18x** | **1.48x** |
+| (+ flat accumulator, reverted) | 19.3 | 563 | 1.18x | 1.44x |
 | Gemmini | **10.8** | **483** | 1.00x | 1.00x |
 
 * `wrap_io=True` copies each argument into a local buffer before the region
@@ -259,16 +259,20 @@ named or be deferred to the end of the run, where it would serialize behind the
 last `mvout` instead of overlapping the compute it currently overlaps. It is the
 next thing to measure.
 
-The `+ flat accumulator` row is the first change to move the marginal term
-since the burst DMA, and it moved it by 0.75 cycles/instruction: `accu`'s
-per-instruction loop became one flat row loop at II=1, which needed a
-write-behind rotation to break the `ar` read-modify-write recurrence
-(`RESULTS_ISA.md`). The array's per-`mm` loop was flattened the same way in the
-same pass, also reached II=1, and measured about +10 cycles at four of five
-shapes, so it was not landed -- the two together say that **array throughput is
-worth ~0.8 cycles of runtime per cycle of MAC while array per-instruction
-overhead is worth nothing**, because `vru` upstream pushes the same `T + 1`
-prologue words per `mm` whatever the PE does.
+The parenthesised `+ flat accumulator` row is the only change since the burst
+DMA that moved the marginal term at all, and it moved it by 0.75
+cycles/instruction: `accu`'s per-instruction loop became one flat row loop at
+II=1, which needed a write-behind rotation to break the `ar` read-modify-write
+recurrence (`RESULTS_ISA.md`). **It is not in the design.** The rotation cost
+`accu` 1,270 -> 17,450 flip-flops -- 13.7x -- for 2.3% end-to-end, and the
+trade gets worse with T, so it was reverted; one `#pragma HLS dependence inter
+false` would have bought the same II at no area, and Allo has no primitive that
+emits one (audit item 21). The array's per-`mm` loop was flattened the same way
+in the same pass, also reached II=1, and measured about +10 cycles at four of
+five shapes, so it was not landed either -- the two together say that **array
+throughput is worth ~0.8 cycles of runtime per cycle of MAC while array
+per-instruction overhead is worth nothing**, because `vru` upstream pushes the
+same `T + 1` prologue words per `mm` whatever the PE does.
 
 **Gemmini still has the better version of this**, and the residual marginal gap
 is where it now shows: `mvin`/`mvout` transfer exactly the tiles the program
