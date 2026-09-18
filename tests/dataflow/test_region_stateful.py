@@ -22,6 +22,7 @@ preserve the buffer's contents across calls.
 """
 
 import numpy as np
+import pytest
 
 import allo.dataflow as df
 from allo.ir.types import Stateful, Stream, int32
@@ -133,3 +134,61 @@ def test_region_stateful_with_stream():
     # 2nd call: persistent acc continues from previous value.
     for v in out:
         assert 4 <= v <= 6, f"unexpected {v} after 2nd call"
+
+
+# ---------------------------------------------------------------------------
+# The HLS backend cannot honour the sharing contract, and must say so.
+# ---------------------------------------------------------------------------
+
+
+def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(capfd):
+    """Sharing is honoured by the simulator but is not expressible in HLS.
+
+    The emitter re-emits each stateful global as a function-local ``static``,
+    so two kernels referencing one region-scope ``Stateful`` would get two
+    *independent* copies -- and real sharing is not available either: under
+    ``#pragma HLS dataflow`` a variable written by one process and read by
+    another is exactly what dataflow forbids.  The emitter therefore has to
+    fail the build rather than emit a silently wrong circuit.
+    """
+
+    @df.region()
+    def top(out_a: int32[4], out_b: int32[4]):
+        acc: int32[4] @ Stateful = 0  # shared by both kernels
+
+        @df.kernel(mapping=[1], args=[out_a])
+        def producer(po: int32[4]):
+            for i in range(4):
+                acc[i] += 1
+                po[i] = acc[i]
+
+        @df.kernel(mapping=[1], args=[out_b])
+        def reader(rb: int32[4]):
+            for i in range(4):
+                rb[i] = acc[i]
+
+    s = df.customize(top)
+    with pytest.raises(RuntimeError):
+        s.build(target="vhls")
+    err = capfd.readouterr().err
+    assert "__stateful_top_acc" in err, err
+    assert "producer" in err and "reader" in err, err
+
+
+def test_kernel_private_stateful_still_builds_for_hls():
+    """The kernel-private model each instance owns its own buffer, so the
+    per-function ``static`` is correct and the build must go through."""
+
+    @df.region()
+    def top(out: int32[2, 4]):
+        @df.kernel(mapping=[2], args=[out])
+        def k(o: int32[2, 4]):
+            acc: int32[4] @ Stateful = 0  # private to each instance
+            p = df.get_pid()
+            for i in range(4):
+                acc[i] += 1
+                o[p, i] = acc[i]
+
+    code = str(df.customize(top).build(target="vhls"))
+    assert code.count("static int32_t __stateful_k_0_acc") == 1, code
+    assert code.count("static int32_t __stateful_k_1_acc") == 1, code

@@ -3081,6 +3081,47 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
     }
   });
 
+  // Every stateful global collected above is re-emitted as a function-local
+  // `static` below, so two functions referencing the same one get two
+  // *independent* copies. That is right for the kernel-private model (#487),
+  // where each kernel owns its buffer -- but a region-scope `Stateful` is
+  // documented (allo/dataflow.py) as "a single persistent buffer shared by
+  // every kernel in the region", and the simulator honours that. Sharing is
+  // not expressible here at all: under `#pragma HLS dataflow` a variable
+  // written by one process and read by another is exactly what dataflow
+  // forbids. Fail the build rather than emit a silently wrong circuit.
+  for (auto &globalOp : statefulGlobals) {
+    SmallVector<StringRef, 4> users;
+    for (auto other :
+         func->getParentOfType<ModuleOp>().getOps<func::FuncOp>()) {
+      if (other.getBlocks().empty())
+        continue;
+      bool uses = false;
+      other.walk([&](memref::GetGlobalOp getGlobalOp) {
+        if (getGlobalOp.getName() == globalOp.getSymName())
+          uses = true;
+      });
+      if (uses)
+        users.push_back(other.getName());
+    }
+    if (users.size() > 1) {
+      std::string msg;
+      llvm::raw_string_ostream ss(msg);
+      ss << "stateful global '" << globalOp.getSymName() << "' is referenced "
+         << "by " << users.size() << " functions (";
+      for (unsigned i = 0; i < users.size(); ++i)
+        ss << (i ? ", " : "") << users[i];
+      ss << "), but it is emitted as a function-local `static`, which gives "
+            "each of them an independent copy rather than the shared buffer "
+            "the dataflow region promises. Sharing mutable state between "
+            "processes is not expressible under `#pragma HLS dataflow`: "
+            "declare the buffer inside a single kernel, or pass the values "
+            "between kernels through a Stream.";
+      emitError(func, msg);
+      return;
+    }
+  }
+
   // Emit function signature.
   auto portList = emitFunctionSignature(func);
   os << "\n) {";

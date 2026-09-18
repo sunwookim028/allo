@@ -748,8 +748,7 @@ def test_bit_slice_is_unsigned():
     )
     assert not re.search(r"\bint8_t v\d+;", hls_code), (
         "bit slice declared as a signed 8-bit type; an 8-bit field holding "
-        "200 reads back as -56 in RTL while the simulator reads 200:\n"
-        + hls_code
+        "200 reads back as -56 in RTL while the simulator reads 200:\n" + hls_code
     )
 
     # When Vitis' ap_int headers are installed, compile and run the emitted
