@@ -2171,9 +2171,14 @@ void allo::hls::VhlsModuleEmitter::emitSetBit(allo::SetIntBitOp op) {
 void allo::hls::VhlsModuleEmitter::emitGetSlice(allo::GetIntSliceOp op) {
   indent();
   Value result = op.getResult();
+  // `fixUnsignedType` has to run *before* `emitValue`: emitValue prints the
+  // declaration (and only on the first declaration), so fixing the signedness
+  // afterwards leaves an `ap_int<N>` declaration behind for an unsigned slice.
+  // Every sibling emitter (emitBinary/emitUnary/emitCast/emitGetBit) already
+  // orders them this way; this one was flipped by upstream PR #415 (3ed35940).
+  fixUnsignedType(result, op->hasAttr("unsigned"));
   emitValue(result);
   os << ";\n";
-  fixUnsignedType(result, op->hasAttr("unsigned"));
   // generate ap_int types
   indent();
   os << "ap_int<" << op.getNum().getType().getIntOrFloatBitWidth() << "> ";

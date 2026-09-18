@@ -1744,12 +1744,17 @@ class ASTTransformer(ASTBuilder):
                 index = ASTTransformer.build_cast_op(
                     ctx, index, node.slice.dtype, Index()
                 )
-                return allo_d.GetIntBitOp(
+                get_bit_op = allo_d.GetIntBitOp(
                     node.dtype.build(),
                     value_result,
                     index.result,
                     ip=ctx.get_ip(),
                 )
+                # The extracted bit is a uint1 (see TypeInferer.visit_Subscript).
+                # Signedness travels on the `unsigned` attribute, so it has to
+                # be attached here or the HLS emitters will declare it signed.
+                get_bit_op.attributes["unsigned"] = UnitAttr.get()
+                return get_bit_op
             else:
                 value_dtype = (
                     node.slice.value.dtype
@@ -1797,13 +1802,21 @@ class ASTTransformer(ASTBuilder):
             )
             # pylint: disable=no-else-return
             if isinstance(node.ctx, ast.Load):
-                return allo_d.GetIntSliceOp(
+                get_slice_op = allo_d.GetIntSliceOp(
                     node.dtype.build(),
                     value_result,
                     upper.result,
                     lower.result,
                     ip=ctx.get_ip(),
                 )
+                # A bit slice is always UInt(stride) (see
+                # TypeInferer.visit_Subscript), LowerBitOps lowers it with
+                # logical shifts, and build_cast_op widens it with ExtUIOp.
+                # Signedness travels on the `unsigned` attribute, so without
+                # this the HLS emitters declare the slice as ap_int<N> and a
+                # field with its top bit set reads back negative.
+                get_slice_op.attributes["unsigned"] = UnitAttr.get()
+                return get_slice_op
             else:  # ast.Store
                 set_slice_op = allo_d.SetIntSliceOp(
                     node.value.dtype.build(),

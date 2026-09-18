@@ -1,11 +1,16 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import glob
+import os
+import re
+import shutil
+import subprocess
 import tempfile
 
 import pytest
 import allo
-from allo.ir.types import bool, int32, float16, float32
+from allo.ir.types import bool, int32, uint32, float16, float32
 from allo.memory import Memory
 import numpy as np
 import allo.backend.hls as hls
@@ -653,6 +658,92 @@ def test_fp16_half_type_and_hls_math():
         assert "half" in hls_code
         assert "hls::exp" in hls_code
         assert "hls::sqrt" in hls_code
+
+
+def _vitis_include_dir():
+    """Directory holding Vitis HLS' ``ap_int.h``, or None if unavailable."""
+    roots = [os.environ.get("XILINX_HLS"), os.environ.get("XILINX_VITIS")]
+    candidates = [os.path.join(r, "include") for r in roots if r]
+    candidates += sorted(
+        glob.glob("/opt/xilinx/Vitis_HLS/*/include")
+        + glob.glob("/tools/Xilinx/Vitis_HLS/*/include"),
+        reverse=True,
+    )
+    for cand in candidates:
+        if os.path.isfile(os.path.join(cand, "ap_int.h")):
+            return cand
+    return None
+
+
+def test_bit_slice_is_unsigned():
+    """A bit slice must reach HLS as an *unsigned* field.
+
+    ``x[lo:hi]`` is typed ``UInt(hi - lo)`` by the type inferencer, lowered
+    with logical (zero-filling) shifts, and widened with ``arith.extui``, so
+    the LLVM simulator reads an 8-bit field holding 200 back as 200.  The
+    Vivado emitter used to declare the same slice signed (``int8_t`` /
+    ``ap_int<8>``), which reads it back as -56: silent RTL/simulator
+    divergence that no functional test on the simulator could catch.
+    """
+
+    def kernel(A: uint32[4], B: int32[4]):
+        for i in range(4):
+            # 8-bit field; 200 and 255 have the field's top bit set.
+            B[i] = A[i][0:8]
+
+    s = allo.customize(kernel)
+
+    np_A = np.array([200, 64, 255, 1], dtype=np.uint32)
+    golden = (np_A & 0xFF).astype(np.int32)
+
+    # Simulator path.
+    sim_B = np.zeros(4, dtype=np.int32)
+    s.build()(np_A, sim_B)
+    np.testing.assert_array_equal(sim_B, golden)
+
+    # HLS path.  The sliced operand is 32-bit, so the only 8-bit scalar
+    # declaration in the generated code is the slice result itself.
+    hls_code = str(s.build(target="vhls"))
+    print(hls_code)
+    assert re.search(r"\buint8_t v\d+;", hls_code), (
+        "bit slice was not declared unsigned:\n" + hls_code
+    )
+    assert not re.search(r"\bint8_t v\d+;", hls_code), (
+        "bit slice declared as a signed 8-bit type; an 8-bit field holding "
+        "200 reads back as -56 in RTL while the simulator reads 200:\n"
+        + hls_code
+    )
+
+    # When Vitis' ap_int headers are installed, compile and run the emitted
+    # device code so the two paths are compared for real.
+    inc = _vitis_include_dir()
+    if inc is None or shutil.which("g++") is None:
+        return
+    harness = (
+        hls_code
+        + """
+#include <cstdio>
+int main() {
+  uint32_t A[4] = {200, 64, 255, 1};
+  int32_t B[4] = {0, 0, 0, 0};
+  kernel(A, B);
+  printf("%d %d %d %d\\n", B[0], B[1], B[2], B[3]);
+  return 0;
+}
+"""
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src = os.path.join(tmpdir, "kernel.cpp")
+        exe = os.path.join(tmpdir, "kernel")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write(harness)
+        subprocess.run(
+            ["g++", "-w", "-std=c++14", f"-I{inc}", src, "-o", exe], check=True
+        )
+        out = subprocess.run(
+            [exe], check=True, capture_output=True, text=True
+        ).stdout.split()
+    np.testing.assert_array_equal(np.array(out, dtype=np.int32), golden)
 
 
 if __name__ == "__main__":
