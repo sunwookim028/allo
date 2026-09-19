@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 AGENT_DIR = Path(__file__).resolve().parent
-REPO = AGENT_DIR.parents[2]
+REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")

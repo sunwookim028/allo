@@ -30,7 +30,7 @@ from pathlib import Path
 from spend import spent_since
 
 AGENT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = AGENT_DIR.parents[2]
+REPO_ROOT = AGENT_DIR.parents[3]
 
 #: Framings of the same objective, each grounded in something measured on this
 #: design (RESULTS_ISA.md / COMPARISON.md). Each worker gets one angle to start

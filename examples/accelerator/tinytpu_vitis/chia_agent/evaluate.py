@@ -58,7 +58,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 AGENT_DIR = Path(__file__).resolve().parent
-REPO = AGENT_DIR.parents[2]
+REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
 
 #: Frozen files are read from this commit (resolved to a hash per run), i.e.
