@@ -105,7 +105,7 @@ intersphinx_mapping = {
 # html_favicon = '_static/favicon.svg'
 html_theme = "piccolo_theme"
 html_theme_options = {
-    "source_url": "https://github.com/cornell-zhang/allo",
+    "source_url": "https://github.com/sunwookim028/allo",
     # "repository_url": "https://github.com/cornell-zhang/allo",
     # "use_repository_button": True,
     # "logo_only": True,
