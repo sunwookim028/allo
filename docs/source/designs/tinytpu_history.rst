@@ -219,6 +219,9 @@ bounded FIFOs, a cooperative scheduler, and a deadlock report naming each
 blocked process and the occupancy of the channel it waits on. It completes at
 **depth 4 for every shape**, 4x4x4 through 16x16x16. So there is no circular
 wait in the architecture at all.
+(That was the per-instruction architecture of the time. ``kpn_model.py`` has
+since been rewritten for the row-flattened units and is driven by the
+assembled header; every shipped program completes at depth **1**.)
 
 **The Allo simulator needed one thread per process.** It gave each ``df.kernel``
 instance an OMP thread and blocked that thread on an empty or full stream. With

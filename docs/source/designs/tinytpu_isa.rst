@@ -550,23 +550,39 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
 
 .. code-block:: bash
 
-   source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # not set by the env
-   export PYTHONPATH=<repo root>
-   export OMP_NUM_THREADS=32   # >= 22 processes; the value the numbers were produced with
-   cd examples/accelerator/tinytpu_vitis
+   # One command, from a clean checkout: builds this checkout's MLIR bindings,
+   # runs bench_isa + stress_isa, then the default cosim, and checks the five
+   # cycle counts against 252 / 383 / 591 / 667 / 919. Exits nonzero otherwise.
+   examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
+   examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
 
-   python bench_isa.py          # functional sweep, one build, every shape
-   python bench_isa.py 8 8 8    # one shape
-   python kpn_model.py          # channel-graph model
-   python cosim.py              # one csynth, cosim per shape
-   TPU_WRAP=1 python cosim.py   # the old hoisted-argument variant, for comparison
+   # Or by hand, from examples/accelerator/tinytpu_vitis (the env sets neither variable):
+   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   python bench_isa.py                   # published functional setup: ALL EXACT
+   python bench_isa.py 8 8 8             # one shape
+   python stress_isa.py                  # correctness gate:          STRESS OK
+   python kpn_model.py                   # channel protocol / deadlock model
+   python cosim.py                       # default TB: the published cycle counts
+   TPU_TB=stress TPU_SHAPES=4x4x4,16x16x16 python cosim.py   # correctness in RTL
+   python mutate.py                      # does the harness catch a broken design?
+   TPU_WRAP=1 python cosim.py            # the old hoisted-argument variant, for comparison
 
-Since the fix recorded in :ref:`limitation-11` the simulator sizes its OpenMP
-team to the section count itself, and the 22-process design runs every shape at
-``OMP_NUM_THREADS=8``; 32 is kept above because it is the setting the recorded
-numbers used. See :doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the
-Vitis install.
+``bench_isa.py`` and ``cosim.py``'s default testbench use Gemmini's ``[-4, 4]``
+operands so the comparison is like for like; they are **performance** checks
+and are blind to an int16 accumulator, a wrong clip boundary, or a unit ignoring
+a field GEMM never varies. ``stress_isa.py`` and ``TPU_TB=stress`` are the
+**correctness** checks; ``mutate.py`` prints which level catches which bug. Any
+``TPU_*`` variable left set changes what ``cosim.py`` measures.
+
+These commands replaced older reproduce instructions (``d18de251``) that named
+``TPU_M`` / ``TPU_K`` / ``TPU_N`` knobs, a ``simulator`` argument and
+``OMP_NUM_THREADS=32``, none of which the current scripts use. Since the fix
+recorded in :ref:`limitation-11` the simulator sizes its OpenMP team to the
+section count itself, so ``OMP_NUM_THREADS=8`` runs the 22-process design; the
+recorded numbers were produced at 32. ``kpn_model.py`` has been rewritten for the
+row-flattened units and is driven by the assembled header (``ef112868``); every
+shipped program completes in it at FIFO depth **1**. See
+:doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the Vitis install.
 
 ``bench_isa.py`` first asserts that the generated program is bit-identical to
 the hand-written one, then that the looped and unrolled programs expand to the
@@ -615,33 +631,88 @@ step fails or any number differs:
    examples/accelerator/tinytpu_vitis/reproduce.sh              # everything, with cosim
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim   # functional only, ~1 min
 
+``reproduce.sh`` was run from a pristine worktree, including a fresh MLIR
+build, and printed ``REPRODUCED`` with 252 / 383 / 591 / 667 / 919 and 0
+mismatches in **5m48s** (``d18de251``). It unsets every ``TPU_*`` knob and checks
+that ``allo`` resolves to the checkout it is run from (``92fb2f1b``).
+
 **Performance vs. correctness.** ``bench_isa.py`` and ``cosim.py`` with its
 default testbench are the **performance** setup: seed 0, operands in [-4, 4]
 (Gemmini's ``allo_cmp.c`` distribution, kept so the comparison is like for
 like), ``C`` zeroed, and only the ``M x N`` region compared. They miss real
 bugs -- at T=4 a PE's partial sum never leaves 9 bits, so narrowing the int32
-partial sum to int16 still prints ``ALL EXACT``. The **correctness** gates are:
+partial sum to int16 still prints ``ALL EXACT``. The correctness gates are
+below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
+``mutate.py`` after any change to the harness.
 
-* ``stress_isa.py`` (~10 s, on the Allo simulator; ``quick`` for the scored
-  shapes plus corner/boundary cases only). Run it after **any** change to
-  ``microarch_isa.py``. It prints ``STRESS OK: n/n`` or lists each failing run.
-* ``TPU_TB=stress python cosim.py``, the same cases on the RTL: several calls
-  on one RTL instance, ``C`` prefilled with random bytes, and the whole of
-  ``C`` compared. Its cycle column is the minimum over those calls, not the
-  headline.
+``stress_isa.py`` (``ef112868``)
+   About 10 s on the Allo simulator, 486 runs: full-range int8 operands with
+   -128 and 127 forced; clip and ReLU edge cases landing on 127 / 128 / -128 /
+   -129 / 0 / -1; all 64 shapes; ``C`` prefilled with random bytes and compared
+   in full; ``isa_dsl.vector_program``, which varies every field GEMM holds
+   constant; and 200 random valid programs. Everything is checked against
+   ``isa_ref.py``, a numpy reference model of the ISA that is itself checked
+   against numpy on every GEMM. It also runs the validator's negative controls
+   (14 crafted bad programs rejected, 387 generated ones accepted) and runs
+   ``kpn_model.py`` on every distinct program first, so a simulator hang becomes
+   a named report. It prints ``STRESS OK: n/n`` or lists each failing run.
 
-Run ``mutate.py`` after any change to the **harness**: it applies one
-deliberate single-point bug at a time to a copy of ``microarch_isa.py`` and
-reports which verification level catches it (``none`` is the unmodified
-control, which must pass everything).
+``TPU_TB=stress python cosim.py`` (``1ac0d22f``)
+   The same idea on the RTL: five calls per shape in one RTL simulation (corner,
+   full-range, boundary and mid operands, plus ``vector_program``), each
+   inheriting the previous call's state, with ``C`` prefilled and compared in
+   full. Its cycle column is the minimum over those calls, not the headline. The
+   default testbench is unchanged byte for byte and is the only mode the
+   published cycle counts come from.
+
+**Proof that the split matters.** The int16 partial-sum mutant:
+
+.. list-table::
+   :header-rows: 1
+
+   * - check
+     - int16 partial-sum mutant
+   * - default cosim (performance testbench)
+     - **passes**: 0/16 and 0/256 mismatches, at the published 252 / 919 cycles
+   * - ``TPU_TB=stress`` cosim
+     - **fails**: 3 wrong at 4x4x4, 82 at 16x16x16
+   * - ``stress_isa.py``
+     - **fails**: 247 of 486 runs
+
+``mutate.py`` (``c8089332``)
+   26 single-point mutants of ``microarch_isa.py`` (plus the unmodified
+   ``none`` control through the same loader), each run through ``bench_isa``
+   and ``stress_isa``, and cosim on request. **All 26 are caught.** 11 of them
+   get past ``bench_isa`` and are caught **only** by ``stress_isa``:
+   ``pe_psum_int16`` (int16 partial sum), ``clip_hi_off_by_one`` and
+   ``clip_lo_off_by_one`` (both clip bounds), ``vadd_dst_is_src1`` and
+   ``vrelu_dst_is_src`` (vadd/vrelu destination), ``vadd_src2_is_src1`` (vadd
+   second source), ``vrelu_src_base_ignored``, ``mvout_src_base_ignored``,
+   ``dma_ld_row_ignored`` and ``mvout_row_ignored`` (base / row fields), and
+   ``dma_st_accumulates_C`` (``dma_st`` relying on a zeroed ``C``). Each
+   mutant's anchor must match exactly once, so a refactor of the design makes
+   the script fail loudly instead of silently testing nothing.
 
 **The arrays are not cleared by hardware.** ``spad``, ``vr`` and ``ar`` carry no
 ``= 0`` initialiser (it cost a runtime zero-fill loop; see
-:ref:`limitation-g`), so ``assemble()`` enforces a write-before-read contract:
-``check_program()`` walks the exact dynamic trace and rejects any program that
-reads an ``ar`` or ``vr`` row no earlier instruction wrote (``4357ed59``). It also
-rejects ``nr=0`` data ops, out-of-range rows, unbalanced or over-deep loops,
-trip 0, AGU terms naming a closed loop, and the retired ``dma_st`` opcode.
+:ref:`limitation-g`), so ``assemble()`` enforces a write-before-read contract
+(``4357ed59``): ``check_program()`` walks the exact dynamic trace -- the program
+has no data-dependent control flow, so this is exact, not conservative -- and
+rejects any read of an ``ar`` row (``mm`` accumulate, ``vadd``, ``vrelu``,
+``mvout``) or a ``vr`` row (``mm``) that no earlier instruction wrote.
+Written-ness propagates through ``vld``: a ``vld`` may copy an unwritten
+``spad`` row, as the shipped GEMM does when ``M < MAXDIM``, but the copy then
+counts as unwritten. It also rejects out-of-range rows, bad loop nesting
+(unbalanced or over-deep loops, trip 0, AGU terms naming a closed loop),
+zero-row instructions, and the retired ``dma_st`` opcode.
+
+Two design facts the hardening found:
+
+* **Zero-row instructions hang the machine** instead of being no-ops: an
+  ``nr=0`` data op desynchronises the flat row loops (confirmed on the
+  simulator). The validator now rejects them.
+* **The hung simulator ignores SIGTERM**; only SIGKILL stops it (it is inside
+  a blocking C call; compare the watchdog note in :ref:`limitation-11`).
 
 
 Results

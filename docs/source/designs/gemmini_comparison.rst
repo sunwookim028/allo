@@ -730,6 +730,11 @@ survives the correction, but at 1.7x rather than 2.7x.
 Reproducing the Gemmini baseline
 --------------------------------
 
+Our side of every table reproduces with one command from a clean checkout,
+``examples/accelerator/tinytpu_vitis/reproduce.sh``, which checks the five cycle
+counts (:ref:`tinytpu-isa-verify`); ``TPU_WRAP=1 python cosim.py`` builds the
+old hoisted-argument variant for comparison. The Gemmini side follows.
+
 Every Gemmini number on this page came from a Chipyard tree whose changes were
 **never committed anywhere**: four uncommitted diffs across three nested
 repositories, plus a benchmark that was untracked even inside its own
