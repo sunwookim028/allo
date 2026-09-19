@@ -1,0 +1,52 @@
+[
+ {
+  "what": "iter1",
+  "seconds": 199.3,
+  "session_id": "ses_f45663f9dffeoRpLCcxnxcLTYv",
+  "global_usd_during_call": 0.0,
+  "completed": true,
+  "input_tokens": 5,
+  "output_tokens": 5,
+  "num_turns": 5
+ },
+ {
+  "what": "iter2",
+  "seconds": 20.3,
+  "session_id": "ses_f456339ecffeMw0SC9mkjsNHAw",
+  "global_usd_during_call": 0.0,
+  "completed": true,
+  "input_tokens": 3,
+  "output_tokens": 3,
+  "num_turns": 3
+ },
+ {
+  "what": "iter3",
+  "seconds": 4.2,
+  "session_id": "ses_f45603e3bffe1D16Muirvdg1Py",
+  "global_usd_during_call": 0.0,
+  "completed": true,
+  "input_tokens": 2,
+  "output_tokens": 2,
+  "num_turns": 2
+ },
+ {
+  "what": "iter3-debug1",
+  "seconds": 3.9,
+  "session_id": "ses_f455fede2ffe3T2e4TAVa2mCe5",
+  "global_usd_during_call": 0.0,
+  "completed": true,
+  "input_tokens": 1,
+  "output_tokens": 1,
+  "num_turns": 1
+ },
+ {
+  "what": "iter4",
+  "seconds": 4.5,
+  "session_id": "ses_f455f9f2dffeLiDRIuYF6o9KPP",
+  "global_usd_during_call": 0.0,
+  "completed": true,
+  "input_tokens": 4,
+  "output_tokens": 4,
+  "num_turns": 4
+ }
+]

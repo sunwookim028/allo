@@ -1,0 +1,11 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -787,7 +787,7 @@
+         holds at II=1. `spm`'s copy of an `mm` carries its own work count
+         (`T + 1`) in `nr` and the array's row count in `f1` (see
+         `sequencer`)."""
+-        spad: UInt(VW)[SPAD_ROWS]
++        spad: UInt(VW)[SPAD_ROWS] = 0
+         nw: UInt(64) = c_spm.get()
+         n_row: int32 = nw[0:16]
+         mw: UInt(64) = c_spm.get()

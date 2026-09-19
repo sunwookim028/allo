@@ -1,0 +1,82 @@
+{
+ "a": {
+  "cosim_seconds": 161.8,
+  "cycles": {
+   "16x16x16": 686,
+   "4x4x4": 172
+  },
+  "frozen_ref": "ffcfa96d4296a88914a4224886b3d2c6906ae1bb",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "seconds": 14.2,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "vouched": true
+  },
+  "invariants": {
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "ok": true,
+  "sandbox": true,
+  "seconds": 177.3,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "synth": {
+   "area": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "ff": 17481,
+    "lut": 26583,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 858
+ },
+ "b": {
+  "cosim_seconds": 162.2,
+  "cycles": {
+   "16x16x16": 1056,
+   "4x4x4": 647
+  },
+  "frozen_ref": "ffcfa96d4296a88914a4224886b3d2c6906ae1bb",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "seconds": 14.6,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "vouched": true
+  },
+  "invariants": {
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "ok": true,
+  "sandbox": true,
+  "seconds": 178.2,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "synth": {
+   "area": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "ff": 17494,
+    "lut": 26701,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 1703
+ }
+}

@@ -338,6 +338,15 @@ Full run: 43/43 cases in 22.3 min, $0.00, `chia_runs/harness-test-20260919-14225
 After the rebase onto main @ `e620576d` (stress_isa gate, gate_runner, pre-flight):
 49/49 cases in 22.8 min, $0.00, `chia_runs/harness-test-20260919-152522/`; the
 loop phase took the pre-flight's test-model path (no cloud checks, $5 run cap).
+After the rebase onto main @ `476a70d8` (design 172 / 262 / 418 / 484 / 686):
+49/49 in 29.9 min, $0.00, `chia_runs/harness-test-20260919-164530/`. a:
+172 / 686. b (`spad = 0` restored) against the NEW design: 647 / 686 -> 1056,
+i.e. +475 / +370 at the two scored shapes; accept at all five shapes 647 / 710
+/ 832 / 854 / 1056 = +475 / +448 / +414 / +370 / +370 (not the old +409 /
++361). c: `gate:stress`, 251/492 exact. No-diff acceptance control:
+`chia_runs/accept-control-476a70d8/` -- 172 / 262 / 418 / 484 / 686, all five
+bit-exact, stress_isa 492/492, RTL stress testbench 0 mismatches over 6 calls
+at every shape, est. clock 2.431 ns.
 
 What it cannot show is how a real model behaves: whether Gemini calls the tools
 sensibly, how long its turns are, and what they cost. The opencode -> MCP ->
