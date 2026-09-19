@@ -8,12 +8,15 @@ convenience, not evidence. A claim is accepted only by this script:
    microarch_isa.py and isa_dsl.py -- anything else is refused),
 3. that checkout's own `mlir/` bindings built in-tree against $LLVM_BUILD_DIR
    (~40 s; no symlink into any other checkout),
-4. `bench_isa.py` (must print ALL EXACT), `chia_agent/stress.py`, and
-   `cosim.py` with NO `TPU_*` variable set -- so all five SHAPES, default
-   memory model -- each run from that checkout,
+4. `bench_isa.py`, main's `stress_isa.py` (the correctness gate) and
+   `cosim.py` with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
+   project goes) -- so all five SHAPES, default memory model -- each run from
+   that checkout under `chia_agent/gate_runner.py`, which vouches for each
+   verdict with a per-run nonce instead of trusting printed lines,
 5. results and logs copied into `--out` BEFORE the worktree is removed.
 
-`ok` means *correct*: bit-exact at all five shapes, ALL EXACT, stress, clock.
+`ok` means *correct*: bit-exact at all five shapes, ALL EXACT, stress_isa,
+clock.
 Whether it is a *win* is a separate field, `claim`, against the unmodified
 design's five cosim numbers at `--ref`:
 
@@ -35,6 +38,7 @@ import argparse
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -52,8 +56,14 @@ ENV_BIN = str(Path(ALLO_PYTHON).parent)
 #: Control runs of the unmodified design: (microarch_isa.py blob, isa_dsl.py
 #: blob) -> five-shape cosim cycles. Measured by this script with no --diff.
 BASELINES = {
+    # main @ e2451b81 (the branch point before the rebase)
     ("ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
      "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
+        {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
+         "16x16x16": 919},
+    # main @ e620576d (check_program in assemble(), docstring fixes)
+    ("cb26d5683338184f02bfcb6be13bc1ace4e5e3e9",
+     "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
         {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
          "16x16x16": 919},
 }
@@ -65,12 +75,13 @@ BWRAP = shutil.which("bwrap")
 GATE_TIMEOUT = 600
 
 
-def sh(cmd, cwd, env=None, log=None, timeout=7200):
+def sh(cmd, cwd, env=None, log=None, timeout=7200, stdin=None):
     t = time.time()
     p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, start_new_session=True)
+                         stderr=subprocess.STDOUT, start_new_session=True,
+                         stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL)
     try:
-        out, _ = p.communicate(timeout=timeout)
+        out, _ = p.communicate(input=stdin, timeout=timeout)
         rc = p.returncode
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)   # the whole group, simulator included
@@ -79,6 +90,19 @@ def sh(cmd, cwd, env=None, log=None, timeout=7200):
     if log:
         Path(log).write_text(out)
     return rc, out, round(time.time() - t, 1)
+
+
+def vouched(check, wt, cwd, env, log, writable, timeout=7200):
+    """As evaluate.py: the check under gate_runner.py (from the checkout, i.e.
+    from git at --ref), passed only on its nonce line. Returns (ok, rc, out, s)."""
+    nonce = secrets.token_hex(16)
+    rc, out, sec = sh(boxed([ALLO_PYTHON, str(wt / PKG / "chia_agent" / "gate_runner.py"),
+                             check], writable), cwd, env, None, timeout,
+                      stdin=nonce + "\n")
+    ok = rc == 0 and f"CHIA-GATE {check} OK {nonce}" in out.splitlines()
+    out = out.replace(nonce, "<nonce>")
+    Path(log).write_text(out)
+    return ok, rc, out, sec
 
 
 def boxed(cmd, writable: Path):
@@ -141,7 +165,8 @@ def main():
 
         env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
         env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
-                   OMP_NUM_THREADS="8", PYTHONPATH=str(wt))
+                   OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
+                   PYTHONDONTWRITEBYTECODE="1")
         rc, o, sec = sh(["cmake", "-G", "Ninja", "-S", "mlir", "-B", "mlir/build",
                          f"-DMLIR_DIR={LLVM_BUILD_DIR}/lib/cmake/mlir",
                          f"-DPython3_EXECUTABLE={ALLO_PYTHON}",
@@ -169,18 +194,22 @@ def main():
                 result["tamper"] = f"tracked files changed during {stage}"
                 raise SystemExit(result["tamper"])
 
-        rc, o, sec = sh(boxed([ALLO_PYTHON, f"{PKG}/bench_isa.py"], cos), wt, env,
-                        out / "bench_isa.log", timeout=GATE_TIMEOUT)
+        ok1, rc, o, sec = vouched("bench_isa", wt, wt, env, out / "bench_isa.log", cos,
+                                  timeout=GATE_TIMEOUT)
         untouched("bench_isa")
-        result["bench_isa"] = {"rc": rc, "last": [l.strip() for l in o.strip().splitlines()[-1:]],
-                               "seconds": sec}
-        rc2, o2, sec2 = sh(boxed([ALLO_PYTHON, f"{PKG}/chia_agent/stress.py"], cos),
-                           wt, env, out / "stress.log", timeout=GATE_TIMEOUT)
-        untouched("stress")
-        result["stress"] = {"rc": rc2, "last": o2.strip().splitlines()[-1:],
-                            "seconds": sec2}
-        rc3, o3, sec3 = sh(boxed([ALLO_PYTHON, str(wt / PKG / "cosim.py")], cos),
-                           cos, env, out / "cosim.log")
+        result["bench_isa"] = {"rc": rc, "vouched": ok1, "seconds": sec,
+                               "all_exact": bool(re.search(r"^  ALL EXACT$", o, re.M))}
+        ok2, rc2, o2, sec2 = vouched("stress_isa", wt, wt, env, out / "stress_isa.log",
+                                     cos, timeout=GATE_TIMEOUT)
+        untouched("stress_isa")
+        result["stress_isa"] = {"rc": rc2, "vouched": ok2, "seconds": sec2,
+                                "line": [l.strip() for l in o2.splitlines()
+                                         if "STRESS OK" in l or "STRESS FAILED" in l][-1:]}
+        # cosim.py puts its project next to itself by default; keep it in the
+        # writable .cosim directory instead.
+        ok3, rc3, o3, sec3 = vouched("cosim", wt, cos,
+                                     dict(env, TPU_PRJ=str(cos / "isa_sweep.prj")),
+                                     out / "cosim.log", cos)
         untouched("cosim")
         rows = re.findall(r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$", o3, re.M)
         result["cosim"] = {f"{m}x{k}x{n}": {"cycles": None if c == "None" else int(c),
@@ -199,8 +228,8 @@ def main():
         exact = all(v["tb"] == f"TB {s} mismatches = 0 / "
                     f"{int(s.split('x')[0]) * int(s.split('x')[2])}"
                     and v["cycles"] is not None for s, v in result["cosim"].items())
-        result["ok"] = (rc == 0 and result["bench_isa"]["last"] == ["ALL EXACT"]
-                        and rc2 == 0 and rc3 == 0 and len(result["cosim"]) == 5
+        result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
+                        and ok2 and ok3 and len(result["cosim"]) == 5
                         and exact and result.get("estimated_ns", 99) <= 3.33)
         if a.baseline:
             base = {s: v["cycles"] for s, v in

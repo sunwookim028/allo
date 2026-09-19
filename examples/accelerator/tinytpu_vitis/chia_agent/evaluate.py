@@ -15,14 +15,22 @@ the objective:
       the numpy golden reference,
       every Vitis TCL setting
     tinytpu_vitis/bench_isa.py
-    chia_agent/stress.py
+    tinytpu_vitis/stress_isa.py   (main's correctness gate)
+    tinytpu_vitis/isa_ref.py      (the ISA as numpy; stress_isa's reference)
+    tinytpu_vitis/kpn_model.py    (stress_isa's deadlock diagnosis)
+    chia_agent/gate_runner.py     (runs each check, vouches for its verdict)
     examples/__init__.py
 
 The two tiers:
 
-1. **gate** -- `bench_isa.py` must exit 0 and print `ALL EXACT`; `stress.py`
-   (full-range operands, sentinel-filled C, extra shapes) must pass. Functional,
-   on Allo's simulator, seconds.
+1. **gate** -- `bench_isa.py` (the published [-4, 4] setup) and main's
+   `stress_isa.py` (486 runs: full-range/corner/boundary operands, all 64
+   shapes, prefilled C compared in full, vector and random programs, many
+   invocations of one build) must both pass. Functional, on Allo's simulator,
+   ~12 s. Each runs under `gate_runner.py`, and the verdict is its
+   `CHIA-GATE <check> OK <nonce>` line -- a fresh nonce per run, handed over on
+   stdin before the candidate is imported -- never the check's own printed
+   `ALL EXACT` / `STRESS OK`, which the candidate's code could print itself.
 2. **score** -- `cosim.py` (Vitis HLS 2023.2 csynth + xsim C/RTL cosim), one
    testbench per shape, each bit-exact against numpy. The score is the SUM of
    cosim cycles over the requested shapes. It is an RTL measurement.
@@ -33,7 +41,8 @@ default 0 and `-random_stall` stays off, and the generated `kernel.cpp` / TCL ar
 checked for interface-latency overrides afterwards.
 
 Independent checks on the result, none of which trust the candidate's process:
-T == 4 and MAXDIM == 16 (the matched-array premise of COMPARISON.md); each
+T == 4 and MAXDIM == 16 (the matched-array premise of the Gemmini comparison,
+docs/source/designs/gemmini_comparison.rst); each
 requested shape reported exactly once; each shape's own cosim log carries
 `mismatches = 0 / M*N` and a PASS; the cycle count agrees with that log's
 simulated time; the csynth estimated clock meets the 3.33 ns target. The work
@@ -44,7 +53,7 @@ Every process that imports the candidate runs in a bubblewrap sandbox when
 read-only too, only the work directory and a private `/tmp` writable, in its own
 PID namespace so that a kill takes every descendant with it. That is the answer
 to "the candidate's import-time code rewrites the gate": a test mutant narrowed
-the datapath AND rewrote the tree's `stress.py` through `numpy.savetxt`, which
+the datapath AND rewrote the tree's stress gate through `numpy.savetxt`, which
 the policy did not know, and passed the gate. After every stage the tree is
 also compared byte-for-byte with what was composed (no file changed, none
 added) and the checkout's tracked files with how they were, so a host without
@@ -62,6 +71,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -78,15 +88,19 @@ PKG = "examples/accelerator/tinytpu_vitis"
 #: from what is COMMITTED, never from the working tree. Only a person, in a
 #: commit, can change them.
 FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
-#: main's commit at branch time. The design's own evaluator -- cosim.py and
-#: bench_isa.py -- must be byte-identical to it, so this branch cannot drift
-#: from how main measures the design.
-MAIN_BASE = "e2451b81"
-DESIGN_EVALUATOR = [f"{PKG}/cosim.py", f"{PKG}/bench_isa.py"]
+#: main's commit this branch is based on (after the 2026-09-19 rebase onto the
+#: baseline hardening). The design's own evaluator -- cosim.py, bench_isa.py
+#: and the stress gate with its reference model -- must be byte-identical to
+#: it, so this branch cannot drift from how main measures and verifies the
+#: design. Moving it is a deliberate, reviewed commit.
+MAIN_BASE = "e620576d"
+DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
+    "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py")]
+GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 FROZEN = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
-    f"{PKG}/chia_agent/stress.py",
+    GATE_RUNNER,
 ]
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: What in the checkout itself the evaluation depends on: the `allo` package
@@ -217,14 +231,15 @@ def sandboxed(cmd, work: Path, tree: Path):
             "--unshare-pid", "--die-with-parent", "--", *cmd]
 
 
-def run(cmd, cwd, env, timeout, work=None, tree=None):
+def run(cmd, cwd, env, timeout, work=None, tree=None, stdin=None):
     t = time.time()
     if work is not None:
         cmd = sandboxed(cmd, work, tree)
     p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, start_new_session=True)
+                         stderr=subprocess.STDOUT, start_new_session=True,
+                         stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL)
     try:
-        out, _ = p.communicate(timeout=timeout)
+        out, _ = p.communicate(input=stdin, timeout=timeout)
         rc = p.returncode
     except subprocess.TimeoutExpired:
         # The whole group: a deadlocked simulator (or vitis_hls under cosim)
@@ -250,20 +265,38 @@ def check_invariants(tree, env, work):
     return inv
 
 
+def vouched(check, tree, env, work, cwd, timeout, args=()):
+    """Run a frozen check under gate_runner.py; (vouched, rc, out, seconds).
+
+    `vouched` is True only if the output carries `CHIA-GATE <check> OK <nonce>`
+    with the nonce minted here for this run. Nothing the candidate prints can
+    produce it: the runner reads the nonce before the candidate is imported,
+    and prints the line only when the check RETURNED success."""
+    nonce = secrets.token_hex(16)
+    runner = str(tree / GATE_RUNNER)
+    rc, out, sec = run([ALLO_PYTHON, runner, check, *args], cwd, env, timeout,
+                       work, tree, stdin=nonce + "\n")
+    ok = rc == 0 and f"CHIA-GATE {check} OK {nonce}" in out.splitlines()
+    # Never echo the nonce into a verdict or a log the agent can read.
+    return ok, rc, out.replace(nonce, "<nonce>"), sec
+
+
 def gate(tree, env, work, verify_now):
-    bench = str(tree / PKG / "bench_isa.py")
-    rc, out, sec = run([ALLO_PYTHON, bench], tree, env, GATE_TIMEOUT, work, tree)
+    ok, rc, out, sec = vouched("bench_isa", tree, env, work, tree, GATE_TIMEOUT)
     verify_now("bench_isa")
-    lines = out.strip().splitlines()
-    if rc or not lines or lines[-1].strip() != "ALL EXACT" or "FAILURES" in out:
+    if not ok or not re.search(r"^  ALL EXACT$", out, re.M) or "FAILURES" in out:
         raise Reject("gate:bench_isa", out[-4000:])
-    stress = str(tree / PKG / "chia_agent" / "stress.py")
-    rc2, out2, sec2 = run([ALLO_PYTHON, stress], tree, env, GATE_TIMEOUT, work, tree)
-    verify_now("stress")
-    # The exact line, with the full count: stress.py is frozen and runs 60.
-    if rc2 or not re.search(r"^  STRESS OK: 60/60 runs exact", out2, re.M):
+    ok2, rc2, out2, sec2 = vouched("stress_isa", tree, env, work, tree, GATE_TIMEOUT)
+    verify_now("stress_isa")
+    # The runner vouches that stress_isa.main() returned 0. The count is
+    # recorded, and must be internally consistent (n/n); it is not pinned,
+    # because stress_isa skips the unrolled reference programs that do not fit
+    # the candidate's imem, as it does on main.
+    m = re.search(r"^  STRESS OK: (\d+)/(\d+) runs exact", out2, re.M)
+    if not ok2 or not m or m.group(1) != m.group(2):
         raise Reject("gate:stress", out2[-4000:])
     return {"bench_isa": "ALL EXACT", "stress": lines_with(out2, "STRESS OK")[0],
+            "stress_runs": int(m.group(1)), "vouched": True,
             "seconds": round(sec + sec2, 1)}
 
 
@@ -306,12 +339,14 @@ def check_memory_model(prj: Path):
 
 
 def score(tree, env, work: Path, shapes, verify_now):
-    cosim = str(tree / PKG / "cosim.py")
-    env = dict(env, TPU_SHAPES=",".join(shapes))
-    rc, out, sec = run([ALLO_PYTHON, cosim], work, env, COSIM_TIMEOUT, work, tree)
-    verify_now("cosim")
     prj = work / "isa_sweep.prj"
-    if rc:
+    # cosim.py (main @ e620576d) puts its project next to itself by default,
+    # which is the read-only tree here; TPU_PRJ is a path, not a memory-model
+    # knob, and is the only TPU_* variable set.
+    env = dict(env, TPU_SHAPES=",".join(shapes), TPU_PRJ=str(prj))
+    ok, rc, out, sec = vouched("cosim", tree, env, work, work, COSIM_TIMEOUT)
+    verify_now("cosim")
+    if not ok:
         raise Reject("cosim", out[-4000:])
     synth = parse_synth(prj)
     check_memory_model(prj)

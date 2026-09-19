@@ -38,14 +38,20 @@ if _TOOL_HOST != "node":
     ray.util.get_node_ip_address = lambda *args, **kwargs: _TOOL_HOST
 
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
-#: Read-only context the agent may look at. Served from git HEAD.
+#: Read-only context the agent may look at, served from git HEAD: the frozen
+#: code that judges a candidate, then the design's documentation. The docs
+#: pages replaced RESULTS_ISA.md / COMPARISON.md when main moved its notes into
+#: the docs site; the reST is served as source.
 REFERENCE = {
     "cosim.py": "examples/accelerator/tinytpu_vitis/cosim.py",
     "bench_isa.py": "examples/accelerator/tinytpu_vitis/bench_isa.py",
-    "stress.py": "examples/accelerator/tinytpu_vitis/chia_agent/stress.py",
+    "stress_isa.py": "examples/accelerator/tinytpu_vitis/stress_isa.py",
+    "isa_ref.py": "examples/accelerator/tinytpu_vitis/isa_ref.py",
     "evaluate.py": "examples/accelerator/tinytpu_vitis/chia_agent/evaluate.py",
-    "RESULTS_ISA.md": "examples/accelerator/tinytpu_vitis/RESULTS_ISA.md",
-    "COMPARISON.md": "examples/accelerator/tinytpu_vitis/COMPARISON.md",
+    "tinytpu_isa.rst": "docs/source/designs/tinytpu_isa.rst",
+    "tinytpu_history.rst": "docs/source/designs/tinytpu_history.rst",
+    "gemmini_comparison.rst": "docs/source/designs/gemmini_comparison.rst",
+    "limitations.rst": "docs/source/developer/limitations.rst",
 }
 
 
@@ -170,9 +176,15 @@ class AlloSpecTool(ChiaTool):
         """Read a FROZEN file for context (you cannot edit these).
 
         ``name`` is one of: cosim.py (the RTL cosim scorer and its testbench),
-        bench_isa.py (the functional gate), stress.py (the extra semantic gate),
-        evaluate.py (how the score is computed), RESULTS_ISA.md (design history
-        and measurements), COMPARISON.md (the Gemmini comparison). Returns
+        bench_isa.py (the published-setup functional check), stress_isa.py
+        (the correctness gate: 486 runs, full-range operands, 64 shapes, whole
+        C compared, vector and random programs), isa_ref.py (what each
+        instruction means -- the reference stress_isa checks against),
+        evaluate.py (how the score is computed), tinytpu_isa.rst (the design,
+        its ISA, and how to verify a change), tinytpu_history.rst (what was
+        tried, measured, and reverted), gemmini_comparison.rst (the Gemmini
+        comparison and where the gap comes from), limitations.rst (Allo
+        frontend/simulator limitations and workarounds). Returns
         ``max_lines`` lines from ``start_line`` (1-based).
         """
         rel = REFERENCE.get(name)
@@ -277,8 +289,10 @@ class AlloSpecTool(ChiaTool):
     # evaluation blocked every other request -- including tool listing for
     # the next session, which then reported that no tools existed.
     async def run_functional_check(self) -> str:
-        """The gate, in ~10 s: bench_isa.py must print ALL EXACT and stress.py
-        (full-range operands, sentinel-filled C, extra shapes) must pass.
+        """The gate, in ~15 s: bench_isa.py (the published [-4, 4] setup) and
+        stress_isa.py (486 runs: full-range/corner/boundary int8, all 64
+        shapes, C prefilled and compared in full, vector and random programs,
+        many calls on one build) must both pass.
         Functional (Allo simulator), not RTL. A deadlocked dataflow fails after
         4 minutes. Run this before score_cycles."""
         verdict = await asyncio.to_thread(self.evaluate, True)

@@ -15,10 +15,14 @@ Cases, each with an expected verdict:
 
   a  no-op (re-save the unmodified design)   scores exactly 252 / 919
   b  `spad ... = 0` (part of b4be2b10 reverted) bit-exact, scored WORSE
-  c  PE partial sum narrowed to int16          passes bench_isa, REJECTED by stress
+  c  PE partial sum narrowed to int16          passes bench_isa, REJECTED by
+                                               stress_isa
   d  one stream put dropped (deadlock)         REJECTED by the 240 s gate timeout,
                                                no process left behind
-  e  frozen-file / import-time attacks         every one refused
+  e  frozen-file / import-time attacks         every one refused, including a
+                                               forged verdict line (SystemExit)
+                                               and a numpy monkeypatch the
+                                               static policy cannot see
   f  concurrent evaluations                    server answers in seconds, no
                                                cross-contamination
   accept  accept.py on (b)                     bit-exact at all five shapes, and
@@ -92,6 +96,26 @@ MUTANTS = {
                  "                    c_acc.put(rw)\n"),
 }
 ANCHOR = "import allo.dataflow as df\n"
+#: Prints both gates' verdict lines and exits 0 during the candidate's import
+#: in any gate process (they put the tree root first on sys.path).
+FORGE_VERDICT = (
+    "import sys\n"
+    "if not sys.path[0].endswith('tinytpu_vitis'):\n"
+    "    print('  STRESS OK: 486/486 runs exact (forged)')\n"
+    "    print('  STRESS OK: 60/60 runs exact (forged)')\n"
+    "    print('  ALL EXACT')\n"
+    "    raise SystemExit(0)\n")
+#: Monkeypatches numpy's RNG through a method's `self`, which the static policy
+#: cannot trace (`self` is a parameter). Only gate_runner's frozen modules stop it.
+METHOD_SELF_PATCH = (
+    "import numpy as _np\n"
+    "class _P:\n"
+    "    def go(self, v):\n"
+    "        self.default_rng = v\n"
+    "_orig = _np.random.default_rng\n"
+    "def _four(seed=None):\n"
+    "    return _orig(0)\n"
+    "_P.go(_np.random, _four)\n")
 #: e: import-time payloads. Each must be refused by the edit tools.
 IMPORT_ATTACKS = {
     "import cosim": "import cosim\n",
@@ -103,14 +127,24 @@ IMPORT_ATTACKS = {
     "sys.modules": "import sys\n_m = sys.modules\n",
     # Rewrites the frozen stress gate in the evaluation tree at import time, so
     # a narrowed datapath would sail through. Uses only allowed imports.
-    "numpy.savetxt over stress.py":
+    "numpy.savetxt over stress_isa.py":
         "import numpy as _np\n"
-        "_np.savetxt(os.path.join(os.path.dirname(__file__), 'chia_agent',"
-        " 'stress.py'), [], header=\"print('  STRESS OK: forged')\", comments='')\n",
-    "ndarray.tofile over stress.py":
+        "_np.savetxt(os.path.join(os.path.dirname(__file__),"
+        " 'stress_isa.py'), [], header=\"print('  STRESS OK: forged')\", comments='')\n",
+    "ndarray.tofile over stress_isa.py":
         "import numpy as _np\n"
         "_np.frombuffer(b\"print('  STRESS OK: forged')\\n\", dtype=_np.uint8).tofile("
-        "os.path.join(os.path.dirname(__file__), 'chia_agent', 'stress.py'))\n",
+        "os.path.join(os.path.dirname(__file__), 'stress_isa.py'))\n",
+    # Prints the verdict lines and exits 0 before the real check runs. Against
+    # the old stdout-reading gate this passed with an int16 datapath (see
+    # phase e's "forged verdict" case, which runs it past the policy).
+    "SystemExit forged verdict": FORGE_VERDICT,
+    # The golden reference's RNG, swapped for one that only draws what the
+    # published [-4, 4] testbench draws.
+    "monkeypatch numpy RNG via an alias":
+        "import numpy as _np\n_r = _np.random\n_r.default_rng = lambda *a, **k: None\n",
+    # Frame walking toward the gate runner's nonce.
+    "frame walk": "def _g():\n    yield 1\n_f = _g().gi_frame\n",
 }
 
 
@@ -329,24 +363,70 @@ class Suite:
         # The tamper that the policy did not know about: narrow the datapath
         # AND overwrite the stress gate at import time. Written straight to
         # disk so it tests the evaluator's own defences, not only the tool's.
-        for label in ("numpy.savetxt over stress.py", "ndarray.tofile over stress.py"):
+        for label in ("numpy.savetxt over stress_isa.py",
+                      "ndarray.tofile over stress_isa.py",
+                      "SystemExit forged verdict"):
             (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
                 ANCHOR, ANCHOR + IMPORT_ATTACKS[label], 1))
             v = await A.verdict("run_functional_check")
             check(f"e.on-disk narrow16 + {label} -> evaluator", "ok=false",
                   f"ok={v.get('ok')} stage={v.get('stage')}", not v.get("ok"),
                   detail=v.get("detail", "")[-600:])
+        # Past the static policy: a monkeypatch through a method's `self`.
+        (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
+            ANCHOR, ANCHOR + METHOD_SELF_PATCH, 1))
+        from spec_policy import policy_violations
+        missed = not policy_violations("microarch_isa.py", self.spec("tpta"))
+        v = await A.verdict("run_functional_check")
+        check("e.on-disk narrow16 + method-self numpy patch -> evaluator",
+              "policy misses it; gate_runner refuses it (ok=false)",
+              f"policy-missed={missed} ok={v.get('ok')} stage={v.get('stage')}",
+              not v.get("ok") and "numpy.random.default_rng" in v.get("detail", ""),
+              detail=v.get("detail", "")[-600:])
         # A stray frozen-file copy in the spec dir is ignored, not merged.
         self.reset("tpta")
         (spec / "cosim.py").write_text("raise SystemExit('forged cosim ran')\n")
-        (spec / "stress.py").write_text("print('  STRESS OK: forged')\n")
+        (spec / "stress_isa.py").write_text("print('  STRESS OK: forged')\n")
         v = await A.verdict("run_functional_check")
         stress = (v.get("gate") or {}).get("stress", "")
-        check("e.forged cosim.py/stress.py in spec dir", "ignored: real stress 60/60",
-              stress, v.get("ok") and "60/60" in stress)
+        check("e.forged cosim.py/stress_isa.py in spec dir",
+              "ignored: real stress_isa 486/486, vouched",
+              stress, v.get("ok") and "486/486" in stress
+              and (v.get("gate") or {}).get("vouched"))
         (spec / "cosim.py").unlink()
-        (spec / "stress.py").unlink()
+        (spec / "stress_isa.py").unlink()
+        self.forged_verdict_probe()
         self.sandbox_probe()
+
+    def forged_verdict_probe(self):
+        """The verdict line, forged past the policy: the stdout the old gate
+        read carries it, the gate runner does not vouch for it."""
+        import importlib.util
+        import shutil
+        spec = importlib.util.spec_from_file_location("evaluate_", AGENT_DIR / "evaluate.py")
+        ev = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ev)
+        work = REPO / ".chia_scratch" / self.run_dir.name / "forge-probe"
+        if work.exists():
+            shutil.rmtree(work)
+        tree = work / "tree"
+        for rel in ev.FROZEN + [f"{PKG}/isa_dsl.py"]:
+            (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tree / rel).write_bytes(ev.git_show("HEAD", rel))
+        (tree / PKG / "microarch_isa.py").write_text(mutate("narrow16").replace(
+            ANCHOR, ANCHOR + FORGE_VERDICT, 1))
+        env = ev.env_for(tree)
+        rc, out, _ = ev.run([ALLO_PYTHON, str(tree / PKG / "stress_isa.py")], tree, env,
+                            GATE_TIMEOUT, work, tree)
+        forged = rc == 0 and "STRESS OK: 486/486" in out
+        results = {}
+        for check_name in ("bench_isa", "stress_isa"):
+            ok, rc2, out2, _ = ev.vouched(check_name, tree, env, work, tree, GATE_TIMEOUT)
+            results[check_name] = (ok, out2.strip().splitlines()[-1:])
+        check("e.forged verdict past the policy",
+              "stdout forged (rc 0 + STRESS OK), runner vouches for neither gate",
+              f"stdout-forged={forged}; runner={results}",
+              forged and not any(ok for ok, _ in results.values()))
 
     def sandbox_probe(self):
         """The evaluator's sandbox, probed directly: candidate processes may

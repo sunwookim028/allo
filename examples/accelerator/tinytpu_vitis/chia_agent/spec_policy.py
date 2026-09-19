@@ -5,7 +5,7 @@
 
 The agent's two writable files, `microarch_isa.py` and `isa_dsl.py`, are Python
 modules that the evaluator *imports*: `cosim.py`, `bench_isa.py` and
-`stress.py` all import them, so anything at their import path runs inside the
+`stress_isa.py` all import them, so anything at their import path runs inside the
 process that produces the score. That makes "which edits are allowed" a
 property of the harness, not of the prompt, and this module is where it is
 decided. `evaluate.py` re-runs it from git on every candidate, and both edit
@@ -72,6 +72,15 @@ DENIED_NAMES = frozenset(
         "__builtins__",
         "__loader__",
         "__spec__",
+        # Ending the process early with a chosen status: a module that prints
+        # `STRESS OK: ...` and raises SystemExit(0) at import time passed the
+        # old stdout-reading gate (shown on this branch, 2026-09-19). The
+        # verdict now comes from `gate_runner.py`, which this cannot fool;
+        # refusing it here makes the attempt visible at edit time.
+        "SystemExit",
+        "KeyboardInterrupt",
+        "exit",
+        "quit",
     }
 )
 
@@ -111,6 +120,28 @@ DENIED_ATTRS = frozenset(
         "memmap",
         "open_memmap",
         "lib",
+        # ...and its file readers: a spec has no business reading files, and
+        # /proc/self/* is a file.
+        "fromfile",
+        "fromregex",
+        "loadtxt",
+        "genfromtxt",
+        "load",
+        # Frame and traceback walking: how code reaches the locals of the
+        # frozen check that called it (gate_runner's nonce lives in one).
+        "f_back",
+        "f_globals",
+        "f_locals",
+        "f_builtins",
+        "f_code",
+        "tb_frame",
+        "tb_next",
+        "gi_frame",
+        "gi_code",
+        "cr_frame",
+        "cr_code",
+        "ag_frame",
+        "ag_code",
     }
 )
 #: Dunder attributes are how Python reaches past a module's surface
@@ -144,13 +175,74 @@ def _parents(tree):
     return parent
 
 
+def _root(node):
+    """The Name an attribute/subscript chain hangs off, or None."""
+    while isinstance(node, (ast.Attribute, ast.Subscript, ast.Starred)):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _bound_names(target):
+    """Names a binding target binds (not the base of `x.a = ...`)."""
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [n for e in target.elts for n in _bound_names(e)]
+    if isinstance(target, ast.Starred):
+        return _bound_names(target.value)
+    return []
+
+
+def _module_names(tree) -> set[str]:
+    """Names bound by an import, plus every name assigned from an expression
+    that mentions one (`r = np.random`, `m = [allo][0]`), to a fixpoint."""
+    bound = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound.add((alias.asname or alias.name).split(".")[0])
+    pairs = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            pairs += [(t, node.value) for t in node.targets]
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)) and node.value:
+            pairs.append((node.target, node.value))
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            pairs.append((node.target, node.iter))
+        elif isinstance(node, ast.withitem) and node.optional_vars is not None:
+            pairs.append((node.optional_vars, node.context_expr))
+    grew = True
+    while grew:
+        grew = False
+        for target, value in pairs:
+            if any(isinstance(n, ast.Name) and n.id in bound for n in ast.walk(value)):
+                for n in _bound_names(target):
+                    if n not in bound:
+                        bound.add(n)
+                        grew = True
+    return bound
+
+
 def policy_violations(name: str, source: str) -> list[str]:
     """Constructs a hardware spec has no business containing."""
     tree = ast.parse(source, filename=name)
     parent = _parents(tree)
     guarded = _main_guard_nodes(tree)
     problems = []
+    modules = _module_names(tree)
     for node in ast.walk(tree):
+        # Monkeypatching: rebinding an attribute of an imported module (or of
+        # anything derived from one) changes code the frozen checks call --
+        # numpy's RNG, allo's build -- from inside the candidate. Attribute
+        # stores are allowed on the spec's own objects only. `gate_runner.py`
+        # also refuses the rebinding at run time, which covers the spellings
+        # this static rule cannot see.
+        if (isinstance(node, ast.Attribute)
+                and isinstance(node.ctx, (ast.Store, ast.Del))):
+            root = _root(node)
+            if root is None or root in modules:
+                problems.append(f"{name}: assigns to '{ast.unparse(node)}', an "
+                                f"attribute of an imported module")
         if isinstance(node, ast.Import):
             for alias in node.names:
                 root = alias.name.split(".")[0]
