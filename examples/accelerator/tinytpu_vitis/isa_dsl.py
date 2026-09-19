@@ -312,6 +312,41 @@ def gemm_program(M, K, N, relu=False):
     return k.emit()
 
 
+def vector_program(M=8):
+    """Every field a GEMM leaves constant, varied -- a TEST program, not a
+    kernel. The shipped GEMM always has `dma_ld`/`mvout` DRAM row 0, one
+    accumulator region, and `vrelu` in place (`f0 == f1`); a unit that ignored
+    any of those fields would pass `bench_isa` exactly. Here:
+
+      * `dma_ld` from nonzero DRAM rows and column blocks, into scattered spad;
+      * `mm` into two accumulator regions away from 0, one of them accumulated;
+      * `vadd` with three distinct regions, `vrelu` with a distinct destination;
+      * `mvout` from nonzero `ar`, to nonzero DRAM rows and column blocks, and
+        through a loop whose AGU walks `f0`, `f1` and `f2` at once.
+
+    Its gold is `isa_ref.run`, not a formula."""
+    assert 2 * M <= MAXDIM and M % 2 == 0
+    k = Program(f"vector {M}")
+    k.dma_ld(src=0, dram_row=3, col_block=1, spad=40, rows=M)
+    k.dma_ld(src=0, dram_row=0, col_block=2, spad=60, rows=M)
+    k.dma_ld(src=1, dram_row=5, col_block=3, spad=100, rows=2 * T)
+    k.vld(10, 40, rows=M)                    # activations 1
+    k.vld(30, 60, rows=M)                    # activations 2
+    k.vld(70, 100, rows=2 * T)               # weights W1 = vr 70.., W2 = vr 74..
+    k.mm(10, 20, 70, rows=M)                 # ar20 = act1 @ W1
+    k.mm(30, 40, 70 + T, rows=M)             # ar40 = act2 @ W2
+    k.mm(10, 40, 70 + T, rows=M, acc=True)   # ar40 += act1 @ W2
+    k.vadd(60, 20, 40, rows=M)               # ar60 = ar20 + ar40
+    k.vrelu(80, 60, rows=M)                  # ar80 = relu(ar60)
+    k.mvout(60, dram_row=0, col_block=1, rows=M)
+    k.mvout(20, dram_row=1, col_block=0, rows=M)
+    h = M // 2
+    with k.loop(2, "half") as i:             # ar80.. -> C rows M.., blocks 2, 3
+        k.mvout(Ref(80).at(i, h), dram_row=Ref(M).at(i, h),
+                col_block=Ref(2).at(i, 1), rows=h)
+    return k.emit()
+
+
 def assert_matches_handwritten(shapes):
     """The generator is right exactly when it emits the same bits.
 

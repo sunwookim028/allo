@@ -10,6 +10,12 @@ made a comparison against Gemmini's single elaboration meaningless.
 
     python bench_isa.py                # sweep every shape up to MAXDIM
     python bench_isa.py 8 8 8          # one shape
+
+This is the PUBLISHED setup -- [-4, 4] operands, seed 0, `C` zeroed, only the
+result region compared -- and it is deliberately weak: an int16 accumulator,
+an off-by-one clip, and a unit ignoring a field GEMM never varies all print
+ALL EXACT here. `stress_isa.py` is the correctness gate; `mutate.py` shows
+which of the two catches what.
 """
 
 import os
