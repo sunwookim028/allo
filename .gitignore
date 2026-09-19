@@ -104,3 +104,9 @@ chia.env
 # tinytpu_vitis verification scratch (mutate.py, ad-hoc runs)
 examples/accelerator/tinytpu_vitis/.mutants/
 examples/accelerator/tinytpu_vitis/.scratch/
+# CHIA co-design loop (chia-isa branch)
+examples/accelerator/tinytpu_vitis/chia_agent/node_modules/
+examples/accelerator/tinytpu_vitis/chia_agent/__pycache__/
+# per-evaluation Vitis projects (~110 MB each) and acceptance checkouts
+.chia_scratch/
+!examples/accelerator/tinytpu_vitis/chia_agent/requirements.txt

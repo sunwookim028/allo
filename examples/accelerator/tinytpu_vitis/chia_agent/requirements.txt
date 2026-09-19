@@ -1,0 +1,10 @@
+# CHIA host framework, pinned to the commit this branch was validated against
+# (v1.0.1-2-g16c35e9). The PyPI distribution is "chialoops"; the import package
+# is "chia". Install into the chia_env environment:
+#   conda run -n chia_env pip install -r requirements.txt
+#
+# Fetched as a source archive rather than git+https: at this commit upstream
+# records a chia_benchmarks gitlink (6c0ac99) that the remote no longer has, so
+# the `git submodule update --init --recursive` pip runs for a VCS URL fails.
+# Those submodules are example benchmarks the agent does not use.
+chialoops @ https://github.com/ucb-bar/chia/archive/16c35e92aaaf9511c6453bf94cd5cf589698f4e3.tar.gz
