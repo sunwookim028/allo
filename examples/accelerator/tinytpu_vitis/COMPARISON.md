@@ -705,11 +705,8 @@ to chase, and at 17.6% we are now two thirds of the way there.
 ## Reproducing
 
 ```bash
-# ours -- one build, all shapes
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
-export PYTHONPATH=/home/sk3463/allo OMP_NUM_THREADS=32   # >= 22 processes
-python bench_isa.py          # functional sweep, one build
-python cosim.py              # one csynth, cosim per shape
+# ours -- one build, all shapes, from a clean checkout; checks the numbers
+examples/accelerator/tinytpu_vitis/reproduce.sh
 TPU_WRAP=1 python cosim.py   # the old hoisted-argument variant, for comparison
 
 # Gemmini, matched

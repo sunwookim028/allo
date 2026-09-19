@@ -36,6 +36,8 @@ TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
     region must be exact and everything outside it untouched. The calls share
     one RTL instance, so each sees the `spad`/`vr`/`ar` the previous left.
     Its cycle column is the minimum over those calls; it is not the headline.
+    Each per-case line appears twice: cosim runs the testbench once in C, then
+    again against the RTL; the summary line is the RTL's.
 
 The functional equivalent of `TPU_TB=stress` is `stress_isa.py` (seconds, on
 Allo's simulator); run that first. This mode is for what only RTL can show.

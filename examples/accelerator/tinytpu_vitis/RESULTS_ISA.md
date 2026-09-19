@@ -200,6 +200,9 @@ blocked process and the occupancy of the channel it waits on. It is the
 instrumentation the Allo simulator does not provide. It completes at **depth 4
 for every shape**, 4x4x4 through 16x16x16. So there is no circular wait in the
 architecture at all.
+(That was the per-instruction architecture of the time. `kpn_model.py` has
+since been rewritten for the row-flattened units and is driven by the
+assembled header; every shipped program completes at depth **1**.)
 
 **The Allo simulator needs one thread per process.** It appears to give each
 `df.kernel` instance an OMP thread and to block that thread on an empty or full
@@ -279,15 +282,28 @@ with one run.
 ## Reproducing
 
 ```bash
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # not set by the env
-export PYTHONPATH=/home/sk3463/allo
-export OMP_NUM_THREADS=32     # >= 22 processes; 8 deadlocks, see above
+# One command, from a clean checkout: builds this checkout's MLIR bindings,
+# runs bench_isa + stress_isa, then the default cosim, and checks the five
+# cycle counts against 252 / 383 / 591 / 667 / 919. Exits nonzero otherwise.
+examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
+examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
 
-TPU_M=8  TPU_K=8  TPU_N=8  python bench_isa.py simulator   # exact, QD=8
-TPU_M=32 TPU_K=16 TPU_N=16 python bench_isa.py simulator   # exact, QD=8
-python kpn_model.py                                       # channel-graph model
-python cosim.py                                           # csim + csynth + cosim
+# Or by hand, from this directory (the env sets neither variable):
+export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+python bench_isa.py                   # published functional setup: ALL EXACT
+python stress_isa.py                  # correctness gate:          STRESS OK
+python kpn_model.py                   # channel protocol / deadlock model
+python cosim.py                       # default TB: the published cycle counts
+TPU_TB=stress TPU_SHAPES=4x4x4,16x16x16 python cosim.py   # correctness in RTL
+python mutate.py                      # does the harness catch a broken design?
 ```
+
+`bench_isa.py` and `cosim.py`'s default testbench use Gemmini's `[-4, 4]`
+operands so the comparison is like for like; they are **performance**
+checks and are blind to an int16 accumulator, a wrong clip boundary, or a unit
+ignoring a field GEMM never varies. `stress_isa.py` and `TPU_TB=stress` are
+the **correctness** checks; `mutate.py` prints which level catches which bug.
+Any `TPU_*` variable left set changes what `cosim.py` measures.
 
 ## Row-flattening: every unit is one loop now, except the accumulator
 

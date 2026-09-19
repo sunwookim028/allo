@@ -19,7 +19,7 @@
 #    published 252 / 383 / 591 / 667 / 919.
 #
 # Needs: the `allo` conda env, LLVM at $LLVM_BUILD_DIR (default below), and
-# Vitis HLS 2023.2 at the path `cosim.py` names in VITIS. ~15-45 min with
+# Vitis HLS 2023.2 at the path `cosim.py` names in VITIS. ~6 min with
 # cosim. Exits nonzero if any step fails or any number differs.
 set -eo pipefail
 
@@ -63,9 +63,9 @@ esac
 
 cd "$HERE"
 echo "== bench_isa.py (published functional setup)"
-"$PY" bench_isa.py | tail -1 | tee /dev/stderr | grep -q "ALL EXACT"
+out=$("$PY" bench_isa.py | tail -1); echo "$out"; grep -q "ALL EXACT" <<<"$out"
 echo "== stress_isa.py (correctness gate)"
-"$PY" stress_isa.py | tail -1 | tee /dev/stderr | grep -q "STRESS OK"
+out=$("$PY" stress_isa.py | tail -1); echo "$out"; grep -q "STRESS OK" <<<"$out"
 
 [ "${1:-}" = "--no-cosim" ] && { echo "REPRODUCED (functional only)"; exit 0; }
 
