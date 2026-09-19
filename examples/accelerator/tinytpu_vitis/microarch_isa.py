@@ -487,7 +487,7 @@ _KB = MAXDIM // T
 # moving to a 2-word instruction format cost exactly +68 cycles at all five
 # shapes, the 68 extra words it added -- the loop logic itself cost nothing.
 # The prefetch now moves 8 words per cycle, so the 56 words cost 7 cycles.
-_MAX_STATIC = 24               # longest program shipped, plus headroom
+_MAX_STATIC = 32               # longest program shipped, plus headroom
 IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
 # VMEM and vreg layout. Fixed offsets in a fixed memory, sized for the
@@ -1116,21 +1116,34 @@ def gemm_program_handwritten(M, K, N, relu=False):
     ins(enc(OP_ENDLOOP))
 
     # --- the output loop: level 0 is nb, level 1 is kb ---
+    # SOFTWARE-PIPELINED (increment 3b): tile k+1 is loaded and pushed before
+    # tile k is popped, so the array's push-to-pop latency is spent pushing
+    # rather than waiting -- the one vpu is in order and cannot run ahead on
+    # its own. MiniTPU's GEMM kernels overlap the same way.
     ins(enc(OP_LOOP, nr=Nt))
-    #   peeled first k-tile: weights B_VR + nb*MAXDIM, popped into AR_C
+    #   tile 0: weights B_VR + nb*MAXDIM
     ins(enc(OP_VMATLOAD, f0=B_VR, nr=T), enc_agu((AGU_F0, 0, MAXDIM)))
     ins(enc(OP_VMATPUSH, f0=A_VR, nr=M))
-    ins(enc(OP_VMATPOP, f0=AR_C, nr=M))
     if Kt > 1:
-        ins(enc(OP_LOOP, nr=Kt - 1))
-        #   f0 needs BOTH tiles: B_VR + nb*MAXDIM + (kb+1)*T
-        ins(enc(OP_VMATLOAD, f0=B_VR + T, nr=T),
-            enc_agu((AGU_F0, 0, MAXDIM), (AGU_F0, 1, T)))
-        ins(enc(OP_VMATPUSH, f0=A_VR + MAXDIM, nr=M),
-            enc_agu((AGU_F0, 1, MAXDIM)))
+        #   tile 1 in, tile 0 out into the accumulator region
+        ins(enc(OP_VMATLOAD, f0=B_VR + T, nr=T), enc_agu((AGU_F0, 0, MAXDIM)))
+        ins(enc(OP_VMATPUSH, f0=A_VR + MAXDIM, nr=M))
+        ins(enc(OP_VMATPOP, f0=AR_C, nr=M))
+        if Kt > 2:
+            ins(enc(OP_LOOP, nr=Kt - 2))
+            #   tile kb+2 in, tile kb+1 out and summed
+            ins(enc(OP_VMATLOAD, f0=B_VR + 2 * T, nr=T),
+                enc_agu((AGU_F0, 0, MAXDIM), (AGU_F0, 1, T)))
+            ins(enc(OP_VMATPUSH, f0=A_VR + 2 * MAXDIM, nr=M),
+                enc_agu((AGU_F0, 1, MAXDIM)))
+            ins(enc(OP_VMATPOP, f0=AR_P, nr=M))
+            ins(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M))
+            ins(enc(OP_ENDLOOP))
+        #   the last tile out and summed
         ins(enc(OP_VMATPOP, f0=AR_P, nr=M))
         ins(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M))
-        ins(enc(OP_ENDLOOP))
+    else:
+        ins(enc(OP_VMATPOP, f0=AR_C, nr=M))
     if relu:
         ins(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
     ins(enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M),
@@ -1162,13 +1175,17 @@ def gemm_program_flat(M, K, N, relu=False):
         p.append((enc(OP_VLD, f0=B_VR + nb * MAXDIM, f1=B_VM + nb * MAXDIM,
                       nr=K), 0))
     for nb in range(Nt):
-        for kb in range(Kt):
-            p.append((enc(OP_VMATLOAD, f0=B_VR + nb * MAXDIM + kb * T,
-                          nr=T), 0))
-            p.append((enc(OP_VMATPUSH, f0=A_VR + kb * MAXDIM, nr=M), 0))
+        def pop(kb):
             p.append((enc(OP_VMATPOP, f0=(AR_P if kb else AR_C), nr=M), 0))
             if kb:
                 p.append((enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M), 0))
+        for kb in range(Kt):                 # push tile kb, pop tile kb - 1
+            p.append((enc(OP_VMATLOAD, f0=B_VR + nb * MAXDIM + kb * T,
+                          nr=T), 0))
+            p.append((enc(OP_VMATPUSH, f0=A_VR + kb * MAXDIM, nr=M), 0))
+            if kb:
+                pop(kb - 1)
+        pop(Kt - 1)
         if relu:
             p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
         p.append((enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M), 0))

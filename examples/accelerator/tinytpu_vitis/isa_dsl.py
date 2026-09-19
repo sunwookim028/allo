@@ -311,16 +311,24 @@ def gemm_program(M, K, N, relu=False):
 
     # --- the output loop ---
     with k.loop(Nt, "n") as nb:
-        #   peeled first k-tile: pop straight into the accumulator region
+        # software-pipelined: tile k+1 is loaded and pushed before tile k is
+        # popped, so the in-order vpu spends the array's latency pushing
         k.vmatload(Ref(B_VR).at(nb, MAXDIM))
         k.vmatpush(A_VR, rows=M)
-        k.vmatpop(AR_C, rows=M)
         if Kt > 1:
-            with k.loop(Kt - 1, "k") as kb:
-                k.vmatload(Ref(B_VR + T).at(nb, MAXDIM).at(kb, T))
-                k.vmatpush(Ref(A_VR + MAXDIM).at(kb, MAXDIM), rows=M)
-                k.vmatpop(AR_P, rows=M)
-                k.vadd(AR_C, AR_C, AR_P, rows=M)
+            k.vmatload(Ref(B_VR + T).at(nb, MAXDIM))
+            k.vmatpush(A_VR + MAXDIM, rows=M)
+            k.vmatpop(AR_C, rows=M)              # tile 0: the accumulator
+            if Kt > 2:
+                with k.loop(Kt - 2, "k") as kb:
+                    k.vmatload(Ref(B_VR + 2 * T).at(nb, MAXDIM).at(kb, T))
+                    k.vmatpush(Ref(A_VR + 2 * MAXDIM).at(kb, MAXDIM), rows=M)
+                    k.vmatpop(AR_P, rows=M)      # tile kb + 1
+                    k.vadd(AR_C, AR_C, AR_P, rows=M)
+            k.vmatpop(AR_P, rows=M)              # the last tile
+            k.vadd(AR_C, AR_C, AR_P, rows=M)
+        else:
+            k.vmatpop(AR_C, rows=M)
         if relu:
             k.vrelu(AR_C, AR_C, rows=M)
         k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)

@@ -1,0 +1,8 @@
+=== T=8 MAXDIM=16
+  KPN OK
+  ALL EXACT
+  STRESS OK: 252/252 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 8 shapes, vector and random programs)
+=== T=8 MAXDIM=32
+  KPN OK
+  ALL EXACT
+  STRESS OK: 488/488 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)

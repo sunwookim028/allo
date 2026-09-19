@@ -692,6 +692,16 @@ setup as v1's published numbers.
        array -> vpu). The in-order ``vpu`` now pays the array's
        push-to-pop latency on every tile, which inc 2's separate ``accu``
        hid, and serialises what MiniTPU's three read ports overlap.
+   * - **inc 3b**: the GEMM program, software-pipelined
+     - 199
+     - 1514
+     - +2 / -390
+     - +27 / +828
+     - Program only: tile k+1 is loaded and pushed before tile k is popped,
+       so the in-order ``vpu`` spends the array latency pushing (MiniTPU's
+       GEMM kernels overlap the same way). The program is 25 static
+       instructions, so the imem grows from 24 to 32 slots, which is the +2
+       prefetch cycles at 4x4x4.
 
 Reading the table: the whole cost so far is where MiniTPU does work that v1
 did not have to. A DMA into VMEM and then a ``vld`` replaces v1's DMA straight
