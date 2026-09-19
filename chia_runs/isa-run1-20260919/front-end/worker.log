@@ -1,0 +1,328 @@
+pre-flight OK: this run will charge billing account 01BF39-94AA3F-36BACB (CHIA2026) through project chia2026-tinytpu (#762944961825); model google-vertex/gemini-3.1-pro-preview @ global
+  CHIA spend on 01BF39-94AA3F-36BACB so far $0.00 (1 sessions, opencode's figures); cap $100.00; remaining $100.00; this run's cap $26.50
+2026-09-19 17:16:24,204	INFO worker.py:1810 -- Connecting to existing Ray cluster at address: 128.84.48.164:6379...
+2026-09-19 17:16:24,285	INFO worker.py:2013 -- Connected to Ray cluster.
+2026-09-19 17:16:24,291	WARNING working_dir.py:86 -- Directory '__pycache__' is now ignored by default when packaging the working directory. To disable this behavior, set the `RAY_OVERRIDE_RUNTIME_ENV_DEFAULT_EXCLUDES=''` environment variable.
+2026-09-19 17:16:24,292	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-isa/examples/accelerator/tinytpu_vitis/chia_agent/.rayignore')]
+2026-09-19 17:16:24,297	INFO packaging.py:691 -- Creating a file package for local module '/home/sk3463/allo-chia-isa/examples/accelerator/tinytpu_vitis/chia_agent'.
+2026-09-19 17:16:24,297	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-isa/examples/accelerator/tinytpu_vitis/chia_agent/.rayignore')]
+2026-09-19 17:16:24,302	INFO packaging.py:463 -- Pushing file package 'gcs://_ray_pkg_56c42e797fc93538.zip' (0.20MiB) to Ray cluster...
+2026-09-19 17:16:24,304	INFO packaging.py:476 -- Successfully pushed file package 'gcs://_ray_pkg_56c42e797fc93538.zip'.
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/ray/_private/worker.py:2052: FutureWarning: Tip: In future versions of Ray, Ray will no longer override accelerator visible devices env var if num_gpus=0 or num_gpus=None (default). To enable this behavior and turn off this error message, set RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  warnings.warn(
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+[36m(_ToolServerActor pid=2787586)[0m INFO:     Started server process [2787586]
+[36m(_ToolServerActor pid=2787586)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=2787586)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=2787586)[0m INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+tpufrontend started at 127.0.0.1:8000 on node 2db190c31ab26777fcc6bf005b2b2dcf98d5eac2e80bbfb581165ab9
+========================================================================
+Baseline: gate + cosim of the unmodified design
+========================================================================
+  cosim total=858 [16x16x16=686, 4x4x4=172] est_clock=2.431ns LUT=26583 FF=17481 DSP=14 BRAM18K=42
+OpenCodeLLM is experimental: only exercised by unit tests so far, not validated in production.
+========================================================================
+Iteration 1/3 -- best so far 858 cosim cycles {'16x16x16': 686, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59936 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59936 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59936 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59946 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59946 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59946 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59946 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59946 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49404 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49404 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49404 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49404 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48562 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48562 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59844 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59844 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33740 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33740 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36452 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36452 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36452 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36452 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43952 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43952 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43958 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43958 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51688 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51688 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45852 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45852 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:44974 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:44974 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48524 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48524 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55128 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55128 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41550 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41550 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56860 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56860 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:34356 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:34356 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60176 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60176 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45798 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45798 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35138 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35138 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:44950 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:44950 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52776 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52776 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41460 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41460 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41598 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41598 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55164 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55164 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47280 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47280 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49616 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49616 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47446 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47446 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55286 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55286 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:37198 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:37198 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54840 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54840 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57366 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57366 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57378 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57378 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58560 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58560 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33954 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33954 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33954 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33954 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39088 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39088 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:34966 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:34966 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46022 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45336 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45336 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45336 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45336 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54858 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54858 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59356 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59356 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59356 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59356 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43886 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43886 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter1] $5.17, 50 turns, 2007s; run total $8.36
+I widened the operand DMA bursts in `dma_ld` to unroll over 4 rows (64 bytes) per iteration, perfectly maxing out the 512-bit wide AXI bus that Vitis infers from `align_value(64)`. I used a ceiling division `(na + 3) >> 2` for the trip counts, ensuring it still correctly loads the required data for vector and random programs whose operand bounds are not multiples of 4 (safely fetching padding within the `MAXDIM` matrix bound). This cuts the serial operand staging bottleneck by ~75%, lowering the RTL cosim cycles at 16x16x16 from 686 to 627, and does not depend on tests failing to exercise corners.
+  cosim total=799 [16x16x16=627, 4x4x4=172] est_clock=2.431ns LUT=31929 FF=24465 DSP=14 BRAM18K=98
+  ACCEPTED (-59 cosim cycles vs best) after 2215s
+========================================================================
+Iteration 2/3 -- best so far 799 cosim cycles {'16x16x16': 627, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43054 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43054 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43054 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43068 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43068 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43068 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48068 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48068 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39152 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39152 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46690 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46690 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35870 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35870 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48730 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48730 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45104 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45104 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50142 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50142 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33184 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33184 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53988 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53988 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53988 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53988 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47932 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47932 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59230 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59230 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57568 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52946 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52946 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35526 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35526 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55608 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55608 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45456 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45456 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48072 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48072 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50304 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50304 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59346 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:59346 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56776 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56776 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41244 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:41244 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40154 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40154 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40154 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40154 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47858 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:47858 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52816 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52816 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52816 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:52816 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40260 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:40260 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46212 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46212 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46214 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46214 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46762 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46762 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42914 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42914 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42914 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42914 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:32908 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:32908 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49550 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49550 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48656 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:48656 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49532 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51316 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51316 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58156 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58156 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58166 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58166 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39116 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39116 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50750 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50750 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39882 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39882 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35300 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:35300 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39366 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39366 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53256 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:53256 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51566 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:51566 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49234 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49234 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54812 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54812 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49738 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:49738 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43014 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43014 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39298 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39298 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39304 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39304 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45058 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45058 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57216 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57216 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58178 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58178 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58186 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:58186 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45818 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45818 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43294 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:43294 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46674 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:46674 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60578 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60578 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:54388 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42522 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:42522 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50106 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:50106 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36402 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36402 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36402 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36402 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57606 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:57606 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56620 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56620 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55804 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:55804 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33356 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:33356 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36784 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36784 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36792 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:36792 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60944 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:60944 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39354 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:39354 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45858 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45858 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45864 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45864 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45864 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:45864 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56188 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=2787586)[0m INFO:     127.0.0.1:56188 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter2] $0.00, ? turns, 2400s; run total $24.76
+
+[36m(OpenCodeLLM.prompt pid=2793348)[0m Timeout on attempt 1/1
+  candidate failed at gate:bench_isa (debug attempt 1)
+  BUDGET: not starting iter2-debug1: spent $25.41 + next call ~$16.03 would pass the $26.50 cap
+  REJECTED (gate:bench_isa) after 2642s
+========================================================================
+Iteration 3/3 -- best so far 799 cosim cycles {'16x16x16': 627, '4x4x4': 172}
+========================================================================
+  BUDGET: not starting iter3: spent $25.41 + next call ~$16.03 would pass the $26.50 cap
+========================================================================
+Search complete
+  baseline : cosim total=858 [16x16x16=686, 4x4x4=172] est_clock=2.431ns LUT=26583 FF=17481 DSP=14 BRAM18K=42
+  best     : cosim total=799 [16x16x16=627, 4x4x4=172] est_clock=2.431ns LUT=31929 FF=24465 DSP=14 BRAM18K=98
+  llm spend (this worker): $5.17 over 2 calls
+[36m(_ToolServerActor pid=2787586)[0m INFO:     Shutting down

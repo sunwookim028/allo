@@ -1,0 +1,348 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -1,270 +1,8 @@
+ # Copyright Allo authors. All Rights Reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-"""TinyTPU-isa: an instruction-programmable tiled-GEMM accelerator in grid Allo.
+-
+-What the earlier designs got and did not get. Both files have since been removed;
+-read them with `git show e2451b81:examples/accelerator/tinytpu_vitis/<file>`.
+-  * `microarch.py`     -- output-stationary, Vitis-legal, but `acc += a*b` is a
+-                          loop-carried dependence so `Final II = 7`.
+-  * `microarch_ws.py`  -- weight-stationary, II=1 per MAC, array at 100% of
+-                          roofline -- but *one* opcode, no scratchpad, no vector
+-                          unit. Operands stream from DRAM straight into the
+-                          array. A fast fixed-function GEMM, not a programmable
+-                          accelerator.
+-
+-This file is the machine both were aiming at. The requirements it is built to
+-meet, and where each one lands:
+-
+-  1. **Instruction-programmable.** Nine opcodes, a decoded instruction word
+-     broadcast to every unit, and units that hold no knowledge of the program.
+-  2. **A vector unit.** `vadd` / `vrelu` operate on accumulator rows. This
+-     item used to say tiled GEMM cannot do without `vadd`, because summing
+-     across k-tiles was an explicit `vadd`. That is no longer true: `mm`'s
+-     `f2` field selects overwrite or accumulate, so the shipped GEMM program
+-     emits no `vadd` at all, and `vadd_program` exists to keep the vector unit
+-     exercised.
+-  3. **A scratchpad with pure SIMD access.** One row of `spad` *is* one
+-     `UInt(T*8)` packed word of T int8 lanes. There is no per-lane addressing
+-     anywhere: one port, one row per cycle, which is what makes T lanes per
+-     cycle come out of a single-ported memory.
+-  4. **Explicit data movement.** `dma_ld` moves DRAM rows into the scratchpad
+-     or straight into the vregs, `vld` moves scratchpad rows into the vregs,
+-     and `mvout` retires accumulator rows to DRAM.
+-  5. **A streaming interface between the memories and the array ports.**
+-     Activations stream from the vregs, weights from the scratchpad; packed
+-     words travel on daisy chains, and each PE taps its own lane.
+-
+-## Why chains rather than T-way fan-out
+-
+-`microarch_ws.py` had a `loader` writing `a_in[0..T-1]` and a `drainer` reading
+-`c_out[0..T-1]`, both in fixed order. That design needs stream depth
+-proportional to `M * NI` -- the entire run -- which means back-pressure never
+-engages (`RESULTS_WS.md` section 6; both files at `e2451b81`). Upstream's
+-`test_multi_cache_gemm.py` has no process of that shape: `offchip_loadA` writes
+-exactly one stream and the border PEs daisy-chain it, `L2_A[i] -> L2_A[i+1]`.
+-`test_tiled_systolic.py` runs on depth-**4** FIFOs for the same reason.
+-
+-So every distribution here is a chain, and every chain carries *packed words*:
+-
+-    spm --hdr,W--> wcol[0] --v--> wld(i,0) --> wcol[i+1]     (down column 0)
+-                                    |    +--wq--> PE(i,0)    (its own weight)
+-                                    +-------> wrow[i,0] --> wld(i,1) --> ...
+-                                                             (east, lane j)
+-
+-    vru --A------> acol[0] --v--> PE(i,0) --> acol[i+1]      (down column 0)
+-                                    |  lane i
+-                                    +-------> a_fwd[i,0] --> east, scalar
+-
+-    PE(T-1,0) --cw[0]--> PE(T-1,1) --cw[1]--> ... --cw[T-1]--> accu
+-              (the bottom row packs its psums into one word as it goes east)
+-
+-One word per cycle per link, so T lanes per cycle, from single-ported memories.
+-
+-## Why the PEs decode nothing
+-
+-A header word leads every `mm` down the chain the weights use, carrying just its
+-row count. Each PE's weight loader (`wld`) forwards it and hands its PE one
+-`(weight, rows)` word; there is no command fan-out to `T*T` PEs and no opcode in
+-the array. Gemmini is the same --
+-its PEs are dumb and `ExecuteController` decodes -- and it also means the
+-instruction set can grow without touching the array.
+-
+-## Dependences come from being in-order
+-
+-Each unit consumes the instruction stream in order and every channel is
+-point-to-point, so `dma_ld` before `mm` before `vadd` before `mvout` is enforced by
+-construction: within a unit by program order, across units by stream order.
+-That is the whole of the hazard logic. Gemmini spends a 48-entry reservation
+-station (`ReservationStation.scala`) to get out-of-order issue on top of this;
+-this design is strictly in-order and does not pretend otherwise.
+-
+-## ROW-FLATTENING: why every unit is one loop and not two
+-
+-Each unit used to be a loop over *instructions* containing a loop over *rows*:
+-
+-    for c in range(n_own):          # instructions this unit is sent
+-        w0 = c_unit.get(); <decode>
+-        if op == OP_A:
+-            for r in range(nr): <work>
+-        if op == OP_B:
+-            for r in range(nr): <work>
+-
+-Vitis reported `Pipelined = no` on every one of those outer loops, with an
+-iteration latency of 69-74 cycles, and the reason is structural rather than a
+-tool defect: modulo scheduling needs a fixed II, an inner loop whose trip count
+-arrives in an instruction field cannot be unrolled to give one, and so the outer
+-loop has no II at all. An independent check found Catapult will not pipeline it
+-either. The sequencer was the only unit that pipelined at all, because its body
+-has no inner loop -- and even it closes at II=5, on the loop-stack recurrence.
+-
+-The consequence was measured against Gemmini: 18.1 cycles per instruction
+-against its 10.8, with `vru` -- 33 instructions and 464 words at 16x16x16 --
+-as the critical process. A unit finished instruction *n* before starting *n+1*,
+-so every instruction boundary cost a pipeline fill and drain plus the call
+-overhead of the sub-function Vitis extracts each inner loop into.
+-
+-**Every unit is now one flat loop over the work items it will process**, with
+-the instruction fetched on the iteration that needs it:
+-
+-    r = -1
+-    for x in range(n_work):         # ROWS (or words), from the header
+-        r += 1
+-        if r >= cnt:                # this row starts a new instruction
+-            w0 = c_unit.get(); <decode>; cnt = <work items>; r = 0
+-        <straight-line body, indexed by r>
+-
+-There is no inner loop left, so the body is straight-line and schedules with a
+-real II; the conditional stream read is legal in a pipelined region and simply
+-back-pressures. The header carries the dynamic *work* count per unit instead of
+-the dynamic instruction count -- `assemble()` already expanded the control flow
+-to compute the latter, so this is the same mechanism with `nr` summed rather
+-than counted.
+-
+-**What could not be split, and why the arms stay in one process.** The obvious
+-alternative -- one process per opcode, fed by per-opcode queues -- founders on
+-one owner per memory. `spad` lives in `spm` and is written by `dma_ld` and read
+-by `vld` and `mm`; `vr` lives in `vru` and is written by `vld` and `dma_ld` and
+-read by `mm`; `ar` lives in `accu` and is touched by all four of its opcodes.
+-Allo enforces single reader and single writer (Vitis itself would share an array
+-between two processes under `stream type=unsync`; see the limitations
+-register), so those three units keep every arm. Flattening gets what the split
+-was wanted for without moving a memory: the opcode test survives as a mux
+-inside a pipelined body instead of as sub-loops the scheduler must serialize.
+-
+-Four traps a naive flattening falls into, and what each unit does instead:
+-
+-  * **T+1 writes to one FIFO in one iteration.** `spm` emits a header word and
+-    T weight words per `mm`; in the fetch branch that would schedule the whole
+-    loop at II=T+1. It charges the prologue T+1 *iterations* instead -- the
+-    same cycles, II=1 everywhere else.
+-  * **the row counter incremented at the bottom.** Vitis put the add in the
+-    last stage and the next iteration's conditional queue read depends on it:
+-    `Final II = 2` on every unit. Hoisting the increment costs nothing.
+-  * **a row count that depends on the decoded opcode** (`cnt = nr`, or
+-    `T + 1` for an `mm`) is a carried dependence on the counter and closes the
+-    loop at `Final II = 2` -- measured in `spm` and `accu`. The sequencer
+-    precomputes each unit's count and sends it in that unit's copy of `nr`.
+-  * **a read in each arm.** The obvious transcription synthesized to one read
+-    port per arm on one memory (`vru` II=2, `accu` II=3). Every unit reads its
+-    memory ONCE per iteration at an address the branch selects.
+-
+-**`accu` was the unit that would not flatten**, for a reason the other units do
+-not have: its row index is a carried register, so Vitis cannot prove that
+-iteration n's store and iteration n+1's load of `ar` touch different rows, and
+-the flat loop closes at `Final II = 3` (II=2 with `ar` in registers, II=1 with a
+-write-behind rotation at 13.7x the flip-flops, reverted). It is flat now because
+-`schedule()` asserts the absence of that dependence with `s.dependence` -- a
+-claim the assembler makes true by enforcing a minimum read-after-write
+-distance on `ar` (THE ACCUMULATOR DISTANCE CONTRACT, below).
+-
+-**The PEs are flat too, and their weights are double-buffered.** A PE used to
+-run one loop per `mm` with a serial prologue -- read the header, latch a weight,
+-forward the rest down the column -- so no wavefront entered the array between
+-two `mm`s until the next weight had walked the chain. The prologue now lives in
+-a separate weight loader per PE (`wld`) that hands its PE `(weight, rows)`
+-through a depth-4 FIFO while the PE computes the previous `mm` (Gemmini's c1/c2
+-double buffer), and the PE runs one flat loop over every wavefront row.
+-
+-## THE DMA: `wrap_io=False`, and one burst per thing the program names
+-
+-The design is built `wrap_io=False`, so nothing is hoisted for it and every
+-unit addresses `m_axi` itself. That was not a free switch: with `wrap_io=True`
+-Allo wraps each argument in a bulk copy before the region starts
+-(`wrap_data_movement`, `allo/ir/transform.py`), and the extent it copies is
+-`MemRefType(arg.type).shape` -- the STATIC type, with no offset and no length.
+-At MAXDIM=16 that is imem 56 + A 256 + B 256 + C 256 = **824 words copied
+-whether the program touches them or not**, at II=1, which cosim charges as a
+-fixed 907 cycles: 57% of 16x16x16 and 90% of 4x4x4, and it did not move for the
+-whole of the array's development. It is not a DMA; it is an argument-passing
+-convention.
+-
+-Turning it off alone makes things worse, and an earlier measurement
+-(fixed 481, marginal 39.8 against 15.1) concluded from that that `m_axi` is
+-inherently slow. It is not. Two access patterns were put to Vitis and they
+-synthesize to completely different hardware:
+-
+-  * **strided** -- `lA[(f1 + r) * MAXDIM + f2 * T + e]`, `e` unrolled over the
+-    T lanes, one row per iteration:
+-    `[HLS 214-115] Multiple burst reads of length 4 and bit width 8`.
+-    A separate four-beat AXI transaction per row, `Final II = 4` on the loop
+-    and nearer 9 cycles a row once request latency is counted.
+-  * **contiguous with a RUNTIME trip count** -- `for i in range(n): b[i] = lA[i]`:
+-    `[HLS 214-115] Multiple burst reads of variable length and bit width 8`.
+-    One real AXI burst, and the loop closes at the port's own limit.
+-
+-So Allo can express a program-controlled burst DMA today; the old measurement
+-condemned the access pattern, not the configuration. Both of the design's
+-`m_axi` readers were restructured around the second pattern:
+-
+-  * `sequencer` pulls the whole program on-chip with one `IMEM_SIZE`-word burst,
+-    8 words per cycle since `align_value` widened gmem0 to 512 bits, and
+-    fetches from on-chip memory afterwards. Fetched in place,
+-    `imem[NHDR + pc * IWORDS]` is a data-dependent address that Vitis can only
+-    burst **two words at a time**, and the fetch loop closes at II=13 instead
+-    of 5. This, not the operand path, was most of the 39.8.
+-  * `dma_ld` opens with one variable-length burst per operand matrix, covering
+-    exactly the DRAM rows the program will name -- the assembler resolves the
+-    control flow and the AGU and passes the two spans in the header. Every
+-    instruction afterwards is one BRAM read, and the flat row loop is back to
+-    II=1 from II=4.
+-
+-Measured over the five shapes, one build each:
+-
+-| shape | `wrap_io=True` | `wrap_io=False`, bursts |
+-|---|---|---|
+-| 4x4x4    | 1004 | **680**  (1.48x) |
+-| 8x8x8    | 1108 | **831**  (1.33x) |
+-| 12x12x12 | 1294 | **1066** (1.21x) |
+-| 16x16x8  | 1344 | **1139** (1.18x) |
+-| 16x16x16 | 1586 | **1457** (1.09x) |
+-
+-Fixed cost 907 -> 557, marginal cost 15.12 -> 20.07 cycles/instruction. That
+-is a real trade and it is stated as one: the win is the fixed term and it is
+-largest where the fixed term dominates. The crossover is at 71 dynamic
+-instructions, which is past the longest program this MAXDIM admits (45), so the
+-burst build wins everywhere it can be run -- but it would not at a larger
+-MAXDIM without also fixing what the marginal term buys.
+-
+-**What the remaining +5 cycles/instruction is.** `dma_st` still writes `C` with
+-the strided pattern -- `[HLS 214-115] Multiple burst writes of length 4 and bit
+-width 8`, II=4 -- because a contiguous write-back would have to either clobber
+-the columns the program never named or be deferred to the end of the run, where
+-it would serialize behind the last `mvout` instead of overlapping the compute
+-it currently overlaps. That is the next thing to measure, not an oversight.
+-
+-**What the operand burst is NOT worth.** Merging the A and B bursts into one
+-loop bounded by `max(na, nb)` halves the burst time -- they are separate
+-bundles and Vitis attributes a variable-length burst on each to the one loop --
+-and it was built, measured, and changed the cosim count at all five shapes by
+-exactly **zero cycles**. The operand burst is already entirely hidden behind
+-the sequencer's dispatch and the units' pipeline fill, so the version that
+-reads the fewest bytes is the one kept. Halving something off the critical path
+-buys nothing, which is worth writing down.
+-
+-**One toolchain avenue that was wrongly called closed, and is now open.**
+-`config_interface -m_axi_max_widen_bitwidth 512` lets Vitis widen the 8-bit
+-`m_axi` ports so a long burst moves 64 bytes a beat instead of one. This
+-docstring used to say it "does nothing here" and blame
+-`[HLS 214-307] Could not widen since type i8 size is greater than or equal to
+-alignment 1(bytes)`. **That error does not occur on this design** -- it came
+-from a standalone probe. Here the setting is simply accepted and the ports stay
+-8 bits with no diagnostic, which is worse, because nothing tells you.
+-
+-The diagnosis underneath was right: Allo emitted the pointers with no alignment
+-attribute, so Vitis assumed 1 byte and declined. With `align_value` emitted
+-(`configs={"align_value": 64}`) the same setting gives gmem0 bit width 512,
+-gmem1/2 32, and takes both `dma_ld`'s burst loop and `dma_st` from II=4 to
+-II=1.
+-
+-## Data type
+-
+-int8 lanes, int32 accumulation, `mvout` clipping to int8 -- Gemmini's default
+-config (`inputType = SInt(8.W)`, `accType = SInt(32.W)`) and its `mvout`
+-behaviour under `ACC_SCALE_IDENTITY` with shift 0, which is what `allo_cmp.c`
+-passes. Packing is what makes the SIMD scratchpad work, and packing needs
+-integers, so unlike `microarch_ws.py` (at `e2451b81`) there is no fp32 switch here.
+-"""
++# empty
++"""TinyTPU-isa"""
+ 
+ import os
+ 
+@@ -273,7 +11,7 @@
+ from allo.customize import Partition
+ import allo.dataflow as df
+ 
+-# ---------------------------------------------------------------- the ISA ----
++# empty
+ # One 64-bit instruction word: a 6-bit opcode and five fields. The fields are
+ # deliberately wide enough that the encoding is not the limit on problem size.
+ #   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
+@@ -429,20 +167,10 @@
+     )
+ 
+ 
+-# ---------------------------------------------------------------------------
+-# THE HARDWARE. Every constant below is fixed at build time and is *independent
+-# of the workload*: one RTL build runs every shape, with M, K and N arriving as
+-# instruction fields rather than as Python constants.
+-#
+-# This is the property the comparison needs. Gemmini's numbers come from one
+-# elaboration -- `allo_cmp.c` declares `elem_t A[MAXDIM][MAXDIM]` and passes
+-# MAXDIM as the stride for every shape it runs -- so a per-workload
+-# specialization on our side would not be measuring the same kind of object.
+-# Earlier revisions of this file did exactly that: M/K/N, the instruction count,
+-# and every unit's loop bound were compile-time constants, so 4x4x4 and
+-# 16x16x16 were *different accelerators*. They are now the same one.
+-# ---------------------------------------------------------------------------
+-T = int(os.environ.get("TPU_T", 4))   # SIMD width == array dimension
++# (truncated microarch_isa.py for space)
++# empty
++T = 4
++MAXDIM = 16
+ # T >= 4 so that a packed word has room for the two 16-bit counts `vru` sends
+ # down `wcol` to the array (`mm` count, wavefront rows).
+ assert T >= 4, "a packed operand word must be at least 32 bits"
+@@ -724,18 +452,26 @@
+         # and moved nothing: the bursts are hidden behind the prefetch.
+         rbA: UInt(VW)[MAXDIM * WPR]
+         rbB: UInt(VW)[MAXDIM * WPR]
+-        for ia in range(na * WPR):
+-            pa: UInt(VW) = 0
+-            with allo.meta_for(T) as e:
+-                av: int8 = lA[ia * T + e]
+-                pa[8 * e : 8 * (e + 1)] = av
+-            rbA[ia] = pa
+-        for ic in range(nb * WPR):
+-            pb: UInt(VW) = 0
+-            with allo.meta_for(T) as e2:
+-                bv: int8 = lB[ic * T + e2]
+-                pb[8 * e2 : 8 * (e2 + 1)] = bv
+-            rbB[ic] = pb
++        na4: int32 = (na + 3) >> 2
++        for row4 in range(na4):
++            with allo.meta_for(4) as ri:
++                with allo.meta_for(WPR) as col_blk:
++                    row = row4 * 4 + ri
++                    pa: UInt(VW) = 0
++                    with allo.meta_for(T) as e:
++                        av: int8 = lA[row * MAXDIM + col_blk * T + e]
++                        pa[8 * e : 8 * (e + 1)] = av
++                    rbA[row * WPR + col_blk] = pa
++        nb4: int32 = (nb + 3) >> 2
++        for row4 in range(nb4):
++            with allo.meta_for(4) as ri2:
++                with allo.meta_for(WPR) as col_blk2:
++                    row2 = row4 * 4 + ri2
++                    pb: UInt(VW) = 0
++                    with allo.meta_for(T) as e2:
++                        bv: int8 = lB[row2 * MAXDIM + col_blk2 * T + e2]
++                        pb[8 * e2 : 8 * (e2 + 1)] = bv
++                    rbB[row2 * WPR + col_blk2] = pb
+ 
+         f0: int32 = 0
+         f1: int32 = 0

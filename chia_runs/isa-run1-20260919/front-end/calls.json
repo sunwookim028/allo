@@ -1,0 +1,22 @@
+[
+ {
+  "what": "iter1",
+  "seconds": 2007.4,
+  "session_id": "ses_f4551e185ffeVSvzFSmp7zxr2a",
+  "global_usd_during_call": 8.3601,
+  "completed": true,
+  "input_tokens": 1666978,
+  "output_tokens": 48460,
+  "reasoning_tokens": 29724,
+  "cache_read": 4494331,
+  "cost_usd": 5.171030200000001,
+  "num_turns": 50
+ },
+ {
+  "what": "iter2",
+  "seconds": 2400.2,
+  "session_id": null,
+  "global_usd_during_call": 16.0284,
+  "completed": false
+ }
+]

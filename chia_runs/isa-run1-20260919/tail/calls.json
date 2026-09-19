@@ -1,0 +1,29 @@
+[
+ {
+  "what": "iter1",
+  "seconds": 2401.3,
+  "session_id": null,
+  "global_usd_during_call": 9.719,
+  "completed": false
+ },
+ {
+  "what": "iter1-debug1",
+  "seconds": 623.5,
+  "session_id": "ses_f452c4116ffeSg7udGFkpb15F6",
+  "global_usd_during_call": 2.5337,
+  "completed": true,
+  "input_tokens": 356919,
+  "output_tokens": 9458,
+  "reasoning_tokens": 12124,
+  "cache_read": 1134703,
+  "cost_usd": 1.1997626,
+  "num_turns": 34
+ },
+ {
+  "what": "iter2",
+  "seconds": 2400.2,
+  "session_id": null,
+  "global_usd_during_call": 15.1888,
+  "completed": false
+ }
+]
