@@ -234,7 +234,9 @@ client and its timeout, `OpenCodeLLM`, keep-or-rewind, `variants.jsonl`,
 | d mvout's `c_dst.put` dropped | 240 s timeout, nothing left running | `gate:bench_isa` TIMEOUT at 242 s, no process under the work dir, `read_spec` 0.12 s meanwhile |
 | e frozen-file / import-time attacks (17) | all refused | all refused; the numpy writers only after the fix |
 | f concurrent evaluations | responsive, no cross-talk | two cosims at once, `read_spec` worst 0.07 s; same-tool calls serialise |
-| accept on b | correct, not a win | see `accept.py`'s `claim` |
+| accept on b | correct, not a win | ok, `claim: not-better`: 661 / 776 / 968 / 1028 / 1280, +409 / +393 / +377 / +361 / +361 over the five shapes, clock 2.431 ns |
+
+Full run: 43/43 cases in 22.3 min, $0.00, `chia_runs/harness-test-20260919-142252/`.
 
 What it cannot show is how a real model behaves: whether Gemini calls the tools
 sensibly, how long its turns are, and what they cost. The opencode -> MCP ->
