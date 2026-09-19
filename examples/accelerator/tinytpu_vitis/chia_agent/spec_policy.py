@@ -98,6 +98,19 @@ DENIED_ATTRS = frozenset(
         "setprofile",
         "putenv",
         "unsetenv",
+        # numpy's file writers. `numpy` is an allowed import, and the harness
+        # test showed `np.savetxt(<tree>/chia_agent/stress.py, ...)` at import
+        # time rewriting the stress gate before it ran. The evaluator's sandbox
+        # is what stops a writer this list does not name.
+        "save",
+        "savez",
+        "savez_compressed",
+        "savetxt",
+        "tofile",
+        "dump",
+        "memmap",
+        "open_memmap",
+        "lib",
     }
 )
 #: Dunder attributes are how Python reaches past a module's surface

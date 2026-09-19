@@ -41,6 +41,9 @@ REPO_ROOT = DESIGN_DIR.parents[2]
 MODEL = os.environ.get("TINYTPU_OPENCODE_MODEL", "google-vertex/gemini-3.1-pro-preview")
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("TINYTPU_VERTEX_LOCATION", "global")
+#: Test hook: an OpenAI-compatible endpoint instead of Vertex AI. Only
+#: `test_harness.py` sets it, to point opencode at `fake_model.py`.
+TEST_BASE_URL = os.environ.get("TINYTPU_OPENCODE_BASE_URL")
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
@@ -76,11 +79,13 @@ SYSTEM_MESSAGE = (
 
 
 def make_llm(tool: AlloSpecTool) -> IsaOpenCodeLLM:
-    if not PROJECT:
-        raise RuntimeError("Set GOOGLE_CLOUD_PROJECT before running the Vertex AI agent.")
     provider, _, model_id = MODEL.partition("/")
-    if provider != "google-vertex" or not model_id:
-        raise ValueError("TINYTPU_OPENCODE_MODEL must be google-vertex/<model-id>.")
+    if TEST_BASE_URL:
+        additional = [AdditionalModelProvider(
+            id=provider, models=[model_id], base_url=TEST_BASE_URL,
+            api_key="unused")]
+    else:
+        additional = [vertex_provider(provider, model_id)]
     return IsaOpenCodeLLM(
         model=MODEL,
         system_message=SYSTEM_MESSAGE,
@@ -90,18 +95,24 @@ def make_llm(tool: AlloSpecTool) -> IsaOpenCodeLLM:
         # for a session that could see no tools. One attempt, and the loop
         # decides what happens next.
         retries=1,
-        additional_providers=[
-            AdditionalModelProvider(
-                id="google-vertex",
-                npm="@ai-sdk/google-vertex",
-                name="Google Vertex AI",
-                models=[model_id],
-                options={"project": PROJECT, "location": LOCATION},
-            )
-        ],
+        additional_providers=additional,
         # opencode's own file and shell tools are denied: the MCP tools are the
         # agent's only capability, so it has no path to a frozen file.
         config={"*": "deny", f"{tool.name}_*": "allow"},
+    )
+
+
+def vertex_provider(provider: str, model_id: str) -> AdditionalModelProvider:
+    if not PROJECT:
+        raise RuntimeError("Set GOOGLE_CLOUD_PROJECT before running the Vertex AI agent.")
+    if provider != "google-vertex" or not model_id:
+        raise ValueError("TINYTPU_OPENCODE_MODEL must be google-vertex/<model-id>.")
+    return AdditionalModelProvider(
+        id="google-vertex",
+        npm="@ai-sdk/google-vertex",
+        name="Google Vertex AI",
+        models=[model_id],
+        options={"project": PROJECT, "location": LOCATION},
     )
 
 
@@ -228,7 +239,7 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         print("=" * 72)
         print("Baseline: gate + cosim of the unmodified design")
         print("=" * 72)
-        baseline = tool.evaluate()
+        baseline = tool.evaluate(work="harness")
         print(f"  {summarize(baseline)}", flush=True)
         _record(log_path, {"iteration": 0, "kind": "baseline", "accepted": True,
                            "head": head, "verdict": baseline})
@@ -281,7 +292,22 @@ it relies on anything the tests happen not to exercise.
             print(response.result, flush=True)
             summary = str(response.result)[-3000:]
 
-            verdict = tool.evaluate()
+            if not tool.diff_against(best_snapshot):
+                # Nothing to score: the spec is the best design, already
+                # measured. Re-running cosim on it would cost minutes to learn
+                # a number the loop already has.
+                history.append(f"iteration {iteration}: no change was made")
+                print("  no change was made; nothing to score", flush=True)
+                _record(log_path, {"iteration": iteration, "kind": "candidate",
+                                   "diff": "", "verdict": None, "accepted": False,
+                                   "reason": "no diff", "agent_summary": summary,
+                                   "llm_usd": round(sum(c.get("cost_usd", 0) for c
+                                                        in calls[n_calls:]), 4),
+                                   "seconds": round(time.time() - started, 1),
+                                   "llm_calls": calls[n_calls:]})
+                continue
+
+            verdict = tool.evaluate(work="harness")
             for attempt in range(1, max_debug_attempts + 1):
                 if verdict.get("ok"):
                     break
@@ -300,7 +326,7 @@ it relies on anything the tests happen not to exercise.
                     print(f"  BUDGET: {stop}")
                     break
                 print(response.result, flush=True)
-                verdict = tool.evaluate()
+                verdict = tool.evaluate(work="harness")
 
             elapsed = time.time() - started
             diff = tool.diff_against(best_snapshot)

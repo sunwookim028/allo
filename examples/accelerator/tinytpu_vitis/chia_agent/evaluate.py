@@ -39,6 +39,17 @@ requested shape reported exactly once; each shape's own cosim log carries
 simulated time; the csynth estimated clock meets the 3.33 ns target. The work
 directory is wiped first, so a stale report can never be read as a result.
 
+Every process that imports the candidate runs in a bubblewrap sandbox when
+`bwrap` is available: the whole filesystem read-only, the evaluation tree
+read-only too, only the work directory and a private `/tmp` writable, in its own
+PID namespace so that a kill takes every descendant with it. That is the answer
+to "the candidate's import-time code rewrites the gate": a test mutant narrowed
+the datapath AND rewrote the tree's `stress.py` through `numpy.savetxt`, which
+the policy did not know, and passed the gate. After every stage the tree is
+also compared byte-for-byte with what was composed (no file changed, none
+added) and the checkout's tracked files with how they were, so a host without
+`bwrap` still catches the tamper after the fact.
+
 Prints one JSON line (last line of stdout) and exits 0 iff the candidate passed.
 
     python evaluate.py --spec-dir DIR --work DIR [--shapes 4x4x4,16x16x16] [--gate-only]
@@ -47,6 +58,7 @@ Prints one JSON line (last line of stdout) and exits 0 iff the candidate passed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -77,6 +89,9 @@ FROZEN = [
     f"{PKG}/chia_agent/stress.py",
 ]
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
+#: What in the checkout itself the evaluation depends on: the `allo` package
+#: (on PYTHONPATH), and this directory's evaluator, policy and design.
+CHECKOUT_WATCH = ["allo", "examples/__init__.py", PKG]
 ALL_SHAPES = ["4x4x4", "8x8x8", "12x12x12", "16x16x8", "16x16x16"]
 SEARCH_SHAPES = ["4x4x4", "16x16x16"]
 TARGET_NS = 3.33
@@ -87,6 +102,9 @@ GATE_TIMEOUT = 240
 COSIM_TIMEOUT = 1800
 #: xsim's transaction window runs a few cycles past HLS's latency count.
 SIMTIME_SLACK = 12
+
+#: Candidate processes run under this. Absent -> integrity checks only.
+BWRAP = shutil.which("bwrap")
 
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
@@ -118,7 +136,9 @@ def resolve_ref(ref):
 
 
 def compose(spec_dir: Path, tree: Path, ref: str):
-    """Evaluation tree = frozen files from git + the candidate's two files."""
+    """Evaluation tree = frozen files from git + the candidate's two files.
+
+    Returns {relative path: sha256} for every file in the tree."""
     for rel in DESIGN_EVALUATOR:
         if git_show(ref, rel) != git_show(MAIN_BASE, rel):
             raise Reject("setup", f"{rel} @ {ref[:8]} differs from main @ {MAIN_BASE}")
@@ -142,6 +162,35 @@ def compose(spec_dir: Path, tree: Path, ref: str):
         (tree / PKG / name).write_text(text, encoding="utf-8")
     # Anything else in the spec dir is ignored, not merged: only these two
     # files are the candidate.
+    manifest = tree_manifest(tree)
+    for f in tree.rglob("*"):
+        if f.is_file():
+            f.chmod(0o444)
+    return manifest
+
+
+def tree_manifest(tree: Path) -> dict:
+    return {str(f.relative_to(tree)): hashlib.sha256(f.read_bytes()).hexdigest()
+            for f in sorted(tree.rglob("*")) if f.is_file()}
+
+
+def checkout_state() -> str:
+    """Content of this checkout's tracked files (the evaluator included), as a
+    hash of their diff against HEAD -- a file already dirty still counts."""
+    diff = subprocess.run(["git", "diff", "HEAD", "--binary", "--", *CHECKOUT_WATCH],
+                          cwd=REPO, capture_output=True).stdout
+    return hashlib.sha256(diff).hexdigest()
+
+
+def verify(tree: Path, manifest: dict, checkout: str, after: str):
+    """Nothing the candidate ran may have changed the tree or the checkout."""
+    now = tree_manifest(tree)
+    if now != manifest:
+        changed = sorted(k for k in set(now) | set(manifest)
+                         if now.get(k) != manifest.get(k))
+        raise Reject("tamper", f"after {after}, the evaluation tree changed: {changed}")
+    if checkout_state() != checkout:
+        raise Reject("tamper", f"after {after}, the checkout's tracked files changed")
 
 
 def env_for(tree: Path):
@@ -157,8 +206,21 @@ def env_for(tree: Path):
     return env
 
 
-def run(cmd, cwd, env, timeout):
+def sandboxed(cmd, work: Path, tree: Path):
+    """`cmd` under bubblewrap: read-only everything, but `work` and a private
+    /tmp; `tree` (inside `work`) read-only again; own PID namespace."""
+    if not BWRAP:
+        return cmd
+    return [BWRAP, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+            "--tmpfs", "/tmp", "--tmpfs", "/dev/shm",
+            "--bind", str(work), str(work), "--ro-bind", str(tree), str(tree),
+            "--unshare-pid", "--die-with-parent", "--", *cmd]
+
+
+def run(cmd, cwd, env, timeout, work=None, tree=None):
     t = time.time()
+    if work is not None:
+        cmd = sandboxed(cmd, work, tree)
     p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, start_new_session=True)
     try:
@@ -173,11 +235,11 @@ def run(cmd, cwd, env, timeout):
     return rc, out, time.time() - t
 
 
-def check_invariants(tree, env):
+def check_invariants(tree, env, work):
     code = ("import json; from examples.accelerator.tinytpu_vitis import "
             "microarch_isa as u; print(json.dumps({'T': u.T, 'MAXDIM': u.MAXDIM,"
             " 'IMEM_SIZE': u.IMEM_SIZE}))")
-    rc, out, _ = run([ALLO_PYTHON, "-c", code], tree, env, 300)
+    rc, out, _ = run([ALLO_PYTHON, "-c", code], tree, env, 300, work, tree)
     if rc:
         raise Reject("import", out[-3000:])
     inv = json.loads(out.strip().splitlines()[-1])
@@ -188,15 +250,18 @@ def check_invariants(tree, env):
     return inv
 
 
-def gate(tree, env):
+def gate(tree, env, work, verify_now):
     bench = str(tree / PKG / "bench_isa.py")
-    rc, out, sec = run([ALLO_PYTHON, bench], tree, env, GATE_TIMEOUT)
+    rc, out, sec = run([ALLO_PYTHON, bench], tree, env, GATE_TIMEOUT, work, tree)
+    verify_now("bench_isa")
     lines = out.strip().splitlines()
     if rc or not lines or lines[-1].strip() != "ALL EXACT" or "FAILURES" in out:
         raise Reject("gate:bench_isa", out[-4000:])
     stress = str(tree / PKG / "chia_agent" / "stress.py")
-    rc2, out2, sec2 = run([ALLO_PYTHON, stress], tree, env, GATE_TIMEOUT)
-    if rc2 or "STRESS OK" not in out2:
+    rc2, out2, sec2 = run([ALLO_PYTHON, stress], tree, env, GATE_TIMEOUT, work, tree)
+    verify_now("stress")
+    # The exact line, with the full count: stress.py is frozen and runs 60.
+    if rc2 or not re.search(r"^  STRESS OK: 60/60 runs exact", out2, re.M):
         raise Reject("gate:stress", out2[-4000:])
     return {"bench_isa": "ALL EXACT", "stress": lines_with(out2, "STRESS OK")[0],
             "seconds": round(sec + sec2, 1)}
@@ -240,10 +305,11 @@ def check_memory_model(prj: Path):
                 raise Reject("memory-model", f"{log.name} changes the memory model")
 
 
-def score(tree, env, work: Path, shapes):
+def score(tree, env, work: Path, shapes, verify_now):
     cosim = str(tree / PKG / "cosim.py")
     env = dict(env, TPU_SHAPES=",".join(shapes))
-    rc, out, sec = run([ALLO_PYTHON, cosim], work, env, COSIM_TIMEOUT)
+    rc, out, sec = run([ALLO_PYTHON, cosim], work, env, COSIM_TIMEOUT, work, tree)
+    verify_now("cosim")
     prj = work / "isa_sweep.prj"
     if rc:
         raise Reject("cosim", out[-4000:])
@@ -294,6 +360,14 @@ def main():
         if bad:
             raise Reject("setup", f"shapes {bad} are not in the frozen SHAPES")
         work = a.work.resolve()
+        spec = a.spec_dir.resolve()
+        if (work == spec or work in spec.parents or spec in work.parents
+                or work == REPO or work in REPO.parents
+                or (work.is_relative_to(REPO)
+                    and not work.is_relative_to(REPO / ".chia_scratch"))):
+            # It is rmtree'd below: never the spec, the checkout, or above them.
+            raise Reject("setup", f"work dir {work} overlaps the spec dir {spec} "
+                                  f"or the checkout; it would be wiped")
         # Wiped every time: a stale cosim report must never be read as a result.
         if work.exists():
             shutil.rmtree(work)
@@ -301,12 +375,16 @@ def main():
         tree.mkdir(parents=True)
         ref = resolve_ref(FROZEN_REF)
         result["frozen_ref"] = ref
-        compose(a.spec_dir.resolve(), tree, ref)
+        checkout = checkout_state()
+        manifest = compose(spec, tree, ref)
+        verify_now = lambda after: verify(tree, manifest, checkout, after)
+        result["sandbox"] = bool(BWRAP)
         env = env_for(tree)
-        result["invariants"] = check_invariants(tree, env)
-        result["gate"] = gate(tree, env)
+        result["invariants"] = check_invariants(tree, env, work)
+        verify_now("the import check")
+        result["gate"] = gate(tree, env, work, verify_now)
         if not a.gate_only:
-            cyc, synth, sec = score(tree, env, work, shapes)
+            cyc, synth, sec = score(tree, env, work, shapes, verify_now)
             result.update(cycles=cyc, total_cycles=sum(cyc.values()),
                           synth=synth, cosim_seconds=sec)
         result["ok"] = True

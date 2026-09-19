@@ -13,6 +13,18 @@ convenience, not evidence. A claim is accepted only by this script:
    memory model -- each run from that checkout,
 5. results and logs copied into `--out` BEFORE the worktree is removed.
 
+`ok` means *correct*: bit-exact at all five shapes, ALL EXACT, stress, clock.
+Whether it is a *win* is a separate field, `claim`, against the unmodified
+design's five cosim numbers at `--ref`:
+
+    win          ok, and the five-shape total is lower
+    not-better   ok, and it is not -- correct but no improvement; nothing to claim
+    rejected     not ok
+    no-baseline  ok, but no baseline is known for this design (pass --baseline)
+
+The baseline is recorded below per design (keyed by the git blob ids of the two
+editable files), or read from a control run's `accept.json` via `--baseline`.
+
     python accept.py --diff RUN/worker/best.diff --out RUN/accept-worker
     python accept.py --out RUN/accept-baseline          # no diff: the control
 """
@@ -24,6 +36,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -36,16 +49,47 @@ ALLO_PYTHON = os.environ.get(
 LLVM_BUILD_DIR = os.environ.get(
     "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
 ENV_BIN = str(Path(ALLO_PYTHON).parent)
+#: Control runs of the unmodified design: (microarch_isa.py blob, isa_dsl.py
+#: blob) -> five-shape cosim cycles. Measured by this script with no --diff.
+BASELINES = {
+    ("ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
+     "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
+        {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
+         "16x16x16": 919},
+}
+
+
+BWRAP = shutil.which("bwrap")
+#: bench_isa / stress on the unmodified design take ~5-10 s each; a deadlocked
+#: candidate would otherwise hold the acceptance for the full cosim timeout.
+GATE_TIMEOUT = 600
 
 
 def sh(cmd, cwd, env=None, log=None, timeout=7200):
     t = time.time()
-    p = subprocess.run(cmd, cwd=cwd, env=env, text=True, capture_output=True,
-                       timeout=timeout)
-    out = p.stdout + p.stderr
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        out, _ = p.communicate(timeout=timeout)
+        rc = p.returncode
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)   # the whole group, simulator included
+        out, _ = p.communicate()
+        out, rc = (out or "") + f"\nTIMEOUT after {timeout}s", 124
     if log:
         Path(log).write_text(out)
-    return p.returncode, out, round(time.time() - t, 1)
+    return rc, out, round(time.time() - t, 1)
+
+
+def boxed(cmd, writable: Path):
+    """As evaluate.py: candidate-importing processes see a read-only
+    filesystem except `writable` and a private /tmp."""
+    if not BWRAP:
+        return cmd
+    return [BWRAP, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+            "--tmpfs", "/tmp", "--tmpfs", "/dev/shm",
+            "--bind", str(writable), str(writable),
+            "--unshare-pid", "--die-with-parent", "--", *cmd]
 
 
 def main():
@@ -54,6 +98,8 @@ def main():
     ap.add_argument("--ref", default="HEAD")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--baseline", type=Path,
+                    help="a control run's accept.json (default: recorded BASELINES)")
     a = ap.parse_args()
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -77,8 +123,21 @@ def main():
                            str(a.diff.resolve())], wt)
             if rc:
                 raise SystemExit(f"git apply failed:\n{o}")
+        # The spec policy, from git at the ref, on the patched files -- the same
+        # check the search applied, which a hand-made diff has not been through.
+        policy = {"__name__": "spec_policy"}
+        exec(compile(subprocess.run(
+            ["git", "show", f"{ref}:{PKG}/chia_agent/spec_policy.py"], cwd=REPO,
+            capture_output=True, check=True).stdout, "spec_policy.py", "exec"), policy)
+        problems = [p for f in ("microarch_isa.py", "isa_dsl.py") for p in
+                    policy["policy_violations"](f, (wt / PKG / f).read_text())]
+        result["policy"] = problems
+        if problems:
+            raise SystemExit(f"refusing: spec policy: {problems}")
         rc, o, _ = sh(["git", "status", "--porcelain"], wt)
         result["checkout_status"] = o.strip().splitlines()
+        tracked = lambda: sh(["git", "status", "--porcelain",
+                              "--untracked-files=no"], wt)[1]
 
         env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
         env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
@@ -100,18 +159,29 @@ def main():
         result["allo_resolves_to"] = o.strip()
         assert o.strip().startswith(str(wt)), o
 
-        rc, o, sec = sh([ALLO_PYTHON, f"{PKG}/bench_isa.py"], wt, env,
-                        out / "bench_isa.log")
-        result["bench_isa"] = {"rc": rc, "last": [l.strip() for l in o.strip().splitlines()[-1:]],
-                               "seconds": sec}
-        rc2, o2, sec2 = sh([ALLO_PYTHON, f"{PKG}/chia_agent/stress.py"], wt, env,
-                           out / "stress.log")
-        result["stress"] = {"rc": rc2, "last": o2.strip().splitlines()[-1:],
-                            "seconds": sec2}
         cos = wt / ".cosim"
         cos.mkdir()
-        rc3, o3, sec3 = sh([ALLO_PYTHON, str(wt / PKG / "cosim.py")], cos, env,
-                           out / "cosim.log")
+        result["sandbox"] = bool(BWRAP)
+        clean = tracked()
+
+        def untouched(stage):
+            if tracked() != clean:
+                result["tamper"] = f"tracked files changed during {stage}"
+                raise SystemExit(result["tamper"])
+
+        rc, o, sec = sh(boxed([ALLO_PYTHON, f"{PKG}/bench_isa.py"], cos), wt, env,
+                        out / "bench_isa.log", timeout=GATE_TIMEOUT)
+        untouched("bench_isa")
+        result["bench_isa"] = {"rc": rc, "last": [l.strip() for l in o.strip().splitlines()[-1:]],
+                               "seconds": sec}
+        rc2, o2, sec2 = sh(boxed([ALLO_PYTHON, f"{PKG}/chia_agent/stress.py"], cos),
+                           wt, env, out / "stress.log", timeout=GATE_TIMEOUT)
+        untouched("stress")
+        result["stress"] = {"rc": rc2, "last": o2.strip().splitlines()[-1:],
+                            "seconds": sec2}
+        rc3, o3, sec3 = sh(boxed([ALLO_PYTHON, str(wt / PKG / "cosim.py")], cos),
+                           cos, env, out / "cosim.log")
+        untouched("cosim")
         rows = re.findall(r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$", o3, re.M)
         result["cosim"] = {f"{m}x{k}x{n}": {"cycles": None if c == "None" else int(c),
                                             "tb": tb.strip()}
@@ -132,6 +202,25 @@ def main():
         result["ok"] = (rc == 0 and result["bench_isa"]["last"] == ["ALL EXACT"]
                         and rc2 == 0 and rc3 == 0 and len(result["cosim"]) == 5
                         and exact and result.get("estimated_ns", 99) <= 3.33)
+        if a.baseline:
+            base = {s: v["cycles"] for s, v in
+                    json.loads(a.baseline.read_text())["cosim"].items()}
+        else:
+            blobs = tuple(subprocess.run(
+                ["git", "rev-parse", f"{ref}:{PKG}/{f}"], cwd=REPO,
+                capture_output=True, text=True).stdout.strip()
+                for f in ("microarch_isa.py", "isa_dsl.py"))
+            base = BASELINES.get(blobs)
+        result["baseline"] = base
+        if not result["ok"]:
+            result["claim"] = "rejected"
+        elif not base or set(base) != set(result["cosim"]):
+            result["claim"] = "no-baseline"
+        else:
+            got = {s: v["cycles"] for s, v in result["cosim"].items()}
+            result["delta"] = {s: got[s] - base[s] for s in base}
+            result["delta_total"] = sum(result["delta"].values())
+            result["claim"] = "win" if result["delta_total"] < 0 else "not-better"
     finally:
         (out / "accept.json").write_text(json.dumps(result, indent=1))
         print(json.dumps(result, indent=1))
