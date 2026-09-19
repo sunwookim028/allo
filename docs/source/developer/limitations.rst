@@ -49,14 +49,388 @@ https://github.com/sunwookim028/allo/issues/13.
 Register
 --------
 
-.. REGISTER-TABLE-PLACEHOLDER: insert the re-verified register table here
+Every item was re-verified on ``main`` at ``7a24c21e`` on 2026-09-19. Each
+older item has a standalone repro under ``tests/limits/`` that prints one
+``[item N] <STATUS>`` line; the repros were run again against ``main``'s
+working tree (after the upstream #612 merge ``dc6b8fa6``) with the same
+verdicts. Statuses:
 
-.. note::
+* **REPRODUCES**: the limitation is present.
+* **FIXED by <commit or PR>**: a commit removed it. Fixes marked
+  *fork-only* exist only on this fork and are **upstreaming candidates**.
+* **CANNOT-REPRODUCE**: the claimed failure does not occur, and no fix
+  explains it (it may never have been broken).
+* **NOT-A-LIMITATION**: the behaviour is not Allo's.
 
-   The summary table for this register (item, status, priority, root cause) is
-   pending: every item below is being re-verified and root-caused. Until the
-   table lands, the per-item sections below are the register, and their
-   statuses are as last recorded.
+Layers: *frontend* (``allo/ir/infer.py``, ``allo/ir/builder.py``,
+``allo/customize.py``), *simulator* (``allo/backend/simulator.py``), *HLS
+driver* (``allo/backend/hls.py``, ``allo/backend/vitis.py``), *emitter*
+(``mlir/lib/Translation/Emit*.cpp``), *SystemC fork* (the
+``choonsik1/allo:SystemC-emitter`` emitter). File:line references are to
+``7a24c21e`` unless a fork commit is named. Fix sizes are the root-cause
+agent's estimates unless marked *verified* (a prototype was built and
+passed).
+
+To run a repro from a checkout of this repository:
+
+.. code-block:: bash
+
+   source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
+   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   cd tests/limits && python item04_math_exp.py      # -> [item 4] REPRODUCES: ...
+
+``tests/limits/_worktree.py`` makes every repro test the tree it is committed
+in: from the primary checkout it does nothing, and from a separate worktree
+(which needs its own built ``allo/_mlir``) it strips the conda env's editable
+install. ``item15`` needs ``vitis_hls`` on ``PATH`` and takes about 4 minutes;
+every other repro is codegen or simulator only. The files are not named
+``test_*.py``, so ``pytest`` does not collect them.
+
+.. _limitations-open:
+
+Open
+~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 12 9 26 20 10 17
+
+   * - Item
+     - Status
+     - Layer
+     - Root cause
+     - Impact on TinyTPU-isa
+     - Fix size
+     - Repro
+   * - :ref:`4 <limitation-4>`
+     - REPRODUCES
+     - frontend
+     - ``infer.py:1218`` treats only ``allo``-module functions as library ops;
+       ``math.exp`` falls through to the user-function lookup at
+       ``infer.py:1316`` -> ``KeyError``. The documented workaround,
+       ``allo.exp``, does not run on the simulator (item A).
+     - none (no transcendental ops)
+     - ~10 lines
+     - `item04_math_exp.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item04_math_exp.py>`__
+   * - :ref:`5 <limitation-5>`
+     - REPRODUCES (extended by E)
+     - frontend
+     - Kernel contexts share the region's scope list (``infer.py:781``); the
+       annotated-assign check at ``infer.py:682-690`` searches all scopes
+       (``visitor.py:244``).
+     - forces the ``l_imem`` / ``lA`` / ``lB`` / ``lC`` naming at
+       ``microarch_isa.py:495,630,1095``
+     - ~15 lines
+     - `item05_region_param_shadowing.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item05_region_param_shadowing.py>`__
+   * - :ref:`8 <limitation-8>`
+     - REPRODUCES -- but **loudly**: a symbol-redefinition error, not a silent
+       break
+     - frontend
+     - ``builder.py:2828-2894`` rebuilds the sub-region per call under the same
+       symbol names (``redefinition of symbol named 'feed_0__0_fixed'``).
+     - none (one region, no sub-region calls)
+     - 8 lines (prototyped; simulator-verified, HLS untested)
+     - `item08_subregion_two_callsites.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item08_subregion_two_callsites.py>`__
+   * - :ref:`10 <limitation-10>`
+     - (a) REPRODUCES; (b) CANNOT-REPRODUCE
+     - simulator, HLS driver, frontend
+     - (a) ``simulator.py:1641`` re-parses ``str(mod)``, dropping locations (also
+       ``hls.py:254``, ``llvm.py:51,60``); ``ASTContext.copy()``
+       (``visitor.py:126``) drops ``file_name``; ``customize.py:1352`` records
+       ``allo/dataflow.py`` as the source file. (b) three regions build and run
+       in one process.
+     - diagnosis time only
+     - 3-line prototype yields ``file.py:12:19``
+     - `item10_error_source_location.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item10_error_source_location.py>`__
+   * - :ref:`14 <limitation-14>`
+     - REPRODUCES, plus a false positive
+     - emitter
+     - ``EmitVivadoHLS.cpp:3019-3044`` rejects any nested function with a 2-D
+       argument -- including a 2-D *local* that never touches a top-level
+       pointer.
+     - forces flat ``A`` / ``B`` / ``C`` addressing at
+       ``microarch_isa.py:402-409,454-457``
+     - not sized
+     - `item14_wrapio_false_multidim.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item14_wrapio_false_multidim.py>`__
+   * - :ref:`15 <limitation-15>`
+     - REPRODUCES -- via ``df.build(mode="csim")`` it **hangs silently**
+       instead of printing the documented error
+     - frontend
+     - Process calls are emitted in ``node.body`` order
+       (``builder.py:2234-2290``).
+     - forces ``dma_st`` to be declared last (``microarch_isa.py:1098-1104``)
+     - ~30 lines (topological sort)
+     - `item15_csim_declaration_order.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item15_csim_declaration_order.py>`__
+   * - :ref:`16 <limitation-16>`
+     - REPRODUCES
+     - HLS driver
+     - ``hls.py:331-338`` rejects ``mode="cosim"``; ``vitis.py:410`` emits
+       ``m_axi`` with no ``depth=``.
+     - ``tinytpu_vitis/cosim.py`` (216 lines, ``patch_axi_depths`` at ``:109``)
+       exists because of it
+     - ~150 lines
+     - `item16_cosim_not_wired.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item16_cosim_not_wired.py>`__
+   * - :ref:`17 <limitation-17>`
+     - (a), (c) REPRODUCE; (b) CANNOT-REPRODUCE; (d), (e) are capabilities and
+       work
+     - frontend
+     - (a) ``infer.py:1051``, message at ``visitor.py:458``. (c) the ``meta_if``
+       body gets its own scope (``builder.py:3905``, ``infer.py:1599``).
+     - (c) forces declare-before-assign at
+       ``microarch_isa.py:879,891,903,916,924,938``
+     - (c) 4-line prototype passes 12 dataflow tests (the AIE non-unroll path
+       must keep the scope)
+     - `item17_frontend_constraints.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item17_frontend_constraints.py>`__
+   * - :ref:`18 <limitation-18>`
+     - REPRODUCES (fork-only code)
+     - emitter
+     - ``EmitCatapultHLS.cpp:321-389`` emits blocking ``read`` / ``write`` with
+       ``success = true``; introduced by fork-only ``73cbba0c``.
+     - none (Vitis target)
+     - ~10 lines to reject instead
+     - `item18_catapult_try_ops_blocking.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item18_catapult_try_ops_blocking.py>`__
+   * - :ref:`19 <limitation-19>`
+     - REPRODUCES
+     - emitter, HLS driver
+     - Only construct/get/put are dispatched (``EmitTapaHLS.cpp:425-429``); the
+       base methods are empty (``EmitBaseHLS.h:85-88``); the message at
+       ``hls.py:311-314`` blames ``wrap_io``.
+     - none (Vitis target)
+     - not sized
+     - `item19_tapa_try_ops_message.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item19_tapa_try_ops_message.py>`__
+   * - :ref:`21 <limitation-21>`
+     - REPRODUCES
+     - frontend, emitter
+     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
+     - **priced**: 35 cycles at 16x16x16 on the shipped design (5 at 4x4x4); 95
+       once the design fixes are in. The pragma form costs 1,744 FF in
+       ``accu`` against 17,438 for the reverted rotation.
+     - not sized; **escape hatch today**: patch ``kernel.cpp`` between
+       ``s.build(mode="csyn")`` and running Vitis
+     - ``v_accudep`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact>`__
+   * - :ref:`22 <limitation-22>`
+     - REPRODUCES
+     - SystemC fork
+     - ``emitWireGet`` / ``emitWirePut`` (fork ``EmitSystemC.cpp:1828-1848``) are
+       bare ``sc_signal`` accesses; nothing ties the reader's loop to the
+       writer's.
+     - none (Vitis target); blocks a MiniTPU-class delay line on the SystemC
+       path
+     - the ``SC_METHOD`` comb mode scoped in ``c7402f9f`` (five phases)
+     - ``examples/systemc_rtlsim/REPRO.sh``
+   * - :ref:`23 <limitation-23>`
+     - REPRODUCES (on probes)
+     - HLS driver, emitter
+     - ``m_axi`` pragma is a regex rewrite of emitted text
+       (``vitis.py:381,410``); ``emitFunctionDirectives`` interface body is
+       dead-commented.
+     - none on the shipped design: the opt-in ``align_value`` widens gmem0 to
+       512 bits (``b4be2b10``)
+     - see item text
+     - probes (not committed)
+   * - :ref:`shared memory <limitation-shared-memory>`
+     - REPRODUCES (Allo's rule, not Vitis's)
+     - emitter; SystemC fork
+     - Allo refuses a region-scope Stateful shared by two kernels
+       (``EmitVivadoHLS.cpp:3083-3122``) and never emits ``#pragma HLS stream
+       type=unsync``. SystemC fork: memory instances keyed per (call, operand)
+       (fork ``EmitSystemC.cpp:2539-2545``), so each client gets a replica.
+     - **0 cycles, measured**: every restructure the design needed was
+       Allo-legal
+     - SystemC fork: ~50-100 lines (bind one writer and one reader to one
+       instance's two pin sets)
+     - ``probe_shared/`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__
+   * - :ref:`A <limitation-a>`
+     - REPRODUCES
+     - simulator
+     - The simulator pipeline has no math-to-LLVM pass
+       (``simulator.py:1674-1686``), so ``allo.exp`` / ``allo.log`` fail there.
+       This also breaks item 4's documented workaround.
+     - none (no transcendental ops)
+     - 1 line (verified)
+     - `new_sim_math_lowering.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_sim_math_lowering.py>`__
+   * - :ref:`B <limitation-b>`
+     - REPRODUCES
+     - frontend
+     - A scalar ``Stream.get()`` result is never cast to the destination type
+       (``builder.py:1054``).
+     - not assessed
+     - 3 lines (verified)
+     - `new_stream_get_no_cast.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_stream_get_no_cast.py>`__
+   * - :ref:`C <limitation-c>`
+     - REPRODUCES
+     - frontend
+     - ``customize()`` calls ``sys.exit(1)`` on frontend errors
+       (``customize.py:1382,1408``); uncatchable by ``except Exception``.
+     - harness only: a sweep or test that expects to catch a build failure is
+       terminated
+     - not sized
+     - `new_customize_sys_exit.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_customize_sys_exit.py>`__
+   * - :ref:`D <limitation-d>`
+     - REPRODUCES (fork-only code)
+     - emitter
+     - Catapult ``full()`` always returns ``false``
+       (``EmitCatapultHLS.cpp:402-414``); same class as item 18.
+     - none (Vitis target)
+     - not sized
+     - reported by `item18_catapult_try_ops_blocking.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item18_catapult_try_ops_blocking.py>`__
+   * - :ref:`E <limitation-e>`
+     - REPRODUCES
+     - frontend
+     - Item 5 extended: same-name, **same-type** shadowing of a region
+       parameter gives an MLIR region-isolation error. Same root cause as
+       item 5.
+     - as item 5
+     - with item 5
+     - variant (b) of `item05_region_param_shadowing.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item05_region_param_shadowing.py>`__
+   * - :ref:`F <limitation-f>`
+     - REPRODUCES
+     - frontend (AIE)
+     - The AIE ``cpp-style`` typing rules (``typing_rule.py:855-860``) have no
+       bitwise ops, so every bitwise op is rejected there.
+     - none (Vitis target)
+     - not sized
+     - informational line of `item07_bitwise_and.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item07_bitwise_and.py>`__
+   * - :ref:`G <limitation-g>`
+     - REPRODUCES
+     - frontend, HLS driver
+     - ``= 0`` on an array lowers to a runtime zero-fill loop
+       (``builder.py:1063-1075`` -> ``linalg.fill`` -> ``hls.py:288``
+       ``convert-linalg-to-affine-loops``).
+     - **+409 / +361 cycles** at 4x4x4 / 16x16x16 when restored on ``spad``
+       (measured, ``v_memset``); the shipped design avoids it
+     - not sized (warn; or reset-time init; or elide -- see item)
+     - ``v_memset`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact>`__
+
+.. _limitations-closed:
+
+Fixed or closed
+~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 16 9 27 16 26
+
+   * - Item
+     - Status
+     - Layer
+     - Root cause
+     - Upstream
+     - Repro
+   * - :ref:`1 <limitation-1>` (+ :ref:`6 <limitation-6>`)
+     - FIXED by ``5c4d1b53``
+     - frontend
+     - Region-scope Stateful not propagated through ``ASTContext.copy()``.
+       Item 6 was a symptom of this, not a separate bug.
+     - **fork-only -- upstreaming candidate** (the ``global_op_cache`` copy
+       crash itself landed upstream via PR #577)
+     - `item01_region_stateful.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item01_region_stateful.py>`__,
+       `item06_elif_local_dominance.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item06_elif_local_dominance.py>`__
+   * - :ref:`2 <limitation-2>`
+     - FIXED by upstream PR #577
+     - frontend
+     - ``global_op_cache`` missing from the copied ``ASTContext``.
+     - upstream
+     - `item02_kernel_stateful.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item02_kernel_stateful.py>`__
+   * - :ref:`3 <limitation-3>`
+     - FIXED by ``5bc104c8``
+     - simulator
+     - ``_process_function_streams`` scanned only the top-level block's ops.
+     - **fork-only -- upstreaming candidate**
+     - `item03_nested_call_streams.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item03_nested_call_streams.py>`__
+   * - :ref:`7 <limitation-7>`
+     - CANNOT-REPRODUCE (bitwise ops work in the default rule set since
+       ``12f898d7``, 2023)
+     - frontend
+     - None in the default rules; the AIE ``cpp-style`` gap is item F.
+     - --
+     - `item07_bitwise_and.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item07_bitwise_and.py>`__
+   * - :ref:`9 <limitation-9>`
+     - NOT-A-LIMITATION
+     - --
+     - The stale ``.cache/llvm_sim/`` belonged to another project's Makefile;
+       Allo keeps no simulator cache.
+     - --
+     - `item09_sim_cache_helpers.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item09_sim_cache_helpers.py>`__
+   * - :ref:`11 <limitation-11>`
+     - FIXED by ``f193c057``
+     - simulator
+     - The OpenMP team defaulted to the core count instead of the section
+       count.
+     - **fork-only -- upstreaming candidate**; upstream draft PR #611
+     - `item11_omp_team_size.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item11_omp_team_size.py>`__
+   * - :ref:`12 <limitation-12>`
+     - FIXED by upstream PR #612 and fork ``3de74846``, merged in ``dc6b8fa6``
+     - emitter
+     - Bit slices were emitted as signed ``ap_int<N>``.
+     - upstream
+     - --
+   * - :ref:`13 <limitation-13>`
+     - retracted 2026-09-18 by its own entry (not in the 2026-09-19 pass); the
+       convenience gap (no ``allo.dma`` intrinsic) remains
+     - --
+     - A contiguous runtime-length copy already infers a variable-length AXI
+       burst.
+     - --
+     - --
+   * - :ref:`20 <limitation-20>`
+     - FIXED by ``aece11c9``
+     - emitter
+     - Generated identifiers and parameter names shared no namespace.
+     - **fork-only -- upstreaming candidate**
+     - `item20_emitter_name_collision.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py>`__
+
+Two sub-items sit inside rows of the open table: 10(b) and 17(b) are
+CANNOT-REPRODUCE.
+
+
+.. _limitations-corrections:
+
+Corrections from the 2026-09-19 re-verification and impact analysis
+-------------------------------------------------------------------
+
+These replace text that earlier revisions of this page (and of the notes it
+came from) stated. The per-item sections below have been corrected in place.
+
+* **Item 6's diagnosis was wrong.** Plain locals declared inside ``elif`` arms
+  always worked (repro variants (a) and (b) pass; (c), reading a name declared
+  in a *different* arm, is rejected by the frontend). The failure was item 1's
+  cause and was fixed with it by ``5c4d1b53``; item 6 is merged into item 1.
+* **Item 8 does not break silently.** Two callsites now fail loudly with a
+  symbol-redefinition error at build time.
+* **Item 7 cannot be reproduced**; bitwise ops have worked since ``12f898d7``
+  (2023). Only the AIE ``cpp-style`` rules lack them (item F).
+* **Item 9 is not an Allo limitation**: the cache belonged to another
+  project's Makefile.
+* **Item 14 has a false positive**: a local 2-D array passed to a nested
+  function is rejected too.
+* **Item 15 hangs silently** via ``df.build(target="vitis_hls", mode="csim")``
+  rather than printing ``an hls::stream is read while empty``.
+* **The one-owner-per-array rule is Allo's, not Vitis's**
+  (:ref:`limitation-shared-memory`). Earlier text, here and on the TinyTPU-isa
+  pages, attributed it to Vitis (``HLS 200-779`` / ``200-979``). A Vitis probe
+  shows ``#pragma HLS stream variable=buf type=unsync`` shares an on-chip array
+  between two processes, one per BRAM port (``HLS 200-824`` / ``200-755`` /
+  ``200-634``); ``200-779`` applies only to *synchronized* arrays. Vitis does
+  separately forbid one ``m_axi`` bundle read by two processes (``HLS 200-1013``
+  / ``200-984``). The earlier claim that removing ``vru``'s double handling
+  needs a second producer on a shared memory **was wrong**: measured impact on
+  the design is 0 cycles, because every restructure it needed was Allo-legal.
+* **Item 21 is priced** (it was "the 2.3% itself, forgone"): 35 cycles on the
+  shipped design at 16x16x16, 95 once the design fixes are in; the pragma form
+  costs 1,744 FF in ``accu`` against 17,438 for the reverted rotation; and it
+  can be injected today by patching ``kernel.cpp`` between
+  ``s.build(mode="csyn")`` and running Vitis. See
+  :doc:`/designs/gemmini_comparison` for the attribution.
+* **Item 22's root cause is located**: ``emitWireGet`` / ``emitWirePut`` at
+  fork ``EmitSystemC.cpp:1828-1848`` are bare ``sc_signal`` accesses with
+  nothing tying the reader's loop to the writer's. The fix is the
+  ``SC_METHOD`` comb mode scoped in ``c7402f9f``.
+* **AlloMemPins does not give two clients one memory**: memory instances are
+  keyed per (call, operand) at fork ``EmitSystemC.cpp:2539-2545``, so each
+  client gets a replica. The fix is ~50-100 lines binding one writer and one
+  reader to one instance's two pin sets. :doc:`/extensions/catapult_systemc`
+  is corrected accordingly.
 
 
 Surfaced while building the L2 TPU (FlashAttention)
@@ -83,6 +457,10 @@ relates to item 3).
 1. Region-scope ``@ Stateful`` lowering is incomplete on ``main``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by ``5c4d1b53`` (fork-only; upstreaming candidate). Item 6 is merged into this item.
+
 - Declaring ``int32[N] @ Stateful = 0`` at ``@df.region`` body scope (so the
   buffer is shared across every ``@df.kernel`` in the region) is the
   natural way to express a Gemmini-style decoder + driver split with
@@ -107,6 +485,10 @@ relates to item 3).
 2. ``@ Stateful`` cannot be declared inside ``@df.kernel`` bodies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by upstream PR #577.
+
 - Putting ``pc: int32[1] @ Stateful = 0`` inside a ``@df.kernel`` triggers
   ``AttributeError: 'ASTContext' object has no attribute 'global_op_cache'``.
 - Forces all PC / loop-counter / preload-latch state to be hoisted to
@@ -121,6 +503,10 @@ relates to item 3).
 
 3. Simulator drops nested-call stream lowering
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by ``5bc104c8`` (fork-only; upstreaming candidate).
 
 - ``_process_function_streams`` in ``allo/backend/simulator.py`` only
   scans ``func.body.blocks[0].operations`` for ``func.call`` ops. If a
@@ -149,6 +535,10 @@ relates to item 3).
 4. ``math.exp`` / ``math.log`` are not recognized by the AST builder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES. Note that the workaround below, ``allo.exp``, does not run on the dataflow simulator: see :ref:`limitation-a`.
+
 - Inside ``@df.kernel`` bodies, ``math.exp(x)`` raises ``KeyError: 'exp'``.
 - Must use ``allo.exp(x)`` (and friends) instead.
 - Not documented as a constraint; the failure mode (KeyError on a
@@ -159,6 +549,10 @@ relates to item 3).
 
 5. Variable shadowing between region params and kernel-local names
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES. Extended by :ref:`limitation-e` (same-type shadowing).
 
 - Declaring a local ``d_addr: int32 = cmd[3]`` inside ``@df.kernel def compute_driver`` raises ``AssertionError: Invalid assignment to d_addr, type mismatch`` because the enclosing ``@df.region def tpu(..., d_addr: int32[1], ...)`` parameter leaks into the kernel
   scope. The compiler treats the local ``int32`` write as an attempted
@@ -173,6 +567,10 @@ relates to item 3).
 
 6. Local ``int32`` decls inside ``elif`` branches don't dominate uses
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by ``5c4d1b53`` -- and the diagnosis below was wrong. Plain locals in ``elif`` arms always worked; the failure was item 1's cause. Merged into :ref:`limitation-1`.
 
 - Pattern that fails: declaring a fresh local inside an ``elif`` branch
   and then referencing it in another branch's calc.
@@ -189,6 +587,10 @@ relates to item 3).
 
 7. No bitwise ``&`` operator support in Allo expression DSL
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   CANNOT-REPRODUCE: bitwise ops work in the default typing rules since ``12f898d7`` (2023). Only the AIE ``cpp-style`` rules lack them: :ref:`limitation-f`.
 
 - For decoding instruction flag bits we wanted ``(iflags & 2) >> 1``.
 
@@ -211,10 +613,16 @@ relates to item 3).
 8. Single-MXU-call rule (Allo region instantiation)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES, but **loudly**: two callsites now fail at build time with a symbol-redefinition error (``redefinition of symbol named 'feed_0__0_fixed'``), not silently as stated below.
+
 - ``mxu(...)`` cannot appear in two different ``if``/``elif`` branches even
   if they are mutually exclusive at runtime. Allo instantiates
   sub-regions at build time regardless of conditions, so two branch
-  callsites become two independent instances and silently break.
+  callsites become two independent instances. *(Corrected 2026-09-19: the
+  build now fails loudly with a symbol-redefinition error; an earlier revision
+  said the design silently breaks.)*
 - Each level keeps ``mxu(...)`` in exactly one combined branch (``OP_MM | OP_MMT`` for L1; ``COMPUTE_PRELOADED | COMPUTE_ACCUMULATED`` for L2).
 - This forces unnatural code structure — the natural reading is "if
   preloaded, do mxu with these args; if accumulated, do mxu and add" —
@@ -225,6 +633,10 @@ relates to item 3).
 
 9. Sim cache invalidation misses imported helpers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   NOT-A-LIMITATION: the ``.cache/llvm_sim/`` cache belonged to another project's Makefile; Allo keeps no simulator cache.
 
 - ``.cache/llvm_sim/`` is keyed on the level's ``tpu.py`` and top-level
   ``tpu_config.py`` only. Editing an imported helper (e.g.
@@ -241,6 +653,10 @@ relates to item 3).
 
 10. Error messages point at lowered MLIR, not source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   (a) REPRODUCES; (b) CANNOT-REPRODUCE -- three regions build and run in one process.
 
 - Most failure modes surface as MLIR / LLVM errors at line numbers in a
   generated module that the user never sees. Examples:
@@ -275,6 +691,10 @@ by when they were found.
 
 11. The dataflow simulator deadlocks when processes outnumber OMP threads — **FIXED**
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by ``f193c057`` (fork-only; upstreaming candidate, upstream draft PR #611).
 
 The simulator appears to give each ``df.kernel`` instance an OMP thread and to
 block that thread on an empty/full stream. With fewer threads than processes, a
@@ -347,6 +767,10 @@ The threshold is exactly the process count. With 32 threads the design runs at
 12. Bit-slices lower to *signed* ``ap_int<N>``, silently, and the simulator disagrees
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by upstream PR #612 together with fork ``3de74846``, merged into ``main`` in ``dc6b8fa6``.
+
 .. note::
 
    Pending re-verification (added 2026-09-19): bit-slice emission has since
@@ -381,6 +805,10 @@ runs zero times.
 
 13. "No program-controlled DMA" (struck) -- **largely RETRACTED**; the gap is convenience, not capability
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   Retracted 2026-09-18 by the entry itself; not part of the 2026-09-19 pass.
 
 ``wrap_io=True`` copies each argument into a local buffer before the region runs,
 sized to the **declared** array rather than to what the program touches.
@@ -448,6 +876,10 @@ check that the thing being measured is the thing named.
 14. ``wrap_io=False`` rejects multi-dimensional arguments to nested kernels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES, with a false positive: a 2-D *local* array passed to a nested function is rejected too.
+
    Top-level multi-dimensional arrays are linearized to 1D pointers ... which
    cannot be passed to nested functions expecting multi-dimensional arrays
 
@@ -461,6 +893,10 @@ check that the thing being measured is the thing named.
 
 15. Vitis ``csim`` executes dataflow processes in declaration order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES. Through ``df.build(target="vitis_hls", mode="csim")`` the consumer-first order **hangs silently** instead of printing the error below.
 
 A consumer declared before its producer reads an empty stream:
 
@@ -478,6 +914,10 @@ A consumer declared before its producer reads an empty stream:
 
 16. ``cosim`` is not wired into ``df.build``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES.
 
 ``df.build(target="vitis_hls", mode=...)`` handles ``csim`` and ``csyn``; every other
 mode routes to the ``XDEVICE`` Makefile flow, and the emitted ``host.cpp`` is an
@@ -519,6 +959,10 @@ OpenCL/XRT host, which is not what ``cosim_design`` wants.
 17. Frontend constraints worth documenting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   (a) and (c) REPRODUCE; (b) CANNOT-REPRODUCE; (d) and (e) are capabilities and work.
+
 Each cost real time; none is a bug exactly, but none is discoverable:
 
 - **Stream-array subscripts must be compile-time.** A runtime index fails with
@@ -543,6 +987,10 @@ Each cost real time; none is a bug exactly, but none is discoverable:
 
 18. Catapult lowers ``try_get``/``try_put`` to *blocking* reads with ``success`` hard-coded true
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES. ``full()`` has the same problem: :ref:`limitation-d`.
 
 ``mlir/lib/Translation/EmitCatapultHLS.cpp`` emits ``ch.read(v)`` for
 ``StreamTryGetOp`` and ``ch.write(v)`` for ``StreamTryPutOp``, then emits
@@ -587,6 +1035,10 @@ designs used. It is false for the reason non-blocking ops exist:
 
 19. ``try_get``/``try_put`` on the TAPA target fail to emit, with a generic message
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES.
 
 ``EmitTapaHLS.cpp``'s visitor dispatches only ``StreamConstructOp`` /
 ``StreamGetOp`` / ``StreamPutOp``. The base hooks ``emitStreamTryGet``,
@@ -669,6 +1121,10 @@ The actual cause was #11, in the simulator, not in any of these.
 20. The emitter can generate a local whose name collides with a parameter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   FIXED by ``aece11c9`` (fork-only; upstreaming candidate).
+
 A kernel body that produces enough SSA temporaries can emit a local with the
 same name as one of the function's own parameters, giving C++ that does not
 compile:
@@ -700,6 +1156,10 @@ compile:
 21. No ``#pragma HLS dependence`` primitive, so a false dependence cannot be asserted away
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES, and now **priced** (below and :ref:`gemmini-gap-attribution`).
+
 Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
 where the scheduler cannot prove two accesses are independent but the author
 can. **Allo emits no dependence pragmas and has no primitive for one** -- the
@@ -719,9 +1179,16 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   was bit-exact at all five shapes, and was reverted at the 2026-09-18
   checkpoint: ``ar`` scales with the array dimension, so the flip-flop cost grows
   with T while the 2.3% does not. The shipped design is back to the nested form
-  at II=2. So the measured cost of this missing pragma is not "16k flip-flops"
-  -- it is **the 2.3% itself, forgone**, because no affordable hardware
-  expresses what one line would have asserted.
+  at II=2.
+- **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
+  ``#pragma HLS dependence variable=ar inter false`` into the emitted
+  ``kernel.cpp`` (``v_accudep`` on branch ``impact-limits``) measures **35
+  cycles** at 16x16x16 on the shipped design (919 -> 884; 5 at 4x4x4), and **95**
+  once the design fixes are in (``v_design_dep``). The pragma form costs
+  **1,744 FF** in ``accu`` against **17,438** for the reverted rotation. It can
+  be injected today by patching ``kernel.cpp`` between
+  ``s.build(mode="csyn")`` and running Vitis. Attribution:
+  :ref:`gemmini-gap-attribution`.
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II
@@ -732,6 +1199,10 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
 
 22. The SystemC fork's ``Wire`` is semantically incomplete -- and wrong in RTL, not just in simulation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES; root cause located (below).
 
    **Tested 2026-09-18: it is not the free-running rewrite; the conclusion
    below stands.** The hypothesis was that ``isSteadyStateLoop`` (which turns a
@@ -797,6 +1268,10 @@ one per step, so ``acc`` runs the entire loop before ``mul`` produces anything.
   numpy golden, with four injected faults all going red, including a one-cycle
   latency change. But it needs hand-built lockstep per design and is not
   checkable by the type system.
+- **Root cause in the emitter (located 2026-09-19):** ``emitWireGet`` /
+  ``emitWirePut`` at fork ``EmitSystemC.cpp:1828-1848`` are bare ``sc_signal``
+  accesses, and nothing ties the reader's loop to the writer's. The fix is the
+  ``SC_METHOD`` comb mode described next (``c7402f9f``).
 - Making wires sound needs the emitter to give cycle-locked kernels a shared
   advance -- one enable driving every stage's counter, which is what a VLIW
   delay line is. That is scoped, in five phases, as an ``SC_METHOD`` "comb"
@@ -832,6 +1307,10 @@ Two incidental findings
 
 23. ``m_axi`` port widening is not reachable from user code -- ``align_value`` is necessary and **not** sufficient (a NEGATIVE result)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (re-verified 2026-09-19)
+
+   REPRODUCES on the probes; the real design widens with the opt-in ``align_value`` (``b4be2b10``).
 
 The goal was one line of Tcl: ``config_interface -m_axi_max_widen_bitwidth 512``,
 so that a long ``int8`` burst moves 64 bytes a beat instead of one and the operand
@@ -921,3 +1400,152 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    bit width 512. See :doc:`/designs/gemmini_comparison` and
    :doc:`/backends/vitis`. The status of this item is left as last recorded
    pending re-verification.
+
+
+Surfaced by the 2026-09-19 re-verification and impact analysis
+---------------------------------------------------------------
+
+Found while re-verifying the items above (A-F, with repros under
+``tests/limits/``) and while pricing the TinyTPU-isa deficit to Gemmini (G and
+the shared-memory item; variants on branch ``impact-limits``,
+``examples/accelerator/tinytpu_vitis/impact/``, commits ``f98c0dac`` and
+``55405e00``).
+
+.. _limitation-shared-memory:
+
+Shared on-chip memory: the one-owner rule is Allo's, not Vitis's
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Earlier text (on this page's sources and on the TinyTPU-isa pages) said Allo
+enforces single reader / single writer *and Vitis rejects the violation
+outright* (``HLS 200-779`` / ``200-979``). The second half is wrong. A Vitis
+2023.2 probe (``impact/probe_shared/``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - mode
+     - construct
+     - Vitis 2023.2
+   * - 0
+     - 1 writer + 2 readers, no pragma
+     - ``HLS 200-779`` single reader / single writer
+   * - 1
+     - + ``#pragma HLS stable``
+     - ``HLS 200-779``
+   * - 3
+     - + ``#pragma HLS stream type=shared``
+     - ``HLS 200-1014``
+   * - 4
+     - + ``#pragma HLS stream type=unsync``
+     - ``HLS 200-780`` 3 processes, only 2 ports
+   * - 5
+     - 2 processes (one writes and reads, one reads) + ``type=unsync``
+     - **accepted**: ``HLS 200-824`` shared without synchronization; port 0 to
+       one process, port 1 to the other (``HLS 200-755``)
+   * - 6
+     - the same 2 processes, no pragma
+     - accepted as a synchronized PIPO (ping-pong handoff)
+   * - 2
+     - one ``m_axi`` bundle read by 2 processes
+     - ``HLS 200-1013`` / ``HLS 200-984``
+
+So ``#pragma HLS stream variable=buf type=unsync`` shares an on-chip array
+between two processes, one per BRAM port (``HLS 200-824`` / ``200-755`` /
+``200-634``), and ``200-779`` applies only to synchronized arrays. Vitis does
+separately forbid one ``m_axi`` bundle read by two processes (``200-1013`` /
+``200-984``).
+
+- **Allo's side:** Allo refuses a region-scope Stateful shared by two kernels
+  (``EmitVivadoHLS.cpp:3083-3122``) and never emits ``stream type=unsync``.
+- **SystemC fork's side:** ``AlloMemPins`` instances are keyed per (call,
+  operand) at fork ``EmitSystemC.cpp:2539-2545``, so each client gets a
+  replica rather than a port of one memory. Fix: ~50-100 lines binding one
+  writer and one reader to one instance's two pin sets.
+- **Measured impact on TinyTPU-isa: 0 cycles.** Every restructure the design
+  needed was Allo-legal. The earlier claim that removing ``vru``'s double
+  handling needs a second producer on a shared memory **was wrong**.
+
+.. _limitation-a:
+
+A. The dataflow simulator cannot run ``allo.exp`` / ``allo.log``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The simulator's own pipeline in ``LLVMOMPModule.__init__``
+(``simulator.py:1674-1686``) has no math-to-LLVM pass, so a kernel using
+``allo.exp`` fails with ``Failure while creating the ExecutionEngine``
+(``cannot be converted to LLVM IR: ... for op: math.exp``). The plain LLVM
+backend lowers the same op (``populateMathToLLVMConversionPatterns`` in
+``lower_allo_to_llvm``). This also breaks item 4's documented workaround on the
+simulator. Fix: 1 line, verified. Repro: ``tests/limits/new_sim_math_lowering.py``.
+
+.. _limitation-b:
+
+B. ``Stream.get()`` is never cast to the destination type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``x: int8 = s.get()`` or ``b[i] = s.get()`` with an ``int32`` stream and an
+``int8`` destination fails IR verification (``'affine.store' op value to store
+must have the same type as memref element type``), while the same narrowing
+from an ``int32`` *array* element works. Root cause ``builder.py:1054``.
+Workaround: land the value in a temporary of the stream's own type first.
+Fix: 3 lines, verified. Repro: ``tests/limits/new_stream_get_no_cast.py``.
+
+.. _limitation-c:
+
+C. ``customize()`` exits the interpreter on a frontend error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Any frontend error inside ``allo.customize`` (type inference or IR building)
+prints a traceback and calls ``sys.exit(1)`` (``customize.py:1382,1408``). A
+``SystemExit`` is not caught by ``except Exception``, so a sweep, a notebook or
+a test harness that expects to catch a build failure and move on is terminated
+instead. Repro: ``tests/limits/new_customize_sys_exit.py``.
+
+.. _limitation-d:
+
+D. Catapult ``full()`` always returns ``false``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``EmitCatapultHLS.cpp:402-414`` emits ``full()`` as a hard-coded ``false``
+(``ac_channel`` has no ``.full()``). Same class as item 18: a design that
+branches on it has the branch compiled away, silently. Reported by
+``tests/limits/item18_catapult_try_ops_blocking.py``.
+
+.. _limitation-e:
+
+E. Item 5 extended: same-type shadowing of a region parameter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A kernel local with the same name **and the same type** as an enclosing region
+parameter (e.g. ``buf: int32[4] = 0`` against a ``buf: int32[4]`` parameter)
+does not hit item 5's type-mismatch assertion; it gives an MLIR
+region-isolation error instead. Same root cause as item 5 (shared scope list).
+Repro: variant (b) of ``tests/limits/item05_region_param_shadowing.py``.
+
+.. _limitation-f:
+
+F. The AIE ``cpp-style`` typing rules reject every bitwise op
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What survives of item 7: the ``cpp-style`` typing rule set used by the AIE
+target (``typing_rule.py:855-860``) has no bitwise ops, so ``&``, ``|``, ``^``
+and shifts are rejected there while the default rule set accepts them. Shown by
+the informational line of ``tests/limits/item07_bitwise_and.py``.
+
+.. _limitation-g:
+
+G. ``= 0`` on an array is a runtime zero-fill loop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An array declared ``= 0`` lowers to a runtime zero-fill loop: ``builder.py:1063-1075``
+emits ``linalg.fill``, and ``hls.py:288`` (``convert-linalg-to-affine-loops``)
+turns it into a loop that runs every invocation. Restoring ``spad = 0`` on
+TinyTPU-isa (``v_memset``) measured **+409 / +361 cycles** at 4x4x4 /
+16x16x16 (661 / 1280 against 252 / 919; the same with all six arrays ``= 0``,
+``v_memset6``). This is the 514-cycle zero-fill the shipped design removed.
+
+The right semantics are one of: warn; initialise at reset through the existing
+Stateful ``memref.global`` path (correct only for the first invocation); or
+elide the fill when every element is provably written before it is read.
+

@@ -189,6 +189,27 @@ and single writer, and Vitis rejects the violation outright
 dispatch in one process. This rules out a one-process-per-opcode split; see
 :ref:`tinytpu-history-rowflat`.
 
+.. note::
+
+   **Correction, 2026-09-19: the one-owner rule is Allo's, not Vitis's.** The
+   paragraph above charges it to both; only the Allo half holds. A Vitis
+   2023.2 probe (``impact/probe_shared/`` on branch ``impact-limits``) shows
+   that ``#pragma HLS stream variable=buf type=unsync`` makes Vitis share an
+   on-chip array between two processes, one per BRAM port (``HLS 200-824``,
+   ``200-755``, ``200-634``); ``HLS 200-779`` applies only to *synchronized*
+   arrays. Allo is what refuses: it rejects a region-scope ``Stateful`` shared
+   by two kernels (``EmitVivadoHLS.cpp:3083-3122``) and never emits
+   ``stream type=unsync``. Vitis does separately forbid one ``m_axi`` bundle
+   read by two processes (``HLS 200-1013`` / ``200-984``).
+
+   **Measured impact on this design: 0 cycles** -- every restructure the gap
+   attribution needed was Allo-legal (:ref:`gemmini-gap-attribution`). An
+   earlier claim in this project, that removing ``vru``'s double handling of B
+   would need a second producer on a shared memory, **was wrong**: the
+   ``v_wdirect`` / ``v_wdb`` variants remove it with ``spm`` still the one owner
+   of ``spad`` and one writer of ``wcol[0]``. See
+   :ref:`limitation-shared-memory`.
+
 Data type
 ~~~~~~~~~
 
@@ -502,8 +523,19 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
        programs, ``schedule()``
    * - ``isa_dsl.py``
      - the loop-nest generator (``gemm_program``)
+   * - ``reproduce.sh``
+     - one command from a clean checkout to the published cycle counts (see
+       :ref:`tinytpu-isa-verify`)
    * - ``bench_isa.py``
-     - functional sweep on the Allo dataflow simulator, one build
+     - functional sweep on the Allo dataflow simulator, one build -- the
+       **performance** setup
+   * - ``stress_isa.py``
+     - the functional **correctness** gate (full-range operands, every shape,
+       prefilled ``C``, non-GEMM and random programs, the validator)
+   * - ``isa_ref.py``
+     - the ISA as numpy: the reference for any program, not just GEMM
+   * - ``mutate.py``
+     - mutation testing of the verification harness
    * - ``cosim.py``
      - one csynth, then Vitis ``cosim`` per shape on the same RTL
    * - ``kpn_model.py``
@@ -559,10 +591,57 @@ row-count stream), then builds the simulator **once** and runs ``gemm`` and
      - pass ``-random_stall`` to ``cosim_design``
    * - ``TPU_WRAP=1``
      - build with ``wrap_io=True`` (the hoisted-argument variant)
+   * - ``TPU_TB=stress``
+     - the **correctness** testbench on the same RTL (below); unset is the
+       default performance testbench, the only mode the published cycle counts
+       come from
 
 The toolchain fixes ``cosim.py`` applies (a plain C++ testbench, ``-B/usr/bin``,
 explicit ``m_axi`` depths, ``alignas(64)`` arrays) are general to any Allo
 dataflow design and are documented in :doc:`/backends/vitis`.
+
+.. _tinytpu-isa-verify:
+
+Verifying a change
+~~~~~~~~~~~~~~~~~~
+
+Added on ``main`` on 2026-09-19. From a clean checkout, one command builds the
+checkout's own bindings, runs the functional gates, runs cosim, and checks the
+published cycle counts (252 / 383 / 591 / 667 / 919), exiting nonzero if any
+step fails or any number differs:
+
+.. code-block:: bash
+
+   examples/accelerator/tinytpu_vitis/reproduce.sh              # everything, with cosim
+   examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim   # functional only, ~1 min
+
+**Performance vs. correctness.** ``bench_isa.py`` and ``cosim.py`` with its
+default testbench are the **performance** setup: seed 0, operands in [-4, 4]
+(Gemmini's ``allo_cmp.c`` distribution, kept so the comparison is like for
+like), ``C`` zeroed, and only the ``M x N`` region compared. They miss real
+bugs -- at T=4 a PE's partial sum never leaves 9 bits, so narrowing the int32
+partial sum to int16 still prints ``ALL EXACT``. The **correctness** gates are:
+
+* ``stress_isa.py`` (~10 s, on the Allo simulator; ``quick`` for the scored
+  shapes plus corner/boundary cases only). Run it after **any** change to
+  ``microarch_isa.py``. It prints ``STRESS OK: n/n`` or lists each failing run.
+* ``TPU_TB=stress python cosim.py``, the same cases on the RTL: several calls
+  on one RTL instance, ``C`` prefilled with random bytes, and the whole of
+  ``C`` compared. Its cycle column is the minimum over those calls, not the
+  headline.
+
+Run ``mutate.py`` after any change to the **harness**: it applies one
+deliberate single-point bug at a time to a copy of ``microarch_isa.py`` and
+reports which verification level catches it (``none`` is the unmodified
+control, which must pass everything).
+
+**The arrays are not cleared by hardware.** ``spad``, ``vr`` and ``ar`` carry no
+``= 0`` initialiser (it cost a runtime zero-fill loop; see
+:ref:`limitation-g`), so ``assemble()`` enforces a write-before-read contract:
+``check_program()`` walks the exact dynamic trace and rejects any program that
+reads an ``ar`` or ``vr`` row no earlier instruction wrote (``4357ed59``). It also
+rejects ``nr=0`` data ops, out-of-range rows, unbalanced or over-deep loops,
+trip 0, AGU terms naming a closed loop, and the retired ``dma_st`` opcode.
 
 
 Results
@@ -612,7 +691,9 @@ to them is on :doc:`gemmini_comparison`. **They are not faster than Gemmini** --
 an earlier claim that they were is withdrawn there.
 
 How the design got from 1017 cycles at 4x4x4 to 252 is on
-:doc:`tinytpu_history`.
+:doc:`tinytpu_history`. Where the remaining deficit to Gemmini comes from --
+forced by Allo, forced by Vitis, or our design -- is priced on
+:ref:`gemmini-gap-attribution` (measured on variants, not on this build).
 
 .. _tinytpu-isa-csynth-bound:
 

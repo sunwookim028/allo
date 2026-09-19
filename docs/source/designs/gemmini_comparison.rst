@@ -122,6 +122,251 @@ priced as :ref:`limitation-21`. The step to the current numbers is the memset
 and widening pass. All of these are on :doc:`tinytpu_history`.
 
 
+.. _gemmini-gap-attribution:
+
+Where the deficit comes from: forced by Allo/Vitis vs. our design
+-----------------------------------------------------------------
+
+.. important::
+
+   **Provenance.** Everything in this section was measured on **variants** of
+   TinyTPU-isa that live on branch ``impact-limits`` (commits ``f98c0dac`` and
+   ``55405e00``, directory ``examples/accelerator/tinytpu_vitis/impact/``),
+   cosimulated at **two shapes only** (4x4x4 and 16x16x16). They are **not the
+   shipped design.** The shipped design's numbers remain
+   **252 / 383 / 591 / 667 / 919** (the like-for-like table above). The 686 and
+   172 below are what the variants reach with every change applied; they are
+   not our result.
+
+Of the **326-cycle deficit at 16x16x16** (919 against Gemmini's 593), **Allo
+forces 35-95 cycles, all of it** :ref:`limitation-21` (no dependence pragma, so
+``accu`` stays at II=2); **Vitis forces nothing measurable**; the rest, about
+80%, is **our design**. With all the changes applied, the measured stack goes
+**919 -> 686** at 16x16x16 and **252 -> 172** at 4x4x4, against Gemmini's 593
+and 144-161.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 17 17 26 10
+
+   * - cause
+     - 16x16x16
+     - 4x4x4
+     - provenance
+     - forced by
+   * - program prefetch, one 64-bit word per iteration
+     - 52
+     - 52
+     - measured (``v_imem8``)
+     - design
+   * - B through the vector registers, plus the serial per-``mm`` weight
+       prologue
+     - 22 alone, 82 once ``accu`` is II=1
+     - ~10
+     - measured
+     - design
+   * - A through ``spad`` -> ``vld`` -> ``vr``
+     - 64
+     - ~13
+     - measured
+     - design
+   * - ``accu`` at II=2 (:ref:`limitation-21`)
+     - 35 alone, 95 after the design fixes
+     - 5
+     - measured
+     - Allo
+   * - region start
+     - ~0
+     -
+     -
+     -
+   * - residual
+     - 93
+     - 11-28
+     - timeline **estimate**: operand staging ~84, serial DMA before the first
+       weight, drain ~142 -- none of it built
+     - design
+
+The rows interact: the bottleneck moves from ``vru`` to the PE prologue to
+``accu``. Taking the design rows first gives 919 to 833 (86) and then 95
+forced; taking forced first gives 35 and then 146 design. The Allo row is
+therefore quoted as a range, 35-95 (65 averaged over both orders).
+
+Variants
+~~~~~~~~
+
+Every variant is the shipped ``microarch_isa.py`` plus asserted textual patches
+(``make_variants.py``), so its diff is exactly the change being priced. A
+variant counts only if the Allo simulator is ``ALL EXACT`` (``bench_variant.py``:
+gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
+mismatches. Measured by cosim (xsim, ``-m_axi_latency 0``), all bit-exact:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 44 9 9 9 9
+
+   * - variant
+     - what changes
+     - 4x4x4
+     - 16x16x16
+     - accu FF
+     - top FF
+   * - base
+     - shipped
+     - 252
+     - 919
+     - 1,250
+     - 14,888
+   * - ``v_accu1``
+     - accu II=1, write-behind rotation (``ca978b97``)
+     - 248
+     - 885
+     - 17,438
+     - 31,076
+   * - ``v_accudep``
+     - accu flat in BRAM + injected ``#pragma HLS dependence variable=ar inter
+       false``
+     - 247
+     - 884
+     - 1,744
+     - 15,382
+   * - ``v_wdirect``
+     - ``mm`` reads its weights from ``spad`` via ``spm``, and the weight ``vld``
+       is dropped
+     - 247
+     - 914
+     -
+     -
+   * - ``v_wdb``
+     - ``v_wdirect`` + per-PE weight loader and depth-4 FIFO (double buffer),
+       flat PE
+     - 242
+     - 897
+     - 1,250
+     - 16,453
+   * - ``v_wdb_accu1``
+     - ``v_wdb`` + rotation
+     - 238
+     - 803
+     -
+     -
+   * - ``v_wdb_accudep``
+     - ``v_wdb`` + pragma
+     - 237
+     - 802
+     -
+     -
+   * - ``v_design``
+     - ``v_wdb`` + A DMA'd straight into ``vr``, so the A ``vld`` is dropped
+     - 229
+     - 833
+     -
+     -
+   * - **v_design_dep**
+     - ``v_design`` + pragma
+     - **224**
+     - **738**
+     - 1,744
+     - 17,780
+   * - ``v_imem8``
+     - program prefetch 8 words/iteration into cyclic-partitioned ``ib``
+     - 200
+     - 867
+     -
+     -
+   * - **v_design_dep_imem8**
+     - ``v_design_dep`` + imem8
+     - **172**
+     - **686**
+     -
+     -
+   * - ``v_order``
+     - program-only reorder: A ``vld`` before the B ``dma_ld``\ s
+     - 252
+     - 919
+     -
+     -
+   * - ``v_dmadirect``
+     - ``dma_ld`` without staging (strided rows, 32-bit beats)
+     - 258
+     - 926
+     -
+     -
+   * - ``v_best``
+     - wdb + rotation + order + dmadirect
+     - 249
+     - 800
+     -
+     -
+   * - ``v_memset``
+     - ``spad`` declared ``= 0`` again
+     - 661
+     - 1280
+     -
+     -
+   * - ``v_memset6``
+     - all six arrays ``= 0`` again
+     - 661
+     - 1280
+     -
+     -
+
+Gemmini (accelerator + dispatch, same window): 161/144 at 4x4x4, 593 at
+16x16x16.
+
+The pragma form of the ``accu`` fix (``v_accudep``) reaches the same cycles as
+the reverted rotation at **1,744 FF in** ``accu`` **against 17,438**. It is
+injected by patching the emitted ``kernel.cpp`` between
+``s.build(mode="csyn")`` and running Vitis (``cosim_variant.py``'s
+``patch_kernel`` hook) -- an escape hatch that exists today, outside Allo.
+
+``v_memset`` restores the ``= 0`` initialiser on ``spad`` and costs **+409**
+cycles at 4x4x4 and **+361** at 16x16x16: Allo lowers an array initialiser to a
+runtime zero-fill loop (:ref:`limitation-g`).
+
+**A design trap found on the way.** A flat loop whose row count depends on the
+decoded opcode closes at ``Final II = 2`` on the row counter (a carried
+dependence). Precomputing the count upstream, in the sequencer, and carrying it
+in the instruction word fixed it in both ``spm`` (``v_wdirect``) and ``accu``.
+
+The shipped design's per-process timeline at 16x16x16
+(``results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
+(``s_axilite`` programming, inside the cosim window), 47-120 program prefetch,
+120-204 operand bursts, 204-334 128 DMA rows through ``spm``, 334-799 ``vru``
+running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
+(array, ``accu``, ``dma_st``).
+
+The same work settled that the one-owner-per-array rule the design works under
+is Allo's, not Vitis's, and that it cost this design **0 cycles**: every
+restructure above was Allo-legal. See :ref:`limitation-shared-memory` and the
+note on :doc:`tinytpu_isa` ("One owner per memory").
+
+Reproducing the attribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From ``examples/accelerator/tinytpu_vitis/impact/`` **on branch**
+``impact-limits`` (the scripts are not on ``main``):
+
+.. code-block:: bash
+
+   source env.sh                    # conda allo, LLVM_BUILD_DIR, OMP, TMPDIR
+   python make_variants.py          # writes v_*.py
+   python pyrun.py bench_variant.py v_design_dep                     # simulator
+   TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py v_design_dep runs/v_design_dep
+   ./profile.sh runs/v_design_dep   # per-process timeline of the last shape
+
+``pyrun.py`` strips the conda env's editable finder, so ``allo`` resolves to that
+worktree. ``cosim_variant.py`` reuses ``../cosim.py`` unchanged (``align_value``
+64, widen 512, ``-B/usr/bin``, ``m_axi`` depths) and adds only a
+``patch_kernel(prj)`` hook for variants that edit the emitted C++.
+``profile.sh`` re-runs cosim with ``-enable_dataflow_profiling``, then re-runs
+the xsim snapshot so the monitor's CSVs survive (cosim deletes them).
+``analyze_df.py`` and ``rle_df.py`` turn them into per-process
+run/starve/block counts and run-length traces. Raw outputs, timelines and the
+Vitis shared-array probe summaries are committed under ``results/`` and
+``probe_shared/`` (``55405e00``).
+
+
 Making the baseline matched
 ---------------------------
 

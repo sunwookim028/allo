@@ -506,6 +506,18 @@ nothing to split there either -- the splitting half of the plan had no legal
 instance anywhere in the design. Flattening turned out to get what the split was
 wanted for without moving a memory, which is why it is the change that shipped.
 
+.. note::
+
+   **Correction, 2026-09-19.** The paragraph above is kept as the record of
+   what was believed. The rule is Allo's, not Vitis's: with
+   ``#pragma HLS stream variable=buf type=unsync`` Vitis shares an on-chip
+   array between two processes, one per BRAM port (``HLS 200-824`` /
+   ``200-755`` / ``200-634``), and ``HLS 200-779`` applies only to synchronized
+   arrays. Allo rejects a region-scope ``Stateful`` shared by two kernels and
+   never emits ``stream type=unsync``. The measured cost to this design is 0
+   cycles. See :ref:`limitation-shared-memory` and
+   :ref:`gemmini-gap-attribution`.
+
 ``accu`` **resisted the flattening.** It was built twice and was bit-exact both
 times, and both times it was slower than the nested loop it replaced:
 

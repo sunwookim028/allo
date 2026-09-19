@@ -58,8 +58,21 @@ only in its history, at ``0eff4888:agents/noc/rtl/<design>/rtl.v`` (``REPRO.sh``
 files as ``779e4350^:agents/noc/rtl/{pe_wire,pe_stream,pe_channel}/rtl.v``). Branch layout for all
 remotes is in :doc:`/developer/fork_maintenance`.
 
-``AlloMemPins``: the hardware for a shared memory exists
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``AlloMemPins``: a dual-port RAM, instantiated once per client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. important::
+
+   **Corrected 2026-09-19.** This section previously said the hardware for a
+   shared memory exists and only Allo's refusal to hand out both ports stood in
+   the way. The module is a real 1R1W dual-port RAM, but the emitter does not
+   share it: memory instances are keyed per (call, operand) at fork
+   ``EmitSystemC.cpp:2539-2545``, so **each client gets a replica**, not a port
+   of one memory. The fix is ~50-100 lines binding one writer and one reader to
+   one instance's two pin sets. Separately, the one-owner rule on the Vitis path
+   is Allo's, not Vitis's: Vitis shares an on-chip array between two processes
+   under ``#pragma HLS stream type=unsync`` (:ref:`limitation-shared-memory`).
+
 ``AlloMemPins`` **is** an unarbitrated 1R1W dual-port RAM, and it synthesizes. It is **not** in
 this checkout's working tree; it lives in ``mlir/lib/Translation/EmitSystemC.cpp`` on
 ``choonsik1/SystemC-emitter``. Read there (verified 2026-09-18), the module has separate read and
@@ -141,8 +154,11 @@ reason to change backend. Six flagged items (2026-09-18):
    * - Item
      - Class
    * - shared multi-ported memory (two ports of one array to two kernels)
-     - **(A)**, and the decision-relevant one -- see ``AlloMemPins`` above: the hardware
-       synthesizes, Allo will not hand out both ports, so no backend switch resolves it
+     - **(A)**, and the decision-relevant one: Allo will not hand out both ports, so no backend
+       switch resolves it. *(Corrected 2026-09-19: Vitis itself accepts two processes on one array
+       under* ``stream type=unsync``; *on the SystemC fork each client gets an* ``AlloMemPins``
+       *replica. See* :ref:`limitation-shared-memory`. *Measured impact on TinyTPU-isa: 0
+       cycles.)*
    * - :ref:`limitation-21`: no ``#pragma HLS dependence``, so a false dependence cannot be
        asserted away
      - **(A)** -- Vitis has the pragma; Allo emits only ``m_axi``/``s_axilite``/``bind_storage``/
@@ -185,6 +201,13 @@ The Wire Investigation: Simulating Catapult's Netlists
 ``examples/systemc_rtlsim/`` is the apparatus behind :ref:`limitation-22`. It took
 reverse-engineering the netlists' internal signal names (e.g. ``tb.u_mul.mul_0_run_inst.v8_and_cse``)
 to build, so it is kept rather than rebuilt.
+
+.. note::
+
+   **Root cause located, 2026-09-19:** ``emitWireGet`` / ``emitWirePut`` at fork
+   ``EmitSystemC.cpp:1828-1848`` are bare ``sc_signal`` accesses, with nothing
+   tying the reader's loop to the writer's. The fix is the ``SC_METHOD`` comb
+   emission mode scoped in ``c7402f9f``. See :ref:`limitation-22`.
 
 An earlier investigation reported ``pe_wire`` as "synthesises clean and fails csim" and concluded
 the SystemC thread model could not represent a wire -- that the design was good and the simulator
