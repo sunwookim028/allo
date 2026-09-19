@@ -29,9 +29,10 @@ from pathlib import Path
 import ray
 
 from chia.base.ChiaFunction import get
-from chia.models.opencode import AdditionalModelProvider, OpenCodeLLM, RateLimitError
+from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
 from allo_tool import AlloSpecTool, EDITABLE
+from llm import IsaOpenCodeLLM
 from spend import spent_since
 
 AGENT_DIR = Path(__file__).resolve().parent
@@ -74,16 +75,21 @@ SYSTEM_MESSAGE = (
 )
 
 
-def make_llm(tool: AlloSpecTool) -> OpenCodeLLM:
+def make_llm(tool: AlloSpecTool) -> IsaOpenCodeLLM:
     if not PROJECT:
         raise RuntimeError("Set GOOGLE_CLOUD_PROJECT before running the Vertex AI agent.")
     provider, _, model_id = MODEL.partition("/")
     if provider != "google-vertex" or not model_id:
         raise ValueError("TINYTPU_OPENCODE_MODEL must be google-vertex/<model-id>.")
-    return OpenCodeLLM(
+    return IsaOpenCodeLLM(
         model=MODEL,
         system_message=SYSTEM_MESSAGE,
         timeout_seconds=2400,
+        # CHIA's default of 3 silently re-runs a whole prompt after a timeout;
+        # in the smoke run that retry began on a blocked tool server and paid
+        # for a session that could see no tools. One attempt, and the loop
+        # decides what happens next.
+        retries=1,
         additional_providers=[
             AdditionalModelProvider(
                 id="google-vertex",
@@ -131,7 +137,7 @@ class Budget:
 
 def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
     for attempt in range(RATE_LIMIT_RETRIES + 1):
-        budget.check(what)
+        before = budget.check(what)
         started = time.time()
         try:
             response = get(
@@ -145,9 +151,17 @@ def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
             time.sleep(delay)
             continue
         usage = dict(getattr(response, "usage", None) or {})
-        budget.observe(usage.get("cost_usd", 0.0))
+        # Project from the GLOBAL spend over this call, not from `usage`: a call
+        # that timed out reports no usage at all but was billed. The delta also
+        # includes other workers' spend in the window -- conservative, which
+        # is the right direction for a cap.
+        delta = budget.spent() - before
+        budget.observe(max(usage.get("cost_usd", 0.0), delta))
         calls.append({"what": what, "seconds": round(time.time() - started, 1),
-                      "session_id": getattr(response, "session_id", None), **usage})
+                      "session_id": getattr(response, "session_id", None),
+                      "global_usd_during_call": round(delta, 4),
+                      "completed": bool(getattr(response, "success", True)),
+                      **usage})
         print(f"  [{what}] ${usage.get('cost_usd', 0):.2f}, "
               f"{usage.get('num_turns', '?')} turns, {time.time() - started:.0f}s; "
               f"run total ${budget.spent():.2f}", flush=True)
@@ -250,7 +264,8 @@ Already attempted in this search:
 
 Propose ONE candidate that should lower the RTL cosim cycle count. Read the
 spec first ({tool.name}_read_spec; {tool.name}_read_reference for the frozen
-files and the design notes). Apply the change as a unified diff, then run
+files and the design notes). Edit with {tool.name}_replace_text (exact text,
+must occur once) -- it is far more reliable than a unified diff. Then run
 {tool.name}_run_functional_check until it passes. You may run
 {tool.name}_score_cycles (2-4 minutes) to see the cosim result; the harness
 re-scores your final spec independently either way. Keep the change as small as

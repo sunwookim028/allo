@@ -51,6 +51,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -79,6 +80,11 @@ EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 ALL_SHAPES = ["4x4x4", "8x8x8", "12x12x12", "16x16x8", "16x16x16"]
 SEARCH_SHAPES = ["4x4x4", "16x16x16"]
 TARGET_NS = 3.33
+#: The unmodified design gates in ~5 s per script and cosims in ~125 s. A
+#: candidate whose dataflow deadlocks blocks forever in the simulator, so the
+#: gate fails it in minutes rather than the quarter-hour the smoke run lost.
+GATE_TIMEOUT = 240
+COSIM_TIMEOUT = 1800
 #: xsim's transaction window runs a few cycles past HLS's latency count.
 SIMTIME_SLACK = 12
 
@@ -153,13 +159,17 @@ def env_for(tree: Path):
 
 def run(cmd, cwd, env, timeout):
     t = time.time()
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, start_new_session=True)
     try:
-        p = subprocess.run(cmd, cwd=cwd, env=env, text=True,
-                           capture_output=True, timeout=timeout)
-        out, rc = p.stdout + p.stderr, p.returncode
-    except subprocess.TimeoutExpired as e:
-        out = (e.stdout or "") if isinstance(e.stdout, str) else ""
-        out, rc = out + f"\nTIMEOUT after {timeout}s", 124
+        out, _ = p.communicate(timeout=timeout)
+        rc = p.returncode
+    except subprocess.TimeoutExpired:
+        # The whole group: a deadlocked simulator (or vitis_hls under cosim)
+        # must not outlive the verdict.
+        os.killpg(p.pid, signal.SIGKILL)
+        out, _ = p.communicate()
+        out, rc = (out or "") + f"\nTIMEOUT after {timeout}s (deadlock?)", 124
     return rc, out, time.time() - t
 
 
@@ -180,12 +190,12 @@ def check_invariants(tree, env):
 
 def gate(tree, env):
     bench = str(tree / PKG / "bench_isa.py")
-    rc, out, sec = run([ALLO_PYTHON, bench], tree, env, 900)
+    rc, out, sec = run([ALLO_PYTHON, bench], tree, env, GATE_TIMEOUT)
     lines = out.strip().splitlines()
     if rc or not lines or lines[-1].strip() != "ALL EXACT" or "FAILURES" in out:
         raise Reject("gate:bench_isa", out[-4000:])
     stress = str(tree / PKG / "chia_agent" / "stress.py")
-    rc2, out2, sec2 = run([ALLO_PYTHON, stress], tree, env, 900)
+    rc2, out2, sec2 = run([ALLO_PYTHON, stress], tree, env, GATE_TIMEOUT)
     if rc2 or "STRESS OK" not in out2:
         raise Reject("gate:stress", out2[-4000:])
     return {"bench_isa": "ALL EXACT", "stress": lines_with(out2, "STRESS OK")[0],
@@ -233,7 +243,7 @@ def check_memory_model(prj: Path):
 def score(tree, env, work: Path, shapes):
     cosim = str(tree / PKG / "cosim.py")
     env = dict(env, TPU_SHAPES=",".join(shapes))
-    rc, out, sec = run([ALLO_PYTHON, cosim], work, env, 3600)
+    rc, out, sec = run([ALLO_PYTHON, cosim], work, env, COSIM_TIMEOUT)
     prj = work / "isa_sweep.prj"
     if rc:
         raise Reject("cosim", out[-4000:])

@@ -9,6 +9,7 @@ and outside its reach; see `evaluate.py` for the list and how it is enforced.
 from __future__ import annotations
 
 import ast
+import asyncio
 import difflib
 import json
 import os
@@ -57,6 +58,7 @@ class AlloSpecTool(ChiaTool):
         assert all(path.is_file() for path in self.sources.values()), self.sources
         self.mcp.add_tool(self.read_spec, name=f"{self.name}_read_spec")
         self.mcp.add_tool(self.read_reference, name=f"{self.name}_read_reference")
+        self.mcp.add_tool(self.replace_text, name=f"{self.name}_replace_text")
         self.mcp.add_tool(self.apply_spec_patch, name=f"{self.name}_apply_spec_patch")
         self.mcp.add_tool(self.insert_after, name=f"{self.name}_insert_after")
         self.mcp.add_tool(
@@ -160,6 +162,29 @@ class AlloSpecTool(ChiaTool):
         return (f"{name}: lines {start}-{start + len(chunk) - 1} of {len(lines)}\n"
                 + "\n".join(chunk))
 
+    def replace_text(self, path: str, old: str, new: str) -> str:
+        """Replace one exact occurrence of ``old`` with ``new`` in ``path``.
+
+        The preferred edit. ``path`` is microarch_isa.py or isa_dsl.py; ``old``
+        must occur exactly once (include enough surrounding lines to make it
+        unique, with exact indentation). The result must parse and pass the
+        spec policy, or nothing is written.
+        """
+        target = self.sources.get(path)
+        if target is None:
+            return "Rejected: path must be microarch_isa.py or isa_dsl.py."
+        source = target.read_text(encoding="utf-8")
+        n = source.count(old) if old else 0
+        if n != 1:
+            return (f"Rejected: `old` occurs {n} times in {path}; it must occur "
+                    f"exactly once. The file is unchanged.")
+        updated = source.replace(old, new, 1)
+        broken = self._check(path, updated)
+        if broken:
+            return broken
+        target.write_text(updated, encoding="utf-8")
+        return f"Replaced 1 occurrence in {path}."
+
     def apply_spec_patch(self, patch: str) -> str:
         """Apply a unified diff touching only microarch_isa.py and/or isa_dsl.py.
 
@@ -223,15 +248,22 @@ class AlloSpecTool(ChiaTool):
         target.write_text(updated, encoding="utf-8")
         return f"Content inserted into {path}."
 
-    def run_functional_check(self) -> str:
+    # The two evaluator tools are async and push the work to a thread: a sync
+    # tool runs on the MCP server's event loop, and in the smoke run one hung
+    # evaluation blocked every other request -- including tool listing for
+    # the next session, which then reported that no tools existed.
+    async def run_functional_check(self) -> str:
         """The gate, in ~10 s: bench_isa.py must print ALL EXACT and stress.py
         (full-range operands, sentinel-filled C, extra shapes) must pass.
-        Functional (Allo simulator), not RTL. Run this before score_cycles."""
-        return json.dumps(self.evaluate(gate_only=True), indent=1)
+        Functional (Allo simulator), not RTL. A deadlocked dataflow fails after
+        4 minutes. Run this before score_cycles."""
+        verdict = await asyncio.to_thread(self.evaluate, True)
+        return json.dumps(verdict, indent=1)
 
-    def score_cycles(self) -> str:
+    async def score_cycles(self) -> str:
         """The objective, in ~2-4 min: gate, then Vitis HLS csynth + RTL C/RTL
         cosim at 4x4x4 and 16x16x16, each testbench bit-exact against numpy.
         Score = sum of cosim cycles (lower is better). Also reports the csynth
         clock estimate (must meet 3.33 ns) and area (recorded, not scored)."""
-        return json.dumps(self.evaluate(), indent=1)
+        verdict = await asyncio.to_thread(self.evaluate)
+        return json.dumps(verdict, indent=1)
