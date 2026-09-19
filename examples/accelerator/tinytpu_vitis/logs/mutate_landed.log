@@ -1,0 +1,86 @@
+# python mutate.py at e24e433b (functional levels for all; TPU_TB=stress cosim at 4x4x4 for the RTL-only mutant)
+
+  mutant                  bench_isa      stress_isa     cosim          caught first by
+  none                    pass           pass           -              control passes
+  pe_psum_int16           pass           CAUGHT         -              stress_isa
+  pe_weight_lane_swapped  CAUGHT         CAUGHT         -              bench_isa
+  pe_act_lane_swapped     CAUGHT         CAUGHT         -              bench_isa
+  pe_shadow_not_swapped   CAUGHT         CAUGHT         -              bench_isa
+  wld_rows_from_weight    CAUGHT (hang)  CAUGHT (hang)  -              bench_isa
+  spm_weight_off_by_one   CAUGHT         CAUGHT         -              bench_isa
+  spm_vld_off_by_one      pass           CAUGHT         -              stress_isa
+  vru_act_off_by_one      CAUGHT         CAUGHT         -              bench_isa
+  vru_dma_ignores_f3      CAUGHT         CAUGHT         -              bench_isa
+  dma_ld_src_swapped      CAUGHT         CAUGHT         -              bench_isa
+  dma_ld_row_ignored      pass           CAUGHT         -              stress_isa
+  mvout_row_ignored       pass           CAUGHT         -              stress_isa
+  dma_st_accumulates_C    pass           CAUGHT         -              stress_isa
+  prefetch_lane7_dup      CAUGHT (hang)  CAUGHT (hang)  -              bench_isa
+  agu_stride_halved       CAUGHT         CAUGHT         -              bench_isa
+  agu_f3_dropped          CAUGHT         CAUGHT         -              bench_isa
+  loop_extra_trip         CAUGHT (hang)  CAUGHT (hang)  -              bench_isa
+  vrelu_rows_short        CAUGHT (hang)  CAUGHT (hang)  -              bench_isa
+  mm_acc_dropped          CAUGHT         CAUGHT         -              bench_isa
+  mm_always_acc           CAUGHT         CAUGHT         -              bench_isa
+  mm_dst_base_ignored     CAUGHT         CAUGHT         -              bench_isa
+  vrelu_dst_is_src        pass           CAUGHT         -              stress_isa
+  vadd_dst_is_src1        pass           CAUGHT         -              stress_isa
+  relu_off_by_one         CAUGHT         CAUGHT         -              bench_isa
+  vadd_subtracts          CAUGHT         CAUGHT         -              bench_isa
+  vadd_src2_is_src1       pass           CAUGHT         -              stress_isa
+  vadd_holds_stale_x      CAUGHT         CAUGHT         -              bench_isa
+  vrelu_src_base_ignored  pass           CAUGHT         -              stress_isa
+  mvout_src_base_ignored  pass           CAUGHT         -              stress_isa
+  clip_hi_off_by_one      pass           CAUGHT         -              stress_isa
+  clip_lo_off_by_one      pass           CAUGHT         -              stress_isa
+  assembler_span_short    CAUGHT         CAUGHT         -              bench_isa
+  ar_contract_unenforced  pass           CAUGHT         -              stress_isa
+  ar_claim_false          pass           pass           CAUGHT         cosim
+
+  none                    control: the design unmodified
+  pe_psum_int16           PE partial sum narrowed int32 -> int16
+  pe_weight_lane_swapped  wld(i,j) hands its PE lane i of the weight word, not j
+  pe_act_lane_swapped     column-0 PE taps activation lane j, not i
+  pe_shadow_not_swapped   weight double buffer: the PE keeps its first nonzero weight instead of taking the next mm's from wq
+  wld_rows_from_weight    wld sends the weight lane as the PE's row count
+  spm_weight_off_by_one   spm streams weight rows f3+1.. instead of f3..
+  spm_vld_off_by_one      vld reads spad one row late
+  vru_act_off_by_one      vru streams activation rows one row late
+  vru_dma_ignores_f3      a dma_ld into the vregs lands at f0 + r, not f3 + r
+  dma_ld_src_swapped      dma_ld reads B for src A and A for src B
+  dma_ld_row_ignored      dma_ld (A path) ignores its DRAM row f1
+  mvout_row_ignored       dma_st ignores the DRAM row f1
+  dma_st_accumulates_C    dma_st adds into C (relies on C arriving zeroed)
+  prefetch_lane7_dup      the 8-wide program prefetch copies word 6 into word 7 of every group
+  agu_stride_halved       AGU stride field read one bit high (stride/2)
+  agu_f3_dropped          AGU terms targeting f3 are ignored
+  loop_extra_trip         loop back-edge test <= (one extra iteration)
+  vrelu_rows_short        the sequencer's vrelu carries one row fewer
+  mm_acc_dropped          mm ignores the accumulate flag
+  mm_always_acc           mm always accumulates (relies on ar arriving zeroed)
+  mm_dst_base_ignored     mm writes ar[r], ignoring its f1 base
+  vrelu_dst_is_src        vrelu writes its source row, not f0
+  vadd_dst_is_src1        vadd writes its first source, not f0
+  relu_off_by_one         ReLU threshold off by one (-1 survives)
+  vadd_subtracts          vadd computes x - y
+  vadd_src2_is_src1       vadd reads its first source twice (x + x)
+  vadd_holds_stale_x      vadd's first operand register is never loaded
+  vrelu_src_base_ignored  vrelu reads ar[r], ignoring its f1 base
+  mvout_src_base_ignored  mvout reads ar[r], ignoring its f0 base
+  clip_hi_off_by_one      mvout clip upper bound 128, not 127
+  clip_lo_off_by_one      mvout clip lower bound -129, not -128
+  assembler_span_short    assemble() bursts one DRAM row too few
+  ar_contract_unenforced  check_program stops enforcing the accumulator distance contract
+  ar_claim_false          FALSE DEPENDENCE CLAIM: the contract admits an ar read one accu iteration after its write, so the `inter false` pragma on ar is untrue for programs the assembler accepts
+
+  logs: /home/sk3463/allo/examples/accelerator/tinytpu_vitis/.mutants/<mutant>/<level>.log
+  MUTATE OK: all 34 mutants run were caught
+
+# ar_claim_false, cosim level (RTL lines):
+    TB 4x4x4 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 5 ar_distance(1) full      wrong = 4, clobbered outside = 0
+   4x 4x 4  cycles=None   TB 4x4x4 stress mismatches = 4 over 6 calls   <-- FAIL

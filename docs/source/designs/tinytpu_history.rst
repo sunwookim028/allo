@@ -33,8 +33,9 @@ readings of those numbers that were later corrected.
    against Gemmini's end-to-end ``tiled_matmul_auto`` numbers (574 / 615 / 740 /
    784 / 986), which include about 395 cycles of Rocket driver software. They
    are kept as a record of our own progress, **not as comparisons**. The
-   like-for-like result -- **1.55-1.8x slower than Gemmini at all five shapes**
-   -- is on :doc:`gemmini_comparison`.
+   like-for-like result -- **1.07-1.24x slower than Gemmini at all five
+   shapes** since ``e24e433b``, 1.55-1.8x before it -- is on
+   :doc:`gemmini_comparison`.
 
 Progression of the 16x16x16 cosim count, one build, bit-exact throughout:
 
@@ -61,10 +62,14 @@ Progression of the 16x16x16 cosim count, one build, bit-exact throughout:
      - 676
      - 1423
      - :ref:`tinytpu-history-lastloops`
-   * - no memset + ``align_value`` widening (**current**)
-     - **252**
-     - **919**
+   * - no memset + ``align_value`` widening (shipped until ``e24e433b``)
+     - 252
+     - 919
      - :ref:`tinytpu-history-prefixes`
+   * - gap-attribution stack landed (**current**)
+     - **172**
+     - **686**
+     - :ref:`tinytpu-history-landing`
 
 
 Removed predecessors
@@ -1077,6 +1082,9 @@ Mismatches 0/16, 0/64, 0/144, 0/128, 0/256. Fixed cost **557 -> 151**; marginal
 Gemmini's 574 / 615 / 740 / 784 / 986 and called it a lead at all five shapes,
 with a 3.2x fixed-cost win. Both claims are withdrawn (:doc:`gemmini_comparison`).
 
+This build was the shipped baseline from ``b4be2b10`` until ``e24e433b``, and
+the one the gap attribution measured its variants against.
+
 What ``dma_st``'s II=4 actually was
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1105,6 +1113,70 @@ serving one per cycle. Subsumed by the change above; no separate work. A design
 that wants the same effect without an Allo change can declare the operands
 ``UInt(32)`` instead, which reaches II=1 with no alignment and no widen setting
 at all.
+
+
+.. _tinytpu-history-landing:
+
+Landing the gap attribution: 919 -> 686
+---------------------------------------
+
+The gap attribution (:ref:`gemmini-gap-attribution`) priced the deficit to
+Gemmini on variants of the 919 build and found about 80% of it in our own
+design and 35-95 cycles forced by Allo's missing dependence pragma
+(:ref:`limitation-21`). ``e24e433b`` (2026-09-19) made its best bit-exact
+stack, ``v_design_dep_imem8``, the design, after ``bbea2af0`` added the
+``s.dependence`` primitive so the pragma no longer needed a ``kernel.cpp``
+patch. The changes are listed on :ref:`tinytpu-isa-landing`.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - 919 build
+     - landed
+     - branch's measurement of the stack
+   * - 4x4x4
+     - 252
+     - **172**
+     - 172
+   * - 8x8x8
+     - 383
+     - **262**
+     - not measured
+   * - 12x12x12
+     - 591
+     - **418**
+     - not measured
+   * - 16x16x8
+     - 667
+     - **484**
+     - not measured
+   * - 16x16x16
+     - 919
+     - **686**
+     - 686
+
+Bit-exact at every shape in the default testbench and at 4x4x4 and 16x16x16
+in ``TPU_TB=stress`` (``logs/cosim_isa_landed_sweep.log``,
+``logs/cosim_isa_landed_stress.log``); est. clock unchanged at 2.431 ns; +2,593
+FF and +6,617 LUT, no BRAM or DSP (:doc:`tinytpu_isa`, "Resources"). The
+variants interacted (the bottleneck moved from ``vru`` to the PE prologue to
+``accu``), so the stack was measured at all five shapes rather than assumed:
+the two measured shapes reproduced exactly.
+
+**What the landing found that the branch had not.** The injected pragma
+claims ``ar`` carries no dependence across ``accu`` iterations, and the
+synthesized pipeline reads a row two states before it writes one, so a program
+that reads an accumulator row one or two iterations after writing it gets the
+old value -- 4 and 20 wrong cells in RTL, 0 in every simulator. GEMM never does
+that, and GEMM was all the branch cosimulated. The landed design makes the
+claim true with an assembler contract (``AR_RAW_DIST = 4``) and tests it at its
+edge in the stress cosim (:ref:`tinytpu-isa-dependence`).
+
+The chia agent's capped smoke run on the 919 build (:doc:`/extensions/chia`)
+had two workers on exactly two of these changes -- folding the vector-register
+tier out of the operand path and the weight prologue -- and neither finished an
+iteration.
 
 
 Superseded readings and plans

@@ -1,0 +1,13 @@
+# RTL probe of accu's dependence claim: isa_dsl.ar_distance_program(d), one call per d,
+# whole C compared, on the landed build (impact/ar_distance_probe.py). First block: C simulation;
+# second block: RTL (xsim).
+HAZ distance 1: wrong = 0
+HAZ distance 2: wrong = 0
+HAZ distance 3: wrong = 0
+HAZ distance 4: wrong = 0
+HAZ distance 5: wrong = 0
+HAZ distance 1: wrong = 4
+HAZ distance 2: wrong = 20
+HAZ distance 3: wrong = 0
+HAZ distance 4: wrong = 0
+HAZ distance 5: wrong = 0

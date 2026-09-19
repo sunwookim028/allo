@@ -379,7 +379,9 @@ width 512** and gmem1/gmem2 to 32, and two burst loops from II=4 to II=1;
 ``csynth.log`` shows one port at 512, two at 32, and zero ``HLS 214-307``
 messages. Without the alignment, the same setting left every port at 8 bits.
 Together with removing a hidden memset it took the design from 1457 to 919
-cycles at 16x16x16 (:ref:`tinytpu-history-prefixes`).
+cycles at 16x16x16 (:ref:`tinytpu-history-prefixes`). The 512-bit gmem0 also
+lets the program prefetch move 8 instruction words per cycle, one of the
+changes that took the design on to 686 (:ref:`tinytpu-isa-landing`).
 
 .. note::
 

@@ -3,8 +3,9 @@
     python pyrun.py cosim_variant.py <variant module> <run dir>
     e.g.  TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py base runs/base
 
-`<variant module>` is a file in this directory (`base` = the shipped
-`microarch_isa`). It must export `tinytpu_isa`, `assemble`, `schedule`,
+`<variant module>` is a file in this directory, or `base` = the shipped
+`microarch_isa` -- since the landing, the design the stack became; the
+pre-landing baseline the attribution table measures against is `v_base`. It must export `tinytpu_isa`, `assemble`, `schedule`,
 `gemm_program`, `IMEM_SIZE`, `MAXDIM`, `T`. Everything else -- testbench, m_axi
 depth patch, Tcl, `-B/usr/bin`, align_value 64, widen 512 -- is `cosim.py`'s,
 unchanged, so the only thing that differs between two runs is the design.

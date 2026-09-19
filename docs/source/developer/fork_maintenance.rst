@@ -70,11 +70,6 @@ Branch layout (as of 2026-09-19)
 |                            |                          | evaluator, GCP pre-flight gate. Lands on |
 |                            |                          | ``main`` once a paid run proves it.      |
 +----------------------------+--------------------------+------------------------------------------+
-| ``impact-limits``          | ``main``                 | The measured design variants behind the  |
-|                            |                          | gap attribution (919 -> 686). The docs   |
-|                            |                          | link to it; it is folded into ``main``   |
-|                            |                          | and then deleted.                        |
-+----------------------------+--------------------------+------------------------------------------+
 | ``chia-codesign``          | ``kkkaishao/allo`` (ACT) | **Retired 2026-09-19**, tag              |
 |                            |                          | ``chia-codesign-final`` (``629c2767``).  |
 |                            |                          | Kept on origin read-only: the superseded |
@@ -88,6 +83,11 @@ Branch layout (as of 2026-09-19)
 |                            |                          | after it merges, per the procedure       |
 |                            |                          | above.                                   |
 +----------------------------+--------------------------+------------------------------------------+
+
+``impact-limits`` (the gap attribution's measured design variants) was folded
+into ``main`` on 2026-09-19 (``96c3aef6``, under
+``examples/accelerator/tinytpu_vitis/impact/``), after its best stack became the
+shipped design (``e24e433b``), and deleted.
 
 ``main`` is the one long-lived working branch; ``upstream`` is just the mirror,
 and ``gh-pages`` holds the published site. ``chia-codesign`` is retired. Exploration branches come and go under the rule in

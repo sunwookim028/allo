@@ -36,12 +36,17 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
 
 .. note::
 
-   Headline, as of 2026-09-18: one hardware build runs every shape as data, all
-   five benchmark shapes are bit-exact in RTL co-simulation, and the design
-   takes **252 / 383 / 591 / 667 / 919** cycles at 4x4x4 / 8x8x8 / 12x12x12 /
-   16x16x8 / 16x16x16 (Vitis ``cosim``, ``-m_axi_latency 0``). Measured over
-   the same window as ours, Gemmini is **1.55-1.8x faster** at all five shapes;
-   see :doc:`gemmini_comparison`.
+   Headline, as of 2026-09-19 (``e24e433b``): one hardware build runs every
+   shape as data, all five benchmark shapes are bit-exact in RTL
+   co-simulation, and the design takes **172 / 262 / 418 / 484 / 686** cycles
+   at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
+   ``-m_axi_latency 0``). Measured over the same window as ours, Gemmini is
+   **1.07-1.24x faster** at all five shapes; see :doc:`gemmini_comparison`.
+
+   Until ``e24e433b`` the shipped design took **252 / 383 / 591 / 667 / 919**
+   (1.55-1.8x behind Gemmini). The step between the two is the gap
+   attribution's measured design stack, landed as the design
+   (:ref:`tinytpu-isa-landing`, :ref:`gemmini-gap-attribution`).
 
 
 Architecture
@@ -50,9 +55,11 @@ Architecture
 .. code-block:: text
 
            imem ─► sequencer ──(decoded instruction)──► every unit
-     A,B ──► dma_ld ─► spm[spad] ─► vru[vr] ─► 4x4 WS array ─► accu[ar] ─► dma_st ─► C
+                   ┌─► spm[spad] ──(header, weights)──► wld ─┐
+     A,B ──► dma_ld┤                                          ├─► 4x4 WS array ─► accu[ar] ─► dma_st ─► C
+                   └─► vru[vr] ────(activations)──────────────┘
 
-Seven units, ``T*T + 6 = 22`` concurrent processes at ``T=4``:
+Eight kinds of unit, ``2*T*T + 6 = 38`` concurrent processes at ``T=4``:
 
 .. list-table::
    :header-rows: 1
@@ -65,19 +72,22 @@ Seven units, ``T*T + 6 = 22`` concurrent processes at ``T=4``:
      - fetch, decode, broadcast; consumes nothing
    * - ``dma_ld``
      - ``A``, ``B``
-     - DRAM -> scratchpad, packing T lanes/cycle
+     - DRAM -> scratchpad or operand vregs, packing T lanes/cycle
    * - ``spm``
      - ``spad``
-     - the scratchpad; **pure SIMD access**
+     - the scratchpad; **pure SIMD access**; the array's weight port
    * - ``vru``
      - ``vr``
-     - operand vregs; drives the array's ports
+     - operand vregs; the array's activation port
+   * - ``wld`` x16
+     - --
+     - one per PE: walks the weight chain, double-buffers its PE's weight
    * - ``pe`` x16
      - its lane
-     - weight-stationary MAC, decodes nothing
+     - weight-stationary MAC, decodes nothing, one flat loop
    * - ``accu``
      - ``ar``
-     - accumulator vregs **and the vector ALU**
+     - accumulator vregs **and the vector ALU**, one flat loop at II=1
    * - ``dma_st``
      - ``C``
      - accumulator -> DRAM, clipped (executes ``mvout``)
@@ -97,10 +107,12 @@ single-ported memory feed T lanes per cycle, and it satisfies ``HLS 200-779``
 (single reader, single writer) without a pragma. The diagnostic, as Vitis first
 raised it on the single-grid predecessor, is quoted on :doc:`tinytpu_history`.
 
-**The PEs decode nothing.** A header word leads every instruction down the same
-chain the weights use, carrying just ``is_mm`` and ``nrows``. A PE forwards it and
-acts on it; there is no command fan-out to ``T*T`` PEs and no opcode in the
-array. Gemmini is the same -- its PEs are dumb and ``ExecuteController``
+**The PEs decode nothing.** A header word leads every ``mm`` down the chain the
+weights use, carrying just its row count. Each PE's weight loader (``wld``)
+forwards it and hands its PE one ``(weight, rows)`` word through a depth-4 FIFO
+-- the shadow register, so ``mm`` n+1's weight is latched while ``mm`` n
+computes (Gemmini's c1/c2 double buffer); there is no command fan-out to
+``T*T`` PEs and no opcode in the array. Gemmini is the same -- its PEs are dumb and ``ExecuteController``
 decodes -- and it also means the instruction set can grow without touching the
 array.
 
@@ -120,9 +132,9 @@ So every distribution here is a chain, and every chain carries *packed words*:
 
 .. code-block:: text
 
-    vru --hdr,W--> wcol[0] --v--> PE(i,0) --> wcol[i+1]      (down column 0)
-                                    |
-                                    +-------> wrow[i,0] --> PE(i,1) --> ...
+    spm --hdr,W--> wcol[0] --v--> wld(i,0) --> wcol[i+1]     (down column 0)
+                                    |    +--wq--> PE(i,0)    (its own weight)
+                                    +-------> wrow[i,0] --> wld(i,1) --> ...
                                                              (east, lane j)
 
     vru --A------> acol[0] --v--> PE(i,0) --> acol[i+1]      (down column 0)
@@ -138,9 +150,12 @@ Hazards come from being in-order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each unit consumes the instruction stream in order and every channel is
-point-to-point, so ``vld`` before ``mm`` before ``vadd`` before ``mvout`` is
+point-to-point, so ``dma_ld`` before ``mm`` before ``vadd`` before ``mvout`` is
 enforced by construction: within a unit by program order, across units by
-stream order. That is the whole of the hazard logic. Gemmini spends a 48-entry
+stream order. That is the whole of the hazard logic *between* units. Inside
+``accu`` one more rule holds, and the assembler enforces it: an accumulator
+row may not be read within ``AR_RAW_DIST`` rows of being written
+(:ref:`tinytpu-isa-dependence`). Gemmini spends a 48-entry
 reservation station (``ReservationStation.scala``) to get out-of-order issue on
 top of this; this design is strictly in-order and does not pretend otherwise.
 
@@ -181,9 +196,10 @@ is still open -- see :ref:`limitation-11`.)
 One owner per memory
 ~~~~~~~~~~~~~~~~~~~~
 
-``spad`` lives in ``spm`` and is written by ``dma_ld`` and read by ``vld``; ``vr``
-lives in ``vru`` and is written by ``vld`` and read by ``mm``; ``ar`` lives in
-``accu`` and is touched by all four of its opcodes. Allo enforces single reader
+``spad`` lives in ``spm`` and is written by ``dma_ld`` and read by ``vld`` and
+``mm`` (weights); ``vr`` lives in ``vru`` and is written by ``dma_ld`` and
+``vld`` and read by ``mm`` (activations); ``ar`` lives in ``accu`` and is
+touched by all four of its opcodes. Allo enforces single reader
 and single writer, and Vitis rejects the violation outright
 (HLS 200-779 / 200-979), so those three units keep every arm of their opcode
 dispatch in one process. This rules out a one-process-per-opcode split; see
@@ -193,7 +209,9 @@ dispatch in one process. This rules out a one-process-per-opcode split; see
 
    **Correction, 2026-09-19: the one-owner rule is Allo's, not Vitis's.** The
    paragraph above charges it to both; only the Allo half holds. A Vitis
-   2023.2 probe (``impact/probe_shared/`` on branch ``impact-limits``) shows
+   2023.2 probe (`impact/probe_shared/
+   <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
+   shows
    that ``#pragma HLS stream variable=buf type=unsync`` makes Vitis share an
    on-chip array between two processes, one per BRAM port (``HLS 200-824``,
    ``200-755``, ``200-634``); ``HLS 200-779`` applies only to *synchronized*
@@ -207,8 +225,8 @@ dispatch in one process. This rules out a one-process-per-opcode split; see
    earlier claim in this project, that removing ``vru``'s double handling of B
    would need a second producer on a shared memory, **was wrong**: the
    ``v_wdirect`` / ``v_wdb`` variants remove it with ``spm`` still the one owner
-   of ``spad`` and one writer of ``wcol[0]``. See
-   :ref:`limitation-shared-memory`.
+   of ``spad`` and one writer of ``wcol[0]``, and that is how the shipped
+   design has done it since ``e24e433b``. See :ref:`limitation-shared-memory`.
 
 Data type
 ~~~~~~~~~
@@ -247,7 +265,9 @@ An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
      -
    * - ``OP_DMA_LD``
      - 1
-     - ``f0`` = src (0=A, 1=B), ``f1`` = dram_row0, ``f2`` = col_block, ``f3`` = spad0, ``nr`` = rows
+     - ``f0`` = src | dst << 1 (src: 0 = A, 1 = B; dst: 0 = ``spad``, 1 = ``vr``),
+       ``f1`` = dram_row0, ``f2`` = col_block, ``f3`` = spad0 or vr0,
+       ``nr`` = rows
    * - ``OP_DMA_ST``
      - 2
      - retired: results leave via ``OP_MVOUT``
@@ -256,7 +276,8 @@ An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
      - ``f0`` = vr0, ``f1`` = spad0, ``nr`` = rows
    * - ``OP_MM``
      - 4
-     - ``f0`` = vr_a, ``f1`` = ar0, ``f2`` = acc, ``f3`` = vr_w, ``nr`` = rows
+     - ``f0`` = vr_a (activations), ``f1`` = ar0, ``f2`` = acc, ``f3`` =
+       spad_w (T weight rows), ``nr`` = rows
    * - ``OP_VADD``
      - 5
      - ``f0`` = ar_d, ``f1`` = ar_s1, ``f2`` = ar_s2, ``nr`` = rows
@@ -280,8 +301,8 @@ trip count of 0 would run **once**; the generator refuses it (below).
 **Address generation.** Each AGU term is ``(target, level, stride)`` and resolves
 to ``field[target] += iv[level] * stride``, so an address can be relative to any
 enclosing loop's induction variable. Terms name their target rather than being
-fixed one-per-field, because a single field often needs two: the weight ``vld``
-inside the k loop is offset by both the n tile and the k tile,
+fixed one-per-field, because a single field often needs two: the ``mm`` inside
+the k loop names its weights at an offset by both the n tile and the k tile,
 ``B_SP + nb*MAXDIM + kb*T``, and a one-term-per-field encoding cannot say it.
 Without this a loop body would reissue identical addresses every iteration and
 simply redo the same work.
@@ -335,29 +356,33 @@ instructions follow, two words each (``assemble()``):
 .. code-block:: text
 
    imem[0] static instruction count   imem[4] mm count | mm rows << 16
-   imem[1] dma_ld  rows               imem[5] accu   INSTRUCTIONS
+   imem[1] dma_ld  rows               imem[5] accu   iterations
    imem[2] spm     rows               imem[6] dma_st rows
-   imem[3] vru     words              imem[7] A rows | B rows << 16
+   imem[3] vru     rows               imem[7] A rows | B rows << 16
 
 ``imem[0]`` bounds the sequencer's fetch; every other count is dynamic, from
 ``expand()``, which runs the program's control flow at assembly time and
 resolves the AGU exactly as the sequencer does. With a hardware loop the static
 and dynamic counts differ, and **a unit promised more work than it receives
 does not produce a wrong answer, it hangs** -- the one place where the
-assembler and the microarchitecture are coupled. These are *work* counts (rows
-or words), not instruction counts, because every unit but ``accu`` runs one
-flat loop over its rows; ``vru`` charges an ``mm`` an extra ``T + 1`` words for
-the header and weight words it pushes. ``imem[7]`` is the DRAM row span
-``dma_ld`` bursts for each operand matrix.
+assembler and the microarchitecture are coupled. These are *work* counts, not
+instruction counts, because every unit runs one flat loop over its rows:
+``spm`` charges an ``mm`` ``T + 1`` rows for the header and weight words it
+pushes, ``accu`` charges a ``vadd`` two iterations per row, and a ``dma_ld``
+counts for ``spm`` or ``vru`` by its destination. ``imem[7]`` is the DRAM row
+span ``dma_ld`` bursts for each operand matrix.
 
 ``IMEM_SIZE`` is ``NHDR + IWORDS * 24`` (the longest program shipped, plus
-headroom). This is not cosmetic: the program is pulled on-chip by one burst of
-``IMEM_SIZE`` words, so every imem word is a startup cycle whether the program
-uses it or not -- 56 cycles today. Measured: moving to the 2-word instruction
-format cost exactly +68 cycles at all five shapes, which is exactly the 68
-extra words it added -- the loop logic itself cost nothing. With control flow
-the program is O(nesting), not O(tiles): the looped GEMM is 17 instructions at
-every shape where the unrolled one reaches 49.
+headroom). The program is pulled on-chip by one burst of ``IMEM_SIZE`` words
+before anything runs, so imem size is startup time whether the program uses it
+or not. Measured when the prefetch moved one word per cycle: moving to the
+2-word instruction format cost exactly +68 cycles at all five shapes, exactly
+the 68 extra words it added -- the loop logic itself cost nothing. Since
+``e24e433b`` the prefetch moves **8 words per cycle** (gmem0 is 512 bits wide;
+``ib`` is cyclically partitioned by 8), so the 56 words cost 7 cycles, not 56
+-- worth 52 cycles at every shape (``v_imem8``). With control flow the program
+is O(nesting), not O(tiles): the looped GEMM is at most 14 instructions (with
+``relu``) at every shape, where the unrolled one reaches 32.
 
 .. _tinytpu-isa-programs:
 
@@ -367,7 +392,9 @@ Programs, and the loop-nest generator
 Three program forms are kept, and ``bench_isa.py`` checks them against each
 other before building anything:
 
-* ``isa_dsl.gemm_program`` -- the shipped program, from the loop-nest generator.
+* ``isa_dsl.gemm_program`` -- the shipped program, from the loop-nest generator:
+  A ``dma_ld``'d straight into the vregs, B into the scratchpad, and every
+  ``mm`` naming its T weight rows there.
 * ``microarch_isa.gemm_program_handwritten`` -- the hand-emitted reference. The
   first k-tile is peeled out of the k loop deliberately: it carries ``f2=0``
   (overwrite the accumulator) where the looped tiles carry ``f2=1``
@@ -378,6 +405,10 @@ other before building anything:
 * ``vadd_program`` computes ``relu(2 * (A @ B))`` on the first output tile, so
   ``vadd``/``vrelu`` stay exercised now that the GEMM inner loop no longer needs
   them.
+* ``isa_dsl.vector_program`` and ``isa_dsl.ar_distance_program`` are test
+  programs: the first varies every field GEMM holds constant (both ``dma_ld``
+  destinations, ``vld``, distinct accumulator regions), the second sits exactly
+  on the accumulator distance contract (:ref:`tinytpu-isa-dependence`).
 
 ``isa_dsl.py`` is **a code generator, not a compiler**. It chooses nothing:
 
@@ -404,17 +435,17 @@ induction variable the ``with`` yields:
 .. code-block:: python
 
    with k.loop(Nt, "n") as nb:                       # level 0, derived
-       k.vld(W_VR, Ref(B_SP).at(nb, MAXDIM), rows=T)
-       k.mm(A_VR, AR_C, W_VR, rows=M, acc=False)     # peeled: overwrite
+       k.mm(A_VR, AR_C, Ref(B_SP).at(nb, MAXDIM), rows=M, acc=False)  # peeled
        with k.loop(Kt - 1, "k") as kb:               # level 1, derived
-           k.vld(W_VR, Ref(B_SP + T).at(nb, MAXDIM).at(kb, T), rows=T)
+           k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
+                Ref(B_SP + T).at(nb, MAXDIM).at(kb, T), rows=M, acc=True)
 
 Swap two ``with`` statements and every address term follows, because the
 induction variables carry their levels with them. It is generalised to this
 AGU rather than copied: MiniTPU's AGU is one term on one field as a
 power-of-two shift, this one is three ``(target, level, stride)`` terms with
 arbitrary 11-bit strides, any number of which may land on the same field --
-``B_SP + nb*MAXDIM + kb*T`` is two terms on ``f1`` and their encoding cannot say
+``B_SP + nb*MAXDIM + kb*T`` is two terms on ``f3`` and their encoding cannot say
 it. So ``Ref`` is a base plus an ordered list of ``(iv, stride)`` terms and any
 field may be one.
 
@@ -547,12 +578,17 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
    * - ``gemmini/``
      - the patches and benchmarks for the matched Gemmini baseline
        (:ref:`gemmini-reproduce`)
+   * - ``impact/``
+     - the gap attribution's variants (generated from the pre-landing
+       baseline), their raw results and timelines, the Vitis shared-array
+       probe, and the RTL probe of the accumulator's dependence claim
+       (:ref:`gemmini-attribution-reproduce`)
 
 .. code-block:: bash
 
    # One command, from a clean checkout: builds this checkout's MLIR bindings,
    # runs bench_isa + stress_isa, then the default cosim, and checks the five
-   # cycle counts against 252 / 383 / 591 / 667 / 919. Exits nonzero otherwise.
+   # cycle counts against 172 / 262 / 418 / 484 / 686. Exits nonzero otherwise.
    examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
 
@@ -564,7 +600,8 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
    python kpn_model.py                   # channel protocol / deadlock model
    python cosim.py                       # default TB: the published cycle counts
    TPU_TB=stress TPU_SHAPES=4x4x4,16x16x16 python cosim.py   # correctness in RTL
-   python mutate.py                      # does the harness catch a broken design?
+   python mutate.py                      # does the harness catch a broken design? (~15 min)
+   python mutate.py --no-rtl             # the same without the one cosim (~5 min)
    TPU_WRAP=1 python cosim.py            # the old hoisted-argument variant, for comparison
 
 ``bench_isa.py`` and ``cosim.py``'s default testbench use Gemmini's ``[-4, 4]``
@@ -578,7 +615,7 @@ These commands replaced older reproduce instructions (``d18de251``) that named
 ``TPU_M`` / ``TPU_K`` / ``TPU_N`` knobs, a ``simulator`` argument and
 ``OMP_NUM_THREADS=32``, none of which the current scripts use. Since the fix
 recorded in :ref:`limitation-11` the simulator sizes its OpenMP team to the
-section count itself, so ``OMP_NUM_THREADS=8`` runs the 22-process design; the
+section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process design; the
 recorded numbers were produced at 32. ``kpn_model.py`` has been rewritten for the
 row-flattened units and is driven by the assembled header (``ef112868``); every
 shipped program completes in it at FIFO depth **1**. See
@@ -623,7 +660,7 @@ Verifying a change
 
 Added on ``main`` on 2026-09-19. From a clean checkout, one command builds the
 checkout's own bindings, runs the functional gates, runs cosim, and checks the
-published cycle counts (252 / 383 / 591 / 667 / 919), exiting nonzero if any
+published cycle counts (172 / 262 / 418 / 484 / 686), exiting nonzero if any
 step fails or any number differs:
 
 .. code-block:: bash
@@ -632,9 +669,11 @@ step fails or any number differs:
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim   # functional only, ~1 min
 
 ``reproduce.sh`` was run from a pristine worktree, including a fresh MLIR
-build, and printed ``REPRODUCED`` with 252 / 383 / 591 / 667 / 919 and 0
-mismatches in **5m48s** (``d18de251``). It unsets every ``TPU_*`` knob and checks
-that ``allo`` resolves to the checkout it is run from (``92fb2f1b``).
+build, and printed ``REPRODUCED`` with 172 / 262 / 418 / 484 / 686 and 0
+mismatches in **5m49s** (``96c3aef6``, re-run at the docs commit); against the pre-landing
+design it printed 252 / 383 / 591 / 667 / 919 in 5m48s (``d18de251``). It
+unsets every ``TPU_*`` knob and checks that ``allo`` resolves to the checkout
+it is run from (``92fb2f1b``).
 
 **Performance vs. correctness.** ``bench_isa.py`` and ``cosim.py`` with its
 default testbench are the **performance** setup: seed 0, operands in [-4, 4]
@@ -646,22 +685,25 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
 ``mutate.py`` after any change to the harness.
 
 ``stress_isa.py`` (``ef112868``)
-   About 10 s on the Allo simulator, 486 runs: full-range int8 operands with
+   About 10 s on the Allo simulator, 492 runs: full-range int8 operands with
    -128 and 127 forced; clip and ReLU edge cases landing on 127 / 128 / -128 /
    -129 / 0 / -1; all 64 shapes; ``C`` prefilled with random bytes and compared
    in full; ``isa_dsl.vector_program``, which varies every field GEMM holds
-   constant; and 200 random valid programs. Everything is checked against
-   ``isa_ref.py``, a numpy reference model of the ISA that is itself checked
-   against numpy on every GEMM. It also runs the validator's negative controls
-   (14 crafted bad programs rejected, 387 generated ones accepted) and runs
-   ``kpn_model.py`` on every distinct program first, so a simulator hang becomes
-   a named report. It prints ``STRESS OK: n/n`` or lists each failing run.
+   constant; ``isa_dsl.ar_distance_program`` at the accumulator's distance
+   contract; and 200 random valid programs, generated to keep that contract.
+   Everything is checked against ``isa_ref.py``, a numpy reference model of the
+   ISA that is itself checked against numpy on every GEMM. It also runs the
+   validator's negative controls (18 crafted bad programs rejected, 390
+   generated ones accepted) and runs ``kpn_model.py`` on every distinct program
+   first, so a simulator hang becomes a named report. It prints ``STRESS OK:
+   n/n`` or lists each failing run.
 
 ``TPU_TB=stress python cosim.py`` (``1ac0d22f``)
-   The same idea on the RTL: five calls per shape in one RTL simulation (corner,
-   full-range, boundary and mid operands, plus ``vector_program``), each
-   inheriting the previous call's state, with ``C`` prefilled and compared in
-   full. Its cycle column is the minimum over those calls, not the headline. The
+   The same idea on the RTL: six calls per shape in one RTL simulation (corner,
+   full-range, boundary and mid operands, ``vector_program``, and
+   ``ar_distance_program(AR_RAW_DIST)`` -- the one case only RTL can fail),
+   each inheriting the previous call's state, with ``C`` prefilled and compared
+   in full. Its cycle column is the minimum over those calls, not the headline. The
    default testbench is unchanged byte for byte and is the only mode the
    published cycle counts come from.
 
@@ -673,25 +715,41 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
    * - check
      - int16 partial-sum mutant
    * - default cosim (performance testbench)
-     - **passes**: 0/16 and 0/256 mismatches, at the published 252 / 919 cycles
+     - **passes**: 0/16 and 0/256 mismatches, at the then-published 252 / 919
+       cycles (measured on the pre-landing design)
    * - ``TPU_TB=stress`` cosim
      - **fails**: 3 wrong at 4x4x4, 82 at 16x16x16
    * - ``stress_isa.py``
-     - **fails**: 247 of 486 runs
+     - **fails**: 247 of 486 runs (pre-landing); 241 of 492 on the landed design
 
-``mutate.py`` (``c8089332``)
-   26 single-point mutants of ``microarch_isa.py`` (plus the unmodified
+``mutate.py`` (``c8089332``; re-anchored and extended in ``e24e433b``)
+   34 single-point mutants of ``microarch_isa.py`` (plus the unmodified
    ``none`` control through the same loader), each run through ``bench_isa``
-   and ``stress_isa``, and cosim on request. **All 26 are caught.** 11 of them
-   get past ``bench_isa`` and are caught **only** by ``stress_isa``:
-   ``pe_psum_int16`` (int16 partial sum), ``clip_hi_off_by_one`` and
-   ``clip_lo_off_by_one`` (both clip bounds), ``vadd_dst_is_src1`` and
-   ``vrelu_dst_is_src`` (vadd/vrelu destination), ``vadd_src2_is_src1`` (vadd
-   second source), ``vrelu_src_base_ignored``, ``mvout_src_base_ignored``,
-   ``dma_ld_row_ignored`` and ``mvout_row_ignored`` (base / row fields), and
-   ``dma_st_accumulates_C`` (``dma_st`` relying on a zeroed ``C``). Each
-   mutant's anchor must match exactly once, so a refactor of the design makes
-   the script fail loudly instead of silently testing nothing.
+   and ``stress_isa``, and through the ``TPU_TB=stress`` cosim for the one
+   RTL-only mutant (and for any mutant on request). **All 34 are caught**
+   (``logs/mutate_landed.log``). 20 fail ``bench_isa``. 13 get past it and are
+   caught **only** by ``stress_isa``: ``pe_psum_int16`` (int16 partial sum),
+   ``clip_hi_off_by_one`` and ``clip_lo_off_by_one`` (both clip bounds),
+   ``vadd_dst_is_src1`` and ``vrelu_dst_is_src`` (vadd/vrelu destination),
+   ``vadd_src2_is_src1`` (vadd second source), ``vrelu_src_base_ignored``,
+   ``mvout_src_base_ignored``, ``dma_ld_row_ignored`` and
+   ``mvout_row_ignored`` (base / row fields), ``spm_vld_off_by_one`` (``vld``,
+   which the shipped GEMM no longer issues), ``dma_st_accumulates_C``
+   (``dma_st`` relying on a zeroed ``C``), and ``ar_contract_unenforced``
+   (the assembler no longer enforcing the accumulator distance contract). One,
+   ``ar_claim_false``, passes both functional levels by construction and is
+   caught **only** by cosim; see :ref:`tinytpu-isa-dependence`.
+
+   The mutants that target the landed code: ``pe_shadow_not_swapped`` and
+   ``wld_rows_from_weight`` (the weight double buffer), ``spm_weight_off_by_one``
+   (weights from the scratchpad), ``vru_dma_ignores_f3`` and ``vru_act_off_by_one``
+   (the A path into and out of the vregs), ``prefetch_lane7_dup`` (the 8-wide
+   prefetch), ``vadd_holds_stale_x`` (``vadd``'s two-iteration rows), and the
+   two dependence mutants. The pre-landing mutants were re-anchored on the
+   equivalent code; ``vrelu_loop_short`` became ``vrelu_rows_short`` (there is
+   no per-instruction loop left to shorten). Each mutant's anchor must match
+   exactly once, so a refactor of the design makes the script fail loudly
+   instead of silently testing nothing.
 
 **The arrays are not cleared by hardware.** ``spad``, ``vr`` and ``ar`` carry no
 ``= 0`` initialiser (it cost a runtime zero-fill loop; see
@@ -699,10 +757,11 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
 (``4357ed59``): ``check_program()`` walks the exact dynamic trace -- the program
 has no data-dependent control flow, so this is exact, not conservative -- and
 rejects any read of an ``ar`` row (``mm`` accumulate, ``vadd``, ``vrelu``,
-``mvout``) or a ``vr`` row (``mm``) that no earlier instruction wrote.
-Written-ness propagates through ``vld``: a ``vld`` may copy an unwritten
-``spad`` row, as the shipped GEMM does when ``M < MAXDIM``, but the copy then
-counts as unwritten. It also rejects out-of-range rows, bad loop nesting
+``mvout``), a ``vr`` row (``mm`` activations) or a ``spad`` row (``mm``
+weights) that no earlier instruction wrote. Written-ness propagates through
+``vld``: a ``vld`` may copy an unwritten ``spad`` row, but the copy then counts
+as unwritten. The same walk enforces the accumulator distance contract
+(:ref:`tinytpu-isa-dependence`). It also rejects out-of-range rows, bad loop nesting
 (unbalanced or over-deep loops, trip 0, AGU terms naming a closed loop),
 zero-row instructions, and the retired ``dma_st`` opcode.
 
@@ -714,6 +773,76 @@ Two design facts the hardening found:
 * **The hung simulator ignores SIGTERM**; only SIGKILL stops it (it is inside
   a blocking C call; compare the watchdog note in :ref:`limitation-11`).
 
+.. _tinytpu-isa-dependence:
+
+The accumulator's dependence claim
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``accu`` is one flat row loop at II=1 because ``schedule()`` tells Vitis that
+its accumulator carries no dependence across iterations:
+
+.. code-block:: python
+
+   s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
+   # -> #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
+
+``s.dependence`` is the schedule primitive added for :ref:`limitation-21`
+(``bbea2af0``). Without the claim the flat loop closes at ``Final II = 3``:
+the row index is a carried register, so Vitis cannot prove that iteration n's
+store and iteration n+1's load of ``ar`` touch different rows.
+
+**The claim is not true of the hardware on its own**, and the branch that
+priced it (``v_accudep`` / ``v_design_dep``, which injected the pragma into
+``kernel.cpp``) never tested where it fails: only GEMM programs were cosimulated
+there. In the synthesized loop (II=1, depth 6) the ``ar`` load issues in
+pipeline state 5 and the store lands in state 7, so a row read one or two
+iterations after it was written returns its **old** value. Measured in RTL
+with ``isa_dsl.ar_distance_program(d)``, every read exactly ``d`` iterations
+after its write (``logs/cosim_isa_ar_distance.log``,
+``impact/ar_distance_probe.py``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - distance ``d`` (accu iterations)
+     - 1
+     - 2
+     - 3
+     - 4
+     - 5
+   * - cells of ``C`` wrong, RTL
+     - **4**
+     - **20**
+     - 0
+     - 0
+     - 0
+   * - cells wrong, C simulation
+     - 0
+     - 0
+     - 0
+     - 0
+     - 0
+
+So the claim is made true by the **assembler**, the way the write-before-read
+contract is: ``check_program()`` counts ``accu`` iterations (one per ``mm``,
+``vrelu`` or ``mvout`` row, two per ``vadd`` row) and rejects any read of an
+``ar`` row fewer than ``AR_RAW_DIST = 4`` iterations after the write it
+depends on -- the first safe distance plus one of margin, and exactly ``T``,
+the row count of the smallest GEMM, so no GEMM is constrained by it. The
+random-program generator keeps the contract, and the ``TPU_TB=stress`` cosim
+runs ``ar_distance_program(AR_RAW_DIST)`` on every build, so a re-synthesis
+that widened the window fails there.
+
+That test has teeth. ``mutate.py``'s ``ar_claim_false`` sets ``AR_RAW_DIST =
+1``: the pragma is then false for programs the assembler accepts. It passes
+``bench_isa`` and ``stress_isa`` -- no simulator models a dependence pragma --
+and the stress cosim catches it (``ar_distance(1)``: 4 cells wrong).
+``ar_contract_unenforced`` (the check disabled) is caught by ``stress_isa``'s
+validator controls.
+
+The alternative claim, ``inter RAW distance=4 true``, would have Vitis honour a
+distance of 4 itself rather than rely on the schedule; it was not measured.
+
 
 Results
 -------
@@ -722,7 +851,8 @@ Cycle counts (current build)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Measured by Vitis ``cosim`` (xsim), one build, ``-m_axi_latency 0``
-(``logs/cosim_isa_widened_sweep.log``):
+(``logs/cosim_isa_landed_sweep.log``, ``e24e433b``), against the pre-landing
+build that was shipped until then (``logs/cosim_isa_widened_sweep.log``):
 
 .. list-table::
    :header-rows: 1
@@ -731,40 +861,87 @@ Measured by Vitis ``cosim`` (xsim), one build, ``-m_axi_latency 0``
      - dynamic instructions
      - cycles
      - mismatches
+     - pre-landing (instructions, cycles)
+     - saved
    * - 4x4x4
-     - 6
-     - **252**
+     - 4
+     - **172**
      - 0/16
+     - 6, 252
+     - 80 (32%)
    * - 8x8x8
-     - 15
-     - **383**
+     - 10
+     - **262**
      - 0/64
+     - 15, 383
+     - 121 (32%)
    * - 12x12x12
-     - 28
-     - **591**
+     - 18
+     - **418**
      - 0/144
+     - 28, 591
+     - 173 (29%)
    * - 16x16x8
-     - 25
-     - **667**
+     - 16
+     - **484**
      - 0/128
+     - 25, 667
+     - 183 (27%)
    * - 16x16x16
-     - 45
-     - **919**
+     - 28
+     - **686**
      - 0/256
+     - 45, 919
+     - 233 (25%)
 
-Least squares against dynamic instruction count: fixed cost **151**, marginal
-**17.28** cycles per dynamic instruction. Utilization against the 4x4 array's
-peak is 1.6% / 8.4% / 18.3% / 19.2% / 27.9%.
+The two shapes the gap attribution measured (172 and 686, :ref:`gemmini-gap-attribution`)
+reproduce exactly; the other three were first measured on this build.
+``TPU_TB=stress`` cosim at 4x4x4 and 16x16x16: 0 wrong over 6 calls each
+(``logs/cosim_isa_landed_stress.log``).
+
+Utilization against the 4x4 array's peak is 2.3% / 12.2% / 25.8% / 26.4% /
+37.3% (was 1.6% / 8.4% / 18.3% / 19.2% / 27.9%). Least squares against dynamic
+instruction count gives fixed **74.5**, marginal **21.70** cycles per dynamic
+instruction (was 151 and 17.28); the two fits are not comparable term by term,
+because the landing removed instructions (the ``vld``\ s) as well as cycles,
+so each remaining instruction carries more work. Against MACs instead: fixed
+**192**, **7.95** MAC/cycle marginal, 49.7% of peak (was 289 and 6.17, 38.6%).
 
 These numbers were measured with a memory that answers immediately; the
-latency sweep (``-m_axi_latency`` 16 and 64) and what a real memory system does
-to them is on :doc:`gemmini_comparison`. **They are not faster than Gemmini** --
-an earlier claim that they were is withdrawn there.
+latency sweep (``-m_axi_latency`` 16 and 64: 214 / 702 and 358 / 894 at
+4x4x4 / 16x16x16) and what a real memory system does to them is on
+:doc:`gemmini_comparison`. **They are not faster than Gemmini**: 1.07-1.24x
+slower like for like.
 
-How the design got from 1017 cycles at 4x4x4 to 252 is on
-:doc:`tinytpu_history`. Where the remaining deficit to Gemmini comes from --
-forced by Allo, forced by Vitis, or our design -- is priced on
-:ref:`gemmini-gap-attribution` (measured on variants, not on this build).
+How the design got from 1017 cycles at 4x4x4 to 172 is on
+:doc:`tinytpu_history`. What the last step was, where it came from, and what
+deficit to Gemmini remains is on :ref:`gemmini-gap-attribution`.
+
+.. _tinytpu-isa-landing:
+
+What landed in ``e24e433b``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The gap attribution priced the deficit to Gemmini on variants of the design
+(:ref:`gemmini-gap-attribution`); its best bit-exact stack,
+``v_design_dep_imem8``, is now the design, rebuilt from the sources rather than
+patched:
+
+* **Program prefetch, 8 words a cycle** into a cyclically partitioned ``ib``
+  (gmem0 is 512 bits wide): 56 words in 7 cycles instead of 56 (``v_imem8``).
+* **Weights by scratchpad address.** ``mm``'s ``f3`` names T scratchpad rows
+  and ``spm`` streams the header and weights down the weight chain; the weight
+  ``vld`` through the vregs is gone. A **per-PE weight loader** (``wld``)
+  double-buffers each PE's weight, and the PE is one flat loop (``v_wdb``).
+* **A straight into the vregs.** ``dma_ld``'s ``f0`` gained a destination bit;
+  the shipped GEMM sends A to the vregs, so the A ``spad -> vld -> vr`` trip is
+  gone (``v_design``). ``vld`` stays in the ISA.
+* ``accu`` **flat at II=1**, held there by the ``s.dependence`` claim and the
+  distance contract that makes it true (:ref:`tinytpu-isa-dependence`), not by
+  patching ``kernel.cpp`` (``v_accudep``).
+* **Per-unit work counts precomputed in the sequencer**: a flat loop whose row
+  count depends on the decoded opcode closes at ``Final II = 2`` on its
+  counter -- the trap the branch found in ``spm`` and ``accu``.
 
 .. _tinytpu-isa-csynth-bound:
 
@@ -824,7 +1001,78 @@ not a measurement. The same lesson, stated as a general rule, is
 Resources
 ~~~~~~~~~
 
-The resource figures the sources record are per build and are listed with the
+What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
+pre-landing design re-synthesized with the same toolchain
+(``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``). The
+estimated clock is **2.431 ns** for both, so the design still meets 3.33 ns
+with the same margin.
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit
+     - BRAM
+     - DSP
+     - FF
+     - LUT
+   * - ``sequencer``
+     - 0 -> 0
+     - 3 -> 2
+     - 2,058 -> 2,275
+     - 2,312 -> 3,313
+   * - ``dma_ld``
+     - 0 -> 0
+     - 0 -> 0
+     - 574 -> 575
+     - 1,075 -> 1,094
+   * - ``spm``
+     - 1 -> 1
+     - 0 -> 0
+     - 147 -> 452
+     - 417 -> 812
+   * - ``vru``
+     - 1 -> 1
+     - 0 -> 0
+     - 221 -> 484
+     - 725 -> 544
+   * - ``wld`` x16 (new)
+     - 0
+     - 0
+     - 1,250
+     - 4,472
+   * - ``pe`` x16
+     - 0 -> 0
+     - 12 -> 12
+     - 4,019 -> 3,996
+     - 5,175 -> 6,264
+   * - ``accu``
+     - 4 -> 4
+     - 0 -> 0
+     - 1,250 -> 1,744
+     - 2,393 -> 1,764
+   * - ``dma_st``
+     - 0 -> 0
+     - 0 -> 0
+     - 342 -> 342
+     - 511 -> 511
+   * - FIFOs and top level
+     - 36 -> 36
+     - 0 -> 0
+     - 6,277 -> 6,363
+     - 7,358 -> 7,809
+   * - **total**
+     - **42 -> 42**
+     - **15 -> 14**
+     - **14,888 -> 17,481** (+17%)
+     - **19,966 -> 26,583** (+33%)
+
+The speedup costs **+2,593 FF and +6,617 LUT**, about 0.1% and 0.5% of the
+xcu280, and no BRAM or DSP. The largest item is the 16 weight loaders (1,250
+FF, 4,472 LUT); ``accu``'s dependence claim costs 494 FF over the nested loop
+it replaced -- against **16,188** for the write-behind rotation that reached
+the same II (:ref:`limitation-21`).
+
+The resource figures the sources record for earlier builds are listed with the
 build they belong to on :doc:`tinytpu_history`: 8x8x8 csynth after the ``nr``
 narrowing (BRAM 42, DSP 12, FF 16247, LUT 21918), the one-build row-flattened
 design (BRAM 16, DSP 15, FF 12835, LUT 18968), and the ``T=16`` build (240 DSP,

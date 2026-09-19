@@ -66,7 +66,8 @@ does not build the fork's site; build locally.
 
 `examples/accelerator/tinytpu_vitis/`. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
-checks the published cycle counts (252/383/591/667/919):
+checks the published cycle counts (172/262/418/484/686; 252/383/591/667/919
+before `e24e433b`):
 
 ```bash
 examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim: ~1 min
@@ -77,7 +78,12 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 `TPU_TB=stress python cosim.py` are the **correctness** gates. Run
 `stress_isa.py` (~10 s) after any change to `microarch_isa.py`, and
 `mutate.py` after any change to the harness. `assemble()` rejects programs that
-read `ar`/`vr` before writing them (the arrays are not cleared by hardware).
+read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
+hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
+iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
+(`#pragma HLS dependence ... inter false`) that is only true under that
+contract, and no simulator can see a violation -- only the `TPU_TB=stress`
+cosim, which runs `ar_distance_program` at the edge.
 Details: `docs/source/designs/tinytpu_isa.rst` ("Verifying a change").
 
 ## Project state
