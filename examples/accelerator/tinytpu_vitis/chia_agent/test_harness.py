@@ -390,8 +390,8 @@ class Suite:
         v = await A.verdict("run_functional_check")
         stress = (v.get("gate") or {}).get("stress", "")
         check("e.forged cosim.py/stress_isa.py in spec dir",
-              "ignored: real stress_isa 486/486, vouched",
-              stress, v.get("ok") and "486/486" in stress
+              "ignored: real stress_isa n/n, vouched",
+              stress, v.get("ok") and re.search(r"STRESS OK: (\d+)/\1 ", stress)
               and (v.get("gate") or {}).get("vouched"))
         (spec / "cosim.py").unlink()
         (spec / "stress_isa.py").unlink()

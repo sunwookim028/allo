@@ -91,13 +91,13 @@ This is a policy, not a sandbox. Real isolation would mean a container.
 ## The evaluator (two tiers)
 
 - **gate**: `bench_isa.py` (the published [-4, 4] setup) and main's
-  `stress_isa.py` must both pass (functional, Allo simulator, ~12 s): 486 runs
+  `stress_isa.py` must both pass (functional, Allo simulator, ~12 s): 492 runs at `476a70d8`
   of full-range/corner/boundary int8 at all 64 shapes, `C` prefilled with
   random bytes and compared in full, vector and 200 random programs checked
   against `isa_ref.py`, many invocations of one build, and the program
   validator's controls. Negative control: narrowing the PE partial sum from
   int32 to int16 passes `bench_isa.py` and all of cosim's testbenches (their
-  [-4, 4] operands never overflow), and stress_isa rejects it (247/486 exact).
+  [-4, 4] operands never overflow), and stress_isa rejects it (251/492 exact at `476a70d8`; 247/486 at `e620576d`).
 
   **Why main's `stress_isa.py` replaced this branch's own `stress.py`**
   (rebase, 2026-09-19): it is a superset on every axis `stress.py` covered --

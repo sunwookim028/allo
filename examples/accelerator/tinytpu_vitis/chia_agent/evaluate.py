@@ -24,7 +24,7 @@ the objective:
 The two tiers:
 
 1. **gate** -- `bench_isa.py` (the published [-4, 4] setup) and main's
-   `stress_isa.py` (486 runs: full-range/corner/boundary operands, all 64
+   `stress_isa.py` (492 runs at 476a70d8: full-range/corner/boundary operands, all 64
    shapes, prefilled C compared in full, vector and random programs, many
    invocations of one build) must both pass. Functional, on Allo's simulator,
    ~12 s. Each runs under `gate_runner.py`, and the verdict is its

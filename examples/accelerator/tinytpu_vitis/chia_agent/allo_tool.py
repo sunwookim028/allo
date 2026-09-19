@@ -181,7 +181,7 @@ class AlloSpecTool(ChiaTool):
 
         ``name`` is one of: cosim.py (the RTL cosim scorer and its testbench),
         bench_isa.py (the published-setup functional check), stress_isa.py
-        (the correctness gate: 486 runs, full-range operands, 64 shapes, whole
+        (the correctness gate: 492 runs at 476a70d8, full-range operands, 64 shapes, whole
         C compared, vector and random programs), isa_ref.py (what each
         instruction means -- the reference stress_isa checks against),
         evaluate.py (how the score is computed), tinytpu_isa.rst (the design,
@@ -296,7 +296,7 @@ class AlloSpecTool(ChiaTool):
     # the next session, which then reported that no tools existed.
     async def run_functional_check(self) -> str:
         """The gate, in ~15 s: bench_isa.py (the published [-4, 4] setup) and
-        stress_isa.py (486 runs: full-range/corner/boundary int8, all 64
+        stress_isa.py (492 runs: full-range/corner/boundary int8, all 64
         shapes, C prefilled and compared in full, vector and random programs,
         many calls on one build) must both pass.
         Functional (Allo simulator), not RTL. A deadlocked dataflow fails after
