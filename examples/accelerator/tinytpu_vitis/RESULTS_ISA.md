@@ -35,7 +35,7 @@ it is not decoration. This is Gemmini's split too: the adds live in
 **Pure SIMD scratchpad.** A row of `spad` *is* one `UInt(T*8)` packed word of T
 int8 lanes; there is no way to address a lane. That is what lets a
 single-ported memory feed T lanes per cycle, and it satisfies `HLS 200-779`
-(single reader, single writer) without a pragma.
+(single reader, single writer) without a pragma (the diagnostic as Vitis first raised it: "Removed predecessors", at the end).
 
 **The PEs decode nothing.** A header word leads every instruction down the same
 chain the weights use, carrying `is_mm` and `nrows`. No command fan-out to T*T
@@ -77,7 +77,7 @@ int8 clip.
 `vitis_hls` at 8x8x8: **0 errors**, `dataflow` at the top, all 16 PEs
 instantiated as separate modules. But the first run reported a top-level
 latency of **91407 cycles**, against 74 for the fixed-function
-`microarch_ws.py`, and the report says why:
+`microarch_ws.py` (removed; see "Removed predecessors" at the end), and the report says why:
 
 ```
 o VITIS_LOOP_300_1   Trip = 1023   Pipelined = yes
@@ -91,7 +91,7 @@ derived from the *encoding*, not a property of the machine.
 
 That is a real consequence of programmability, and it is worth stating plainly
 as an evaluation finding: for a fixed-function design, csynth's interval *is*
-the answer (`microarch_ws.py` hit its roofline exactly and could be checked
+the answer (`microarch_ws.py`, at `e2451b81`, hit its roofline exactly and could be checked
 statically). For an instruction-programmable design, **trip counts are data**,
 so static estimates become bounds and only `cosim` gives a cycle count. Any
 comparison against Gemmini's measured `rdcycle` has to be a cosim comparison.
@@ -126,7 +126,7 @@ Re-verified exact at 4x4x4, 8x8x8 and 16x16x16 after the change. Per unit at
 
 `accu_0` at 3058 is the whole top-level interval, so the vector unit -- not the
 array -- is the thing to optimize next. DSP is 12 rather than the 96 of the
-int8 `microarch_ws.py` build because int8 multiplies mapped into LUTs here;
+int8 `microarch_ws.py` build (at `e2451b81`) because int8 multiplies mapped into LUTs here;
 that is a mapping difference, not a missing array (all 16 `pe_i_j` modules are
 present in the report).
 
@@ -774,3 +774,30 @@ Answered by a unit-level probe matrix, and it was none of the usual suspects:
 
 It was **element width**: four scalar byte accesses per iteration through a
 port serving one per cycle. Subsumed by the change above; no separate work.
+
+## Removed predecessors
+
+`microarch_isa.py` is the only design left in the tree. The designs it
+superseded were removed on 2026-09-19; the last commit containing them is
+`e2451b81`, and every file below is readable with
+`git show e2451b81:examples/accelerator/<path>`.
+
+| path | what it was |
+| --- | --- |
+| `tinytpu_grid/microarch.py`, `bench.py` | the first, single-grid machine: 36 PEs sharing `A`, `B`, `imem` and `C` |
+| `tinytpu_grid/repro/` | why it failed: the command-broadcast deadlock in the dataflow simulator (`README.md`, `a_passes_no_imem.py`, `b_hangs_with_imem.py`) and Vitis's refusal of the same fan-out (`vitis_csyn_errors.log`) |
+| `tinytpu_grid/BACKEND_CHOICE.md` | the backend comparison (Vitis dataflow vs. chia RTLGen vs. SystemC/Catapult) that chose Vitis and forced the one-owner-per-array structure every later design keeps |
+| `tinytpu_vitis/microarch.py`, `bench.py`, `RESULTS.md`, `csyn_4x4x4.log`, `csynth_4x4x4.rpt` | output-stationary feeder/drainer restructure; Vitis-legal, `Final II = 7` on the `acc += a*b` recurrence |
+| `tinytpu_vitis/microarch_ws.py`, `bench_ws.py`, `RESULTS_WS.md`, `logs/csyn_int8_8x8x8.log`, `logs/csynth_{int8_8x8x8,int8_16x16x16,fp32_8x8x8}.rpt` | weight-stationary, one opcode, II=1 per MAC at 100% of roofline (interval 74 at 8x8x8, down from 168 once the feeders and accumulator were partitioned) |
+
+The Vitis diagnostic that every design since the grid satisfies by construction,
+from `tinytpu_grid/repro/vitis_csyn_errors.log` on the 4x4x4 grid, where
+`v728`/`v729`/`v730` are `A`, `B`, `imem` (read by all 36 instances) and `v731`
+is `C` (written by 16):
+
+```
+ERROR: [HLS 200-779] Non-shared array 'v730' failed dataflow checking:
+                     it can only have a single reader and a single writer.
+ERROR: [HLS 200-979] Argument 'v731' failed dataflow checking:
+                     it can only be written in one process function.
+```

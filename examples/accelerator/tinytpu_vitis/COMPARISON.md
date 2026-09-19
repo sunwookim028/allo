@@ -694,7 +694,8 @@ marginal term is 1.9x, so the next pass belongs on the marginal side, starting
 with the write path.
 
 Neither term is about the array, the data type, or the dataflow -- all three are
-correct and RTL-verified, and `microarch_ws.py` reached exactly 100% of roofline
+correct and RTL-verified, and `microarch_ws.py` (since removed;
+`git show e2451b81:examples/accelerator/tinytpu_vitis/microarch_ws.py`) reached exactly 100% of roofline
 with the same PE structure. The compute is not the limit.
 
 Both utilizations are low in absolute terms because these are tiny problems on

@@ -58,7 +58,8 @@ bound at call time.
 
 They share no code. The branches' merge base (`76130c63`) predates both;
 `tinytpu_vitis` does not exist on `chia-codesign` and `tinytpu` does not exist
-on `main`; the two `microarch.py` files share only their SPDX header.
+on `main`; our `tinytpu_vitis/microarch_isa.py` and chia's `tinytpu/microarch.py`
+share only their SPDX header.
 
 | | ours (`main`) | chia's (`chia-codesign`) |
 | --- | --- | --- |

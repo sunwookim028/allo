@@ -395,7 +395,9 @@ Each cost real time; none is a bug exactly, but none is discoverable:
 - **`df.build` is `customize(func)` + `s.build(...)`**, so the schedule
   primitives (`s.partition`, `MockBuffer`) are reachable on the Vitis path.
   Also undocumented, and load-bearing: partitioning the feeders and the
-  accumulator took the top-level interval from 168 to 74 cycles.
+  accumulator took the top-level interval from 168 to 74 cycles, measured on
+  the since-removed weight-stationary design
+  (`git show e2451b81:examples/accelerator/tinytpu_vitis/RESULTS_WS.md`, section 3).
 - **Priority: Low individually, Medium as a "dataflow gotchas" page.**
 
 ## 18. Catapult lowers `try_get`/`try_put` to *blocking* reads with `success` hard-coded true

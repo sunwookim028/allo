@@ -3,8 +3,8 @@
 
 """TinyTPU-isa: an instruction-programmable tiled-GEMM accelerator in grid Allo.
 
-What the earlier files in this directory got and did not get:
-
+What the earlier designs got and did not get. Both files have since been removed;
+read them with `git show e2451b81:examples/accelerator/tinytpu_vitis/<file>`.
   * `microarch.py`     -- output-stationary, Vitis-legal, but `acc += a*b` is a
                           loop-carried dependence so `Final II = 7`.
   * `microarch_ws.py`  -- weight-stationary, II=1 per MAC, array at 100% of
@@ -36,10 +36,10 @@ meet, and where each one lands:
 `microarch_ws.py` had a `loader` writing `a_in[0..T-1]` and a `drainer` reading
 `c_out[0..T-1]`, both in fixed order. That design needs stream depth
 proportional to `M * NI` -- the entire run -- which means back-pressure never
-engages (`RESULTS_WS.md` section 6). Upstream's `test_multi_cache_gemm.py` has
-no process of that shape: `offchip_loadA` writes exactly one stream and the
-border PEs daisy-chain it, `L2_A[i] -> L2_A[i+1]`. `test_tiled_systolic.py`
-runs on depth-**4** FIFOs for the same reason.
+engages (`RESULTS_WS.md` section 6; both files at `e2451b81`). Upstream's
+`test_multi_cache_gemm.py` has no process of that shape: `offchip_loadA` writes
+exactly one stream and the border PEs daisy-chain it, `L2_A[i] -> L2_A[i+1]`.
+`test_tiled_systolic.py` runs on depth-**4** FIFOs for the same reason.
 
 So every distribution here is a chain, and every chain carries *packed words*:
 
@@ -264,7 +264,7 @@ int8 lanes, int32 accumulation, `vst` clipping to int8 -- Gemmini's default
 config (`inputType = SInt(8.W)`, `accType = SInt(32.W)`) and its `mvout`
 behaviour under `ACC_SCALE_IDENTITY` with shift 0, which is what `allo_cmp.c`
 passes. Packing is what makes the SIMD scratchpad work, and packing needs
-integers, so unlike `microarch_ws.py` there is no fp32 switch here.
+integers, so unlike `microarch_ws.py` (at `e2451b81`) there is no fp32 switch here.
 """
 
 import os
@@ -869,9 +869,9 @@ def tinytpu_isa(
 
         The compute loop has **no loop-carried value**: tap a lane, take the
         partial sum from the north, multiply-add, pass both on. The multiplier
-        and adder latencies are pipeline *depth*, not initiation interval, which
-        is the property `microarch.py` could not have and the reason a systolic
-        array is built deep."""
+        and adder latencies are pipeline *depth*, not initiation interval --
+        the property `microarch.py` (at `e2451b81`) could not have, and the reason a
+        systolic array is built deep."""
         i, j = df.get_pid()
         w: int8 = 0
         # The `mm` count arrives on the same chain the headers use, so the
@@ -1041,7 +1041,7 @@ def tinytpu_isa(
                 # It also cannot recur: consecutive iterations touch different
                 # addresses (`f1 + r` for successive r), so the add is pipeline
                 # depth rather than initiation interval. That is the same reason
-                # `microarch_ws.py`'s drainer accumulated at II=1.
+                # `microarch_ws.py`'s drainer (at `e2451b81`) accumulated at II=1.
                 for r in range(nr):
                     v: UInt(AW) = cw[T - 1].get()
                     base: UInt(AW) = 0
