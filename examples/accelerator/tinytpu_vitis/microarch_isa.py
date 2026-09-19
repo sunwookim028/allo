@@ -311,12 +311,16 @@ OP_NOP = 0
 OP_DMA_LD = 1     # f0=src f1=dram_row0 f2=col_block f3=vmem0          nr=rows
 OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
 OP_VLD = 3        # f0=vr0  f1=vmem0                            nr=rows
-OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=vmem_w     nr=rows
+OP_MM = 4         # (retired: split into vmatload / vmatpush / vmatpop)
 OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
 OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
 OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
 OP_ENDLOOP = 9    # close the innermost loop
+# MiniTPU's M slot (alignment increment 2). The array computes Y = X W.
+OP_VMATLOAD = 10  # f0=vr_w: T weight rows, W row i = vr[f0 + i]    nr=T
+OP_VMATPUSH = 11  # f0=vr_a: activation rows                        nr=rows
+OP_VMATPOP = 12   # f0=ar_d: the oldest un-popped result rows       nr=rows
 
 # `dma_ld`'s f0 is the SOURCE matrix: 0 A, 1 B. The destination is always
 # VMEM (MiniTPU: DMA moves only between DRAM and VMEM). TinyTPU-isa v1 also
@@ -462,10 +466,17 @@ MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
 # hoists every argument into a local buffer before the region starts, sized to
 # the *declared* array rather than to the shape being run, and that copy was
 # 907 of the 1586 cycles at 16x16x16 and 90% of them at 4x4x4.
-VMEM_ROWS = int(os.environ.get("TPU_VMEM", 512))   # rows, each one packed word
-NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
-NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
+# Memory sizes grow with the problem the build admits: the GEMM layout needs
+# 2 * MAXDIM^2 / T rows of VMEM and of vregs (A and B, one column block per
+# MAXDIM rows), and the test programs up to about 8 * MAXDIM accumulator
+# rows. The defaults are the v1 sizes wherever those suffice, so the T=4,
+# MAXDIM=16 build is unchanged.
+_LAYOUT = 2 * (MAXDIM // T) * MAXDIM
+VMEM_ROWS = int(os.environ.get("TPU_VMEM", max(512, 2 * _LAYOUT)))
+NVR = int(os.environ.get("TPU_NVR", max(256, 2 * _LAYOUT)))
+NAR = int(os.environ.get("TPU_NAR", max(128, 8 * MAXDIM)))
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
+OUTQ = 64                      # the array's output FIFO, rows (MiniTPU's)
 
 MAXROWS = 127                                      # `nr` is 8 bits, top bit spare
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
@@ -497,9 +508,20 @@ A_VR = 0                       # A vregs:  kb * MAXDIM + m  (vld'd from VMEM)
 B_VM = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
 A_VM = KB_MAX * MAXDIM         # A words in VMEM: kb * MAXDIM + m, after B
 AR_C = 0                       # the accumulator, up to MAXDIM words
-AR_P = MAXDIM + 1              # scratch region for vector-unit programs
+AR_P = MAXDIM + 1              # a popped k-tile, before its vadd
+B_VR = KB_MAX * MAXDIM         # B vregs: nb * MAXDIM + k  (vmatload's weights)
 AR_RAW_DIST = 4                # see THE ACCUMULATOR DISTANCE CONTRACT
 assert AR_RAW_DIST <= T, "a T-row GEMM must satisfy the accumulator contract"
+
+# The scored shapes, scaled with the array: T, 2T, 3T, 4T x 4T x 2T and 4T
+# cubed, dropped where they exceed MAXDIM. At T=4 they are exactly the five
+# shapes v1 and Gemmini were measured at; nothing in the harness names a
+# shape by number, so a constant that only holds at T=4 cannot hide.
+# Rows of `isa_dsl.vector_program` by default: 8 where MAXDIM admits it.
+VEC_M = max(2, min(8, MAXDIM // 2) // 2 * 2)
+SCORED_SHAPES = [s for s in ((T, T, T), (2 * T,) * 3, (3 * T,) * 3,
+                             (4 * T, 4 * T, 2 * T), (4 * T,) * 3)
+                 if max(s) <= MAXDIM]
 assert IMEM_SIZE % 8 == 0, "the program prefetch moves 8 words per iteration"
 
 
@@ -528,15 +550,25 @@ def tinytpu_isa(
     ac2sp: Stream[UInt(VW), QD]         # accumulator -> dma_st (clipped)
 
     # The array's streaming ports. Chains, never fan-out.
-    wcol: Stream[UInt(VW), QD][T]       # header + weight words, down column 0
+    wcol: Stream[UInt(VW), QD][T]       # counts, then weight words, down column 0
     wrow: Stream[UInt(VW), QD][T, T]    # ... then east along row i
     acol: Stream[UInt(VW), QD][T]       # activation words, down column 0
-    a_fwd: Stream[int8, QD][T, T]       # one lane, east
+    # The weight-switch flag, beside each activation word down column 0. A
+    # separate chain rather than bit VW of `acol`: a Stream of UInt(VW + 1)
+    # (65 bits at T=8) corrupts the dataflow simulator's heap (72 and 128 bits
+    # run, 96 hangs) -- see docs/source/designs/alignment.rst.
+    afl: Stream[UInt(8), QD][T]
+    a_fwd: Stream[UInt(16), QD][T, T]   # one lane and the flag, east
     p_fwd: Stream[int32, QD][T, T]      # partial sums, south
-    cw: Stream[UInt(AW), QD][T]         # bottom row packs T psums going east
-    # wld(i, j) -> pe(i, j): (weight lane, row count) per `mm`. Depth 4 is the
-    # shadow weight register -- the next `mm`'s weight is latched while this
-    # one computes, Gemmini's c1/c2 double buffer.
+    cw: Stream[UInt(AW), QD][T - 1]     # bottom row packs T psums going east
+    # The array's OUTPUT FIFO: rows pushed and not yet popped wait here.
+    # MiniTPU's holds 64 rows; `check_program` refuses a program that leaves
+    # more than OUTQ rows un-popped, which under back-pressure would be a
+    # deadlock where MiniTPU drops results.
+    mxo: Stream[UInt(AW), OUTQ]
+    # wld(i, j) -> pe(i, j): the weight lane per `vmatload`. Depth 4 holds
+    # the pending weights -- the next load's weight is latched while this one
+    # computes (MiniTPU's two banks, Gemmini's c1/c2 double buffer).
     wq: Stream[UInt(32), 4][T, T]
 
     @df.kernel(mapping=[1], args=[imem])
@@ -593,8 +625,8 @@ def tinytpu_isa(
         c_dld.put(ib[1])
         c_dld.put(ib[7])
         c_vmu.put(ib[2])
-        c_vmu.put(ib[4])
         c_vru.put(ib[3])
+        c_vru.put(ib[4])
         c_acc.put(ib[5])
         c_dst.put(ib[6])
 
@@ -660,12 +692,11 @@ def tinytpu_isa(
                 if op == OP_VLD:
                     c_vmu.put(rw)
                     c_vru.put(rw)
-                if op == OP_MM:
-                    ws: UInt(64) = rw
-                    ws[54:62] = T + 1
-                    ws[18:30] = nr
-                    c_vmu.put(ws)
+                if op == OP_VMATLOAD:
                     c_vru.put(rw)
+                if op == OP_VMATPUSH:
+                    c_vru.put(rw)
+                if op == OP_VMATPOP:
                     c_acc.put(rw)
                 if op == OP_VADD:
                     wv: UInt(64) = rw
@@ -757,36 +788,18 @@ def tinytpu_isa(
 
     @df.kernel(mapping=[1])
     def vmu():
-        """The VMEM, the only unit that owns it, and the array's WEIGHT
-        port.
+        """VMEM, the only unit that owns it.
 
         Pure SIMD access: an address names a whole `UInt(T*8)` row and there is
-        no way to address a lane, which is what lets a single-ported memory
-        feed T lanes per cycle.
+        no way to address a lane. Written by `dma_ld` (the only place DMA
+        writes) and read by `vld` (VMEM -> vregs). Since increment 2 it no
+        longer feeds the array: MiniTPU's `vmatload` takes its weights from
+        VREGs, so B travels VMEM -> `vld` -> vregs -> `vmatload` like A.
 
-        **`mm` names its weights by VMEM address** (`f3`), and this unit
-        pushes one header word and those T weight rows down `wcol[0]` itself.
-        Before, a weight `vld` copied them into the vregs and `vru` pushed them
-        from there -- two trips through two memories for T words, and `vru`,
-        the critical unit, spending T + 1 of its cycles per `mm` on them.
-        Still ONE owner of `vmem` and ONE writer of `wcol[0]`: every restructure
-        here is legal under Allo's one-owner rule.
-
-        It opens by handing the array its counts (how many `mm`s, how many
-        wavefront rows between them) on the chain it uses for headers.
-
-        The three arms share one flat row loop with ONE `vmem` read per
-        iteration at a muxed address and one write, which a dual-port BRAM
-        holds at II=1. `vmu`'s copy of an `mm` carries its own work count
-        (`T + 1`) in `nr` and the array's row count in `f1` (see
-        `sequencer`)."""
+        One flat row loop, ONE `vmem` access per iteration."""
         vmem: UInt(VW)[VMEM_ROWS]
         nw: UInt(64) = c_vmu.get()
         n_row: int32 = nw[0:16]
-        mw: UInt(64) = c_vmu.get()
-        nmo: UInt(VW) = 0
-        nmo[0:32] = mw[0:32]        # mm count | wavefront rows << 16
-        wcol[0].put(nmo)
         op: int32 = 0
         f1: int32 = 0
         f3: int32 = 0
@@ -801,50 +814,40 @@ def tinytpu_isa(
                 f3 = w0[42:54]
                 cnt = w0[54:62]
                 r = 0
-            ra: int32 = f1 + r
-            if op == OP_MM:
-                # iteration 0 is the header; iterations 1..T are weight rows
-                # 0..T-1, row 0 first: PE row i keeps the i-th word it sees.
-                ra = f3 + r - 1
-                if r == 0:
-                    ra = f3
             if op == OP_DMA_LD:
                 vmem[f3 + r] = dma2vm.get()
             else:
-                lw: UInt(VW) = vmem[ra]
-                if op == OP_VLD:
-                    vm2vr.put(lw)
-                else:
-                    ow: UInt(VW) = lw
-                    if r == 0:
-                        hdr: UInt(VW) = 0
-                        hdr[0:12] = f1
-                        ow = hdr
-                    wcol[0].put(ow)
-            # No write-back branch: the VMEM is input-only. Results
-            # leave through the accumulator, which is a separate memory.
+                vm2vr.put(vmem[f1 + r])
 
     @df.kernel(mapping=[1])
     def vru():
-        """Operand vector registers, and the array's ACTIVATION port.
+        """Operand vector registers, and BOTH of the array's input ports.
 
-        Written by `vld` (from the VMEM) and by a `dma_ld` addressed to
-        the vregs (straight from DRAM); read by `mm`, which streams `nr`
-        activation rows down `acol[0]`. Weights no longer pass through here
-        (see `vmu`), so an `mm` costs this unit exactly `nr` cycles.
+        Written by `vld` (from VMEM); read by `vmatload`, which streams T
+        weight rows down `wcol[0]`, and by `vmatpush`, which streams `nr`
+        activation rows down `acol[0]` (MiniTPU's M slot: both commands read
+        VREG port C).
 
-        **This was the critical unit.** At 16x16x16 it ran 465 cycles back to
-        back -- 464 words, of which 80 were the per-`mm` header and weights and
-        64 the A `vld` -- and everything behind it waited. One flat loop with
-        ONE `vr` read and ONE `vr` write per iteration, each at a muxed address
-        (and the write from a muxed source), holds II=1."""
+        **The weight switch rides the activation wavefront**, as on MiniTPU
+        (`mxu.sv`: each PE switches to newly loaded weights as the first
+        activation of the next push passes it). The first activation row
+        after a `vmatload` carries a flag (on `afl`, beside it); each PE takes
+        its next weight from its `wld` queue when it sees the flag. There is
+        no row count per tile anywhere, so a push's length is free.
+
+        It opens by handing the array its counts (loads, pushed rows) on the
+        weight chain. One flat loop, ONE `vr` access per iteration."""
         nw: UInt(64) = c_vru.get()
         n_word: int32 = nw[0:16]
+        mw: UInt(64) = c_vru.get()
+        nmo: UInt(VW) = 0
+        nmo[0:32] = mw[0:32]        # load count | pushed rows << 16
+        wcol[0].put(nmo)
         vr: UInt(VW)[NVR]
         op: int32 = 0
         f0: int32 = 0
-        f3: int32 = 0
         cnt: int32 = 0
+        pend: int32 = 0             # a vmatload no push has used yet
         r: int32 = -1               # advanced at the TOP: see the II note
         for x in range(n_word):
             r += 1
@@ -852,29 +855,32 @@ def tinytpu_isa(
                 w0: UInt(64) = c_vru.get()
                 op = w0[0:6]
                 f0 = w0[6:18]
-                f3 = w0[42:54]
                 cnt = w0[54:62]
                 r = 0
-            if op == OP_MM:
-                vv: UInt(VW) = vr[f0 + r]
-                acol[0].put(vv)
-            else:
-                # `vld`: the only way into the vregs (increment 1).
+            if op == OP_VLD:
                 vr[f0 + r] = vm2vr.get()
+            else:
+                vv: UInt(VW) = vr[f0 + r]
+                if op == OP_VMATLOAD:
+                    wcol[0].put(vv)
+                    pend = 1
+                else:
+                    acol[0].put(vv)
+                    fw: UInt(8) = pend
+                    afl[0].put(fw)
+                    pend = 0
 
     @df.kernel(mapping=[T, T])
     def wld():
         """The weight half of a processing element: one per PE.
 
-        Walks the header/weight chain -- down column 0, then east along the
-        row -- and hands its own PE one word per `mm`, `(weight lane, row
-        count)`, through `wq[i, j]`. The PE used to do this itself, as a
-        serial prologue at the start of every `mm` (read the header, latch a
-        weight, forward the rest), so no wavefront could enter the array
-        between two `mm`s until the next weight had walked the chain. Split
-        out, this process latches `mm` n+1's weight while the PE computes
-        `mm` n: `wq` is the shadow register, Gemmini's c1/c2 double buffer.
-        Worth 22 cycles at 16x16x16 alone and 82 once `accu` is at II=1."""
+        Walks the weight chain -- down column 0, then east along the row --
+        and hands its own PE one weight lane per `vmatload` through `wq[i,
+        j]`. PE row i keeps the i-th of the T words a `vmatload` sends, so PE
+        (i, j) holds W[i][j] and the array computes Y = X W, as MiniTPU's
+        does. `wq` is the pending-weight queue: `vmatload` n+1's weight is
+        latched while the PE computes with n's (MiniTPU's two pending banks,
+        Gemmini's c1/c2 double buffer)."""
         i, j = df.get_pid()
         nmw: UInt(VW) = 0
         with allo.meta_if(j == 0):
@@ -885,20 +891,11 @@ def tinytpu_isa(
             nmw = wrow[i, j - 1].get()
         with allo.meta_if(j != T - 1):
             wrow[i, j].put(nmw)
-        nmm: int32 = nmw[0:16]
+        nld: int32 = nmw[0:16]
         tq: UInt(32) = 0
-        tq[0:16] = nmw[16:32]       # the PE's own trip count: wavefront rows
+        tq[0:16] = nmw[16:32]       # the PE's own trip count: pushed rows
         wq[i, j].put(tq)
-        for c in range(nmm):
-            hdr: UInt(VW) = 0
-            with allo.meta_if(j == 0):
-                hdr = wcol[i].get()
-                with allo.meta_if(i != T - 1):
-                    wcol[i + 1].put(hdr)
-            with allo.meta_else():
-                hdr = wrow[i, j - 1].get()
-            with allo.meta_if(j != T - 1):
-                wrow[i, j].put(hdr)
+        for c in range(nld):
             ww: UInt(VW) = 0
             with allo.meta_if(j == 0):
                 ww = wcol[i].get()
@@ -910,7 +907,6 @@ def tinytpu_isa(
                 wrow[i, j].put(ww)
             q: UInt(32) = 0
             q[0:8] = ww[8 * j : 8 * (j + 1)]
-            q[8:20] = hdr[0:12]
             wq[i, j].put(q)
 
     @df.kernel(mapping=[T, T])
@@ -918,35 +914,37 @@ def tinytpu_isa(
         """One processing element: weight-stationary MAC, and it decodes
         nothing.
 
-        ONE flat loop over every wavefront row of every `mm` -- the trip count
-        is the total its `wld` sends first. On the row that starts an `mm` it
-        takes the next `(weight, rows)` word from `wq`; there is no prologue
-        left in this loop, so consecutive `mm`s stream back to back.
+        ONE flat loop over every pushed row. A row whose flag bit is set is
+        the first after a `vmatload`, and the PE takes its next weight from
+        `wq` before using it (MiniTPU: the switch rides the wavefront).
 
         The MAC has **no loop-carried value**: tap a lane, take the partial
-        sum from the north, multiply-add, pass both on. The multiplier and
-        adder latencies are pipeline depth, not initiation interval."""
+        sum from the north, multiply-add, pass both on. The partial sum starts
+        at 0 in row 0, so nothing accumulates across pushes -- a k-tile's
+        result leaves the array and deeper contractions are summed by `vadd`
+        (MiniTPU's split)."""
         i, j = df.get_pid()
         tq: UInt(32) = wq[i, j].get()
         nt: int32 = tq[0:16]
         w: int8 = 0
-        cnt: int32 = 0
-        r: int32 = -1               # advanced at the TOP: see the II note
         for x in range(nt):
-            r += 1
-            if r >= cnt:
-                q: UInt(32) = wq[i, j].get()
-                w = q[0:8]
-                cnt = q[8:20]
-                r = 0
             a: int8 = 0
+            fl: UInt(1) = 0
             with allo.meta_if(j == 0):
                 aw: UInt(VW) = acol[i].get()
+                fw: UInt(8) = afl[i].get()
                 with allo.meta_if(i != T - 1):
                     acol[i + 1].put(aw)
+                    afl[i + 1].put(fw)
                 a = aw[8 * i : 8 * (i + 1)]
+                fl = fw[0:1]
             with allo.meta_else():
-                a = a_fwd[i, j - 1].get()
+                af: UInt(16) = a_fwd[i, j - 1].get()
+                a = af[0:8]
+                fl = af[8:9]
+            if fl == 1:
+                q: UInt(32) = wq[i, j].get()
+                w = q[0:8]
             p: int32 = 0
             with allo.meta_if(i > 0):
                 p = p_fwd[i - 1, j].get()
@@ -959,25 +957,32 @@ def tinytpu_isa(
                 p_fwd[i, j].put(o)
             with allo.meta_else():
                 # The bottom row assembles the packed result word as it
-                # travels east, so the accumulator sees whole words and
-                # there is no T-way fan-in.
+                # travels east, so the pop sees whole words and there is no
+                # T-way fan-in.
                 cv: UInt(AW) = 0
                 with allo.meta_if(j > 0):
                     cv = cw[j - 1].get()
                 cv[32 * j : 32 * (j + 1)] = o
-                cw[j].put(cv)
+                with allo.meta_if(j == T - 1):
+                    mxo.put(cv)
+                with allo.meta_else():
+                    cw[j].put(cv)
             with allo.meta_if(j != T - 1):
-                a_fwd[i, j].put(a)
+                ao: UInt(16) = 0
+                ao[0:8] = a
+                ao[8:9] = fl
+                a_fwd[i, j].put(ao)
 
     @df.kernel(mapping=[1])
     def accu():
         """Accumulator vector registers and the vector ALU.
 
-        `mm` deposits (f2=0) or accumulates (f2=1) one k-tile's psums into
-        `ar` -- Gemmini's structure, the add in `AccumulatorMem`'s write path
-        rather than in the mesh -- `vadd`/`vrelu` are elementwise, and `mvout`
-        clips to int8 on the way out (Gemmini's `mvout` under
-        ACC_SCALE_IDENTITY with shift 0).
+        `vmatpop` writes the oldest un-popped result rows into `ar` (MiniTPU:
+        results leave the array in push order and a pop drains the oldest).
+        Since increment 2 nothing accumulates here implicitly: a k-tile's
+        partial result is popped into a scratch region and summed with
+        `vadd`, MiniTPU's split. `mvout` clips to int8 on the way out
+        (Gemmini's `mvout` under ACC_SCALE_IDENTITY with shift 0).
 
         **One flat row loop at II=1, `ar` in BRAM, and a dependence claim.**
         Every arm is muxed down to ONE `ar` read and ONE `ar` write per
@@ -999,11 +1004,7 @@ def tinytpu_isa(
         assembler, not by the hardware:** `check_program` rejects any program
         in which an `ar` row is read fewer than `AR_RAW_DIST` accu iterations
         after it was written, and `AR_RAW_DIST` covers the pipeline's
-        read-to-write window with margin. Every GEMM the generator emits
-        reads an accumulator row at least `M >= T` iterations after writing
-        it. What the claim bought: 1,744 FF in this unit against 17,438 for the
-        write-behind rotation that also reached II=1 (`ca978b97`, reverted;
-        docs/source/designs/tinytpu_history.rst)."""
+        read-to-write window with margin."""
         ar: UInt(AW)[NAR]
         nw: UInt(64) = c_acc.get()
         n_row: int32 = nw[0:16]
@@ -1031,8 +1032,6 @@ def tinytpu_isa(
                 ph = r - (rr << 1)
             ra: int32 = f1 + rr
             wa: int32 = f0 + rr
-            if op == OP_MM:
-                wa = f1 + rr
             if op == OP_MVOUT:
                 ra = f0 + rr
             if op == OP_VADD:
@@ -1041,16 +1040,8 @@ def tinytpu_isa(
             rv: UInt(AW) = ar[ra]
             z: UInt(AW) = 0
             dw: int32 = 1
-            if op == OP_MM:
-                v: UInt(AW) = cw[T - 1].get()
-                base: UInt(AW) = 0
-                if f2 == 1:
-                    base = rv
-                with allo.meta_for(T) as e:
-                    be: int32 = base[32 * e : 32 * (e + 1)]
-                    ve: int32 = v[32 * e : 32 * (e + 1)]
-                    se: int32 = be + ve
-                    z[32 * e : 32 * (e + 1)] = se
+            if op == OP_VMATPOP:
+                z = mxo.get()
             elif op == OP_VADD:
                 if ph == 0:
                     xr = rv
@@ -1121,21 +1112,17 @@ def gemm_program_handwritten(M, K, N, relu=False):
     **Superseded as the shipped program by `isa_dsl.gemm_program`, and kept as
     its reference.** The two must emit bit-identical words at every shape --
     `isa_dsl.assert_matches_handwritten` checks every word of every instruction
-    and `bench_isa.py` runs it. What the generated form removes is the last two
-    lines of this docstring: the AGU *levels* below are hand-typed integers
-    that have to agree with where the `loop`/`endloop` pairs happen to sit, and
-    nothing here checks that they do.
+    and `bench_isa.py` runs it. What the generated form removes is the AGU
+    *levels* below: hand-typed integers that have to agree with where the
+    `loop`/`endloop` pairs happen to sit.
 
-    The static program is O(nesting), not O(tiles): the n and k loops are
-    `loop`/`endloop` pairs and the addresses that used to be baked into each
-    unrolled instruction are AGU terms against the induction variables. The
-    instruction count stops growing with the problem, which is the property
-    that makes this a programmable machine rather than a very long tape.
-
-    The first k-tile is peeled out of the k loop deliberately: it carries
-    `f2=0` (overwrite the accumulator) where the looped tiles carry `f2=1`
-    (accumulate), and peeling is how you say that without a predicate on the
-    induction variable.
+    The program is MiniTPU's GEMM on this machine (alignment increment 2):
+    A and B go DRAM -> VMEM -> `vld` -> vregs; each (n, k) tile is a
+    `vmatload` of T weight rows, a `vmatpush` of the M activation rows and a
+    `vmatpop` of the M result rows; k-tiles after the first are popped into a
+    scratch region and summed with `vadd` (MiniTPU: the array accumulates only
+    T deep, deeper contractions are `vadd`s in the VPU). The first k-tile is
+    peeled so it can pop straight into the accumulator region.
     """
     assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
         f"{M}x{K}x{N} exceeds the built MAXDIM={MAXDIM}")
@@ -1152,23 +1139,29 @@ def gemm_program_handwritten(M, K, N, relu=False):
     ins(enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
         enc_agu((AGU_F0, 0, MAXDIM), (AGU_F1, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
-    # --- B: one per column block, into the VMEM ---
+    # --- B: the same, one per column block ---
     ins(enc(OP_LOOP, nr=Nt))
     ins(enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=K),
         enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_VLD, f0=B_VR, f1=B_VM, nr=K),
+        enc_agu((AGU_F0, 0, MAXDIM), (AGU_F1, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
 
     # --- the output loop: level 0 is nb, level 1 is kb ---
     ins(enc(OP_LOOP, nr=Nt))
-    #   peeled first k-tile: overwrite the accumulator. Weights by
-    #   VMEM address: B_VM + nb*MAXDIM
-    ins(enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_VM, nr=M),
-        enc_agu((AGU_F3, 0, MAXDIM)))
+    #   peeled first k-tile: weights B_VR + nb*MAXDIM, popped into AR_C
+    ins(enc(OP_VMATLOAD, f0=B_VR, nr=T), enc_agu((AGU_F0, 0, MAXDIM)))
+    ins(enc(OP_VMATPUSH, f0=A_VR, nr=M))
+    ins(enc(OP_VMATPOP, f0=AR_C, nr=M))
     if Kt > 1:
         ins(enc(OP_LOOP, nr=Kt - 1))
-        #   f3 needs BOTH tiles: B_VM + nb*MAXDIM + (kb+1)*T
-        ins(enc(OP_MM, f0=A_VR + MAXDIM, f1=AR_C, f2=1, f3=B_VM + T, nr=M),
-            enc_agu((AGU_F0, 1, MAXDIM), (AGU_F3, 0, MAXDIM), (AGU_F3, 1, T)))
+        #   f0 needs BOTH tiles: B_VR + nb*MAXDIM + (kb+1)*T
+        ins(enc(OP_VMATLOAD, f0=B_VR + T, nr=T),
+            enc_agu((AGU_F0, 0, MAXDIM), (AGU_F0, 1, T)))
+        ins(enc(OP_VMATPUSH, f0=A_VR + MAXDIM, nr=M),
+            enc_agu((AGU_F0, 1, MAXDIM)))
+        ins(enc(OP_VMATPOP, f0=AR_P, nr=M))
+        ins(enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M))
         ins(enc(OP_ENDLOOP))
     if relu:
         ins(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
@@ -1198,11 +1191,16 @@ def gemm_program_flat(M, K, N, relu=False):
     for nb in range(Nt):
         p.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
                       f3=B_VM + nb * MAXDIM, nr=K), 0))
+        p.append((enc(OP_VLD, f0=B_VR + nb * MAXDIM, f1=B_VM + nb * MAXDIM,
+                      nr=K), 0))
     for nb in range(Nt):
         for kb in range(Kt):
-            p.append((enc(OP_MM, f0=A_VR + kb * MAXDIM, f1=AR_C,
-                          f2=(1 if kb else 0),
-                          f3=B_VM + nb * MAXDIM + kb * T, nr=M), 0))
+            p.append((enc(OP_VMATLOAD, f0=B_VR + nb * MAXDIM + kb * T,
+                          nr=T), 0))
+            p.append((enc(OP_VMATPUSH, f0=A_VR + kb * MAXDIM, nr=M), 0))
+            p.append((enc(OP_VMATPOP, f0=(AR_P if kb else AR_C), nr=M), 0))
+            if kb:
+                p.append((enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M), 0))
         if relu:
             p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
         p.append((enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M), 0))
@@ -1210,17 +1208,20 @@ def gemm_program_flat(M, K, N, relu=False):
 
 
 def vadd_program(M, K, N):
-    """A program for the vector unit itself, so `vadd`/`vrelu` stay exercised
-    now that tiled GEMM no longer needs them on its inner loop.
-
-    Computes A@B twice into two accumulator regions, adds them, ReLUs the sum
-    and retires it: `relu(2 * (A @ B))` on the first output tile."""
+    """A program for the vector unit itself: `relu(2 * (A @ B))` on the first
+    output tile, as two pushes of the same tile popped into two regions,
+    added, ReLU'd and retired."""
     return [(w, 0) for w in [
         enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_VM, nr=M),
         enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
         enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=T),
-        enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_VM, nr=M),
-        enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=B_VM, nr=M),
+        enc(OP_VLD, f0=B_VR, f1=B_VM, nr=T),
+        enc(OP_VMATLOAD, f0=B_VR, nr=T),
+        enc(OP_VMATPUSH, f0=A_VR, nr=M),
+        enc(OP_VMATPOP, f0=AR_C, nr=M),
+        enc(OP_VMATLOAD, f0=B_VR, nr=T),
+        enc(OP_VMATPUSH, f0=A_VR, nr=M),
+        enc(OP_VMATPOP, f0=AR_P, nr=M),
         enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
         enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
         enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]]
@@ -1303,7 +1304,10 @@ class ProgramError(ValueError):
 
 _OPNAME = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
            OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
-           OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop"}
+           OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop",
+           OP_VMATLOAD: "vmatload", OP_VMATPUSH: "vmatpush",
+           OP_VMATPOP: "vmatpop"}
+_RETIRED = (OP_DMA_ST, OP_MM)
 
 
 def check_program(prog):
@@ -1321,8 +1325,8 @@ def check_program(prog):
       * **write-before-read** on `vmem`, `vr` and `ar` -- the contract at the
         opcode table. Written-ness is tracked per row and propagated through
         `vld` (a copy of an unwritten row is unwritten); it is an error only
-        where a value is *consumed*: `mm` reading `vr` and `vmem`, and
-        `mm`-acc / `vadd` / `vrelu` / `mvout` reading `ar`.
+        where a value is *consumed*: `vmatload` and `vmatpush` reading
+        `vr`, and `vadd` / `vrelu` / `mvout` reading `ar`.
       * **the accumulator distance contract**: every `ar` read comes at least
         `AR_RAW_DIST` `accu` iterations after the write it depends on, which
         is what makes `schedule()`'s dependence claim on `ar` true.
@@ -1339,7 +1343,14 @@ def check_program(prog):
         have accepted; this is the only place that can see it.
       * structure: balanced loops, depth <= LOOP_DEPTH, trip >= 1 (the
         sequencer is a do-while), AGU terms naming a loop that is open, no
-        retired opcode, `mm` f2 in {0, 1}, `dma_ld` f0 in {0, 1}.
+        retired opcode, `dma_ld` f0 in {0, 1}.
+      * **the array's queue**: a `vmatload` moves exactly T rows and its
+        weights must be used by a `vmatpush` before the next `vmatload` (the
+        PE switches on the first pushed row after a load); a `vmatpush` needs
+        weights; a `vmatpop` may not pop more rows than are pushed and
+        un-popped (it would wait forever); at most OUTQ rows may be
+        un-popped (the output FIFO; MiniTPU drops the excess, this machine
+        would deadlock); and every pushed row is popped by the end.
 
     Raises `ProgramError` naming the static instruction, the loop iteration,
     and the rows; returns None."""
@@ -1350,7 +1361,7 @@ def check_program(prog):
         op = w0 & 0x3F
         name = _OPNAME.get(op)
         where = f"instruction {pc} ({name or f'opcode {op}'})"
-        if name is None or op == OP_DMA_ST:
+        if name is None or op in _RETIRED:
             raise ProgramError(f"{where}: not an opcode this machine executes")
         if op == OP_LOOP:
             if depth >= LOOP_DEPTH:
@@ -1379,6 +1390,7 @@ def check_program(prog):
                "ar": [False] * NAR}
     ar_wrote = [-AR_RAW_DIST] * NAR   # accu iteration of each row's last write
     it = 0                            # accu iterations issued so far
+    q = {"loaded": False, "unused": False, "out": 0}   # the array's queue
     size = {"vmem": VMEM_ROWS, "vr": NVR, "ar": NAR}
 
     for pc, ivs, op, nr, f0, f1, f2, f3 in _trace(prog):
@@ -1436,15 +1448,32 @@ def check_program(prog):
             src = span("vmem", f1, nr)
             for d, s in zip(span("vr", f0, nr), src):
                 written["vr"][d] = written["vmem"][s]
-        elif op == OP_MM:
-            if f2 not in (0, 1):
-                raise ProgramError(f"{where}: f2={f2}, must be 0 (overwrite) or 1 (accumulate)")
-            need("vmem", span("vmem", f3, T), "weights")
+        elif op == OP_VMATLOAD:
+            if nr != T:
+                raise ProgramError(f"{where}: nr={nr}; a vmatload moves "
+                                   f"exactly T={T} weight rows")
+            need("vr", span("vr", f0, T), "weights")
+            if q["unused"]:
+                raise ProgramError(f"{where}: the previous vmatload's weights "
+                                   f"were never pushed; each PE switches on "
+                                   f"the first pushed row after a load")
+            q["loaded"] = q["unused"] = True
+        elif op == OP_VMATPUSH:
+            if not q["loaded"]:
+                raise ProgramError(f"{where}: no vmatload before this push")
             need("vr", span("vr", f0, nr), "activations")
-            dst = span("ar", f1, nr)
-            for i, r in enumerate(dst):      # row by row, as `accu` runs it
-                if f2 == 1:
-                    ar_read(r, it + i, "the accumulate base")
+            q["unused"] = False
+            q["out"] += nr
+            if q["out"] > OUTQ:
+                raise ProgramError(f"{where}: {q['out']} rows pushed and not "
+                                   f"popped; the output FIFO holds OUTQ={OUTQ}")
+        elif op == OP_VMATPOP:
+            if nr > q["out"]:
+                raise ProgramError(f"{where}: pops {nr} rows but only "
+                                   f"{q['out']} are pushed and un-popped; the "
+                                   f"pop would wait forever")
+            q["out"] -= nr
+            for i, r in enumerate(span("ar", f0, nr)):   # row by row, as `accu`
                 ar_write(r, it + i)
             it += nr
         elif op == OP_VADD:
@@ -1467,12 +1496,16 @@ def check_program(prog):
             if f2 >= WPR or f1 + nr > MAXDIM:
                 raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
                                    f"block {f2} outside the {MAXDIM}x{MAXDIM} result")
+    if q["out"]:
+        raise ProgramError(f"{q['out']} pushed row(s) are never popped")
+    if q["unused"]:
+        raise ProgramError("the last vmatload's weights are never pushed")
 
 
 def assemble(prog, check=True):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
-        imem[0] static instruction count   imem[4] mm count | mm rows << 16
+        imem[0] static instruction count   imem[4] loads | pushed rows << 16
         imem[1] dma_ld  rows               imem[5] accu   iterations
         imem[2] vmu     rows               imem[6] dma_st rows
         imem[3] vru     rows               imem[7] A rows | B rows << 16
@@ -1483,13 +1516,10 @@ def assemble(prog, check=True):
     **These are work counts, not instruction counts.** Each unit runs one flat
     loop over the rows (or words, or iterations) it will actually process, so
     what it is promised has to be the sum of `nr` over the instructions it is
-    sent, with the two per-unit adjustments the flattened bodies make:
+    sent, with the per-unit adjustments the flattened bodies make:
 
-      * `vmu` charges an `mm` `T + 1` iterations -- the header and the T
-        weight rows it pushes down `wcol` -- whatever the `mm`'s own `nr`;
       * `accu` charges a `vadd` two iterations per row;
-      * a `dma_ld` goes to `vmu` or to `vru` by its destination bit, never
-        both.
+      * `vru` is charged T rows per `vmatload` (its `nr` is T by rule).
 
     A unit promised the wrong number here does not produce a wrong answer, it
     hangs -- which is worth stating, because it is the one place where the
@@ -1519,16 +1549,15 @@ def assemble(prog, check=True):
     assert a_span <= MAXDIM and b_span <= MAXDIM, (
         f"dma_ld row span {a_span}/{b_span} exceeds MAXDIM={MAXDIM}")
 
-    n_mm = count(OP_MM)
-    mm_rows = rows(OP_MM)
-    assert n_mm < (1 << 15) and mm_rows < (1 << 15), "array counts overflow"
-    ld_sp = rows(OP_DMA_LD)
+    n_ld = count(OP_VMATLOAD)
+    push_rows = rows(OP_VMATPUSH)
+    assert n_ld < (1 << 15) and push_rows < (1 << 15), "array counts overflow"
     hdr = [len(prog),
            rows(OP_DMA_LD),
-           ld_sp + rows(OP_VLD) + n_mm * (T + 1),
-           rows(OP_VLD) + mm_rows,
-           n_mm | (mm_rows << 16),
-           rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
+           rows(OP_DMA_LD, OP_VLD),
+           rows(OP_VLD, OP_VMATLOAD, OP_VMATPUSH),
+           n_ld | (push_rows << 16),
+           rows(OP_VMATPOP, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
            rows(OP_MVOUT),
            a_span | (b_span << 16)]
     assert len(hdr) == NHDR

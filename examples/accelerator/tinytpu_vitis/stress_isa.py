@@ -53,16 +53,20 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     tinytpu_isa, assemble, check_program, ProgramError, enc, enc_agu,
     gemm_program_flat, gemm_program_handwritten, vadd_program,
     OP_DMA_LD, OP_DMA_ST, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
+    OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OUTQ,
     OP_LOOP, OP_ENDLOOP, AGU_F0, AGU_F1,
     MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, VMEM_ROWS, NVR, NAR, AR_RAW_DIST,
+    SCORED_SHAPES, VEC_M,
 )
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     Program, Ref, gemm_program, vector_program, ar_distance_program,
 )
 from examples.accelerator.tinytpu_vitis import isa_ref, kpn_model  # noqa: E402
 
-SCORED = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+SCORED = list(SCORED_SHAPES)     # T, 2T, 3T, 4Tx4Tx2T, 4T -- v1's five at T=4
 ALL_SHAPES = [s for s in itertools.product(range(T, MAXDIM + 1, T), repeat=3)]
+# vector_program sizes: VEC_M and half of it (4 and 8 at MAXDIM=16)
+VEC_MS = sorted({max(2, VEC_M // 2 // 2 * 2), VEC_M})
 MAX_STATIC = (IMEM_SIZE - NHDR) // IWORDS
 CORNERS = np.array([-128, -127, -1, 0, 1, 126, 127], np.int8)
 CORNER_P = np.array([4, 2, 1, 1, 1, 2, 4], float) / 15
@@ -156,7 +160,8 @@ def random_program(seed):
     k = Program(f"fuzz {seed}")
     ri = lambda lo, hi: int(rng.integers(lo, hi + 1))   # noqa: E731
     hi_win = bool(rng.integers(0, 2))
-    lo = {m: (s - 64 if hi_win else 0)
+    win = max(64, 2 * MAXDIM)            # every window fits a MAXDIM-row run
+    lo = {m: (s - win if hi_win else 0)
           for m, s in (("vmem", VMEM_ROWS), ("vr", NVR), ("ar", NAR))}
     wr = {"vmem": np.zeros(VMEM_ROWS, bool), "vr": np.zeros(NVR, bool),
           "ar": np.zeros(NAR, bool)}
@@ -164,10 +169,10 @@ def random_program(seed):
     acc = {"it": 0}                      # accu iterations issued so far
 
     def place(mem, n):
-        return lo[mem] + ri(0, 64 - n)
+        return lo[mem] + ri(0, win - n)
 
     def run_of(mem, n):
-        ok = [s for s in range(lo[mem], lo[mem] + 64 - n + 1)
+        ok = [s for s in range(lo[mem], lo[mem] + win - n + 1)
               if wr[mem][s:s + n].all()]
         return int(rng.choice(ok)) if ok else None
 
@@ -200,18 +205,35 @@ def random_program(seed):
         wr["vr"][d:d + n] = True
         return True
 
-    def mm():
-        n = ri(1, MAXDIM)
-        w, a = run_of("vmem", T), run_of("vr", n)
-        if w is None or a is None:
+    qout = {"n": 0}                      # rows pushed and not yet popped
+
+    def pop(n=None):
+        if qout["n"] == 0:
             return False
-        d = run_of("ar", n) if rng.integers(0, 2) else None   # accumulate onto
-        d = place("ar", n) if d is None else d                # a live region?
-        acc_ = (bool(wr["ar"][d:d + n].all()) and bool(rng.integers(0, 2))
-                and accu_ok([(d + i, i) for i in range(n)]))
-        k.mm(a, d, w, rows=n, acc=acc_)
+        n = n or ri(1, min(qout["n"], MAXDIM))
+        d = place("ar", n)
+        k.vmatpop(d, rows=n)
         accu_commit([(d + i, i) for i in range(n)], n)
+        qout["n"] -= n
         return True
+
+    def mm():
+        # a load and one push, sometimes a second load and push behind it
+        # (pending weights, two tiles in the output FIFO); pops now, later,
+        # or split
+        for _ in range(ri(1, 2)):
+            n = ri(1, MAXDIM)
+            w, a = run_of("vr", T), run_of("vr", n)
+            if w is None or a is None or qout["n"] + n > OUTQ:
+                break
+            k.vmatload(w)
+            k.vmatpush(a, rows=n)
+            qout["n"] += n
+        else:
+            if rng.integers(0, 2):
+                pop()
+            return True
+        return qout["n"] > 0
 
     def vec(op):
         n = ri(1, 12)
@@ -253,7 +275,9 @@ def random_program(seed):
 
     def mvout_loop():
         # the AGU on three fields of one instruction at once
-        trip, n = ri(2, 3), ri(1, 4)
+        if WPR < 2:
+            return False                 # one column block: nothing to walk
+        trip, n = ri(2, min(3, WPR)), ri(1, min(4, MAXDIM // 3))
         s = run_of("ar", trip * n)
         if s is None or not accu_ok([(s + i, i) for i in range(trip * n)]):
             return False
@@ -270,11 +294,15 @@ def random_program(seed):
     while not mm():
         dma_ld()
         vld()
-    ops = [dma_ld, vld, mm, lambda: vec("vadd"), lambda: vec("vrelu"),
+    while pop():                         # something in `ar` before vec/mvout
+        pass
+    ops = [dma_ld, vld, mm, pop, lambda: vec("vadd"), lambda: vec("vrelu"),
            mvout, mvout_loop]
-    budget = ri(8, MAX_STATIC - 4)
+    budget = ri(8, MAX_STATIC - 10)   # mm, the drain pops and the last mvout overshoot it
     while len(k.words) < budget:
         ops[int(rng.integers(0, len(ops)))]()
+    while qout["n"]:                     # every pushed row is popped
+        pop(min(qout["n"], MAXDIM))
     mvout()
     prog = k.emit()
     assert len(prog) <= MAX_STATIC
@@ -287,41 +315,56 @@ def _bad_programs():
     """Programs `check_program` must REJECT, each breaking one rule. Raw
     `enc` words where the DSL would refuse first, so the check under test is
     the assembler's and not the generator's."""
-    ld = (enc(OP_DMA_LD, f0=0, f3=0, nr=4), 0)
-    vw = (enc(OP_VLD, f0=0, f1=0, nr=4), 0)
-    mm0 = (enc(OP_MM, f0=0, f1=0, f2=0, f3=0, nr=4), 0)
+    # every base run is T rows, so a vmatload of vr 0.. is fully written and
+    # each program is rejected for the rule it names, not for another
+    ld = (enc(OP_DMA_LD, f0=0, f3=0, nr=T), 0)
+    vw = (enc(OP_VLD, f0=0, f1=0, nr=T), 0)
+    wl = lambda v=0, n=T: (enc(OP_VMATLOAD, f0=v, nr=n), 0)  # noqa: E731
+    wp = lambda v=0, n=4: (enc(OP_VMATPUSH, f0=v, nr=n), 0)  # noqa: E731
+    wo = lambda a=0, n=4: (enc(OP_VMATPOP, f0=a, nr=n), 0)   # noqa: E731
+    mm0 = [wl(), wp(), wo()]
     out = lambda a=0: (enc(OP_MVOUT, f0=a, nr=4), 0)  # noqa: E731
     return {
         "mvout before any write to ar": [ld, out()],
-        "mm accumulate onto unwritten ar": [ld, vw, (enc(OP_MM, f2=1, nr=4), 0), out()],
-        "vadd second source unwritten": [ld, vw, mm0, (enc(OP_VADD, f0=8, f1=0, f2=4, nr=4), 0), out(8)],
-        "vrelu source unwritten": [ld, vw, mm0, (enc(OP_VRELU, f0=0, f1=20, nr=4), 0), out()],
-        "mm weights never loaded into vmem": [ld, vw, (enc(OP_MM, f3=40, nr=4), 0), out()],
-        "mm activations only in vmem, never in vr": [ld, (enc(OP_MM, f0=8, nr=4), 0), out()],
-        "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, mm0, out()],
+        "vadd second source unwritten": [ld, vw, *mm0, (enc(OP_VADD, f0=8, f1=0, f2=4, nr=4), 0), out(8)],
+        "vrelu source unwritten": [ld, vw, *mm0, (enc(OP_VRELU, f0=0, f1=20, nr=4), 0), out()],
+        "vmatload weights never vld'd into vr": [ld, vw, wl(40), wp(), wo(), out()],
+        "vmatpush activations only in vmem, never in vr": [ld, vw, wl(), wp(8), wo(), out()],
+        "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, *mm0, out()],
         # The accumulator distance contract, one iteration inside it. Relative
         # to AR_RAW_DIST on purpose: whether the contract is wide enough for
         # the RTL is a question only cosim can answer (TPU_TB=stress runs
         # ar_distance_program(AR_RAW_DIST); mutate.py's `ar_claim_false`).
         **({f"ar reads at distance AR_RAW_DIST - 1 = {AR_RAW_DIST - 1}":
             ar_distance_program(AR_RAW_DIST - 1)} if AR_RAW_DIST > 1 else {}),
-        **({"mvout of a 1-row mm's row, 1 accu iteration later": [
-            ld, vw, (enc(OP_MM, nr=1), 0), (enc(OP_MVOUT, nr=1), 0)]}
+        **({"mvout of a 1-row pop's row, 1 accu iteration later": [
+            ld, vw, wl(), wp(0, 1), wo(0, 1), (enc(OP_MVOUT, nr=1), 0)]}
            if AR_RAW_DIST > 1 else {}),
-        "mm consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), mm0, out()],
+        "vmatpush consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), *mm0, out()],
         # Loop semantics: the body is fine on iteration 0 and reads ar 4..7,
         # which nothing wrote, on iteration 1.
         "loop iteration 1 reads unwritten ar": [
-            ld, vw, mm0, (enc(OP_LOOP, nr=2), 0),
+            ld, vw, *mm0, (enc(OP_LOOP, nr=2), 0),
             (enc(OP_MVOUT, f0=0, f1=0, nr=4), enc_agu((AGU_F0, 0, 4), (AGU_F1, 0, 4))),
             (enc(OP_ENDLOOP), 0)],
-        "zero-row vld (hangs the machine)": [ld, (enc(OP_VLD, nr=0), 0), vw, mm0, out()],
-        "loop trip count 0": [ld, vw, mm0, (enc(OP_LOOP, nr=0), 0), out(), (enc(OP_ENDLOOP), 0)],
-        "AGU term names a closed loop": [ld, vw, mm0, (enc(OP_MVOUT, nr=4), enc_agu((AGU_F1, 0, 4)))],
-        "ar row past NAR": [ld, vw, (enc(OP_MM, f1=NAR - 2, nr=4), 0), out(NAR - 2)],
-        "mvout past the last C row": [ld, vw, mm0, (enc(OP_MVOUT, f1=MAXDIM - 2, nr=4), 0)],
-        "retired dma_st opcode": [ld, vw, mm0, out(), (enc(OP_DMA_ST, nr=4), 0)],
-        "unbalanced loop": [ld, vw, mm0, (enc(OP_LOOP, nr=2), 0), out()],
+        "zero-row vld (hangs the machine)": [ld, (enc(OP_VLD, nr=0), 0), vw, *mm0, out()],
+        "loop trip count 0": [ld, vw, *mm0, (enc(OP_LOOP, nr=0), 0), out(), (enc(OP_ENDLOOP), 0)],
+        "AGU term names a closed loop": [ld, vw, *mm0, (enc(OP_MVOUT, nr=4), enc_agu((AGU_F1, 0, 4)))],
+        "ar row past NAR": [ld, vw, wl(), wp(), wo(NAR - 2), out(NAR - 2)],
+        "mvout past the last C row": [ld, vw, *mm0, (enc(OP_MVOUT, f1=MAXDIM - 2, nr=4), 0)],
+        "retired dma_st opcode": [ld, vw, *mm0, out(), (enc(OP_DMA_ST, nr=4), 0)],
+        "retired mm opcode": [ld, vw, (enc(OP_MM, nr=4), 0), out()],
+        "unbalanced loop": [ld, vw, *mm0, (enc(OP_LOOP, nr=2), 0), out()],
+        # The array's queue.
+        "vmatload moving T-1 rows": [ld, vw, wl(0, T - 1), wp(), wo(), out()],
+        "vmatpush with no vmatload before it": [ld, vw, wp(), wo(), out()],
+        "two vmatloads with no push between": [ld, vw, wl(), wl(), wp(), wo(), out()],
+        # rebalanced afterwards, so only the pop rule can reject it
+        "vmatpop of more rows than are pushed": [ld, vw, wl(), wp(0, 4), wo(0, 8), wp(0, 4), out()],
+        "pushed rows never popped": [ld, vw, *mm0, out(), wl(), wp()],
+        "more than OUTQ rows un-popped": [ld, vw, wl()] + [wp()] * (OUTQ // 4 + 1)
+                                         + [wo(0, 4)] * (OUTQ // 4 + 1) + [out()],
+        "the last vmatload is never pushed": [ld, vw, *mm0, out(), wl()],
     }
 
 
@@ -339,7 +382,7 @@ def validator_controls():
     good = [(g.__name__, s, r, g(*s, r)) for s in ALL_SHAPES for r in (False, True)
             for g in (gemm_program, gemm_program_flat, gemm_program_handwritten)]
     good += [("vadd_program", SCORED[-1], False, vadd_program(*SCORED[-1]))]
-    good += [("vector_program", (M,), False, vector_program(M)) for M in (4, 8)]
+    good += [("vector_program", (M,), False, vector_program(M)) for M in VEC_MS]
     good += [("ar_distance_program", (d,), False, ar_distance_program(d))
              for d in (AR_RAW_DIST, AR_RAW_DIST + 1, 2 * AR_RAW_DIST)]
     for name, s, r, prog in good:
@@ -384,7 +427,7 @@ def cases(quick=False):
                 if (M, K, N) in SCORED and dist == "full" and \
                         NHDR + IWORDS * len(flat) <= IMEM_SIZE:
                     yield tag + " flat", flat, A, B, C0, gold, M, N
-    for M in (4, 8):
+    for M in VEC_MS:
         for dist in ("full", "mid", "small"):
             seed += 1
             A, B = operands(dist, seed)
@@ -442,4 +485,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    _rc = main(sys.argv[1:])
+    # os._exit: see bench_isa.py -- teardown can race the OpenMP threads
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_rc)

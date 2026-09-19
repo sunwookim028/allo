@@ -26,7 +26,8 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    OP_DMA_LD, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
+    OP_DMA_LD, OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP,
+    OP_VADD, OP_VRELU, OP_MVOUT,
     DMA_SRC_B,
     MAXDIM, T, VMEM_ROWS, NVR, NAR, check_program, expand,
 )
@@ -46,20 +47,26 @@ def run(prog, A, B, C):
     vmem = np.zeros((VMEM_ROWS, T), np.int64)   # one row = T int8 lanes
     vr = np.zeros((NVR, T), np.int64)
     ar = np.zeros((NAR, T), np.int64)           # one row = T int32 lanes
+    W = None                                    # the weights in the array
+    queue = []                                  # pushed, un-popped results
     for op, nr, f0, f1, f2, f3 in expand(prog):
+        if op == OP_VMATLOAD:
+            # PE(i, j) holds W[i][j] = lane j of weight row i; they take
+            # effect from the next push (check_program: every load is
+            # pushed before the next one), so Y = X W.
+            W = vr[f0:f0 + T].copy()
+            continue
         for r in range(nr):
             if op == OP_DMA_LD:
                 src = B if f0 & DMA_SRC_B else A
                 vmem[f3 + r] = src[f1 + r, f2 * T:(f2 + 1) * T]
             elif op == OP_VLD:
                 vr[f0 + r] = vmem[f1 + r]
-            elif op == OP_MM:
-                # PE(i, j) holds lane j of weight row i and taps lane i of the
-                # activation word, so column j is sum_i act[i] * W[i][j].
-                W = vmem[f3:f3 + T]
-                psum = vr[f0 + r] @ W
-                base = ar[f1 + r] if f2 == 1 else 0
-                ar[f1 + r] = _wrap32(base + psum)
+            elif op == OP_VMATPUSH:
+                # column j is sum_i act[i] * W[i][j], T deep, from 0
+                queue.append(_wrap32(vr[f0 + r] @ W))
+            elif op == OP_VMATPOP:
+                ar[f0 + r] = queue.pop(0)
             elif op == OP_VADD:
                 ar[f0 + r] = _wrap32(ar[f1 + r] + ar[f2 + r])
             elif op == OP_VRELU:

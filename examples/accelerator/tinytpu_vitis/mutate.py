@@ -65,16 +65,17 @@ MUTANTS = [
     ("pe_shadow_not_swapped", "weight double buffer: the PE keeps its first nonzero "
      "weight instead of taking the next mm's from wq",
      "w = q[0:8]", "w = q[0:8]", "if w == 0:\n                    w = q[0:8]"),
-    ("wld_rows_from_weight", "wld sends the weight lane as the PE's row count",
-     "q[8:20] = hdr[0:12]", "hdr[0:12]", "ww[0:12]"),
-    # --- the VMEM: weights for mm, and vld ---
-    ("vmu_weight_off_by_one", "vmu streams weight rows f3+1.. instead of f3..",
-     "ra = f3 + r - 1", "f3 + r - 1", "f3 + r"),
+    ("vru_flag_sticky", "the weight-switch flag is never cleared, so every pushed "
+     "row switches weights",
+     "                    pend = 0\n", "pend = 0", "pend = pend"),
+    # --- VMEM, and vld ---
     ("vmu_vld_off_by_one", "vld reads vmem one row late",
-     "ra: int32 = f1 + r\n", "f1 + r", "f1 + r + 1"),
-    # --- the vregs: the A path ---
-    ("vru_act_off_by_one", "vru streams activation rows one row late",
+     "vm2vr.put(vmem[f1 + r])", "vmem[f1 + r]", "vmem[f1 + r + 1]"),
+    # --- the vregs: both array ports ---
+    ("vru_read_off_by_one", "vru streams weight and activation rows one row late",
      "vv: UInt(VW) = vr[f0 + r]", "vr[f0 + r]", "vr[f0 + r + 1]"),
+    ("vru_weight_off_by_one", "vmatload streams weight rows f0+1.. instead of f0..",
+     "wcol[0].put(vv)", "wcol[0].put(vv)", "wcol[0].put(vr[f0 + r + 1])"),
     ("vru_vld_dst_ignored", "vld writes vr[r], ignoring its destination base f0",
      "vr[f0 + r] = vm2vr.get()", "vr[f0 + r]", "vr[r]"),
     # --- DMA ---
@@ -103,18 +104,17 @@ MUTANTS = [
      "                if op == OP_VRELU:\n                    c_acc.put(rw)",
      "c_acc.put(rw)", "rw[54:62] = nr - 1\n                    c_acc.put(rw)"),
     # --- the accumulator and the vector ALU ---
-    ("mm_acc_dropped", "mm ignores the accumulate flag",
-     "base: UInt(AW) = 0", "if f2 == 1:", "if f2 == 2:"),
-    ("mm_always_acc", "mm always accumulates (relies on ar arriving zeroed)",
-     "base: UInt(AW) = 0", "if f2 == 1:", "if f2 <= 1:"),
-    ("mm_dst_base_ignored", "mm writes ar[r], ignoring its f1 base",
-     "wa = f1 + rr", "wa = f1 + rr", "wa = rr"),
+    ("pop_ors_old_row", "vmatpop ORs the result into the old ar row (right only "
+     "if ar arrives zeroed)",
+     "z = mxo.get()", "z = mxo.get()", "z = mxo.get() | rv"),
+    ("pop_dst_base_ignored", "vmatpop writes ar[r], ignoring its f0 base",
+     "z = mxo.get()", "z = mxo.get()", "z = mxo.get()\n                wa = rr"),
     ("vrelu_dst_is_src", "vrelu writes its source row, not f0",
-     "            if op == OP_MM:\n                wa = f1 + rr", "if op == OP_MM:",
-     "if op != OP_VADD:"),
+     "            wa: int32 = f0 + rr\n", "wa: int32 = f0 + rr\n",
+     "wa: int32 = f0 + rr\n            if op == OP_VRELU:\n                wa = f1 + rr\n"),
     ("vadd_dst_is_src1", "vadd writes its first source, not f0",
-     "            if op == OP_MM:\n                wa = f1 + rr", "if op == OP_MM:",
-     "if op != OP_VRELU:"),
+     "            wa: int32 = f0 + rr\n", "wa: int32 = f0 + rr\n",
+     "wa: int32 = f0 + rr\n            if op == OP_VADD:\n                wa = f1 + rr\n"),
     ("relu_off_by_one", "ReLU threshold off by one (-1 survives)",
      "ue: int32 = rv[32 * e3", "if re < 0:", "if re < -1:"),
     ("vadd_subtracts", "vadd computes x - y",
@@ -135,6 +135,11 @@ MUTANTS = [
     # --- the assembler, and the dependence claim it makes true ---
     ("assembler_span_short", "assemble() bursts one DRAM row too few",
      "def span(src):", "e[3] + e[1] for e in ev", "e[3] + e[1] - 1 for e in ev"),
+    ("outq_unenforced", "check_program stops enforcing the output FIFO bound",
+     'if q["out"] > OUTQ:', "> OUTQ:", "> 10 * OUTQ:"),
+    ("pop_underflow_unenforced", "check_program lets a pop take more rows than "
+     "are pushed",
+     'if nr > q["out"]:', 'if nr > q["out"]:', 'if nr > q["out"] + MAXDIM:'),
     ("ar_contract_unenforced", "check_program stops enforcing the accumulator "
      "distance contract",
      "if at - ar_wrote[row] < AR_RAW_DIST:", "< AR_RAW_DIST:", "< 1:"),

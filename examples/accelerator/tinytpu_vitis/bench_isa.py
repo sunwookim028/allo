@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 import allo.dataflow as df  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     tinytpu_isa, gemm_program_flat, vadd_program, assemble,
-    expand, MAXDIM, T, IMEM_SIZE, NHDR, IWORDS,
+    expand, MAXDIM, T, IMEM_SIZE, NHDR, IWORDS, SCORED_SHAPES,
 )
 # The shipped GEMM program is GENERATED: the loop levels come from the nesting
 # of `with k.loop(...)`, not from integers typed into `enc_agu`. The
@@ -37,7 +37,7 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     gemm_program, assert_matches_handwritten,
 )
 
-SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+SHAPES = SCORED_SHAPES          # T, 2T, 3T, 4Tx4Tx2T, 4T (v1's five at T=4)
 
 
 def buffers(seed=0):
@@ -131,5 +131,9 @@ if __name__ == "__main__":
         ok &= check(mod, M, K, N, True, looped=False)
         ok &= check(mod, M, K, N, True, looped=True)
     ok &= check_vadd(mod, *shapes[-1])
-    print("  ALL EXACT" if ok else "  FAILURES")
-    sys.exit(0 if ok else 1)
+    print("  ALL EXACT" if ok else "  FAILURES", flush=True)
+    # os._exit, not sys.exit: interpreter teardown can race the simulator's
+    # OpenMP threads and crash after the verdict is printed (CLAUDE.md;
+    # reliably at T=8, 134 processes), which would turn a pass into rc != 0.
+    sys.stderr.flush()
+    os._exit(0 if ok else 1)

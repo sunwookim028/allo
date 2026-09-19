@@ -79,9 +79,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
-    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
-    OP_VRELU, enc, enc_agu,
-    A_VM, A_VR, AR_C, B_VM, DMA_SRC_B, MAXDIM, MAXROWS, T,
+    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
+    OP_VRELU, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, enc, enc_agu,
+    A_VM, A_VR, AR_C, AR_P, B_VM, B_VR, DMA_SRC_B, MAXDIM, MAXROWS, T, WPR,
+    VEC_M,
 )
 
 _TARGETS = (AGU_F0, AGU_F1, AGU_F2, AGU_F3)
@@ -196,12 +197,18 @@ class Program:
         """VMEM -> operand vregs, `rows` packed words."""
         self._ins(OP_VLD, vr, vmem, nr=rows)
 
-    def mm(self, vr_a, ar, vmem_w, rows, acc=False):
-        """One k-tile into the array: `rows` activation rows from the vregs at
-        `vr_a`, T weight rows from the VMEM at `vmem_w`. `acc`
-        accumulates into `ar`, else overwrites -- which is why a k loop wants
-        its first tile peeled."""
-        self._ins(OP_MM, vr_a, ar, int(acc), vmem_w, nr=rows)
+    def vmatload(self, vr_w):
+        """T weight rows from the vregs at `vr_w` into the array; they take
+        effect from the next `vmatpush` (MiniTPU's semantics)."""
+        self._ins(OP_VMATLOAD, vr_w, nr=T)
+
+    def vmatpush(self, vr_a, rows):
+        """`rows` activation rows from the vregs at `vr_a` into the array."""
+        self._ins(OP_VMATPUSH, vr_a, nr=rows)
+
+    def vmatpop(self, ar, rows):
+        """The oldest `rows` un-popped result rows into `ar`."""
+        self._ins(OP_VMATPOP, ar, nr=rows)
 
     def vadd(self, ar_d, ar_s1, ar_s2, rows):
         self._ins(OP_VADD, ar_d, ar_s1, ar_s2, nr=rows)
@@ -269,16 +276,17 @@ def gemm_program(M, K, N, relu=False):
     """Tiled GEMM, generated. The shipped program; `bench_isa.py` asserts it is
     word-for-word what `microarch_isa.gemm_program_handwritten` emits.
 
-    Every decision here is the author's and is visible in the source: A goes
-    straight into the vregs one column block per k-tile, B into the
-    VMEM one column block per n-tile, and each `mm` names its T weight
-    rows there; the output loop is n outermost and k innermost; the first
-    k-tile is peeled so it can carry `acc=False` (overwrite the accumulator)
-    without a predicate on the induction variable.
+    Every decision here is the author's and is visible in the source: A and B
+    go DRAM -> VMEM -> vregs one column block at a time; each (n, k) tile is
+    a `vmatload` of T weight rows, a `vmatpush` of M activation rows and a
+    `vmatpop` of M result rows; k-tiles after the first are popped into
+    `AR_P` and summed into `AR_C` with `vadd` (MiniTPU's split: the array
+    accumulates T deep, deeper is the VPU's). The first k-tile is peeled so it
+    can pop straight into `AR_C`.
 
     What is *not* here is any AGU level. `nb` and `kb` are objects yielded by
-    the nest, and `B_VM + nb*MAXDIM + kb*T` is written as
-    `Ref(B_VM).at(nb, MAXDIM).at(kb, T)` -- reorder the two `with` statements
+    the nest, and `B_VR + nb*MAXDIM + kb*T` is written as
+    `Ref(B_VR).at(nb, MAXDIM).at(kb, T)` -- reorder the two `with` statements
     and the encoding follows.
     """
     assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
@@ -294,71 +302,100 @@ def gemm_program(M, K, N, relu=False):
                  col_block=Ref().at(kb, 1),
                  vmem=Ref(A_VM).at(kb, MAXDIM), rows=M)
         k.vld(Ref(A_VR).at(kb, MAXDIM), Ref(A_VM).at(kb, MAXDIM), rows=M)
-    # --- B: one per column block, into the VMEM ---
+    # --- B: the same ---
     with k.loop(Nt, "nB") as nb:
         k.dma_ld(src=1, dram_row=0,
                  col_block=Ref().at(nb, 1),
                  vmem=Ref(B_VM).at(nb, MAXDIM), rows=K)
+        k.vld(Ref(B_VR).at(nb, MAXDIM), Ref(B_VM).at(nb, MAXDIM), rows=K)
 
     # --- the output loop ---
     with k.loop(Nt, "n") as nb:
-        #   peeled first k-tile: overwrite the accumulator
-        k.mm(A_VR, AR_C, Ref(B_VM).at(nb, MAXDIM), rows=M, acc=False)
+        #   peeled first k-tile: pop straight into the accumulator region
+        k.vmatload(Ref(B_VR).at(nb, MAXDIM))
+        k.vmatpush(A_VR, rows=M)
+        k.vmatpop(AR_C, rows=M)
         if Kt > 1:
             with k.loop(Kt - 1, "k") as kb:
-                k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
-                     Ref(B_VM + T).at(nb, MAXDIM).at(kb, T), rows=M, acc=True)
+                k.vmatload(Ref(B_VR + T).at(nb, MAXDIM).at(kb, T))
+                k.vmatpush(Ref(A_VR + MAXDIM).at(kb, MAXDIM), rows=M)
+                k.vmatpop(AR_P, rows=M)
+                k.vadd(AR_C, AR_C, AR_P, rows=M)
         if relu:
             k.vrelu(AR_C, AR_C, rows=M)
         k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
     return k.emit()
 
 
-def vector_program(M=8):
+def vector_program(M=None):
     """Every field a GEMM leaves constant, varied -- a TEST program, not a
     kernel. The shipped GEMM always has `dma_ld`/`mvout` DRAM row 0, one
-    accumulator region, A only as activations, B only as weights, and
-    `vrelu` in place (`f0 == f1`); a unit that ignored any of those would
-    pass `bench_isa` exactly. Here:
+    accumulator region, A only as activations, B only as weights, one push
+    per load popped at once, and `vrelu` in place (`f0 == f1`); a unit that
+    ignored any of those would pass `bench_isa` exactly. Here:
 
       * `dma_ld` from nonzero DRAM rows and column blocks, both sources, to
         VMEM rows away from the GEMM layout;
-      * `vld` moving VMEM rows into the vregs as activations, B's as well as
-        A's;
-      * `mm` into two accumulator regions away from 0, one of them accumulated,
-        with weights from two VMEM regions, one of them A's rows;
+      * `vld` moving B's rows in as activations;
+      * two loads and two pushes before the first pop (the pending-weight
+        queue and the output FIFO both hold more than one tile), and one
+        push drained by two pops;
       * `vadd` with three distinct regions, `vrelu` with a distinct destination;
       * `mvout` from nonzero `ar`, to nonzero DRAM rows and column blocks, and
         through a loop whose AGU walks `f0`, `f1` and `f2` at once.
 
-    Its gold is `isa_ref.run`, not a formula."""
+    Every address is derived from T and MAXDIM (M defaults to VEC_M), so the
+    program exercises the same things at every array size. Its gold is
+    `isa_ref.run`, not a formula."""
+    M = M or VEC_M
     assert 2 * M <= MAXDIM and M % 2 == 0
-    k = Program(f"vector {M}")
-    k.dma_ld(src=0, dram_row=3, col_block=1, vmem=40, rows=M)   # A -> vmem
-    k.dma_ld(src=1, dram_row=2, col_block=2, vmem=200, rows=M)  # B -> vmem
-    k.vld(30, 200, rows=M)                   # ... -> vr: activations 2
-    k.dma_ld(src=1, dram_row=5, col_block=3, vmem=100, rows=2 * T)
-    k.vld(10, 40, rows=M)                    # activations 1: A rows via vmem
-    k.mm(10, 20, 100, rows=M)                # ar20 = act1 @ W1 (vmem 100..)
-    k.mm(30, 40, 100 + T, rows=M)            # ar40 = act2 @ W2 (vmem 104..)
-    k.mm(10, 40, 40, rows=M, acc=True)       # ar40 += act1 @ (A rows 40..)
-    k.vadd(60, 20, 40, rows=M)               # ar60 = ar20 + ar40
-    k.vrelu(80, 60, rows=M)                  # ar80 = relu(ar60)
-    k.mvout(60, dram_row=0, col_block=1, rows=M)
-    k.mvout(20, dram_row=1, col_block=0, rows=M)
     h = M // 2
-    with k.loop(2, "half") as i:             # ar80.. -> C rows M.., blocks 2, 3
-        k.mvout(Ref(80).at(i, h), dram_row=Ref(M).at(i, h),
-                col_block=Ref(2).at(i, 1), rows=h)
+    c = lambda i: i % WPR                    # noqa: E731  column blocks
+    va, vb, vw = 2 * MAXDIM + 8, 3 * MAXDIM + 16, 4 * MAXDIM + 24   # VMEM
+    r1 = 10                                  # vregs: act1, act2, W1 | W2
+    r2 = r1 + M + 5
+    rw = r2 + M + 7
+    S = M + 8                                # accumulator regions
+    a1, a2, a3, a4, a5 = 20, 20 + S, 20 + 2 * S, 20 + 3 * S, 20 + 4 * S
+    k = Program(f"vector {M}")
+    k.dma_ld(src=0, dram_row=min(3, MAXDIM - M), col_block=c(1), vmem=va, rows=M)
+    k.dma_ld(src=1, dram_row=min(2, MAXDIM - M), col_block=c(2), vmem=vb, rows=M)
+    if 2 * T <= MAXDIM:                      # W1 | W2: 2T rows of B
+        k.dma_ld(src=1, dram_row=min(5, MAXDIM - 2 * T), col_block=c(3),
+                 vmem=vw, rows=2 * T)
+    else:                                    # only T rows exist: two blocks
+        k.dma_ld(src=1, dram_row=0, col_block=c(3), vmem=vw, rows=T)
+        k.dma_ld(src=0, dram_row=0, col_block=c(0), vmem=vw + T, rows=T)
+    k.vld(r1, va, rows=M)                    # act1: A rows
+    k.vld(r2, vb, rows=M)                    # act2: B rows
+    k.vld(rw, vw, rows=2 * T)                # W1 at rw, W2 at rw + T
+    k.vmatload(rw)                           # W1
+    k.vmatpush(r1, rows=M)                   #   act1 @ W1
+    k.vmatload(rw + T)                       # W2, pending while act1 runs
+    k.vmatpush(r2, rows=M)                   #   act2 @ W2
+    k.vmatpop(a1, rows=h)                    # a1 = act1 @ W1, in two pops
+    k.vmatpop(a1 + h, rows=M - h)
+    k.vmatpop(a2, rows=M)                    # a2 = act2 @ W2
+    k.vmatload(rw)                           # W1 again
+    k.vmatpush(r2, rows=M)
+    k.vmatpop(a3, rows=M)                    # a3 = act2 @ W1
+    k.vadd(a2, a2, a3, rows=M)               # a2 += a3
+    k.vadd(a4, a1, a2, rows=M)               # a4 = a1 + a2
+    k.vrelu(a5, a4, rows=M)                  # a5 = relu(a4)
+    k.mvout(a4, dram_row=0, col_block=c(1), rows=M)
+    k.mvout(a1, dram_row=1, col_block=c(0), rows=M)
+    with k.loop(2, "half") as i:             # a5.. -> C rows M.., blocks 2, 3
+        k.mvout(Ref(a5).at(i, h), dram_row=Ref(M).at(i, h),
+                col_block=Ref(c(2)).at(i, 1 if WPR > c(2) + 1 else 0), rows=h)
     return k.emit()
 
 
 def ar_distance_program(dist):
     """The accumulator distance contract, exercised AT its edge -- a TEST
     program. Reads of `ar` land exactly `dist` `accu` iterations after the
-    write they depend on, through every kind of read `accu` has: an
-    accumulating `mm`, `vrelu`, `vadd`'s first and second source, and `mvout`,
-    and after every kind of write, including `vadd`'s (two iterations a row).
+    write they depend on, through every kind of read `accu` has -- `vrelu`,
+    `vadd`'s first and second source, and `mvout` -- and after every kind of
+    write: a pop, a `vrelu` and a `vadd` (two iterations a row).
 
     With `dist = AR_RAW_DIST` it is the tightest program `check_program`
     accepts, and it is what shows the RTL honours the dependence claim
@@ -366,7 +403,7 @@ def ar_distance_program(dist):
     reads a stale row here, where no GEMM ever would. `check_program` must
     reject `dist - 1`.
 
-    `accu` iterations below are counted from the first `mm`: one per row, two
+    `accu` iterations below are counted from the first pop: one per row, two
     per `vadd` row. An `n`-row instruction's first row is read by the next
     instruction `n` iterations after it was written."""
     n = dist
@@ -374,17 +411,25 @@ def ar_distance_program(dist):
     k = Program(f"ar distance {dist}")
     k.dma_ld(src=0, dram_row=0, col_block=0, vmem=0, rows=n)
     k.vld(0, 0, rows=n)
-    k.dma_ld(src=1, dram_row=0, col_block=1, vmem=0, rows=T)
-    k.mm(0, 10, 0, rows=n)                   # ar10+i written at i
-    k.mm(0, 10, 0, rows=n, acc=True)         # acc read at n+i: distance n
-    k.vrelu(30, 10, rows=n)                  # read at 2n+i: distance n
+    k.dma_ld(src=1, dram_row=0, col_block=1 % WPR, vmem=64, rows=T)
+    k.vld(64, 64, rows=T)
+    k.vmatload(64)
+    k.vmatpush(0, rows=n)
+    k.vmatpush(0, rows=n)
+    k.vmatpop(10, rows=n)                    # ar10+i written at i
+    k.vrelu(30, 10, rows=n)                  # read at n+i: distance n
     k.vadd(40, 30, 10, rows=n)               # 1st source row 0: distance n
     k.mvout(40, dram_row=0, col_block=0, rows=n)   # last row: distance n
     if n >= 2:
-        k.mm(0, 50, 0, rows=n - 1)           # ar50+i written n-1 rows long
+        k.vmatpop(50, rows=n - 1)            # ar50+i written n-1 rows long
         k.vadd(60, 40, 50, rows=n - 1)       # 2nd source row 0: distance n
-        k.mvout(10, dram_row=n, col_block=1, rows=n)   # spacer
-        k.mvout(60, dram_row=0, col_block=2, rows=n - 1)
+        k.vmatpop(70, rows=1)                # drain the queue
+        k.mvout(10, dram_row=n, col_block=1 % WPR, rows=n)   # spacer
+        k.mvout(60, dram_row=0, col_block=2 % WPR, rows=n - 1)
+        k.mvout(70, dram_row=2 * n - 1, col_block=3 % WPR, rows=1)
+    else:
+        k.vmatpop(50, rows=n)
+        k.mvout(50, dram_row=n, col_block=1 % WPR, rows=n)
     return k.emit()
 
 
@@ -418,7 +463,7 @@ def assert_matches_handwritten(shapes):
 
 
 if __name__ == "__main__":
-    from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES
+    from examples.accelerator.tinytpu_vitis.microarch_isa import SCORED_SHAPES as SHAPES
     assert_matches_handwritten(SHAPES)
     print(f"  generated == hand-written, word for word, at all "
           f"{len(SHAPES)} shapes x {{gemm, gemm.relu}}")

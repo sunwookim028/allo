@@ -42,7 +42,7 @@ def build(prog):
 
     def seq():
         for ch, w in (("c_dld", hdr[1]), ("c_dld", hdr[7]), ("c_vmu", hdr[2]),
-                      ("c_vmu", hdr[4]), ("c_vru", hdr[3]), ("c_acc", hdr[5]),
+                      ("c_vru", hdr[3]), ("c_vru", hdr[4]), ("c_acc", hdr[5]),
                       ("c_dst", hdr[6])):
             yield ("put", ch, w)
         for op, nr, f0, f1, f2, f3 in dyn:
@@ -52,10 +52,9 @@ def build(prog):
             elif op == U.OP_VLD:
                 yield ("put", "c_vmu", (op, nr, f0))
                 yield ("put", "c_vru", (op, nr, f0))
-            elif op == U.OP_MM:
-                # vmu's copy: its own work count T + 1, the array's rows in f1
-                yield ("put", "c_vmu", (op, T + 1, nr))
+            elif op in (U.OP_VMATLOAD, U.OP_VMATPUSH):
                 yield ("put", "c_vru", (op, nr, f0))
+            elif op == U.OP_VMATPOP:
                 yield ("put", "c_acc", (op, nr, f0))
             elif op == U.OP_VADD:
                 yield ("put", "c_acc", (op, 2 * nr, f0))
@@ -88,30 +87,31 @@ def build(prog):
 
     def vmu():
         n_row = (yield ("get", "c_vmu")) & 0xFFFF
-        mw = yield ("get", "c_vmu")
-        yield ("put", "wcol0", (mw & 0xFFFF, mw >> 16))   # the array's counts
 
         def body(word, r):
-            op = word[0]
-            if op == U.OP_DMA_LD:
+            if word[0] == U.OP_DMA_LD:
                 yield ("get", "dma2vm")
-            elif op == U.OP_VLD:
-                yield ("put", "vm2vr", 0)
-            elif r == 0:
-                yield ("put", "wcol0", word[2])      # header: this mm's rows
             else:
-                yield ("put", "wcol0", "w")          # T weight words
+                yield ("put", "vm2vr", 0)
         yield from flat("c_vmu", n_row, body)
 
     def vru():
         n_word = (yield ("get", "c_vru")) & 0xFFFF
+        mw = yield ("get", "c_vru")
+        yield ("put", "wcol0", (mw & 0xFFFF, mw >> 16))   # the array's counts
+        pend = [0]
 
         def body(word, r):
             op = word[0]
-            if op == U.OP_MM:
-                yield ("put", "acol0", 0)            # one activation word
-            else:
+            if op == U.OP_VLD:
                 yield ("get", "vm2vr")
+            elif op == U.OP_VMATLOAD:
+                yield ("put", "wcol0", "w")          # T weight words
+                pend[0] = 1
+            else:
+                yield ("put", "acol0", 0)            # one activation word
+                yield ("put", "afl0", pend[0])       # its flag
+                pend[0] = 0
         yield from flat("c_vru", n_word, body)
 
     def chain_in(i, j):
@@ -123,10 +123,9 @@ def build(prog):
         return v
 
     def wld(i, j):
-        nmm, nrows = yield from chain_in(i, j)
+        nld, nrows = yield from chain_in(i, j)
         yield ("put", f"wq{i}_{j}", nrows)                   # the PE's trip
-        for _ in range(nmm):
-            rows = yield from chain_in(i, j)                  # header
+        for _ in range(nld):
             if j == 0:                                        # weights
                 yield ("get", f"wcol{i}")
                 for _ in range(T - 1 - i):
@@ -136,22 +135,21 @@ def build(prog):
                 yield ("get", f"wrow{i}_{j - 1}")
             if j != T - 1:
                 yield ("put", f"wrow{i}_{j}", "w")
-            yield ("put", f"wq{i}_{j}", rows)
+            yield ("put", f"wq{i}_{j}", "w")
 
     def pe(i, j):
         nt = yield ("get", f"wq{i}_{j}")
-        r, cnt = -1, 0
         for _ in range(nt):
-            r += 1
-            if r >= cnt:
-                cnt = yield ("get", f"wq{i}_{j}")
-                r = 0
             if j == 0:
                 yield ("get", f"acol{i}")
+                fl = yield ("get", f"afl{i}")
                 if i != T - 1:
                     yield ("put", f"acol{i + 1}", 0)
+                    yield ("put", f"afl{i + 1}", fl)
             else:
-                yield ("get", f"a_fwd{i}_{j - 1}")
+                fl = yield ("get", f"a_fwd{i}_{j - 1}")
+            if fl:
+                yield ("get", f"wq{i}_{j}")          # the weight switch
             if i > 0:
                 yield ("get", f"p_fwd{i - 1}_{j}")
             if i != T - 1:
@@ -159,16 +157,16 @@ def build(prog):
             else:
                 if j > 0:
                     yield ("get", f"cw{j - 1}")
-                yield ("put", f"cw{j}", 0)
+                yield ("put", "mxo" if j == T - 1 else f"cw{j}", 0)
             if j != T - 1:
-                yield ("put", f"a_fwd{i}_{j}", 0)
+                yield ("put", f"a_fwd{i}_{j}", fl)
 
     def accu():
         n_row = (yield ("get", "c_acc")) & 0xFFFF
 
         def body(word, r):
-            if word[0] == U.OP_MM:
-                yield ("get", f"cw{T - 1}")
+            if word[0] == U.OP_VMATPOP:
+                yield ("get", "mxo")
             if word[0] == U.OP_MVOUT:
                 yield ("put", "ac2sp", 0)
         yield from flat("c_acc", n_row, body)
@@ -190,7 +188,10 @@ def build(prog):
 
 
 def depth(ch, QD):
-    """`wq` is declared depth 4 whatever QD is (the shadow weight register)."""
+    """`wq` is declared depth 4 whatever QD is (the pending weights), and
+    `mxo`, the array's output FIFO, OUTQ."""
+    if ch == "mxo":
+        return U.OUTQ
     return min(QD, 4) if ch.startswith("wq") else QD
 
 
@@ -248,11 +249,11 @@ def run(prog, QD=U.QD):
 if __name__ == "__main__":
     from examples.accelerator.tinytpu_vitis.isa_dsl import (
         gemm_program, vector_program, ar_distance_program)
-    from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES
+    SHAPES = U.SCORED_SHAPES
     progs = [(f"gemm{'.relu' if r else ''} {M}x{K}x{N}", gemm_program(M, K, N, r))
              for (M, K, N) in SHAPES for r in (False, True)]
-    progs += [("vadd 16x16x16", U.vadd_program(16, 16, 16)),
-              ("vector 8", vector_program(8)),
+    progs += [("vadd %dx%dx%d" % SHAPES[-1], U.vadd_program(*SHAPES[-1])),
+              (f"vector {U.VEC_M}", vector_program()),
               (f"ar distance {U.AR_RAW_DIST}", ar_distance_program(U.AR_RAW_DIST))]
     ok = True
     for name, prog in progs:

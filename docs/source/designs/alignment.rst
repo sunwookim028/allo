@@ -643,4 +643,97 @@ in Vitis cosim against v1's 172 / 262 / 418 / 484 / 686.
 7. Phase 2: the increments and what each costs
 ==============================================
 
-Filled in as each increment lands; see the branch log.
+Each increment is one commit on ``tinytpu-align``, verified before the next
+(:ref:`align-verification`). Cycle counts are Vitis ``cosim`` (xsim),
+``-m_axi_latency 0``, the default testbench, T = 4, MAXDIM = 16, the same
+setup as v1's published numbers.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 9 9 9 9 34
+
+   * - design
+     - 4x4x4
+     - 16x16x16
+     - vs previous (4 / 16)
+     - vs v1 (4 / 16)
+     - what it changed
+   * - ``tinytpu-isa-v1`` (parked)
+     - 172
+     - 686
+     - --
+     - --
+     - --
+   * - **inc 1**: one VMEM, DMA only into VMEM (``b3793f85``)
+     - 176
+     - 750
+     - +4 / +64
+     - +4 / +64
+     - A reaches the vregs by ``vld`` from VMEM, not by the DMA bypass. The
+       +64 is exactly v1's measured A-bypass worth (``v_design``).
+   * - **inc 2**: MiniTPU's M slot; accumulation by ``vadd``
+     - 186
+     - 1216
+     - +10 / +466
+     - +14 / +530
+     - ``mm`` split into ``vmatload`` (weights from VREGs), ``vmatpush`` and
+       ``vmatpop``; the weight switch rides the activation wavefront; k-tiles
+       summed by ``vadd`` in ``accu``, two iterations a row. ``accu``
+       becomes the critical unit: 704 iterations at 16x16x16, against 320
+       for v1's accumulate-in-``mm``.
+
+Reading the table: the whole cost so far is where MiniTPU does work that v1
+did not have to. A DMA into VMEM and then a ``vld`` replaces v1's DMA straight
+into the vregs. Summing k-tiles with explicit ``vadd`` instructions replaces
+v1's accumulate-on-write (MiniTPU's own README records trying accumulation
+across weight loads and reverting it).
+
+
+.. _align-verification:
+
+Verification of every increment
+-------------------------------
+
+Every increment passes, before the next is started:
+
+* ``bench_isa.py``: ALL EXACT (looped and flat GEMM, with and without relu, at
+  every scored shape, plus ``vadd_program``);
+* ``stress_isa.py``: STRESS OK. This covers full-range, corner and boundary
+  operands, every GEMM shape, ``C`` prefilled and compared in full,
+  ``vector_program``, ``ar_distance_program`` at the contract, and 200 random
+  valid programs, all against ``isa_ref.py``. It also includes the validator's
+  controls (every crafted bad program rejected, every generated one accepted)
+  and ``kpn_model.py`` on every distinct program;
+* ``mutate.py --no-rtl``: every mutant caught (the anchors are re-targeted to
+  each increment's code, and new mutants are added for each new mechanism);
+* the RTL-only dependence-claim mutant (``ar_claim_false`` / ``vr_claim_false``),
+  caught by ``TPU_TB=stress`` cosim;
+* Vitis cosim at 4x4x4 and 16x16x16: default testbench (the cycle counts) and
+  ``TPU_TB=stress`` (six calls per shape on one RTL instance, ``C``
+  prefilled, 0 wrong).
+
+**Parametric in T and MAXDIM.** The design and the harness were made to derive
+every shape, address, memory size and crafted program from ``T`` and
+``MAXDIM`` (``SCORED_SHAPES`` = T, 2T, 3T, 4T x 4T x 2T, 4T; at T=4 the five v1
+shapes). From increment 2 on, the functional gates are run at **T=4 /
+MAXDIM=16, T=8 / MAXDIM=16 and T=8 / MAXDIM=32**, and cosim at T=8 as well.
+Doing so found a real T-dependence in increment 2 (``aw[0:VW] = vv``: Allo
+infers a slice's width from ``upper - lower`` with global names as free
+symbols, so the width silently became 32 bits, right only at T=4), and a
+simulator bug (a ``Stream`` of ``UInt(65)`` corrupts the simulator's heap at
+T=8; 72 and 128 bits run, 96 hangs), now avoided by carrying the weight-switch
+flag on its own 8-bit chain.
+
+**What broke at T != 4 on v1** (read-only diagnosis of ``tinytpu-isa-v1``):
+v1's **hardware is T-parametric**: its GEMM is exact on the dataflow
+simulator at T=8 with MAXDIM 16 and 32, up to 32x32x32. What fails is the
+harness, and each failure is small:
+
+* ``bench_isa.py`` and ``cosim.py`` hard-code the five T=4 shapes;
+  4x4x4 and 12x12x12 trip ``gemm_program``'s ``M % T`` assertion;
+* ``isa_dsl.vector_program`` and ``ar_distance_program`` hard-code column
+  blocks 2 and 3, past ``WPR = MAXDIM / T = 2``, so ``check_program`` rejects
+  them;
+* ``stress_isa.py``'s random ``mvout_loop`` walks up to column block 2.
+
+None of it is structural.

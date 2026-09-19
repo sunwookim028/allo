@@ -63,16 +63,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from allo.dataflow import customize  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, assemble, schedule, MAXDIM, T, IMEM_SIZE,
+    tinytpu_isa, assemble, schedule, MAXDIM, T, IMEM_SIZE, SCORED_SHAPES,
 )
 from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"
-_ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
-# Only shapes the built array can express: every dimension must be a multiple
-# of T, since one vmatpush-equivalent is a whole packed word of T lanes.
-SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]
+# The scored shapes scale with the array (microarch_isa.SCORED_SHAPES): at T=4
+# they are the five v1/Gemmini shapes.
+SHAPES = list(SCORED_SHAPES)
 if os.environ.get("TPU_SHAPES"):        # e.g. TPU_SHAPES=4x4x4,16x16x16
     # Any shape the build can express, not only the five scored ones.
     SHAPES = [tuple(int(x) for x in t.split("x"))
@@ -166,8 +165,8 @@ def stress_testbench(M, K, N):
         cases.append((f"gemm{'.relu' if relu else ''} {dist}", prog, A, B, C0, gold))
     A, B = operands("full", 950)
     C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
-    prog = vector_program(8)
-    cases.append(("vector_program(8) full", prog, A, B, C0,
+    prog = vector_program()
+    cases.append(("vector_program full", prog, A, B, C0,
                   isa_ref.run(prog, A, B, C0)))
     # The accumulator's dependence claim, at the edge of the contract that
     # makes it true: every `ar` read exactly AR_RAW_DIST iterations after its

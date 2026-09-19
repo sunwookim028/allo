@@ -1,0 +1,24 @@
+=== T=4 MAXDIM=16
+  gemm.relu 16x16x16   21 static instructions
+  KPN OK
+  ALL EXACT
+bench rc=0
+  validator: 25 crafted bad programs rejected, 390 generated programs accepted
+  STRESS OK: 487/487 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)
+stress rc=0
+=== T=8 MAXDIM=16
+  gemm.relu 16x16x16   21 static instructions
+  KPN OK
+  ALL EXACT
+bench rc=0
+  validator: 25 crafted bad programs rejected, 54 generated programs accepted
+  STRESS OK: 251/251 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 8 shapes, vector and random programs)
+stress rc=0
+=== T=8 MAXDIM=32
+  gemm.relu 32x32x32   21 static instructions
+  KPN OK
+  ALL EXACT
+bench rc=0
+  validator: 25 crafted bad programs rejected, 390 generated programs accepted
+  STRESS OK: 487/487 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)
+stress rc=0
