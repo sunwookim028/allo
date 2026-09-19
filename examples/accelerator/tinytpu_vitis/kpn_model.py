@@ -42,8 +42,7 @@ def build(prog):
 
     def seq():
         for ch, w in (("c_dld", hdr[1]), ("c_dld", hdr[7]), ("c_vmu", hdr[2]),
-                      ("c_vru", hdr[3]), ("c_vru", hdr[4]), ("c_acc", hdr[5]),
-                      ("c_dst", hdr[6])):
+                      ("c_vpu", hdr[3]), ("c_vpu", hdr[4]), ("c_dst", hdr[6])):
             yield ("put", ch, w)
         for op, nr, f0, f1, f2, f3 in dyn:
             if op == U.OP_DMA_LD:
@@ -51,18 +50,14 @@ def build(prog):
                 yield ("put", "c_vmu", (op, nr, f0))
             elif op == U.OP_VLD:
                 yield ("put", "c_vmu", (op, nr, f0))
-                yield ("put", "c_vru", (op, nr, f0))
-            elif op in (U.OP_VMATLOAD, U.OP_VMATPUSH):
-                yield ("put", "c_vru", (op, nr, f0))
-            elif op == U.OP_VMATPOP:
-                yield ("put", "c_acc", (op, nr, f0))
+                yield ("put", "c_vpu", (op, nr, f0))
             elif op == U.OP_VADD:
-                yield ("put", "c_acc", (op, 2 * nr, f0))
-            elif op == U.OP_VRELU:
-                yield ("put", "c_acc", (op, nr, f0))
+                yield ("put", "c_vpu", (op, 2 * nr, f0))
             elif op == U.OP_MVOUT:
-                yield ("put", "c_acc", (op, nr, f0))
+                yield ("put", "c_vpu", (op, nr, f0))
                 yield ("put", "c_dst", (op, nr, f0))
+            elif op in (U.OP_VMATLOAD, U.OP_VMATPUSH, U.OP_VMATPOP, U.OP_VRELU):
+                yield ("put", "c_vpu", (op, nr, f0))
 
     def flat(ctl, n_row, body):
         """The row-flattened loop every unit runs: fetch an instruction when
@@ -95,9 +90,11 @@ def build(prog):
                 yield ("put", "vm2vr", 0)
         yield from flat("c_vmu", n_row, body)
 
-    def vru():
-        n_word = (yield ("get", "c_vru")) & 0xFFFF
-        mw = yield ("get", "c_vru")
+    def vpu():
+        """The one vreg file's owner: vld in, vmatload/vmatpush out to the
+        array, vmatpop back in, mvout out to dma_st -- in program order."""
+        n_it = (yield ("get", "c_vpu")) & 0xFFFF
+        mw = yield ("get", "c_vpu")
         yield ("put", "wcol0", (mw & 0xFFFF, mw >> 16))   # the array's counts
         pend = [0]
 
@@ -108,11 +105,15 @@ def build(prog):
             elif op == U.OP_VMATLOAD:
                 yield ("put", "wcol0", "w")          # T weight words
                 pend[0] = 1
-            else:
+            elif op == U.OP_VMATPUSH:
                 yield ("put", "acol0", 0)            # one activation word
                 yield ("put", "afl0", pend[0])       # its flag
                 pend[0] = 0
-        yield from flat("c_vru", n_word, body)
+            elif op == U.OP_VMATPOP:
+                yield ("get", "mxo")
+            elif op == U.OP_MVOUT:
+                yield ("put", "ac2sp", 0)
+        yield from flat("c_vpu", n_it, body)
 
     def chain_in(i, j):
         v = yield ("get", f"wcol{i}" if j == 0 else f"wrow{i}_{j - 1}")
@@ -161,16 +162,6 @@ def build(prog):
             if j != T - 1:
                 yield ("put", f"a_fwd{i}_{j}", fl)
 
-    def accu():
-        n_row = (yield ("get", "c_acc")) & 0xFFFF
-
-        def body(word, r):
-            if word[0] == U.OP_VMATPOP:
-                yield ("get", "mxo")
-            if word[0] == U.OP_MVOUT:
-                yield ("put", "ac2sp", 0)
-        yield from flat("c_acc", n_row, body)
-
     def dma_st():
         n_row = (yield ("get", "c_dst")) & 0xFFFF
 
@@ -178,8 +169,8 @@ def build(prog):
             yield ("get", "ac2sp")
         yield from flat("c_dst", n_row, body)
 
-    procs = {"sequencer": seq(), "dma_ld": dma_ld(), "vmu": vmu(), "vru": vru(),
-             "accu": accu(), "dma_st": dma_st()}
+    procs = {"sequencer": seq(), "dma_ld": dma_ld(), "vmu": vmu(), "vpu": vpu(),
+             "dma_st": dma_st()}
     for i in range(T):
         for j in range(T):
             procs[f"wld{i}_{j}"] = wld(i, j)
@@ -254,7 +245,7 @@ if __name__ == "__main__":
              for (M, K, N) in SHAPES for r in (False, True)]
     progs += [("vadd %dx%dx%d" % SHAPES[-1], U.vadd_program(*SHAPES[-1])),
               (f"vector {U.VEC_M}", vector_program()),
-              (f"ar distance {U.AR_RAW_DIST}", ar_distance_program(U.AR_RAW_DIST))]
+              (f"vr distance {U.VR_RAW_DIST}", ar_distance_program(U.VR_RAW_DIST))]
     ok = True
     for name, prog in progs:
         lo = next((d for d in (1, 2, 3, 4, 8) if run(prog, d)[0]), None)

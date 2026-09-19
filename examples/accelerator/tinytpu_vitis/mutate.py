@@ -27,8 +27,8 @@ loader really runs the file it was given.
 
 **RTL-only mutants** (`RTL_ONLY`) break something no simulator models, so they
 pass `bench_isa` and `stress_isa` by construction and only cosim can catch
-them. `ar_claim_false` is the one there is: it makes the dependence claim
-`schedule()` emits on `accu`'s `ar` (`#pragma HLS dependence ... inter false`)
+them. `vr_claim_false` is the one there is: it makes the dependence claim
+`schedule()` emits on `vpu`'s `vreg` (`#pragma HLS dependence ... inter false`)
 untrue for programs the assembler accepts, and the `TPU_TB=stress` testbench's
 `ar_distance_program` case is what fails. Their cosim runs at 4x4x4 unless
 `TPU_SHAPES` says otherwise. With `--no-rtl` they are reported as not run, not
@@ -71,13 +71,18 @@ MUTANTS = [
     # --- VMEM, and vld ---
     ("vmu_vld_off_by_one", "vld reads vmem one row late",
      "vm2vr.put(vmem[f1 + r])", "vmem[f1 + r]", "vmem[f1 + r + 1]"),
-    # --- the vregs: both array ports ---
-    ("vru_read_off_by_one", "vru streams weight and activation rows one row late",
-     "vv: UInt(VW) = vr[f0 + r]", "vr[f0 + r]", "vr[f0 + r + 1]"),
-    ("vru_weight_off_by_one", "vmatload streams weight rows f0+1.. instead of f0..",
-     "wcol[0].put(vv)", "wcol[0].put(vv)", "wcol[0].put(vr[f0 + r + 1])"),
-    ("vru_vld_dst_ignored", "vld writes vr[r], ignoring its destination base f0",
-     "vr[f0 + r] = vm2vr.get()", "vr[f0 + r]", "vr[r]"),
+    # --- the vreg file: both array ports, vld, the lane conversions ---
+    ("vpu_read_off_by_one", "vmatload/vmatpush/mvout read vreg rows one late",
+     "                if op != OP_VRELU:\n                    ra = f0 + rr",
+     "ra = f0 + rr", "ra = f0 + rr + 1"),
+    ("vpu_vld_dst_ignored", "vld writes vreg[r], ignoring its destination base f0",
+     "v8: UInt(VW) = vm2vr.get()", "v8: UInt(VW) = vm2vr.get()",
+     "v8: UInt(VW) = vm2vr.get()\n                wa = rr"),
+    ("vpu_vld_zero_extends", "vld zero-extends int8 lanes instead of sign-extending",
+     "b8: int8 = v8[8 * e0", "b8: int8", "b8: UInt(8)"),
+    ("vpu_narrow_high_byte", "the array gets bits 8..15 of each lane, not the low 8",
+     "nv[8 * e5 : 8 * (e5 + 1)] = rv[32 * e5 : 32 * e5 + 8]",
+     "rv[32 * e5 : 32 * e5 + 8]", "rv[32 * e5 + 8 : 32 * e5 + 16]"),
     # --- DMA ---
     ("dma_ld_src_swapped", "dma_ld reads B for src A and A for src B",
      "if (f0 & DMA_SRC_B) == 0:", "== 0:", "!= 0:"),
@@ -101,13 +106,13 @@ MUTANTS = [
     ("loop_extra_trip", "loop back-edge test <= (one extra iteration)",
      "nxt: int32 = lp_iv[sp - 1] + 1", "if nxt < lp_trip", "if nxt <= lp_trip"),
     ("vrelu_rows_short", "the sequencer's vrelu carries one row fewer",
-     "                if op == OP_VRELU:\n                    c_acc.put(rw)",
-     "c_acc.put(rw)", "rw[54:62] = nr - 1\n                    c_acc.put(rw)"),
+     "                if op == OP_VRELU:\n                    c_vpu.put(rw)",
+     "c_vpu.put(rw)", "rw[54:62] = nr - 1\n                    c_vpu.put(rw)"),
     # --- the accumulator and the vector ALU ---
-    ("pop_ors_old_row", "vmatpop ORs the result into the old ar row (right only "
-     "if ar arrives zeroed)",
+    ("pop_ors_old_row", "vmatpop ORs the result into the old vreg row (right only "
+     "if the file arrives zeroed)",
      "z = mxo.get()", "z = mxo.get()", "z = mxo.get() | rv"),
-    ("pop_dst_base_ignored", "vmatpop writes ar[r], ignoring its f0 base",
+    ("pop_dst_base_ignored", "vmatpop writes vreg[r], ignoring its f0 base",
      "z = mxo.get()", "z = mxo.get()", "z = mxo.get()\n                wa = rr"),
     ("vrelu_dst_is_src", "vrelu writes its source row, not f0",
      "            wa: int32 = f0 + rr\n", "wa: int32 = f0 + rr\n",
@@ -123,11 +128,12 @@ MUTANTS = [
      "if ph == 1:", "ra = f2 + rr", "ra = f1 + rr"),
     ("vadd_holds_stale_x", "vadd's first operand register is never loaded",
      "xr = rv", "xr = rv", "xr = xr"),
-    ("vrelu_src_base_ignored", "vrelu reads ar[r], ignoring its f1 base",
-     "            if op == OP_MVOUT:\n                ra = f0 + rr",
-     "ra = f0 + rr", "ra = f0 + rr\n            if op == OP_VRELU:\n                ra = rr"),
-    ("mvout_src_base_ignored", "mvout reads ar[r], ignoring its f0 base",
-     "            if op == OP_MVOUT:\n                ra = f0 + rr", "ra = f0 + rr", "ra = rr"),
+    ("vrelu_src_base_ignored", "vrelu reads vreg[r], ignoring its f1 base",
+     "            rv: UInt(AW) = vreg[ra]", "rv: UInt(AW) = vreg[ra]",
+     "if op == OP_VRELU:\n                ra = rr\n            rv: UInt(AW) = vreg[ra]"),
+    ("mvout_src_base_ignored", "mvout reads vreg[r], ignoring its f0 base",
+     "            rv: UInt(AW) = vreg[ra]", "rv: UInt(AW) = vreg[ra]",
+     "if op == OP_MVOUT:\n                ra = rr\n            rv: UInt(AW) = vreg[ra]"),
     ("clip_hi_off_by_one", "mvout clip upper bound 128, not 127",
      "te: int32 = rv[32 * e4", "if te > 127:", "if te > 128:"),
     ("clip_lo_off_by_one", "mvout clip lower bound -129, not -128",
@@ -140,18 +146,18 @@ MUTANTS = [
     ("pop_underflow_unenforced", "check_program lets a pop take more rows than "
      "are pushed",
      'if nr > q["out"]:', 'if nr > q["out"]:', 'if nr > q["out"] + MAXDIM:'),
-    ("ar_contract_unenforced", "check_program stops enforcing the accumulator "
+    ("vr_contract_unenforced", "check_program stops enforcing the vreg "
      "distance contract",
-     "if at - ar_wrote[row] < AR_RAW_DIST:", "< AR_RAW_DIST:", "< 1:"),
-    ("ar_claim_false", "FALSE DEPENDENCE CLAIM: the contract admits an ar read one "
-     "accu iteration after its write, so the `inter false` pragma on ar is untrue "
+     "if at - vr_wrote[row] < VR_RAW_DIST:", "< VR_RAW_DIST:", "< 1:"),
+    ("vr_claim_false", "FALSE DEPENDENCE CLAIM: the contract admits a vreg read one "
+     "vpu iteration after its write, so the `inter false` pragma on vreg is untrue "
      "for programs the assembler accepts",
-     "AR_RAW_DIST = ", "AR_RAW_DIST = 4", "AR_RAW_DIST = 1"),
+     "VR_RAW_DIST = ", "VR_RAW_DIST = 4", "VR_RAW_DIST = 1"),
 ]
 
 
 # Caught only in RTL (see the module docstring); cosim runs for these by default.
-RTL_ONLY = {"ar_claim_false"}
+RTL_ONLY = {"vr_claim_false"}
 
 LEVELS = {
     # name: (script, args, success marker, timeout s)

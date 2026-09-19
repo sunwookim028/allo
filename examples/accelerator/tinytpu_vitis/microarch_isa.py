@@ -297,7 +297,7 @@ import allo.dataflow as df
 #
 # The rule this imposed: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
 # is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
-# a 2047 maximum, which is comfortably above VMEM_ROWS and NVR.
+# a 2047 maximum, which is comfortably above VMEM_ROWS and NVREG.
 #
 # `nr` is the row count for *every* instruction that has one, and it is only 7
 # bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
@@ -329,42 +329,31 @@ OP_VMATPOP = 12   # f0=ar_d: the oldest un-popped result rows       nr=rows
 # `vld` from VMEM, as on MiniTPU.
 DMA_SRC_B = 1
 
-# ---- THE WRITE-BEFORE-READ CONTRACT (`mm` acc, `vadd`, `vrelu`, `mvout`) ----
-# `vmem`, `vr` and `ar` are NOT cleared by the hardware. Their `= 0`
+# ---- THE WRITE-BEFORE-READ CONTRACT ----
+# `vmem` and `vreg` are NOT cleared by the hardware. Their `= 0`
 # initialisers were removed to delete a 514-cycle memset, so at `ap_start`
 # each holds whatever the previous invocation (or power-up) left there. The
-# guarantee moved from the hardware to the program:
+# guarantee moved from the hardware to the program: every vreg row that
+# `vmatload`, `vmatpush`, `vadd`, `vrelu` or `mvout` reads must have been
+# written earlier in the SAME program -- by a `vld` of a VMEM row a `dma_ld`
+# wrote, a `vmatpop`, a `vadd` or a `vrelu`. `vld` is a pure copy and MAY copy
+# an unwritten VMEM row, but the copy is then unwritten too.
 #
-#   * `mm` with f2=1 (accumulate), `vadd` (both sources), `vrelu` (source) and
-#     `mvout` read `ar` rows, and every such row must have been written earlier
-#     in the SAME program -- by an overwriting `mm` (f2=0), a `vadd` or a
-#     `vrelu`. `ar` is the accumulator; reading it early is a wrong answer,
-#     not a crash.
-#   * `mm` reads `nr` activation rows of `vr` at f0 and T weight rows of
-#     `vmem` at f3; those rows must hold data a `dma_ld` put there (directly,
-#     or into `vmem` and then through a `vld`).
-#   * `vld` is a pure copy and MAY copy an unwritten `vmem` row, but the copy
-#     is then unwritten too, and consuming it in an `mm` is an error.
-#
-# ---- THE ACCUMULATOR DISTANCE CONTRACT ----
-# `accu` runs at II=1 because `schedule()` tells Vitis there is no carried
-# dependence through `ar` (`s.dependence`, limitations register item 21). That
-# is true only if no row is read too soon after it was written: counting
-# `accu` iterations -- one per `mm`/`vrelu`/`mvout` row, two per `vadd` row
-# (first source on the even one; second source and the write on the odd
-# one) -- a read of an `ar` row must come at least AR_RAW_DIST iterations
-# after the write it depends on. Every GEMM satisfies it with room to spare
-# (an accumulating `mm`, a `vrelu` or an `mvout` reads row r exactly `M >= T`
-# iterations after the previous instruction wrote it), and `check_program`
-# rejects any program that does not, exactly as it rejects an unwritten read.
-# Why 4. In the synthesized loop (II=1, depth 6) the `ar` load issues in
-# pipeline state 5 and the store lands in state 7, so a read 1 or 2
-# iterations after the write returns the OLD row. Measured in RTL cosim with
-# `isa_dsl.ar_distance_program(d)`: d=1 -> 4 cells wrong, d=2 -> 20 wrong,
-# d=3, 4, 5 -> 0. The contract is the first safe distance plus one of margin,
-# and it equals T, the row count of the smallest GEMM, so no GEMM is
-# affected. `TPU_TB=stress` cosim runs `ar_distance_program(AR_RAW_DIST)` on
-# every build; a re-synthesis that widened the window fails there.
+# ---- THE VREG DISTANCE CONTRACT ----
+# `vpu` runs at II=1 because `schedule()` tells Vitis there is no carried
+# dependence through `vreg` (`s.dependence`, limitations register item 21).
+# That is true only if no row is read too soon after it was written: counting
+# `vpu` iterations -- one per row of every instruction it runs (`vld`,
+# `vmatload`, `vmatpush`, `vmatpop`, `vrelu`, `mvout`), two per `vadd` row
+# (first source on the even one; second source and the write on the odd one)
+# -- a read of a vreg row must come at least VR_RAW_DIST iterations after the
+# write it depends on. Every GEMM satisfies it with room to spare, and
+# `check_program` rejects any program that does not, exactly as it rejects an
+# unwritten read. The contract was measured on v1's `accu` (a read 1 or 2
+# iterations after the write returned the OLD row in RTL; 3, 4, 5 were
+# exact), and moved here with the file in alignment increment 3;
+# `TPU_TB=stress` cosim runs `ar_distance_program(VR_RAW_DIST)` on every
+# build, so a re-synthesis that widened the window fails there.
 #
 # `rbA`/`rbB` (dma_ld's burst buffers) and `ib` (the sequencer's program
 # buffer) are also unzeroed but cannot be read early: `ib` is filled by an
@@ -473,8 +462,10 @@ MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
 # MAXDIM=16 build is unchanged.
 _LAYOUT = 2 * (MAXDIM // T) * MAXDIM
 VMEM_ROWS = int(os.environ.get("TPU_VMEM", max(512, 2 * _LAYOUT)))
-NVR = int(os.environ.get("TPU_NVR", max(256, 2 * _LAYOUT)))
-NAR = int(os.environ.get("TPU_NAR", max(128, 8 * MAXDIM)))
+# one vreg file: the GEMM layout (A, B), the accumulator and a popped tile,
+# and the test programs' regions (about 8 * MAXDIM rows past 10)
+NVREG = int(os.environ.get("TPU_NVREG",
+                           max(256, _LAYOUT + 2 * MAXDIM + 8, 10 + 8 * MAXDIM)))
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 OUTQ = 64                      # the array's output FIFO, rows (MiniTPU's)
 
@@ -504,14 +495,16 @@ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 KB_MAX = MAXDIM // T           # column blocks in the widest matrix
 assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
-A_VR = 0                       # A vregs:  kb * MAXDIM + m  (vld'd from VMEM)
-B_VM = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
+B_VM = 0                       # B words:  nb * MAXDIM + k  (weights)
 A_VM = KB_MAX * MAXDIM         # A words in VMEM: kb * MAXDIM + m, after B
-AR_C = 0                       # the accumulator, up to MAXDIM words
-AR_P = MAXDIM + 1              # a popped k-tile, before its vadd
-B_VR = KB_MAX * MAXDIM         # B vregs: nb * MAXDIM + k  (vmatload's weights)
-AR_RAW_DIST = 4                # see THE ACCUMULATOR DISTANCE CONTRACT
-assert AR_RAW_DIST <= T, "a T-row GEMM must satisfy the accumulator contract"
+# ONE vreg file (increment 3): A, B, the accumulator and the popped k-tile
+# are regions of it.
+A_VR = 0                       # A rows:  kb * MAXDIM + m  (vld'd from VMEM)
+B_VR = KB_MAX * MAXDIM         # B rows:  nb * MAXDIM + k  (vmatload's weights)
+AR_C = 2 * KB_MAX * MAXDIM     # the accumulator, up to MAXDIM rows
+AR_P = AR_C + MAXDIM + 1       # a popped k-tile, before its vadd
+VR_RAW_DIST = 4                # see THE VREG DISTANCE CONTRACT
+assert VR_RAW_DIST <= T, "a T-row GEMM must satisfy the vreg contract"
 
 # The scored shapes, scaled with the array: T, 2T, 3T, 4T x 4T x 2T and 4T
 # cubed, dropped where they exceed MAXDIM. At T=4 they are exactly the five
@@ -540,8 +533,7 @@ def tinytpu_isa(
     # cycle with it; measured, the design then needed QD >= ~NPROG.)
     c_dld: Stream[UInt(64), QD]         # sequencer -> dma_ld
     c_vmu: Stream[UInt(64), QD]         # sequencer -> vmu
-    c_vru: Stream[UInt(64), QD]         # sequencer -> vru
-    c_acc: Stream[UInt(64), QD]         # sequencer -> accu
+    c_vpu: Stream[UInt(64), QD]         # sequencer -> vpu
     c_dst: Stream[UInt(64), QD]         # sequencer -> dma_st
 
     # Data paths, all one packed word wide.
@@ -625,9 +617,8 @@ def tinytpu_isa(
         c_dld.put(ib[1])
         c_dld.put(ib[7])
         c_vmu.put(ib[2])
-        c_vru.put(ib[3])
-        c_vru.put(ib[4])
-        c_acc.put(ib[5])
+        c_vpu.put(ib[3])
+        c_vpu.put(ib[4])
         c_dst.put(ib[6])
 
         lp_start: int32[LOOP_DEPTH] = 0
@@ -691,21 +682,21 @@ def tinytpu_isa(
                     c_vmu.put(rw)
                 if op == OP_VLD:
                     c_vmu.put(rw)
-                    c_vru.put(rw)
+                    c_vpu.put(rw)
                 if op == OP_VMATLOAD:
-                    c_vru.put(rw)
+                    c_vpu.put(rw)
                 if op == OP_VMATPUSH:
-                    c_vru.put(rw)
+                    c_vpu.put(rw)
                 if op == OP_VMATPOP:
-                    c_acc.put(rw)
+                    c_vpu.put(rw)
                 if op == OP_VADD:
                     wv: UInt(64) = rw
                     wv[54:62] = nr * 2
-                    c_acc.put(wv)
+                    c_vpu.put(wv)
                 if op == OP_VRELU:
-                    c_acc.put(rw)
+                    c_vpu.put(rw)
                 if op == OP_MVOUT:
-                    c_acc.put(rw)
+                    c_vpu.put(rw)
                     c_dst.put(rw)
                 pc += 1
 
@@ -820,55 +811,133 @@ def tinytpu_isa(
                 vm2vr.put(vmem[f1 + r])
 
     @df.kernel(mapping=[1])
-    def vru():
-        """Operand vector registers, and BOTH of the array's input ports.
+    def vpu():
+        """THE VREG FILE -- one file, one owner -- and every unit that reads or
+        writes it: MiniTPU's V slot (`vadd`, `vrelu`), the VREG side of its M
+        slot (`vmatload`/`vmatpush` read, `vmatpop` writes) and of its MEM
+        slot (`vld` writes; `mvout`, until `vst` exists, reads).
 
-        Written by `vld` (from VMEM); read by `vmatload`, which streams T
-        weight rows down `wcol[0]`, and by `vmatpush`, which streams `nr`
-        activation rows down `acol[0]` (MiniTPU's M slot: both commands read
-        VREG port C).
+        **One file, int32 lanes.** A row is T int32 lanes (`UInt(AW)`): wide
+        enough for a popped result, and `vld` sign-extends an int8 VMEM row
+        into it. `vmatload`/`vmatpush` send the array the low 8 bits of each
+        lane, which is exact for anything a `vld` wrote. (MiniTPU has one
+        type, BF16, so its file needs no such rule.)
 
-        **The weight switch rides the activation wavefront**, as on MiniTPU
-        (`mxu.sv`: each PE switches to newly loaded weights as the first
-        activation of the next push passes it). The first activation row
-        after a `vmatload` carries a flag (on `afl`, beside it); each PE takes
-        its next weight from its `wld` queue when it sees the flag. There is
-        no row count per tile anywhere, so a push's length is free.
+        **MiniTPU has three read ports and one write port; this process does
+        one row of one instruction per iteration**, with ONE `vreg` read and
+        ONE write, so the ports are a budget, not concurrency: V, M and MEM
+        work that MiniTPU overlaps in one bundle is serialised here. That is
+        the cost this increment measures. `vadd` takes two iterations per row
+        (first source on the even one, second source and the write on the odd
+        one), as `accu` did.
 
-        It opens by handing the array its counts (loads, pushed rows) on the
-        weight chain. One flat loop, ONE `vr` access per iteration."""
-        nw: UInt(64) = c_vru.get()
-        n_word: int32 = nw[0:16]
-        mw: UInt(64) = c_vru.get()
+        **This process is on a CYCLE**: it feeds the array and drains it
+        (`acol`/`wcol` out, `mxo` in). A pop waits for rows an earlier push in
+        the same pipelined loop put; under Vitis's default stall pipeline the
+        blocked read freezes that put and the RTL deadlocks.
+        `schedule()` pipelines this loop `style=flp` (flushable), which keeps
+        earlier iterations draining (`align_probes/probe_cycle.py`), and
+        `cosim.py` runs the C model threaded (`threaded_csim.py`).
+
+        **The dependence claim moves here from `accu`**: `schedule()` tells
+        Vitis there is no carried dependence through `vreg`, and
+        `check_program` makes it true by keeping every read at least
+        `VR_RAW_DIST` vpu iterations after the write it depends on -- now for
+        every reader: `vmatload`, `vmatpush`, `vadd`, `vrelu`, `mvout`."""
+        nw: UInt(64) = c_vpu.get()
+        n_it: int32 = nw[0:16]
+        mw: UInt(64) = c_vpu.get()
         nmo: UInt(VW) = 0
         nmo[0:32] = mw[0:32]        # load count | pushed rows << 16
         wcol[0].put(nmo)
-        vr: UInt(VW)[NVR]
+        vreg: UInt(AW)[NVREG]
         op: int32 = 0
         f0: int32 = 0
+        f1: int32 = 0
+        f2: int32 = 0
         cnt: int32 = 0
         pend: int32 = 0             # a vmatload no push has used yet
         r: int32 = -1               # advanced at the TOP: see the II note
-        for x in range(n_word):
+        xr: UInt(AW) = 0            # vadd's first operand, held for one row
+        for x in range(n_it):
             r += 1
             if r >= cnt:
-                w0: UInt(64) = c_vru.get()
+                w0: UInt(64) = c_vpu.get()
                 op = w0[0:6]
                 f0 = w0[6:18]
+                f1 = w0[18:30]
+                f2 = w0[30:42]
                 cnt = w0[54:62]
                 r = 0
+            rr: int32 = r
+            ph: int32 = 0
+            if op == OP_VADD:
+                rr = r >> 1
+                ph = r - (rr << 1)
+            ra: int32 = f1 + rr
+            wa: int32 = f0 + rr
+            if op != OP_VADD:
+                if op != OP_VRELU:
+                    ra = f0 + rr
+            if op == OP_VADD:
+                if ph == 1:
+                    ra = f2 + rr
+            rv: UInt(AW) = vreg[ra]
+            z: UInt(AW) = 0
+            dw: int32 = 1
             if op == OP_VLD:
-                vr[f0 + r] = vm2vr.get()
+                v8: UInt(VW) = vm2vr.get()
+                with allo.meta_for(T) as e0:
+                    b8: int8 = v8[8 * e0 : 8 * (e0 + 1)]
+                    b32: int32 = b8
+                    z[32 * e0 : 32 * (e0 + 1)] = b32
+            elif op == OP_VMATPOP:
+                z = mxo.get()
+            elif op == OP_VADD:
+                if ph == 0:
+                    xr = rv
+                    dw = 0
+                else:
+                    with allo.meta_for(T) as e2:
+                        xe: int32 = xr[32 * e2 : 32 * (e2 + 1)]
+                        ye: int32 = rv[32 * e2 : 32 * (e2 + 1)]
+                        xy: int32 = xe + ye
+                        z[32 * e2 : 32 * (e2 + 1)] = xy
+            elif op == OP_VRELU:
+                with allo.meta_for(T) as e3:
+                    ue: int32 = rv[32 * e3 : 32 * (e3 + 1)]
+                    re: int32 = ue
+                    if re < 0:
+                        re = 0
+                    z[32 * e3 : 32 * (e3 + 1)] = re
+            elif op == OP_MVOUT:
+                dw = 0
+                ow: UInt(VW) = 0
+                with allo.meta_for(T) as e4:
+                    te: int32 = rv[32 * e4 : 32 * (e4 + 1)]
+                    if te > 127:
+                        te = 127
+                    if te < -128:
+                        te = -128
+                    tc: int8 = te
+                    ow[8 * e4 : 8 * (e4 + 1)] = tc
+                ac2sp.put(ow)
             else:
-                vv: UInt(VW) = vr[f0 + r]
+                # vmatload / vmatpush: the low 8 bits of each lane
+                dw = 0
+                nv: UInt(VW) = 0
+                with allo.meta_for(T) as e5:
+                    nv[8 * e5 : 8 * (e5 + 1)] = rv[32 * e5 : 32 * e5 + 8]
                 if op == OP_VMATLOAD:
-                    wcol[0].put(vv)
+                    wcol[0].put(nv)
                     pend = 1
                 else:
-                    acol[0].put(vv)
+                    acol[0].put(nv)
                     fw: UInt(8) = pend
                     afl[0].put(fw)
                     pend = 0
+            if dw == 1:
+                vreg[wa] = z
 
     @df.kernel(mapping=[T, T])
     def wld():
@@ -972,107 +1041,6 @@ def tinytpu_isa(
                 ao[0:8] = a
                 ao[8:9] = fl
                 a_fwd[i, j].put(ao)
-
-    @df.kernel(mapping=[1])
-    def accu():
-        """Accumulator vector registers and the vector ALU.
-
-        `vmatpop` writes the oldest un-popped result rows into `ar` (MiniTPU:
-        results leave the array in push order and a pop drains the oldest).
-        Since increment 2 nothing accumulates here implicitly: a k-tile's
-        partial result is popped into a scratch region and summed with
-        `vadd`, MiniTPU's split. `mvout` clips to int8 on the way out
-        (Gemmini's `mvout` under ACC_SCALE_IDENTITY with shift 0).
-
-        **One flat row loop at II=1, `ar` in BRAM, and a dependence claim.**
-        Every arm is muxed down to ONE `ar` read and ONE `ar` write per
-        iteration; `vadd`, which needs two reads, takes two iterations per row
-        (first source on the even one, second source and the write on the odd
-        one), which is why the sequencer sends this unit `nr = 2 * rows` for
-        it. Flattened, the row index is a carried register rather than the
-        loop's own induction variable, so Vitis cannot prove that iteration
-        n's store and iteration n+1's load touch different rows and closes the
-        loop at `Final II = 3`:
-
-            Unable to enforce a carried dependence constraint
-            (II = 1, distance = 1) between 'store' on array 'ar'
-            and 'load' ('rv') on array 'ar'
-
-        `schedule()` answers it with `s.dependence("accu_0:x", "ar", ...)`,
-        which emits `#pragma HLS dependence variable=ar inter false` in this
-        loop (limitations register item 21). **The claim is made true by the
-        assembler, not by the hardware:** `check_program` rejects any program
-        in which an `ar` row is read fewer than `AR_RAW_DIST` accu iterations
-        after it was written, and `AR_RAW_DIST` covers the pipeline's
-        read-to-write window with margin."""
-        ar: UInt(AW)[NAR]
-        nw: UInt(64) = c_acc.get()
-        n_row: int32 = nw[0:16]
-        op: int32 = 0
-        f0: int32 = 0
-        f1: int32 = 0
-        f2: int32 = 0
-        cnt: int32 = 0
-        r: int32 = -1               # advanced at the TOP: see the II note
-        xr: UInt(AW) = 0            # vadd's first operand, held for one row
-        for x in range(n_row):
-            r += 1
-            if r >= cnt:
-                w0: UInt(64) = c_acc.get()
-                op = w0[0:6]
-                f0 = w0[6:18]
-                f1 = w0[18:30]
-                f2 = w0[30:42]
-                cnt = w0[54:62]
-                r = 0
-            rr: int32 = r
-            ph: int32 = 0
-            if op == OP_VADD:
-                rr = r >> 1
-                ph = r - (rr << 1)
-            ra: int32 = f1 + rr
-            wa: int32 = f0 + rr
-            if op == OP_MVOUT:
-                ra = f0 + rr
-            if op == OP_VADD:
-                if ph == 1:
-                    ra = f2 + rr
-            rv: UInt(AW) = ar[ra]
-            z: UInt(AW) = 0
-            dw: int32 = 1
-            if op == OP_VMATPOP:
-                z = mxo.get()
-            elif op == OP_VADD:
-                if ph == 0:
-                    xr = rv
-                    dw = 0
-                else:
-                    with allo.meta_for(T) as e2:
-                        xe: int32 = xr[32 * e2 : 32 * (e2 + 1)]
-                        ye: int32 = rv[32 * e2 : 32 * (e2 + 1)]
-                        xy: int32 = xe + ye
-                        z[32 * e2 : 32 * (e2 + 1)] = xy
-            elif op == OP_VRELU:
-                with allo.meta_for(T) as e3:
-                    ue: int32 = rv[32 * e3 : 32 * (e3 + 1)]
-                    re: int32 = ue
-                    if re < 0:
-                        re = 0
-                    z[32 * e3 : 32 * (e3 + 1)] = re
-            else:
-                dw = 0
-                ow: UInt(VW) = 0
-                with allo.meta_for(T) as e4:
-                    te: int32 = rv[32 * e4 : 32 * (e4 + 1)]
-                    if te > 127:
-                        te = 127
-                    if te < -128:
-                        te = -128
-                    tc: int8 = te
-                    ow[8 * e4 : 8 * (e4 + 1)] = tc
-                ac2sp.put(ow)
-            if dw == 1:
-                ar[wa] = z
 
     @df.kernel(mapping=[1], args=[C])
     def dma_st(lC: int8[MAXDIM * MAXDIM]):
@@ -1322,17 +1290,17 @@ def check_program(prog):
 
     What it checks, per dynamic issue:
 
-      * **write-before-read** on `vmem`, `vr` and `ar` -- the contract at the
-        opcode table. Written-ness is tracked per row and propagated through
-        `vld` (a copy of an unwritten row is unwritten); it is an error only
-        where a value is *consumed*: `vmatload` and `vmatpush` reading
-        `vr`, and `vadd` / `vrelu` / `mvout` reading `ar`.
-      * **the accumulator distance contract**: every `ar` read comes at least
-        `AR_RAW_DIST` `accu` iterations after the write it depends on, which
-        is what makes `schedule()`'s dependence claim on `ar` true.
+      * **write-before-read** on `vmem` and the vreg file -- the contract at
+        the opcode table. Written-ness is tracked per row and propagated
+        through `vld` (a copy of an unwritten row is unwritten); it is an
+        error only where a value is *consumed*: `vmatload`, `vmatpush`,
+        `vadd`, `vrelu` and `mvout` reading vregs.
+      * **the vreg distance contract**: every vreg read comes at least
+        `VR_RAW_DIST` `vpu` iterations after the write it depends on, which
+        is what makes `schedule()`'s dependence claim on `vreg` true.
       * **bounds** on every memory and on `C`/`A`/`B`: an out-of-range row is
         silent corruption in RTL, not an exception.
-      * **`nr >= 1`** on every data op. `dma_ld`, `vmu`, `vru` and `dma_st` run
+      * **`nr >= 1`** on every data op. `dma_ld`, `vmu`, `vpu` and `dma_st` run
         one flat loop over the SUM of their rows and fetch an instruction
         whenever the row counter runs out, so a zero-row instruction is
         fetched as if it had one row -- it desynchronises the unit, it is not
@@ -1386,12 +1354,11 @@ def check_program(prog):
     if depth:
         raise ProgramError(f"{depth} loop(s) never closed")
 
-    written = {"vmem": [False] * VMEM_ROWS, "vr": [False] * NVR,
-               "ar": [False] * NAR}
-    ar_wrote = [-AR_RAW_DIST] * NAR   # accu iteration of each row's last write
-    it = 0                            # accu iterations issued so far
+    written = {"vmem": [False] * VMEM_ROWS, "vr": [False] * NVREG}
+    vr_wrote = [-VR_RAW_DIST] * NVREG  # vpu iteration of each row's last write
+    it = 0                            # vpu iterations issued so far
     q = {"loaded": False, "unused": False, "out": 0}   # the array's queue
-    size = {"vmem": VMEM_ROWS, "vr": NVR, "ar": NAR}
+    size = {"vmem": VMEM_ROWS, "vr": NVREG}
 
     for pc, ivs, op, nr, f0, f1, f2, f3 in _trace(prog):
         where = (f"instruction {pc} ({_OPNAME[op]}"
@@ -1420,20 +1387,21 @@ def check_program(prog):
         if nr < 1:
             raise ProgramError(f"{where}: nr=0 desynchronises the unit's "
                                f"flat row loop; drop the instruction instead")
-        def ar_read(row, at, what):
-            # the distance contract: `at` is the accu iteration of the read
-            need("ar", [row], what)
-            if at - ar_wrote[row] < AR_RAW_DIST:
+
+        def vr_read(row, at, what):
+            # the distance contract: `at` is the vpu iteration of the read
+            need("vr", [row], what)
+            if at - vr_wrote[row] < VR_RAW_DIST:
                 raise ProgramError(
-                    f"{where}: reads ar row {row} as {what} "
-                    f"{at - ar_wrote[row]} accu iteration(s) after it was "
-                    f"written; the accumulator's dependence claim needs "
-                    f">= AR_RAW_DIST={AR_RAW_DIST} (see THE ACCUMULATOR "
+                    f"{where}: reads vr row {row} as {what} "
+                    f"{at - vr_wrote[row]} vpu iteration(s) after it was "
+                    f"written; the vreg file's dependence claim needs "
+                    f">= VR_RAW_DIST={VR_RAW_DIST} (see THE VREG "
                     f"DISTANCE CONTRACT)")
 
-        def ar_write(row, at):
-            written["ar"][row] = True
-            ar_wrote[row] = at
+        def vr_write(row, at, ok=True):
+            written["vr"][row] = ok
+            vr_wrote[row] = at
 
         if op == OP_DMA_LD:
             if f0 not in (0, 1):
@@ -1446,13 +1414,16 @@ def check_program(prog):
                 written["vmem"][r] = True
         elif op == OP_VLD:
             src = span("vmem", f1, nr)
-            for d, s in zip(span("vr", f0, nr), src):
-                written["vr"][d] = written["vmem"][s]
+            for i, (d, s_) in enumerate(zip(span("vr", f0, nr), src)):
+                vr_write(d, it + i, written["vmem"][s_])   # a copy of unwritten
+            it += nr                                       # is unwritten
         elif op == OP_VMATLOAD:
             if nr != T:
                 raise ProgramError(f"{where}: nr={nr}; a vmatload moves "
                                    f"exactly T={T} weight rows")
-            need("vr", span("vr", f0, T), "weights")
+            for i, r in enumerate(span("vr", f0, T)):
+                vr_read(r, it + i, "weights")
+            it += T
             if q["unused"]:
                 raise ProgramError(f"{where}: the previous vmatload's weights "
                                    f"were never pushed; each PE switches on "
@@ -1461,7 +1432,9 @@ def check_program(prog):
         elif op == OP_VMATPUSH:
             if not q["loaded"]:
                 raise ProgramError(f"{where}: no vmatload before this push")
-            need("vr", span("vr", f0, nr), "activations")
+            for i, r in enumerate(span("vr", f0, nr)):
+                vr_read(r, it + i, "activations")
+            it += nr
             q["unused"] = False
             q["out"] += nr
             if q["out"] > OUTQ:
@@ -1473,25 +1446,25 @@ def check_program(prog):
                                    f"{q['out']} are pushed and un-popped; the "
                                    f"pop would wait forever")
             q["out"] -= nr
-            for i, r in enumerate(span("ar", f0, nr)):   # row by row, as `accu`
-                ar_write(r, it + i)
+            for i, r in enumerate(span("vr", f0, nr)):   # row by row, as `vpu`
+                vr_write(r, it + i)
             it += nr
         elif op == OP_VADD:
-            s1, s2, dst = span("ar", f1, nr), span("ar", f2, nr), span("ar", f0, nr)
+            s1, s2, dst = span("vr", f1, nr), span("vr", f2, nr), span("vr", f0, nr)
             for i in range(nr):              # two iterations per row
-                ar_read(s1[i], it + 2 * i, "a source")
-                ar_read(s2[i], it + 2 * i + 1, "a source")
-                ar_write(dst[i], it + 2 * i + 1)
+                vr_read(s1[i], it + 2 * i, "a source")
+                vr_read(s2[i], it + 2 * i + 1, "a source")
+                vr_write(dst[i], it + 2 * i + 1)
             it += 2 * nr
         elif op == OP_VRELU:
-            src, dst = span("ar", f1, nr), span("ar", f0, nr)
+            src, dst = span("vr", f1, nr), span("vr", f0, nr)
             for i in range(nr):
-                ar_read(src[i], it + i, "a source")
-                ar_write(dst[i], it + i)
+                vr_read(src[i], it + i, "a source")
+                vr_write(dst[i], it + i)
             it += nr
         elif op == OP_MVOUT:
-            for i, r in enumerate(span("ar", f0, nr)):
-                ar_read(r, it + i, "the value to retire")
+            for i, r in enumerate(span("vr", f0, nr)):
+                vr_read(r, it + i, "the value to retire")
             it += nr
             if f2 >= WPR or f1 + nr > MAXDIM:
                 raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
@@ -1506,9 +1479,9 @@ def assemble(prog, check=True):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
         imem[0] static instruction count   imem[4] loads | pushed rows << 16
-        imem[1] dma_ld  rows               imem[5] accu   iterations
+        imem[1] dma_ld  rows               imem[5] (retired)
         imem[2] vmu     rows               imem[6] dma_st rows
-        imem[3] vru     rows               imem[7] A rows | B rows << 16
+        imem[3] vpu iterations             imem[7] A rows | B rows << 16
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
     `expand`. They must match the sequencer's dispatch rules exactly.
@@ -1518,8 +1491,8 @@ def assemble(prog, check=True):
     what it is promised has to be the sum of `nr` over the instructions it is
     sent, with the per-unit adjustments the flattened bodies make:
 
-      * `accu` charges a `vadd` two iterations per row;
-      * `vru` is charged T rows per `vmatload` (its `nr` is T by rule).
+      * `vpu` charges a `vadd` two iterations per row, and T per
+        `vmatload` (its `nr` is T by rule).
 
     A unit promised the wrong number here does not produce a wrong answer, it
     hangs -- which is worth stating, because it is the one place where the
@@ -1555,16 +1528,17 @@ def assemble(prog, check=True):
     hdr = [len(prog),
            rows(OP_DMA_LD),
            rows(OP_DMA_LD, OP_VLD),
-           rows(OP_VLD, OP_VMATLOAD, OP_VMATPUSH),
+           rows(OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OP_VRELU,
+                OP_MVOUT) + 2 * rows(OP_VADD),
            n_ld | (push_rows << 16),
-           rows(OP_VMATPOP, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
+           0,                                  # retired (was accu's count)
            rows(OP_MVOUT),
            a_span | (b_span << 16)]
     assert len(hdr) == NHDR
     # Every count is read back through a 16-bit slice, which used to extract
     # to a signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
     # encoding note at the top of the file; the spare bit is kept).
-    for h in hdr[1:4] + hdr[5:7]:
+    for h in hdr[1:4] + hdr[6:7]:
         assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
     words = list(hdr)
     for w0, w1 in prog:
@@ -1583,16 +1557,34 @@ def schedule(s):
         per cycle.
       * `ib` is cyclically partitioned by 8, so the sequencer's program
         prefetch writes 8 words per cycle (see `sequencer`).
-      * **`accu`'s row loop carries no dependence through `ar`** -- the claim
-        `s.dependence` emits as `#pragma HLS dependence variable=ar inter
-        false`. It is what holds the flat loop at II=1 (Vitis alone closes it
-        at 3), and it is true because `check_program` enforces THE
-        ACCUMULATOR DISTANCE CONTRACT on every program `assemble()` accepts.
+      * **`vpu`'s row loop carries no dependence through `vreg`** -- the
+        claim `s.dependence` emits as `#pragma HLS dependence variable=vreg
+        inter false`. It is what holds the flat loop at II=1, and it is true
+        because `check_program` enforces THE VREG DISTANCE CONTRACT on every
+        program `assemble()` accepts.
+      * **`vpu`'s row loop is a flushable pipeline** (`style=flp`, the
+        `s.pipeline` option added for this): the unit pushes into the array
+        and pops from it in one loop, and under the default stall pipeline a
+        pop blocked on an earlier iteration's push deadlocks the RTL.
     """
     top = s.top_func_name
     s.partition(f"{top}:A", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
-    s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
+    s.dependence("vpu_0:x", "vreg", dep_type="inter", dependent=False)
+    # vpu both feeds the array and drains it: a flushable pipeline, or a pop
+    # that waits on an earlier iteration's push deadlocks the RTL
+    s.pipeline("vpu_0:x", style="flp")
+    # ... and so does every pipelined loop on the cycle it closes. A PE
+    # blocked reading its NEXT activation row -- which the vpu will not push
+    # until it has popped -- would otherwise freeze the previous row's
+    # forwarding puts inside its own stall pipeline, and the pop never
+    # completes (cosim deadlock at 16x16x16; 4x4x4 escaped only because the
+    # last pushed rows end the PE loops, which drains them). The weight
+    # loaders hold weights the same way.
+    for i in range(T):
+        for j in range(T):
+            s.pipeline(f"pe_{i}_{j}:x", style="flp")
+            s.pipeline(f"wld_{i}_{j}:c", style="flp")
     return s

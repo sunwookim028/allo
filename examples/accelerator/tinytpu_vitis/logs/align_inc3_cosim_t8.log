@@ -1,0 +1,9 @@
+TinyTPU-isa: ONE build -- 8x8 array, MAXDIM=16; sweeping 2 shapes as data; testbench=default
+  synthesizing once ...
+   8x 8x 8  cycles=287   TB 8x8x8 mismatches = 0 / 64
+  16x16x16  cycles=874   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   8x 8x 8   287
+  16x16x16   874
+  COSIM OK (testbench=default)

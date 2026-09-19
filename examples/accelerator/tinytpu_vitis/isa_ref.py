@@ -29,12 +29,17 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP,
     OP_VADD, OP_VRELU, OP_MVOUT,
     DMA_SRC_B,
-    MAXDIM, T, VMEM_ROWS, NVR, NAR, check_program, expand,
+    MAXDIM, T, VMEM_ROWS, NVREG, check_program, expand,
 )
 
 
 def _wrap32(x):
     return ((np.asarray(x, np.int64) + (1 << 31)) % (1 << 32) - (1 << 31))
+
+
+def _low8(x):
+    """The low 8 bits of each int32 lane, as int8: what the array sees."""
+    return (np.asarray(x, np.int64) + 128) % 256 - 128
 
 
 def run(prog, A, B, C):
@@ -45,32 +50,32 @@ def run(prog, A, B, C):
     B = np.asarray(B, np.int8).reshape(MAXDIM, MAXDIM)
     C = np.array(C, np.int8).reshape(MAXDIM, MAXDIM)
     vmem = np.zeros((VMEM_ROWS, T), np.int64)   # one row = T int8 lanes
-    vr = np.zeros((NVR, T), np.int64)
-    ar = np.zeros((NAR, T), np.int64)           # one row = T int32 lanes
+    vr = np.zeros((NVREG, T), np.int64)         # ONE file: T int32 lanes a row
     W = None                                    # the weights in the array
     queue = []                                  # pushed, un-popped results
     for op, nr, f0, f1, f2, f3 in expand(prog):
         if op == OP_VMATLOAD:
             # PE(i, j) holds W[i][j] = lane j of weight row i; they take
             # effect from the next push (check_program: every load is
-            # pushed before the next one), so Y = X W.
-            W = vr[f0:f0 + T].copy()
+            # pushed before the next one), so Y = X W. The array takes the
+            # low 8 bits of each lane.
+            W = _low8(vr[f0:f0 + T])
             continue
         for r in range(nr):
             if op == OP_DMA_LD:
                 src = B if f0 & DMA_SRC_B else A
                 vmem[f3 + r] = src[f1 + r, f2 * T:(f2 + 1) * T]
             elif op == OP_VLD:
-                vr[f0 + r] = vmem[f1 + r]
+                vr[f0 + r] = vmem[f1 + r]           # int8 sign-extended
             elif op == OP_VMATPUSH:
                 # column j is sum_i act[i] * W[i][j], T deep, from 0
-                queue.append(_wrap32(vr[f0 + r] @ W))
+                queue.append(_wrap32(_low8(vr[f0 + r]) @ W))
             elif op == OP_VMATPOP:
-                ar[f0 + r] = queue.pop(0)
+                vr[f0 + r] = queue.pop(0)
             elif op == OP_VADD:
-                ar[f0 + r] = _wrap32(ar[f1 + r] + ar[f2 + r])
+                vr[f0 + r] = _wrap32(vr[f1 + r] + vr[f2 + r])
             elif op == OP_VRELU:
-                ar[f0 + r] = np.maximum(ar[f1 + r], 0)
+                vr[f0 + r] = np.maximum(vr[f1 + r], 0)
             elif op == OP_MVOUT:
-                C[f1 + r, f2 * T:(f2 + 1) * T] = np.clip(ar[f0 + r], -128, 127)
+                C[f1 + r, f2 * T:(f2 + 1) * T] = np.clip(vr[f0 + r], -128, 127)
     return C.reshape(-1)

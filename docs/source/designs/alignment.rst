@@ -681,6 +681,17 @@ setup as v1's published numbers.
        summed by ``vadd`` in ``accu``, two iterations a row. ``accu``
        becomes the critical unit: 704 iterations at 16x16x16, against 320
        for v1's accumulate-in-``mm``.
+   * - **inc 3**: one VREG file
+     - 197
+     - 1904
+     - +11 / +688
+     - +25 / +1218
+     - ``vru`` (operands) and ``accu`` (accumulators) merge into one ``vpu``
+       that owns one file of int32 lanes (``vld`` sign-extends; the array
+       takes each lane's low 8 bits). The graph becomes **cyclic** (vpu ->
+       array -> vpu). The in-order ``vpu`` now pays the array's
+       push-to-pop latency on every tile, which inc 2's separate ``accu``
+       hid, and serialises what MiniTPU's three read ports overlap.
 
 Reading the table: the whole cost so far is where MiniTPU does work that v1
 did not have to. A DMA into VMEM and then a ``vld`` replaces v1's DMA straight
@@ -688,6 +699,22 @@ into the vregs. Summing k-tiles with explicit ``vadd`` instructions replaces
 v1's accumulate-on-write (MiniTPU's own README records trying accumulation
 across weight loads and reverting it).
 
+
+**What the cycle costs in RTL, beyond cycles.** Two things only RTL shows,
+both found by increment 3's cosim:
+
+* Vitis runs a dataflow region's C model one process after another, so cosim's
+  C-testbench pass aborts on a cyclic graph (``threaded_csim.py`` runs the C
+  model's processes on threads).
+* A pipelined loop that blocks on a read under Vitis's default *stall*
+  pipeline freezes its older iterations' puts. The ``vpu``, every PE and
+  every weight loader must be pipelined ``style=flp``. The PEs are the
+  subtle case. A PE blocked reading its *next* activation row, which the
+  ``vpu`` will not push until it has popped, holds the previous row's
+  forwarding puts, and the pop never completes. With only the ``vpu`` flushable,
+  cosim deadlocked at 16x16x16. It passed at 4x4x4 only because the last
+  pushed rows end the PE loops, which drains them. ``s.pipeline(style=)``
+  was added to Allo for this (``0038833c``).
 
 .. _align-verification:
 

@@ -22,7 +22,7 @@ here re-proves it). This gate runs on the same simulator build and adds:
     result region must be overwritten and everything outside it untouched, so
     a design may not rely on `C` arriving zeroed nor scribble past `M x N`;
   * **programs other than GEMM**: `isa_dsl.vector_program`, which varies
-    every field GEMM leaves constant (DRAM row, accumulator region, distinct
+    every field GEMM leaves constant (DRAM row, result region, distinct
     `vadd`/`vrelu` destinations), and random valid programs, both against
     `isa_ref.run` -- the ISA as numpy;
   * **many invocations of one build**, so a later run sees the state an
@@ -55,7 +55,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_DMA_ST, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
     OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OUTQ,
     OP_LOOP, OP_ENDLOOP, AGU_F0, AGU_F1,
-    MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, VMEM_ROWS, NVR, NAR, AR_RAW_DIST,
+    MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, VMEM_ROWS, NVREG, VR_RAW_DIST,
     SCORED_SHAPES, VEC_M,
 )
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
@@ -152,21 +152,21 @@ def compare(tag, got, want, M=None, N=None):
 # ------------------------------------------------------ random programs ---
 def random_program(seed):
     """A random program that is valid BY CONSTRUCTION: every read names rows
-    an earlier instruction wrote, and every `ar` read keeps the accumulator
-    distance contract (`AR_RAW_DIST` accu iterations after the write). Memory
-    windows are either low or at the top of each memory, so both overlapping
-    reuse and the last rows get hit."""
+    an earlier instruction wrote, and every vreg read keeps the distance
+    contract (`VR_RAW_DIST` vpu iterations after the write it depends on,
+    counting every instruction the vpu runs). Memory windows are either low
+    or at the top of each memory, so both overlapping reuse and the last rows
+    get hit."""
     rng = np.random.default_rng(seed)
     k = Program(f"fuzz {seed}")
     ri = lambda lo, hi: int(rng.integers(lo, hi + 1))   # noqa: E731
     hi_win = bool(rng.integers(0, 2))
     win = max(64, 2 * MAXDIM)            # every window fits a MAXDIM-row run
     lo = {m: (s - win if hi_win else 0)
-          for m, s in (("vmem", VMEM_ROWS), ("vr", NVR), ("ar", NAR))}
-    wr = {"vmem": np.zeros(VMEM_ROWS, bool), "vr": np.zeros(NVR, bool),
-          "ar": np.zeros(NAR, bool)}
-    ar_at = np.full(NAR, -AR_RAW_DIST)   # accu iteration of each row's last write
-    acc = {"it": 0}                      # accu iterations issued so far
+          for m, s in (("vmem", VMEM_ROWS), ("vr", NVREG))}
+    wr = {"vmem": np.zeros(VMEM_ROWS, bool), "vr": np.zeros(NVREG, bool)}
+    vr_at = np.full(NVREG, -VR_RAW_DIST)  # vpu iteration of each row's last write
+    vpu = {"it": 0}                      # vpu iterations issued so far
 
     def place(mem, n):
         return lo[mem] + ri(0, win - n)
@@ -176,16 +176,25 @@ def random_program(seed):
               if wr[mem][s:s + n].all()]
         return int(rng.choice(ok)) if ok else None
 
-    def accu_ok(reads):
-        """reads: (ar row, accu iteration) pairs, iterations counted from the
-        instruction's first. True if each keeps the distance contract."""
-        return all(acc["it"] + t - ar_at[row] >= AR_RAW_DIST for row, t in reads)
+    def reads_ok(reads, writes=()):
+        """reads/writes: (vr row, vpu iteration) pairs, iterations counted
+        from the instruction's first. True if every read keeps the contract,
+        against earlier instructions and against this one's own writes."""
+        for row, t in reads:
+            last = max([wt for wrow, wt in writes if wrow == row and wt < t],
+                       default=None)
+            at = vpu["it"] + t
+            if last is not None and t - last < VR_RAW_DIST:
+                return False
+            if last is None and at - vr_at[row] < VR_RAW_DIST:
+                return False
+        return True
 
-    def accu_commit(writes, n_it):
+    def commit(writes, n_it):
         for row, t in writes:
-            wr["ar"][row] = True
-            ar_at[row] = acc["it"] + t
-        acc["it"] += n_it
+            wr["vr"][row] = True
+            vr_at[row] = vpu["it"] + t
+        vpu["it"] += n_it
 
     def dma_ld(n=None):
         # DMA writes only VMEM; the vregs are reached by `vld`
@@ -202,7 +211,7 @@ def random_program(seed):
             return False
         d = place("vr", n)
         k.vld(d, s, rows=n)
-        wr["vr"][d:d + n] = True
+        commit([(d + i, i) for i in range(n)], n)
         return True
 
     qout = {"n": 0}                      # rows pushed and not yet popped
@@ -211,9 +220,9 @@ def random_program(seed):
         if qout["n"] == 0:
             return False
         n = n or ri(1, min(qout["n"], MAXDIM))
-        d = place("ar", n)
+        d = place("vr", n)
         k.vmatpop(d, rows=n)
-        accu_commit([(d + i, i) for i in range(n)], n)
+        commit([(d + i, i) for i in range(n)], n)
         qout["n"] -= n
         return True
 
@@ -224,10 +233,18 @@ def random_program(seed):
         for _ in range(ri(1, 2)):
             n = ri(1, MAXDIM)
             w, a = run_of("vr", T), run_of("vr", n)
-            if w is None or a is None or qout["n"] + n > OUTQ:
+            if (w is None or a is None or qout["n"] + n > OUTQ
+                    or not reads_ok([(w + i, i) for i in range(T)])):
                 break
             k.vmatload(w)
+            commit([], T)
+            if not reads_ok([(a + i, i) for i in range(n)]):
+                k.vmatpush(w, rows=T)        # the weights themselves, which
+                commit([], T)                # are T iterations old already
+                qout["n"] += T
+                continue
             k.vmatpush(a, rows=n)
+            commit([], n)
             qout["n"] += n
         else:
             if rng.integers(0, 2):
@@ -237,10 +254,10 @@ def random_program(seed):
 
     def vec(op):
         n = ri(1, 12)
-        s1, s2 = run_of("ar", n), run_of("ar", n)
+        s1, s2 = run_of("vr", n), run_of("vr", n)
         if s1 is None:
             return False
-        d = place("ar", n)
+        d = place("vr", n)
         if op == "vadd":
             reads = [(r, t) for i in range(n)
                      for r, t in ((s1 + i, 2 * i), (s2 + i, 2 * i + 1))]
@@ -248,29 +265,22 @@ def random_program(seed):
         else:
             reads = [(s1 + i, i) for i in range(n)]
             writes, n_it = [(d + i, i) for i in range(n)], n
-        # a read of a row this same instruction wrote earlier counts too
-        ok = True
-        for r, t in reads:
-            last = max([wt for wrow, wt in writes if wrow == r and wt < t],
-                       default=None)
-            if last is not None and t - last < AR_RAW_DIST:
-                ok = False
-        if not ok or not accu_ok(reads):
+        if not reads_ok(reads, writes):
             return False
         if op == "vadd":
             k.vadd(d, s1, s2, rows=n)
         else:
             k.vrelu(d, s1, rows=n)
-        accu_commit(writes, n_it)
+        commit(writes, n_it)
         return True
 
     def mvout():
         n = ri(1, MAXDIM)
-        s = run_of("ar", n)
-        if s is None or not accu_ok([(s + i, i) for i in range(n)]):
+        s = run_of("vr", n)
+        if s is None or not reads_ok([(s + i, i) for i in range(n)]):
             return False
         k.mvout(s, dram_row=ri(0, MAXDIM - n), col_block=ri(0, WPR - 1), rows=n)
-        acc["it"] += n
+        commit([], n)
         return True
 
     def mvout_loop():
@@ -278,13 +288,13 @@ def random_program(seed):
         if WPR < 2:
             return False                 # one column block: nothing to walk
         trip, n = ri(2, min(3, WPR)), ri(1, min(4, MAXDIM // 3))
-        s = run_of("ar", trip * n)
-        if s is None or not accu_ok([(s + i, i) for i in range(trip * n)]):
+        s = run_of("vr", trip * n)
+        if s is None or not reads_ok([(s + i, i) for i in range(trip * n)]):
             return False
         with k.loop(trip) as i:
             k.mvout(Ref(s).at(i, n), dram_row=Ref(0).at(i, n),
                     col_block=Ref(0).at(i, 1), rows=n)
-        acc["it"] += trip * n
+        commit([], trip * n)
         return True
 
     dma_ld(ri(T, MAXDIM))                # weights
@@ -294,7 +304,7 @@ def random_program(seed):
     while not mm():
         dma_ld()
         vld()
-    while pop():                         # something in `ar` before vec/mvout
+    while pop():                         # something to read before vec/mvout
         pass
     ops = [dma_ld, vld, mm, pop, lambda: vec("vadd"), lambda: vec("vrelu"),
            mvout, mvout_loop]
@@ -303,14 +313,14 @@ def random_program(seed):
         ops[int(rng.integers(0, len(ops)))]()
     while qout["n"]:                     # every pushed row is popped
         pop(min(qout["n"], MAXDIM))
-    mvout()
+    while not mvout():                   # the program ends by retiring rows
+        vld() or dma_ld()
     prog = k.emit()
     assert len(prog) <= MAX_STATIC
     check_program(prog)
     return prog
 
 
-# ------------------------------------------- the validator, both directions ---
 def _bad_programs():
     """Programs `check_program` must REJECT, each breaking one rule. Raw
     `enc` words where the DSL would refuse first, so the check under test is
@@ -324,33 +334,34 @@ def _bad_programs():
     wo = lambda a=0, n=4: (enc(OP_VMATPOP, f0=a, nr=n), 0)   # noqa: E731
     mm0 = [wl(), wp(), wo()]
     out = lambda a=0: (enc(OP_MVOUT, f0=a, nr=4), 0)  # noqa: E731
+    U = 2 * T + 8        # one vreg file: rows here are written by nothing below
     return {
-        "mvout before any write to ar": [ld, out()],
-        "vadd second source unwritten": [ld, vw, *mm0, (enc(OP_VADD, f0=8, f1=0, f2=4, nr=4), 0), out(8)],
-        "vrelu source unwritten": [ld, vw, *mm0, (enc(OP_VRELU, f0=0, f1=20, nr=4), 0), out()],
+        "mvout before any write to the vregs": [ld, out()],
+        "vadd second source unwritten": [ld, vw, *mm0, (enc(OP_VADD, f0=U + 8, f1=0, f2=U, nr=4), 0), out(U + 8)],
+        "vrelu source unwritten": [ld, vw, *mm0, (enc(OP_VRELU, f0=0, f1=U, nr=4), 0), out()],
         "vmatload weights never vld'd into vr": [ld, vw, wl(40), wp(), wo(), out()],
-        "vmatpush activations only in vmem, never in vr": [ld, vw, wl(), wp(8), wo(), out()],
+        "vmatpush activations only in vmem, never in vr": [ld, vw, wl(), wp(U), wo(), out()],
         "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, *mm0, out()],
-        # The accumulator distance contract, one iteration inside it. Relative
-        # to AR_RAW_DIST on purpose: whether the contract is wide enough for
+        # The vreg distance contract, one iteration inside it. Relative
+        # to VR_RAW_DIST on purpose: whether the contract is wide enough for
         # the RTL is a question only cosim can answer (TPU_TB=stress runs
-        # ar_distance_program(AR_RAW_DIST); mutate.py's `ar_claim_false`).
-        **({f"ar reads at distance AR_RAW_DIST - 1 = {AR_RAW_DIST - 1}":
-            ar_distance_program(AR_RAW_DIST - 1)} if AR_RAW_DIST > 1 else {}),
-        **({"mvout of a 1-row pop's row, 1 accu iteration later": [
+        # ar_distance_program(VR_RAW_DIST); mutate.py's `ar_claim_false`).
+        **({f"ar reads at distance VR_RAW_DIST - 1 = {VR_RAW_DIST - 1}":
+            ar_distance_program(VR_RAW_DIST - 1)} if VR_RAW_DIST > 1 else {}),
+        **({"mvout of a 1-row pop's row, 1 vpu iteration later": [
             ld, vw, wl(), wp(0, 1), wo(0, 1), (enc(OP_MVOUT, nr=1), 0)]}
-           if AR_RAW_DIST > 1 else {}),
+           if VR_RAW_DIST > 1 else {}),
         "vmatpush consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), *mm0, out()],
         # Loop semantics: the body is fine on iteration 0 and reads ar 4..7,
         # which nothing wrote, on iteration 1.
-        "loop iteration 1 reads unwritten ar": [
-            ld, vw, *mm0, (enc(OP_LOOP, nr=2), 0),
-            (enc(OP_MVOUT, f0=0, f1=0, nr=4), enc_agu((AGU_F0, 0, 4), (AGU_F1, 0, 4))),
+        "loop iteration 1 reads unwritten vregs": [
+            ld, vw, wl(), wp(), wo(U), (enc(OP_LOOP, nr=2), 0),
+            (enc(OP_MVOUT, f0=U, f1=0, nr=4), enc_agu((AGU_F0, 0, 4), (AGU_F1, 0, 4))),
             (enc(OP_ENDLOOP), 0)],
         "zero-row vld (hangs the machine)": [ld, (enc(OP_VLD, nr=0), 0), vw, *mm0, out()],
         "loop trip count 0": [ld, vw, *mm0, (enc(OP_LOOP, nr=0), 0), out(), (enc(OP_ENDLOOP), 0)],
         "AGU term names a closed loop": [ld, vw, *mm0, (enc(OP_MVOUT, nr=4), enc_agu((AGU_F1, 0, 4)))],
-        "ar row past NAR": [ld, vw, wl(), wp(), wo(NAR - 2), out(NAR - 2)],
+        "vr row past NVREG": [ld, vw, wl(), wp(), wo(NVREG - 2), out(NVREG - 2)],
         "mvout past the last C row": [ld, vw, *mm0, (enc(OP_MVOUT, f1=MAXDIM - 2, nr=4), 0)],
         "retired dma_st opcode": [ld, vw, *mm0, out(), (enc(OP_DMA_ST, nr=4), 0)],
         "retired mm opcode": [ld, vw, (enc(OP_MM, nr=4), 0), out()],
@@ -384,7 +395,7 @@ def validator_controls():
     good += [("vadd_program", SCORED[-1], False, vadd_program(*SCORED[-1]))]
     good += [("vector_program", (M,), False, vector_program(M)) for M in VEC_MS]
     good += [("ar_distance_program", (d,), False, ar_distance_program(d))
-             for d in (AR_RAW_DIST, AR_RAW_DIST + 1, 2 * AR_RAW_DIST)]
+             for d in (VR_RAW_DIST, VR_RAW_DIST + 1, 2 * VR_RAW_DIST)]
     for name, s, r, prog in good:
         try:
             check_program(prog)
@@ -439,8 +450,8 @@ def cases(quick=False):
         seed += 1
         A, B = operands(dist, seed)
         C0 = prefill()
-        prog = ar_distance_program(AR_RAW_DIST)
-        yield (f"ar distance {AR_RAW_DIST} {dist} seed={seed}", prog, A, B, C0,
+        prog = ar_distance_program(VR_RAW_DIST)
+        yield (f"ar distance {VR_RAW_DIST} {dist} seed={seed}", prog, A, B, C0,
                isa_ref.run(prog, A, B, C0), None, None)
     for s in range(8 if quick else 200):
         A, B = operands(("mid", "full", "small")[s % 3], 7000 + s)

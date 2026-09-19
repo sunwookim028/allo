@@ -68,7 +68,9 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
 from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
-LDFLAGS = "-B/usr/bin"
+# -lpthread: the C model runs each process on a std::thread
+# (threaded_csim.py), because the aligned machine's process graph is cyclic
+LDFLAGS = "-B/usr/bin -lpthread"
 # The scored shapes scale with the array (microarch_isa.SCORED_SHAPES): at T=4
 # they are the five v1/Gemmini shapes.
 SHAPES = list(SCORED_SHAPES)
@@ -148,7 +150,7 @@ def stress_testbench(M, K, N):
     from examples.accelerator.tinytpu_vitis import isa_ref
     from examples.accelerator.tinytpu_vitis.isa_dsl import (
         vector_program, ar_distance_program)
-    from examples.accelerator.tinytpu_vitis.microarch_isa import AR_RAW_DIST
+    from examples.accelerator.tinytpu_vitis.microarch_isa import VR_RAW_DIST
     from examples.accelerator.tinytpu_vitis.stress_isa import (
         operands, boundary_operands, gemm_gold)
     crng = np.random.default_rng(4321 + M * 10000 + K * 100 + N)
@@ -169,12 +171,12 @@ def stress_testbench(M, K, N):
     cases.append(("vector_program full", prog, A, B, C0,
                   isa_ref.run(prog, A, B, C0)))
     # The accumulator's dependence claim, at the edge of the contract that
-    # makes it true: every `ar` read exactly AR_RAW_DIST iterations after its
+    # makes it true: every vreg read exactly VR_RAW_DIST iterations after its
     # write. Only the RTL can fail this; every simulator ignores the pragma.
     A, B = operands("full", 951)
     C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
-    prog = ar_distance_program(AR_RAW_DIST)
-    cases.append((f"ar_distance({AR_RAW_DIST}) full", prog, A, B, C0,
+    prog = ar_distance_program(VR_RAW_DIST)
+    cases.append((f"vr_distance({VR_RAW_DIST}) full", prog, A, B, C0,
                   isa_ref.run(prog, A, B, C0)))
 
     src = ["#include <cstdio>\n#include <cstdint>\n",
@@ -299,6 +301,13 @@ def main():
             wrap_io=(os.environ.get("TPU_WRAP", "0") == "1"),
             configs={"align_value": 64})
     patch_axi_depths(prj)
+    # The process graph is cyclic (vpu -> array -> vpu), and Vitis runs a
+    # dataflow region's C model one process after another, so cosim's C
+    # testbench pass would read an empty stream and abort before the RTL
+    # ran. Run the C model's processes concurrently instead (synthesis is
+    # untouched: the rewrite is under #ifndef __SYNTHESIS__).
+    from examples.accelerator.tinytpu_vitis import threaded_csim
+    threaded_csim.patch(os.path.join(prj, "kernel.cpp"), "tinytpu_isa")
     open(os.path.join(prj, "tb.cpp"), "w").write(tb(*SHAPES[0]))
     print("  synthesizing once ...", flush=True)
     vitis(prj, TCL_SYN, "csynth.log")

@@ -352,11 +352,12 @@ def vector_program(M=None):
     h = M // 2
     c = lambda i: i % WPR                    # noqa: E731  column blocks
     va, vb, vw = 2 * MAXDIM + 8, 3 * MAXDIM + 16, 4 * MAXDIM + 24   # VMEM
-    r1 = 10                                  # vregs: act1, act2, W1 | W2
-    r2 = r1 + M + 5
-    rw = r2 + M + 7
-    S = M + 8                                # accumulator regions
-    a1, a2, a3, a4, a5 = 20, 20 + S, 20 + 2 * S, 20 + 3 * S, 20 + 4 * S
+    r1 = 10                                  # one vreg file: act1, act2,
+    r2 = r1 + M + 5                          # W1 | W2, then five result
+    rw = r2 + M + 7                          # regions, none overlapping
+    S = M + 8
+    a1 = rw + 2 * T + 6
+    a2, a3, a4, a5 = a1 + S, a1 + 2 * S, a1 + 3 * S, a1 + 4 * S
     k = Program(f"vector {M}")
     k.dma_ld(src=0, dram_row=min(3, MAXDIM - M), col_block=c(1), vmem=va, rows=M)
     k.dma_ld(src=1, dram_row=min(2, MAXDIM - M), col_block=c(2), vmem=vb, rows=M)
@@ -412,8 +413,8 @@ def ar_distance_program(dist):
     k.dma_ld(src=0, dram_row=0, col_block=0, vmem=0, rows=n)
     k.vld(0, 0, rows=n)
     k.dma_ld(src=1, dram_row=0, col_block=1 % WPR, vmem=64, rows=T)
-    k.vld(64, 64, rows=T)
-    k.vmatload(64)
+    k.vld(100, 64, rows=T)                   # clear of every region below
+    k.vmatload(100)
     k.vmatpush(0, rows=n)
     k.vmatpush(0, rows=n)
     k.vmatpop(10, rows=n)                    # ar10+i written at i
