@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>AMD Vitis HLS (FPGA) &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Siemens Catapult HLS (FPGA)" href="catapult.html" />
+    <link rel="prev" title="LLVM (CPU)" href="llvm.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="amd-vitis-hls-fpga">
+<h1>AMD Vitis HLS (FPGA)<a class="headerlink" href="#amd-vitis-hls-fpga" title="Link to this heading"><span>¶</span></a></h1>
+<p>The <a class="reference external" href="https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vitis/vitis-hls.html">Vitis HLS</a> FPGA backend leverages the Vivado/Vitis HLS toolchain to generate hardware accelerators for FPGA devices. This document demonstrates how to define a general matrix multiplication (GEMM) kernel using the Allo ADL and generate HLS code for FPGA synthesis. For more details on kernel customizations and scheduling optimizations, please refer to the <a class="reference external" href="https://cornell-zhang.github.io/allo/gallery/tutorial_02_vhls.html">Allo-HLS tutorial</a>.</p>
+<section id="kernel-definition">
+<h2>Kernel Definition<a class="headerlink" href="#kernel-definition" title="Link to this heading"><span>¶</span></a></h2>
+<p>The GEMM kernel is implemented with <cite>float32</cite> precision using pre-defined constants for the matrix dimensions. The kernel utilizes the <cite>allo.grid</cite> API to iterate over output indices and the <cite>allo.reduction</cite> API to designate the reduction axis for accumulating the dot-product.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">allo</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">allo.ir.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">float32</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="c1"># Define matrix dimensions</span>
+<span class="n">M</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">K</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">gemm</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span> <span class="n">B</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]:</span>
+    <span class="n">C</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">allo</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">):</span>
+        <span class="n">C</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">C</span>
+</pre></div>
+</div>
+</section>
+<section id="code-generation-for-vivado-vitis-hls">
+<h2>Code Generation for Vivado/Vitis HLS<a class="headerlink" href="#code-generation-for-vivado-vitis-hls" title="Link to this heading"><span>¶</span></a></h2>
+<p>Allo supports several approaches to generate HLS code:</p>
+<ol class="arabic">
+<li><p><strong>Direct HLS Code Generation</strong>:
+Set the target to <cite>“vhls”</cite> to produce HLS code as a string. This code includes the necessary headers and pragmas for Vitis HLS synthesis.</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">code</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"vhls"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>HLS Emulation, Synthesis, and Execution</strong>:
+Specify the target as <cite>“vitis_hls”</cite> along with a synthesis mode and project name to generate a complete HLS project. The supported modes are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sw_emu</span></code>: Software emulation mode, which is similar to C simulation that compiles the program using C compiler and runs it on the CPU. Depending on the size of your input data, this mode may take within one minute.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hw_emu</span></code>: Hardware emulation mode, which is similar to co-simulation that compiles the program into RTL design using HLS compiler and runs the RTL with the test bench on the FPGA emulator. Since it needs to go through the HLS synthesis flow, it may take several minutes to finish.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hw</span></code>: Full hardware synthesis mode, which compiles the program into RTL design using HLS, goes through placement and routing, generates the bitstream, and finally executes on FPGA. This mode may take several hours to finish.</p></li>
+</ul>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"hw_emu"</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">"gemm.prj"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>(Legacy) HLS Synthesis</strong>:
+Set the target to <cite>“vivado_hls”</cite> to generate a legacy HLS project. This approach is similar to the previous one but uses <code class="docutils literal notranslate"><span class="pre">run.tcl</span></code> for the project script. The supported modes are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">csim</span></code>: C simulation mode, using the gcc compiler to compile the program and runs it on the CPU.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">csyn</span></code>: C synthesis mode, using Vivado HLS compiler to synthesize the program. <strong>Note: This mode only synthesize the program and generate the RTL design but does not execute the program!</strong></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cosim</span></code>: Co-simulation mode, using Vivado HLS compiler to synthesize the program and generate the RTL design, then runs the RTL with the test bench on the CPU.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">impl</span></code>: Implementation mode, using Vivado HLS compiler to synthesize the program, generate the RTL design, and go through placement and routing to the bitstream.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"vivado_hls"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"csim"</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">"gemm.prj"</span><span class="p">)</span>
+<span class="c1"># For csim</span>
+<span class="n">mod</span><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">np_B</span><span class="p">,</span> <span class="n">allo_C</span><span class="p">)</span>
+<span class="c1"># For csyn</span>
+<span class="n">mod</span><span class="p">()</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="project-structure-and-execution">
+<h2>Project Structure and Execution<a class="headerlink" href="#project-structure-and-execution" title="Link to this heading"><span>¶</span></a></h2>
+<p>The generated HLS project (e.g., in the folder <code class="docutils literal notranslate"><span class="pre">gemm.prj</span></code>) typically includes:</p>
+<ul class="simple">
+<li><p><strong>host.cpp</strong>: The host-side (CPU) code that invokes the accelerator.</p></li>
+<li><p><strong>kernel.cpp</strong>: The accelerator kernel code.</p></li>
+<li><p><strong>Makefile</strong>: Build scripts to compile the project.</p></li>
+</ul>
+<p>To run the design, prepare the input matrices using NumPy and allocate an output array for the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">np_A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="n">M</span><span class="p">,</span> <span class="n">K</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">np_B</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="n">K</span><span class="p">,</span> <span class="n">N</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">allo_C</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">M</span><span class="p">,</span> <span class="n">N</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">mod</span><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">np_B</span><span class="p">,</span> <span class="n">allo_C</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">allo_C</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">np_B</span><span class="p">),</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt>Note:</dt><dd><p>Ensure that the Vitis HLS and XRT environments are correctly configured before running the HLS flow. For further environment setup and synthesis mode details, please consult the <a class="reference external" href="https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vitis/vitis-hls.html">Vitis HLS</a> documentation.</p>
+</dd>
+</dl>
+</section>
+<section id="hbm-ddr-memory-mapping">
+<h2>HBM/DDR Memory Mapping<a class="headerlink" href="#hbm-ddr-memory-mapping" title="Link to this heading"><span>¶</span></a></h2>
+<p>For designs targeting platforms with High Bandwidth Memory (HBM) or multiple DDR banks (such as Alveo U280), Allo provides an easy way to specify memory channel mappings for kernel arguments. This is done through the <code class="docutils literal notranslate"><span class="pre">hbm_mapping</span></code> configuration option in the <code class="docutils literal notranslate"><span class="pre">configs</span></code> dictionary.</p>
+<p><strong>Basic Usage</strong></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">hbm_mapping</span></code> dictionary maps function argument names to memory channels. You can specify:</p>
+<ul class="simple">
+<li><p><strong>Integer values</strong>: Interpreted as HBM channel numbers (e.g., <code class="docutils literal notranslate"><span class="pre">0</span></code> → <code class="docutils literal notranslate"><span class="pre">HBM[0]</span></code>)</p></li>
+<li><p><strong>String values</strong>: Full memory specification (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;HBM[0]&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;DDR[1]&quot;</span></code>)</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">allo.ir.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">int32</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">gemm</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span> <span class="n">B</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]:</span>
+    <span class="n">C</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">allo</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">):</span>
+        <span class="n">C</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">C</span>
+
+<span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">gemm</span><span class="p">)</span>
+
+<span class="c1"># Define HBM channel mapping using argument names</span>
+<span class="n">hbm_mapping</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"A"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>              <span class="c1"># Input A -&gt; HBM channel 0</span>
+    <span class="s2">"B"</span><span class="p">:</span> <span class="s2">"HBM[1]"</span><span class="p">,</span>       <span class="c1"># Input B -&gt; HBM channel 1</span>
+    <span class="s2">"output_0"</span><span class="p">:</span> <span class="s2">"DDR[0]"</span><span class="p">,</span> <span class="c1"># Return value -&gt; DDR bank 0</span>
+<span class="p">}</span>
+
+<span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"hw"</span><span class="p">,</span>
+    <span class="n">project</span><span class="o">=</span><span class="s2">"gemm.prj"</span><span class="p">,</span>
+    <span class="n">configs</span><span class="o">=</span><span class="p">{</span><span class="s2">"hbm_mapping"</span><span class="p">:</span> <span class="n">hbm_mapping</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Argument Naming Convention</strong></p>
+<ul class="simple">
+<li><p><strong>Input arguments</strong>: Use the same names as in your function definition (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;A&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;B&quot;</span></code>)</p></li>
+<li><p><strong>Return values</strong>: Use <code class="docutils literal notranslate"><span class="pre">&quot;output_0&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;output_1&quot;</span></code>, etc. for functions with return values</p></li>
+</ul>
+<p><strong>Generated Configuration File</strong></p>
+<p>Allo automatically generates a <code class="docutils literal notranslate"><span class="pre">.cfg</span></code> file in the project directory with the connectivity settings. For example, the above configuration would generate a file like:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[connectivity]
+
+sp=gemm.v15:HBM[0]
+sp=gemm.v16:HBM[1]
+sp=gemm.v17:DDR[0]
+</pre></div>
+</div>
+<p>Note that Allo automatically translates your user-friendly argument names (<code class="docutils literal notranslate"><span class="pre">A</span></code>, <code class="docutils literal notranslate"><span class="pre">B</span></code>, <code class="docutils literal notranslate"><span class="pre">output_0</span></code>) to the actual HLS-generated argument names (<code class="docutils literal notranslate"><span class="pre">v15</span></code>, <code class="docutils literal notranslate"><span class="pre">v16</span></code>, <code class="docutils literal notranslate"><span class="pre">v17</span></code>).</p>
+<p><strong>Complex Example with Multiple Arguments</strong></p>
+<p>For larger designs with many memory interfaces, you can specify different HBM channels for each argument:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hbm_mapping</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"inp_0"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>           <span class="c1"># HBM[0]</span>
+    <span class="s2">"inp_1"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>           <span class="c1"># HBM[0] - can share channels</span>
+    <span class="s2">"weight_0"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>        <span class="c1"># HBM[1]</span>
+    <span class="s2">"weight_1"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>        <span class="c1"># HBM[2]</span>
+    <span class="s2">"bias"</span><span class="p">:</span> <span class="s2">"HBM[3]"</span><span class="p">,</span>     <span class="c1"># HBM[3]</span>
+    <span class="s2">"output_0"</span><span class="p">:</span> <span class="s2">"DDR[0]"</span><span class="p">,</span> <span class="c1"># DDR bank 0</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This feature is particularly useful for:</p>
+<ul class="simple">
+<li><p><strong>Memory bandwidth optimization</strong>: Distribute data across multiple HBM channels to maximize bandwidth</p></li>
+<li><p><strong>Bank conflict avoidance</strong>: Place frequently accessed data on separate memory banks</p></li>
+<li><p><strong>Platform-specific tuning</strong>: Match memory assignments to your target FPGA platform’s memory architecture</p></li>
+</ul>
+</section>
+<section id="memory-implementation-customization">
+<h2>Memory Implementation Customization<a class="headerlink" href="#memory-implementation-customization" title="Link to this heading"><span>¶</span></a></h2>
+<p>Allo provides the <code class="docutils literal notranslate"><span class="pre">Memory</span></code> class to specify on-chip memory implementation details for arrays, similar to the <a class="reference external" href="https://docs.amd.com/r/en-US/ug1399-vitis-hls/pragma-HLS-bind_storage">Vitis HLS bind_storage pragma</a>. This allows fine-grained control over how arrays are mapped to FPGA memory resources (BRAM, URAM, LUTRAM, etc.).</p>
+<p><strong>Basic Usage</strong></p>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> operator to annotate function arguments or local variables with memory specifications:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">allo</span><span class="w"> </span><span class="kn">import</span> <span class="n">Memory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">allo.ir.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">int32</span><span class="p">,</span> <span class="n">float32</span>
+
+<span class="c1"># Define memory specifications</span>
+<span class="n">MemUram</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"URAM"</span><span class="p">)</span>
+<span class="n">MemBram</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"BRAM"</span><span class="p">,</span> <span class="n">storage_type</span><span class="o">=</span><span class="s2">"RAM_2P"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">kernel</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">]</span> <span class="o">@</span> <span class="n">MemUram</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">float32</span><span class="p">[</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">]</span> <span class="o">@</span> <span class="n">MemBram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">]:</span>
+    <span class="c1"># Local variable with memory annotation</span>
+    <span class="n">buf</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">]</span> <span class="o">@</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"BRAM"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">32</span><span class="p">):</span>
+        <span class="n">buf</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="mi">2</span>
+    <span class="n">c</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">32</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">32</span><span class="p">):</span>
+        <span class="n">c</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">buf</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">c</span>
+
+<span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span>
+<span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"vhls"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">hls_code</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This generates HLS code with <code class="docutils literal notranslate"><span class="pre">bind_storage</span></code> pragmas:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">kernel</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">v0</span><span class="p">[</span><span class="mi">32</span><span class="p">],</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">v1</span><span class="p">[</span><span class="mi">16</span><span class="p">][</span><span class="mi">16</span><span class="p">],</span><span class="w"> </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">v2</span><span class="p">[</span><span class="mi">32</span><span class="p">])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="cp">#pragma HLS bind_storage variable=v0 impl=uram</span>
+<span class="w">  </span><span class="cp">#pragma HLS bind_storage variable=v1 type=ram_2p impl=bram</span>
+
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">buf</span><span class="p">[</span><span class="mi">32</span><span class="p">];</span>
+<span class="w">  </span><span class="cp">#pragma HLS bind_storage variable=buf impl=bram</span>
+<span class="w">  </span><span class="c1">// ... kernel body ...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Memory Class Parameters</strong></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">Memory</span></code> class accepts the following parameters:</p>
+<ul class="simple">
+<li><p><strong>resource</strong> (str): Memory resource type</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;BRAM&quot;</span></code>: Block RAM - the most common on-chip memory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;URAM&quot;</span></code>: Ultra RAM - larger capacity, available on UltraScale+ devices</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;LUTRAM&quot;</span></code>: LUT-based RAM - faster but smaller</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;SRL&quot;</span></code>: Shift Register LUT - efficient for FIFOs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;AUTO&quot;</span></code>: Let the HLS tool decide (default)</p></li>
+</ul>
+</li>
+<li><p><strong>storage_type</strong> (str, optional): RAM access pattern</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;RAM_1P&quot;</span></code>: Single-port RAM</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;RAM_2P&quot;</span></code>: Simple dual-port RAM (one read, one write port)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;RAM_T2P&quot;</span></code>: True dual-port RAM (two read/write ports)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;RAM_1WNR&quot;</span></code>: Single write, N read ports</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;RAM_S2P&quot;</span></code>: Simple dual-port (alias for RAM_2P)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;ROM_1P&quot;</span></code>: Single-port ROM</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;ROM_2P&quot;</span></code>: Dual-port ROM</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;ROM_NP&quot;</span></code>: N-port ROM</p></li>
+</ul>
+</li>
+<li><p><strong>latency</strong> (int, optional): Memory access latency in cycles</p></li>
+<li><p><strong>depth</strong> (int, optional): Depth of the memory (useful for streams/FIFOs)</p></li>
+</ul>
+<p><strong>Examples</strong></p>
+<ol class="arabic">
+<li><p><strong>URAM for large buffers</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># URAM is ideal for large arrays on UltraScale+ FPGAs</span>
+<span class="n">LargeBuffer</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"URAM"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">float32</span><span class="p">[</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">]</span> <span class="o">@</span> <span class="n">LargeBuffer</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Dual-port BRAM for concurrent access</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># RAM_2P allows simultaneous read and write</span>
+<span class="n">DualPort</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"BRAM"</span><span class="p">,</span> <span class="n">storage_type</span><span class="o">=</span><span class="s2">"RAM_2P"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pipeline</span><span class="p">(</span><span class="n">inp</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="mi">256</span><span class="p">]</span> <span class="o">@</span> <span class="n">DualPort</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">int32</span><span class="p">[</span><span class="mi">256</span><span class="p">]:</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>LUTRAM for small, fast buffers</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># LUTRAM is faster but uses more LUTs</span>
+<span class="n">FastBuffer</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"LUTRAM"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="n">weights</span><span class="p">:</span> <span class="n">int8</span><span class="p">[</span><span class="mi">64</span><span class="p">]</span> <span class="o">@</span> <span class="n">FastBuffer</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Multiple memory types in one kernel</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">InputMem</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"BRAM"</span><span class="p">,</span> <span class="n">storage_type</span><span class="o">=</span><span class="s2">"RAM_1P"</span><span class="p">)</span>
+<span class="n">WeightMem</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"URAM"</span><span class="p">)</span>
+<span class="n">OutputMem</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="s2">"BRAM"</span><span class="p">,</span> <span class="n">storage_type</span><span class="o">=</span><span class="s2">"RAM_2P"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">neural_layer</span><span class="p">(</span>
+    <span class="n">inp</span><span class="p">:</span> <span class="n">float32</span><span class="p">[</span><span class="mi">128</span><span class="p">]</span> <span class="o">@</span> <span class="n">InputMem</span><span class="p">,</span>
+    <span class="n">weights</span><span class="p">:</span> <span class="n">float32</span><span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">]</span> <span class="o">@</span> <span class="n">WeightMem</span><span class="p">,</span>
+    <span class="n">out</span><span class="p">:</span> <span class="n">float32</span><span class="p">[</span><span class="mi">64</span><span class="p">]</span> <span class="o">@</span> <span class="n">OutputMem</span>
+<span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p><strong>Best Practices</strong></p>
+<ul class="simple">
+<li><p>Use <strong>URAM</strong> for large arrays (&gt;36Kb) on UltraScale+ devices to save BRAM resources</p></li>
+<li><p>Use <strong>BRAM with RAM_2P</strong> when you need concurrent read/write access</p></li>
+<li><p>Use <strong>LUTRAM</strong> for small lookup tables that require low latency</p></li>
+<li><p>Use <strong>ROM</strong> types for constant data that never changes</p></li>
+<li><p>Let the tool decide (<code class="docutils literal notranslate"><span class="pre">resource=&quot;AUTO&quot;</span></code>) when you don’t have specific requirements</p></li>
+</ul>
+</section>
+<section id="device-and-frequency-configuration">
+<h2>Device and Frequency Configuration<a class="headerlink" href="#device-and-frequency-configuration" title="Link to this heading"><span>¶</span></a></h2>
+<p>You can specify the target device and clock frequency through the <code class="docutils literal notranslate"><span class="pre">configs</span></code> dictionary:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"hw"</span><span class="p">,</span>
+    <span class="n">project</span><span class="o">=</span><span class="s2">"gemm.prj"</span><span class="p">,</span>
+    <span class="n">configs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"device"</span><span class="p">:</span> <span class="s2">"u280"</span><span class="p">,</span>     <span class="c1"># Target device (default: "u280")</span>
+        <span class="s2">"frequency"</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span>     <span class="c1"># Target frequency in MHz (default: 300)</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Supported Devices</strong></p>
+<ul class="simple">
+<li><p><strong>Alveo</strong>: <code class="docutils literal notranslate"><span class="pre">u200</span></code>, <code class="docutils literal notranslate"><span class="pre">u250</span></code>, <code class="docutils literal notranslate"><span class="pre">u280</span></code></p></li>
+<li><p><strong>Zynq UltraScale+</strong>: <code class="docutils literal notranslate"><span class="pre">zcu102</span></code>, <code class="docutils literal notranslate"><span class="pre">zcu104</span></code>, <code class="docutils literal notranslate"><span class="pre">zcu106</span></code>, <code class="docutils literal notranslate"><span class="pre">zcu111</span></code></p></li>
+<li><p><strong>Versal</strong>: <code class="docutils literal notranslate"><span class="pre">vck190</span></code>, <code class="docutils literal notranslate"><span class="pre">vhk158</span></code></p></li>
+<li><p><strong>Embedded</strong>: <code class="docutils literal notranslate"><span class="pre">ultra96v2</span></code>, <code class="docutils literal notranslate"><span class="pre">pynqz2</span></code>, <code class="docutils literal notranslate"><span class="pre">zedboard</span></code></p></li>
+</ul>
+</section>
+<section id="aligned-m-axi-pointers-and-port-widening">
+<h2>Aligned <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> Pointers and Port Widening<a class="headerlink" href="#aligned-m-axi-pointers-and-port-widening" title="Link to this heading"><span>¶</span></a></h2>
+<p>Vitis HLS can widen an <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> port so that a long burst of narrow elements
+(e.g. <code class="docutils literal notranslate"><span class="pre">int8</span></code>) moves many bytes per beat instead of one. The Tcl setting is
+<code class="docutils literal notranslate"><span class="pre">config_interface</span> <span class="pre">-m_axi_max_widen_bitwidth</span> <span class="pre">&lt;bits&gt;</span></code>, but Vitis only widens a
+port whose pointer it knows to be aligned. By default Allo emits the top
+function’s array arguments as plain <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*name</span></code> pointers, so Vitis assumes
+1-byte alignment and <strong>declines to widen, silently</strong>: the setting is accepted,
+csynth completes, and the ports stay at the element width with no diagnostic.</p>
+<p>Allo can emit an alignment promise on every array argument of the top function.
+It is opt-in, through the <code class="docutils literal notranslate"><span class="pre">align_value</span></code> key of <code class="docutils literal notranslate"><span class="pre">configs</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"csyn"</span><span class="p">,</span>
+    <span class="n">project</span><span class="o">=</span><span class="s2">"design.prj"</span><span class="p">,</span>
+    <span class="n">configs</span><span class="o">=</span><span class="p">{</span><span class="s2">"align_value"</span><span class="p">:</span> <span class="mi">64</span><span class="p">},</span>   <span class="c1"># bytes</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>With it, each array parameter of the top function is emitted as</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int8_t</span><span class="w"> </span><span class="o">*</span><span class="n">__attribute__</span><span class="p">((</span><span class="n">align_value</span><span class="p">(</span><span class="mi">64</span><span class="p">)))</span><span class="w"> </span><span class="n">v0</span><span class="p">,</span>
+</pre></div>
+</div>
+<p>next to the usual <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">interface</span> <span class="pre">m_axi</span> <span class="pre">port=v0</span> <span class="pre">offset=slave</span>
+<span class="pre">bundle=gmem0</span></code>. The attribute is added in <code class="docutils literal notranslate"><span class="pre">postprocess_hls_code</span></code>
+(<code class="docutils literal notranslate"><span class="pre">allo/backend/vitis.py</span></code>) when a <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> project is generated; scalar
+arguments are unaffected, and without the key the output is unchanged.</p>
+<p>Allo does not add <code class="docutils literal notranslate"><span class="pre">-m_axi_max_widen_bitwidth</span></code> itself; put it in your own
+synthesis script alongside the alignment:</p>
+<div class="highlight-tcl notranslate"><div class="highlight"><pre><span></span><span class="nv">config_interface</span><span class="w"> </span><span class="o">-</span>m_axi_max_widen_bitwidth<span class="w"> </span><span class="mi">512</span>
+</pre></div>
+</div>
+<p><strong>Measured effect.</strong> On the TinyTPU-isa accelerator (<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>),
+<code class="docutils literal notranslate"><span class="pre">align_value</span></code> 64 plus <code class="docutils literal notranslate"><span class="pre">-m_axi_max_widen_bitwidth</span> <span class="pre">512</span></code> took gmem0 to <strong>bit
+width 512</strong> and gmem1/gmem2 to 32, and two burst loops from II=4 to II=1;
+<code class="docutils literal notranslate"><span class="pre">csynth.log</span></code> shows one port at 512, two at 32, and zero <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">214-307</span></code>
+messages. Without the alignment, the same setting left every port at 8 bits.
+Together with removing a hidden memset it took the design from 1457 to 919
+cycles at 16x16x16 (<a class="reference internal" href="../designs/tinytpu_history.html#tinytpu-history-prefixes"><span class="std std-ref">The two hidden prefixes, and the silent refusal to widen</span></a>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">[HLS</span> <span class="pre">214-307]</span> <span class="pre">Could</span> <span class="pre">not</span> <span class="pre">widen</span> <span class="pre">since</span> <span class="pre">type</span> <span class="pre">i8</span> <span class="pre">size</span> <span class="pre">is</span> <span class="pre">greater</span> <span class="pre">than</span> <span class="pre">or</span> <span class="pre">equal</span>
+<span class="pre">to</span> <span class="pre">alignment</span> <span class="pre">1(bytes)</span></code> is what small standalone probes report. On the full
+design it did <strong>not</strong> appear – the refusal was silent. Probes also showed
+that <code class="docutils literal notranslate"><span class="pre">__attribute__((aligned(N)))</span></code> on the element type is the wrong lever
+(Vitis tests the pointer <em>parameter</em>), and that <code class="docutils literal notranslate"><span class="pre">align_value</span></code> alone is
+necessary but not sufficient to widen every probe kernel. See
+<a class="reference internal" href="../developer/limitations.html#limitation-23"><span class="std std-ref">23. m_axi port widening is not reachable from user code – align_value is necessary and not sufficient (a NEGATIVE result)</span></a>.</p>
+</div>
+<p><strong>It is a promise.</strong> <code class="docutils literal notranslate"><span class="pre">align_value</span></code> tells Vitis the pointer <em>is</em> N-byte
+aligned; the host must keep that promise, which is why it is opt-in rather than
+always emitted. XRT buffers are 4 KB aligned, so it holds on hardware for free.
+In C/RTL co-simulation the testbench <em>is</em> the host, so testbench arrays must be
+declared aligned too (<code class="docutils literal notranslate"><span class="pre">static</span> <span class="pre">alignas(64)</span> <span class="pre">int8_t</span> <span class="pre">A[...]</span></code>). A design that wants
+wide accesses without the promise can instead declare its operands with a wider
+element type (e.g. <code class="docutils literal notranslate"><span class="pre">UInt(32)</span></code> words holding four <code class="docutils literal notranslate"><span class="pre">int8</span></code> lanes), which reaches
+II=1 with no alignment and no widen setting at all.</p>
+</section>
+<section id="rtl-co-simulation-of-dataflow-designs">
+<h2>RTL Co-Simulation of Dataflow Designs<a class="headerlink" href="#rtl-co-simulation-of-dataflow-designs" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">df.build(target=&quot;vitis_hls&quot;,</span> <span class="pre">mode=...)</span></code> handles <code class="docutils literal notranslate"><span class="pre">csim</span></code> and <code class="docutils literal notranslate"><span class="pre">csyn</span></code>; the
+other <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> modes route to the <code class="docutils literal notranslate"><span class="pre">XDEVICE</span></code> Makefile flow, and the emitted
+<code class="docutils literal notranslate"><span class="pre">host.cpp</span></code> is an OpenCL/XRT host – which is not what Vitis <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code>
+wants. <code class="docutils literal notranslate"><span class="pre">mode=&quot;cosim&quot;</span></code> is not wired into <code class="docutils literal notranslate"><span class="pre">df.build</span></code> (<a class="reference internal" href="../developer/limitations.html#limitation-16"><span class="std std-ref">16. cosim is not wired into df.build</span></a>).
+Running C/RTL co-simulation on an Allo dataflow design therefore needs a small
+external driver. <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/cosim.py</span></code> (~180 lines) is
+a working one and shows the four things any such driver has to do:</p>
+<ol class="arabic simple">
+<li><p><strong>A plain C++ testbench.</strong> Build the project with <code class="docutils literal notranslate"><span class="pre">mode=&quot;csyn&quot;</span></code> to get
+<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code>, then write a <code class="docutils literal notranslate"><span class="pre">tb.cpp</span></code> whose <code class="docutils literal notranslate"><span class="pre">main</span></code> calls the top function
+directly on static arrays and compares against a reference. <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>
+generates it from the same inputs and numpy reference the Allo simulator
+run uses, so the vectors cannot drift from the design.</p></li>
+<li><p><strong>Explicit</strong> <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> <strong>depths.</strong> Cosim has to know how much memory to model
+behind each port and fails otherwise (<code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">depth</span> <span class="pre">specification</span> <span class="pre">is</span> <span class="pre">required</span>
+<span class="pre">for</span> <span class="pre">MAXI</span> <span class="pre">interface</span> <span class="pre">port</span> <span class="pre">'gmem0'</span> <span class="pre">for</span> <span class="pre">cosimulation</span></code>). Allo emits the interface
+pragmas without a depth, so the driver patches <code class="docutils literal notranslate"><span class="pre">depth=&lt;words&gt;</span></code> into each
+<code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">interface</span> <span class="pre">m_axi</span> <span class="pre">...</span> <span class="pre">bundle=gmemN</span></code> line, in the port order of
+the top function.</p></li>
+<li><p><strong>Aligned testbench arrays</strong> if the kernel was built with <code class="docutils literal notranslate"><span class="pre">align_value</span></code>
+(above): <code class="docutils literal notranslate"><span class="pre">static</span> <span class="pre">alignas(64)</span></code>.</p></li>
+<li><p><strong>A linker Vitis can use on this host</strong> (next section): pass
+<code class="docutils literal notranslate"><span class="pre">-ldflags</span> <span class="pre">&quot;-B/usr/bin&quot;</span></code> to <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code>.</p></li>
+</ol>
+<p>The synthesis and co-simulation scripts <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> drives, with the
+project’s part and clock:</p>
+<div class="highlight-tcl notranslate"><div class="highlight"><pre><span></span><span class="c"># run.tcl for csynth -- run once</span>
+<span class="nv">open_project</span><span class="w"> </span>out.prj<span class="w"> </span><span class="o">-</span>reset
+<span class="nv">open_solution</span><span class="w"> </span><span class="o">-</span>reset<span class="w"> </span>solution1<span class="w"> </span><span class="o">-</span>flow_target<span class="w"> </span>vivado
+<span class="nv">set_top</span><span class="w"> </span>tinytpu_isa
+<span class="nv">add_files</span><span class="w"> </span>kernel.cpp
+<span class="nv">add_files</span><span class="w"> </span><span class="o">-</span>tb<span class="w"> </span>tb.cpp<span class="w"> </span><span class="o">-</span>cflags<span class="w"> </span><span class="s2">"-std=gnu++0x"</span>
+<span class="nv">set_part</span><span class="w"> </span><span class="k">{</span><span class="nv">xcu280-fsvh2892-2L-e</span><span class="k">}</span>
+<span class="nv">create_clock</span><span class="w"> </span><span class="o">-</span>period<span class="w"> </span><span class="mf">3.33</span>
+<span class="nv">config_interface</span><span class="w"> </span><span class="o">-</span>m_axi_max_widen_bitwidth<span class="w"> </span><span class="mi">512</span>
+<span class="c"># config_interface -m_axi_latency &lt;n&gt;     (optional, see below)</span>
+<span class="nv">csynth_design</span>
+<span class="nb">exit</span>
+</pre></div>
+</div>
+<div class="highlight-tcl notranslate"><div class="highlight"><pre><span></span><span class="c"># run.tcl for cosim -- run once per testbench</span>
+<span class="nv">open_project</span><span class="w"> </span>out.prj
+<span class="nv">open_solution</span><span class="w"> </span>solution1
+<span class="nv">set_top</span><span class="w"> </span>tinytpu_isa
+<span class="nv">cosim_design</span><span class="w"> </span><span class="o">-</span>trace_level<span class="w"> </span>none<span class="w"> </span><span class="o">-</span>rtl<span class="w"> </span>verilog<span class="w"> </span><span class="o">-</span>ldflags<span class="w"> </span><span class="s2">"-B/usr/bin"</span>
+<span class="nb">exit</span>
+</pre></div>
+</div>
+<p>Because <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> runs one testbench per invocation, a sweep over
+workloads can rewrite <code class="docutils literal notranslate"><span class="pre">tb.cpp</span></code> and re-run only the cosim script against the
+same project: <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> runs once, so the RTL under test is identical for
+every workload. The cycle count is read from
+<code class="docutils literal notranslate"><span class="pre">out.prj/solution1/sim/report/&lt;top&gt;_cosim.rpt</span></code>.</p>
+<p><strong>Memory-model knobs.</strong> Cosim’s AXI slave answers immediately unless told
+otherwise: <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span></code> defaults to 0. <code class="docutils literal notranslate"><span class="pre">config_interface</span> <span class="pre">-m_axi_latency</span>
+<span class="pre">&lt;n&gt;</span></code> (at csynth time) makes HLS schedule against an <code class="docutils literal notranslate"><span class="pre">n</span></code>-cycle read latency,
+and <code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-random_stall</span></code> stalls the top-level interfaces at random.
+State which one a number was measured with; on TinyTPU-isa, latency 64 costs 75%
+at the smallest shape and 23% at the largest (<a class="reference internal" href="../designs/gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>).
+In <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> these are <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=&lt;n&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_RANDOM_STALL=1</span></code>.</p>
+<p><strong>Why cosim rather than the csynth report.</strong> When loop trip counts are runtime
+data – any instruction-programmable design – csynth can only report a
+worst-case bound derived from the index ranges, and it can be off by orders of
+magnitude (91,407 vs 4,133 and 2.259e+08 vs 1,176 on TinyTPU-isa; see
+<a class="reference internal" href="../designs/tinytpu_isa.html#tinytpu-isa-csynth-bound"><span class="std std-ref">A programmable design’s csynth number is not a cycle count</span></a>). Cosim is the cycle count. Cosim also compiles
+an <code class="docutils literal notranslate"><span class="pre">AESL_deadlock_detect_unit</span></code> into the RTL testbench, so it reports
+deadlocks.</p>
+<p><strong>C simulation runs dataflow processes in declaration order.</strong> In <code class="docutils literal notranslate"><span class="pre">csim</span></code> the
+processes of a <code class="docutils literal notranslate"><span class="pre">dataflow</span></code> region are called sequentially, in source order, so a
+consumer declared before its producer reads an empty stream and aborts with
+<code class="docutils literal notranslate"><span class="pre">ERROR</span> <span class="pre">[HLS</span> <span class="pre">SIM]:</span> <span class="pre">an</span> <span class="pre">hls::stream</span> <span class="pre">is</span> <span class="pre">read</span> <span class="pre">while</span> <span class="pre">empty</span></code>. Kernel declaration order
+inside a <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> is therefore load-bearing for <code class="docutils literal notranslate"><span class="pre">csim</span></code> (not for RTL),
+and designs with bidirectional handshakes cannot pass <code class="docutils literal notranslate"><span class="pre">csim</span></code> at all. See
+<a class="reference internal" href="../developer/limitations.html#limitation-15"><span class="std std-ref">15. Vitis csim executes dataflow processes in declaration order</span></a> and <a class="reference internal" href="../developer/dataflow_semantics.html"><span class="doc">Dataflow Simulation Semantics: Allo vs HLS CSIM</span></a>.</p>
+</section>
+<section id="vitis-2023-2-linker-vs-newer-glibc">
+<h2>Vitis 2023.2 Linker vs. Newer glibc<a class="headerlink" href="#vitis-2023-2-linker-vs-newer-glibc" title="Link to this heading"><span>¶</span></a></h2>
+<p>Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux
+distributions. Both the <code class="docutils literal notranslate"><span class="pre">csim</span></code> and <code class="docutils literal notranslate"><span class="pre">cosim</span></code> links fail with</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>unknown type [0x13] section '.relr.dyn'
+...
+cannot find libm.so.6
+</pre></div>
+</div>
+<p>The fix is a compiler-driver flag, not a <code class="docutils literal notranslate"><span class="pre">PATH</span></code> override: <code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code> points
+the driver at the system linker (2.42 on the host these results were produced
+on) while leaving the rest of the Vitis toolchain in place. Pass it to
+<code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-ldflags</span> <span class="pre">&quot;-B/usr/bin&quot;</span></code> (and equivalently to any <code class="docutils literal notranslate"><span class="pre">csim_design</span></code>
+link). Any new Vitis flow on such a host needs the equivalent. Host toolchain
+details are on <a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>.</p>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"><span>¶</span></a></h2>
+<p>This example illustrates the process of defining a GEMM kernel using the Allo ADL and generating HLS code for FPGA acceleration with the Vitis HLS backend. The approach supports various synthesis modes (sw_emu, hw_emu, hw) to cater to different design and verification needs.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">AMD Vitis HLS (FPGA)</a><ul>
+<li><a class="reference internal" href="#kernel-definition">Kernel Definition</a></li>
+<li><a class="reference internal" href="#code-generation-for-vivado-vitis-hls">Code Generation for Vivado/Vitis HLS</a></li>
+<li><a class="reference internal" href="#project-structure-and-execution">Project Structure and Execution</a></li>
+<li><a class="reference internal" href="#hbm-ddr-memory-mapping">HBM/DDR Memory Mapping</a></li>
+<li><a class="reference internal" href="#memory-implementation-customization">Memory Implementation Customization</a></li>
+<li><a class="reference internal" href="#device-and-frequency-configuration">Device and Frequency Configuration</a></li>
+<li><a class="reference internal" href="#aligned-m-axi-pointers-and-port-widening">Aligned <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> Pointers and Port Widening</a></li>
+<li><a class="reference internal" href="#rtl-co-simulation-of-dataflow-designs">RTL Co-Simulation of Dataflow Designs</a></li>
+<li><a class="reference internal" href="#vitis-2023-2-linker-vs-newer-glibc">Vitis 2023.2 Linker vs. Newer glibc</a></li>
+<li><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="llvm.html">
+                    <span class="icon">&lt;</span><span>LLVM (CPU)</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="catapult.html"><span>Siemens Catapult HLS (FPGA)</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

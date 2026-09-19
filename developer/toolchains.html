@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Development Environment and Toolchains &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Fork Maintenance and Upstream Merging" href="fork_maintenance.html" />
+    <link rel="prev" title="Dataflow Region Pitfalls" href="pitfalls.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="development-environment-and-toolchains">
+<h1>Development Environment and Toolchains<a class="headerlink" href="#development-environment-and-toolchains" title="Link to this heading"><span>¶</span></a></h1>
+<p>The environment every result in the fork’s documentation was produced with:
+the conda environment, the LLVM/MLIR builds, the EDA tools on the development
+host, and the golden simulator tests. None of the tools below is installed by
+the repository, and the <code class="docutils literal notranslate"><span class="pre">allo</span></code> conda environment sets none of them.</p>
+<section id="environment">
+<h2>Environment<a class="headerlink" href="#environment" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> is <strong>not</strong> set by the conda environment – neither
+<code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">allo</span></code> nor <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">run</span></code> sets it (verified 2026-09-17) – and
+the simulator asserts <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">set</span></code> without it. Export it
+explicitly (see <a class="reference internal" href="pitfalls.html"><span class="doc">Dataflow Region Pitfalls</span></a>).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+<span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w">   </span><span class="c1"># the env does NOT set this</span>
+
+<span class="c1"># OMP_NUM_THREADS no longer has to exceed the kernel-instance count: the</span>
+<span class="c1"># simulator now sets the OpenMP team size to the section count itself.</span>
+<span class="c1"># Before that fix a PE blocked on a stream spun in its section, so a team</span>
+<span class="c1"># smaller than the section count never started the sections that would</span>
+<span class="c1"># unblock it and the region hung SILENTLY. See docs/source/developer/limitations.rst, item 11.</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
+</pre></div>
+</div>
+</section>
+<section id="golden-test-for-dataflow-simulator">
+<h2>Golden test for dataflow simulator<a class="headerlink" href="#golden-test-for-dataflow-simulator" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># `conda run` does not source the activate scripts, so export the env first.</span>
+<span class="nb">source</span><span class="w"> </span><span class="k">$(</span>conda<span class="w"> </span>info<span class="w"> </span>--base<span class="k">)</span>/etc/profile.d/conda.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+<span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
+python<span class="w"> </span>tests/dataflow/test_df_unit.py
+python<span class="w"> </span>tests/dataflow/test_region_stateful.py
+</pre></div>
+</div>
+</section>
+<section id="toolchains-on-the-development-host">
+<h2>Toolchains on the development host<a class="headerlink" href="#toolchains-on-the-development-host" title="Link to this heading"><span>¶</span></a></h2>
+<p>Verified 2026-09-18 on the fork’s development host (<code class="docutils literal notranslate"><span class="pre">ace-01</span></code>). None of this is installed by the repo, and
+the <code class="docutils literal notranslate"><span class="pre">allo</span></code> conda env sets none of it; a migration (e.g. to zhang-21) has to
+reproduce or re-point every row. The conda env, <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> and
+<code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> are covered above and are not repeated here.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Tool</p></th>
+<th class="head"><p>Location</p></th>
+<th class="head"><p>On <code class="docutils literal notranslate"><span class="pre">PATH</span></code> by default?</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Vivado 2023.2 — <code class="docutils literal notranslate"><span class="pre">vivado</span></code>, and the <code class="docutils literal notranslate"><span class="pre">xsim</span></code>
+trio <code class="docutils literal notranslate"><span class="pre">xvlog</span></code>/<code class="docutils literal notranslate"><span class="pre">xelab</span></code>/<code class="docutils literal notranslate"><span class="pre">xsim</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vivado/2023.2/settings64.sh</span></code></p></td>
+<td><p><strong>Yes</strong> — <code class="docutils literal notranslate"><span class="pre">which</span> <span class="pre">xvlog</span></code> already resolves to
+<code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vivado/2023.2/bin/xvlog</span></code>, so the
+login profile sources <code class="docutils literal notranslate"><span class="pre">settings64.sh</span></code>. Do not
+assume that on the new host.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Vitis HLS 2023.2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vitis_HLS/2023.2</span></code>
+(<code class="docutils literal notranslate"><span class="pre">settings64.sh</span></code> present)</p></td>
+<td><p><strong>No.</strong> <code class="docutils literal notranslate"><span class="pre">which</span> <span class="pre">vitis_hls</span></code> finds nothing;
+scripts source <code class="docutils literal notranslate"><span class="pre">settings64.sh</span></code> themselves —
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/cosim.py</span></code>
+hardcodes the path in its <code class="docutils literal notranslate"><span class="pre">VITIS</span></code> constant.</p></td>
+</tr>
+<tr class="row-even"><td><p>Verilator 5.051
+(<code class="docutils literal notranslate"><span class="pre">devel</span> <span class="pre">rev</span> <span class="pre">vUNKNOWN-built20260904-2286359</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VERILATOR_ROOT</span></code> tree at
+<code class="docutils literal notranslate"><span class="pre">~/.local/share/verilator</span></code>; driver at
+<code class="docutils literal notranslate"><span class="pre">~/.local/bin/verilator</span></code></p></td>
+<td><p>Yes. Leave <code class="docutils literal notranslate"><span class="pre">VERILATOR_ROOT</span></code> <strong>unset</strong> — the
+driver derives it and warns if an inconsistent
+one is exported.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Chipyard</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">~/chipyard/env.sh</span></code></p></td>
+<td><p>No; <code class="docutils literal notranslate"><span class="pre">source</span></code> it. It <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span></code>s
+<code class="docutils literal notranslate"><span class="pre">/home/sk3463/chipyard/.conda-env</span></code>, so it
+<strong>replaces</strong> the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env — source it in a
+separate shell.</p></td>
+</tr>
+<tr class="row-even"><td><p>Cadence Xcelium</p></td>
+<td><p>—</p></td>
+<td><p><strong>Not installed here.</strong> <code class="docutils literal notranslate"><span class="pre">/opt/cadence</span></code> does
+not exist and no <code class="docutils literal notranslate"><span class="pre">xrun</span></code> is on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>;
+<code class="docutils literal notranslate"><span class="pre">/opt</span></code> holds only <code class="docutils literal notranslate"><span class="pre">xilinx</span></code> among EDA
+vendors. Earlier notes describing
+<code class="docutils literal notranslate"><span class="pre">/opt/cadence/XCELIUM2403</span></code> and an
+<code class="docutils literal notranslate"><span class="pre">unset</span> <span class="pre">LD_PRELOAD</span></code> workaround do not apply to
+this host. (<a class="reference internal" href="limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>
+cites Xcelium cosim results from elsewhere.)</p></td>
+</tr>
+</tbody>
+</table>
+<section id="vitis-binutils-vs-glibc-relr-dyn">
+<h3>Vitis binutils vs. glibc <code class="docutils literal notranslate"><span class="pre">.relr.dyn</span></code><a class="headerlink" href="#vitis-binutils-vs-glibc-relr-dyn" title="Link to this heading"><span>¶</span></a></h3>
+<p>Vitis 2023.2 ships binutils 2.37, which cannot read this system’s glibc:
+<code class="docutils literal notranslate"><span class="pre">unknown</span> <span class="pre">type</span> <span class="pre">[0x13]</span> <span class="pre">section</span> <span class="pre">'.relr.dyn'</span></code>, then <code class="docutils literal notranslate"><span class="pre">cannot</span> <span class="pre">find</span> <span class="pre">libm.so.6</span></code>. Both
+the csim and the cosim link fail without it.</p>
+<p>The fix in tree is <strong>not</strong> a <code class="docutils literal notranslate"><span class="pre">PATH</span></code> override — it is a compiler-driver flag.
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/cosim.py</span></code> sets <code class="docutils literal notranslate"><span class="pre">LDFLAGS</span> <span class="pre">=</span> <span class="pre">&quot;-B/usr/bin&quot;</span></code> and
+splices it into the generated Vitis script, pointing the driver at the system
+linker (2.42) while leaving the rest of the Vitis toolchain in place. Same
+story in <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>. Any new Vitis flow needs the
+equivalent.</p>
+</section>
+<section id="python-for-cosim-vs-python-for-allo">
+<h3>Python for cosim vs. Python for <code class="docutils literal notranslate"><span class="pre">allo</span></code><a class="headerlink" href="#python-for-cosim-vs-python-for-allo" title="Link to this heading"><span>¶</span></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">allo</span></code> conda env is <strong>python 3.12</strong> (<code class="docutils literal notranslate"><span class="pre">3.12.13</span></code>); the miniconda <strong>base</strong> env
+is <strong>python 3.14</strong> (<code class="docutils literal notranslate"><span class="pre">3.14.6</span></code>). This matters because CMake picks them
+independently: <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt/build/CMakeCache.txt</span></code> records
+<code class="docutils literal notranslate"><span class="pre">Python3</span></code> as the env’s 3.12 but <code class="docutils literal notranslate"><span class="pre">Python</span></code> as base 3.14, and nanobind took its
+suffix from the latter — <code class="docutils literal notranslate"><span class="pre">NB_SUFFIX=.cpython-314-x86_64-linux-gnu.so</span></code>. The
+chia worktree’s bindings are therefore tagged <code class="docutils literal notranslate"><span class="pre">cpython-314</span></code> and the 3.12
+interpreter will not import them. Pass an explicit <code class="docutils literal notranslate"><span class="pre">-DPython_EXECUTABLE=</span></code> as
+well as <code class="docutils literal notranslate"><span class="pre">-DPython3_EXECUTABLE=</span></code> when configuring.</p>
+<p>The python 3.14 venv that carried <code class="docutils literal notranslate"><span class="pre">cocotb</span> <span class="pre">2.1.0</span></code> + <code class="docutils literal notranslate"><span class="pre">ml_dtypes</span></code> for chia cosim
+<strong>is gone</strong> — it lived under <code class="docutils literal notranslate"><span class="pre">/tmp</span></code> and nothing matching it survives. The only
+cocotb on the host now is <strong>2.0.1</strong> in the <code class="docutils literal notranslate"><span class="pre">mininpu</span></code> conda env (python 3.11);
+neither base 3.14 nor the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env has cocotb or <code class="docutils literal notranslate"><span class="pre">ml_dtypes</span></code>. Rebuilding that
+venv is a prerequisite for <code class="docutils literal notranslate"><span class="pre">allo/backend/rtl/sim/</span></code> on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>.</p>
+</section>
+</section>
+<section id="llvm-mlir-builds-and-worktrees">
+<h2>LLVM/MLIR builds and worktrees<a class="headerlink" href="#llvm-mlir-builds-and-worktrees" title="Link to this heading"><span>¶</span></a></h2>
+<section id="two-llvm-builds-one-submodule-check-the-version-before-trusting-a-build">
+<h3>Two LLVM builds, one submodule: check the version before trusting a build<a class="headerlink" href="#two-llvm-builds-one-submodule-check-the-version-before-trusting-a-build" title="Link to this heading"><span>¶</span></a></h3>
+<p>There are <strong>two</strong> LLVM/MLIR builds on this host and they are different LLVM
+versions. Verified 2026-09-18:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Build</p></th>
+<th class="head"><p>Size</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">llvm-config</span> <span class="pre">--version</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">VCSRevision.h</span></code> <code class="docutils literal notranslate"><span class="pre">LLVM_REVISION</span></code></p></th>
+<th class="head"><p>Configured <code class="docutils literal notranslate"><span class="pre">LLVM_SOURCE_DIR</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/llvm-allo-6b09f739/build</span></code>
+(external, what <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> points
+at)</p></td>
+<td><p>11 GB</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">22.0.0git</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">6b09f739c4d085dc39eb9ff220c786bc3aa8c7fb</span></code></p></td>
+<td><p>its own out-of-tree checkout</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">externals/llvm-project/build</span></code>
+(in-tree)</p></td>
+<td><p>3.9 GB</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">23.0.0git</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">040a641988f6ed6f4fab250706ca2b620c1de2d8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo/externals/llvm-project/llvm</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">status</span></code> <strong>showing</strong> <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">externals/llvm-project</span></code> <strong>is the correct state, not
+dirt. Do not “fix” it.</strong> <code class="docutils literal notranslate"><span class="pre">main</span></code> records the pin <code class="docutils literal notranslate"><span class="pre">6b09f739</span></code> (LLVM 22), but the
+working checkout is deliberately at <code class="docutils literal notranslate"><span class="pre">040a6419</span></code> (LLVM 23), because the in-tree
+build above was configured against those sources and <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> links
+against that build.</p>
+<p>This was gotten wrong once, on 2026-09-18: the drift was read as accidental and
+the submodule was checked back out to the pin. Nothing on <code class="docutils literal notranslate"><span class="pre">main</span></code> noticed –
+<code class="docutils literal notranslate"><span class="pre">main</span></code> does not use this submodule at all, its <code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code> points at the
+external <code class="docutils literal notranslate"><span class="pre">llvm-allo-6b09f739</span></code> tree – but it silently put LLVM 22 sources under
+<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>’s LLVM 23 binaries (see the worktree section below). It was
+restored the same day.</p>
+<p>So: the checked-out revision serves <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>, the recorded pin serves
+<code class="docutils literal notranslate"><span class="pre">main</span></code>, and they are not the same revision. That is a structural consequence of
+two worktrees sharing one submodule, and the real fix is rule 2 below, not a
+<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">submodule</span> <span class="pre">update</span></code>.</p>
+<p>Practical rule: <code class="docutils literal notranslate"><span class="pre">externals/llvm-project/build</span></code> <strong>is not the project’s build.</strong>
+<code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> and <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code> both point at the external 6b09f739 tree
+(<code class="docutils literal notranslate"><span class="pre">mlir/build/CMakeCache.txt</span></code> records
+<code class="docutils literal notranslate"><span class="pre">LLVM_DIR=/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm</span></code>). Before using
+any LLVM build here, run <code class="docutils literal notranslate"><span class="pre">&lt;build&gt;/bin/llvm-config</span> <span class="pre">--version</span></code> and compare
+<code class="docutils literal notranslate"><span class="pre">VCSRevision.h</span></code> against <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">submodule</span> <span class="pre">status</span></code>; a 3.9 GB directory in the right
+place is not evidence.</p>
+<p><em>Not verified:</em> the reason given for the LLVM 23 build was that CIRCT requires
+LLVM 23, and that CIRCT was removed from <code class="docutils literal notranslate"><span class="pre">externals/</span></code> on 2026-09-18. What is
+checkable today: <code class="docutils literal notranslate"><span class="pre">externals/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code> holds only <code class="docutils literal notranslate"><span class="pre">llvm-project</span></code> and
+<code class="docutils literal notranslate"><span class="pre">past-python-bindings</span></code>, and <code class="docutils literal notranslate"><span class="pre">main</span></code> <strong>has never tracked</strong> <code class="docutils literal notranslate"><span class="pre">externals/circt</span></code> –
+its <code class="docutils literal notranslate"><span class="pre">.gitmodules</span></code> has no such entry and no commit on <code class="docutils literal notranslate"><span class="pre">main</span></code> touches one. CIRCT
+is a <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> submodule (<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">ls-tree</span> <span class="pre">chia-codesign</span> <span class="pre">externals/</span></code> lists it,
+and <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt/externals/circt</span></code> is populated). So there was
+nothing tracked on <code class="docutils literal notranslate"><span class="pre">main</span></code> to delete; if a CIRCT tree was removed it was
+untracked, and that cannot be confirmed from git. The 2026-09-18 submodule
+checkout is likewise inferred from the mtime of <code class="docutils literal notranslate"><span class="pre">externals/llvm-project/.git</span></code>,
+not from a reflog.</p>
+</section>
+<section id="never-point-one-worktree-s-build-at-another-worktree-s-tree">
+<h3>Never point one worktree’s build at another worktree’s tree<a class="headerlink" href="#never-point-one-worktree-s-build-at-another-worktree-s-tree" title="Link to this heading"><span>¶</span></a></h3>
+<p>cmake preserves mtimes, so a cross-worktree build dependency leaves <strong>nothing
+looking stale</strong>. No rebuild is triggered, no warning is printed, and the symptom
+surfaces much later as an unexplained ABI or dialect mismatch.</p>
+<p>The current arrangement, verified 2026-09-18 – the second worktree already
+does this:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo</span></code> (<code class="docutils literal notranslate"><span class="pre">main</span></code>)</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt</span></code> (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code></p></td>
+<td><p>symlink <code class="docutils literal notranslate"><span class="pre">-&gt;</span> <span class="pre">../mlir/build/tools/allo/_mlir</span></code>,
+<strong>relative, stays inside the worktree</strong></p></td>
+<td><p>a <strong>real directory</strong> of installed output, not a symlink</p></td>
+</tr>
+<tr class="row-odd"><td><p>extension ABI tag</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">_allo.cpython-312-*.so</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">_allo.cpython-314-*.so</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>runtime soname</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">libAlloDataflowRuntime.so.22.0git</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">libAlloDataflowRuntime.so.23.0git</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>build’s <code class="docutils literal notranslate"><span class="pre">LLVM_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo/externals/llvm-project/build/lib/cmake/llvm</span></code>
+– <strong>the other worktree</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Worse, individual files inside <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt/allo/_mlir</span></code> are
+absolute symlinks out of the worktree: <code class="docutils literal notranslate"><span class="pre">ir.py</span></code>, <code class="docutils literal notranslate"><span class="pre">passmanager.py</span></code>, <code class="docutils literal notranslate"><span class="pre">rewrite.py</span></code>
+and <code class="docutils literal notranslate"><span class="pre">execution_engine.py</span></code> all point into
+<code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo/externals/llvm-project/mlir/python/mlir/</span></code>, i.e. into <code class="docutils literal notranslate"><span class="pre">main</span></code>’s
+submodule checkout. Only <code class="docutils literal notranslate"><span class="pre">schedule.py</span></code> stays local
+(<code class="docutils literal notranslate"><span class="pre">-&gt;</span> <span class="pre">/home/sk3463/allo-chia-wt/mlir/python/allo/schedule.py</span></code>).</p>
+<p><strong>This is the mechanism by which the 2026-09-18 mistake above did its damage.</strong>
+Checking out a different revision of <code class="docutils literal notranslate"><span class="pre">main</span></code>’s submodule swapped four of
+<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>’s Python binding files to a different LLVM version, with no
+build step, no warning, and nothing in either worktree’s <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">status</span></code> pointing
+at it. The failure this produces is an ABI or dialect error that appears to come
+from the <em>other</em> branch’s code.</p>
+<p>Rules:</p>
+<ol class="arabic simple">
+<li><p>A worktree’s <code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code> symlink target must be <strong>relative</strong> and must stay
+inside that worktree. <code class="docutils literal notranslate"><span class="pre">main</span></code>’s is correct; copy that shape.</p></li>
+<li><p>Each worktree gets its own LLVM/MLIR build directory, or they share a
+read-only external one (like <code class="docutils literal notranslate"><span class="pre">llvm-allo-6b09f739</span></code>) that <strong>neither</strong> worktree’s
+<code class="docutils literal notranslate"><span class="pre">externals/</span></code> can be checked out from under.</p></li>
+<li><p>Never run a build in worktree A that names a path under worktree B in
+<code class="docutils literal notranslate"><span class="pre">LLVM_DIR</span></code>/<code class="docutils literal notranslate"><span class="pre">MLIR_DIR</span></code>. Checking out a branch in B then silently changes A’s
+sources.</p></li>
+<li><p>On any “impossible” ABI or dialect error, first <code class="docutils literal notranslate"><span class="pre">readlink</span> <span class="pre">-f</span> <span class="pre">allo/_mlir</span></code>,
+then <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">-E</span> <span class="pre">'^(LLVM|MLIR)_DIR'</span> <span class="pre">&lt;build&gt;/CMakeCache.txt</span></code>, and check the
+soname version suffix in <code class="docutils literal notranslate"><span class="pre">allo/_mlir/_mlir_libs/</span></code>. Those three answer it
+faster than any rebuild.</p></li>
+</ol>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Development Environment and Toolchains</a><ul>
+<li><a class="reference internal" href="#environment">Environment</a></li>
+<li><a class="reference internal" href="#golden-test-for-dataflow-simulator">Golden test for dataflow simulator</a></li>
+<li><a class="reference internal" href="#toolchains-on-the-development-host">Toolchains on the development host</a><ul>
+<li><a class="reference internal" href="#vitis-binutils-vs-glibc-relr-dyn">Vitis binutils vs. glibc <code class="docutils literal notranslate"><span class="pre">.relr.dyn</span></code></a></li>
+<li><a class="reference internal" href="#python-for-cosim-vs-python-for-allo">Python for cosim vs. Python for <code class="docutils literal notranslate"><span class="pre">allo</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#llvm-mlir-builds-and-worktrees">LLVM/MLIR builds and worktrees</a><ul>
+<li><a class="reference internal" href="#two-llvm-builds-one-submodule-check-the-version-before-trusting-a-build">Two LLVM builds, one submodule: check the version before trusting a build</a></li>
+<li><a class="reference internal" href="#never-point-one-worktree-s-build-at-another-worktree-s-tree">Never point one worktree’s build at another worktree’s tree</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="pitfalls.html">
+                    <span class="icon">&lt;</span><span>Dataflow Region Pitfalls</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="fork_maintenance.html"><span>Fork Maintenance and Upstream Merging</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

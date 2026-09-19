@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ACT Compiler-Backend Flow &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Developer Setup" href="../developer/index.html" />
+    <link rel="prev" title="CHIA Agentic Co-Design" href="chia.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">ACT Compiler-Backend Flow</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="act-compiler-backend-flow">
+<h1>ACT Compiler-Backend Flow<a class="headerlink" href="#act-compiler-backend-flow" title="Link to this heading"><span>¶</span></a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>ACT is Kai Shao’s work.</strong> The ACT / DSA compiler flow, the <code class="docutils literal notranslate"><span class="pre">allov2</span></code>
+core re-architecture it builds on, and the CIRCT RTL generator are developed
+in Kai Shao’s repository, <a class="reference external" href="https://github.com/kkkaishao/allo">https://github.com/kkkaishao/allo</a>. In this fork’s
+clones that repository is the <code class="docutils literal notranslate"><span class="pre">kai</span></code> remote, with three read-only lineages:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kai/main</span></code> – has <code class="docutils literal notranslate"><span class="pre">dataflow.py</span></code>, plus <code class="docutils literal notranslate"><span class="pre">frontend/</span></code>, <code class="docutils literal notranslate"><span class="pre">harness/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">primitives/</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kai/allov2</span></code> – <code class="docutils literal notranslate"><span class="pre">compiler/</span></code>, <code class="docutils literal notranslate"><span class="pre">lang/</span></code>, <code class="docutils literal notranslate"><span class="pre">operators/</span></code>, <code class="docutils literal notranslate"><span class="pre">schedule/</span></code>;
+no <code class="docutils literal notranslate"><span class="pre">dataflow.py</span></code>, no ACT;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kai/act</span></code> – the <code class="docutils literal notranslate"><span class="pre">allov2</span></code> lineage plus <code class="docutils literal notranslate"><span class="pre">exp/dsa</span></code>, the ACT compiler
+flow.</p></li>
+</ul>
+<p>The fork’s <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> branch imports these (ACT from branch <code class="docutils literal notranslate"><span class="pre">act</span></code>,
+commit <code class="docutils literal notranslate"><span class="pre">3c1ad38d</span></code>, merged as <code class="docutils literal notranslate"><span class="pre">29cb1d99</span></code>); its <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code> records
+exactly which parts are Kai’s (503 of the 539 commits <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> carries
+that <code class="docutils literal notranslate"><span class="pre">main</span></code> does not). This page is an audit of that work <em>from the outside</em>,
+for the purpose of connecting it to this fork’s accelerator. It cites ACT; it
+does not republish it. Refer to the upstream repository for the code itself.
+See also <a class="reference internal" href="../developer/fork_maintenance.html"><span class="doc">Fork Maintenance and Upstream Merging</span></a> for how the lineages relate.</p>
+</div>
+<p>This page records what exists in ACT, what connecting it to the
+<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> accelerator would take, and which earlier claims
+about it were wrong. Audited 2026-09-18 against <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>
+(<code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/</span></code>, 11 files) and <code class="docutils literal notranslate"><span class="pre">main</span></code>
+(<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/</span></code>). <code class="docutils literal notranslate"><span class="pre">main</span></code> has <strong>no ACT sources at
+all</strong> – <code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/</span></code> there held only stale <code class="docutils literal notranslate"><span class="pre">.pyc</span></code> files left by a branch
+switch.</p>
+<section id="the-finding">
+<h2>The Finding<a class="headerlink" href="#the-finding" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>ACT’s mapper is already a loop-nest mapper. Everything below it is defined
+over a flat list of steps.</strong> So the obstacle is ACT’s <em>backend</em>, not its model,
+and the cheap fix is on our side rather than in ACT.</p>
+<p><code class="docutils literal notranslate"><span class="pre">mapping.Loop(rank,</span> <span class="pre">factor,</span> <span class="pre">level,</span> <span class="pre">spatial)</span></code> and <code class="docutils literal notranslate"><span class="pre">mapspace.mapspace</span></code>
+enumerate factorizations x permutations x spatial splits – a real loop nest, and
+close to what our <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> + 3-term AGU encoding <em>is</em> a serialization
+of. Then <code class="docutils literal notranslate"><span class="pre">mapping._lower</span></code> walks that nest into flat steps and <strong>discards it</strong>.
+From there down everything assumes flatness: <code class="docutils literal notranslate"><span class="pre">OracleProgram.steps</span></code> is a flat
+list, <code class="docutils literal notranslate"><span class="pre">build_main</span></code> walks it linearly, <code class="docutils literal notranslate"><span class="pre">epoch.epochs</span></code> makes one epoch per
+emit, and <code class="docutils literal notranslate"><span class="pre">_Planner</span></code>’s liveness indexes steps by integer position.</p>
+<section id="the-minimum-change-both-directions">
+<h3>The minimum change, both directions<a class="headerlink" href="#the-minimum-change-both-directions" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 15.0%" />
+<col style="width: 85.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>scope</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>ACT side</strong></p></td>
+<td><p>Large. Loop nodes in <code class="docutils literal notranslate"><span class="pre">steps</span></code>/<code class="docutils literal notranslate"><span class="pre">emits</span></code>; a loop-aware <code class="docutils literal notranslate"><span class="pre">build_main</span></code>
+(the allo dialect has no loop-of-emits op); per-iteration liveness /
+allocation / spill in <code class="docutils literal notranslate"><span class="pre">_Planner</span></code>; loop-aware <code class="docutils literal notranslate"><span class="pre">epochs</span></code> and <code class="docutils literal notranslate"><span class="pre">check</span></code>;
+address params as affine functions of induction variables; and an
+imem-capacity objective, since <code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code>
+with <code class="docutils literal notranslate"><span class="pre">emits</span></code> only a tie-break – nothing models instruction memory.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>our side</strong></p></td>
+<td><p>Moderate, localized. Write an ACT <code class="docutils literal notranslate"><span class="pre">isa.py</span></code> for our 7 data opcodes,
+take ACT’s flat stream, and <strong>re-roll it</strong>.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="recommendation-act-as-a-mapper-only">
+<h3>Recommendation: ACT as a mapper only<a class="headerlink" href="#recommendation-act-as-a-mapper-only" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Recommended: use ACT as a mapper only</strong> – read the chosen <code class="docutils literal notranslate"><span class="pre">Loop</span></code> nest out
+of <code class="docutils literal notranslate"><span class="pre">Mapping</span></code> and have <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code> emit <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> + AGU from it,
+bypassing ACT’s codegen. We already have the forward direction and, more
+usefully, the equivalence check: <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code> derives AGU levels from
+<code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">k.loop(...)</span></code> nesting and <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> asserts
+<code class="docutils literal notranslate"><span class="pre">expand(looped)</span> <span class="pre">==</span> <span class="pre">flat</span></code> at every shape, so the re-roll is the missing inverse
+of an identity we already test.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The caveat that has to travel with that recommendation:</strong> <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>
+is <strong>dead code</strong>. Nothing imports it, no test exercises it, it is absent from
+<code class="docutils literal notranslate"><span class="pre">__init__.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">__all__</span></code>, and its docstring calls itself “refactor
+target 4”. Taking this route makes us its first user.</p>
+</div>
+</section>
+</section>
+<section id="our-9-opcodes-against-act-s-isa-model">
+<h2>Our 9 Opcodes Against ACT’s ISA Model<a class="headerlink" href="#our-9-opcodes-against-act-s-isa-model" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 15.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>opcode</p></th>
+<th class="head"><p>expressible</p></th>
+<th class="head"><p>blocker</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DMA_LD</span></code>, <code class="docutils literal notranslate"><span class="pre">DMA_ST</span></code>, <code class="docutils literal notranslate"><span class="pre">VLD</span></code>, <code class="docutils literal notranslate"><span class="pre">MVOUT</span></code></p></td>
+<td><p>yes</p></td>
+<td><p>movers: <code class="docutils literal notranslate"><span class="pre">contiguous</span></code>/<code class="docutils literal notranslate"><span class="pre">strided</span></code> + <code class="docutils literal notranslate"><span class="pre">primitive.identity</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VADD</span></code>, <code class="docutils literal notranslate"><span class="pre">VRELU</span></code></p></td>
+<td><p>yes</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MM</span></code> (plain)</p></td>
+<td><p>yes</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MM</span></code> (accumulating)</p></td>
+<td><p><strong>no</strong></p></td>
+<td><p>reads its own destination, so pattern matching returns <code class="docutils literal notranslate"><span class="pre">None</span></code> and it
+is “oracle-only”. Workaround: model the accumulator as an explicit
+source.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MM</span></code> (stationary weight latch)</p></td>
+<td><p>partial</p></td>
+<td><p>a constant-addressed read resolves only <em>inside one</em> <code class="docutils literal notranslate"><span class="pre">&#64;expand</span></code>; no
+ISA-level stationary-register concept</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NOP</span></code></p></td>
+<td><p>no</p></td>
+<td><p>needs both a compute and an access region, and has neither</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LOOP</span></code> / <code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code></p></td>
+<td><p><strong>no</strong></p></td>
+<td><p>touch no buffer and compute no value; they mutate PC and the loop
+stack, and ACT has no machine state outside buffers and no step kind for
+them</p></td>
+</tr>
+</tbody>
+</table>
+<p>Our AGU terms are likewise unexpressible: our addresses are affine in loop
+induction variables, while an ACT emit’s address params are concrete integers
+bound at call time.</p>
+</section>
+<section id="two-tinytpus-not-one">
+<h2>Two TinyTPUs, Not One<a class="headerlink" href="#two-tinytpus-not-one" title="Link to this heading"><span>¶</span></a></h2>
+<p>They share no code. The branches’ merge base (<code class="docutils literal notranslate"><span class="pre">76130c63</span></code>) predates both;
+<code class="docutils literal notranslate"><span class="pre">tinytpu_vitis</span></code> does not exist on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> and <code class="docutils literal notranslate"><span class="pre">tinytpu</span></code> does not
+exist on <code class="docutils literal notranslate"><span class="pre">main</span></code>; our <code class="docutils literal notranslate"><span class="pre">tinytpu_vitis/microarch_isa.py</span></code> and chia’s
+<code class="docutils literal notranslate"><span class="pre">tinytpu/microarch.py</span></code> share only their SPDX header.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>ours (<code class="docutils literal notranslate"><span class="pre">main</span></code>, <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>)</p></th>
+<th class="head"><p>chia’s (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>, <a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>data type</p></td>
+<td><p>int8 / int32</p></td>
+<td><p>fp32</p></td>
+</tr>
+<tr class="row-odd"><td><p>instruction</p></td>
+<td><p>2 packed <code class="docutils literal notranslate"><span class="pre">UInt(64)</span></code> words</p></td>
+<td><p>4-5 <code class="docutils literal notranslate"><span class="pre">i32</span></code> words</p></td>
+</tr>
+<tr class="row-even"><td><p>control</p></td>
+<td><p>PC + 4-deep loop stack + 3-term AGU</p></td>
+<td><p>flat PC walk, no loop stack</p></td>
+</tr>
+<tr class="row-odd"><td><p>ISA</p></td>
+<td><p>9 opcodes, hand-written</p></td>
+<td><p>11 ACT-declared instructions</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Chia’s TinyTPU is not a loop machine either</strong>, which reframes the whole
+question: ACT emitting flat streams is not an oversight, it matches the only
+machine ACT has ever targeted. Ours would be the first.</p>
+</section>
+<section id="corrections-to-earlier-claims">
+<h2>Corrections to Earlier Claims<a class="headerlink" href="#corrections-to-earlier-claims" title="Link to this heading"><span>¶</span></a></h2>
+<p>Earlier claims made in this project’s history, corrected here rather than left
+standing (commit <code class="docutils literal notranslate"><span class="pre">a0de6d8d</span></code>, 2026-09-18):</p>
+<ul class="simple">
+<li><p>“A minimal ACT pilot was run, using a toy ISA.” <strong>No artifact exists.</strong> There
+are no <code class="docutils literal notranslate"><span class="pre">pilot</span></code> hits in either repo’s notes or git log. If it ran, it ran in
+<code class="docutils literal notranslate"><span class="pre">~/allo-act</span></code>, deleted 2026-09-07 (the CHIA checkpoint on
+<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>). Nothing in <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code> is it:
+<code class="docutils literal notranslate"><span class="pre">20260905-060830/variants.jsonl</span></code> is a single baseline line, and
+<code class="docutils literal notranslate"><span class="pre">swarm-20260905-063857/</span></code> is a 6-worker <strong>CHIA LLM-agent</strong> search (best
+126,432 -&gt; 31,056 cycles on the <code class="docutils literal notranslate"><span class="pre">dram</span></code> hypothesis), which is not a mapspace
+search.</p></li>
+<li><p>“ACT has a mapspace search” – it has a mapspace <em>file</em>. See
+<a class="reference internal" href="#recommendation-act-as-a-mapper-only">Recommendation: ACT as a mapper only</a> above.</p></li>
+<li><p>“Flat needs 106 imem words vs our 56.” The 106 is right; the 56 was
+<code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code>, not the program. Measured: <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 49
+instructions = 106 words flat, 17 instructions = <strong>42 words</strong> looped. Flat
+still does not fit; the headroom is 14 words, not 0.</p></li>
+</ul>
+<section id="test-counts">
+<h3>Test counts<a class="headerlink" href="#test-counts" title="Link to this heading"><span>¶</span></a></h3>
+<p>The committed record of ACT’s own test suite on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> is commit
+<code class="docutils literal notranslate"><span class="pre">cee57bc0</span></code> (2026-09-07), which made the torch-backed tests skip instead of
+error in an environment without the torch stack: <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/dsa/</span></code> is
+<strong>238 passed, 40 skipped, 0 failed</strong>. Skipped tests assert nothing, so this
+count is not evidence about the torch-backed paths.</p>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">ACT Compiler-Backend Flow</a><ul>
+<li><a class="reference internal" href="#the-finding">The Finding</a><ul>
+<li><a class="reference internal" href="#the-minimum-change-both-directions">The minimum change, both directions</a></li>
+<li><a class="reference internal" href="#recommendation-act-as-a-mapper-only">Recommendation: ACT as a mapper only</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#our-9-opcodes-against-act-s-isa-model">Our 9 Opcodes Against ACT’s ISA Model</a></li>
+<li><a class="reference internal" href="#two-tinytpus-not-one">Two TinyTPUs, Not One</a></li>
+<li><a class="reference internal" href="#corrections-to-earlier-claims">Corrections to Earlier Claims</a><ul>
+<li><a class="reference internal" href="#test-counts">Test counts</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="chia.html">
+                    <span class="icon">&lt;</span><span>CHIA Agentic Co-Design</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="../developer/index.html"><span>Developer Setup</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

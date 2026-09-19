@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Hierarchical Regions: Design Record" href="hierarchical_regions.html" />
+    <link rel="prev" title="Catapult Synthesis Record: top_decoupled_2x1" href="catapult_decoupled_2x1.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="vitis-hls-record-non-blocking-streams-and-the-decoupled-mesh">
+<h1>Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh<a class="headerlink" href="#vitis-hls-record-non-blocking-streams-and-the-decoupled-mesh" title="Link to this heading"><span>¶</span></a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Dated measurement record.</strong> Xilinx U280 (xcu280-fsvh2892-2L-e), Vitis HLS
+2023.2, 3.33 ns clock period (300 MHz target), estimated Fmax 411 MHz; dated
+2026-03-08 (fp16 addendum 2026-04-13). Rescued onto the fork 2026-07-15 and
+retired 2026-09-17. Nothing here is maintained – treat every claim as dated.</p>
+</div>
+<p>This page preserves §1-3 of the former <code class="docutils literal notranslate"><span class="pre">notes/archive/HLS_SYNTH_REPORT.md</span></code>,
+with its key findings (§4). They are the only blocking-vs-non-blocking LUT/FF
+breakdown at module granularity, and the only place the decoupled-mesh area
+numbers (5355/5300 for 1 MT + 1 CT, 7361/6724 for 2x1) appear at all.</p>
+<p>This is the <strong>primary record</strong> for these numbers. <a class="reference internal" href="../backends/nonblocking_streams.html"><span class="doc">Non-Blocking Stream Operations</span></a>
+repeats LUT 1417 / 1457 but gives FF as 248 / 260 in a table it labels
+“estimated”, where this record measured <strong>1325 / 1369</strong>; where the two
+disagree, this record wins.</p>
+<p>Two statements of the original are no longer true and are corrected here
+rather than in the preserved text below:</p>
+<ul class="simple">
+<li><p>Its fp16 fixes (§6.3 of the original, ISSUE-009/ISSUE-010) are upstream as
+of <code class="docutils literal notranslate"><span class="pre">upstream/main</span></code>, so that section is not carried.</p></li>
+<li><p>Its claim that <code class="docutils literal notranslate"><span class="pre">EmitTapaHLS.cpp</span></code> carries the non-blocking ops (“Tapa HLS
+codegen (NB ops fixed)”, and the Tapa column of the API table in §1.5) is
+false: that support was removed, and <code class="docutils literal notranslate"><span class="pre">try_get</span></code>/<code class="docutils literal notranslate"><span class="pre">try_put</span></code> on the TAPA
+target fail to emit (see <a class="reference internal" href="../developer/limitations.html#limitation-19"><span class="std std-ref">19. try_get/try_put on the TAPA target fail to emit, with a generic message</span></a>).</p></li>
+</ul>
+<section id="blocking-vs-non-blocking-stream-primitives">
+<h2>1. Blocking vs Non-Blocking Stream Primitives<a class="headerlink" href="#blocking-vs-non-blocking-stream-primitives" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Designs</strong>: <code class="docutils literal notranslate"><span class="pre">tests/dataflow/hls_synth_streams.py</span></code>
+<strong>Reference test</strong>: <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_nb_simple.py</span></code></p>
+<section id="functional-verification-csim">
+<h3>1.1 Functional Verification (CSIM)<a class="headerlink" href="#functional-verification-csim" title="Link to this heading"><span>¶</span></a></h3>
+<p>All three designs passed C-simulation (<code class="docutils literal notranslate"><span class="pre">vitis_hls</span> <span class="pre">csim</span></code>):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Design</p></th>
+<th class="head"><p>Test</p></th>
+<th class="head"><p>Result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top_blocking</span></code> (put/get)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out[i]</span> <span class="pre">==</span> <span class="pre">i</span> <span class="pre">*</span> <span class="pre">10</span></code> for i in 0..3</p></td>
+<td><p>PASS</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">top_nonblocking</span></code> (try_put/try_get)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out[i]</span> <span class="pre">==</span> <span class="pre">i</span> <span class="pre">*</span> <span class="pre">10</span></code> for i in 0..3</p></td>
+<td><p>PASS</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top_status_flags</span></code> (empty/full)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[1,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">0]</span></code> for flags/status</p></td>
+<td><p>PASS</p></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<div><p><strong>Note on</strong> <code class="docutils literal notranslate"><span class="pre">top_nonblocking</span></code> <strong>CSIM</strong>: Non-blocking spin-wait loops succeed in
+HLS CSIM because HLS CSIM executes dataflow processes sequentially — the
+producer fills the depth-4 FIFO completely in a single pass, then the consumer
+drains it. Each <code class="docutils literal notranslate"><span class="pre">try_put</span></code>/<code class="docutils literal notranslate"><span class="pre">try_get</span></code> call succeeds on first attempt because
+there is no concurrent racing. Functional correctness is verified; cycle-level
+concurrency behavior requires RTL co-simulation.</p>
+</div></blockquote>
+</section>
+<section id="hls-synthesis-results-csyn">
+<h3>1.2 HLS Synthesis Results (CSYN)<a class="headerlink" href="#hls-synthesis-results-csyn" title="Link to this heading"><span>¶</span></a></h3>
+<p>Top-level resource comparison:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Design</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>BRAM_18K</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>Latency (cycles)</p></th>
+<th class="head"><p>Pipeline II</p></th>
+<th class="head"><p>Fmax (MHz)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top_blocking</span></code></p></td>
+<td><p><strong>1417</strong></p></td>
+<td><p><strong>1325</strong></p></td>
+<td><p>2</p></td>
+<td><p>0</p></td>
+<td><p>19–20</p></td>
+<td><p><strong>7</strong></p></td>
+<td><p>411</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">top_nonblocking</span></code></p></td>
+<td><p><strong>1457</strong></p></td>
+<td><p><strong>1369</strong></p></td>
+<td><p>2</p></td>
+<td><p>0</p></td>
+<td><p>undef</p></td>
+<td><p>undef</p></td>
+<td><p>411</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Overhead (non-blocking vs blocking)</strong>:</p>
+<ul class="simple">
+<li><p>LUT: +40 (+2.8%), FF: +44 (+3.3%)</p></li>
+<li><p>Latency: becomes statically unbounded due to spin-wait loops (correct: actual
+cycles depend on FIFO occupancy at runtime)</p></li>
+<li><p>Fmax: identical — non-blocking comparators do not affect timing closure</p></li>
+</ul>
+</section>
+<section id="per-module-breakdown">
+<h3>1.3 Per-Module Breakdown<a class="headerlink" href="#per-module-breakdown" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Module</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">producer_0</span></code></p></td>
+<td><p>Blocking put</p></td>
+<td><p>82</p></td>
+<td><p>9</p></td>
+<td><p>Loop body: stream.write()</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">consumer_0</span></code></p></td>
+<td><p>Blocking get</p></td>
+<td><p>73</p></td>
+<td><p>9</p></td>
+<td><p>Loop body: stream.read()</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">producer_nb_0</span></code></p></td>
+<td><p>Non-blocking try_put</p></td>
+<td><p>89</p></td>
+<td><p>15</p></td>
+<td><p>+7 LUT (+9%), +6 FF</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">consumer_nb_0</span></code></p></td>
+<td><p>Non-blocking try_get</p></td>
+<td><p>106</p></td>
+<td><p>47</p></td>
+<td><p>+33 LUT (+45%), +38 FF</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Analysis</strong>:</p>
+<ul class="simple">
+<li><p><strong>Producer overhead</strong> (+7 LUT, +6 FF): The <code class="docutils literal notranslate"><span class="pre">write_nb()</span></code> call adds one
+comparator (is_not_full?) plus a MUX for the success return bit. Extra FFs
+track the spin-wait iteration state.</p></li>
+<li><p><strong>Consumer overhead</strong> (+33 LUT, +38 FF): The <code class="docutils literal notranslate"><span class="pre">read_nb()</span></code> adds a comparator
+and success MUX. The <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">ok</span> <span class="pre">==</span> <span class="pre">0</span></code> spin loop requires a state machine
+register (+1 FF for ok, +1 FF for the loop counter). The larger FF overhead
+reflects the loop-control registers in the pipelined state machine.</p></li>
+<li><p><strong>Conclusion</strong>: Non-blocking ops add ~O(1) LUTs per stream (one comparator</p>
+<ul>
+<li><p>one MUX for the success bit). The extra FFs come from the spin-wait state
+machine, not from the stream datapath itself.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="status-flags-empty-full">
+<h3>1.4 Status Flags (<code class="docutils literal notranslate"><span class="pre">empty()</span></code> / <code class="docutils literal notranslate"><span class="pre">full()</span></code>)<a class="headerlink" href="#status-flags-empty-full" title="Link to this heading"><span>¶</span></a></h3>
+<ul class="simple">
+<li><p>HLS codegen verification: PASS — <code class="docutils literal notranslate"><span class="pre">.empty()</span></code> and <code class="docutils literal notranslate"><span class="pre">.full()</span></code> correctly lower to
+<code class="docutils literal notranslate"><span class="pre">hls::stream&lt;T&gt;::empty()</span></code> and <code class="docutils literal notranslate"><span class="pre">hls::stream&lt;T&gt;::full()</span></code> (see
+<code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitVivadoHLS.cpp</span></code>)</p></li>
+<li><p>HLS synthesis: <strong>SKIP</strong> — <code class="docutils literal notranslate"><span class="pre">top_status_flags</span></code> has a single-kernel design that
+writes to an internal stream without consuming it (pure status test). HLS
+dataflow requires every internal FIFO to be produced by exactly one process and
+consumed by exactly one process. A functional-only design cannot be synthesized
+as-is; in a real design, empty()/full() are used inside producer/consumer
+kernels as guards, not standalone.</p></li>
+</ul>
+</section>
+<section id="hls-api-mapping">
+<h3>1.5 HLS API Mapping<a class="headerlink" href="#hls-api-mapping" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Allo Python</p></th>
+<th class="head"><p>Vitis HLS C++</p></th>
+<th class="head"><p>Tapa HLS C++</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.put(v)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.write(v)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.write(v)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.get()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.read()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.read()</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.try_put(v)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.write_nb(v)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.try_write(v)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">v,</span> <span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.try_get()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.read_nb(v)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">=</span> <span class="pre">s.try_read(v)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.empty()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.empty()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.empty()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.full()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.full()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.full()</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="decoupled-mesh-architecture">
+<h2>2. Decoupled Mesh Architecture<a class="headerlink" href="#decoupled-mesh-architecture" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Designs</strong>: <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_decoupled_mesh.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/dataflow/hls_synth_decoupled.py</span></code></p>
+<section id="architecture-overview">
+<h3>2.1 Architecture Overview<a class="headerlink" href="#architecture-overview" title="Link to this heading"><span>¶</span></a></h3>
+<p>The decoupled mesh replaces Allo’s blocking fixed-II streaming protocol with a
+<strong>valid-ready handshake</strong> on control channels:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Memory Tile (MT)  ─── req_valid[i] (try_put) ───▶  Compute Tile i (CT_i)
+                  ◀── grant_ready[i] (try_get) ───  Compute Tile i (CT_i)
+                  ─── data_mt2ct[i] (burst put) ──▶  Compute Tile i
+                  ◀── data_ct2mt[i] (burst get) ───  Compute Tile i
+</pre></div>
+</div>
+<p><strong>Protocol (3 phases per CT per invocation)</strong>:</p>
+<ol class="arabic simple">
+<li><p><strong>WRITE</strong> (MSG=1): MT raises Valid (try_put) → CT asserts Ready (try_put
+grant) → MT sends unconditional data burst</p></li>
+<li><p><strong>COMPUTE</strong> (MSG=4): MT dispatches work token → CT performs in-place +1.0
+→ CT sends completion grant</p></li>
+<li><p><strong>READ</strong> (MSG=2): MT raises Valid → CT asserts Ready → CT sends data burst</p></li>
+</ol>
+<p><strong>Key advantage over blocking (top_2x1 in test_hierachical_mesh.py)</strong>:</p>
+<ul class="simple">
+<li><p>Blocking requires every MT→CT channel to be written in every invocation
+(fixed-II), even via NOP padding, to avoid FIFO deadlock</p></li>
+<li><p>Decoupled allows MT to selectively target any subset of CTs</p></li>
+<li><p>CTs run concurrently and independently with no fixed-II constraint</p></li>
+</ul>
+</section>
+<section id="functional-verification">
+<h3>2.2 Functional Verification<a class="headerlink" href="#functional-verification" title="Link to this heading"><span>¶</span></a></h3>
+<p>Verified with the <strong>Allo simulator</strong> (OpenMP concurrent threads):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Design</p></th>
+<th class="head"><p>Test</p></th>
+<th class="head"><p>Result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top_message_passing</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out[i]</span> <span class="pre">==</span> <span class="pre">in[i]</span> <span class="pre">+</span> <span class="pre">1.0</span></code></p></td>
+<td><p>PASS</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></p></td>
+<td><p>CT0: <code class="docutils literal notranslate"><span class="pre">out0[i]</span> <span class="pre">==</span> <span class="pre">in0[i]</span> <span class="pre">+</span> <span class="pre">1.0</span></code>
+CT1: <code class="docutils literal notranslate"><span class="pre">out1[i]</span> <span class="pre">==</span> <span class="pre">in1[i]</span> <span class="pre">+</span> <span class="pre">1.0</span></code></p></td>
+<td><p>PASS
+PASS</p></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<div><p><strong>HLS CSIM not applicable</strong>: Vitis HLS C-simulation runs dataflow processes
+<strong>sequentially</strong> (documented in UG1399). A valid-ready handshake requires
+concurrent execution: the MT’s <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">ack</span> <span class="pre">==</span> <span class="pre">0:</span> <span class="pre">try_get(grant)</span></code> spin-wait
+deadlocks if CT hasn’t had a chance to run. For cycle-accurate concurrent
+validation, use RTL co-simulation (<code class="docutils literal notranslate"><span class="pre">mode=&quot;cosim&quot;</span></code>), which runs synthesized RTL
+in Xsim with true concurrency. The Allo simulator (OpenMP) correctly models
+concurrent kernel execution and is used for functional verification.</p>
+</div></blockquote>
+</section>
+<section id="id1">
+<h3>2.3 HLS Synthesis Results (CSYN)<a class="headerlink" href="#id1" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Design</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>BRAM_18K</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>Fmax (MHz)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top_message_passing</span></code> (1 MT + 1 CT)</p></td>
+<td><p>5355</p></td>
+<td><p>5300</p></td>
+<td><p>7</p></td>
+<td><p>2</p></td>
+<td><p>411</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code> (1 MT + 2 CTs)</p></td>
+<td><p>7361</p></td>
+<td><p>6724</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+<td><p>411</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scaling from 1 CT → 2 CTs</strong> (+1 CT):</p>
+<ul class="simple">
+<li><p>LUT: +2006 (+37.5%)</p></li>
+<li><p>FF: +1424 (+26.9%)</p></li>
+<li><p>BRAM: +1 (+14%)</p></li>
+<li><p>DSP: +2 (+100% — each CT’s burst data pipeline uses 1 DSP for AXI burst)</p></li>
+</ul>
+<p>Both designs synthesize cleanly at 411 MHz (3.33 ns period satisfied with margin).</p>
+<blockquote>
+<div><p><strong>Latency: undef</strong> — Expected for designs with spin-wait while loops.
+HLS cannot statically bound the iteration count of <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">ack</span> <span class="pre">==</span> <span class="pre">0</span></code>.
+In practice, latency is bounded by the FIFO depth and the handshake round-trip
+time (1–2 clock cycles). The undef label does not indicate a real problem.</p>
+</div></blockquote>
+</section>
+<section id="per-module-breakdown-21-mesh">
+<h3>2.4 Per-Module Breakdown (2×1 Mesh)<a class="headerlink" href="#per-module-breakdown-21-mesh" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Module</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>Function</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">memory_tile_2x1_0</span></code></p></td>
+<td><p>789</p></td>
+<td><p>131</p></td>
+<td><p>MT: 6 handshake phases + burst control</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">compute_tile_2x1_0</span></code> (CT0)</p></td>
+<td><p>801</p></td>
+<td><p>619</p></td>
+<td><p>CT: spin-poll + 3-phase protocol</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">compute_tile_2x1_1</span></code> (CT1)</p></td>
+<td><p>801</p></td>
+<td><p>619</p></td>
+<td><p>CT: same (symmetric)</p></td>
+</tr>
+<tr class="row-odd"><td><p>AXI burst load/store</p></td>
+<td><p>239+229</p></td>
+<td><p>439+469</p></td>
+<td><p>AXI-M data movers (per array port)</p></td>
+</tr>
+<tr class="row-even"><td><p>FIFOs (shift-register)</p></td>
+<td><p>—</p></td>
+<td><p>—</p></td>
+<td><p>req_valid, grant_ready, data streams</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Observations</strong>:</p>
+<ul class="simple">
+<li><p>Each CT adds ~801 LUT + ~619 FF — <strong>near-linear scaling</strong> (slightly sublinear
+due to shared AXI interface logic being amortized)</p></li>
+<li><p>The MT is surprisingly lean (789 LUT, 131 FF) because its handshake loops
+are lightweight comparators; the AXI burst data movers are in separate
+processes (<code class="docutils literal notranslate"><span class="pre">load_buf</span></code>, <code class="docutils literal notranslate"><span class="pre">store_res</span></code>)</p></li>
+<li><p>CT has higher FF count (~619) than MT (~131) because the <code class="docutils literal notranslate"><span class="pre">spad[BURST_SIZE]</span></code>
+scratchpad registers inside <code class="docutils literal notranslate"><span class="pre">compute_tile_2x1</span></code> are kept as FFs (small arrays
+get inferred into registers rather than BRAM at depth=16)</p></li>
+</ul>
+</section>
+</section>
+<section id="blocking-vs-decoupled-area-comparison">
+<h2>3. Blocking vs Decoupled: Area Comparison<a class="headerlink" href="#blocking-vs-decoupled-area-comparison" title="Link to this heading"><span>¶</span></a></h2>
+<p>For reference, the blocking <code class="docutils literal notranslate"><span class="pre">top_2x1</span></code> (from <code class="docutils literal notranslate"><span class="pre">test_hierachical_mesh.py</span></code>) uses:</p>
+<ul class="simple">
+<li><p>Fixed command packets (ctrl, daddr, size, data) always broadcast to all CTs</p></li>
+<li><p>CTs decode NOP commands in every cycle to satisfy fixed-II</p></li>
+<li><p>Total area: not synthesized here (requires full GEMM/VADD sub-regions)</p></li>
+</ul>
+<p>For a simplified 2-CT point comparison with identical compute (vadd +1):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Protocol</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>BRAM</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Blocking (put/get FIFO)</p></td>
+<td><p>~1417</p></td>
+<td><p>~1325</p></td>
+<td><p>2</p></td>
+<td><p>Simple producer-consumer only</p></td>
+</tr>
+<tr class="row-odd"><td><p>Non-blocking (try_put/get)</p></td>
+<td><p>~1457</p></td>
+<td><p>~1369</p></td>
+<td><p>2</p></td>
+<td><p>Spin-wait overhead +3% area</p></td>
+</tr>
+<tr class="row-even"><td><p>Decoupled mesh (1 MT + 1 CT)</p></td>
+<td><p>5355</p></td>
+<td><p>5300</p></td>
+<td><p>7</p></td>
+<td><p>Full handshake + AXIM burst</p></td>
+</tr>
+<tr class="row-odd"><td><p>Decoupled mesh (1 MT + 2 CTs)</p></td>
+<td><p>7361</p></td>
+<td><p>6724</p></td>
+<td><p>8</p></td>
+<td><p>+37% per extra CT</p></td>
+</tr>
+</tbody>
+</table>
+<p>The decoupled mesh has higher absolute area because:</p>
+<ol class="arabic simple">
+<li><p><strong>AXI-M burst interfaces</strong> for the external data ports (not present in simple
+stream tests)</p></li>
+<li><p><strong>Stateful scratchpad</strong> (<code class="docutils literal notranslate"><span class="pre">spad[16]</span> <span class="pre">&#64;</span> <span class="pre">stateful</span></code>) mapped to FFs inside each CT</p></li>
+<li><p><strong>Full handshake state machine</strong> for 3-phase protocol vs simple FIFO</p></li>
+</ol>
+</section>
+<section id="key-findings">
+<h2>4. Key Findings<a class="headerlink" href="#key-findings" title="Link to this heading"><span>¶</span></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Non-blocking overhead is minimal</strong>: try_put/try_get add only ~3% area over
+blocking equivalents. The extra LUTs come from comparators; extra FFs come
+from spin-wait state machines. Fmax is not affected.</p></li>
+<li><p><strong>Both designs meet 411 MHz</strong>: Far exceeding the 300 MHz target. Non-blocking
+handshake does NOT become the critical path.</p></li>
+<li><p><strong>Decoupled mesh scales near-linearly with CT count</strong>: Adding 1 CT costs
+~2000 LUT + ~1400 FF. The MT overhead is sublinear (shared AXI logic).</p></li>
+<li><p><strong>HLS CSIM limitation for handshake designs</strong>: Designs with bidirectional
+spin-wait handshakes (MT waits for CT grant before CT has run) deadlock in
+HLS CSIM’s sequential execution model. The Allo simulator (OMP threads) is
+the correct verification vehicle for such designs.</p></li>
+<li><p><strong>Single-kernel internal streams fail HLS synthesis</strong>: <code class="docutils literal notranslate"><span class="pre">empty()</span></code>/<code class="docutils literal notranslate"><span class="pre">full()</span></code>
+flags are only useful as guards inside producer/consumer kernels — not as
+standalone single-kernel status checks (HLS dataflow requires one producer
+and one consumer per internal stream).</p></li>
+</ol>
+</section>
+<section id="files-and-recovery">
+<h2>Files and recovery<a class="headerlink" href="#files-and-recovery" title="Link to this heading"><span>¶</span></a></h2>
+<p>The designs were driven by <code class="docutils literal notranslate"><span class="pre">tests/dataflow/hls_synth_streams.py</span></code> (CSIM+CSYN,
+blocking vs non-blocking) and <code class="docutils literal notranslate"><span class="pre">tests/dataflow/hls_synth_decoupled.py</span></code> (CSYN,
+decoupled mesh), with unit tests in <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_nb_simple.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">test_stream_ops_ir.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_stream_ops_sim.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_stream_ops_hls.py</span></code>
+and <code class="docutils literal notranslate"><span class="pre">test_decoupled_mesh.py</span></code>. The dropped sections (§5 file list, §6 fp16
+verification, §7 command reference) are recoverable with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>show<span class="w"> </span>a2d92cd8:notes/archive/HLS_SYNTH_REPORT.md
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a><ul>
+<li><a class="reference internal" href="#blocking-vs-non-blocking-stream-primitives">1. Blocking vs Non-Blocking Stream Primitives</a><ul>
+<li><a class="reference internal" href="#functional-verification-csim">1.1 Functional Verification (CSIM)</a></li>
+<li><a class="reference internal" href="#hls-synthesis-results-csyn">1.2 HLS Synthesis Results (CSYN)</a></li>
+<li><a class="reference internal" href="#per-module-breakdown">1.3 Per-Module Breakdown</a></li>
+<li><a class="reference internal" href="#status-flags-empty-full">1.4 Status Flags (<code class="docutils literal notranslate"><span class="pre">empty()</span></code> / <code class="docutils literal notranslate"><span class="pre">full()</span></code>)</a></li>
+<li><a class="reference internal" href="#hls-api-mapping">1.5 HLS API Mapping</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#decoupled-mesh-architecture">2. Decoupled Mesh Architecture</a><ul>
+<li><a class="reference internal" href="#architecture-overview">2.1 Architecture Overview</a></li>
+<li><a class="reference internal" href="#functional-verification">2.2 Functional Verification</a></li>
+<li><a class="reference internal" href="#id1">2.3 HLS Synthesis Results (CSYN)</a></li>
+<li><a class="reference internal" href="#per-module-breakdown-21-mesh">2.4 Per-Module Breakdown (2×1 Mesh)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#blocking-vs-decoupled-area-comparison">3. Blocking vs Decoupled: Area Comparison</a></li>
+<li><a class="reference internal" href="#key-findings">4. Key Findings</a></li>
+<li><a class="reference internal" href="#files-and-recovery">Files and recovery</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="catapult_decoupled_2x1.html">
+                    <span class="icon">&lt;</span><span>Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="hierarchical_regions.html"><span>Hierarchical Regions: Design Record</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

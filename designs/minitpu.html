@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>MiniTPU: Reference Architecture &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Systolic-Array Design Space: Sourced Survey" href="design_space.html" />
+    <link rel="prev" title="TinyTPU-isa: Design History" href="tinytpu_history.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="minitpu-reference-architecture">
+<h1>MiniTPU: Reference Architecture<a class="headerlink" href="#minitpu-reference-architecture" title="Link to this heading"><span>¶</span></a></h1>
+<p>MiniTPU is the reference architecture the TinyTPU-isa work benchmarked
+against (see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>). Originally titled “MiniTPU –
+reference architecture we benchmarked against”.</p>
+<p><strong>Not our design, and not ours to modify.</strong> MiniTPU is another engineer’s
+machine; its source is <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> (live) and <code class="docutils literal notranslate"><span class="pre">~/core/npu</span></code> (read by an
+earlier pass, now empty), and neither travels to zhang-21. This records what we
+<em>found</em> about a reference architecture we benchmarked against, because the
+findings outlive the tree. Everything was read-only. Distilled from two rescued
+scratchpad reports; <em>(verified)</em> means re-checked against <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> on
+2026-09-18.</p>
+<section id="shipped-bitstream-qor-xczu7ev-ffvc1156-2-e-vivado-2023-2-verified">
+<h2>1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2) <em>(verified)</em><a class="headerlink" href="#shipped-bitstream-qor-xczu7ev-ffvc1156-2-e-vivado-2023-2-verified" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>value</p></th>
+<th class="head"><p>source under
+<code class="docutils literal notranslate"><span class="pre">board_package/minitpu/qor/</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CLB LUT</p></td>
+<td><p>191,231 (83.00 %)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">utilization_report.txt</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>CLB registers</p></td>
+<td><p>118,684 (25.76 %)</p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-even"><td><p>DSP</p></td>
+<td><p>838 (48.50 %)</p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-odd"><td><p>BRAM tile</p></td>
+<td><p>147 (47.12 %)</p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-even"><td><p>URAM</p></td>
+<td><p>15 (15.63 %)</p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-odd"><td><p>WNS</p></td>
+<td><p>+0.114 ns on <code class="docutils literal notranslate"><span class="pre">clk_pl_0</span></code>, 5.000 ns
+constraint</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">timing_summary.txt</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Power</p></td>
+<td><p>8.255 W on-chip (vectorless)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">power_report.txt</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>LUT is the scarce resource, not DSP.</p>
+<p><strong>Every board number was taken at 187.5 MHz, not the 200 MHz the bitstream is
+constrained to.</strong> PL0 is set by hand (<code class="docutils literal notranslate"><span class="pre">scripts/set_pl_clock.sh</span></code>,
+<code class="docutils literal notranslate"><span class="pre">PL0_REF_CTRL</span> <span class="pre">=</span> <span class="pre">0xFF5E00C0</span></code>); without it the PL runs at 99.999 MHz and every
+check still passes, and <code class="docutils literal notranslate"><span class="pre">clk_summary</span></code> misreports it.
+<code class="docutils literal notranslate"><span class="pre">tools/dma_fence_report.py</span></code> hardcodes <code class="docutils literal notranslate"><span class="pre">CLOCK_HZ</span> <span class="pre">=</span> <span class="pre">187.5e6</span></code>. Any cycles→seconds
+or GFLOP/s comparison must use 187.5 MHz; 200 MHz overstates it by 6.7 %.</p>
+<p>The design’s README once stated <strong>7.255 W</strong>, which was stale. Fixed after we
+reported it; it now reads 8.255 W.</p>
+</section>
+<section id="the-qor-noise-floor-the-most-reusable-finding-here">
+<h2>2. The QoR noise floor — the most reusable finding here<a class="headerlink" href="#the-qor-noise-floor-the-most-reusable-finding-here" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Two builds of an identical netlist differed by −1407 LUT and −0.046 ns.</strong></p>
+<p>So in this flow <strong>no QoR delta below roughly 1.5k LUT (~0.6 % of the device) or
+50 ps is evidence of anything</strong> — place-and-route seeding alone covers it. That
+is a fact about the tool flow, not about MiniTPU, and it applies to us:</p>
+<ul class="simple">
+<li><p>It is the standard behind commit <code class="docutils literal notranslate"><span class="pre">644d8cdc</span></code>: the accumulator rotation bought
+2.3 % end-to-end for 13.7× the flip-flops in one unit — cost far outside the
+noise band, benefit barely outside it. Reverted.</p></li>
+<li><p>Every future Catapult PPA claim needs a delta above this band, or repeated
+builds with different seeds. A single-build A/B below it is a coin flip
+reported as a result.</p></li>
+</ul>
+<p>Provenance: the ±1407 pair came from rescued build logs that did not survive —
+the nine <code class="docutils literal notranslate"><span class="pre">~/core/minitpu*</span></code> worktrees today all report 191,231 / +0.114 ns, so it
+cannot be re-derived. The magnitude is the load-bearing part.</p>
+</section>
+<section id="architecture">
+<h2>3. Architecture<a class="headerlink" href="#architecture" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Array</p></td>
+<td><p>16×16 weight-stationary BF16 PEs; <code class="docutils literal notranslate"><span class="pre">psum_in</span></code> zero only at row 0, so it
+accumulates exactly 16 deep in hardware — deeper is a BF16 <code class="docutils literal notranslate"><span class="pre">vadd</span></code> in the VPU</p></td>
+</tr>
+<tr class="row-odd"><td><p>Accumulator</p></td>
+<td><p><strong>24-bit float</strong> per PE (sign + 8 exp + 15 frac, <code class="docutils literal notranslate"><span class="pre">MXU_ACC_W</span></code>), not fixed point</p></td>
+</tr>
+<tr class="row-even"><td><p>Bundle</p></td>
+<td><p><strong>128-bit VLIW</strong>: slots V / M / MEM / S / C, shared immediate, <strong>7-bit DELAY</strong>
+(<code class="docutils literal notranslate"><span class="pre">DELAY_W</span> <span class="pre">=</span> <span class="pre">7</span></code>, <code class="docutils literal notranslate"><span class="pre">sequencer_pkg.sv:23</span></code>) <em>(verified)</em>. MEM’s two kinds, LDST
+(<code class="docutils literal notranslate"><span class="pre">vld</span></code>/<code class="docutils literal notranslate"><span class="pre">vst</span></code>) and DESC (<code class="docutils literal notranslate"><span class="pre">vmemld</span></code>/<code class="docutils literal notranslate"><span class="pre">vmemst</span></code>), cannot share a bundle</p></td>
+</tr>
+<tr class="row-odd"><td><p>Hazards</p></td>
+<td><p><strong>none in hardware.</strong> Fetch stalls only for DELAY, matrix-busy, halt-drain; VREG
+RAW, write-port collisions, WAW, SREG RAW, VMEM ownership are the assembler’s
+job (<code class="docutils literal notranslate"><span class="pre">asm.py</span> <span class="pre">schedule()</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p>Loops</p></td>
+<td><p><strong>4-deep hardware stack</strong>, one <code class="docutils literal notranslate"><span class="pre">{body_start,</span> <span class="pre">iv,</span> <span class="pre">hi,</span> <span class="pre">step}</span></code> frame per level
+(<code class="docutils literal notranslate"><span class="pre">STACK_DEPTH</span> <span class="pre">=</span> <span class="pre">4</span></code>, <code class="docutils literal notranslate"><span class="pre">sequencer_loop_ctrl.sv</span></code>) <em>(verified)</em></p></td>
+</tr>
+<tr class="row-odd"><td><p>Replay</p></td>
+<td><p><strong>24-bundle</strong> loop buffer (<code class="docutils literal notranslate"><span class="pre">LB_CAP</span> <span class="pre">=</span> <span class="pre">24</span></code>), innermost loop only; a longer body
+refetches from IRAM each iteration — time, not correctness</p></td>
+</tr>
+<tr class="row-even"><td><p>AGU</p></td>
+<td><p><strong>1-term, shift-only</strong>: <code class="docutils literal notranslate"><span class="pre">agu_valid</span></code>, 2-bit <code class="docutils literal notranslate"><span class="pre">agu_level</span></code>, 3-bit <code class="docutils literal notranslate"><span class="pre">agu_shift</span></code>
+— one loop-index term, shifted, no multiply. DMA bypasses it, walking its own
+base/stride</p></td>
+</tr>
+<tr class="row-odd"><td><p>Fences</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">wait.channel(mask)</span></code> over two async DMA channels; <code class="docutils literal notranslate"><span class="pre">halt</span></code> waits for DMA idle,
+<strong>not</strong> for VREG writes in flight</p></td>
+</tr>
+<tr class="row-even"><td><p>IRAM</p></td>
+<td><p>self-fetching: host loads bundles over AXI-Lite via a command unit and IRAM
+loader, then the core fetches for itself</p></td>
+</tr>
+<tr class="row-odd"><td><p>Silent limits</p></td>
+<td><p>MXU output FIFO 32/lane — <strong>overflow drops results, no replay</strong>; loop buffer 24;
+DELAY width. Checked by <code class="docutils literal notranslate"><span class="pre">gen_isa_doc.py</span> <span class="pre">--check</span></code> and <code class="docutils literal notranslate"><span class="pre">tb_isa_conformance.sv</span></code>
+against RTL localparams</p></td>
+</tr>
+</tbody>
+</table>
+<p>Why BF16: accumulator width was chosen first from the LUT/DSP budget, and an
+8-bit-exponent format is what fits it — “there is no FP32 state anywhere in this
+design… fp32’s extra 8 bits could only ever hold zeros there”
+(<code class="docutils literal notranslate"><span class="pre">minitpu_config_pkg.sv</span></code>). Why no interlocks: “a legal schedule is a correctness
+argument, and the assembler carries it” (README) — paid for with two silicon bugs
+nothing caught at runtime.</p>
+<section id="vmem-correction-to-the-source-document">
+<h3>VMEM — <strong>CORRECTION to the source document</strong><a class="headerlink" href="#vmem-correction-to-the-source-document" title="Link to this heading"><span>¶</span></a></h3>
+<p>The rescued scaling report describes VMEM as <strong>4 banks per lane</strong>
+(<code class="docutils literal notranslate"><span class="pre">bank</span> <span class="pre">=</span> <span class="pre">row</span> <span class="pre">mod</span> <span class="pre">NUM_SUBLANES</span></code>, conflict cost <code class="docutils literal notranslate"><span class="pre">gcd(stride,4)</span></code>, an assembly-time
+conditional latency) and stakes its whole staged plan on it. <strong>Wrong for the
+live design.</strong> <code class="docutils literal notranslate"><span class="pre">src/core/vpu/vpu_word_array.sv</span></code> is a <strong>single flat dual-port
+URAM array</strong> — one compute port, one DMA port, whole words only — with <strong>no
+arbiter and no interlock</strong>; its own comment: “same-word collisions across the
+two ports are undefined, as on the FPGA” <em>(verified)</em>. No banking, no conflict
+cost model, nothing to model as a conditional latency. Do not build against the
+banked model.</p>
+</section>
+</section>
+<section id="measured-performance-and-the-bound-that-is-not-a-measurement">
+<h2>4. Measured performance, and the bound that is not a measurement<a class="headerlink" href="#measured-performance-and-the-bound-that-is-not-a-measurement" title="Link to this heading"><span>¶</span></a></h2>
+<p>Cycle model, exact over 20 simulated points (<code class="docutils literal notranslate"><span class="pre">tools/gemm_cycle_model.py</span></code>); <code class="docutils literal notranslate"><span class="pre">n</span></code>
+output column tiles, <code class="docutils literal notranslate"><span class="pre">B</span></code> contraction blocks of 32:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 46 + 194·n + 64.5·B + 303·n·B
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>19.0 % of peak is the MEASURED figure</strong> at the margin.</p></li>
+<li><p><strong>36.4 % of peak is a BOUND</strong>, set by the matrix controller not overlapping a
+push with a pop.</p></li>
+<li><p><strong>Never present the bound as a measurement.</strong> That error was made once already
+and corrected.</p></li>
+</ul>
+<p>A 16×16×16 matmul takes <strong>168 cycles</strong>, capped by the serialized matrix-command
+FSM (push and pop share one controller). (<em>From the rescued comparison work; not
+stated in either surviving source doc nor in the current</em> <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code>
+<em>docs, so not re-verifiable today.</em>)</p>
+<p>The rest of the gap is result latency — 82 cycles from <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> to first
+result — and it <strong>cannot be hidden by reordering</strong>: loading the next weights
+early corrupts the tile in flight, because weight-commit reaches every PE on one
+cycle (<code class="docutils literal notranslate"><span class="pre">mxu_pe.sv</span></code>). Recovering it needs hardware (hold commit until the array
+drains, or a second weight bank); splitting the matrix controller alone was
+measured and gains nothing.</p>
+<p>Board-validated targets: 32×64 BF16 add 119 cy, 32×64 multiply-add 155 cy,
+16×16 GEMM 283 cy, 16×16 GEMM→GELU 253 cy, 32×32 DMA-streamed multiply-add 929
+cy, 768-element LayerNorm 941 core cy / 218 bundles. Accuracy: GPT-2 124M block
+0.68 % vs fp32, Qwen2.5-0.5B decoder layer 3.81 %. <code class="docutils literal notranslate"><span class="pre">B</span> <span class="pre">=</span> <span class="pre">1..16</span></code> is bit-identical
+row-wise only — an earlier claim omitted the qualifier and was wrong for
+attention.</p>
+</section>
+<section id="what-this-says-about-our-own-cost-model">
+<h2>5. What this says about our own cost model<a class="headerlink" href="#what-this-says-about-our-own-cost-model" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">docs/isa_latency.json</span></code> (in the MiniTPU tree) is the measured-from-silicon version of what
+<code class="docutils literal notranslate"><span class="pre">tpu.latency(unit,</span> <span class="pre">ii=,</span> <span class="pre">depth=)</span></code> asserts pre-synthesis, and carries two latency
+shapes our <code class="docutils literal notranslate"><span class="pre">UnitLatency</span></code> (<code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/core.py:438</span></code>, on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>; see <a class="reference internal" href="../extensions/act.html"><span class="doc">ACT Compiler-Backend Flow</span></a>) does not express:
+<strong>conditional latency</strong> (latency depending on a statically known operand
+property — in the npu tree <code class="docutils literal notranslate"><span class="pre">vld</span></code>’s <code class="docutils literal notranslate"><span class="pre">L</span> <span class="pre">=</span> <span class="pre">W</span> <span class="pre">+</span> <span class="pre">conflict</span> <span class="pre">degree</span></code>; per the correction
+above the live design has no such case), and <strong>occupancy ≠ result latency</strong>
+(<code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> occupies the controller 5 cycles, first result at +82 — queue
+semantics, not an <code class="docutils literal notranslate"><span class="pre">(ii,</span> <span class="pre">depth)</span></code> pair).</p>
+<p>Writeback offsets for scale: ALU 5, SFU 7, cross-lane reduction 15 (it crosses
+all 64 elements — a reduction tree, not a per-lane pipe), <code class="docutils literal notranslate"><span class="pre">vld</span></code> 6, <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code>
+3..6. Occupancies: <code class="docutils literal notranslate"><span class="pre">vmatload</span></code> 18, <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> 5, <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> 7.</p>
+<p>Also worth carrying: <strong>the binding resource is the instruction encoding, not the
+silicon.</strong> The compute bundle has 1 spare bit — doubling VMEM rows per slot fits
+exactly it; doubling VREG count needs 5 bits that do not exist.</p>
+</section>
+<section id="defects-reported-outward-to-that-design-s-owner">
+<h2>6. Defects reported outward to that design’s owner<a class="headerlink" href="#defects-reported-outward-to-that-design-s-owner" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p>The stale <strong>7.255 W</strong> README figure (shipped: 8.255 W) — since fixed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/core/mxu/mxu_adapter.sv</span></code> <strong>is dead code</strong>: listed in <code class="docutils literal notranslate"><span class="pre">core.f</span></code> and <code class="docutils literal notranslate"><span class="pre">vpu.f</span></code>,
+instantiated nowhere in <code class="docutils literal notranslate"><span class="pre">src/</span></code> or <code class="docutils literal notranslate"><span class="pre">tb/</span></code> <em>(verified, still present)</em>.
+<strong>CORRECTION</strong>: the rescued report treats the MXU adapter path as live.</p></li>
+<li><p>A stale <code class="docutils literal notranslate"><span class="pre">matrix_busy_o</span></code> doc comment.</p></li>
+</ul>
+</section>
+<section id="where-the-two-source-trees-disagree">
+<h2>7. Where the two source trees disagree<a class="headerlink" href="#where-the-two-source-trees-disagree" title="Link to this heading"><span>¶</span></a></h2>
+<p>The rescued report was written against <code class="docutils literal notranslate"><span class="pre">~/core/npu</span></code>; <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> is live
+and has moved. Do not mix vocabularies:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p>rescued report (<code class="docutils literal notranslate"><span class="pre">~/core/npu</span></code>)</p></th>
+<th class="head"><p>live <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> <em>(verified)</em></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>VLIW slots</p></td>
+<td><p>E / M / X / S / D / F</p></td>
+<td><p>V / M / MEM / S / C</p></td>
+</tr>
+<tr class="row-odd"><td><p>DELAY field</p></td>
+<td><p>6 bits</p></td>
+<td><p><strong>7 bits</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>VMEM</p></td>
+<td><p>4 banks/lane + conflict model</p></td>
+<td><p><strong>flat dual-port URAM, no arbiter</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Both agree on: 16×16 BF16 array, 24-bit accumulator, 128-bit bundle, no
+interlocks, 24-bundle loop buffer, 32-entry MXU output FIFO, 82-cycle
+push→result latency.</p>
+<p>Consequence: <strong>the rescued report’s 8-stage TinyTPU scaling plan rests on the
+banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.</strong>
+Not reproduced here; what survives of it is §5.</p>
+</section>
+<section id="provenance">
+<h2>Provenance<a class="headerlink" href="#provenance" title="Link to this heading"><span>¶</span></a></h2>
+<p>The “rescued scaling report” referred to above was kept in the repository as
+<code class="docutils literal notranslate"><span class="pre">notes/archive/minitpu_scaling.md</span></code> until the notes were moved into this
+documentation. It holds the 8-stage TinyTPU scaling plan, dropped here as plan
+rather than evidence. <strong>Read it with care:</strong> it describes <code class="docutils literal notranslate"><span class="pre">~/core/npu</span></code>, a
+<em>different machine</em> from the live <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> (see the table in the
+previous section), and its scaling stages rest on the banked VMEM and on
+<code class="docutils literal notranslate"><span class="pre">mxu_adapter.sv</span></code>, which is dead code. It is recoverable from git history:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>show<span class="w"> </span>a2d92cd8:notes/archive/minitpu_scaling.md
+</pre></div>
+</div>
+<p>Neither source tree travels (<code class="docutils literal notranslate"><span class="pre">~/core/npu</span></code> is now empty), so nothing in it can
+be re-derived from source on another host.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">MiniTPU: Reference Architecture</a><ul>
+<li><a class="reference internal" href="#shipped-bitstream-qor-xczu7ev-ffvc1156-2-e-vivado-2023-2-verified">1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2) <em>(verified)</em></a></li>
+<li><a class="reference internal" href="#the-qor-noise-floor-the-most-reusable-finding-here">2. The QoR noise floor — the most reusable finding here</a></li>
+<li><a class="reference internal" href="#architecture">3. Architecture</a><ul>
+<li><a class="reference internal" href="#vmem-correction-to-the-source-document">VMEM — <strong>CORRECTION to the source document</strong></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#measured-performance-and-the-bound-that-is-not-a-measurement">4. Measured performance, and the bound that is not a measurement</a></li>
+<li><a class="reference internal" href="#what-this-says-about-our-own-cost-model">5. What this says about our own cost model</a></li>
+<li><a class="reference internal" href="#defects-reported-outward-to-that-design-s-owner">6. Defects reported outward to that design’s owner</a></li>
+<li><a class="reference internal" href="#where-the-two-source-trees-disagree">7. Where the two source trees disagree</a></li>
+<li><a class="reference internal" href="#provenance">Provenance</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="tinytpu_history.html">
+                    <span class="icon">&lt;</span><span>TinyTPU-isa: Design History</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="design_space.html"><span>Systolic-Array Design Space: Sourced Survey</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>
