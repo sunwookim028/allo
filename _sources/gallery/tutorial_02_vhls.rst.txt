@@ -41,6 +41,12 @@ First, we import the necessary packages.
     import numpy as np
 
 
+
+
+
+
+
+
 .. GENERATED FROM PYTHON SOURCE LINES 24-30
 
 Algorithm Definition
@@ -56,6 +62,12 @@ We can define the constants as follows, which denotes the matrix sizes:
 
 
     M, N, K = 32, 32, 32
+
+
+
+
+
+
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 34-49
@@ -91,6 +103,12 @@ this information to generate correct intermediate buffers.
 
 
 
+
+
+
+
+
+
 .. GENERATED FROM PYTHON SOURCE LINES 60-76
 
 Scalar-Vector Product for GEMM
@@ -118,6 +136,12 @@ original dot-product.
     s = allo.customize(gemm)
 
 
+
+
+
+
+
+
 .. GENERATED FROM PYTHON SOURCE LINES 80-82
 
 We first reorder the inner reduction loop with the middle loop.
@@ -130,6 +154,38 @@ This is used to change the computation order of matrix multiplication.
 
     s.reorder("k", "j")
     print(s.module)
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+    module {
+      func.func @gemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
+        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
+        %cst = arith.constant 0.000000e+00 : f32
+        linalg.fill ins(%cst : f32) outs(%alloc : memref<32x32xf32>)
+        affine.for %arg2 = 0 to 32 {
+          affine.for %arg3 = 0 to 32 {
+            affine.for %arg4 = 0 to 32 {
+              %0 = affine.load %arg0[%arg2, %arg3] {from = "A"} : memref<32x32xf32>
+              %1 = affine.load %arg1[%arg3, %arg4] {from = "B"} : memref<32x32xf32>
+              %2 = arith.mulf %0, %1 : f32
+              %3 = affine.load %alloc[%arg2, %arg4] {from = "C"} : memref<32x32xf32>
+              %4 = arith.addf %3, %2 : f32
+              affine.store %4, %alloc[%arg2, %arg4] {to = "C"} : memref<32x32xf32>
+            } {loop_name = "j"}
+          } {loop_name = "k", op_name = "S_k_0", reduction}
+        } {loop_name = "i", op_name = "S_i_j_0"}
+        return %alloc : memref<32x32xf32>
+      }
+    }
+
+
+
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 87-93
@@ -157,6 +213,46 @@ we can directly use ``<schedule>.<tensor>`` to access a specific tensor in the s
     print(s.module)
 
 
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+    module {
+      func.func @gemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
+        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
+        %cst = arith.constant 0.000000e+00 : f32
+        linalg.fill ins(%cst : f32) outs(%alloc : memref<32x32xf32>)
+        affine.for %arg2 = 0 to 32 {
+          %alloc_0 = memref.alloc() : memref<32xf32>
+          affine.for %arg3 = 0 to 32 {
+            affine.store %cst, %alloc_0[%arg3] : memref<32xf32>
+          } {buffer, loop_name = "j_init", pipeline_ii = 1 : i32}
+          affine.for %arg3 = 0 to 32 {
+            affine.for %arg4 = 0 to 32 {
+              %0 = affine.load %arg0[%arg2, %arg3] {from = "A"} : memref<32x32xf32>
+              %1 = affine.load %arg1[%arg3, %arg4] {from = "B"} : memref<32x32xf32>
+              %2 = arith.mulf %0, %1 : f32
+              %3 = affine.load %alloc_0[%arg4] : memref<32xf32>
+              %4 = arith.addf %3, %2 : f32
+              affine.store %4, %alloc_0[%arg4] : memref<32xf32>
+            } {loop_name = "j"}
+          } {loop_name = "k", op_name = "S_k_0", reduction}
+          affine.for %arg3 = 0 to 32 {
+            %0 = affine.load %alloc_0[%arg3] : memref<32xf32>
+            affine.store %0, %alloc[%arg2, %arg3] : memref<32x32xf32>
+          } {buffer, loop_name = "j_back", pipeline_ii = 1 : i32}
+        } {loop_name = "i", op_name = "S_i_j_0"}
+        return %alloc : memref<32x32xf32>
+      }
+    }
+
+
+
+
+
 .. GENERATED FROM PYTHON SOURCE LINES 104-108
 
 From the above generated code, we can see that Allo automatically
@@ -177,6 +273,46 @@ Lastly, we pipeline the ``j`` loop in order to achieve the best performance.
     print(s.module)
 
 
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+    module {
+      func.func @gemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
+        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
+        %cst = arith.constant 0.000000e+00 : f32
+        linalg.fill ins(%cst : f32) outs(%alloc : memref<32x32xf32>)
+        affine.for %arg2 = 0 to 32 {
+          %alloc_0 = memref.alloc() : memref<32xf32>
+          affine.for %arg3 = 0 to 32 {
+            affine.store %cst, %alloc_0[%arg3] : memref<32xf32>
+          } {buffer, loop_name = "j_init", pipeline_ii = 1 : i32}
+          affine.for %arg3 = 0 to 32 {
+            affine.for %arg4 = 0 to 32 {
+              %0 = affine.load %arg0[%arg2, %arg3] {from = "A"} : memref<32x32xf32>
+              %1 = affine.load %arg1[%arg3, %arg4] {from = "B"} : memref<32x32xf32>
+              %2 = arith.mulf %0, %1 : f32
+              %3 = affine.load %alloc_0[%arg4] : memref<32xf32>
+              %4 = arith.addf %3, %2 : f32
+              affine.store %4, %alloc_0[%arg4] : memref<32xf32>
+            } {loop_name = "j", pipeline_ii = 1 : ui32}
+          } {loop_name = "k", op_name = "S_k_0", reduction}
+          affine.for %arg3 = 0 to 32 {
+            %0 = affine.load %alloc_0[%arg3] : memref<32xf32>
+            affine.store %0, %alloc[%arg2, %arg3] : memref<32x32xf32>
+          } {buffer, loop_name = "j_back", pipeline_ii = 1 : i32}
+        } {loop_name = "i", op_name = "S_i_j_0"}
+        return %alloc : memref<32x32xf32>
+      }
+    }
+
+
+
+
+
 .. GENERATED FROM PYTHON SOURCE LINES 116-121
 
 Codegen for Vivado/Vitis HLS
@@ -192,6 +328,70 @@ Vivado/Vitis HLS code, which will directly returns the generated code as a strin
 
     code = s.build(target="vhls")
     print(code)
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+
+    //===------------------------------------------------------------*- C++ -*-===//
+    //
+    // Automatically generated file for High-level Synthesis (HLS).
+    //
+    //===----------------------------------------------------------------------===//
+    #include <algorithm>
+    #include <ap_axi_sdata.h>
+    #include <ap_fixed.h>
+    #include <ap_int.h>
+    #include <hls_math.h>
+    #include <hls_stream.h>
+    #include <hls_vector.h>
+    #include <math.h>
+    #include <stdint.h>
+    using namespace std;
+    /// This is top function.
+    void gemm(
+      float v0[32][32],
+      float v1[32][32],
+      float v2[32][32]
+    ) {     // L2
+      for (int v3 = 0; v3 < 32; v3++) {     // L5
+        for (int v4 = 0; v4 < 32; v4++) {   // L5
+          v2[v3][v4] = 0.000000f;   // L5
+        }
+      }
+      l_S_i_j_0_i: for (int i = 0; i < 32; i++) {   // L6
+        float v5[32];       // L7
+        l_j_init: for (int j_init = 0; j_init < 32; j_init++) {     // L8
+        #pragma HLS pipeline II=1
+          v5[j_init] = 0.000000f;   // L9
+        }
+        l_S_k_0_k: for (int k = 0; k < 32; k++) {   // L11
+          l_j: for (int j = 0; j < 32; j++) {       // L12
+          #pragma HLS pipeline II=1
+            float v6 = v0[i][k];    // L13
+            float v7 = v1[k][j];    // L14
+            float v8 = v6 * v7;     // L15
+            float v9 = v5[j];       // L16
+            float v10 = v9 + v8;    // L17
+            v5[j] = v10;    // L18
+          }
+        }
+        l_j_back: for (int j_back = 0; j_back < 32; j_back++) {     // L21
+        #pragma HLS pipeline II=1
+          float v11 = v5[j_back];   // L22
+          v2[i][j_back] = v11;      // L23
+        }
+      }
+    }
+
+
+
+
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 126-136
@@ -226,6 +426,12 @@ the HLS project and invoke the compiler to generate the RTL design.
 
 
     mod = s.build(target="vitis_hls", mode="hw_emu", project="gemm.prj")
+
+
+
+
+
+
 
 
 
@@ -323,6 +529,11 @@ you can check the following files:
 - ``gemm.prj/_x.hw.xilinx_u280_gen3x16_xdma_1_202211_1/reports/link/imp/impl_1_slr_util_routed.rpt``: The per SLR utilization report after placement and routing.
 - ``gemm.prj/_x.hw.xilinx_u280_gen3x16_xdma_1_202211_1/logs/gemm/gemm_vitis_hls.log``: The log file of the Vitis HLS.
 - ``gemm.prj/_x.hw.xilinx_u280_gen3x16_xdma_1_202211_1/logs/link/v++.log``: The log file of the Vivado backend synthesis.
+
+
+.. rst-class:: sphx-glr-timing
+
+   **Total running time of the script:** (0 minutes 0.109 seconds)
 
 
 .. _sphx_glr_download_gallery_tutorial_02_vhls.py:
