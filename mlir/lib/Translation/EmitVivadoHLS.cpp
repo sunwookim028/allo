@@ -2578,6 +2578,12 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
     // https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Rewinding-Pipelined-Loops-for-Performance
     if (op->hasAttr("rewind"))
       os << " rewind";
+    // stp (Vitis's default), flp or frp. A flushable pipeline (flp) keeps
+    // draining earlier iterations while a later one waits on a blocking
+    // stream read; under stp the whole pipeline freezes, which deadlocks a
+    // process that puts a request and gets its response in one loop.
+    if (auto style = op->getAttrOfType<StringAttr>("pipeline_style"))
+      os << " style=" << style.getValue();
     os << "\n";
     addIndent();
   }

@@ -803,7 +803,7 @@ class Schedule:
         allo_d.ReshapeOp(memref_type, target.result, ip=self.ip)
 
     @wrapped_apply
-    def pipeline(self, axis, initiation_interval=1, rewind=False):
+    def pipeline(self, axis, initiation_interval=1, rewind=False, style=None):
         """
         Pipelines a loop with index `axis` into `initiation_interval` stages.
 
@@ -818,8 +818,20 @@ class Schedule:
         rewind: bool
             If true, rewinding is allowed, allowing continuous loop pipelining.
             This is only effective for perfect loop nests inside a top level function.
+
+        style: str | None
+            Vitis's pipeline control style: ``"stp"`` (stall, the default),
+            ``"flp"`` (flushable) or ``"frp"`` (free-running); emitted as
+            ``#pragma HLS pipeline ... style=<style>`` (Vivado/Vitis HLS only).
+            A process that puts a request on one stream and gets the response
+            on another inside one pipelined loop deadlocks in RTL under
+            ``stp`` -- the blocked read of a later iteration freezes the
+            earlier iteration's put -- and runs under ``flp``. Neither the
+            dataflow simulator nor csim can show the difference.
         """
 
+        if style is not None and style not in ("stp", "flp", "frp"):
+            raise AlloValueError(f"pipeline: style {style!r} is not stp/flp/frp")
         i32 = IntegerType.get_unsigned(32)
         ii = IntegerAttr.get(i32, initiation_interval)
         func, axis = self._get_func_and_axis(axis)
@@ -828,6 +840,10 @@ class Schedule:
             self.get_loops(func)[band_name][axis].loop.attributes[
                 "rewind"
             ] = UnitAttr.get()
+        if style is not None:
+            self.get_loops(func)[band_name][axis].loop.attributes[
+                "pipeline_style"
+            ] = StringAttr.get(style)
         self.get_loops(func)[band_name][axis].loop.attributes["pipeline_ii"] = ii
 
     @wrapped_apply
