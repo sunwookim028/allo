@@ -251,10 +251,11 @@ so do not hardcode names here).</p></li>
 <td><p>cornell-zhang</p></td>
 <td><p>Fork integration branch: upstream plus
 fork-local features. <strong>Not</strong> a mirror of
-upstream — 130 ahead, 0 behind
-<code class="docutils literal notranslate"><span class="pre">upstream/main</span></code> (<code class="docutils literal notranslate"><span class="pre">094ab413</span></code>,
-upstream #612) as of the 2026-09-19
-reconciliation merge <code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code>.</p></td>
+upstream — 0 behind <code class="docutils literal notranslate"><span class="pre">upstream/main</span></code>
+(<code class="docutils literal notranslate"><span class="pre">094ab413</span></code>, upstream #612) since the
+2026-09-19 reconciliation merge
+<code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code>. Holds the one design,
+TinyTPU-isa, and the docs source.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">upstream</span></code></p></td>
 <td><p>cornell-zhang</p></td>
@@ -265,11 +266,28 @@ against it to see what the fork carries.
 <strong>Rebasing main onto it is never</strong>
 <strong>automatic — it is an explicit call.</strong></p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chia-isa</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">main</span></code></p></td>
+<td><p>CHIA agentic co-design, retargeted at
+TinyTPU-isa: harness, sandboxed
+evaluator, GCP pre-flight gate. Lands on
+<code class="docutils literal notranslate"><span class="pre">main</span></code> once a paid run proves it.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">impact-limits</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">main</span></code></p></td>
+<td><p>The measured design variants behind the
+gap attribution (919 -&gt; 686). The docs
+link to it; it is folded into <code class="docutils literal notranslate"><span class="pre">main</span></code>
+and then deleted.</p></td>
+</tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">kkkaishao/allo</span></code> (ACT)</p></td>
-<td><p>The CHIA / TinyTPU co-design artifact. A
-separate codebase, not a feature branch
-— see below.</p></td>
+<td><p><strong>Retired 2026-09-19</strong>, tag
+<code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code> (<code class="docutils literal notranslate"><span class="pre">629c2767</span></code>).
+Kept on origin read-only: the superseded
+fp32 TinyTPU, Kai Shao’s imported work
+(its <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code>) and the CHIA
+run history. No worktree. See below.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">upstream-omp-team-size</span></code></p></td>
 <td><p>cornell-zhang</p></td>
@@ -281,8 +299,8 @@ above.</p></td>
 </tr>
 </tbody>
 </table>
-<p><code class="docutils literal notranslate"><span class="pre">main</span></code> and <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> are the long-lived working branches; <code class="docutils literal notranslate"><span class="pre">upstream</span></code> is
-just the mirror. Exploration branches come and go under the rule in
+<p><code class="docutils literal notranslate"><span class="pre">main</span></code> is the one long-lived working branch; <code class="docutils literal notranslate"><span class="pre">upstream</span></code> is just the mirror,
+and <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> holds the published site. <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> is retired. Exploration branches come and go under the rule in
 “Where work lands” below.
 <code class="docutils literal notranslate"><span class="pre">fix/vhls-mlir-percent-alloc-csim</span></code> is gone: upstream PR #554 merged and is now
 the tip of <code class="docutils literal notranslate"><span class="pre">upstream/main</span></code>.</p>
@@ -353,10 +371,8 @@ maintained separately and are not expected to converge</strong>; the upstream-me
 procedure above applies to <code class="docutils literal notranslate"><span class="pre">main</span></code> only. <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> carries its own
 frontmatter (<code class="docutils literal notranslate"><span class="pre">CODESIGN.md</span></code>) and checkpoint (<code class="docutils literal notranslate"><span class="pre">notes/CHIA_CHECKPOINT.md</span></code>).
 <strong>Neither file exists on</strong> <code class="docutils literal notranslate"><span class="pre">main</span></code> – do not go looking for them in this tree.
-They live on the <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> branch; on this host that is the worktree at
-<code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt</span></code>, so the checkpoint reads as
-<code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt/notes/CHIA_CHECKPOINT.md</span></code> (or
-<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span> <span class="pre">chia-codesign:notes/CHIA_CHECKPOINT.md</span></code>).</p>
+They live on the retired <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> branch, which has no worktree any
+more: read them with <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span> <span class="pre">chia-codesign-final:notes/CHIA_CHECKPOINT.md</span></code>.</p>
 </section>
 </section>
 <section id="project-state">

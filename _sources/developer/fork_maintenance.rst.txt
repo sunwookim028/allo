@@ -52,10 +52,11 @@ Branch layout (as of 2026-09-19)
 +============================+==========================+==========================================+
 | ``main``                   | cornell-zhang            | Fork integration branch: upstream plus   |
 |                            |                          | fork-local features. **Not** a mirror of |
-|                            |                          | upstream — 130 ahead, 0 behind           |
-|                            |                          | ``upstream/main`` (``094ab413``,         |
-|                            |                          | upstream #612) as of the 2026-09-19      |
-|                            |                          | reconciliation merge ``dc6b8fa6``.       |
+|                            |                          | upstream — 0 behind ``upstream/main``    |
+|                            |                          | (``094ab413``, upstream #612) since the  |
+|                            |                          | 2026-09-19 reconciliation merge          |
+|                            |                          | ``dc6b8fa6``. Holds the one design,      |
+|                            |                          | TinyTPU-isa, and the docs source.        |
 +----------------------------+--------------------------+------------------------------------------+
 | ``upstream``               | cornell-zhang            | Mirror of ``upstream/main``, tracking    |
 |                            |                          | the ``upstream`` remote. Refresh it to   |
@@ -64,9 +65,22 @@ Branch layout (as of 2026-09-19)
 |                            |                          | **Rebasing main onto it is never**       |
 |                            |                          | **automatic — it is an explicit call.**  |
 +----------------------------+--------------------------+------------------------------------------+
-| ``chia-codesign``          | ``kkkaishao/allo`` (ACT) | The CHIA / TinyTPU co-design artifact. A |
-|                            |                          | separate codebase, not a feature branch  |
-|                            |                          | — see below.                             |
+| ``chia-isa``               | ``main``                 | CHIA agentic co-design, retargeted at    |
+|                            |                          | TinyTPU-isa: harness, sandboxed          |
+|                            |                          | evaluator, GCP pre-flight gate. Lands on |
+|                            |                          | ``main`` once a paid run proves it.      |
++----------------------------+--------------------------+------------------------------------------+
+| ``impact-limits``          | ``main``                 | The measured design variants behind the  |
+|                            |                          | gap attribution (919 -> 686). The docs   |
+|                            |                          | link to it; it is folded into ``main``   |
+|                            |                          | and then deleted.                        |
++----------------------------+--------------------------+------------------------------------------+
+| ``chia-codesign``          | ``kkkaishao/allo`` (ACT) | **Retired 2026-09-19**, tag              |
+|                            |                          | ``chia-codesign-final`` (``629c2767``).  |
+|                            |                          | Kept on origin read-only: the superseded |
+|                            |                          | fp32 TinyTPU, Kai Shao's imported work   |
+|                            |                          | (its ``ATTRIBUTION.md``) and the CHIA    |
+|                            |                          | run history. No worktree. See below.     |
 +----------------------------+--------------------------+------------------------------------------+
 | ``upstream-omp-team-size`` | cornell-zhang            | One commit on ``upstream/main``:         |
 |                            |                          | upstream draft PR #611 (simulator OpenMP |
@@ -75,8 +89,8 @@ Branch layout (as of 2026-09-19)
 |                            |                          | above.                                   |
 +----------------------------+--------------------------+------------------------------------------+
 
-``main`` and ``chia-codesign`` are the long-lived working branches; ``upstream`` is
-just the mirror. Exploration branches come and go under the rule in
+``main`` is the one long-lived working branch; ``upstream`` is just the mirror,
+and ``gh-pages`` holds the published site. ``chia-codesign`` is retired. Exploration branches come and go under the rule in
 "Where work lands" below.
 ``fix/vhls-mlir-percent-alloc-csim`` is gone: upstream PR #554 merged and is now
 the tip of ``upstream/main``.
@@ -143,10 +157,8 @@ maintained separately and are not expected to converge**; the upstream-merge
 procedure above applies to ``main`` only. ``chia-codesign`` carries its own
 frontmatter (``CODESIGN.md``) and checkpoint (``notes/CHIA_CHECKPOINT.md``).
 **Neither file exists on** ``main`` -- do not go looking for them in this tree.
-They live on the ``chia-codesign`` branch; on this host that is the worktree at
-``/home/sk3463/allo-chia-wt``, so the checkpoint reads as
-``/home/sk3463/allo-chia-wt/notes/CHIA_CHECKPOINT.md`` (or
-``git show chia-codesign:notes/CHIA_CHECKPOINT.md``).
+They live on the retired ``chia-codesign`` branch, which has no worktree any
+more: read them with ``git show chia-codesign-final:notes/CHIA_CHECKPOINT.md``.
 
 Project state
 -------------
