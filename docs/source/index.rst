@@ -77,6 +77,7 @@ Allo is an Accelerator Design Language (ADL) and compiler that facilitates the c
    designs/gemmini_comparison.rst
    designs/tinytpu_history.rst
    designs/minitpu.rst
+   designs/alignment.rst
    designs/design_space.rst
 
 
