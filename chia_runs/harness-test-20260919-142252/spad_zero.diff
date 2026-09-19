@@ -1,0 +1,11 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -746,7 +746,7 @@
+         rather than as two sub-loops the scheduler has to serialize. One
+         `spad` read and one `spad` write per iteration is what a dual-port
+         BRAM gives, so this still schedules at II=1."""
+-        spad: UInt(VW)[SPAD_ROWS]
++        spad: UInt(VW)[SPAD_ROWS] = 0
+         nw: UInt(64) = c_spm.get()
+         n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+                                     # and the top bit of a slice is its sign,

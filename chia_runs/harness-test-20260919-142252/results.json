@@ -1,0 +1,435 @@
+{
+ "phases": [
+  "e",
+  "c",
+  "d",
+  "abf",
+  "loop",
+  "accept"
+ ],
+ "seconds": 1335,
+ "head": "8906de004c2ba75615d824374f6ceeb7a197ab66",
+ "results": [
+  {
+   "case": "e.tool-surface",
+   "expected": "exactly the 7 spec tools",
+   "actual": [
+    "tpta_apply_spec_patch",
+    "tpta_insert_after",
+    "tpta_read_reference",
+    "tpta_read_spec",
+    "tpta_replace_text",
+    "tpta_run_functional_check",
+    "tpta_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "e.patch cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch microarch_isa.py + cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text absolute repo path",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.insert_after bench_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'cosim', which is not allow\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: from examples ... import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'examples.accelerator.tinyt\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import subprocess",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'subprocess', which is not \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: open() write",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses 'open'. Describe hardware; do \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: __import__",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '__import__'. Describe hardwar\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: sys.modules",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.modules'; microarch_isa.py: \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: numpy.savetxt over stress.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.savetxt'. Describe hardware;\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: ndarray.tofile over stress.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.tofile'. Describe hardware; \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.read_reference outside the list",
+   "expected": "Unknown reference",
+   "actual": "Unknown reference; choose one of ['COMPARISON.md', 'RESULTS_",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk import cosim -> evaluator",
+   "expected": "ok=false at stage policy",
+   "actual": "ok=False stage=policy",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk narrow16 + numpy.savetxt over stress.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.savetxt'\n{\"frozen_ref\": \"8906de004c2ba75615d824374f6ceeb7a197ab66\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.1, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + ndarray.tofile over stress.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.tofile'\n{\"frozen_ref\": \"8906de004c2ba75615d824374f6ceeb7a197ab66\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.1, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.forged cosim.py/stress.py in spec dir",
+   "expected": "ignored: real stress 60/60",
+   "actual": "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)",
+   "pass": true
+  },
+  {
+   "case": "e.sandbox",
+   "expected": "only the work dir (not tree/repo/evaluator/home) writable",
+   "actual": "writable=['/home/sk3463/allo-chia-isa/.chia_scratch/harness-test-20260919-142252/sandbox-probe/isa_sweep.prj']",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16",
+   "expected": "edit accepted; bench_isa passes; REJECTED at gate:stress",
+   "actual": "'Replaced 1 occurrence in microarch_isa.py.'; ok=False stage=gate:stress stress=STRESS FAILED: 40/60",
+   "pass": true
+  },
+  {
+   "case": "d.deadlock",
+   "expected": "REJECTED at gate:bench_isa by the 240s timeout",
+   "actual": "ok=False stage=gate:bench_isa after 241s, timeout-in-detail=True",
+   "pass": true
+  },
+  {
+   "case": "d.no-orphans",
+   "expected": "no process left under the work dir",
+   "actual": "none",
+   "pass": true
+  },
+  {
+   "case": "d.server-responsive",
+   "expected": "read_spec < 5 s during the hung gate",
+   "actual": "worst 0.44s",
+   "pass": true
+  },
+  {
+   "case": "f.same-tool-concurrent-gates",
+   "expected": "both ok (serialised on one work dir)",
+   "actual": "ok=True,True in 24s",
+   "pass": true
+  },
+  {
+   "case": "a.noop",
+   "expected": "ok, cycles == {'4x4x4': 252, '16x16x16': 919}",
+   "actual": "ok=True {'16x16x16': 919, '4x4x4': 252}",
+   "pass": true,
+   "verdict": {
+    "cosim_seconds": 140.1,
+    "cycles": {
+     "16x16x16": 919,
+     "4x4x4": 252
+    },
+    "frozen_ref": "8906de004c2ba75615d824374f6ceeb7a197ab66",
+    "gate": {
+     "bench_isa": "ALL EXACT",
+     "seconds": 10.1,
+     "stress": "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)"
+    },
+    "invariants": {
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "T": 4
+    },
+    "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+    "ok": true,
+    "sandbox": true,
+    "seconds": 151.3,
+    "shapes": [
+     "4x4x4",
+     "16x16x16"
+    ],
+    "synth": {
+     "area": {
+      "bram_18k": 42,
+      "dsp": 15,
+      "ff": 14888,
+      "lut": 19966,
+      "uram": 0
+     },
+     "estimated_ns": 2.431,
+     "target_ns": 3.33
+    },
+    "total_cycles": 1171
+   }
+  },
+  {
+   "case": "b.spad_zero",
+   "expected": "ok (bit-exact at both shapes), every shape WORSE",
+   "actual": "ok=True {'16x16x16': 1280, '4x4x4': 661} (delta {'16x16x16': 361, '4x4x4': 409})",
+   "pass": true,
+   "verdict": {
+    "cosim_seconds": 141.8,
+    "cycles": {
+     "16x16x16": 1280,
+     "4x4x4": 661
+    },
+    "frozen_ref": "8906de004c2ba75615d824374f6ceeb7a197ab66",
+    "gate": {
+     "bench_isa": "ALL EXACT",
+     "seconds": 10.3,
+     "stress": "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)"
+    },
+    "invariants": {
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "T": 4
+    },
+    "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+    "ok": true,
+    "sandbox": true,
+    "seconds": 153.3,
+    "shapes": [
+     "4x4x4",
+     "16x16x16"
+    ],
+    "synth": {
+     "area": {
+      "bram_18k": 42,
+      "dsp": 15,
+      "ff": 14902,
+      "lut": 20090,
+      "uram": 0
+     },
+     "estimated_ns": 2.431,
+     "target_ns": 3.33
+    },
+    "total_cycles": 1941
+   }
+  },
+  {
+   "case": "f.server-responsive",
+   "expected": "read_spec < 5 s during two cosims",
+   "actual": "worst 0.07s over 153s",
+   "pass": true
+  },
+  {
+   "case": "f.no-cross-contamination",
+   "expected": "distinct work dirs, distinct results",
+   "actual": "A={'16x16x16': 919, '4x4x4': 252} B={'16x16x16': 1280, '4x4x4': 661} A-logs=['cosim_16x16x16.log', 'cosim_4x4x4.log']",
+   "pass": true
+  },
+  {
+   "case": "loop.fake-model",
+   "expected": "5 scripted sessions consumed, no errors",
+   "actual": "5 sessions, errors=[]",
+   "pass": true
+  },
+  {
+   "case": "loop.baseline",
+   "expected": "cycles == {'4x4x4': 252, '16x16x16': 919}",
+   "actual": {
+    "16x16x16": 919,
+    "4x4x4": 252
+   },
+   "pass": true
+  },
+  {
+   "case": "a.noop via opencode score_cycles (mid-turn MCP)",
+   "expected": "{'4x4x4': 252, '16x16x16': 919}, returned after > 60 s",
+   "actual": "{'16x16x16': 919, '4x4x4': 252} after 154.8s",
+   "pass": true
+  },
+  {
+   "case": "loop.iter1 no-op",
+   "expected": "not accepted: no diff, not re-scored",
+   "actual": "accepted=False reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "b.spad_zero via loop",
+   "expected": "bit-exact, delta > 0, REJECTED (not better)",
+   "actual": "ok=True {'16x16x16': 1280, '4x4x4': 661} delta=770 accepted=False",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16 via loop",
+   "expected": "REJECTED at gate:stress (after 1 debug session)",
+   "actual": "stage=gate:stress accepted=False",
+   "pass": true
+  },
+  {
+   "case": "e.attacks via opencode",
+   "expected": "every call Rejected; no diff",
+   "actual": "['Rejected: patches may touch only microar', 'Rejected: path must be microarch_isa.py ', 'Rejected: the edit is outside what a spe']; reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "loop.artifacts",
+   "expected": "best.diff empty, summary.json with no best",
+   "actual": "best.diff='' best=None",
+   "pass": true
+  },
+  {
+   "case": "loop.spend",
+   "expected": "$0.00",
+   "actual": "$0.00",
+   "pass": true
+  },
+  {
+   "case": "loop.opencode-tools",
+   "expected": "only the 7 MCP tools advertised to the model",
+   "actual": [
+    "tpuoperandpath_tpuoperandpath_apply_spec_patch",
+    "tpuoperandpath_tpuoperandpath_insert_after",
+    "tpuoperandpath_tpuoperandpath_read_reference",
+    "tpuoperandpath_tpuoperandpath_read_spec",
+    "tpuoperandpath_tpuoperandpath_replace_text",
+    "tpuoperandpath_tpuoperandpath_run_functional_check",
+    "tpuoperandpath_tpuoperandpath_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "accept.spad_zero",
+   "expected": "bit-exact at all 5 shapes, claim=not-better",
+   "actual": "ok=True claim=not-better {'4x4x4': 661, '8x8x8': 776, '12x12x12': 968, '16x16x8': 1028, '16x16x16': 1280}",
+   "pass": true,
+   "accept": {
+    "ref": "8906de004c2ba75615d824374f6ceeb7a197ab66",
+    "diff": "/home/sk3463/allo-chia-isa/chia_runs/harness-test-20260919-142252/spad_zero.diff",
+    "ok": true,
+    "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset",
+    "policy": [],
+    "checkout_status": [
+     "M examples/accelerator/tinytpu_vitis/microarch_isa.py"
+    ],
+    "allo_resolves_to": "/home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789828789/allo/__init__.py",
+    "sandbox": true,
+    "bench_isa": {
+     "rc": 0,
+     "last": [
+      "ALL EXACT"
+     ],
+     "seconds": 5.1
+    },
+    "stress": {
+     "rc": 0,
+     "last": [
+      "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)"
+     ],
+     "seconds": 5.0
+    },
+    "cosim": {
+     "4x4x4": {
+      "cycles": 661,
+      "tb": "TB 4x4x4 mismatches = 0 / 16"
+     },
+     "8x8x8": {
+      "cycles": 776,
+      "tb": "TB 8x8x8 mismatches = 0 / 64"
+     },
+     "12x12x12": {
+      "cycles": 968,
+      "tb": "TB 12x12x12 mismatches = 0 / 144"
+     },
+     "16x16x8": {
+      "cycles": 1028,
+      "tb": "TB 16x16x8 mismatches = 0 / 128"
+     },
+     "16x16x16": {
+      "cycles": 1280,
+      "tb": "TB 16x16x16 mismatches = 0 / 256"
+     }
+    },
+    "cosim_seconds": 266.0,
+    "estimated_ns": 2.431,
+    "baseline": {
+     "4x4x4": 252,
+     "8x8x8": 383,
+     "12x12x12": 591,
+     "16x16x8": 667,
+     "16x16x16": 919
+    },
+    "delta": {
+     "4x4x4": 409,
+     "8x8x8": 393,
+     "12x12x12": 377,
+     "16x16x8": 361,
+     "16x16x16": 361
+    },
+    "delta_total": 1901,
+    "claim": "not-better"
+   }
+  },
+  {
+   "case": "hygiene.no-orphans-at-exit",
+   "expected": "no process under the scratch dir",
+   "actual": "none",
+   "pass": true
+  }
+ ]
+}
