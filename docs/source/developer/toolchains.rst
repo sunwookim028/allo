@@ -135,7 +135,7 @@ LLVM/MLIR builds and worktrees
 ------------------------------
 
 One LLVM build, at the pinned revision
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Since 2026-09-19 there is **one** LLVM/MLIR build that matters:
 ``/home/sk3463/llvm-allo-6b09f739/build`` (LLVM ``22.0.0git`` at ``6b09f739``), the
