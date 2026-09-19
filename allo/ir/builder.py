@@ -281,11 +281,14 @@ class ASTTransformer(ASTBuilder):
             res = tensor_d.ExtractOp(tensor=res, indices=[], ip=ctx.get_ip())
         else:
             res_result = ASTTransformer.get_mlir_op_result(ctx, res)
+            is_unsigned = hasattr(res, "attributes") and "unsigned" in res.attributes
             affine_map = AffineMap.get_identity(0)
             affine_attr = AffineMapAttr.get(affine_map)
             res = affine_d.AffineLoadOp(
                 res_result.type.element_type, res, [], affine_attr, ip=ctx.get_ip()
             )
+            if is_unsigned:
+                res.attributes["unsigned"] = UnitAttr.get()
         return res
 
     @staticmethod
@@ -1744,17 +1747,12 @@ class ASTTransformer(ASTBuilder):
                 index = ASTTransformer.build_cast_op(
                     ctx, index, node.slice.dtype, Index()
                 )
-                get_bit_op = allo_d.GetIntBitOp(
+                return allo_d.GetIntBitOp(
                     node.dtype.build(),
                     value_result,
                     index.result,
                     ip=ctx.get_ip(),
                 )
-                # The extracted bit is a uint1 (see TypeInferer.visit_Subscript).
-                # Signedness travels on the `unsigned` attribute, so it has to
-                # be attached here or the HLS emitters will declare it signed.
-                get_bit_op.attributes["unsigned"] = UnitAttr.get()
-                return get_bit_op
             else:
                 value_dtype = (
                     node.slice.value.dtype
@@ -1802,21 +1800,16 @@ class ASTTransformer(ASTBuilder):
             )
             # pylint: disable=no-else-return
             if isinstance(node.ctx, ast.Load):
-                get_slice_op = allo_d.GetIntSliceOp(
+                op = allo_d.GetIntSliceOp(
                     node.dtype.build(),
                     value_result,
                     upper.result,
                     lower.result,
                     ip=ctx.get_ip(),
                 )
-                # A bit slice is always UInt(stride) (see
-                # TypeInferer.visit_Subscript), LowerBitOps lowers it with
-                # logical shifts, and build_cast_op widens it with ExtUIOp.
-                # Signedness travels on the `unsigned` attribute, so without
-                # this the HLS emitters declare the slice as ap_int<N> and a
-                # field with its top bit set reads back negative.
-                get_slice_op.attributes["unsigned"] = UnitAttr.get()
-                return get_slice_op
+                # every integer bit slice is unsigned
+                op.attributes["unsigned"] = UnitAttr.get()
+                return op
             else:  # ast.Store
                 set_slice_op = allo_d.SetIntSliceOp(
                     node.value.dtype.build(),
