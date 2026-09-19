@@ -315,6 +315,31 @@ OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
 OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
 OP_ENDLOOP = 9    # close the innermost loop
 
+# ---- THE WRITE-BEFORE-READ CONTRACT (`mm` acc, `vadd`, `vrelu`, `mvout`) ----
+# `spad`, `vr` and `ar` are NOT cleared by the hardware. Their `= 0`
+# initialisers were removed to delete a 514-cycle memset, so at `ap_start`
+# each holds whatever the previous invocation (or power-up) left there. The
+# guarantee moved from the hardware to the program:
+#
+#   * `mm` with f2=1 (accumulate), `vadd` (both sources), `vrelu` (source) and
+#     `mvout` read `ar` rows, and every such row must have been written earlier
+#     in the SAME program -- by an overwriting `mm` (f2=0), a `vadd` or a
+#     `vrelu`. `ar` is the accumulator; reading it early is a wrong answer,
+#     not a crash.
+#   * `mm` reads `vr` (T weight rows at f3, `nr` activation rows at f0); those
+#     rows must hold data that came from a `dma_ld` via `vld`.
+#   * `vld` is a pure copy and MAY copy an unwritten `spad` row -- the shipped
+#     GEMM does, when M < MAXDIM it moves whole MAXDIM-row blocks -- but the
+#     copy is then unwritten too, and consuming it in an `mm` is an error.
+#
+# `rbA`/`rbB` (dma_ld's burst buffers) and `ib` (the sequencer's program
+# buffer) are also unzeroed but cannot be read early: `ib` is filled by an
+# unconditional IMEM_SIZE-word burst, and the A/B spans are computed by
+# `assemble()` from the same resolved trace that names the rows `dma_ld` reads.
+#
+# `check_program()` below enforces all of this statically, and `assemble()`
+# calls it, so a program that violates the contract cannot be assembled.
+
 
 LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's loop stack
 IWORDS = 2                     # an instruction is two 64-bit words
@@ -1270,7 +1295,13 @@ def expand(prog):
     two forms must now agree on every resolved address, not just on the opcode
     and row-count stream.
     """
-    ops = []
+    return [e[2:] for e in _trace(prog)]
+
+
+def _trace(prog):
+    """`expand`, with where each dynamic issue came from: yields
+    `(pc, ivs, op, nr, f0, f1, f2, f3)`, `ivs` the live induction variables.
+    The one place the assembler mirrors the sequencer's control flow."""
     pc = 0
     stack = []
     iv_now = [0] * LOOP_DEPTH
@@ -1304,12 +1335,153 @@ def expand(prog):
                 st = (w1 >> (base + 7)) & 0xFFF
                 if tw != 0:
                     f[tw - 1] += iv_now[lw] * st
-            ops.append((op, (w0 >> 54) & 0xFF, f[0], f[1], f[2], f[3]))
+            yield (pc, tuple(iv_now[:len(stack)]), op, (w0 >> 54) & 0xFF,
+                   f[0], f[1], f[2], f[3])
             pc += 1
-    return ops
 
 
-def assemble(prog):
+class ProgramError(ValueError):
+    """A program the hardware would run to a wrong answer, or a hang."""
+
+
+_OPNAME = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
+           OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
+           OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop"}
+
+
+def check_program(prog):
+    """Reject a program the hardware cannot run correctly. Called by `assemble`.
+
+    **Static, and exact rather than conservative.** The program has no
+    data-dependent control flow -- trip counts and AGU strides are instruction
+    fields -- so the dynamic instruction stream is a pure function of the
+    program text, and walking it (`_trace`, the same walk that computes the
+    header) visits every issue the sequencer will make with the addresses it
+    will resolve. There is no loop abstraction to get wrong.
+
+    What it checks, per dynamic issue:
+
+      * **write-before-read** on `spad`, `vr` and `ar` -- the contract at the
+        opcode table. Written-ness is tracked per row and propagated through
+        `vld` (a copy of an unwritten row is unwritten); it is an error only
+        where a value is *consumed*: `mm` reading `vr`, and `mm`-acc / `vadd` /
+        `vrelu` / `mvout` reading `ar`.
+      * **bounds** on every memory and on `C`/`A`/`B`: an out-of-range row is
+        silent corruption in RTL, not an exception.
+      * **`nr >= 1`** on every data op. `dma_ld`, `spm`, `vru` and `dma_st` run
+        one flat loop over the SUM of their rows and fetch an instruction
+        whenever the row counter runs out, so a zero-row instruction is
+        fetched as if it had one row -- it desynchronises the unit, it is not
+        a no-op.
+      * resolved fields below 2^11, the range `enc` admits (the encoding
+        note at the top). The sequencer writes the resolved sum back into the
+        12-bit field, so an AGU term can push a field past what `enc` would
+        have accepted; this is the only place that can see it.
+      * structure: balanced loops, depth <= LOOP_DEPTH, trip >= 1 (the
+        sequencer is a do-while), AGU terms naming a loop that is open, no
+        retired opcode, `mm` f2 in {0, 1}, `dma_ld` source in {0, 1}.
+
+    Raises `ProgramError` naming the static instruction, the loop iteration,
+    and the rows; returns None."""
+    if not prog:
+        raise ProgramError("empty program")
+    depth = 0
+    for pc, (w0, w1) in enumerate(prog):
+        op = w0 & 0x3F
+        name = _OPNAME.get(op)
+        where = f"instruction {pc} ({name or f'opcode {op}'})"
+        if name is None or op == OP_DMA_ST:
+            raise ProgramError(f"{where}: not an opcode this machine executes")
+        if op == OP_LOOP:
+            if depth >= LOOP_DEPTH:
+                raise ProgramError(f"{where}: nesting exceeds LOOP_DEPTH={LOOP_DEPTH}")
+            if (w0 >> 54) & 0xFF < 1:
+                raise ProgramError(f"{where}: trip count 0 still runs the body once")
+            depth += 1
+        elif op == OP_ENDLOOP:
+            if depth == 0:
+                raise ProgramError(f"{where}: endloop with no open loop")
+            depth -= 1
+        for t in range(AGU_TERMS):
+            tw = (w1 >> (19 * t)) & 0xF
+            lw = (w1 >> (19 * t + 4)) & 0x7
+            if tw == 0:
+                continue
+            if op in (OP_LOOP, OP_ENDLOOP, OP_NOP) or tw > 4 or lw >= depth:
+                raise ProgramError(
+                    f"{where}: AGU term {t} targets field {tw - 1} with loop "
+                    f"level {lw}, but {depth} loop(s) are open here -- the "
+                    f"sequencer would use a stale iv_now[{lw}]")
+    if depth:
+        raise ProgramError(f"{depth} loop(s) never closed")
+
+    written = {"spad": [False] * SPAD_ROWS, "vr": [False] * NVR,
+               "ar": [False] * NAR}
+    size = {"spad": SPAD_ROWS, "vr": NVR, "ar": NAR}
+
+    for pc, ivs, op, nr, f0, f1, f2, f3 in _trace(prog):
+        where = (f"instruction {pc} ({_OPNAME[op]}"
+                 + (f", loop ivs {list(ivs)}" if ivs else "") + ")")
+
+        def span(mem, base, n):
+            if base < 0 or base + n > size[mem]:
+                raise ProgramError(f"{where}: {mem} rows {base}..{base + n - 1} "
+                                   f"outside 0..{size[mem] - 1}")
+            return range(base, base + n)
+
+        def need(mem, rows, what):
+            bad = [r for r in rows if not written[mem][r]]
+            if bad:
+                raise ProgramError(
+                    f"{where}: reads {mem} row(s) {bad} as {what} before any "
+                    f"instruction wrote them. {mem} is not cleared by the "
+                    f"hardware; see the write-before-read contract.")
+
+        if op == OP_NOP:
+            continue
+        for v, fld in ((f0, "f0"), (f1, "f1"), (f2, "f2"), (f3, "f3")):
+            if v >= 1 << 11:
+                raise ProgramError(f"{where}: AGU-resolved {fld}={v} is "
+                                   f"outside the 0..2047 range `enc` admits")
+        if nr < 1:
+            raise ProgramError(f"{where}: nr=0 desynchronises the unit's "
+                               f"flat row loop; drop the instruction instead")
+        if op == OP_DMA_LD:
+            if f0 not in (0, 1):
+                raise ProgramError(f"{where}: source f0={f0}, must be 0 (A) or 1 (B)")
+            if f2 >= WPR or f1 + nr > MAXDIM:
+                raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
+                                   f"col block {f2} outside the {MAXDIM}x{MAXDIM} operand")
+            for r in span("spad", f3, nr):
+                written["spad"][r] = True
+        elif op == OP_VLD:
+            src = span("spad", f1, nr)
+            for d, s in zip(span("vr", f0, nr), src):
+                written["vr"][d] = written["spad"][s]
+        elif op == OP_MM:
+            if f2 not in (0, 1):
+                raise ProgramError(f"{where}: f2={f2}, must be 0 (overwrite) or 1 (accumulate)")
+            need("vr", span("vr", f3, T), "weights")
+            need("vr", span("vr", f0, nr), "activations")
+            dst = span("ar", f1, nr)
+            if f2 == 1:
+                need("ar", dst, "the accumulate base")
+            for r in dst:
+                written["ar"][r] = True
+        elif op in (OP_VADD, OP_VRELU):
+            srcs = [span("ar", f1, nr)] + ([span("ar", f2, nr)] if op == OP_VADD else [])
+            dst = span("ar", f0, nr)
+            for i, d in enumerate(dst):      # row by row, as `accu` runs it
+                need("ar", [s[i] for s in srcs], "a source")
+                written["ar"][d] = True
+        elif op == OP_MVOUT:
+            need("ar", span("ar", f0, nr), "the value to retire")
+            if f2 >= WPR or f1 + nr > MAXDIM:
+                raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
+                                   f"block {f2} outside the {MAXDIM}x{MAXDIM} result")
+
+
+def assemble(prog, check=True):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
         imem[0] static instruction count   imem[4] mm count | mm rows << 16
@@ -1336,7 +1508,13 @@ def assemble(prog):
     A unit promised the wrong number here does not produce a wrong answer, it
     hangs -- which is worth stating, because it is the one place where the
     assembler and the microarchitecture are coupled.
+
+    Every program goes through `check_program` first. `check=False` exists
+    only so a test can put a known-bad program on the machine and watch it
+    fail; nothing that ships passes it.
     """
+    if check:
+        check_program(prog)
     ev = expand(prog)
 
     def rows(*ops):
