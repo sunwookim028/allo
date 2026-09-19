@@ -1,20 +1,17 @@
 """Smallest end-to-end check that the whole agent path is wired up.
 
-Exercises, in one shot: Application Default Credentials -> Vertex AI -> the
-opencode CLI -> CHIA's Ray actor and MCP tool server -> the TinyTPU tool -> the
-``allo`` conda environment. It asks the model for one tool call and one number,
-so it costs a few cents rather than the few dollars a real candidate costs.
+ADC -> Vertex AI -> opencode -> CHIA's Ray actor and MCP server -> this tool ->
+the frozen evaluator's gate in the `allo` env. One model call that must read
+the spec to answer, so it costs cents, not dollars. No cosim.
 
     python chia_agent/smoke.py
-
-Exit status is 0 only if the model actually reached the tool and came back with
-the instruction count it had to read the spec to know.
 """
 
 from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -23,55 +20,53 @@ import ray
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from allo_tool import AlloSpecTool  # noqa: E402
-from loop import CONDA_EXE, TINYTPU_DIR, ask, make_llm  # noqa: E402
+from loop import (AGENT_DIR, ALLO_PYTHON, LLVM_BUILD_DIR, REPO_ROOT,  # noqa: E402
+                  Budget, ask, make_llm, seed_spec)
 
-# The spec declares these; the model can only answer by calling read_spec.
-EXPECTED = ("dma_load", "dma_store", "vload", "vstore", "vpu", "mxu")
+#: The unit names in microarch_isa.py; the model can only know them by reading.
+EXPECTED = ("sequencer", "dma_ld", "spm", "vru", "accu")
 
 
 def main() -> int:
     if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
         print("FAIL: GOOGLE_CLOUD_PROJECT is unset")
         return 1
-
     started = time.time()
     try:
-        ray.init(address="auto", ignore_reinit_error=True)
+        ray.init(address="auto", ignore_reinit_error=True,
+                 runtime_env={"working_dir": str(AGENT_DIR)})
     except (ConnectionError, ValueError):
-        ray.init(resources={"opencode_creds": 1}, ignore_reinit_error=True)
-
-    tool = AlloSpecTool("tinytpusmoke", str(TINYTPU_DIR), CONDA_EXE)
+        ray.init(resources={"opencode_creds": 1}, ignore_reinit_error=True,
+                 runtime_env={"working_dir": str(AGENT_DIR)})
+    scratch = REPO_ROOT / ".chia_scratch" / "smoke"
+    spec = Path(tempfile.mkdtemp(prefix="spec-", dir=scratch.parent))
+    seed_spec(spec)
+    tool = AlloSpecTool("tpusmoke", str(spec), str(scratch), str(AGENT_DIR),
+                        str(REPO_ROOT), ALLO_PYTHON, LLVM_BUILD_DIR)
     try:
-        print("[1/3] tool server up; checking the allo environment...")
-        compiler = tool.run_compiler_check()
-        if not compiler.startswith("exit=0"):
-            print(f"FAIL: compiler check did not pass\n{compiler[-1500:]}")
+        print("[1/3] tool up; running the frozen gate on the unmodified spec...")
+        v = tool.evaluate(gate_only=True)
+        if not v.get("ok"):
+            print(f"FAIL: gate did not pass\n{v}")
             return 1
-        print("      allo environment OK")
-
-        print("[2/3] asking the model for one tool call (Vertex AI)...")
-        response = ask(
-            make_llm(tool),
-            tool,
-            "Call tinytpusmoke_read_spec exactly once. Then reply with a single "
-            "line listing the names of the @tpu.unit hardware blocks defined in "
-            "microarch.py, comma separated, and nothing else.",
-        )
+        print(f"      gate OK: {v['gate']}")
+        print("[2/3] one model call through the MCP tool (Vertex AI)...")
+        calls = []
+        response = ask(make_llm(tool), tool,
+                       "Call tpusmoke_read_spec exactly once. Then reply with a "
+                       "single line listing the names of the @df.kernel functions "
+                       "defined inside the tinytpu_isa region in microarch_isa.py, "
+                       "comma separated, and nothing else.",
+                       Budget(1.0, int(started * 1000)), "smoke", calls)
         text = str(response.result)
-        print(f"      model replied: {text.strip()[:200]}")
-
+        print(f"      model replied: {text.strip()[:300]}")
         print("[3/3] checking the reply came from the spec...")
-        missing = [unit for unit in EXPECTED if unit not in text]
+        missing = [u for u in EXPECTED if u not in text]
         if missing:
-            print(
-                f"FAIL: reply did not name {missing} - the model may not have "
-                f"reached the tool"
-            )
+            print(f"FAIL: reply did not name {missing}")
             return 1
-        print(
-            f"SMOKE OK ({time.time() - started:.0f}s): "
-            f"ADC -> Vertex -> opencode -> CHIA -> MCP tool -> allo env"
-        )
+        print(f"SMOKE OK ({time.time() - started:.0f}s, "
+              f"${calls[0].get('cost_usd', 0):.3f})")
         return 0
     finally:
         tool.stop()

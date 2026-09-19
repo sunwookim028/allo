@@ -1,22 +1,19 @@
-"""Run several TinyTPU co-design searches at once, then keep the best.
+"""Run several TinyTPU-isa co-design searches at once, then report the best.
 
-One search is bounded by the model, not the tools: an agent turn costs minutes
-while a full synthesize-and-score costs about 50 seconds on one core, so a
-serial loop leaves a 144-core machine essentially idle. Two things serialize it,
-and both are lifted here:
+Each worker gets its own spec directory (a private copy of the two editable
+files, under the run directory), its own evaluation scratch, its own MCP tool
+name, and one framing of the problem. No git worktree is created for a worker:
+the evaluator composes its tree from git plus the spec directory, so a worker
+needs nothing else -- and there is no `git worktree remove --force` at the end to
+delete a worker's `variants.jsonl` along with its checkout, which is how an
+earlier run on chia-codesign had to rescue its logs by hand. Every artefact a
+worker writes is already under `--run-dir`.
 
-* CHIA gates every LLM call on a cluster resource (``opencode_creds``). Start
-  the head with as many units as workers -- see ``--workers``.
-* ``AlloSpecTool`` edits one checkout. Each worker therefore gets its own git
-  worktree, so the writable spec, the HLS project, and the MCP tool name are
-  all per-worker.
+Spend: the cap is global. Each loop refuses to start a model call that would
+pass it (projected from the largest call seen), and this process polls the
+opencode DB and kills every worker outright if the cap is reached anyway.
 
-Running K searches also buys what one search cannot: diversity. A single loop
-is greedy hill-climbing from one incumbent, so it re-treads variants of
-whatever last worked. K searches started on different framings of the problem
-explore different parts of the space, and the best of K is kept.
-
-    python chia_agent/swarm.py --workers 4 --iterations 5
+    python chia_agent/swarm.py --workers 2 --iterations 3 --budget-usd 15
 """
 
 from __future__ import annotations
@@ -24,236 +21,181 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-AGENT_DIR = Path(__file__).resolve().parent
-TINYTPU_DIR = AGENT_DIR.parent
-REPO_ROOT = TINYTPU_DIR.parents[2]
+from spend import spent_since
 
-#: Different framings of the same objective. Each worker gets one, so the
-#: population starts from genuinely different hypotheses rather than from K
-#: samples of one prompt.
+AGENT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = AGENT_DIR.parents[2]
+
+#: Framings of the same objective, each grounded in something measured on this
+#: design (RESULTS_ISA.md / COMPARISON.md). Each worker gets one angle to start
+#: from; none of them is an instruction to make a particular change.
 STRATEGIES = (
     (
-        "dram",
-        """Attack DRAM staging. Synthesis measures dma_load at depth 75 -- the
-m_axi read latency Vitis actually builds -- and the compiler issues one
-dma_load per tile, so that latency is paid over and over. Reduce the NUMBER of
-DRAM transactions: larger blocks, coalesced tiles, or staging a tile once and
-reusing it across the K loop.""",
+        "operand-path",
+        """Look at the operand delivery path spm -> vru -> array. At 16x16x16,
+208 of the 464 words vru handles are overhead rather than MACs, and the 64
+B-side vld words cross vru twice. Gemmini has no vector-register tier between
+its scratchpad and the array. Is the vru tier paying for itself here?""",
     ),
     (
-        "onchip",
-        """Attack the on-chip round trip. Values move BRAM->VREG->compute->VREG->BRAM
-even when a producer and consumer are adjacent. Let MXU and VPU exchange values
-through VREG directly, or otherwise remove a staging hop, without breaking the
-compiler's allocation.""",
+        "weight-prologue",
+        """Look at the per-`mm` weight prologue: every mm instruction first
+pushes T weight words into the array before any MAC, and that prologue is
+serial with the MACs. Gemmini hides the equivalent with double-buffered weight
+registers (preload into one set while computing with the other).""",
     ),
     (
-        "mxu",
-        """Attack the matmul unit itself. Synthesis reports mxu at 72 cycles per
-4x4 tile with ii=2, because its body synthesizes as two sequential passes over
-the tile. Restructure it so the staging pass and the dot-product pass overlap,
-or so one pass is eliminated, to get ii closer to 1.""",
-    ),
-    (
-        "granularity",
-        """Attack instruction granularity. Each instruction pays its unit's full
-pipeline depth, and the benchmarks issue 216 and 1792 instructions. A coarser
-instruction that does more work per issue amortizes that depth. Add or widen
-one instruction so the same computation issues fewer times.""",
+        "accumulator",
+        """Look at the accumulator: its read-add-write into a register file is
+a real recurrence and synthesizes at II=2. An earlier flat-accumulator attempt
+bought 2.3% for 13.7x the flip-flops in that unit and was reverted (audit item
+21 in RESULTS_ISA.md), so weigh area as well as cycles.""",
     ),
 )
 
-BASE_TASK = """Reduce the synthesized cycle count of the tiled GEMM benchmarks.
-Any change must keep the GEMM results numerically correct.
+BASE_TASK = """Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.
+Current cosim cycles (all five shapes, for context): 4x4x4=252, 8x8x8=383,
+12x12x12=591, 16x16x8=667, 16x16x16=919. A matched 4x4 int8 Gemmini, measured
+over the same window, takes 161(or 144)/220/347/391/593, so this design is
+1.55-1.8x slower. The search scores 4x4x4 + 16x16x16; a winner is re-verified
+bit-exact at all five shapes.
 
-Your assigned angle for this search:
+Known, measured, still open (context -- not a list of instructions): vru word
+count (208 of 464 words at 16x16x16 are overhead); the per-mm T-word weight
+prologue (Gemmini double-buffers weights); the accumulator's II=2 recurrence.
+
+Your starting angle:
 {angle}
 """
 
 
-# Worker scratch lives outside the repository, but not under /tmp: a reboot
-# wipes /tmp while leaving the worktree *registrations* behind, so every
-# `git worktree list` afterwards shows checkouts that no longer exist.
-SCRATCH = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "tinytpu"
-
-
-def make_worktree(base: Path, worker: str) -> Path:
-    """A private checkout for one worker, at the current commit."""
-    path = base / f"worker-{worker}"
-    if path.exists():
-        return path
-    subprocess.run(
-        ["git", "worktree", "add", "--detach", str(path), "HEAD"],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-    )
-    return path
-
-
-def drop_worktree(path: Path) -> None:
-    """Unregister a worker checkout. Its findings are already in the run dir."""
-    subprocess.run(
-        ["git", "worktree", "remove", "--force", str(path)],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-    )
-
-
-def launch(
-    worker: str, angle: str, workspace: Path, log_dir: Path, iterations: int
-) -> subprocess.Popen:
-    env = os.environ | {
-        # Each worker evaluates its own copy of the spec.
-        "PYTHONPATH": str(workspace),
-        "TINYTPU_SYNTH_PROJECT": str(SCRATCH / "synth" / worker),
-    }
-    command = [
-        sys.executable,
-        "-u",  # unbuffered, so a long run's progress is visible while it runs
-        str(AGENT_DIR / "loop.py"),
-        "--task",
-        BASE_TASK.format(angle=angle),
-        "--iterations",
-        str(iterations),
-        "--workspace",
-        str(workspace / "examples" / "accelerator" / "tinytpu"),
-        "--tool-name",
-        f"tinytpu{worker}",
-        "--log-dir",
-        str(log_dir),
-    ]
+def launch(worker, angle, run_dir: Path, iterations, budget, t0_ms):
+    log_dir = run_dir / worker
     log_dir.mkdir(parents=True, exist_ok=True)
+    work = REPO_ROOT / ".chia_scratch" / run_dir.name / worker
+    env = os.environ | {"CHIA_RUN_T0_MS": str(t0_ms), "CHIA_BUDGET_USD": str(budget)}
+    command = [sys.executable, "-u", str(AGENT_DIR / "loop.py"),
+               "--task", BASE_TASK.format(angle=angle),
+               "--iterations", str(iterations),
+               "--log-dir", str(log_dir),
+               "--spec-dir", str(log_dir / "spec"),
+               "--work-dir", str(work),
+               "--tool-name", f"tpu{worker.replace('-', '')}"]
     handle = (log_dir / "worker.log").open("w", encoding="utf-8")
-    return subprocess.Popen(
-        command, cwd=workspace, env=env, stdout=handle, stderr=subprocess.STDOUT
-    )
+    return subprocess.Popen(command, cwd=AGENT_DIR, env=env, stdout=handle,
+                            stderr=subprocess.STDOUT, start_new_session=True)
 
 
 def read_variants(log_dir: Path) -> list[dict]:
     path = log_dir / "variants.jsonl"
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
 
-def report(run_dir: Path, workers: list[str]) -> int:
-    """Print each worker's trajectory and the best design across all of them."""
-    baseline = None
-    best = (None, None, None)  # (cycles, worker, entry)
+def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dict:
     print("=" * 78)
-    print("Swarm results")
+    print("Swarm results (all cycle counts are RTL cosim)")
     print("=" * 78)
+    summary = {"workers": {}, "baseline": None, "best": None}
     for worker in workers:
         entries = read_variants(run_dir / worker)
-        if not entries:
-            print(f"  worker {worker}: no results")
-            continue
-        accepted = [e for e in entries if e.get("accepted") and e.get("score")]
         base = next((e for e in entries if e["kind"] == "baseline"), None)
-        if base:
-            baseline = base["score"]["total_cycles"]
-        tried = len([e for e in entries if e["kind"] == "candidate"])
-        kept = [e for e in accepted if e["kind"] == "candidate"]
-        top = min(
-            (e for e in accepted),
-            key=lambda e: e["score"]["total_cycles"],
-            default=None,
-        )
-        cycles = top["score"]["total_cycles"] if top else None
-        print(
-            f"  worker {worker:<12} candidates={tried:<3} accepted={len(kept):<3} "
-            f"best={cycles}"
-        )
-        if cycles is not None and (best[0] is None or cycles < best[0]):
-            best = (cycles, worker, top)
+        if base and base["verdict"].get("ok"):
+            summary["baseline"] = base["verdict"]["cycles"]
+        rows = []
+        for e in entries:
+            if e["kind"] != "candidate":
+                continue
+            v = e["verdict"]
+            rows.append({"iteration": e["iteration"], "accepted": e["accepted"],
+                         "ok": v.get("ok"), "stage": v.get("stage"),
+                         "cycles": v.get("cycles"), "total": v.get("total_cycles"),
+                         "llm_usd": e.get("llm_usd")})
+            print(f"  {worker:<16} iter {e['iteration']}: "
+                  + (f"cosim {v['cycles']} total {v['total_cycles']}"
+                     if v.get("ok") else f"FAILED at {v.get('stage')}")
+                  + f"  {'ACCEPTED' if e['accepted'] else 'rejected'}"
+                  + f"  ${e.get('llm_usd', 0):.2f}")
+            if e["accepted"] and (summary["best"] is None
+                                  or v["total_cycles"] < summary["best"]["total"]):
+                summary["best"] = {"worker": worker, "iteration": e["iteration"],
+                                   "total": v["total_cycles"], "cycles": v["cycles"]}
+        summary["workers"][worker] = rows
+    spend = spent_since(t0_ms)
+    summary["spend"] = spend
+    summary["wall_seconds"] = round(time.time() - started, 1)
+    print(f"\n  baseline {summary['baseline']}")
+    print(f"  best     {summary['best'] or 'no candidate beat the baseline'}")
+    print(f"  spend    ${spend['usd']:.2f} ({spend['messages']} model messages); "
+          f"wall {summary['wall_seconds'] / 60:.1f} min")
+    (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
+    return summary
 
-    if best[0] is None or baseline is None:
-        print("\n  no scored candidate produced")
-        return 1
-    gain = baseline - best[0]
-    print(
-        f"\n  baseline {baseline:.0f} cycles -> best {best[0]:.0f} cycles "
-        f"({gain:+.0f}, {100.0 * gain / baseline:.1f}%) from worker '{best[1]}'"
-    )
-    diff = (best[2] or {}).get("diff") or ""
-    if diff:
-        winner = run_dir / "swarm_best.diff"
-        winner.write_text(diff, encoding="utf-8")
-        print(f"  winning diff: {winner}")
-    return 0
+
+def kill(procs):
+    for _, p in procs:
+        if p.poll() is None:
+            try:
+                os.killpg(p.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", type=int, default=len(STRATEGIES))
-    parser.add_argument("--iterations", type=int, default=5)
-    parser.add_argument(
-        "--run-dir",
-        type=Path,
-        default=REPO_ROOT / "chia_runs" / f"swarm-{time.strftime('%Y%m%d-%H%M%S')}",
-    )
-    parser.add_argument("--worktree-base", type=Path, default=SCRATCH / "worktrees")
-    parser.add_argument(
-        "--keep-worktrees",
-        action="store_true",
-        help="leave the per-worker checkouts in place instead of unregistering them",
-    )
-    parser.add_argument(
-        "--stagger",
-        type=float,
-        default=90.0,
-        help="seconds between worker launches, to spread the initial burst",
-    )
+    parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--iterations", type=int, default=3)
+    parser.add_argument("--budget-usd", type=float, default=15.0)
+    parser.add_argument("--run-dir", type=Path, default=REPO_ROOT / "chia_runs"
+                        / f"isa-{time.strftime('%Y%m%d-%H%M%S')}")
+    parser.add_argument("--stagger", type=float, default=60.0)
     args = parser.parse_args()
-
+    run_dir = args.run_dir.resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
     strategies = list(STRATEGIES)[: args.workers]
-    # Clear registrations whose checkout a previous cleanup or reboot removed,
-    # so `worktree add` below cannot collide with a stale name.
-    subprocess.run(
-        ["git", "worktree", "prune"], cwd=REPO_ROOT, check=False, capture_output=True
-    )
-    args.worktree_base.mkdir(parents=True, exist_ok=True)
-    args.run_dir.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    t0_ms = int(started * 1000)
+    (run_dir / "run.json").write_text(json.dumps({
+        "t0_ms": t0_ms, "workers": [w for w, _ in strategies],
+        "iterations": args.iterations, "budget_usd": args.budget_usd,
+        "model": os.environ.get("TINYTPU_OPENCODE_MODEL"),
+        "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
+                               capture_output=True, text=True).stdout.strip(),
+        "task_template": BASE_TASK, "strategies": dict(strategies)}, indent=1))
 
-    running: list[tuple[str, subprocess.Popen]] = []
-    trees: list[Path] = []
+    procs = []
+    capped = False
     try:
         for worker, angle in strategies:
-            if running and args.stagger:
-                # Every worker opens with the same large context, so launching
-                # them together is what trips the provider's rate limit.
-                print(f"  waiting {args.stagger:.0f}s before the next launch")
+            if procs and args.stagger:
                 time.sleep(args.stagger)
-            workspace = make_worktree(args.worktree_base, worker)
-            trees.append(workspace)
-            log_dir = args.run_dir / worker
-            print(f"launching worker '{worker}' in {workspace}")
-            running.append(
-                (worker, launch(worker, angle, workspace, log_dir, args.iterations))
-            )
-
-        print(f"\n{len(running)} searches running; logs under {args.run_dir}")
-        for worker, process in running:
-            code = process.wait()
-            print(f"worker '{worker}' exited with {code}")
-
-        code = report(args.run_dir, [worker for worker, _ in strategies])
+            print(f"launching worker '{worker}'", flush=True)
+            procs.append((worker, launch(worker, angle, run_dir, args.iterations,
+                                         args.budget_usd, t0_ms)))
+        while any(p.poll() is None for _, p in procs):
+            spent = spent_since(t0_ms)["usd"]
+            if spent >= args.budget_usd:
+                print(f"HARD CAP: spent ${spent:.2f} >= ${args.budget_usd:.2f}; "
+                      f"killing workers", flush=True)
+                capped = True
+                kill(procs)
+                break
+            time.sleep(15)
+        for worker, p in procs:
+            print(f"worker '{worker}' exited with {p.wait()}", flush=True)
     finally:
-        for _, process in running:
-            if process.poll() is None:
-                process.terminate()
-        if not args.keep_worktrees:
-            for tree in trees:
-                drop_worktree(tree)
-
-    raise SystemExit(code)
+        kill(procs)
+    summary = report(run_dir, [w for w, _ in strategies], t0_ms, started)
+    summary["hard_cap_hit"] = capped
+    (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":

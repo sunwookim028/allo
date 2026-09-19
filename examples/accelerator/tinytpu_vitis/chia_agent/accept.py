@@ -1,0 +1,145 @@
+"""Acceptance of a claimed winner: a CLEAN checkout, all five shapes, bit-exact.
+
+The search scores two shapes in a composed evaluation tree. That is a search
+convenience, not evidence. A claim is accepted only by this script:
+
+1. a fresh `git worktree` of `--ref` (default HEAD) under `.chia_scratch/`,
+2. the candidate diff applied with `git apply` (it may touch only
+   microarch_isa.py and isa_dsl.py -- anything else is refused),
+3. that checkout's own `mlir/` bindings built in-tree against $LLVM_BUILD_DIR
+   (~40 s; no symlink into any other checkout),
+4. `bench_isa.py` (must print ALL EXACT), `chia_agent/stress.py`, and
+   `cosim.py` with NO `TPU_*` variable set -- so all five SHAPES, default
+   memory model -- each run from that checkout,
+5. results and logs copied into `--out` BEFORE the worktree is removed.
+
+    python accept.py --diff RUN/worker/best.diff --out RUN/accept-worker
+    python accept.py --out RUN/accept-baseline          # no diff: the control
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+AGENT_DIR = Path(__file__).resolve().parent
+REPO = AGENT_DIR.parents[2]
+PKG = "examples/accelerator/tinytpu_vitis"
+ALLO_PYTHON = os.environ.get(
+    "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
+LLVM_BUILD_DIR = os.environ.get(
+    "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
+ENV_BIN = str(Path(ALLO_PYTHON).parent)
+
+
+def sh(cmd, cwd, env=None, log=None, timeout=7200):
+    t = time.time()
+    p = subprocess.run(cmd, cwd=cwd, env=env, text=True, capture_output=True,
+                       timeout=timeout)
+    out = p.stdout + p.stderr
+    if log:
+        Path(log).write_text(out)
+    return p.returncode, out, round(time.time() - t, 1)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--diff", type=Path)
+    ap.add_argument("--ref", default="HEAD")
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--keep", action="store_true")
+    a = ap.parse_args()
+    out = a.out.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    ref = subprocess.run(["git", "rev-parse", a.ref], cwd=REPO, capture_output=True,
+                         text=True, check=True).stdout.strip()
+    wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
+    result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
+              "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
+                             "clean checkout, all five SHAPES, TPU_* unset"}
+    subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
+                   check=True, capture_output=True)
+    try:
+        if a.diff:
+            diff = a.diff.read_text()
+            touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
+                re.findall(r"^--- a/(\S+)", diff, re.M))
+            if not touched or not touched <= {"microarch_isa.py", "isa_dsl.py"}:
+                raise SystemExit(f"refusing: diff touches {sorted(touched)}")
+            (out / "candidate.diff").write_text(diff)
+            rc, o, _ = sh(["git", "apply", f"--directory={PKG}", "-p1",
+                           str(a.diff.resolve())], wt)
+            if rc:
+                raise SystemExit(f"git apply failed:\n{o}")
+        rc, o, _ = sh(["git", "status", "--porcelain"], wt)
+        result["checkout_status"] = o.strip().splitlines()
+
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+        env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
+                   OMP_NUM_THREADS="8", PYTHONPATH=str(wt))
+        rc, o, sec = sh(["cmake", "-G", "Ninja", "-S", "mlir", "-B", "mlir/build",
+                         f"-DMLIR_DIR={LLVM_BUILD_DIR}/lib/cmake/mlir",
+                         f"-DPython3_EXECUTABLE={ALLO_PYTHON}",
+                         f"-DPython_EXECUTABLE={ALLO_PYTHON}",
+                         "-DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo"], wt, env,
+                        out / "cmake.log")
+        if rc:
+            raise SystemExit("cmake failed; see cmake.log")
+        rc, o, sec = sh(["ninja", "-C", "mlir/build", "-j", "48"], wt, env,
+                        out / "ninja.log")
+        if rc:
+            raise SystemExit("ninja failed; see ninja.log")
+        rc, o, _ = sh([ALLO_PYTHON, "-c", "import allo,os;print(os.path.realpath("
+                       "allo.__file__))"], "/", env)
+        result["allo_resolves_to"] = o.strip()
+        assert o.strip().startswith(str(wt)), o
+
+        rc, o, sec = sh([ALLO_PYTHON, f"{PKG}/bench_isa.py"], wt, env,
+                        out / "bench_isa.log")
+        result["bench_isa"] = {"rc": rc, "last": o.strip().splitlines()[-1:],
+                               "seconds": sec}
+        rc2, o2, sec2 = sh([ALLO_PYTHON, f"{PKG}/chia_agent/stress.py"], wt, env,
+                           out / "stress.log")
+        result["stress"] = {"rc": rc2, "last": o2.strip().splitlines()[-1:],
+                            "seconds": sec2}
+        cos = wt / ".cosim"
+        cos.mkdir()
+        rc3, o3, sec3 = sh([ALLO_PYTHON, str(wt / PKG / "cosim.py")], cos, env,
+                           out / "cosim.log")
+        rows = re.findall(r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$", o3, re.M)
+        result["cosim"] = {f"{m}x{k}x{n}": {"cycles": None if c == "None" else int(c),
+                                            "tb": tb.strip()}
+                           for m, k, n, c, tb in rows}
+        result["cosim_seconds"] = sec3
+        prj = cos / "isa_sweep.prj"
+        for f in prj.glob("cosim_*.log"):
+            shutil.copy2(f, out / f.name)
+        xml = prj / "out.prj/solution1/syn/report/csynth.xml"
+        if xml.exists():
+            shutil.copy2(xml, out / "csynth.xml")
+            t = xml.read_text()
+            result["estimated_ns"] = float(re.search(
+                r"<EstimatedClockPeriod>([\d.]+)", t).group(1))
+        exact = all(v["tb"] == f"TB {s} mismatches = 0 / "
+                    f"{int(s.split('x')[0]) * int(s.split('x')[2])}"
+                    and v["cycles"] is not None for s, v in result["cosim"].items())
+        result["ok"] = (rc == 0 and result["bench_isa"]["last"] == ["ALL EXACT"]
+                        and rc2 == 0 and rc3 == 0 and len(result["cosim"]) == 5
+                        and exact and result.get("estimated_ns", 99) <= 3.33)
+    finally:
+        (out / "accept.json").write_text(json.dumps(result, indent=1))
+        print(json.dumps(result, indent=1))
+        # Results are already under --out; only now may the checkout go.
+        if not a.keep:
+            subprocess.run(["git", "worktree", "remove", "--force", str(wt)],
+                           cwd=REPO, capture_output=True)
+
+
+if __name__ == "__main__":
+    main()
