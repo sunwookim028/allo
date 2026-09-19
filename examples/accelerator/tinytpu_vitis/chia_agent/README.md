@@ -16,7 +16,7 @@ scored by RTL cosim.
 | | files | how it is enforced |
 | --- | --- | --- |
 | **editable** | `microarch_isa.py`, `isa_dsl.py` | The agent edits a private copy in `<run>/<worker>/spec/`, never the repository. |
-| **frozen** | `cosim.py` (testbench generator, `SHAPES`, numpy golden reference, every Vitis/TCL setting), `bench_isa.py`, `chia_agent/stress.py`, `chia_agent/evaluate.py`, `chia_agent/spec_policy.py` | See below. |
+| **frozen** | main's `cosim.py` (testbench generator, `SHAPES`, numpy golden reference, every Vitis/TCL setting), `bench_isa.py`, `stress_isa.py` (the correctness gate), `isa_ref.py` (the ISA as numpy), `kpn_model.py`; and here `chia_agent/gate_runner.py`, `chia_agent/evaluate.py`, `chia_agent/spec_policy.py` | See below. |
 
 Mechanical enforcement, not instructions:
 
@@ -28,9 +28,11 @@ Mechanical enforcement, not instructions:
 2. **Frozen files come from git, never from disk.** `evaluate.py` composes a
    fresh evaluation tree for every candidate. The frozen files come from
    `git show HEAD:...`, the spec directory supplies only the two editable
-   files, and any other file there is ignored. `cosim.py` and `bench_isa.py`
-   are also checked byte-identical to main @ `e2451b81`. `loop.py` refuses to
-   start if any frozen path is dirty in the working tree.
+   files, and any other file there is ignored. `cosim.py`, `bench_isa.py`,
+   `stress_isa.py`, `isa_ref.py` and `kpn_model.py` are also checked
+   byte-identical to main @ `e620576d` (`MAIN_BASE` in `evaluate.py`), so the
+   loop measures and verifies the design exactly as main does. `loop.py`
+   refuses to start if any frozen path is dirty in the working tree.
 3. **Import-time code is policed.** The evaluator imports the two editable
    files, so `spec_policy.py` (itself executed from git) refuses file I/O,
    process spawning, `exec`/`eval`, `sys.modules`, dunder attribute access,
@@ -38,18 +40,39 @@ Mechanical enforcement, not instructions:
    modules. It runs at edit time and again at evaluation time. It also refuses
    numpy's file writers (`savetxt`, `tofile`, `save*`, `dump`, `memmap`,
    `.lib`): `test_harness.py` showed `np.savetxt` at import time overwriting the
-   tree's `stress.py`, so an int16-narrowed datapath passed the gate with
-   `STRESS OK: forged`.
+   tree's stress gate, so an int16-narrowed datapath passed the gate with
+   `STRESS OK: forged`. Since the rebase it also refuses `SystemExit`/`exit`/
+   `quit`, numpy's file readers, frame/traceback walking (`f_back`,
+   `gi_frame`, ...), and assignments to attributes of an imported module or
+   of any alias of one (`np.random.default_rng = ...`, `r = np.random;
+   r.default_rng = ...`).
 3b. **The candidate runs in a sandbox, and the tree is verified.** Every
    process that imports the candidate (import check, `bench_isa.py`,
-   `stress.py`, `cosim.py`) runs under `bwrap`: the filesystem read-only, the
+   `stress_isa.py`, `cosim.py`) runs under `bwrap`: the filesystem read-only, the
    evaluation tree read-only as well, only the work directory and a private
    `/tmp` writable, in its own PID namespace. After each stage the tree must
    equal what was composed byte for byte (nothing changed, nothing added), and
    the checkout's `allo/` and `tinytpu_vitis/` must be as they were; otherwise
    the verdict is `tamper`. Tree files are also mode 0444, for hosts without
-   `bwrap`. The gate requires the exact line `STRESS OK: 60/60 runs exact`.
-   `accept.py` applies the same policy, sandbox and tamper check.
+   `bwrap`. `accept.py` applies the same policy, sandbox and tamper check.
+3c. **The verdict is vouched for, not read from stdout.** The candidate's code
+   runs inside every gate process, so a printed `ALL EXACT` / `STRESS OK` line
+   proves nothing: on this branch, before the rebase, a candidate that printed
+   `STRESS OK: 60/60 runs exact` and raised `SystemExit(0)` at import passed
+   the old `stress.py` gate with an int16 datapath -- and the policy accepted
+   it. Each check (bench_isa, stress_isa, cosim) now runs under the frozen
+   `gate_runner.py`. The evaluator mints a fresh nonce per run and hands it
+   over on stdin; the runner reads it before the candidate is imported,
+   imports the candidate on its own (any exception, `SystemExit` included,
+   fails), runs the check and takes its **return value** (`stress_isa.main()`
+   must return 0; `bench_isa.py`/`cosim.py` must end in `SystemExit(0)` from
+   their own module frame), and only then prints `CHIA-GATE <check> OK
+   <nonce>`, the line the evaluator requires. The runner also switches every
+   loaded `numpy*`/`allo*` module to a class that refuses to rebind an existing
+   function or submodule, and compares their identities after the check, so a
+   golden reference computed with a monkeypatched numpy is `tamper` even when
+   the patch dodges the static policy (tested: a patch through a method's
+   `self`). The nonce never reaches a verdict or log.
 4. **The memory model is not the candidate's.** Every `TPU_*` variable is
    scrubbed before `cosim.py` runs, so `-m_axi_latency` stays at its
    default 0, which is the setting that matches Gemmini's harness. `-random_stall`
@@ -67,21 +90,41 @@ This is a policy, not a sandbox. Real isolation would mean a container.
 
 ## The evaluator (two tiers)
 
-- **gate**: `bench_isa.py` must print `ALL EXACT`, and `stress.py` must pass
-  (functional, Allo simulator, ~10 s). `stress.py` is new here. It uses
-  full-range int8 operands, three seeds, five shapes beyond the scored five,
-  and a sentinel-filled `C` that must survive outside the `M x N` result.
-  Negative control: narrowing the PE partial sum from int32 to int16 passes
-  `bench_isa.py` and all of cosim's testbenches (their [-4, 4] operands never
-  overflow), and stress rejects it (20/60 runs wrong).
+- **gate**: `bench_isa.py` (the published [-4, 4] setup) and main's
+  `stress_isa.py` must both pass (functional, Allo simulator, ~12 s): 486 runs
+  of full-range/corner/boundary int8 at all 64 shapes, `C` prefilled with
+  random bytes and compared in full, vector and 200 random programs checked
+  against `isa_ref.py`, many invocations of one build, and the program
+  validator's controls. Negative control: narrowing the PE partial sum from
+  int32 to int16 passes `bench_isa.py` and all of cosim's testbenches (their
+  [-4, 4] operands never overflow), and stress_isa rejects it (247/486 exact).
+
+  **Why main's `stress_isa.py` replaced this branch's own `stress.py`**
+  (rebase, 2026-09-19): it is a superset on every axis `stress.py` covered --
+  64 shapes to its 10, random-prefilled `C` compared in full to a constant
+  sentinel, corner and exact-boundary operands that hit the clip and ReLU
+  edges, state across many calls on one build -- and adds what `stress.py`
+  never looked at (non-GEMM programs, the validator). It is main's canonical
+  correctness gate, maintained there and measured by `mutate.py`; keeping a
+  second, weaker definition of "correct" here would let the loop drift from
+  main exactly the way pinning `cosim.py`/`bench_isa.py` to main prevents.
+  The cost is explicit: `isa_ref.py` is frozen, so **the architectural
+  meaning of each instruction is now part of the contract**. The agent may
+  change how the hardware executes the ISA and which instructions
+  `isa_dsl.py` emits, not what an instruction means, and must keep the names
+  `stress_isa.py` imports. The system prompt says so. An ISA-changing search
+  would need `isa_ref.py` (and `stress_isa.py`'s crafted programs) to become
+  part of the candidate -- a separate design decision.
 - **score**: the sum of **RTL cosim** cycles (Vitis HLS 2023.2 csynth + xsim)
   at 4x4x4 and 16x16x16, each testbench bit-exact. About 2.2 min per
   candidate. Area and clock are recorded but not scored.
 - **acceptance**: `accept.py` is the only way a win is claimed. It makes a
   clean `git worktree` of HEAD, `git apply`s the candidate diff, builds that
-  checkout's own `mlir/` in-tree (~40 s), then runs `bench_isa.py`, `stress.py`
-  and `cosim.py` with no `TPU_*` set, which covers all five shapes. Logs are
-  copied out before the worktree is removed.
+  checkout's own `mlir/` in-tree (~40 s), then runs `bench_isa.py`,
+  `stress_isa.py` and `cosim.py` under `gate_runner.py`, with no `TPU_*` set
+  except `TPU_PRJ` (main's `cosim.py` now puts its project next to itself by
+  default, which is read-only in the sandbox), which covers all five shapes.
+  Logs are copied out before the worktree is removed.
 
 What none of this can see is state carried across two invocations of the RTL,
 for example an initialisation removed because one call per testbench never
@@ -104,7 +147,59 @@ ninja -C mlir/build                        # ~35 s
 PYTHONPATH=$PWD python -c 'import allo; print(allo.__file__)'   # must be this tree
 npm ci --prefix examples/accelerator/tinytpu_vitis/chia_agent   # opencode, 725 MB, gitignored
 cp examples/accelerator/tinytpu_vitis/chia_agent/chia.env.example chia.env  # fill in; gitignored
+examples/accelerator/tinytpu_vitis/chia_agent/gcp_setup.sh      # checks + billing report
 ```
+
+### Billing: which project and account a run charges
+
+CHIA runs on its own project, **`chia2026-tinytpu`** (#762944961825), linked
+to the billing account **CHIA2026** (`01BF39-94AA3F-36BACB`). Earlier runs
+(2026-09-05 .. 09-19, $221.31 by opencode's figures) billed `test-adrs`, which
+sits on a general account shared with unrelated projects; CHIA no longer uses
+it.
+
+Everything is scoped per process. The host's global gcloud config and the ADC
+quota project stay `test-adrs`, because other work uses them; nothing here
+runs `gcloud config set` or `gcloud auth application-default
+set-quota-project`. What decides the charge is the project in the Vertex
+request URL, and opencode's `google-vertex` provider (opencode 1.18.25, read
+from its bundled source) resolves it as
+`options.project ?? GOOGLE_VERTEX_PROJECT ?? GOOGLE_CLOUD_PROJECT ??
+GCP_PROJECT ?? GCLOUD_PROJECT`, and the location as `options.location ??
+GOOGLE_VERTEX_LOCATION ?? GOOGLE_CLOUD_LOCATION ?? VERTEX_LOCATION ??
+"us-central1"`. `loop.py` passes `options.project` / `options.location` from
+`GOOGLE_CLOUD_PROJECT` / `TINYTPU_VERTEX_LOCATION`, and `chia.env` also sets
+`GOOGLE_VERTEX_PROJECT` / `GOOGLE_VERTEX_LOCATION` to the same values. Auth is
+ADC through google-auth-library; opencode's provider fetch sends only the
+`Authorization` header (no `x-goog-user-project`), so the ADC quota project
+does not affect a model call. `GOOGLE_CLOUD_QUOTA_PROJECT` (which
+google-auth-library reads in place of the ADC file's `quota_project_id`) is
+set to the CHIA project anyway, for any client that does send it.
+
+**Pre-flight gate** (`preflight.py`, run by `swarm.py`, `loop.py` and
+`smoke.py` before any worker or model call; three gcloud reads, no model
+call). It refuses to start unless the project bills `CHIA_BILLING_ACCOUNT`
+(CHIA2026) with billing enabled, `aiplatform.googleapis.com` is enabled, a
+per-run cap (`--budget-usd`, now required) is given, and CHIA's cumulative
+spend on CHIA2026 plus that cap fits **`CHIA_TOTAL_CAP_USD` ($100 in
+chia.env)**. It prints the account, project, spend so far, remaining, and this
+run's cap. The scripted test model on loopback skips the cloud checks (it
+cannot reach Vertex); nothing else does.
+
+**Cumulative spend** is opencode's own record (`session.cost` in
+`~/.local/share/opencode/opencode.db`), attributed to CHIA2026 **by cutover
+time**, which `billing.json` records (2026-09-19T15:17:35Z, when chia.env
+switched projects): every `google-vertex` session from then on counts against
+the cap, everything before it is reported separately as test-adrs. By time,
+because opencode stores no GCP project with a session; the pre-flight gate is
+what makes "after the cutover" mean "billed CHIA2026". The error it can make is
+only the safe one: other google-vertex opencode use on this Unix account would
+be counted against CHIA's cap. These are opencode's figures (tokens x its price
+table), not the invoice. The budget on CHIA2026 ("CHIA2026 credit
+consumption", $900/month, credits excluded) alerts but does not cap, and the
+remaining **credit balance is only in the Cloud Console** (Billing -> CHIA2026
+-> Credits); gcloud and the Billing API do not expose it. `gcp_setup.sh`
+prints all of the above.
 
 `.rayignore` holds `node_modules/`. Without it Ray's `working_dir` package is
 over 1 GB against a 512 MB limit, and every worker dies silently.
@@ -114,14 +209,14 @@ A search:
 ```bash
 conda activate chia_env
 set -a; source chia.env; set +a
-# Tool servers bind the node's routable address by default, unauthenticated;
-# on a single host bind loopback instead (read in the tools' Ray actors).
-TINYTPU_TOOL_HOST=127.0.0.1 ray start --head --resources='{"opencode_creds": 2}' \
-  --include-dashboard=false
+# Tool servers bind loopback by default (09d7defa); a multi-host swarm opts in
+# with TINYTPU_TOOL_HOST=node and then needs its own auth or firewall.
+ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
 cd examples/accelerator/tinytpu_vitis/chia_agent
-python test_harness.py                                  # ~35 min, $0 -- see below
+python test_harness.py                                  # ~25 min, $0 -- see below
+python preflight.py --budget-usd 15                     # the gate alone, $0
 python smoke.py                                         # ~30 s, ~$0.05 (Vertex)
-python swarm.py --workers 2 --iterations 3 --budget-usd 15
+python swarm.py --workers 2 --iterations 3 --budget-usd 15   # cap required
 python accept.py --diff ../../../../chia_runs/<run>/<worker>/best.diff \
                  --out  ../../../../chia_runs/<run>/accept-<worker>
 ray stop
@@ -141,14 +236,17 @@ No git worktree is created per worker. Each worker's spec, logs and
 | File | Role |
 | --- | --- |
 | `evaluate.py` | frozen two-tier evaluator; one JSON verdict per candidate |
-| `stress.py` | frozen extra semantic gate |
+| `gate_runner.py` | frozen: runs bench_isa / stress_isa / cosim and vouches for the verdict with a nonce |
 | `spec_policy.py` | frozen: what an editable file may contain |
 | `accept.py` | clean-checkout, five-shape acceptance of a claimed winner |
 | `allo_tool.py` | the MCP surface: read spec / read frozen reference / replace_text, patch, insert / functional check / score |
 | `llm.py` | CHIA's OpenCodeLLM with a 40-minute MCP request timeout |
 | `loop.py` | one search: baseline, propose from best, harness re-scores, keep or rewind |
 | `swarm.py` | K searches on different starting angles, global spend cap, report |
-| `spend.py` | USD from opencode's DB since a timestamp |
+| `spend.py` | USD from opencode's DB: per run, and cumulative on CHIA2026 since the cutover |
+| `billing.json` | which project/account CHIA's spend is attributed to, and the cutover time |
+| `preflight.py` | refuses a run that would charge the wrong account or exceed the caps |
+| `gcp_setup.sh` | auth/project/billing/API checks and the spend report; never changes global gcloud config |
 | `smoke.py` | the cheapest end-to-end check |
 | `test_harness.py` | LLM-free end-to-end test of all of the above; run before spending |
 | `fake_model.py` | scripted OpenAI-compatible model that `test_harness.py` points opencode at |
@@ -179,7 +277,7 @@ earned a cosim number:
   junk in the file, such as `# DUMMY COMMENT FOR TRACEBACK`.
 - **weight-prologue** ($6.14 + $1.80): was flattening the PE into one
   state-machine loop. That is not double-buffered weights, and it is the
-  flat-PE variant `RESULTS_ISA.md` already measured as buying nothing while
+  flat-PE variant `tinytpu_history.rst` already records as buying nothing while
   `vru` pays the same prologue upstream. It left a duplicate `pe` and dummy
   functions. Gated post-hoc: `gate:bench_isa`, Allo frontend error.
 
@@ -214,7 +312,7 @@ one; see the next section.
 ## `test_harness.py`: the whole harness, no LLM, $0
 
 Run it before any paid search (`conda activate chia_env; python
-test_harness.py`, ~35 min, mostly cosim; `--phases e,c` is a 1-minute subset).
+test_harness.py`, ~25 min, mostly cosim; `--phases e,c` is a 1-minute subset).
 It clears every cloud credential variable first, so it cannot reach Vertex.
 
 Two scripted agents drive the real code. An MCP client (the `mcp` package,

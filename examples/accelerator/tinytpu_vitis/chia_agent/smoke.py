@@ -2,14 +2,15 @@
 
 ADC -> Vertex AI -> opencode -> CHIA's Ray actor and MCP server -> this tool ->
 the frozen evaluator's gate in the `allo` env. One model call that must read
-the spec to answer, so it costs cents, not dollars. No cosim.
+the spec to answer, so it costs cents, not dollars. No cosim. The pre-flight
+gate runs first, so the call is charged to the configured CHIA project and
+billing account (chia2026-tinytpu / CHIA2026) or not made at all.
 
     python chia_agent/smoke.py
 """
 
 from __future__ import annotations
 
-import os
 import sys
 import tempfile
 import time
@@ -19,19 +20,20 @@ import ray
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import preflight  # noqa: E402
 from allo_tool import AlloSpecTool  # noqa: E402
 from loop import (AGENT_DIR, ALLO_PYTHON, LLVM_BUILD_DIR, REPO_ROOT,  # noqa: E402
                   Budget, ask, make_llm, seed_spec)
 
+#: Per-run spend cap for the smoke call (one prompt; ~$0.05 measured).
+SMOKE_CAP_USD = 5.0
 #: The unit names in microarch_isa.py; the model can only know them by reading.
 EXPECTED = ("sequencer", "dma_ld", "spm", "vru", "accu")
 
 
 def main() -> int:
-    if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
-        print("FAIL: GOOGLE_CLOUD_PROJECT is unset")
-        return 1
     started = time.time()
+    preflight.require(SMOKE_CAP_USD, run_t0_ms=int(started * 1000))
     try:
         ray.init(address="auto", ignore_reinit_error=True,
                  runtime_env={"working_dir": str(AGENT_DIR)})
@@ -57,7 +59,7 @@ def main() -> int:
                        "single line listing the names of the @df.kernel functions "
                        "defined inside the tinytpu_isa region in microarch_isa.py, "
                        "comma separated, and nothing else.",
-                       Budget(5.0, int(started * 1000)), "smoke", calls)
+                       Budget(SMOKE_CAP_USD, int(started * 1000)), "smoke", calls)
         text = str(response.result)
         print(f"      model replied: {text.strip()[:300]}")
         print("[3/3] checking the reply came from the spec...")
