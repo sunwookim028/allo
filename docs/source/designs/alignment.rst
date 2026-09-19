@@ -712,6 +712,21 @@ setup as v1's published numbers.
        rows to C. VMEM's owner now also sits on a cycle with the ``vpu``
        (``vld`` out, ``vst`` back), so its loop is ``style=flp`` too. Nearly
        free: the ``vpu`` did the same row work for ``mvout``.
+   * - **inc 5a**: MiniTPU's DMA ISA (descriptors, channels, ``wait``)
+     - 216
+     - 1521
+     - +10 / +2
+     - +44 / +835
+     - ``vmemld``/``vmemst`` are MiniTPU descriptors: beat ``base + r *
+       stride`` of a flat beat space (A then B for loads, C for stores) and
+       a channel, with ``wait`` fencing a channel mask. ``check_program``
+       enforces MiniTPU's contract: no descriptor on a busy channel, no wait
+       on an idle one, no ``vld``/``vst``/descriptor racing an unfenced
+       descriptor. The machine runs each descriptor at its issue point in
+       VMEM's program order, so a fenced program means the same here. The
+       cost is the waits themselves: a ``wait`` reaches no unit but still
+       takes a sequencer issue slot, three more dynamic instructions at
+       4x4x4.
 
 Reading the table: the whole cost so far is where MiniTPU does work that v1
 did not have to. A DMA into VMEM and then a ``vld`` replaces v1's DMA straight
@@ -719,6 +734,61 @@ into the vregs. Summing k-tiles with explicit ``vadd`` instructions replaces
 v1's accumulate-on-write (MiniTPU's own README records trying accumulation
 across weight loads and reverting it).
 
+
+**The aligned design at every scored shape** (after inc 5a, the default
+testbench, one csynth; ``logs/align_final_cosim.log``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - v1
+     - TinyTPU-align
+     - ratio
+   * - 4x4x4
+     - 172
+     - 216
+     - 1.26x
+   * - 8x8x8
+     - 262
+     - 408
+     - 1.56x
+   * - 12x12x12
+     - 418
+     - 809
+     - 1.94x
+   * - 16x16x8
+     - 484
+     - 933
+     - 1.93x
+   * - 16x16x16
+     - 686
+     - 1521
+     - 2.22x
+
+The ratio grows with the work because nearly all of it is per-row work that
+v1 spread over three processes and TinyTPU-align serialises in one ``vpu``.
+At 16x16x16 the ``vpu`` runs about 1,150 iterations: every ``vld``,
+``vmatload``, push, pop, ``vst`` and two per ``vadd`` row. The price
+decomposes as:
+
+* the A bypass (inc 1): +64;
+* accumulate-by-``vadd`` (inc 2): +466;
+* one VREG file (inc 3 and 3b): +298;
+* the output path and the DMA ISA (inc 4 and 5a): +7.
+
+**At T=8** (MAXDIM=16, ``logs/align_final_cosim_t8.log``): 8x8x8 302,
+16x16x8 474, 16x16x16 699 cycles, 0 wrong. ``TPU_TB=stress`` is 0 wrong over
+six calls at 8x8x8 and 16x16x16. T=16 was not cosimulated: 518 processes; v1's
+T=16 csynth is on :doc:`tinytpu_isa`.
+
+Where the cycles would come back, none of it built yet:
+
+* issue V, M and MEM work of one bundle concurrently. This is MiniTPU's
+  three read ports, and Phase 3's bundle semantics;
+* ``vadd`` in one iteration a row, which needs a second read port, i.e. a
+  replicated file;
+* overlapping DMA with compute (inc 5b).
 
 **What the cycle costs in RTL, beyond cycles.** Two things only RTL shows,
 both found by increment 3's cosim:
@@ -770,6 +840,51 @@ symbols, so the width silently became 32 bits, right only at T=4), and a
 simulator bug (a ``Stream`` of ``UInt(65)`` corrupts the simulator's heap at
 T=8; 72 and 128 bits run, 96 hangs), now avoided by carrying the weight-switch
 flag on its own 8-bit chain.
+
+.. _align-status:
+
+Status: done, pending, and the decisions needed
+-----------------------------------------------
+
+**Done on** ``tinytpu-align``: increments 1, 2, 3, 3b, 4 and 5a, each verified
+as above. Also done:
+
+* ``s.pipeline(style=)`` in Allo (``0038833c``);
+* ``threaded_csim.py``, for cosim of a cyclic region;
+* a design and harness parametric in T and MAXDIM;
+* limitations-register items P1-P4 (:ref:`limitations-align`).
+
+**Pending (not started):**
+
+* **Inc 5b, asynchronous DMA.** The VMEM owner would run its DMA port
+  concurrently with compute. That means a ``while`` loop with non-blocking
+  stream I/O, a two-entry descriptor queue activated at its issue point (WAR
+  interlocked), and ``wait`` stalling only compute. Everything it needs exists
+  in Allo (``empty``/``full``/``try_get``/``try_put``) except loop directives
+  on a ``while`` loop (P1, still open). It changes timing only: 5a already has
+  the contract.
+* **V-op set.** MiniTPU has ``vsub``, ``vmul``, ``vmax``/``vmin``, ``vmov``,
+  reductions, transpose and the SFU; this design keeps ``vadd`` and
+  ``vrelu``. ``vrelu`` is ``vmax`` against a zero register.
+* **VMEM/VREG geometry.** Rows here are T lanes, one sublane (MiniTPU: a word
+  is 4 sublanes). Instructions carry row counts where MiniTPU's ops are one
+  VREG each. The per-op row granularity belongs to Phase 3's encoding.
+* **Phase 3** (MiniTPU's bundle and slot semantics, DELAY as minimum issue
+  spacing) was **not started**, as instructed: Phase 2 took most of the
+  effort.
+
+**Decisions needed:**
+
+1. **Whether to switch** to TinyTPU-align for experiments at a cost of
+   1.26x-2.22x v1's cycles (table above). The cost is the one-VREG-file
+   serialisation plus MiniTPU's ``vadd`` accumulation, and both could be
+   bought back by bundle-level issue.
+2. **The datatype** (:ref:`align-datatype`). BF16 bit-exact to MiniTPU is
+   integer soft-float in Allo, with no Allo fix. BF16 through Allo's float
+   types needs the emitter fix (60-100 lines) and gives ``ap_float``
+   rounding, which is not MiniTPU's.
+3. **Whether Phase 3 goes ahead**, which is also where the cycles above
+   would come back.
 
 **What broke at T != 4 on v1** (read-only diagnosis of ``tinytpu-isa-v1``):
 v1's **hardware is T-parametric**: its GEMM is exact on the dataflow

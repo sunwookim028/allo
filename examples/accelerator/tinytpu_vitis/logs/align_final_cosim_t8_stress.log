@@ -1,0 +1,33 @@
+TinyTPU-isa: ONE build -- 8x8 array, MAXDIM=16; sweeping 2 shapes as data; testbench=stress (correctness mode: cycles are NOT the published numbers)
+  synthesizing once ...
+    TB 8x8x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 4 vector_program full      wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 5 vr_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 4 vector_program full      wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 5 vr_distance(4) full      wrong = 0, clobbered outside = 0
+   8x 8x 8  cycles=302   TB 8x8x8 stress mismatches = 0 over 6 calls
+    TB 16x16x16 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 4 vector_program full      wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 5 vr_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 4 vector_program full      wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 5 vr_distance(4) full      wrong = 0, clobbered outside = 0
+  16x16x16  cycles=465   TB 16x16x16 stress mismatches = 0 over 6 calls
+
+  shape      cycles   (min over the stress calls)
+   8x 8x 8   302
+  16x16x16   465
+  COSIM OK (testbench=stress)

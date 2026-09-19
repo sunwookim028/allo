@@ -16,7 +16,8 @@
 # 3. stress_isa.py -- the correctness gate, must print STRESS OK;
 # 4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
 #    csynth, one cosim per shape -- and compares the cycle counts with the
-#    published 172 / 262 / 418 / 484 / 686.
+#    published 216 / 408 / 809 / 933 / 1521 (TinyTPU-align; v1 published
+#    172 / 262 / 418 / 484 / 686).
 #
 # Needs: the `allo` conda env, LLVM at $LLVM_BUILD_DIR (default below), and
 # Vitis HLS 2023.2 at the path `cosim.py` names in VITIS. ~6 min with
@@ -25,7 +26,7 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
-EXPECTED="4x4x4=172 8x8x8=262 12x12x12=418 16x16x8=484 16x16x16=686"
+EXPECTED="4x4x4=216 8x8x8=408 12x12x12=809 16x16x8=933 16x16x16=1521"   # TinyTPU-align (v1: 172 262 418 484 686)
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate allo

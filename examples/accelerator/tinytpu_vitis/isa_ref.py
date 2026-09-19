@@ -28,7 +28,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP,
     OP_VADD, OP_VRELU, OP_VST, OP_VMEMST,
-    DMA_SRC_B,
     MAXDIM, T, VMEM_ROWS, NVREG, check_program, expand,
 )
 
@@ -51,6 +50,8 @@ def run(prog, A, B, C):
     C = np.array(C, np.int8).reshape(MAXDIM, MAXDIM)
     vmem = np.zeros((VMEM_ROWS, T), np.int64)   # one row = T int8 lanes
     vr = np.zeros((NVREG, T), np.int64)         # ONE file: T int32 lanes a row
+    AB = np.concatenate([A.reshape(-1, T), B.reshape(-1, T)]).astype(np.int64)
+    Cb = C.reshape(-1, T)                       # C by beats (a view)
     W = None                                    # the weights in the array
     queue = []                                  # pushed, un-popped results
     for op, nr, f0, f1, f2, f3 in expand(prog):
@@ -63,8 +64,8 @@ def run(prog, A, B, C):
             continue
         for r in range(nr):
             if op == OP_DMA_LD:
-                src = B if f0 & DMA_SRC_B else A
-                vmem[f3 + r] = src[f1 + r, f2 * T:(f2 + 1) * T]
+                # beat base + r * stride of the flat beat space A | B
+                vmem[f3 + r] = AB[f1 + r * f2]
             elif op == OP_VLD:
                 vr[f0 + r] = vmem[f1 + r]           # int8 sign-extended
             elif op == OP_VMATPUSH:
@@ -79,5 +80,5 @@ def run(prog, A, B, C):
             elif op == OP_VST:
                 vmem[f1 + r] = np.clip(vr[f0 + r], -128, 127)   # saturated
             elif op == OP_VMEMST:
-                C[f1 + r, f2 * T:(f2 + 1) * T] = vmem[f3 + r]
+                Cb[f1 + r * f2] = vmem[f3 + r]          # C's beat, a view
     return C.reshape(-1)

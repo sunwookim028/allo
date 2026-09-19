@@ -1,7 +1,21 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""TinyTPU-isa: an instruction-programmable tiled-GEMM accelerator in grid Allo.
+"""TinyTPU-align: TinyTPU-isa aligned with MiniTPU (branch `tinytpu-align`).
+
+**Read this first.** On this branch the machine is TinyTPU-isa (tag
+`tinytpu-isa-v1`) moved, increment by increment, onto MiniTPU's ISA and memory
+hierarchy. It has one VMEM, the only thing DMA touches, with MiniTPU's
+descriptors, two channels and `wait`. It has one vreg file owned by one `vpu`.
+The array takes MiniTPU's `vmatload`/`vmatpush`/`vmatpop`, k-tiles are summed
+by `vadd`, and output leaves through `vst` -> VMEM -> `vmemst`. It keeps
+MiniTPU's semantics on interlocked hardware. The spec, the classification
+against MiniTPU and the per-increment cycle cost are in
+docs/source/designs/alignment.rst. The history below is v1's; where it names
+`vru`, `accu`, `mm` or `mvout`, the aligned units are `vpu`,
+`vmatload`/`vmatpush`/`vmatpop` and `vst`/`vmemst`.
+
+TinyTPU-isa: an instruction-programmable tiled-GEMM accelerator in grid Allo.
 
 What the earlier designs got and did not get. Both files have since been removed;
 read them with `git show e2451b81:examples/accelerator/tinytpu_vitis/<file>`.
@@ -308,7 +322,7 @@ import allo.dataflow as df
 # design. Narrowing the field narrows the bound. Gemmini does the same thing:
 # its mvin/mvout carry an explicit, bounded row count.
 OP_NOP = 0
-OP_DMA_LD = 1     # f0=src f1=dram_row0 f2=col_block f3=vmem0          nr=rows
+OP_DMA_LD = 1     # vmemld: f0=ch f1=beat0 f2=stride f3=vmem0        nr=beats
 OP_DMA_ST = 2     # (retired: results leave via OP_VST + OP_VMEMST)
 OP_VLD = 3        # f0=vr0  f1=vmem0                            nr=rows
 OP_MM = 4         # (retired: split into vmatload / vmatpush / vmatpop)
@@ -323,14 +337,31 @@ OP_VMATPUSH = 11  # f0=vr_a: activation rows                        nr=rows
 OP_VMATPOP = 12   # f0=ar_d: the oldest un-popped result rows       nr=rows
 # MiniTPU's output path (alignment increment 4): VREG -> VMEM -> DRAM.
 OP_VST = 13       # f0=vr_s f1=vmem_d  (int32 lanes saturated to int8) nr=rows
-OP_VMEMST = 14    # f1=dram_row0 f2=col_block f3=vmem_s  VMEM -> C       nr=rows
+OP_VMEMST = 14    # vmemst: f0=ch f1=beat0 f2=stride f3=vmem0 -> C   nr=beats
+OP_WAIT = 15      # wait.channel: f0=channel mask (1, 2 or 3)       nr=1
 
-# `dma_ld`'s f0 is the SOURCE matrix: 0 A, 1 B. The destination is always
-# VMEM (MiniTPU: DMA moves only between DRAM and VMEM). TinyTPU-isa v1 also
-# had a destination bit that sent A straight into the operand vregs (the A
-# bypass); alignment increment 1 removed it, so activations reach the vregs by
-# `vld` from VMEM, as on MiniTPU.
-DMA_SRC_B = 1
+# ---- MINITPU'S DMA (alignment increment 5a) ----
+# A descriptor moves `nr` BEATS between DRAM and VMEM; beat r is DRAM beat
+# `f1 + r * f2` (base + r * stride), VMEM row `f3 + r`. A beat is one VMEM row:
+# T lanes, one packed word (MiniTPU's beat is 16 BF16 lanes, 32 bytes). DRAM
+# is one flat beat space for loads -- A's beats [0, BEATS), then B's -- and C's
+# beats for `vmemst`; beat b of a matrix is its elements b*T .. b*T + T-1, so
+# a column block kb of rows 0..M-1 is base kb, stride WPR, M beats, and one
+# descriptor moves it (MiniTPU's descriptor is 1-D the same way).
+#
+# f0 is the CHANNEL, 0 or 1, and `wait` (MiniTPU's `wait.channel`) names a
+# mask of them. The ISA contract is MiniTPU's, and `check_program` enforces it:
+# a descriptor may not be issued on a channel whose last descriptor was not
+# waited for (MiniTPU hangs), a wait may not name an idle channel (MiniTPU
+# hangs), and no compute access (`vld`, `vst`) or other descriptor may touch a
+# VMEM row a descriptor still outstanding writes -- or write one it reads --
+# before the wait that fences it (a race on MiniTPU, which does not arbitrate
+# its two VMEM ports). A program that keeps those rules means the same on this
+# machine, which runs each descriptor at its issue point in VMEM's program
+# order: interlocked and synchronous, where MiniTPU's DMA overlaps compute.
+# Overlapping them is increment 5b (pending).
+DMA_SRC_B = 1                  # (the retired source bit of v1-style dma_ld)
+N_CH = 2                       # DMA channels, as MiniTPU
 
 # ---- THE WRITE-BEFORE-READ CONTRACT ----
 # `vmem` and `vreg` are NOT cleared by the hardware. Their `= 0`
@@ -498,6 +529,7 @@ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 KB_MAX = MAXDIM // T           # column blocks in the widest matrix
 assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
+BEATS = MAXDIM * WPR           # beats per operand matrix: A at 0, B at BEATS
 B_VM = 0                       # B words:  nb * MAXDIM + k  (weights)
 A_VM = KB_MAX * MAXDIM         # A words in VMEM: kb * MAXDIM + m, after B
 C_VM = 2 * KB_MAX * MAXDIM     # C words in VMEM: nb * MAXDIM + m (vst, vmemst)
@@ -741,22 +773,22 @@ def tinytpu_isa(
         it on purpose."""
         nw: UInt(64) = c_dld.get()
         n_row: int32 = nw[0:16]
-        sw: UInt(64) = c_dld.get()  # the DRAM row span of each source matrix
+        sw: UInt(64) = c_dld.get()  # the beat span of each source matrix
         na: int32 = sw[0:16]
         nb: int32 = sw[16:32]
 
         # One burst per matrix, each covering exactly that matrix's own span.
         # Merging the two into one loop bounded by `max(na, nb)` was measured
         # and moved nothing: the bursts are hidden behind the prefetch.
-        rbA: UInt(VW)[MAXDIM * WPR]
-        rbB: UInt(VW)[MAXDIM * WPR]
-        for ia in range(na * WPR):
+        rbA: UInt(VW)[BEATS]
+        rbB: UInt(VW)[BEATS]
+        for ia in range(na):
             pa: UInt(VW) = 0
             with allo.meta_for(T) as e:
                 av: int8 = lA[ia * T + e]
                 pa[8 * e : 8 * (e + 1)] = av
             rbA[ia] = pa
-        for ic in range(nb * WPR):
+        for ic in range(nb):
             pb: UInt(VW) = 0
             with allo.meta_for(T) as e2:
                 bv: int8 = lB[ic * T + e2]
@@ -778,11 +810,13 @@ def tinytpu_isa(
                 f2 = w0[30:42]
                 cnt = w0[54:62]
                 r = 0
+            # beat r of the descriptor: base + r * stride, in A's beats or B's
+            bt: int32 = f1 + r * f2
             pw: UInt(VW) = 0
-            if (f0 & DMA_SRC_B) == 0:
-                pw = rbA[(f1 + r) * WPR + f2]
+            if bt < BEATS:
+                pw = rbA[bt]
             else:
-                pw = rbB[(f1 + r) * WPR + f2]
+                pw = rbB[bt - BEATS]
             dma2vm.put(pw)
 
     @df.kernel(mapping=[1])
@@ -1105,9 +1139,10 @@ def tinytpu_isa(
                 cnt = w0[54:62]
                 r = 0
             qw: UInt(VW) = vm2dst.get()
+            bt: int32 = f1 + r * f2     # C beat: base + r * stride
             with allo.meta_for(T) as e:
                 ov: int8 = qw[8 * e : 8 * (e + 1)]
-                lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
+                lC[bt * T + e] = ov
 
 def gemm_program_handwritten(M, K, N, relu=False):
     """Tiled GEMM as a program with **control flow**, hand-emitted.
@@ -1135,17 +1170,20 @@ def gemm_program_handwritten(M, K, N, relu=False):
     p = []
     ins = lambda w, agu=0: p.append((w, agu))
 
-    # --- A: one dma_ld per column block into VMEM, then vld into the vregs ---
+    # --- A: one descriptor per column block into VMEM (channel 0, base kb,
+    #     stride WPR beats), fenced, then vld into the vregs ---
     ins(enc(OP_LOOP, nr=Kt))
-    ins(enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_VM, nr=M),
-        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_DMA_LD, f0=0, f1=0, f2=WPR, f3=A_VM, nr=M),
+        enc_agu((AGU_F1, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_WAIT, f0=1, nr=1))
     ins(enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
         enc_agu((AGU_F0, 0, MAXDIM), (AGU_F1, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
-    # --- B: the same, one per column block ---
+    # --- B: the same on channel 1, B's beats start at BEATS ---
     ins(enc(OP_LOOP, nr=Nt))
-    ins(enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=K),
-        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_DMA_LD, f0=1, f1=BEATS, f2=WPR, f3=B_VM, nr=K),
+        enc_agu((AGU_F1, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_WAIT, f0=2, nr=1))
     ins(enc(OP_VLD, f0=B_VR, f1=B_VM, nr=K),
         enc_agu((AGU_F0, 0, MAXDIM), (AGU_F1, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
@@ -1183,8 +1221,9 @@ def gemm_program_handwritten(M, K, N, relu=False):
         ins(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
     #   MiniTPU's output path: vst to VMEM, then vmemst to DRAM
     ins(enc(OP_VST, f0=AR_C, f1=C_VM, nr=M), enc_agu((AGU_F1, 0, MAXDIM)))
-    ins(enc(OP_VMEMST, f1=0, f2=0, f3=C_VM, nr=M),
-        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_VMEMST, f0=0, f1=0, f2=WPR, f3=C_VM, nr=M),
+        enc_agu((AGU_F1, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_WAIT, f0=1, nr=1))
     ins(enc(OP_ENDLOOP))
     return p
 
@@ -1202,13 +1241,15 @@ def gemm_program_flat(M, K, N, relu=False):
     Kt, Nt = K // T, N // T
     p = []
     for kb in range(Kt):
-        p.append((enc(OP_DMA_LD, f0=0, f1=0, f2=kb,
+        p.append((enc(OP_DMA_LD, f0=0, f1=kb, f2=WPR,
                       f3=A_VM + kb * MAXDIM, nr=M), 0))
+        p.append((enc(OP_WAIT, f0=1, nr=1), 0))
         p.append((enc(OP_VLD, f0=A_VR + kb * MAXDIM, f1=A_VM + kb * MAXDIM,
                       nr=M), 0))
     for nb in range(Nt):
-        p.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
+        p.append((enc(OP_DMA_LD, f0=1, f1=BEATS + nb, f2=WPR,
                       f3=B_VM + nb * MAXDIM, nr=K), 0))
+        p.append((enc(OP_WAIT, f0=2, nr=1), 0))
         p.append((enc(OP_VLD, f0=B_VR + nb * MAXDIM, f1=B_VM + nb * MAXDIM,
                       nr=K), 0))
     for nb in range(Nt):
@@ -1226,7 +1267,9 @@ def gemm_program_flat(M, K, N, relu=False):
         if relu:
             p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
         p.append((enc(OP_VST, f0=AR_C, f1=C_VM + nb * MAXDIM, nr=M), 0))
-        p.append((enc(OP_VMEMST, f1=0, f2=nb, f3=C_VM + nb * MAXDIM, nr=M), 0))
+        p.append((enc(OP_VMEMST, f0=0, f1=nb, f2=WPR, f3=C_VM + nb * MAXDIM,
+                      nr=M), 0))
+        p.append((enc(OP_WAIT, f0=1, nr=1), 0))
     return p
 
 
@@ -1235,9 +1278,10 @@ def vadd_program(M, K, N):
     output tile, as two pushes of the same tile popped into two regions,
     added, ReLU'd and retired."""
     return [(w, 0) for w in [
-        enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_VM, nr=M),
+        enc(OP_DMA_LD, f0=0, f1=0, f2=WPR, f3=A_VM, nr=M),
+        enc(OP_DMA_LD, f0=1, f1=BEATS, f2=WPR, f3=B_VM, nr=T),
+        enc(OP_WAIT, f0=3, nr=1),
         enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
-        enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=T),
         enc(OP_VLD, f0=B_VR, f1=B_VM, nr=T),
         enc(OP_VMATLOAD, f0=B_VR, nr=T),
         enc(OP_VMATPUSH, f0=A_VR, nr=M),
@@ -1248,7 +1292,7 @@ def vadd_program(M, K, N):
         enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
         enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
         enc(OP_VST, f0=AR_C, f1=C_VM, nr=M),
-        enc(OP_VMEMST, f1=0, f2=0, f3=C_VM, nr=M)]]
+        enc(OP_VMEMST, f0=0, f1=0, f2=WPR, f3=C_VM, nr=M)]]
 
 
 def expand(prog):
@@ -1330,7 +1374,8 @@ _OPNAME = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
            OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
            OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop",
            OP_VMATLOAD: "vmatload", OP_VMATPUSH: "vmatpush",
-           OP_VMATPOP: "vmatpop", OP_VST: "vst", OP_VMEMST: "vmemst"}
+           OP_VMATPOP: "vmatpop", OP_VST: "vst", OP_VMEMST: "vmemst",
+           OP_WAIT: "wait"}
 _RETIRED = (OP_DMA_ST, OP_MM, OP_MVOUT)
 
 
@@ -1367,7 +1412,12 @@ def check_program(prog):
         have accepted; this is the only place that can see it.
       * structure: balanced loops, depth <= LOOP_DEPTH, trip >= 1 (the
         sequencer is a do-while), AGU terms naming a loop that is open, no
-        retired opcode, `dma_ld` f0 in {0, 1}.
+        retired opcode.
+      * **MiniTPU's DMA contract**: a descriptor's channel must be idle (its
+        last descriptor waited for), a `wait` may only name busy channels,
+        every beat inside its matrix, and no `vld`, `vst` or other
+        descriptor may touch VMEM rows an outstanding descriptor writes (or
+        write rows it reads) before the wait that fences it.
       * **the array's queue**: a `vmatload` moves exactly T rows and its
         weights must be used by a `vmatpush` before the next `vmatload` (the
         PE switches on the first pushed row after a load); a `vmatpush` needs
@@ -1415,6 +1465,9 @@ def check_program(prog):
     it = 0                            # vpu iterations issued so far
     q = {"loaded": False, "unused": False, "out": 0}   # the array's queue
     size = {"vmem": VMEM_ROWS, "vr": NVREG}
+    # per DMA channel: the outstanding descriptor's VMEM rows, written (a
+    # vmemld) or read (a vmemst), or None when the channel is idle
+    dma = [None] * N_CH
 
     for pc, ivs, op, nr, f0, f1, f2, f3 in _trace(prog):
         where = (f"instruction {pc} ({_OPNAME[op]}"
@@ -1435,6 +1488,34 @@ def check_program(prog):
                     f"hardware; see the write-before-read contract.")
 
         if op == OP_NOP:
+            continue
+
+        def race(rows, writes, what, skip=None):
+            # a VMEM access vs every outstanding descriptor: a read races a
+            # vmemld's write, a write races either
+            for ch in range(N_CH):
+                if ch == skip or dma[ch] is None:
+                    continue
+                dw, drows = dma[ch]
+                hit = sorted(set(rows) & drows)
+                if hit and (dw or writes):
+                    raise ProgramError(
+                        f"{where}: {what} VMEM row(s) {hit[:4]} while channel "
+                        f"{ch}'s {'vmemld writes' if dw else 'vmemst reads'} "
+                        f"them, before a wait fences it -- a race on MiniTPU")
+
+        if op == OP_WAIT:
+            if f0 < 1 or f0 >= 1 << N_CH:
+                raise ProgramError(f"{where}: mask {f0} names no channel of "
+                                   f"{N_CH}")
+            for ch in range(N_CH):
+                if f0 >> ch & 1:
+                    if dma[ch] is None:
+                        raise ProgramError(
+                            f"{where}: waits on channel {ch} with nothing "
+                            f"outstanding -- MiniTPU hangs until the PL is "
+                            f"reprogrammed")
+                    dma[ch] = None
             continue
         for v, fld in ((f0, "f0"), (f1, "f1"), (f2, "f2"), (f3, "f3")):
             if v >= 1 << 11:
@@ -1459,17 +1540,28 @@ def check_program(prog):
             written["vr"][row] = ok
             vr_wrote[row] = at
 
+        def descriptor(limit, what):
+            if f0 not in range(N_CH):
+                raise ProgramError(f"{where}: channel f0={f0}, must be 0..{N_CH - 1}")
+            if dma[f0] is not None:
+                raise ProgramError(
+                    f"{where}: channel {f0} still has a descriptor no wait "
+                    f"fenced -- MiniTPU's sequencer hangs on a busy channel")
+            last = f1 + (nr - 1) * f2
+            if last >= limit:
+                raise ProgramError(f"{where}: {what} beat {last} outside "
+                                   f"0..{limit - 1}")
+
         if op == OP_DMA_LD:
-            if f0 not in (0, 1):
-                raise ProgramError(f"{where}: f0={f0}, must be the source "
-                                   f"(0 A, 1 B); DMA only writes VMEM")
-            if f2 >= WPR or f1 + nr > MAXDIM:
-                raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
-                                   f"col block {f2} outside the {MAXDIM}x{MAXDIM} operand")
-            for r in span("vmem", f3, nr):
+            descriptor(2 * BEATS, "A|B")
+            rows = span("vmem", f3, nr)
+            race(rows, True, "writes")
+            for r in rows:
                 written["vmem"][r] = True
+            dma[f0] = (True, set(rows))
         elif op == OP_VLD:
             src = span("vmem", f1, nr)
+            race(src, False, "reads")
             for i, (d, s_) in enumerate(zip(span("vr", f0, nr), src)):
                 vr_write(d, it + i, written["vmem"][s_])   # a copy of unwritten
             it += nr                                       # is unwritten
@@ -1519,16 +1611,18 @@ def check_program(prog):
                 vr_write(dst[i], it + i)
             it += nr
         elif op == OP_VST:
+            race(span("vmem", f1, nr), True, "writes")
             for i, (r, d) in enumerate(zip(span("vr", f0, nr),
                                            span("vmem", f1, nr))):
                 vr_read(r, it + i, "the value to store")
                 written["vmem"][d] = True
             it += nr
         elif op == OP_VMEMST:
-            need("vmem", span("vmem", f3, nr), "the rows to store")
-            if f2 >= WPR or f1 + nr > MAXDIM:
-                raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
-                                   f"block {f2} outside the {MAXDIM}x{MAXDIM} result")
+            descriptor(BEATS, "C")
+            rows = span("vmem", f3, nr)
+            need("vmem", rows, "the rows to store")
+            race(rows, False, "reads")
+            dma[f0] = (False, set(rows))
     if q["out"]:
         raise ProgramError(f"{q['out']} pushed row(s) are never popped")
     if q["unused"]:
@@ -1541,7 +1635,7 @@ def assemble(prog, check=True):
         imem[0] static instruction count   imem[4] loads | pushed rows << 16
         imem[1] dma_ld  rows               imem[5] (retired)
         imem[2] vmu     rows               imem[6] dma_st rows
-        imem[3] vpu iterations             imem[7] A rows | B rows << 16
+        imem[3] vpu iterations             imem[7] A beats | B beats << 16
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
     `expand`. They must match the sequencer's dispatch rules exactly.
@@ -1573,14 +1667,16 @@ def assemble(prog, check=True):
         return sum(1 for e in ev if e[0] in ops)
 
     def span(src):
-        # The DRAM row span `dma_ld` must burst for one source matrix: the
-        # highest row any of its `dma_ld`s names, after the AGU is resolved.
-        return max([e[3] + e[1] for e in ev
-                    if e[0] == OP_DMA_LD and (e[2] & DMA_SRC_B) == src] + [0])
+        # The beat span `dma_ld` must burst for one source matrix: one past the
+        # highest beat of that matrix any descriptor names, AGU resolved.
+        beats = [e[3] + r * e[4] for e in ev if e[0] == OP_DMA_LD
+                 for r in range(e[1])]
+        lo = src * BEATS
+        return max([b - lo + 1 for b in beats if lo <= b < lo + BEATS] + [0])
 
     a_span, b_span = span(0), span(1)
-    assert a_span <= MAXDIM and b_span <= MAXDIM, (
-        f"dma_ld row span {a_span}/{b_span} exceeds MAXDIM={MAXDIM}")
+    assert a_span <= BEATS and b_span <= BEATS, (
+        f"dma_ld beat span {a_span}/{b_span} exceeds BEATS={BEATS}")
 
     n_ld = count(OP_VMATLOAD)
     push_rows = rows(OP_VMATPUSH)

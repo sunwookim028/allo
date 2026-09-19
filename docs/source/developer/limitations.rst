@@ -445,6 +445,82 @@ came from) stated. The per-item sections below have been corrected in place.
   is corrected accordingly.
 
 
+.. _limitations-align:
+
+Surfaced while aligning TinyTPU with MiniTPU (2026-09-19)
+---------------------------------------------------------
+
+Found on branch ``tinytpu-align`` (:doc:`/designs/alignment`). MiniTPU's
+machine has one VREG file that both feeds the systolic array and receives
+its results, so the aligned design's process graph is **cyclic**. The first
+two items below are what a cyclic dataflow region costs on Allo's Vitis path.
+
+.. _limitation-pipeline-style:
+
+P1. No pipeline control style, so a request/response loop deadlocks in RTL -- FIXED on the branch
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Under Vitis's default *stall* pipeline, a blocking stream read in iteration
+i+k freezes the whole pipeline, including iteration i's pending puts. A
+process that puts a request and later gets the response in one loop
+therefore deadlocks in RTL. So does any process on the cycle that holds
+older iterations' outputs while it waits on its next input: TinyTPU-align's
+PEs are the subtle case. ``#pragma HLS pipeline style=flp`` (flushable)
+keeps older iterations draining. ``frp`` does not help.
+
+* Probe: ``examples/accelerator/tinytpu_vitis/align_probes/probe_cycle.py``,
+  a two-process ping-pong. The Allo simulator passes; Vitis cosim deadlocks
+  under ``stp`` and ``frp`` and passes under ``flp``.
+* Neither the dataflow simulator nor csim can show it.
+* Fixed by ``0038833c``: ``s.pipeline(axis, ..., style="stp"|"flp"|"frp")``
+  (~20 lines, ``tests/test_vhls.py::test_pipeline_style``).
+* Still open: Allo cannot attach any loop directive to a ``while`` loop
+  (emitted as ``while (true) { if (!c) break; ... }``), so a free-running
+  unit written as one gets no ``style``, ``dependence`` or ``II``.
+
+.. _limitation-cyclic-csim:
+
+P2. A cyclic dataflow region cannot be C-simulated, so cosim aborts before the RTL runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vitis's C model of a ``#pragma HLS dataflow`` region calls its processes one
+after another. In a cycle, some process reads a stream fed only by a later
+one: ``ERROR [HLS SIM]: an hls::stream is read while empty``, and cosim stops
+at ``COSIM 212-360`` before the RTL simulation starts. Csynth accepts the
+region. This is likely what sank TinyTPU-isa's first attempt to write results
+back into its input scratchpad (:doc:`/designs/tinytpu_isa`, "Two structural
+rules"). Workaround, outside Allo:
+``examples/accelerator/tinytpu_vitis/threaded_csim.py`` rewrites the emitted
+top function, under ``#ifndef __SYNTHESIS__`` only, to run each process on a
+``std::thread``. Vitis's ``hls::stream`` model is already thread-safe and
+blocking. Fix in Allo: emit that form for the C model, about 30 lines in the
+emitter.
+
+.. _limitation-sim-odd-width:
+
+P3. The dataflow simulator corrupts its heap on some stream widths above 64 bits
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With TinyTPU-align at T=8, a ``Stream`` of ``UInt(65)`` produced exact results
+on its first invocation and ``corrupted size vs. prev_size`` (glibc abort) or
+a segfault on the next. The same design with 72 or 128 bits ran clean, and
+with 96 bits it hung. Not reduced to a minimal repro; the bisection is in the
+branch log (increment 2). The design avoids non-power-of-two widths above 64
+bits in streams.
+
+.. _limitation-slice-width:
+
+P4. A bit-slice ``x[0:NAME]`` with a global ``NAME`` silently gets 32 bits
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``infer.py`` ``visit_Subscript`` infers a slice's width from
+``upper - lower``, with every global name as a free sympy symbol. ``8*j :
+8*(j+1)`` is an integer (8), but ``0 : VW`` is the symbol ``VW``. The inferer
+warns ``Cannot infer the bitwidth of the slice, use UInt(32)`` and continues.
+TinyTPU-align's ``aw[0:VW] = vv`` was right at T=4 (VW = 32) and wrong at
+T=8. Fix: resolve global integer names to their values before taking the
+difference (``ctx.global_vars``), and make the fallback an error.
+
 Surfaced while building the L2 TPU (FlashAttention)
 ---------------------------------------------------
 

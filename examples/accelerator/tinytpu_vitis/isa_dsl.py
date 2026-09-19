@@ -79,9 +79,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
-    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_VST, OP_VMEMST, OP_NOP, OP_VADD, OP_VLD,
+    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_VST, OP_VMEMST, OP_WAIT, OP_NOP,
+    OP_VADD, OP_VLD,
     OP_VRELU, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, enc, enc_agu,
-    A_VM, A_VR, AR_C, AR_P, B_VM, B_VR, C_VM, DMA_SRC_B, MAXDIM, MAXROWS, T, WPR,
+    A_VM, A_VR, AR_C, AR_P, B_VM, B_VR, C_VM, BEATS, MAXDIM, MAXROWS, T, WPR,
     VEC_M,
 )
 
@@ -185,13 +186,15 @@ class Program:
     def nop(self):
         self._ins(OP_NOP)
 
-    def dma_ld(self, src, dram_row=0, col_block=0, vmem=None, rows=0):
-        """DRAM -> VMEM, the only place DMA writes. `src` is 0 for A, 1
-        for B."""
-        if vmem is None:
-            raise NestError(f"{self.name}: dma_ld needs vmem=")
-        self._ins(OP_DMA_LD, DMA_SRC_B if src else 0, dram_row, col_block,
-                  vmem, nr=rows)
+    def vmemld(self, ch, base, stride, vmem, rows):
+        """MiniTPU's `vmemld`: `rows` beats DRAM -> VMEM on channel `ch`;
+        beat r is DRAM beat `base + r * stride` (A's beats from 0, B's from
+        BEATS; `beat()` computes them), landing in VMEM row `vmem + r`."""
+        self._ins(OP_DMA_LD, ch, base, stride, vmem, nr=rows)
+
+    def wait(self, mask):
+        """MiniTPU's `wait.channel`: fence the channels in `mask`."""
+        self._ins(OP_WAIT, mask, nr=1)
 
     def vld(self, vr, vmem, rows):
         """VMEM -> operand vregs, `rows` packed words."""
@@ -221,10 +224,10 @@ class Program:
         (the narrowing v1's `mvout` did)."""
         self._ins(OP_VST, vr, vmem, nr=rows)
 
-    def vmemst(self, vmem, dram_row=0, col_block=0, rows=0):
-        """VMEM -> C: `rows` VMEM rows to C rows `dram_row..`, column block
-        `col_block`."""
-        self._ins(OP_VMEMST, 0, dram_row, col_block, vmem, nr=rows)
+    def vmemst(self, ch, base, stride, vmem, rows):
+        """MiniTPU's `vmemst`: `rows` VMEM rows from `vmem` to C's beats
+        `base + r * stride`, on channel `ch`."""
+        self._ins(OP_VMEMST, ch, base, stride, vmem, nr=rows)
 
     def emit(self):
         """The `(word, agu_word)` list `assemble()` takes."""
@@ -277,6 +280,15 @@ class Program:
                 f"open at level {iv.level}")
 
 
+def beat(src, row, col):
+    """The DRAM beat of `row`, column block `col` of A (src 0), B (src 1) or
+    C (src 0, for `vmemst`): an int, or a `Ref` when `col` walks a loop."""
+    base = src * BEATS + row * WPR
+    if isinstance(col, Ref):
+        return Ref(base + col.base, col.terms)
+    return base + col
+
+
 # ---------------------------------------------------------------- programs ---
 def gemm_program(M, K, N, relu=False):
     """Tiled GEMM, generated. The shipped program; `bench_isa.py` asserts it is
@@ -302,17 +314,17 @@ def gemm_program(M, K, N, relu=False):
     Kt, Nt = K // T, N // T
     k = Program(f"gemm{'.relu' if relu else ''} {M}x{K}x{N}")
 
-    # --- A: one dma_ld per column block into VMEM, then vld into the vregs ---
+    # --- A: one descriptor per column block (channel 0), fenced, then vld ---
     with k.loop(Kt, "kA") as kb:
-        k.dma_ld(src=0, dram_row=0,
-                 col_block=Ref().at(kb, 1),
-                 vmem=Ref(A_VM).at(kb, MAXDIM), rows=M)
+        k.vmemld(0, beat(0, 0, Ref().at(kb, 1)), WPR,
+                 Ref(A_VM).at(kb, MAXDIM), rows=M)
+        k.wait(1)
         k.vld(Ref(A_VR).at(kb, MAXDIM), Ref(A_VM).at(kb, MAXDIM), rows=M)
-    # --- B: the same ---
+    # --- B: the same on channel 1 ---
     with k.loop(Nt, "nB") as nb:
-        k.dma_ld(src=1, dram_row=0,
-                 col_block=Ref().at(nb, 1),
-                 vmem=Ref(B_VM).at(nb, MAXDIM), rows=K)
+        k.vmemld(1, beat(1, 0, Ref().at(nb, 1)), WPR,
+                 Ref(B_VM).at(nb, MAXDIM), rows=K)
+        k.wait(2)
         k.vld(Ref(B_VR).at(nb, MAXDIM), Ref(B_VM).at(nb, MAXDIM), rows=K)
 
     # --- the output loop ---
@@ -339,19 +351,20 @@ def gemm_program(M, K, N, relu=False):
             k.vrelu(AR_C, AR_C, rows=M)
         # MiniTPU's output path: vst to VMEM, then vmemst to DRAM
         k.vst(AR_C, Ref(C_VM).at(nb, MAXDIM), rows=M)
-        k.vmemst(Ref(C_VM).at(nb, MAXDIM), dram_row=0,
-                 col_block=Ref().at(nb, 1), rows=M)
+        k.vmemst(0, beat(0, 0, Ref().at(nb, 1)), WPR,
+                 Ref(C_VM).at(nb, MAXDIM), rows=M)
+        k.wait(1)
     return k.emit()
 
 
 def vector_program(M=None):
     """Every field a GEMM leaves constant, varied -- a TEST program, not a
-    kernel. The shipped GEMM always has `dma_ld`/`vmemst` DRAM row 0, one
+    kernel. The shipped GEMM always has its descriptors at DRAM row 0, one
     accumulator region, A only as activations, B only as weights, one push
     per load popped at once, and `vrelu` in place (`f0 == f1`); a unit that
     ignored any of those would pass `bench_isa` exactly. Here:
 
-      * `dma_ld` from nonzero DRAM rows and column blocks, both sources, to
+      * descriptors from nonzero DRAM rows and column blocks, both sources, to
         VMEM rows away from the GEMM layout;
       * `vld` moving B's rows in as activations;
       * two loads and two pushes before the first pop (the pending-weight
@@ -376,14 +389,17 @@ def vector_program(M=None):
     a1 = rw + 2 * T + 6
     a2, a3, a4, a5 = a1 + S, a1 + 2 * S, a1 + 3 * S, a1 + 4 * S
     k = Program(f"vector {M}")
-    k.dma_ld(src=0, dram_row=min(3, MAXDIM - M), col_block=c(1), vmem=va, rows=M)
-    k.dma_ld(src=1, dram_row=min(2, MAXDIM - M), col_block=c(2), vmem=vb, rows=M)
+    k.vmemld(0, beat(0, min(3, MAXDIM - M), c(1)), WPR, va, rows=M)   # A
+    k.vmemld(1, beat(1, min(2, MAXDIM - M), c(2)), WPR, vb, rows=M)   # B
+    k.wait(3)
     if 2 * T <= MAXDIM:                      # W1 | W2: 2T rows of B
-        k.dma_ld(src=1, dram_row=min(5, MAXDIM - 2 * T), col_block=c(3),
-                 vmem=vw, rows=2 * T)
+        k.vmemld(0, beat(1, min(5, MAXDIM - 2 * T), c(3)), WPR, vw,
+                 rows=2 * T)
+        k.wait(1)
     else:                                    # only T rows exist: two blocks
-        k.dma_ld(src=1, dram_row=0, col_block=c(3), vmem=vw, rows=T)
-        k.dma_ld(src=0, dram_row=0, col_block=c(0), vmem=vw + T, rows=T)
+        k.vmemld(0, beat(1, 0, c(3)), WPR, vw, rows=T)
+        k.vmemld(1, beat(0, 0, c(0)), WPR, vw + T, rows=T)
+        k.wait(3)
     k.vld(r1, va, rows=M)                    # act1: A rows
     k.vld(r2, vb, rows=M)                    # act2: B rows
     k.vld(rw, vw, rows=2 * T)                # W1 at rw, W2 at rw + T
@@ -402,15 +418,15 @@ def vector_program(M=None):
     k.vrelu(a5, a4, rows=M)                  # a5 = relu(a4)
     vo = vw + 2 * T + 8                      # VMEM output rows
     k.vst(a4, vo, rows=M)
-    k.vst(a1, vo + M, rows=M)
     with k.loop(2, "half") as i:             # a5.. -> VMEM, two halves
-        k.vst(Ref(a5).at(i, h), Ref(vo + 2 * M).at(i, h), rows=h)
-    k.vmemst(vo, dram_row=0, col_block=c(1), rows=M)
-    k.vmemst(vo + M, dram_row=1, col_block=c(0), rows=M)
-    with k.loop(2, "out") as i:              # -> C rows M.., blocks 2, 3: the
-        k.vmemst(Ref(vo + 2 * M).at(i, h),   # AGU on three fields at once
-                 dram_row=Ref(M).at(i, h),
-                 col_block=Ref(c(2)).at(i, 1 if WPR > c(2) + 1 else 0), rows=h)
+        k.vst(Ref(a5).at(i, h), Ref(vo + M).at(i, h), rows=h)
+    k.vmemst(0, beat(0, 0, c(1)), WPR, vo, rows=M)
+    k.wait(1)
+    step = h * WPR + (1 if WPR > c(2) + 1 else 0)   # rows M.. and blocks 2, 3
+    with k.loop(2, "out") as i:              # the AGU on base and VMEM at once
+        k.vmemst(1, Ref(beat(0, M, c(2))).at(i, step), WPR,
+                 Ref(vo + M).at(i, h), rows=h)
+        k.wait(2)
     return k.emit()
 
 
@@ -433,9 +449,10 @@ def ar_distance_program(dist):
     n = dist
     assert 1 <= n and 2 * n <= MAXDIM
     k = Program(f"ar distance {dist}")
-    k.dma_ld(src=0, dram_row=0, col_block=0, vmem=0, rows=n)
+    k.vmemld(0, beat(0, 0, 0), WPR, 0, rows=n)
+    k.vmemld(1, beat(1, 0, 1 % WPR), WPR, 64, rows=T)
+    k.wait(3)
     k.vld(0, 0, rows=n)
-    k.dma_ld(src=1, dram_row=0, col_block=1 % WPR, vmem=64, rows=T)
     k.vld(100, 64, rows=T)                   # clear of every region below
     k.vmatload(100)
     k.vmatpush(0, rows=n)
@@ -452,15 +469,16 @@ def ar_distance_program(dist):
         k.vst(10, vo + n, rows=n)            # spacer
         k.vst(60, vo + 2 * n, rows=n - 1)
         k.vst(70, vo + 3 * n, rows=1)
-        k.vmemst(vo, dram_row=0, col_block=0, rows=n)
-        k.vmemst(vo + n, dram_row=n, col_block=1 % WPR, rows=n)
-        k.vmemst(vo + 2 * n, dram_row=0, col_block=2 % WPR, rows=n - 1)
-        k.vmemst(vo + 3 * n, dram_row=2 * n - 1, col_block=3 % WPR, rows=1)
+        k.vmemst(0, beat(0, 0, 0), WPR, vo, rows=n)
+        k.vmemst(1, beat(0, n, 1 % WPR), WPR, vo + n, rows=n)
+        k.wait(3)
+        k.vmemst(0, beat(0, 0, 2 % WPR), WPR, vo + 2 * n, rows=n - 1)
+        k.vmemst(1, beat(0, 2 * n - 1, 3 % WPR), WPR, vo + 3 * n, rows=1)
     else:
         k.vmatpop(50, rows=n)
         k.vst(50, vo + n, rows=n)
-        k.vmemst(vo, dram_row=0, col_block=0, rows=n)
-        k.vmemst(vo + n, dram_row=n, col_block=1 % WPR, rows=n)
+        k.vmemst(0, beat(0, 0, 0), WPR, vo, rows=n)
+        k.vmemst(1, beat(0, n, 1 % WPR), WPR, vo + n, rows=n)
     return k.emit()
 
 
