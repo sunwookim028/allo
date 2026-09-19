@@ -1,0 +1,9 @@
+ERROR: [HLS 200-780] Array 'buf' (../probe.cpp:49) failed dataflow checking: it has 3 processes accessing it and only 2 ports.
+INFO: [HLS 200-992] Variable 'buf' has write operations in process function 'wr' (../probe.cpp:10:20) (around ../probe.cpp:60).
+Resolution: For help on HLS 200-992 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-992.html
+INFO: [HLS 200-992] Variable 'buf' has read operations in process function 'rd' (../probe.cpp:16:20) (around ../probe.cpp:61).
+Resolution: For help on HLS 200-992 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-992.html
+INFO: [HLS 200-992] Variable 'buf' has read operations in process function 'rd.1' (../probe.cpp:17:20) (around ../probe.cpp:62).
+Resolution: For help on HLS 200-992 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-992.html
+ERROR: [HLS 200-1715] Encountered problem during source synthesis
+ERROR: [HLS 200-70] Pre-synthesis failed.

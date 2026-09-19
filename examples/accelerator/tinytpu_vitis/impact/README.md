@@ -1,0 +1,1 @@
+Evidence and scripts behind the TinyTPU-isa gap attribution; documentation: docs/source/designs/gemmini_comparison.rst ("Where the deficit came from"), https://sunwookim028.github.io/allo/designs/gemmini_comparison.html

@@ -1,0 +1,8 @@
+INFO: [HLS 200-824] Sharing array  'buf' (../probe.cpp:59)  without synchronization
+INFO: [HLS 200-992] Variable 'buf' has read and write operations in process function 'wrrd' (../probe.cpp:22:20) (around ../probe.cpp:71).
+Resolution: For help on HLS 200-992 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-992.html
+INFO: [HLS 200-992] Variable 'buf' has read operations in process function 'rd' (../probe.cpp:17:20) (around ../probe.cpp:72).
+Resolution: For help on HLS 200-992 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-992.html
+INFO: [HLS 200-755] Binding port 0 of memory 'buf' (../probe.cpp:59) to function 'wrrd' (../probe.cpp:22:20) 
+INFO: [HLS 200-755] Binding port 1 of memory 'buf' (../probe.cpp:59) to function 'rd' (../probe.cpp:17:20) 
+INFO: [HLS 200-634] Sharing array buf among processes wrrd and rd

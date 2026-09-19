@@ -1,0 +1,9 @@
+variant=v_design module=/home/sk3463/allo-impact/examples/accelerator/tinytpu_vitis/impact/v_design.py run=/home/sk3463/allo-impact/examples/accelerator/tinytpu_vitis/impact/runs/v_design
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data
+  synthesizing once ...
+   4x 4x 4  cycles=229   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=833   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   229
+  16x16x16   833

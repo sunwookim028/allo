@@ -1,0 +1,8 @@
+# the evidence is text the root .gitignore would otherwise drop (*.out, *.txt)
+!results/*.out
+!results/*.txt
+!probe_shared/*.summary.txt
+runs/
+probe_shared/m*/
+v_*.py
+scratch/

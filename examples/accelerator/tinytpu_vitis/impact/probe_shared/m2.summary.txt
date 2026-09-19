@@ -1,0 +1,4 @@
+ERROR: [HLS 200-1013] Bundled bus interface 'gmem0' on port 'p' failed dataflow checking: it cannot read data in multiple processes.
+ERROR: [HLS 200-984] Bundled bus interface 'gmem0' on port 'p' has read operations in functions:  'rdm' (../probe.cpp:22:20) and 'rdm.1' (../probe.cpp:23:20).
+ERROR: [HLS 200-1715] Encountered problem during source synthesis
+ERROR: [HLS 200-70] Pre-synthesis failed.

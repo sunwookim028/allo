@@ -1,0 +1,1 @@
+INFO: [HLS 200-741] Implementing PIPO top_buf_r_RAM_AUTO_1R1W using a single memory for all blocks

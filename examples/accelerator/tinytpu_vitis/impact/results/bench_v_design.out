@@ -1,0 +1,12 @@
+  gemm       4x 4x 4 wrong=0/16
+  gemm.relu  4x 4x 4 wrong=0/16
+  gemm       8x 8x 8 wrong=0/64
+  gemm.relu  8x 8x 8 wrong=0/64
+  gemm      12x12x12 wrong=0/144
+  gemm.relu 12x12x12 wrong=0/144
+  gemm      16x16x 8 wrong=0/128
+  gemm.relu 16x16x 8 wrong=0/128
+  gemm      16x16x16 wrong=0/256
+  gemm.relu 16x16x16 wrong=0/256
+  vadd+relu wrong=0/64
+  ALL EXACT
