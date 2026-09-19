@@ -22,7 +22,7 @@ Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied
    (`{"*": "deny"}`). The MCP tools are all the agent has.
-   `apply_spec_patch` / `insert_after` reject any path except the two bare
+   `replace_text` / `apply_spec_patch` / `insert_after` reject any path except the two bare
    file names. That includes a diff that also touches another file, and
    `../` paths.
 2. **Frozen files come from git, never from disk.** `evaluate.py` composes a
@@ -126,8 +126,66 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `stress.py` | frozen extra semantic gate |
 | `spec_policy.py` | frozen: what an editable file may contain |
 | `accept.py` | clean-checkout, five-shape acceptance of a claimed winner |
-| `allo_tool.py` | the MCP surface: read spec / read frozen reference / patch / functional check / score |
+| `allo_tool.py` | the MCP surface: read spec / read frozen reference / replace_text, patch, insert / functional check / score |
+| `llm.py` | CHIA's OpenCodeLLM with a 40-minute MCP request timeout |
 | `loop.py` | one search: baseline, propose from best, harness re-scores, keep or rewind |
 | `swarm.py` | K searches on different starting angles, global spend cap, report |
 | `spend.py` | USD from opencode's DB since a timestamp |
 | `smoke.py` | the cheapest end-to-end check |
+
+## Capped smoke run, 2026-09-19: nothing improved, and what it exposed
+
+`chia_runs/isa-smoke-20260919-035443/`: 2 workers (`operand-path`,
+`weight-prologue`), at most 3 iterations each, $15 hard cap, model
+`google-vertex/gemini-3.1-pro-preview`, harness @ `201f9342`..`68dfbc53` (same
+frozen files).
+
+| | |
+| --- | --- |
+| spend | **$15.15** (opencode DB, 234 model messages). The hard cap fired at $15.15 and killed both workers |
+| wall | 56.1 min |
+| baseline, in-loop | cosim **252 / 919** (4x4x4 / 16x16x16), gate + stress pass. Both workers reproduced it |
+| candidates completed | **0**. Neither worker finished iteration 1. No cycle number was produced for any proposal |
+| acceptance control | `accept.py` on the unmodified design, clean checkout: cosim **252 / 383 / 591 / 667 / 919**, all five TBs `mismatches = 0`, ALL EXACT, stress 60/60, est. clock 2.431 ns |
+
+What the workers were doing when stopped. Both are unfinished edits, not
+candidates. They are in `<worker>/unscored_leftover.diff`, and neither
+earned a cosim number:
+
+- **operand-path** ($7.15 + $0.06): was folding `vru` into `spm` to remove the
+  vector-register tier. `spm`'s new `mm` branch reads `spad` but never feeds the
+  array, and `vru` is stubbed out. Gated post-hoc by me, with the fixed
+  harness: **deadlock**, `gate:bench_isa` TIMEOUT at 240 s. It also left debug
+  junk in the file, such as `# DUMMY COMMENT FOR TRACEBACK`.
+- **weight-prologue** ($6.14 + $1.80): was flattening the PE into one
+  state-machine loop. That is not double-buffered weights, and it is the
+  flat-PE variant `RESULTS_ISA.md` already measured as buying nothing while
+  `vru` pays the same prologue upstream. It left a duplicate `pe` and dummy
+  functions. Gated post-hoc: `gate:bench_isa`, Allo frontend error.
+
+Neither leftover is claimed as a result. Most of both sessions went on edit
+mechanics: 102 (operand-path) and 69 (weight-prologue, both sessions)
+patch/insert calls, most rejected as non-applying or unparseable.
+
+Harness defects the run exposed, all fixed in `97308da0` (none of them touch
+the objective):
+
+1. opencode timed MCP tool calls out at 60 s, and a cosim score takes 2-4 min,
+   so the agent's `score_cycles` could never return. The harness's own scoring
+   does not go through MCP and was unaffected. `llm.py` now sets a 40-minute
+   MCP timeout.
+2. Sync evaluator tools blocked the MCP server's event loop. After a hung
+   functional check, the next session saw **no tools at all**, tried
+   `bash`/`python` (all refused, so containment held), and gave up. The tools
+   are now async and run in a thread. Tested: `read_spec` answers in 1 s while
+   a gate runs.
+3. A deadlocked candidate held the gate for up to 900 s. The gate timeout is
+   now 240 s, and the process group is killed.
+4. CHIA's `retries=3` silently re-ran the 40-minute timed-out prompt, and a
+   timed-out call reports $0 usage while still being billed. `retries=1` now,
+   and the budget projects from the global DB delta.
+5. Unified diffs were the agents' main failure mode, so `replace_text` (exact,
+   unique) is now the preferred edit.
+
+The fixed loop has **not** been exercised against the model: that needs more
+than the $15 this run was capped at.

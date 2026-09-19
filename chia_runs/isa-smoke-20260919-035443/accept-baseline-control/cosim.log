@@ -1,0 +1,14 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 5 shapes as data
+  synthesizing once ...
+   4x 4x 4  cycles=252   TB 4x4x4 mismatches = 0 / 16
+   8x 8x 8  cycles=383   TB 8x8x8 mismatches = 0 / 64
+  12x12x12  cycles=591   TB 12x12x12 mismatches = 0 / 144
+  16x16x 8  cycles=667   TB 16x16x8 mismatches = 0 / 128
+  16x16x16  cycles=919   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   252
+   8x 8x 8   383
+  12x12x12   591
+  16x16x 8   667
+  16x16x16   919

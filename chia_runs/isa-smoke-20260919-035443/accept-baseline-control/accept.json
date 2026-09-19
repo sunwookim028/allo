@@ -1,0 +1,46 @@
+{
+ "ref": "06b06deafc1e817b45d38035054a99985b9c6e63",
+ "diff": null,
+ "ok": true,
+ "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset",
+ "checkout_status": [],
+ "allo_resolves_to": "/home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-baseline-control-1789824628/allo/__init__.py",
+ "bench_isa": {
+  "rc": 0,
+  "last": [
+   "ALL EXACT"
+  ],
+  "seconds": 4.1
+ },
+ "stress": {
+  "rc": 0,
+  "last": [
+   "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)"
+  ],
+  "seconds": 3.9
+ },
+ "cosim": {
+  "4x4x4": {
+   "cycles": 252,
+   "tb": "TB 4x4x4 mismatches = 0 / 16"
+  },
+  "8x8x8": {
+   "cycles": 383,
+   "tb": "TB 8x8x8 mismatches = 0 / 64"
+  },
+  "12x12x12": {
+   "cycles": 591,
+   "tb": "TB 12x12x12 mismatches = 0 / 144"
+  },
+  "16x16x8": {
+   "cycles": 667,
+   "tb": "TB 16x16x8 mismatches = 0 / 128"
+  },
+  "16x16x16": {
+   "cycles": 919,
+   "tb": "TB 16x16x16 mismatches = 0 / 256"
+  }
+ },
+ "cosim_seconds": 242.1,
+ "estimated_ns": 2.431
+}

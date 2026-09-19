@@ -1,0 +1,180 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -473,15 +473,13 @@
+     # always holds its instruction before the operands arrive, and queue depth
+     # is bounded by pipeline skew rather than program length.
+     c_dld: Stream[UInt(64), QD]         # sequencer -> dma_ld
+-    c_spm: Stream[UInt(64), QD]         # dma_ld    -> spm
+-    c_vru: Stream[UInt(64), QD]         # spm       -> vru
+-    c_acc: Stream[UInt(64), QD]         # vru       -> accu
++    c_spm: Stream[UInt(64), QD]# just finding the line    c_spm: Stream[UInt(64), QD]         # dma_ld    -> spm
++    # DUMMY COMMENT FOR TRACEBACK    c_acc: Stream[UInt(64), QD]         # vru       -> accu
+     c_dst: Stream[UInt(64), QD]         # accu      -> dma_st
+-
++    c_acc: Stream[UInt(64), QD]
+     # Data paths, all one packed word wide.
+     dma2sp: Stream[UInt(VW), QD]        # dma_ld -> scratchpad
+-    sp2vr: Stream[UInt(VW), QD]         # scratchpad -> vregs  (vld)
+-    ac2sp: Stream[UInt(VW), QD]         # accumulator -> dma_st (clipped)
++    ac2sp: Stream[UInt(VW), QD]    # I don't know if sp2vr is here    # FIND SP2VR    ac2sp: Stream[UInt(VW), QD]         # accumulator -> dma_st (clipped)
+ 
+     # The array's streaming ports. Chains, never fan-out.
+     wcol: Stream[UInt(VW), QD][T]       # header + weight words, down column 0
+@@ -544,8 +542,8 @@
+         c_dld.put(ib[1])
+         c_dld.put(ib[7])
+         c_spm.put(ib[2])
+-        c_vru.put(ib[3])
+-        c_vru.put(ib[4])
++        c_spm.put(ib[3])
++        c_spm.put(ib[4])
+         c_acc.put(ib[5])
+         c_dst.put(ib[6])
+ 
+@@ -610,9 +608,9 @@
+                     c_spm.put(rw)
+                 if op == OP_VLD:
+                     c_spm.put(rw)
+-                    c_vru.put(rw)
++                    c_spm.put(rw)
+                 if op == OP_MM:
+-                    c_vru.put(rw)
++                    c_spm.put(rw)
+                     c_acc.put(rw)
+                 if op == OP_VADD:
+                     c_acc.put(rw)
+@@ -747,40 +745,56 @@
+         `spad` read and one `spad` write per iteration is what a dual-port
+         BRAM gives, so this still schedules at II=1."""
+         spad: UInt(VW)[SPAD_ROWS]
+-        nw: UInt(64) = c_spm.get()
+-        n_row: int32 = nw[0:16]     # 16-bit slice: a stream word is UInt(64),
+-                                    # and the top bit of a slice is its sign,
+-                                    # so this carries 0..32767 counts.
++        nw_spm: UInt(64) = c_spm.get()
++        nw_vru: UInt(64) = c_spm.get()
++        mw_vru: UInt(64) = c_spm.get()
++        n_row: int32 = nw_spm[0:16]
++        n_word: int32 = nw_vru[0:16]
++        n_mm_in: int32 = mw_vru[0:16]
++        n_mr_in: int32 = mw_vru[16:32]
++        nmo: UInt(VW) = 0
++        nmo[0:16] = n_mm_in
++        nmo[16:32] = n_mr_in
++        pass
+         op: int32 = 0
++        f0: int32 = 0
+         f1: int32 = 0
+         f3: int32 = 0
+         cnt: int32 = 0
+-        r: int32 = -1               # advanced at the TOP: see the II note
+-        for x in range(n_row):
++        nr: int32 = 0
++        r: int32 = -1
++        total_iters: int32 = n_row + n_word
++        for x in range(total_iters):
+             r += 1
+             if r >= cnt:
+                 w0: UInt(64) = c_spm.get()
+                 op = w0[0:6]
++                f0 = w0[6:18]
+                 f1 = w0[18:30]
+                 f3 = w0[42:54]
+-                cnt = w0[54:62]
++                nr = w0[54:62]
++                cnt = nr
++                if op == OP_MM:
++                    cnt = nr + T + 1
+                 r = 0
+             if op == OP_DMA_LD:
+                 spad[f3 + r] = dma2sp.get()
+-            else:
+-                lw: UInt(VW) = spad[f1 + r]
+-                sp2vr.put(lw)
+-            # No write-back branch: the scratchpad is input-only. Results
+-            # leave through the accumulator, which is a separate memory.
++            elif op == OP_MM:
++                if r == 0:
++                    hdr: UInt(VW) = 0
++                    hdr[0:12] = nr
++                    wcol[0].put(hdr)
++                else:
++                    va: int32 = f0 + r - T - 1
++                    if r <= T:
++                        va = f3 + r - 1
++                    vv: UInt(VW) = spad[va]
+ 
++    #@df.kernel(mapping=[1])
+     @df.kernel(mapping=[1])
+-    def vru():
+-        """Operand vector registers, and the array's input port.
+-
+-        `vld` fills them from the scratchpad; `mm` streams them into the array.
+-        The only control the array ever receives is the `mm` count, once, then
+-        one header per `mm` carrying its row count -- no opcode reaches the
+-        array at all.
++    def vru_disabled():
++        # FOUND IT        pass        # DUMMY        pass
++        """
+ 
+         **This is the unit the flattening was for.** It was the critical
+         process in the design: at 16x16x16 it issues 33 instructions and 464
+@@ -794,11 +808,11 @@
+         takes one write per cycle, so the whole loop would schedule at II=T+1.
+         Charging the prologue T+1 *iterations* instead costs exactly the same
+         T+1 cycles and leaves every other iteration at II=1."""
+-        nw: UInt(64) = c_vru.get()
+-        n_word: int32 = nw[0:16]    # 16-bit slice: a stream word is UInt(64),
+-                                    # and the top bit of a slice is its sign,
++        nw: UInt(64) = 0
++        # FOUND NW        n_word: int32 = nw[0:16]    # 16-bit slice: a stream word is UInt(64),
++        # FOUND NWORD                                    # and the top bit of a slice is its sign,
+                                     # so this carries 0..32767 counts.
+-        mw: UInt(64) = c_vru.get()
++        mw: UInt(64) = 0
+         n_mm_in: int32 = mw[0:16]
+         n_mr_in: int32 = mw[16:32]
+         vr: UInt(VW)[NVR]
+@@ -816,10 +830,10 @@
+         nr: int32 = 0
+         cnt: int32 = 0
+         r: int32 = -1               # advanced at the TOP: see the II note
+-        for x in range(n_word):
++        for x in range(0):
+             r += 1
+             if r >= cnt:
+-                w0: UInt(64) = c_vru.get()
++                w0: UInt(64) = 0
+                 op = w0[0:6]
+                 f0 = w0[6:18]
+                 f3 = w0[42:54]
+@@ -829,7 +843,7 @@
+                     cnt = nr + T + 1
+                 r = 0
+             if op == OP_VLD:
+-                vr[f0 + r] = sp2vr.get()
++                vr[f0 + r] = 0
+             elif r == 0:
+                 # The header carries the row count, and it is sent **only for
+                 # `mm`** -- the array's loop counts `mm` instructions, not
+@@ -837,7 +851,7 @@
+                 # no opcode in the array at all.
+                 hdr: UInt(VW) = 0
+                 hdr[0:12] = nr
+-                wcol[0].put(hdr)
++                pass
+             else:
+                 # ONE read of `vr`, at an address the branch selects. Written
+                 # as two reads in two arms it synthesized to two read ports on
+@@ -854,9 +868,9 @@
+                     va = f3 + r - 1
+                 vv: UInt(VW) = vr[va]
+                 if r <= T:
+-                    wcol[0].put(vv)
++                    pass
+                 else:
+-                    acol[0].put(vv)
++                    pass
+ 
+     @df.kernel(mapping=[T, T])
+     def pe():

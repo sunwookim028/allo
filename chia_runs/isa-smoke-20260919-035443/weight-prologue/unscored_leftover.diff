@@ -1,0 +1,213 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -1,6 +1,11 @@
+ # Copyright Allo authors. All Rights Reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ 
++def dummy():
++    pass
++
++def dummy2(): pass
++
+ """TinyTPU-isa: an instruction-programmable tiled-GEMM accelerator in grid Allo.
+ 
+ What the earlier files in this directory got and did not get:
+@@ -490,6 +495,95 @@
+     a_fwd: Stream[int8, QD][T, T]       # one lane, east
+     p_fwd: Stream[int32, QD][T, T]      # partial sums, south
+     cw: Stream[UInt(AW), QD][T]         # bottom row packs T psums going east
++    @df.kernel(mapping=[T, T])
++    def pe():
++        i, j = df.get_pid()
++        w: int8 = 0
++        nmw: UInt(VW) = 0
++        with allo.meta_if(j == 0):
++            nmw = wcol[i].get()
++            with allo.meta_if(i != T - 1):
++                wcol[i + 1].put(nmw)
++        with allo.meta_else():
++            nmw = wrow[i, j - 1].get()
++        with allo.meta_if(j != T - 1):
++            wrow[i, j].put(nmw)
++        nmm: int32 = nmw[0:16]
++        nmr: int32 = nmw[16:32]
++        total_iters: int32 = 0
++        with allo.meta_if(j == 0):
++            total_iters = nmm * (T + 1 - i) + nmr
++        with allo.meta_else():
++            total_iters = nmm * 2 + nmr
++        nrows: int32 = 0
++        state: int32 = 0
++        m_state: int32 = 0
++        for _pe_x in range(total_iters):
++            if state == 0:
++                hdr: UInt(VW) = 0
++                with allo.meta_if(j == 0):
++                    hdr = wcol[i].get()
++                    with allo.meta_if(i != T - 1):
++                        wcol[i + 1].put(hdr)
++                with allo.meta_else():
++                    hdr = wrow[i, j - 1].get()
++                with allo.meta_if(j != T - 1):
++                    wrow[i, j].put(hdr)
++                nrows = hdr[0:12]
++                state = 1
++            elif state == 1:
++                ww: UInt(VW) = 0
++                with allo.meta_if(j == 0):
++                    ww = wcol[i].get()
++                with allo.meta_else():
++                    ww = wrow[i, j - 1].get()
++                with allo.meta_if(j != T - 1):
++                    wrow[i, j].put(ww)
++                w = ww[8 * j : 8 * (j + 1)]
++                with allo.meta_if(j == 0):
++                    with allo.meta_if(i == T - 1):
++                        state = 3
++                    with allo.meta_else():
++                        state = 2
++                with allo.meta_else():
++                    state = 3
++            elif state == 2:
++                with allo.meta_if(j == 0):
++                    with allo.meta_if(i != T - 1):
++                        wcol[i + 1].put(wcol[i].get())
++                        m_state += 1
++                        if m_state == T - 1 - i:
++                            state = 3
++                            m_state = 0
++            else:
++                a: int8 = 0
++                with allo.meta_if(j == 0):
++                    aw: UInt(VW) = acol[i].get()
++                    with allo.meta_if(i != T - 1):
++                        acol[i + 1].put(aw)
++                    a = aw[8 * i : 8 * (i + 1)]
++                with allo.meta_else():
++                    a = a_fwd[i, j - 1].get()
++                p: int32 = 0
++                with allo.meta_if(i > 0):
++                    p = p_fwd[i - 1, j].get()
++                av: int16 = a
++                wv: int16 = w
++                o: int32 = p + av * wv
++                with allo.meta_if(i != T - 1):
++                    p_fwd[i, j].put(o)
++                with allo.meta_else():
++                    cv: UInt(AW) = 0
++                    with allo.meta_if(j > 0):
++                        cv = cw[j - 1].get()
++                    cv[32 * j : 32 * (j + 1)] = o
++                    cw[j].put(cv)
++                with allo.meta_if(j != T - 1):
++                    a_fwd[i, j].put(a)
++                m_state += 1
++                if m_state == nrows:
++                    state = 0
++                    m_state = 0
+ 
+     @df.kernel(mapping=[1], args=[imem])
+     def sequencer(l_imem: UInt(64)[IMEM_SIZE]):
+@@ -858,8 +952,8 @@
+                 else:
+                     acol[0].put(vv)
+ 
+-    @df.kernel(mapping=[T, T])
+-    def pe():
++    # @df.kernel(mapping=[T, T])
++    def pe_stub_ignored():
+         """One processing element. Weight-stationary, and it decodes nothing.
+ 
+         Its loop counts **`mm` instructions**, not program instructions: the
+@@ -872,7 +966,7 @@
+         and adder latencies are pipeline *depth*, not initiation interval, which
+         is the property `microarch.py` could not have and the reason a systolic
+         array is built deep."""
+-        i, j = df.get_pid()
++        i, j = 0, 0
+         w: int8 = 0
+         # The `mm` count arrives on the same chain the headers use, so the
+         # array learns how many matmuls the program holds without decoding it.
+@@ -886,6 +980,82 @@
+         with allo.meta_if(j != T - 1):
+             wrow[i, j].put(nmw)
+         nmm: int32 = nmw[0:16]
++        nmr: int32 = nmw[16:32]
++        total_iters: int32 = 0
++        with allo.meta_if(j == 0):
++            total_iters = nmm * (T + 1 - i) + nmr
++        with allo.meta_else():
++            total_iters = nmm * 2 + nmr
++        nrows: int32 = 0
++        state: int32 = 0
++        m_state: int32 = 0
++        for _pe_x in range(total_iters):
++            if state == 0:
++                hdr: UInt(VW) = 0
++                with allo.meta_if(j == 0):
++                    hdr = wcol[i].get()
++                    with allo.meta_if(i != T - 1):
++                        wcol[i + 1].put(hdr)
++                with allo.meta_else():
++                    hdr = wrow[i, j - 1].get()
++                with allo.meta_if(j != T - 1):
++                    wrow[i, j].put(hdr)
++                nrows = hdr[0:12]
++                state = 1
++            elif state == 1:
++                ww: UInt(VW) = 0
++                with allo.meta_if(j == 0):
++                    ww = wcol[i].get()
++                with allo.meta_else():
++                    ww = wrow[i, j - 1].get()
++                with allo.meta_if(j != T - 1):
++                    wrow[i, j].put(ww)
++                w = ww[8 * j : 8 * (j + 1)]
++                with allo.meta_if(j == 0):
++                    with allo.meta_if(i == T - 1):
++                        state = 3
++                    with allo.meta_else():
++                        state = 2
++                with allo.meta_else():
++                    state = 3
++            elif state == 2:
++                with allo.meta_if(j == 0):
++                    with allo.meta_if(i != T - 1):
++                        wcol[i + 1].put(wcol[i].get())
++                        m += 1
++                        if m == T - 1 - i:
++                            state = 3
++                            m = 0
++            else:
++                a: int8 = 0
++                with allo.meta_if(j == 0):
++                    aw: UInt(VW) = acol[i].get()
++                    with allo.meta_if(i != T - 1):
++                        acol[i + 1].put(aw)
++                    a = aw[8 * i : 8 * (i + 1)]
++                with allo.meta_else():
++                    a = a_fwd[i, j - 1].get()
++                p: int32 = 0
++                with allo.meta_if(i > 0):
++                    p = p_fwd[i - 1, j].get()
++                av: int16 = a
++                wv: int16 = w
++                o: int32 = p + av * wv
++                with allo.meta_if(i != T - 1):
++                    p_fwd[i, j].put(o)
++                with allo.meta_else():
++                    cv: UInt(AW) = 0
++                    with allo.meta_if(j > 0):
++                        cv = cw[j - 1].get()
++                    cv[32 * j : 32 * (j + 1)] = o
++                    cw[j].put(cv)
++                with allo.meta_if(j != T - 1):
++                    a_fwd[i, j].put(a)
++                m_state += 1
++                if m_state == nrows:
++                    state = 0
++                    m = 0
++        return
+         for c in range(nmm):
+             # --- header: down column 0, then east along the row ---
+             hdr: UInt(VW) = 0

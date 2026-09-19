@@ -1,0 +1,12 @@
+launching worker 'operand-path'
+launching worker 'weight-prologue'
+HARD CAP: spent $15.15 >= $15.00; killing workers
+worker 'operand-path' exited with 15
+worker 'weight-prologue' exited with -6
+==============================================================================
+Swarm results (all cycle counts are RTL cosim)
+==============================================================================
+
+  baseline {'16x16x16': 919, '4x4x4': 252}
+  best     no candidate beat the baseline
+  spend    $15.15 (234 model messages); wall 56.1 min
