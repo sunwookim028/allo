@@ -198,16 +198,6 @@ Open
      - none (Vitis target)
      - not sized
      - `item19_tapa_try_ops_message.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item19_tapa_try_ops_message.py>`__
-   * - :ref:`21 <limitation-21>`
-     - REPRODUCES
-     - frontend, emitter
-     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
-     - **priced**: 35 cycles at 16x16x16 on the shipped design (5 at 4x4x4); 95
-       once the design fixes are in. The pragma form costs 1,744 FF in
-       ``accu`` against 17,438 for the reverted rotation.
-     - not sized; **escape hatch today**: patch ``kernel.cpp`` between
-       ``s.build(mode="csyn")`` and running Vitis
-     - ``v_accudep`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact>`__
    * - :ref:`22 <limitation-22>`
      - REPRODUCES
      - SystemC fork
@@ -239,7 +229,7 @@ Open
        Allo-legal
      - SystemC fork: ~50-100 lines (bind one writer and one reader to one
        instance's two pin sets)
-     - ``probe_shared/`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__
+     - `impact/probe_shared/ <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__
    * - :ref:`A <limitation-a>`
      - REPRODUCES
      - simulator
@@ -300,7 +290,7 @@ Open
      - **+409 / +361 cycles** at 4x4x4 / 16x16x16 when restored on ``spad``
        (measured, ``v_memset``); the shipped design avoids it
      - not sized (warn; or reset-time init; or elide -- see item)
-     - ``v_memset`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact>`__
+     - ``v_memset`` in `impact/ <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact>`__
    * - :ref:`H <limitation-h>`
      - REPRODUCES
      - frontend
@@ -394,6 +384,13 @@ Fixed or closed
      - Generated identifiers and parameter names shared no namespace.
      - **fork-only -- upstreaming candidate**
      - `item20_emitter_name_collision.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py>`__
+   * - :ref:`21 <limitation-21>`
+     - FIXED by ``bbea2af0`` (``s.dependence``); TinyTPU-isa uses it since
+       ``e24e433b``
+     - frontend, emitter
+     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
+     - **fork-only -- upstreaming candidate**
+     - ``tests/test_vhls.py::test_dependence_pragma*``
 
 Two sub-items sit inside rows of the open table: 10(b) and 17(b) are
 CANNOT-REPRODUCE.
@@ -1171,9 +1168,27 @@ compile:
 21. No ``#pragma HLS dependence`` primitive, so a false dependence cannot be asserted away
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
+.. admonition:: Status (2026-09-19)
 
-   REPRODUCES, and now **priced** (below and :ref:`gemmini-gap-attribution`).
+   **FIXED by** ``bbea2af0`` (fork-only; upstreaming candidate): a schedule
+   primitive, ``s.dependence(axis, target, dep_type="inter"|"intra",
+   direction=None|"RAW"|"WAR"|"WAW", distance=None, dependent=False,
+   dep_class=None|"array"|"pointer")``, next to ``s.partition`` in
+   ``allo/customize.py``. It stores the claim as a ``dependence`` attribute on
+   the loop and ``emitLoopDirectives`` in ``EmitVivadoHLS.cpp`` emits
+   ``#pragma HLS dependence variable=<array> ...`` inside that loop (affine and
+   ``scf`` loops alike). The array is a local buffer or an argument of the
+   loop's function. It is reachable on a dataflow region through
+   ``allo.dataflow.customize`` by the kernel instance's name, as ``s.partition``
+   is. Tests: ``tests/test_vhls.py::test_dependence_pragma``,
+   ``::test_dependence_pragma_rejects_bad_claims``,
+   ``::test_dependence_pragma_dataflow_region``. 112 lines of Python (about
+   half of them the docstring and argument checks) and 46 of C++, against the
+   30-50 sized: larger than sized, not blocked. TinyTPU-isa has used it for its
+   accumulator since ``e24e433b`` (:ref:`tinytpu-isa-dependence`); the price
+   below is what that recovered.
+
+   The text below is the item as it stood before the fix.
 
 Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
 where the scheduler cannot prove two accesses are independent but the author
@@ -1197,13 +1212,20 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   at II=2.
 - **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
   ``#pragma HLS dependence variable=ar inter false`` into the emitted
-  ``kernel.cpp`` (``v_accudep`` on branch ``impact-limits``) measures **35
-  cycles** at 16x16x16 on the shipped design (919 -> 884; 5 at 4x4x4), and **95**
-  once the design fixes are in (``v_design_dep``). The pragma form costs
-  **1,744 FF** in ``accu`` against **17,438** for the reverted rotation. It can
-  be injected today by patching ``kernel.cpp`` between
-  ``s.build(mode="csyn")`` and running Vitis. Attribution:
-  :ref:`gemmini-gap-attribution`.
+  ``kernel.cpp`` (``v_accudep``, now under ``examples/accelerator/tinytpu_vitis/impact/``)
+  measures **35 cycles** at 16x16x16 on the then-shipped design (919 -> 884; 5
+  at 4x4x4), and **95** once the design fixes are in (``v_design_dep``). The
+  pragma form costs **1,744 FF** in ``accu`` against **17,438** for the
+  reverted rotation. Before the fix the only way to get it was patching
+  ``kernel.cpp`` between ``s.build(mode="csyn")`` and running Vitis.
+  Attribution: :ref:`gemmini-gap-attribution`.
+- **A dependence claim is a contract, and the primitive does not check it.**
+  Landing the claim on TinyTPU-isa showed that ``inter false`` on ``ar`` is
+  true only for programs that never read an accumulator row within two
+  iterations of writing it: the synthesized loop loads in state 5 and stores in
+  state 7, and a distance-1 or -2 read returns the old row in RTL while every
+  simulator (Allo's, and Vitis csim) is exact. The design makes the claim true
+  in its assembler. Nothing in Allo can see a false claim; only RTL can.
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II
@@ -1422,9 +1444,9 @@ Surfaced by the 2026-09-19 re-verification and impact analysis
 
 Found while re-verifying the items above (A-F, with repros under
 ``tests/limits/``) and while pricing the TinyTPU-isa deficit to Gemmini (G and
-the shared-memory item; variants on branch ``impact-limits``,
-``examples/accelerator/tinytpu_vitis/impact/``, commits ``f98c0dac`` and
-``55405e00``).
+the shared-memory item; the variants are on ``main`` under
+``examples/accelerator/tinytpu_vitis/impact/``, folded in from branch
+``impact-limits`` -- commits ``f98c0dac`` and ``55405e00`` -- since deleted).
 
 .. _limitation-shared-memory:
 
@@ -1557,8 +1579,9 @@ An array declared ``= 0`` lowers to a runtime zero-fill loop: ``builder.py:1063-
 emits ``linalg.fill``, and ``hls.py:288`` (``convert-linalg-to-affine-loops``)
 turns it into a loop that runs every invocation. Restoring ``spad = 0`` on
 TinyTPU-isa (``v_memset``) measured **+409 / +361 cycles** at 4x4x4 /
-16x16x16 (661 / 1280 against 252 / 919; the same with all six arrays ``= 0``,
-``v_memset6``). This is the 514-cycle zero-fill the shipped design removed.
+16x16x16 (661 / 1280 against 252 / 919, the design shipped until
+``e24e433b``; the same with all six arrays ``= 0``, ``v_memset6``). This is the
+514-cycle zero-fill the shipped design removed.
 
 The right semantics are one of: warn; initialise at reset through the existing
 Stateful ``memref.global`` path (correct only for the first invocation); or

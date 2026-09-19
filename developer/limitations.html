@@ -403,18 +403,7 @@ base methods are empty (<code class="docutils literal notranslate"><span class="
 <td><p>not sized</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item19_tapa_try_ops_message.py">item19_tapa_try_ops_message.py</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-21"><span class="std std-ref">21</span></a></p></td>
-<td><p>REPRODUCES</p></td>
-<td><p>frontend, emitter</p></td>
-<td><p>No schedule primitive and no emitter path for <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>.</p></td>
-<td><p><strong>priced</strong>: 35 cycles at 16x16x16 on the shipped design (5 at 4x4x4); 95
-once the design fixes are in. The pragma form costs 1,744 FF in
-<code class="docutils literal notranslate"><span class="pre">accu</span></code> against 17,438 for the reverted rotation.</p></td>
-<td><p>not sized; <strong>escape hatch today</strong>: patch <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between
-<code class="docutils literal notranslate"><span class="pre">s.build(mode=&quot;csyn&quot;)</span></code> and running Vitis</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">v_accudep</span></code> on branch <a class="reference external" href="https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact">impact-limits</a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-22"><span class="std std-ref">22</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-22"><span class="std std-ref">22</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>SystemC fork</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">emitWireGet</span></code> / <code class="docutils literal notranslate"><span class="pre">emitWirePut</span></code> (fork <code class="docutils literal notranslate"><span class="pre">EmitSystemC.cpp:1828-1848</span></code>) are
@@ -425,7 +414,7 @@ path</p></td>
 <td><p>the <code class="docutils literal notranslate"><span class="pre">SC_METHOD</span></code> comb mode scoped in <code class="docutils literal notranslate"><span class="pre">c7402f9f</span></code> (five phases)</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/REPRO.sh</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-23"><span class="std std-ref">23</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-23"><span class="std std-ref">23</span></a></p></td>
 <td><p>REPRODUCES (on probes)</p></td>
 <td><p>HLS driver, emitter</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">m_axi</span></code> pragma is a regex rewrite of emitted text
@@ -436,7 +425,7 @@ dead-commented.</p></td>
 <td><p>see item text</p></td>
 <td><p>probes (not committed)</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-shared-memory"><span class="std std-ref">shared memory</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-shared-memory"><span class="std std-ref">shared memory</span></a></p></td>
 <td><p>REPRODUCES (Allo’s rule, not Vitis’s)</p></td>
 <td><p>emitter; SystemC fork</p></td>
 <td><p>Allo refuses a region-scope Stateful shared by two kernels
@@ -447,9 +436,9 @@ dead-commented.</p></td>
 Allo-legal</p></td>
 <td><p>SystemC fork: ~50-100 lines (bind one writer and one reader to one
 instance’s two pin sets)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">probe_shared/</span></code> on branch <a class="reference external" href="https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact/probe_shared">impact-limits</a></p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared">impact/probe_shared/</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-a"><span class="std std-ref">A</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-a"><span class="std std-ref">A</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>simulator</p></td>
 <td><p>The simulator pipeline has no math-to-LLVM pass
@@ -459,7 +448,7 @@ This also breaks item 4’s documented workaround.</p></td>
 <td><p>1 line (verified)</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_sim_math_lowering.py">new_sim_math_lowering.py</a></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-b"><span class="std std-ref">B</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-b"><span class="std std-ref">B</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend</p></td>
 <td><p>A scalar <code class="docutils literal notranslate"><span class="pre">Stream.get()</span></code> result is never cast to the destination type
@@ -468,7 +457,7 @@ This also breaks item 4’s documented workaround.</p></td>
 <td><p>3 lines (verified)</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_stream_get_no_cast.py">new_stream_get_no_cast.py</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-c"><span class="std std-ref">C</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-c"><span class="std std-ref">C</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">customize()</span></code> calls <code class="docutils literal notranslate"><span class="pre">sys.exit(1)</span></code> on frontend errors
@@ -478,7 +467,7 @@ terminated</p></td>
 <td><p>not sized</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_customize_sys_exit.py">new_customize_sys_exit.py</a></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-d"><span class="std std-ref">D</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-d"><span class="std std-ref">D</span></a></p></td>
 <td><p>REPRODUCES (fork-only code)</p></td>
 <td><p>emitter</p></td>
 <td><p>Catapult <code class="docutils literal notranslate"><span class="pre">full()</span></code> always returns <code class="docutils literal notranslate"><span class="pre">false</span></code>
@@ -487,7 +476,7 @@ terminated</p></td>
 <td><p>not sized</p></td>
 <td><p>reported by <a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item18_catapult_try_ops_blocking.py">item18_catapult_try_ops_blocking.py</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-e"><span class="std std-ref">E</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-e"><span class="std std-ref">E</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend</p></td>
 <td><p>Item 5 extended: same-name, <strong>same-type</strong> shadowing of a region
@@ -497,7 +486,7 @@ item 5.</p></td>
 <td><p>with item 5</p></td>
 <td><p>variant (b) of <a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item05_region_param_shadowing.py">item05_region_param_shadowing.py</a></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-f"><span class="std std-ref">F</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-f"><span class="std std-ref">F</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend (AIE)</p></td>
 <td><p>The AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> typing rules (<code class="docutils literal notranslate"><span class="pre">typing_rule.py:855-860</span></code>) have no
@@ -506,7 +495,7 @@ bitwise ops, so every bitwise op is rejected there.</p></td>
 <td><p>not sized</p></td>
 <td><p>informational line of <a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item07_bitwise_and.py">item07_bitwise_and.py</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-g"><span class="std std-ref">G</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-g"><span class="std std-ref">G</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend, HLS driver</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code> on an array lowers to a runtime zero-fill loop
@@ -515,9 +504,9 @@ bitwise ops, so every bitwise op is rejected there.</p></td>
 <td><p><strong>+409 / +361 cycles</strong> at 4x4x4 / 16x16x16 when restored on <code class="docutils literal notranslate"><span class="pre">spad</span></code>
 (measured, <code class="docutils literal notranslate"><span class="pre">v_memset</span></code>); the shipped design avoids it</p></td>
 <td><p>not sized (warn; or reset-time init; or elide – see item)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> on branch <a class="reference external" href="https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact">impact-limits</a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> in <a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact">impact/</a></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a></p></td>
 <td><p>REPRODUCES</p></td>
 <td><p>frontend</p></td>
 <td><p>A called sub-region is type-checked with the <em>caller’s</em> globals:
@@ -627,6 +616,14 @@ burst.</p></td>
 <td><p>Generated identifiers and parameter names shared no namespace.</p></td>
 <td><p><strong>fork-only – upstreaming candidate</strong></p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py">item20_emitter_name_collision.py</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-21"><span class="std std-ref">21</span></a></p></td>
+<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code> (<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code>); TinyTPU-isa uses it since
+<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></p></td>
+<td><p>frontend, emitter</p></td>
+<td><p>No schedule primitive and no emitter path for <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>.</p></td>
+<td><p><strong>fork-only – upstreaming candidate</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_dependence_pragma*</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -1402,9 +1399,26 @@ points nowhere near the cause.</p></li>
 </section>
 <section id="no-pragma-hls-dependence-primitive-so-a-false-dependence-cannot-be-asserted-away">
 <span id="limitation-21"></span><h3>21. No <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> primitive, so a false dependence cannot be asserted away<a class="headerlink" href="#no-pragma-hls-dependence-primitive-so-a-false-dependence-cannot-be-asserted-away" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>REPRODUCES, and now <strong>priced</strong> (below and <a class="reference internal" href="../designs/gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit comes from: forced by Allo/Vitis vs. our design</span></a>).</p>
+<div class="admonition-status-2026-09-19 admonition">
+<p class="admonition-title">Status (2026-09-19)</p>
+<p><strong>FIXED by</strong> <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code> (fork-only; upstreaming candidate): a schedule
+primitive, <code class="docutils literal notranslate"><span class="pre">s.dependence(axis,</span> <span class="pre">target,</span> <span class="pre">dep_type=&quot;inter&quot;|&quot;intra&quot;,</span>
+<span class="pre">direction=None|&quot;RAW&quot;|&quot;WAR&quot;|&quot;WAW&quot;,</span> <span class="pre">distance=None,</span> <span class="pre">dependent=False,</span>
+<span class="pre">dep_class=None|&quot;array&quot;|&quot;pointer&quot;)</span></code>, next to <code class="docutils literal notranslate"><span class="pre">s.partition</span></code> in
+<code class="docutils literal notranslate"><span class="pre">allo/customize.py</span></code>. It stores the claim as a <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute on
+the loop and <code class="docutils literal notranslate"><span class="pre">emitLoopDirectives</span></code> in <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> emits
+<code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">variable=&lt;array&gt;</span> <span class="pre">...</span></code> inside that loop (affine and
+<code class="docutils literal notranslate"><span class="pre">scf</span></code> loops alike). The array is a local buffer or an argument of the
+loop’s function. It is reachable on a dataflow region through
+<code class="docutils literal notranslate"><span class="pre">allo.dataflow.customize</span></code> by the kernel instance’s name, as <code class="docutils literal notranslate"><span class="pre">s.partition</span></code>
+is. Tests: <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_dependence_pragma</span></code>,
+<code class="docutils literal notranslate"><span class="pre">::test_dependence_pragma_rejects_bad_claims</span></code>,
+<code class="docutils literal notranslate"><span class="pre">::test_dependence_pragma_dataflow_region</span></code>. 112 lines of Python (about
+half of them the docstring and argument checks) and 46 of C++, against the
+30-50 sized: larger than sized, not blocked. TinyTPU-isa has used it for its
+accumulator since <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (<a class="reference internal" href="../designs/tinytpu_isa.html#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>); the price
+below is what that recovered.</p>
+<p>The text below is the item as it stood before the fix.</p>
 </div>
 <p>Vitis takes <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">variable=x</span> <span class="pre">inter</span> <span class="pre">false</span></code> for exactly the case
 where the scheduler cannot prove two accesses are independent but the author
@@ -1428,13 +1442,20 @@ with T while the 2.3% does not. The shipped design is back to the nested form
 at II=2.</p></li>
 <li><p><strong>Priced, 2026-09-19</strong> (replacing “the 2.3% itself, forgone”): injecting
 <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">variable=ar</span> <span class="pre">inter</span> <span class="pre">false</span></code> into the emitted
-<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code> on branch <code class="docutils literal notranslate"><span class="pre">impact-limits</span></code>) measures <strong>35
-cycles</strong> at 16x16x16 on the shipped design (919 -&gt; 884; 5 at 4x4x4), and <strong>95</strong>
-once the design fixes are in (<code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code>). The pragma form costs
-<strong>1,744 FF</strong> in <code class="docutils literal notranslate"><span class="pre">accu</span></code> against <strong>17,438</strong> for the reverted rotation. It can
-be injected today by patching <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between
-<code class="docutils literal notranslate"><span class="pre">s.build(mode=&quot;csyn&quot;)</span></code> and running Vitis. Attribution:
-<a class="reference internal" href="../designs/gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit comes from: forced by Allo/Vitis vs. our design</span></a>.</p></li>
+<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code>, now under <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>)
+measures <strong>35 cycles</strong> at 16x16x16 on the then-shipped design (919 -&gt; 884; 5
+at 4x4x4), and <strong>95</strong> once the design fixes are in (<code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code>). The
+pragma form costs <strong>1,744 FF</strong> in <code class="docutils literal notranslate"><span class="pre">accu</span></code> against <strong>17,438</strong> for the
+reverted rotation. Before the fix the only way to get it was patching
+<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between <code class="docutils literal notranslate"><span class="pre">s.build(mode=&quot;csyn&quot;)</span></code> and running Vitis.
+Attribution: <a class="reference internal" href="../designs/gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p></li>
+<li><p><strong>A dependence claim is a contract, and the primitive does not check it.</strong>
+Landing the claim on TinyTPU-isa showed that <code class="docutils literal notranslate"><span class="pre">inter</span> <span class="pre">false</span></code> on <code class="docutils literal notranslate"><span class="pre">ar</span></code> is
+true only for programs that never read an accumulator row within two
+iterations of writing it: the synthesized loop loads in state 5 and stores in
+state 7, and a distance-1 or -2 read returns the old row in RTL while every
+simulator (Allo’s, and Vitis csim) is exact. The design makes the claim true
+in its assembler. Nothing in Allo can see a false claim; only RTL can.</p></li>
 <li><p>So the missing primitive is not cosmetic: it is the difference between a
 one-line assertion and a hardware redesign with a real area price.</p></li>
 <li><p><strong>Priority: Medium-High.</strong> It is the standard HLS escape hatch for II
@@ -1640,9 +1661,9 @@ pending re-verification.</p>
 <h2>Surfaced by the 2026-09-19 re-verification and impact analysis<a class="headerlink" href="#surfaced-by-the-2026-09-19-re-verification-and-impact-analysis" title="Link to this heading"><span>¶</span></a></h2>
 <p>Found while re-verifying the items above (A-F, with repros under
 <code class="docutils literal notranslate"><span class="pre">tests/limits/</span></code>) and while pricing the TinyTPU-isa deficit to Gemmini (G and
-the shared-memory item; variants on branch <code class="docutils literal notranslate"><span class="pre">impact-limits</span></code>,
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>, commits <code class="docutils literal notranslate"><span class="pre">f98c0dac</span></code> and
-<code class="docutils literal notranslate"><span class="pre">55405e00</span></code>).</p>
+the shared-memory item; the variants are on <code class="docutils literal notranslate"><span class="pre">main</span></code> under
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>, folded in from branch
+<code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> – commits <code class="docutils literal notranslate"><span class="pre">f98c0dac</span></code> and <code class="docutils literal notranslate"><span class="pre">55405e00</span></code> – since deleted).</p>
 <section id="shared-on-chip-memory-the-one-owner-rule-is-allo-s-not-vitis-s">
 <span id="limitation-shared-memory"></span><h3>Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s<a class="headerlink" href="#shared-on-chip-memory-the-one-owner-rule-is-allo-s-not-vitis-s" title="Link to this heading"><span>¶</span></a></h3>
 <p>Earlier text (on this page’s sources and on the TinyTPU-isa pages) said Allo
@@ -1769,8 +1790,9 @@ the informational line of <code class="docutils literal notranslate"><span class
 emits <code class="docutils literal notranslate"><span class="pre">linalg.fill</span></code>, and <code class="docutils literal notranslate"><span class="pre">hls.py:288</span></code> (<code class="docutils literal notranslate"><span class="pre">convert-linalg-to-affine-loops</span></code>)
 turns it into a loop that runs every invocation. Restoring <code class="docutils literal notranslate"><span class="pre">spad</span> <span class="pre">=</span> <span class="pre">0</span></code> on
 TinyTPU-isa (<code class="docutils literal notranslate"><span class="pre">v_memset</span></code>) measured <strong>+409 / +361 cycles</strong> at 4x4x4 /
-16x16x16 (661 / 1280 against 252 / 919; the same with all six arrays <code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code>,
-<code class="docutils literal notranslate"><span class="pre">v_memset6</span></code>). This is the 514-cycle zero-fill the shipped design removed.</p>
+16x16x16 (661 / 1280 against 252 / 919, the design shipped until
+<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>; the same with all six arrays <code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">v_memset6</span></code>). This is the
+514-cycle zero-fill the shipped design removed.</p>
 <p>The right semantics are one of: warn; initialise at reset through the existing
 Stateful <code class="docutils literal notranslate"><span class="pre">memref.global</span></code> path (correct only for the first invocation); or
 elide the fill when every element is provably written before it is read.</p>

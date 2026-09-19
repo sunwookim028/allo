@@ -250,28 +250,31 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.pipeline" title="allo.customize.Schedule.pipeline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline</span></code></a>(axis[, initiation_interval, rewind])</p></td>
 <td><p>Pipelines a loop with index <cite>axis</cite> into <cite>initiation_interval</cite> stages.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.parallel" title="allo.customize.Schedule.parallel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallel</span></code></a>(axis)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.dependence" title="allo.customize.Schedule.dependence"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dependence</span></code></a>(axis, target[, dep_type, ...])</p></td>
+<td><p>Tells HLS about the loop-carried (or intra-iteration) dependences of one array in one loop -- Vitis's <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>, emitted inside the loop:</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.parallel" title="allo.customize.Schedule.parallel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallel</span></code></a>(axis)</p></td>
 <td><p>Instantiates a loop with index <cite>axis</cite> to be computed in parallel with the loops it is nested with.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.inline" title="allo.customize.Schedule.inline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inline</span></code></a>([axis])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.inline" title="allo.customize.Schedule.inline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inline</span></code></a>([axis])</p></td>
 <td><p>Inlines a function <cite>axis</cite>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.dataflow" title="allo.customize.Schedule.dataflow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataflow</span></code></a>(axis)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.dataflow" title="allo.customize.Schedule.dataflow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataflow</span></code></a>(axis)</p></td>
 <td><p>Applies a &quot;dataflow&quot; attribute to function <cite>axis</cite>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.compute_at" title="allo.customize.Schedule.compute_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_at</span></code></a>(from_loop, target_loop)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.compute_at" title="allo.customize.Schedule.compute_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_at</span></code></a>(from_loop, target_loop)</p></td>
 <td><p>If <cite>from_loop</cite> and <cite>target_loop</cite> are indices over the same range, <cite>&lt;schedule&gt;.compute_at(from_loop, target_loop)</cite> merges the two loops, taking the body of <cite>from_loop</cite> and appending it to the body of <cite>target_loop</cite>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.reuse_at" title="allo.customize.Schedule.reuse_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reuse_at</span></code></a>(target, axis)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.reuse_at" title="allo.customize.Schedule.reuse_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reuse_at</span></code></a>(target, axis)</p></td>
 <td><p>Takes an array in a kernel, for example if the array is <cite>B</cite>, this would be <cite>&lt;schedule&gt;.B</cite>, accessed by index <cite>axis</cite> and creates a reuse buffer to reuse values from <cite>target</cite> which are accessed in a sequentially moving window.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.to" title="allo.customize.Schedule.to"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to</span></code></a>(target, dst[, axis, depth])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.to" title="allo.customize.Schedule.to"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to</span></code></a>(target, dst[, axis, depth])</p></td>
 <td><p>Takes an array in the kernel, <cite>target</cite>, for example if the array is <cite>B</cite>, this would be <cite>target</cite> would be <cite>&lt;schedule&gt;.B</cite>, and converts it into a stream.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.unfold" title="allo.customize.Schedule.unfold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unfold</span></code></a>(band_name, axes)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.unfold" title="allo.customize.Schedule.unfold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unfold</span></code></a>(band_name, axes)</p></td>
 <td><p>Finds a set of nested loops with name <cite>band_name</cite> and for every <cite>&lt;i&gt;</cite> in list <cite>axes</cite>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.compose" title="allo.customize.Schedule.compose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compose</span></code></a>(schs[, id, instantiate])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.compose" title="allo.customize.Schedule.compose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compose</span></code></a>(schs[, id, instantiate])</p></td>
 <td><p>Uses <cite>schs</cite>, a schedule for a kernel called in this kernel, in this kernel.</p></td>
 </tr>
 </tbody>
@@ -406,6 +409,41 @@ instead of immediately writing them to memory in a systolic array.</p>
 <li><p><strong>initiation_interval</strong> (<em>int</em>) – The initiation_interval to be used when pipelining.</p></li>
 <li><p><strong>rewind</strong> (<em>bool</em>) – If true, rewinding is allowed, allowing continuous loop pipelining.
 This is only effective for perfect loop nests inside a top level function.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="allo.customize.Schedule.dependence">
+<span class="sig-name descname"><span class="pre">dependence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'inter'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dependent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.dependence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.dependence" title="Link to this definition"><span>¶</span></a></dt>
+<dd><p>Tells HLS about the loop-carried (or intra-iteration) dependences of
+one array in one loop – Vitis’s <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>, emitted
+inside the loop:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>#pragma HLS dependence variable=&lt;target&gt; [&lt;dep_class&gt;] &lt;dep_type&gt;</dt><dd><p>[&lt;direction&gt;] [distance=&lt;distance&gt;] &lt;dependent&gt;</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>The claim is the programmer’s. <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> removes the
+dependence from the scheduler’s view, which is what lets a loop whose
+index is not affine in the induction variable (a flattened row loop,
+say) pipeline at II=1; if the claim is false the RTL computes a wrong
+answer while every software simulation, which ignores the pragma,
+still passes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axis</strong> (<em>str</em><em> | </em><em>LoopWrapper</em>) – The loop, as for <code class="docutils literal notranslate"><span class="pre">pipeline</span></code> (<code class="docutils literal notranslate"><span class="pre">&quot;func:loop&quot;</span></code> or a loop handle).</p></li>
+<li><p><strong>target</strong> (<em>str</em><em> | </em><em>MockBuffer</em>) – The array: a local buffer or an argument of the loop’s function.
+A bare name is looked up in the loop’s function.</p></li>
+<li><p><strong>dep_type</strong> (<em>str</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;inter&quot;</span></code> (across iterations) or <code class="docutils literal notranslate"><span class="pre">&quot;intra&quot;</span></code> (within one).</p></li>
+<li><p><strong>direction</strong> (<em>str</em><em> | </em><em>None</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;RAW&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;WAR&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;WAW&quot;</span></code>; None claims all three.</p></li>
+<li><p><strong>distance</strong> (<em>int</em><em> | </em><em>None</em>) – The inter-iteration distance of a true dependence; only with
+<code class="docutils literal notranslate"><span class="pre">dep_type=&quot;inter&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">dependent=True</span></code>.</p></li>
+<li><p><strong>dependent</strong> (<em>bool</em>) – Whether the dependence exists (True) or is claimed absent (False).</p></li>
+<li><p><strong>dep_class</strong> (<em>str</em><em> | </em><em>None</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;array&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;pointer&quot;</span></code>; None leaves Vitis’s default.</p></li>
 </ul>
 </dd>
 </dl>
@@ -566,6 +604,7 @@ This schedule in <cite>self</cite> must be annotated if <cite>id</cite> is speci
 <li><a class="reference internal" href="#allo.customize.Schedule.buffer_at_systolic"><code class="docutils literal notranslate"><span class="pre">Schedule.buffer_at_systolic()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.reshape"><code class="docutils literal notranslate"><span class="pre">Schedule.reshape()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.pipeline"><code class="docutils literal notranslate"><span class="pre">Schedule.pipeline()</span></code></a></li>
+<li><a class="reference internal" href="#allo.customize.Schedule.dependence"><code class="docutils literal notranslate"><span class="pre">Schedule.dependence()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.parallel"><code class="docutils literal notranslate"><span class="pre">Schedule.parallel()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.inline"><code class="docutils literal notranslate"><span class="pre">Schedule.inline()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.dataflow"><code class="docutils literal notranslate"><span class="pre">Schedule.dataflow()</span></code></a></li>

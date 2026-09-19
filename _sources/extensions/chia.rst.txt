@@ -276,6 +276,15 @@ cap, model ``google-vertex/gemini-3.1-pro-preview``, harness @
        **252 / 383 / 591 / 667 / 919**, all five TBs ``mismatches = 0``,
        ALL EXACT, stress 60/60, est. clock 2.431 ns
 
+.. note::
+
+   These runs were against the design shipped until ``e24e433b``. ``main`` now
+   ships the gap attribution's stack at **172 / 262 / 418 / 484 / 686**
+   (:doc:`/designs/tinytpu_isa`), which includes both changes the two workers
+   below were attempting. ``chia-isa``'s ``accept.py`` still records 252 / 383
+   / 591 / 667 / 919 as its baseline and must be rebased onto ``main`` and
+   re-baselined before another run.
+
 What the workers were doing when stopped. Both are unfinished edits, not
 candidates. They are in ``<worker>/unscored_leftover.diff``, and neither earned a
 cosim number:
@@ -755,10 +764,11 @@ Summary: Demonstrated vs. Not
 - On ``chia-codesign``: C1-C8 -- the deterministic claims, re-derivable by the
   listed commands, including replay of the two agent-found variants (4.07x and
   1.98x) to their recorded cycle counts with exact numerics.
-- On ``chia-isa``: the harness reproduces the TinyTPU-isa baseline in-loop
-  (cosim 252 / 919) and ``accept.py`` reproduces all five shapes from a clean
-  checkout (252 / 383 / 591 / 667 / 919, bit-exact); containment held when a
-  worker lost its tools and tried ``bash``/``python``.
+- On ``chia-isa``: the harness reproduces the TinyTPU-isa baseline of the
+  time in-loop (cosim 252 / 919) and ``accept.py`` reproduces all five shapes
+  from a clean checkout (252 / 383 / 591 / 667 / 919, bit-exact); containment
+  held when a worker lost its tools and tried ``bash``/``python``. That
+  baseline was superseded on ``main`` by ``e24e433b`` (172 / ... / 686).
 
 **Not demonstrated**
 

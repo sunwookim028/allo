@@ -545,7 +545,9 @@ width 512</strong> and gmem1/gmem2 to 32, and two burst loops from II=4 to II=1;
 <code class="docutils literal notranslate"><span class="pre">csynth.log</span></code> shows one port at 512, two at 32, and zero <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">214-307</span></code>
 messages. Without the alignment, the same setting left every port at 8 bits.
 Together with removing a hidden memset it took the design from 1457 to 919
-cycles at 16x16x16 (<a class="reference internal" href="../designs/tinytpu_history.html#tinytpu-history-prefixes"><span class="std std-ref">The two hidden prefixes, and the silent refusal to widen</span></a>).</p>
+cycles at 16x16x16 (<a class="reference internal" href="../designs/tinytpu_history.html#tinytpu-history-prefixes"><span class="std std-ref">The two hidden prefixes, and the silent refusal to widen</span></a>). The 512-bit gmem0 also
+lets the program prefetch move 8 instruction words per cycle, one of the
+changes that took the design on to 686 (<a class="reference internal" href="../designs/tinytpu_isa.html#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>).</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p><code class="docutils literal notranslate"><span class="pre">[HLS</span> <span class="pre">214-307]</span> <span class="pre">Could</span> <span class="pre">not</span> <span class="pre">widen</span> <span class="pre">since</span> <span class="pre">type</span> <span class="pre">i8</span> <span class="pre">size</span> <span class="pre">is</span> <span class="pre">greater</span> <span class="pre">than</span> <span class="pre">or</span> <span class="pre">equal</span>

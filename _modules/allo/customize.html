@@ -1075,6 +1075,121 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">get_loops</span><span class="p">(</span><span class="n">func</span><span class="p">)[</span><span class="n">band_name</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="o">.</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"pipeline_ii"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ii</span></div>
 
 
+<div class="viewcode-block" id="Schedule.dependence">
+<a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.dependence">[docs]</a>
+    <span class="nd">@wrapped_apply</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dependence</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">axis</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">,</span>
+        <span class="n">dep_type</span><span class="o">=</span><span class="s2">"inter"</span><span class="p">,</span>
+        <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dependent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">dep_class</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Tells HLS about the loop-carried (or intra-iteration) dependences of</span>
+<span class="sd">        one array in one loop -- Vitis's ``#pragma HLS dependence``, emitted</span>
+<span class="sd">        inside the loop:</span>
+
+<span class="sd">            #pragma HLS dependence variable=&lt;target&gt; [&lt;dep_class&gt;] &lt;dep_type&gt;</span>
+<span class="sd">                    [&lt;direction&gt;] [distance=&lt;distance&gt;] &lt;dependent&gt;</span>
+
+<span class="sd">        The claim is the programmer's. ``dependent=False`` removes the</span>
+<span class="sd">        dependence from the scheduler's view, which is what lets a loop whose</span>
+<span class="sd">        index is not affine in the induction variable (a flattened row loop,</span>
+<span class="sd">        say) pipeline at II=1; if the claim is false the RTL computes a wrong</span>
+<span class="sd">        answer while every software simulation, which ignores the pragma,</span>
+<span class="sd">        still passes.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        axis: str | LoopWrapper</span>
+<span class="sd">            The loop, as for ``pipeline`` (``"func:loop"`` or a loop handle).</span>
+<span class="sd">        target: str | MockBuffer</span>
+<span class="sd">            The array: a local buffer or an argument of the loop's function.</span>
+<span class="sd">            A bare name is looked up in the loop's function.</span>
+<span class="sd">        dep_type: str</span>
+<span class="sd">            ``"inter"`` (across iterations) or ``"intra"`` (within one).</span>
+<span class="sd">        direction: str | None</span>
+<span class="sd">            ``"RAW"``, ``"WAR"`` or ``"WAW"``; None claims all three.</span>
+<span class="sd">        distance: int | None</span>
+<span class="sd">            The inter-iteration distance of a true dependence; only with</span>
+<span class="sd">            ``dep_type="inter"`` and ``dependent=True``.</span>
+<span class="sd">        dependent: bool</span>
+<span class="sd">            Whether the dependence exists (True) or is claimed absent (False).</span>
+<span class="sd">        dep_class: str | None</span>
+<span class="sd">            ``"array"`` or ``"pointer"``; None leaves Vitis's default.</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._mlir.ir</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayAttr</span><span class="p">,</span> <span class="n">BoolAttr</span><span class="p">,</span> <span class="n">DictAttr</span>
+
+        <span class="k">if</span> <span class="n">dep_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"inter"</span><span class="p">,</span> <span class="s2">"intra"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"dependence: dep_type </span><span class="si">{</span><span class="n">dep_type</span><span class="si">!r}</span><span class="s2"> is not inter/intra"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">direction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">direction</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"RAW"</span><span class="p">,</span> <span class="s2">"WAR"</span><span class="p">,</span> <span class="s2">"WAW"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"dependence: direction </span><span class="si">{</span><span class="n">direction</span><span class="si">!r}</span><span class="s2"> is not RAW/WAR/WAW"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">dep_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dep_class</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"array"</span><span class="p">,</span> <span class="s2">"pointer"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"dependence: dep_class </span><span class="si">{</span><span class="n">dep_class</span><span class="si">!r}</span><span class="s2"> is not array/pointer"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">distance</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">dependent</span> <span class="ow">and</span> <span class="n">dep_type</span> <span class="o">==</span> <span class="s2">"inter"</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                    <span class="s2">"dependence: a distance only describes a true "</span>
+                    <span class="s2">"(dependent=True) inter-iteration dependence"</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">distance</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="n">distance</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dependence: distance </span><span class="si">{</span><span class="n">distance</span><span class="si">!r}</span><span class="s2"> must be &gt;= 1"</span><span class="p">)</span>
+
+        <span class="n">func</span><span class="p">,</span> <span class="n">axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_func_and_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+        <span class="n">band_name</span><span class="p">,</span> <span class="n">axis</span> <span class="o">=</span> <span class="n">find_loop_in_bands</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">axis</span><span class="p">)</span>
+        <span class="n">loop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_loops</span><span class="p">(</span><span class="n">func</span><span class="p">)[</span><span class="n">band_name</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="o">.</span><span class="n">loop</span>
+        <span class="n">func_name</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"sym_name"</span><span class="p">]</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">":"</span> <span class="ow">in</span> <span class="n">target</span><span class="p">:</span>
+                <span class="n">buf_func</span><span class="p">,</span> <span class="n">buf_name</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">buf_func</span><span class="p">,</span> <span class="n">buf_name</span> <span class="o">=</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">target</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">MockBuffer</span><span class="p">(</span><span class="n">buf_func</span><span class="p">,</span> <span class="n">buf_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target</span><span class="o">.</span><span class="n">func</span> <span class="o">!=</span> <span class="n">func_name</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"dependence: </span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">func</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not in the loop's "</span>
+                <span class="sa">f</span><span class="s2">"function </span><span class="si">{</span><span class="n">func_name</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">mlir_target</span> <span class="o">=</span> <span class="n">find_buffer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_args</span><span class="p">)</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dep_type</span><span class="p">),</span>
+            <span class="s2">"dependent"</span><span class="p">:</span> <span class="n">BoolAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">dependent</span><span class="p">)),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mlir_target</span><span class="p">,</span> <span class="n">MockArg</span><span class="p">):</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"arg_index"</span><span class="p">]</span> <span class="o">=</span> <span class="n">IntegerAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">IntegerType</span><span class="o">.</span><span class="n">get_signless</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">parent</span> <span class="o">=</span> <span class="n">mlir_target</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">parent</span>
+            <span class="k">while</span> <span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">parent</span><span class="o">.</span><span class="n">operation</span> <span class="o">==</span> <span class="n">loop</span><span class="o">.</span><span class="n">operation</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"dependence: </span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is declared inside the loop"</span>
+                    <span class="p">)</span>
+                <span class="n">parent</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"variable"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">direction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"direction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">direction</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">distance</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"distance"</span><span class="p">]</span> <span class="o">=</span> <span class="n">IntegerAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">IntegerType</span><span class="o">.</span><span class="n">get_signless</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span> <span class="n">distance</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dep_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"class"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dep_class</span><span class="p">)</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"dependence"</span><span class="p">])</span>
+            <span class="k">if</span> <span class="s2">"dependence"</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">attributes</span>
+            <span class="k">else</span> <span class="p">[]</span>
+        <span class="p">)</span>
+        <span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"dependence"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">old</span> <span class="o">+</span> <span class="p">[</span><span class="n">DictAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">entry</span><span class="p">)])</span></div>
+
+
 <div class="viewcode-block" id="Schedule.parallel">
 <a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.parallel">[docs]</a>
     <span class="nd">@wrapped_apply</span>

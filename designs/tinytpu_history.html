@@ -225,8 +225,9 @@ readings of those numbers that were later corrected.</p>
 against Gemmini’s end-to-end <code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code> numbers (574 / 615 / 740 /
 784 / 986), which include about 395 cycles of Rocket driver software. They
 are kept as a record of our own progress, <strong>not as comparisons</strong>. The
-like-for-like result – <strong>1.55-1.8x slower than Gemmini at all five shapes</strong>
-– is on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
+like-for-like result – <strong>1.07-1.24x slower than Gemmini at all five
+shapes</strong> since <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>, 1.55-1.8x before it – is on
+<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
 </div>
 <p>Progression of the 16x16x16 cosim count, one build, bit-exact throughout:</p>
 <table class="docutils align-default">
@@ -258,10 +259,15 @@ like-for-like result – <strong>1.55-1.8x slower than Gemmini at all five shape
 <td><p>1423</p></td>
 <td><p><a class="reference internal" href="#tinytpu-history-lastloops"><span class="std std-ref">The last two unpipelined loops, and which one paid</span></a></p></td>
 </tr>
-<tr class="row-even"><td><p>no memset + <code class="docutils literal notranslate"><span class="pre">align_value</span></code> widening (<strong>current</strong>)</p></td>
-<td><p><strong>252</strong></p></td>
-<td><p><strong>919</strong></p></td>
+<tr class="row-even"><td><p>no memset + <code class="docutils literal notranslate"><span class="pre">align_value</span></code> widening (shipped until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>)</p></td>
+<td><p>252</p></td>
+<td><p>919</p></td>
 <td><p><a class="reference internal" href="#tinytpu-history-prefixes"><span class="std std-ref">The two hidden prefixes, and the silent refusal to widen</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>gap-attribution stack landed (<strong>current</strong>)</p></td>
+<td><p><strong>172</strong></p></td>
+<td><p><strong>686</strong></p></td>
+<td><p><a class="reference internal" href="#tinytpu-history-landing"><span class="std std-ref">Landing the gap attribution: 919 -&gt; 686</span></a></p></td>
 </tr>
 </tbody>
 </table>
@@ -728,7 +734,7 @@ array between two processes, one per BRAM port (<code class="docutils literal no
 arrays. Allo rejects a region-scope <code class="docutils literal notranslate"><span class="pre">Stateful</span></code> shared by two kernels and
 never emits <code class="docutils literal notranslate"><span class="pre">stream</span> <span class="pre">type=unsync</span></code>. The measured cost to this design is 0
 cycles. See <a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a> and
-<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit comes from: forced by Allo/Vitis vs. our design</span></a>.</p>
+<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">accu</span></code> <strong>resisted the flattening.</strong> It was built twice and was bit-exact both
 times, and both times it was slower than the nested loop it replaced:</p>
@@ -1310,6 +1316,8 @@ build’s <code class="docutils literal notranslate"><span class="pre">csynth.lo
 <p><strong>These are not faster than Gemmini.</strong> An earlier revision set this table against
 Gemmini’s 574 / 615 / 740 / 784 / 986 and called it a lead at all five shapes,
 with a 3.2x fixed-cost win. Both claims are withdrawn (<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>).</p>
+<p>This build was the shipped baseline from <code class="docutils literal notranslate"><span class="pre">b4be2b10</span></code> until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>, and
+the one the gap attribution measured its variants against.</p>
 </section>
 <section id="what-dma-st-s-ii-4-actually-was">
 <h3>What <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>’s II=4 actually was<a class="headerlink" href="#what-dma-st-s-ii-4-actually-was" title="Link to this heading"><span>¶</span></a></h3>
@@ -1347,6 +1355,71 @@ that wants the same effect without an Allo change can declare the operands
 <code class="docutils literal notranslate"><span class="pre">UInt(32)</span></code> instead, which reaches II=1 with no alignment and no widen setting
 at all.</p>
 </section>
+</section>
+<section id="landing-the-gap-attribution-919-686">
+<span id="tinytpu-history-landing"></span><h2>Landing the gap attribution: 919 -&gt; 686<a class="headerlink" href="#landing-the-gap-attribution-919-686" title="Link to this heading"><span>¶</span></a></h2>
+<p>The gap attribution (<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>) priced the deficit to
+Gemmini on variants of the 919 build and found about 80% of it in our own
+design and 35-95 cycles forced by Allo’s missing dependence pragma
+(<a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>). <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (2026-09-19) made its best bit-exact
+stack, <code class="docutils literal notranslate"><span class="pre">v_design_dep_imem8</span></code>, the design, after <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code> added the
+<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> primitive so the pragma no longer needed a <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code>
+patch. The changes are listed on <a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>919 build</p></th>
+<th class="head"><p>landed</p></th>
+<th class="head"><p>branch’s measurement of the stack</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p>252</p></td>
+<td><p><strong>172</strong></p></td>
+<td><p>172</p></td>
+</tr>
+<tr class="row-odd"><td><p>8x8x8</p></td>
+<td><p>383</p></td>
+<td><p><strong>262</strong></p></td>
+<td><p>not measured</p></td>
+</tr>
+<tr class="row-even"><td><p>12x12x12</p></td>
+<td><p>591</p></td>
+<td><p><strong>418</strong></p></td>
+<td><p>not measured</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>667</p></td>
+<td><p><strong>484</strong></p></td>
+<td><p>not measured</p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>919</p></td>
+<td><p><strong>686</strong></p></td>
+<td><p>686</p></td>
+</tr>
+</tbody>
+</table>
+<p>Bit-exact at every shape in the default testbench and at 4x4x4 and 16x16x16
+in <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> (<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code>,
+<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_stress.log</span></code>); est. clock unchanged at 2.431 ns; +2,593
+FF and +6,617 LUT, no BRAM or DSP (<a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, “Resources”). The
+variants interacted (the bottleneck moved from <code class="docutils literal notranslate"><span class="pre">vru</span></code> to the PE prologue to
+<code class="docutils literal notranslate"><span class="pre">accu</span></code>), so the stack was measured at all five shapes rather than assumed:
+the two measured shapes reproduced exactly.</p>
+<p><strong>What the landing found that the branch had not.</strong> The injected pragma
+claims <code class="docutils literal notranslate"><span class="pre">ar</span></code> carries no dependence across <code class="docutils literal notranslate"><span class="pre">accu</span></code> iterations, and the
+synthesized pipeline reads a row two states before it writes one, so a program
+that reads an accumulator row one or two iterations after writing it gets the
+old value – 4 and 20 wrong cells in RTL, 0 in every simulator. GEMM never does
+that, and GEMM was all the branch cosimulated. The landed design makes the
+claim true with an assembler contract (<code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code>) and tests it at its
+edge in the stress cosim (<a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>).</p>
+<p>The chia agent’s capped smoke run on the 919 build (<a class="reference internal" href="../extensions/chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>)
+had two workers on exactly two of these changes – folding the vector-register
+tier out of the operand path and the weight prologue – and neither finished an
+iteration.</p>
 </section>
 <section id="superseded-readings-and-plans">
 <h2>Superseded readings and plans<a class="headerlink" href="#superseded-readings-and-plans" title="Link to this heading"><span>¶</span></a></h2>
@@ -1467,6 +1540,7 @@ so the operand burst is the whole matrix with no column overfetch at all.
 <li><a class="reference internal" href="#what-dma-st-s-ii-4-actually-was">What <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>’s II=4 actually was</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#landing-the-gap-attribution-919-686">Landing the gap attribution: 919 -&gt; 686</a></li>
 <li><a class="reference internal" href="#superseded-readings-and-plans">Superseded readings and plans</a><ul>
 <li><a class="reference internal" href="#honest-reading-at-the-burst-dma-build">“Honest reading”, at the burst-DMA build</a></li>
 <li><a class="reference internal" href="#what-would-close-the-rest">“What would close the rest”</a></li>

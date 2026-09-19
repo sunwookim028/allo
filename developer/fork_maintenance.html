@@ -273,14 +273,7 @@ TinyTPU-isa: harness, sandboxed
 evaluator, GCP pre-flight gate. Lands on
 <code class="docutils literal notranslate"><span class="pre">main</span></code> once a paid run proves it.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">impact-limits</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">main</span></code></p></td>
-<td><p>The measured design variants behind the
-gap attribution (919 -&gt; 686). The docs
-link to it; it is folded into <code class="docutils literal notranslate"><span class="pre">main</span></code>
-and then deleted.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">kkkaishao/allo</span></code> (ACT)</p></td>
 <td><p><strong>Retired 2026-09-19</strong>, tag
 <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code> (<code class="docutils literal notranslate"><span class="pre">629c2767</span></code>).
@@ -289,7 +282,7 @@ fp32 TinyTPU, Kai Shao’s imported work
 (its <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code>) and the CHIA
 run history. No worktree. See below.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">upstream-omp-team-size</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">upstream-omp-team-size</span></code></p></td>
 <td><p>cornell-zhang</p></td>
 <td><p>One commit on <code class="docutils literal notranslate"><span class="pre">upstream/main</span></code>:
 upstream draft PR #611 (simulator OpenMP
@@ -299,6 +292,10 @@ above.</p></td>
 </tr>
 </tbody>
 </table>
+<p><code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> (the gap attribution’s measured design variants) was folded
+into <code class="docutils literal notranslate"><span class="pre">main</span></code> on 2026-09-19 (<code class="docutils literal notranslate"><span class="pre">96c3aef6</span></code>, under
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>), after its best stack became the
+shipped design (<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>), and deleted.</p>
 <p><code class="docutils literal notranslate"><span class="pre">main</span></code> is the one long-lived working branch; <code class="docutils literal notranslate"><span class="pre">upstream</span></code> is just the mirror,
 and <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> holds the published site. <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> is retired. Exploration branches come and go under the rule in
 “Where work lands” below.

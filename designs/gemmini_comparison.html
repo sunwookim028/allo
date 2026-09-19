@@ -219,9 +219,12 @@
 distribution. The design under test is <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p><strong>Result, 2026-09-18: TinyTPU-isa is 1.55-1.8x slower than Gemmini at all
-five shapes</strong> when both sides are measured over the same window: the
-accelerator plus its dispatch, with near-zero memory latency on both.</p>
+<p><strong>Result, 2026-09-19: TinyTPU-isa is 1.07-1.24x slower than Gemmini at all
+five shapes</strong> (<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>) when both sides are measured over the same
+window: the accelerator plus its dispatch, with near-zero memory latency on
+both. Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> it was <strong>1.55-1.8x</strong> slower (252 / 383 / 591 / 667
+/ 919 cycles); the step is the gap attribution’s measured design stack,
+landed as the design (<a class="reference internal" href="#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).</p>
 <p>The earlier claim, “faster at all five shapes”, compared our
 accelerator-only count with Gemmini’s <code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>, and about 395
 cycles of that call is Rocket driver software. <strong>That claim is withdrawn</strong>,
@@ -245,6 +248,7 @@ measured in one ~90 s simulator run (<code class="docutils literal notranslate">
 <th class="head"><p>Gemmini accel+dispatch</p></th>
 <th class="head"><p>ours</p></th>
 <th class="head"><p><strong>ours / Gemmini</strong></p></th>
+<th class="head"><p>ours before <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></p></th>
 </tr>
 </thead>
 <tbody>
@@ -252,42 +256,48 @@ measured in one ~90 s simulator run (<code class="docutils literal notranslate">
 <td><p>1,1,1</p></td>
 <td><p>1</p></td>
 <td><p>161 / 144</p></td>
-<td><p>252</p></td>
-<td><p><strong>1.6-1.8x slower</strong></p></td>
+<td><p>172</p></td>
+<td><p><strong>1.07-1.19x slower</strong></p></td>
+<td><p>252 (1.6-1.8x)</p></td>
 </tr>
 <tr class="row-odd"><td><p>8x8x8</p></td>
 <td><p>2,2,2</p></td>
 <td><p>1</p></td>
 <td><p>220 / 218</p></td>
-<td><p>383</p></td>
-<td><p><strong>1.74x slower</strong></p></td>
+<td><p>262</p></td>
+<td><p><strong>1.19x slower</strong></p></td>
+<td><p>383 (1.74x)</p></td>
 </tr>
 <tr class="row-even"><td><p>12x12x12</p></td>
 <td><p>3,3,3</p></td>
 <td><p>1</p></td>
 <td><p>347 / 344</p></td>
-<td><p>591</p></td>
-<td><p><strong>1.70x slower</strong></p></td>
+<td><p>418</p></td>
+<td><p><strong>1.20x slower</strong></p></td>
+<td><p>591 (1.70x)</p></td>
 </tr>
 <tr class="row-odd"><td><p>16x16x8</p></td>
 <td><p>4,2,4</p></td>
 <td><p>1</p></td>
 <td><p>391 / 390</p></td>
-<td><p>667</p></td>
-<td><p><strong>1.71x slower</strong></p></td>
+<td><p>484</p></td>
+<td><p><strong>1.24x slower</strong></p></td>
+<td><p>667 (1.71x)</p></td>
 </tr>
 <tr class="row-even"><td><p>16x16x16</p></td>
 <td><p>4,4,4</p></td>
 <td><p>1</p></td>
 <td><p>593 / 590</p></td>
-<td><p>919</p></td>
-<td><p><strong>1.55x slower</strong></p></td>
+<td><p>686</p></td>
+<td><p><strong>1.16x slower</strong></p></td>
+<td><p>919 (1.55x)</p></td>
 </tr>
 </tbody>
 </table>
-<p><strong>We are slower at all five shapes, by 1.55-1.8x, near-uniformly.</strong> Every shape
-uses exactly one <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code>, verified at runtime by replicating the driver’s own
-tiling search rather than assuming it.</p>
+<p><strong>We are slower at all five shapes, by 1.07-1.24x</strong> (ratios against the first
+Gemmini trial; the 4x4x4 range spans both). Every shape uses exactly one
+<code class="docutils literal notranslate"><span class="pre">loop_ws</span></code>, verified at runtime by replicating the driver’s own tiling search
+rather than assuming it.</p>
 <p>The decomposition closes, which is the reason to trust this. <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code>’s
 total minus this window, per shape: <strong>413, 396, 395, 394, 395</strong>. A flat ~395
 cycles of Rocket software across a 16x range of work is exactly what a per-call
@@ -303,35 +313,45 @@ computes those operands at runtime, and that cost sits in the ~395. So the
 true like-for-like number is at or above these, i.e. the conservative
 direction <em>for us</em>.</p></li>
 <li><p><strong>The intercepts are still not comparable</strong> and are not paired here. This
-column’s fitted intercept (~154 on a tile-count axis) is not our 151 on a
-dynamic-instruction axis, and pairing them would repeat the error the audit
-found.</p></li>
+column’s fitted intercept (~154 on a tile-count axis) is not our 74.5 (151
+before <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>) on a dynamic-instruction axis, and pairing them would
+repeat the error the audit found.</p></li>
 </ul>
 <p>History of our column, since earlier revisions quoted each in turn: 1004 / 1108
 / 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 / 1139 / 1457 after
 it, which is where the table sat for most of a day at 1.18x to 1.48x <em>behind</em>
 (end-to-end Gemmini); 676 / 827 / 1062 / 1125 / 1423 with a flat accumulator
 that was <strong>reverted</strong>, costing 13.7x the flip-flops in that unit for 2.3% and
-priced as <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>. The step to the current numbers is the memset
-and widening pass. All of these are on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>.</p>
+priced as <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>; 252 / 383 / 591 / 667 / 919 after the memset
+and widening pass, the shipped baseline until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. The step to the
+current numbers is the gap attribution’s design stack
+(<a class="reference internal" href="#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>). All of these are on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>.</p>
 </section>
-<section id="where-the-deficit-comes-from-forced-by-allo-vitis-vs-our-design">
-<span id="gemmini-gap-attribution"></span><h2>Where the deficit comes from: forced by Allo/Vitis vs. our design<a class="headerlink" href="#where-the-deficit-comes-from-forced-by-allo-vitis-vs-our-design" title="Link to this heading"><span>¶</span></a></h2>
+<section id="where-the-deficit-came-from-and-what-was-landed">
+<span id="gemmini-gap-attribution"></span><h2>Where the deficit came from, and what was landed<a class="headerlink" href="#where-the-deficit-came-from-and-what-was-landed" title="Link to this heading"><span>¶</span></a></h2>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p><strong>Provenance.</strong> Everything in this section was measured on <strong>variants</strong> of
-TinyTPU-isa that live on branch <code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> (commits <code class="docutils literal notranslate"><span class="pre">f98c0dac</span></code> and
-<code class="docutils literal notranslate"><span class="pre">55405e00</span></code>, directory <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>),
-cosimulated at <strong>two shapes only</strong> (4x4x4 and 16x16x16). They are <strong>not the
-shipped design.</strong> The shipped design’s numbers remain
-<strong>252 / 383 / 591 / 667 / 919</strong> (the like-for-like table above). The 686 and
-172 below are what the variants reach with every change applied; they are
-not our result.</p>
+<p><strong>Provenance.</strong> The attribution below was measured on <strong>variants</strong> of the
+design as it was shipped until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (<code class="docutils literal notranslate"><span class="pre">7a24c21e</span></code>: 252 / 383 / 591
+/ 667 / 919), cosimulated at two shapes (4x4x4 and 16x16x16), on branch
+<code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> (<code class="docutils literal notranslate"><span class="pre">f98c0dac</span></code>, <code class="docutils literal notranslate"><span class="pre">55405e00</span></code>). The branch’s scripts, raw
+results and timelines are now on <code class="docutils literal notranslate"><span class="pre">main</span></code> under
+<a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact">examples/accelerator/tinytpu_vitis/impact/</a>
+and the branch is deleted.</p>
+<p><strong>Its best stack is now the shipped design.</strong> <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> landed
+<code class="docutils literal notranslate"><span class="pre">v_design_dep_imem8</span></code> – every design row of the table below, plus the
+<code class="docutils literal notranslate"><span class="pre">accu</span></code> row through a real schedule primitive (<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code>) rather than a <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> patch – and measured it at all
+five shapes: <strong>172 / 262 / 418 / 484 / 686</strong>, bit-exact. At the two shapes
+the variants were measured on, the landed build reproduces them exactly
+(172 and 686); the other three shapes were first measured on the landed
+build. What landed is listed on <a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>.</p>
 </div>
 <p>Of the <strong>326-cycle deficit at 16x16x16</strong> (919 against Gemmini’s 593), <strong>Allo
-forces 35-95 cycles, all of it</strong> <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a> (no dependence pragma, so
-<code class="docutils literal notranslate"><span class="pre">accu</span></code> stays at II=2); <strong>Vitis forces nothing measurable</strong>; the rest, about
-80%, is <strong>our design</strong>. With all the changes applied, the measured stack goes
+forced 35-95 cycles, all of it</strong> <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a> (no dependence pragma, so
+<code class="docutils literal notranslate"><span class="pre">accu</span></code> stayed at II=2); <strong>Vitis forced nothing measurable</strong>; the rest, about
+80%, was <strong>our design</strong>. Both parts are now removed: the design rows by
+rebuilding the units, the Allo row by adding the primitive. The stack took
 <strong>919 -&gt; 686</strong> at 16x16x16 and <strong>252 -&gt; 172</strong> at 4x4x4, against Gemmini’s 593
 and 144-161.</p>
 <table class="docutils align-default">
@@ -343,7 +363,7 @@ and 144-161.</p>
 <col style="width: 10.0%" />
 </colgroup>
 <thead>
-<tr class="row-odd"><th class="head"><p>cause</p></th>
+<tr class="row-odd"><th class="head"><p>cause (pre-landing design)</p></th>
 <th class="head"><p>16x16x16</p></th>
 <th class="head"><p>4x4x4</p></th>
 <th class="head"><p>provenance</p></th>
@@ -354,27 +374,27 @@ and 144-161.</p>
 <tr class="row-even"><td><p>program prefetch, one 64-bit word per iteration</p></td>
 <td><p>52</p></td>
 <td><p>52</p></td>
-<td><p>measured (<code class="docutils literal notranslate"><span class="pre">v_imem8</span></code>)</p></td>
+<td><p>measured (<code class="docutils literal notranslate"><span class="pre">v_imem8</span></code>); <strong>landed</strong></p></td>
 <td><p>design</p></td>
 </tr>
 <tr class="row-odd"><td><p>B through the vector registers, plus the serial per-<code class="docutils literal notranslate"><span class="pre">mm</span></code> weight
 prologue</p></td>
 <td><p>22 alone, 82 once <code class="docutils literal notranslate"><span class="pre">accu</span></code> is II=1</p></td>
 <td><p>~10</p></td>
-<td><p>measured</p></td>
+<td><p>measured; <strong>landed</strong></p></td>
 <td><p>design</p></td>
 </tr>
 <tr class="row-even"><td><p>A through <code class="docutils literal notranslate"><span class="pre">spad</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">vld</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">vr</span></code></p></td>
 <td><p>64</p></td>
 <td><p>~13</p></td>
-<td><p>measured</p></td>
+<td><p>measured; <strong>landed</strong></p></td>
 <td><p>design</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> at II=2 (<a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>)</p></td>
 <td><p>35 alone, 95 after the design fixes</p></td>
 <td><p>5</p></td>
-<td><p>measured</p></td>
-<td><p>Allo</p></td>
+<td><p>measured; <strong>landed</strong>, via <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code></p></td>
+<td><p>Allo (<strong>fixed</strong>)</p></td>
 </tr>
 <tr class="row-even"><td><p>region start</p></td>
 <td><p>~0</p></td>
@@ -386,7 +406,7 @@ prologue</p></td>
 <td><p>93</p></td>
 <td><p>11-28</p></td>
 <td><p>timeline <strong>estimate</strong>: operand staging ~84, serial DMA before the first
-weight, drain ~142 – none of it built</p></td>
+weight, drain ~142 – <strong>none of it built</strong></p></td>
 <td><p>design</p></td>
 </tr>
 </tbody>
@@ -395,10 +415,24 @@ weight, drain ~142 – none of it built</p></td>
 <code class="docutils literal notranslate"><span class="pre">accu</span></code>. Taking the design rows first gives 919 to 833 (86) and then 95
 forced; taking forced first gives 35 and then 146 design. The Allo row is
 therefore quoted as a range, 35-95 (65 averaged over both orders).</p>
+<p><strong>What remains.</strong> The landed design is still <strong>93 cycles</strong> behind Gemmini at
+16x16x16 (686 against 593) and <strong>11-28</strong> at 4x4x4 (172 against 144-161), and
+between 42 and 93 cycles at the three shapes the branch did not measure (262
+against 220, 418 against 347, 484 against 391). The branch estimated where the
+16x16x16 residual sits from the stack’s per-process timelines
+(<code class="docutils literal notranslate"><span class="pre">impact/results/</span></code>): operand staging (~84 cycles), the serial DMA ahead of
+the first weight, and the drain (~142). That split is an <strong>estimate</strong>, and no
+change against it has been built or measured.</p>
+<p><strong>The dependence claim needed a contract the branch never tested.</strong> The
+injected pragma is only true for programs that never read an accumulator row
+within two <code class="docutils literal notranslate"><span class="pre">accu</span></code> iterations of writing it; the branch cosimulated GEMM
+programs only, which never do. Landing it added the contract to the assembler
+and a test at its edge (<a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>).</p>
 <section id="variants">
 <h3>Variants<a class="headerlink" href="#variants" title="Link to this heading"><span>¶</span></a></h3>
-<p>Every variant is the shipped <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> plus asserted textual patches
-(<code class="docutils literal notranslate"><span class="pre">make_variants.py</span></code>), so its diff is exactly the change being priced. A
+<p>Every variant is the pre-landing <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> (<code class="docutils literal notranslate"><span class="pre">7a24c21e</span></code>, the
+<code class="docutils literal notranslate"><span class="pre">base</span></code> row) plus asserted textual patches (<code class="docutils literal notranslate"><span class="pre">make_variants.py</span></code>), so its diff
+is exactly the change being priced. A
 variant counts only if the Allo simulator is <code class="docutils literal notranslate"><span class="pre">ALL</span> <span class="pre">EXACT</span></code> (<code class="docutils literal notranslate"><span class="pre">bench_variant.py</span></code>:
 gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
 mismatches. Measured by cosim (xsim, <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>), all bit-exact:</p>
@@ -422,7 +456,7 @@ mismatches. Measured by cosim (xsim, <code class="docutils literal notranslate">
 </thead>
 <tbody>
 <tr class="row-even"><td><p>base</p></td>
-<td><p>shipped</p></td>
+<td><p>the design shipped until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></p></td>
 <td><p>252</p></td>
 <td><p>919</p></td>
 <td><p>1,250</p></td>
@@ -495,7 +529,7 @@ flat PE</p></td>
 <td></td>
 </tr>
 <tr class="row-even"><td><p><strong>v_design_dep_imem8</strong></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code> + imem8</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code> + imem8 – <strong>shipped since</strong> <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></p></td>
 <td><p><strong>172</strong></p></td>
 <td><p><strong>686</strong></p></td>
 <td></td>
@@ -541,49 +575,57 @@ flat PE</p></td>
 <p>Gemmini (accelerator + dispatch, same window): 161/144 at 4x4x4, 593 at
 16x16x16.</p>
 <p>The pragma form of the <code class="docutils literal notranslate"><span class="pre">accu</span></code> fix (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code>) reaches the same cycles as
-the reverted rotation at <strong>1,744 FF in</strong> <code class="docutils literal notranslate"><span class="pre">accu</span></code> <strong>against 17,438</strong>. It is
-injected by patching the emitted <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between
+the reverted rotation at <strong>1,744 FF in</strong> <code class="docutils literal notranslate"><span class="pre">accu</span></code> <strong>against 17,438</strong>. On the
+branch it was injected by patching the emitted <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between
 <code class="docutils literal notranslate"><span class="pre">s.build(mode=&quot;csyn&quot;)</span></code> and running Vitis (<code class="docutils literal notranslate"><span class="pre">cosim_variant.py</span></code>’s
-<code class="docutils literal notranslate"><span class="pre">patch_kernel</span></code> hook) – an escape hatch that exists today, outside Allo.</p>
+<code class="docutils literal notranslate"><span class="pre">patch_kernel</span></code> hook); the shipped design emits it through <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code>,
+and the landed build’s <code class="docutils literal notranslate"><span class="pre">accu</span></code> is 1,744 FF, as the variant’s was.</p>
 <p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> restores the <code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code> initialiser on <code class="docutils literal notranslate"><span class="pre">spad</span></code> and costs <strong>+409</strong>
 cycles at 4x4x4 and <strong>+361</strong> at 16x16x16: Allo lowers an array initialiser to a
 runtime zero-fill loop (<a class="reference internal" href="../developer/limitations.html#limitation-g"><span class="std std-ref">G. = 0 on an array is a runtime zero-fill loop</span></a>).</p>
 <p><strong>A design trap found on the way.</strong> A flat loop whose row count depends on the
 decoded opcode closes at <code class="docutils literal notranslate"><span class="pre">Final</span> <span class="pre">II</span> <span class="pre">=</span> <span class="pre">2</span></code> on the row counter (a carried
 dependence). Precomputing the count upstream, in the sequencer, and carrying it
-in the instruction word fixed it in both <code class="docutils literal notranslate"><span class="pre">spm</span></code> (<code class="docutils literal notranslate"><span class="pre">v_wdirect</span></code>) and <code class="docutils literal notranslate"><span class="pre">accu</span></code>.</p>
-<p>The shipped design’s per-process timeline at 16x16x16
-(<code class="docutils literal notranslate"><span class="pre">results/base.rle.txt</span></code>) reads, in monitor cycles: 0-47 region start
+in the instruction word fixed it in both <code class="docutils literal notranslate"><span class="pre">spm</span></code> (<code class="docutils literal notranslate"><span class="pre">v_wdirect</span></code>) and <code class="docutils literal notranslate"><span class="pre">accu</span></code>;
+the landed sequencer does the same.</p>
+<p>The pre-landing design’s per-process timeline at 16x16x16
+(<code class="docutils literal notranslate"><span class="pre">impact/results/base.rle.txt</span></code>) reads, in monitor cycles: 0-47 region start
 (<code class="docutils literal notranslate"><span class="pre">s_axilite</span></code> programming, inside the cosim window), 47-120 program prefetch,
 120-204 operand bursts, 204-334 128 DMA rows through <code class="docutils literal notranslate"><span class="pre">spm</span></code>, 334-799 <code class="docutils literal notranslate"><span class="pre">vru</span></code>
 running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
 (array, <code class="docutils literal notranslate"><span class="pre">accu</span></code>, <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>).</p>
 <p>The same work settled that the one-owner-per-array rule the design works under
 is Allo’s, not Vitis’s, and that it cost this design <strong>0 cycles</strong>: every
-restructure above was Allo-legal. See <a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a> and the
-note on <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> (“One owner per memory”).</p>
+restructure above was Allo-legal, and the landed design is too. See
+<a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a> and the note on <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> (“One owner
+per memory”).</p>
 </section>
 <section id="reproducing-the-attribution">
-<h3>Reproducing the attribution<a class="headerlink" href="#reproducing-the-attribution" title="Link to this heading"><span>¶</span></a></h3>
-<p>From <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code> <strong>on branch</strong>
-<code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> (the scripts are not on <code class="docutils literal notranslate"><span class="pre">main</span></code>):</p>
+<span id="gemmini-attribution-reproduce"></span><h3>Reproducing the attribution<a class="headerlink" href="#reproducing-the-attribution" title="Link to this heading"><span>¶</span></a></h3>
+<p>From <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span>env.sh<span class="w">                    </span><span class="c1"># conda allo, LLVM_BUILD_DIR, OMP, TMPDIR</span>
-python<span class="w"> </span>make_variants.py<span class="w">          </span><span class="c1"># writes v_*.py</span>
+python<span class="w"> </span>make_variants.py<span class="w">          </span><span class="c1"># writes v_base.py and v_*.py from 7a24c21e</span>
 python<span class="w"> </span>pyrun.py<span class="w"> </span>bench_variant.py<span class="w"> </span>v_design_dep<span class="w">                     </span><span class="c1"># simulator</span>
 <span class="nv">TPU_SHAPES</span><span class="o">=</span>4x4x4,16x16x16<span class="w"> </span>python<span class="w"> </span>pyrun.py<span class="w"> </span>cosim_variant.py<span class="w"> </span>v_design_dep<span class="w"> </span>runs/v_design_dep
 ./profile.sh<span class="w"> </span>runs/v_design_dep<span class="w">   </span><span class="c1"># per-process timeline of the last shape</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">pyrun.py</span></code> strips the conda env’s editable finder, so <code class="docutils literal notranslate"><span class="pre">allo</span></code> resolves to that
-worktree. <code class="docutils literal notranslate"><span class="pre">cosim_variant.py</span></code> reuses <code class="docutils literal notranslate"><span class="pre">../cosim.py</span></code> unchanged (<code class="docutils literal notranslate"><span class="pre">align_value</span></code>
-64, widen 512, <code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code>, <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths) and adds only a
+<p><code class="docutils literal notranslate"><span class="pre">make_variants.py</span></code> reads its baseline from git at <code class="docutils literal notranslate"><span class="pre">7a24c21e</span></code> – the design
+the table calls <code class="docutils literal notranslate"><span class="pre">base</span></code> – not the shipped file, so the variants keep
+measuring what the table says; it gives them the baseline’s own hand-written
+program, since <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code> now targets the landed ISA. <code class="docutils literal notranslate"><span class="pre">cosim_variant.py</span>
+<span class="pre">base</span></code> builds the <em>shipped</em> design; the pre-landing one is <code class="docutils literal notranslate"><span class="pre">v_base</span></code>.
+<code class="docutils literal notranslate"><span class="pre">pyrun.py</span></code> strips the conda env’s editable finder, so <code class="docutils literal notranslate"><span class="pre">allo</span></code> resolves to
+this checkout. <code class="docutils literal notranslate"><span class="pre">cosim_variant.py</span></code> reuses <code class="docutils literal notranslate"><span class="pre">../cosim.py</span></code> (<code class="docutils literal notranslate"><span class="pre">align_value</span></code> 64,
+widen 512, <code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code>, <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths) and adds only a
 <code class="docutils literal notranslate"><span class="pre">patch_kernel(prj)</span></code> hook for variants that edit the emitted C++.
 <code class="docutils literal notranslate"><span class="pre">profile.sh</span></code> re-runs cosim with <code class="docutils literal notranslate"><span class="pre">-enable_dataflow_profiling</span></code>, then re-runs
 the xsim snapshot so the monitor’s CSVs survive (cosim deletes them).
 <code class="docutils literal notranslate"><span class="pre">analyze_df.py</span></code> and <code class="docutils literal notranslate"><span class="pre">rle_df.py</span></code> turn them into per-process
 run/starve/block counts and run-length traces. Raw outputs, timelines and the
-Vitis shared-array probe summaries are committed under <code class="docutils literal notranslate"><span class="pre">results/</span></code> and
-<code class="docutils literal notranslate"><span class="pre">probe_shared/</span></code> (<code class="docutils literal notranslate"><span class="pre">55405e00</span></code>).</p>
+Vitis shared-array probe summaries are under <code class="docutils literal notranslate"><span class="pre">results/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">probe_shared/</span></code>; <code class="docutils literal notranslate"><span class="pre">ar_distance_probe.py</span></code> is the RTL probe behind the
+accumulator distance contract.</p>
 </section>
 </section>
 <section id="making-the-baseline-matched">
@@ -766,8 +808,9 @@ accelerator work, <strong>~413 (72%)</strong> Rocket software driver. About 30 o
 L1 coherence from the pre-window <code class="docutils literal notranslate"><span class="pre">fill()</span></code>.</p>
 <p>So Gemmini’s accelerator-plus-dispatch fixed cost is about <strong>161</strong> against our
 <strong>151</strong> – parity, not 3.2x. And because the same driver sits inside all five of
-its numbers, the honest pairing at 4x4x4 is 252 against ~161: <strong>we are roughly
-1.6x slower</strong>, not 2.28x faster.</p>
+its numbers, the honest pairing at 4x4x4 was 252 against ~161: <strong>we were
+roughly 1.6x slower</strong>, not 2.28x faster (172 against ~161 since <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>:
+1.07x).</p>
 <p><strong>What a real comparison needed</strong> was one of two things: a Gemmini window that
 excludes the driver at every shape, or our number re-measured with an
 equivalent host-side cost included. The first was the cheaper and it is done –
@@ -781,38 +824,50 @@ would see rather than what each machine’s hardware does.</p>
 answers immediately. That is Vitis’s default and it was never stated, so it is
 stated here, along with what happens when it is not true.</p>
 <p>Rebuilding the design at a given read latency and cosimulating it there
-(<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> with <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY</span></code>; <code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_axi_latency_sweep.log</span></code>):</p>
+(<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> with <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY</span></code>; <code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_axi_latency.log</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_axi_latency_sweep.log</span></code> for the pre-landing design):</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code></p></th>
 <th class="head"><p>4x4x4</p></th>
 <th class="head"><p>16x16x16</p></th>
+<th class="head"><p>4x4x4, pre-landing</p></th>
+<th class="head"><p>16x16x16, pre-landing</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><strong>0</strong> (the tables above)</p></td>
+<td><p>172</p></td>
+<td><p>686</p></td>
 <td><p>252</p></td>
 <td><p>919</p></td>
 </tr>
 <tr class="row-odd"><td><p>16</p></td>
+<td><p>214 (+24%)</p></td>
+<td><p>702 (+2%)</p></td>
 <td><p>297 (+18%)</p></td>
 <td><p>935 (+2%)</p></td>
 </tr>
 <tr class="row-even"><td><p>64</p></td>
+<td><p>358 (+108%)</p></td>
+<td><p>894 (+30%)</p></td>
 <td><p>441 (+75%)</p></td>
 <td><p>1127 (+23%)</p></td>
 </tr>
 </tbody>
 </table>
-<p>Bit-exact at every point (0/16 and 0/256 mismatches). An earlier revision set
-these against Gemmini’s end-to-end 574 and 986 as a margin of lead. Those
-Gemmini numbers include about 395 cycles of Rocket driver software, so that
-margin was withdrawn with the headline. Gemmini’s own harness is also
-near-zero latency (SimDRAM without <code class="docutils literal notranslate"><span class="pre">+dramsim</span></code>), so latency 0 is the matched
-setting. <strong>The sweep is a property of our design, not a fairness correction.</strong></p>
+<p>Bit-exact at every point (0/16 and 0/256 mismatches). The latency costs the
+landed design <strong>the same absolute cycles</strong> as the pre-landing one to within 3
+(+42 / +186 at 4x4x4, +16 / +208 at 16x16x16), so it is a larger fraction of a
+smaller total. An earlier revision set these against Gemmini’s end-to-end 574
+and 986 as a margin of lead. Those Gemmini numbers include about 395 cycles of
+Rocket driver software, so that margin was withdrawn with the headline.
+Gemmini’s own harness is also near-zero latency (SimDRAM without
+<code class="docutils literal notranslate"><span class="pre">+dramsim</span></code>), so latency 0 is the matched setting. <strong>The sweep is a property
+of our design, not a fairness correction.</strong></p>
 <p><strong>The large shape amortises latency and the small one does not.</strong> 16x16x16
-moves 1.7% at latency 16, while 4x4x4 moves 18% at latency 16 and 75% at
-latency 64. Latency lands on the fixed term, so a real memory system would
+moves 2% at latency 16, while 4x4x4 moves 24% at latency 16 and 108% at
+latency 64 (18% and 75% before <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>). Latency lands on the fixed term, so a real memory system would
 widen the like-for-like deficit above at small shapes.</p>
 </section>
 <section id="marginal-cost-across-the-sweep">
@@ -830,33 +885,45 @@ machine’s own peak):</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>step</p></th>
 <th class="head"><p>Gemmini</p></th>
-<th class="head"><p>ours</p></th>
+<th class="head"><p>ours (1457 build)</p></th>
+<th class="head"><p>ours (landed, 686)</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>4x4x4 -&gt; 8x8x8</p></td>
 <td><p>10.93 MAC/cyc (<strong>68.3%</strong>)</p></td>
 <td><p>2.97 (<strong>18.5%</strong>)</p></td>
+<td><p>4.98 (31.1%)</p></td>
 </tr>
 <tr class="row-odd"><td><p>8x8x8 -&gt; 12x12x12</p></td>
 <td><p>9.73 (<strong>60.8%</strong>)</p></td>
 <td><p>5.17 (<strong>32.3%</strong>)</p></td>
+<td><p>7.79 (48.7%)</p></td>
 </tr>
 <tr class="row-even"><td><p>12x12x12 -&gt; 16x16x8</p></td>
 <td><p>7.27 (45.5%)</p></td>
 <td><p>4.38 (27.4%)</p></td>
+<td><p>4.85 (30.3%)</p></td>
 </tr>
 <tr class="row-odd"><td><p>16x16x8 -&gt; 16x16x16</p></td>
 <td><p>10.14 (<strong>63.4%</strong>)</p></td>
 <td><p>6.44 (<strong>40.3%</strong>)</p></td>
+<td><p>10.14 (<strong>63.4%</strong>)</p></td>
 </tr>
 <tr class="row-even"><td><p>least squares, all five</p></td>
 <td><p>9.71 (<strong>60.7%</strong>), fixed 566</p></td>
 <td><p>5.31 (<strong>33.2%</strong>), fixed 717</p></td>
+<td><p>7.95 (<strong>49.7%</strong>), fixed 192</p></td>
 </tr>
 </tbody>
 </table>
-<p>Our column is post-burst-DMA (the 680 … 1457 build). It read 4.31 / 6.54 /
+<p>The landed column (<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>) is differences of our own cycle counts, so it
+is as comparable with Gemmini’s marginal as the driver-inclusive Gemmini
+column allows: a per-call driver cost cancels in a difference. Its last step
+equals Gemmini’s to the digit (10.14 MAC/cycle): adding the second half of K at
+16x16 costs both machines the same 202 cycles. Its fixed term, 192, is not
+comparable with Gemmini’s 566, which carries the driver.</p>
+<p>The middle column is post-burst-DMA (the 680 … 1457 build). It read 4.31 / 6.54 /
 6.40 / 8.46 and 44.1% with fixed 1028 after row-flattening and before the burst
 DMA, and 3.50 / 5.43 / 6.67 / 6.92 and 37.0% with fixed 1067 before that. <strong>The
 burst DMA took the marginal efficiency DOWN, 44.1% -&gt; 33.2%, and the fixed cost
@@ -1104,7 +1171,7 @@ rather than total cycles.</p></li>
                 <ul>
 <li><a class="reference internal" href="#">TinyTPU-isa vs Gemmini: A Matched Comparison</a><ul>
 <li><a class="reference internal" href="#the-like-for-like-comparison">The like-for-like comparison</a></li>
-<li><a class="reference internal" href="#where-the-deficit-comes-from-forced-by-allo-vitis-vs-our-design">Where the deficit comes from: forced by Allo/Vitis vs. our design</a><ul>
+<li><a class="reference internal" href="#where-the-deficit-came-from-and-what-was-landed">Where the deficit came from, and what was landed</a><ul>
 <li><a class="reference internal" href="#variants">Variants</a></li>
 <li><a class="reference internal" href="#reproducing-the-attribution">Reproducing the attribution</a></li>
 </ul>

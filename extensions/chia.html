@@ -493,6 +493,15 @@ ALL EXACT, stress 60/60, est. clock 2.431 ns</p></td>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These runs were against the design shipped until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. <code class="docutils literal notranslate"><span class="pre">main</span></code> now
+ships the gap attribution’s stack at <strong>172 / 262 / 418 / 484 / 686</strong>
+(<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>), which includes both changes the two workers
+below were attempting. <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code>’s <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> still records 252 / 383
+/ 591 / 667 / 919 as its baseline and must be rebased onto <code class="docutils literal notranslate"><span class="pre">main</span></code> and
+re-baselined before another run.</p>
+</div>
 <p>What the workers were doing when stopped. Both are unfinished edits, not
 candidates. They are in <code class="docutils literal notranslate"><span class="pre">&lt;worker&gt;/unscored_leftover.diff</span></code>, and neither earned a
 cosim number:</p>
@@ -1052,10 +1061,11 @@ rather than tribal.</p></li>
 <li><p>On <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>: C1-C8 – the deterministic claims, re-derivable by the
 listed commands, including replay of the two agent-found variants (4.07x and
 1.98x) to their recorded cycle counts with exact numerics.</p></li>
-<li><p>On <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code>: the harness reproduces the TinyTPU-isa baseline in-loop
-(cosim 252 / 919) and <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> reproduces all five shapes from a clean
-checkout (252 / 383 / 591 / 667 / 919, bit-exact); containment held when a
-worker lost its tools and tried <code class="docutils literal notranslate"><span class="pre">bash</span></code>/<code class="docutils literal notranslate"><span class="pre">python</span></code>.</p></li>
+<li><p>On <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code>: the harness reproduces the TinyTPU-isa baseline of the
+time in-loop (cosim 252 / 919) and <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> reproduces all five shapes
+from a clean checkout (252 / 383 / 591 / 667 / 919, bit-exact); containment
+held when a worker lost its tools and tried <code class="docutils literal notranslate"><span class="pre">bash</span></code>/<code class="docutils literal notranslate"><span class="pre">python</span></code>. That
+baseline was superseded on <code class="docutils literal notranslate"><span class="pre">main</span></code> by <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (172 / … / 686).</p></li>
 </ul>
 <p><strong>Not demonstrated</strong></p>
 <ul class="simple">
