@@ -487,8 +487,9 @@ For a permanent fix, add to ``~/.bashrc`` on zhang-21:
        export LD_LIBRARY_PATH="$CONDA_ENV_LIB:$LD_LIBRARY_PATH"
    fi
 
-The quickstart this is taken from also names a ``./run_allo.sh`` wrapper that sets this
-automatically; it is not in this repository.
+Or use the wrapper at the repository root, ``./run_allo.sh python my_script.py``, which sets
+this automatically (it also prepends a hard-coded ``mlir/build/tools/allo/_mlir`` path under
+``/work/shared/users/phd/sk3463/projects/allo``; edit both paths for another checkout).
 
 **LLVM build.** The ``.so`` files in ``allo/_mlir/_mlir_libs/`` must be built against an LLVM that
 is compatible with RHEL 8's glibc (the ``build-rhel8`` LLVM), not one compiled on a glibc 2.35 host;
