@@ -18,10 +18,12 @@ meet, and where each one lands:
 
   1. **Instruction-programmable.** Nine opcodes, a decoded instruction word
      broadcast to every unit, and units that hold no knowledge of the program.
-  2. **A vector unit that tiled GEMM cannot do without.** `mm` computes the
-     psums of *one* k-tile and writes them to accumulator registers; summing
-     across k-tiles is an explicit `vadd`. Remove `vadd` and tiled GEMM stops
-     working -- it is load-bearing, not decoration.
+  2. **A vector unit.** `vadd` / `vrelu` operate on accumulator rows. This
+     item used to say tiled GEMM cannot do without `vadd`, because summing
+     across k-tiles was an explicit `vadd`. That is no longer true: `mm`'s
+     `f2` field selects overwrite or accumulate, so the shipped GEMM program
+     emits no `vadd` at all, and `vadd_program` exists to keep the vector unit
+     exercised.
   3. **A scratchpad with pure SIMD access.** One row of `spad` *is* one
      `UInt(T*8)` packed word of T int8 lanes. There is no per-lane addressing
      anywhere: one port, one row per cycle, which is what makes T lanes per
@@ -280,19 +282,23 @@ import allo.dataflow as df
 #   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
 #
 # **Every field carries one more bit than its value range needs, because a
-# bit-slice is extracted into a *signed* `ap_int<N>` in the emitted HLS:**
+# bit-slice USED TO BE extracted into a *signed* `ap_int<N>` in the emitted HLS:**
 #
 #     ap_int<7> v268;  v268 = w02(60, 54);   // nr
 #     int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
 #
-# so a field whose top bit is set reads back negative, and a loop bounded by it
-# runs zero times. This cost a real bug: `nr = 64` for a 64-row `vld` silently
+# so a field whose top bit was set read back negative, and a loop bounded by it
+# ran zero times. This cost a real bug: `nr = 64` for a 64-row `vld` silently
 # loaded nothing, and the design produced zeros. The Allo dataflow simulator
-# treats the slice as unsigned and passed, so **only cosim/csim caught it** --
+# treated the slice as unsigned and passed, so **only cosim/csim caught it** --
 # a genuine simulator/RTL divergence, and the reason `cosim.py` is worth having
 # in the loop rather than at the end.
 #
-# The rule this imposes: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
+# Fixed since: slices are emitted unsigned (fork 3de74846, upstream #612, merged
+# in dc6b8fa6; limitations register item 12). The spare bit is kept as a
+# conservative encoding rule, and `enc()` still asserts it.
+#
+# The rule this imposed: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
 # is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
 # a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
 #
@@ -363,8 +369,8 @@ def enc_agu(*terms):
     and simply redo the same work, which is why MiniTPU exports its induction
     variables to `sequencer_agu_resolve` instead of keeping them in the stack.
 
-    Field widths carry a spare bit each: a slice extracts to a signed
-    `ap_int<N>` (see the encoding note above), so target is 4 bits for 0..4,
+    Field widths carry a spare bit each: a slice used to extract to a signed
+    `ap_int<N>` (see the encoding note above; fixed since, the rule is kept), so target is 4 bits for 0..4,
     level 3 bits for 0..3, stride 12 bits for 0..2047."""
     assert len(terms) <= AGU_TERMS, f"at most {AGU_TERMS} address terms"
     w = 0
@@ -437,7 +443,7 @@ NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
 NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 
-MAXROWS = 127                                      # `nr` is 8 bits, top bit signed
+MAXROWS = 127                                      # `nr` is 8 bits, top bit spare
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 
 # Instruction slots. Sized to the longest program the built MAXDIM admits, not
@@ -1545,9 +1551,9 @@ def assemble(prog, check=True):
            rows(OP_MVOUT),
            a_span | (b_span << 16)]
     assert len(hdr) == NHDR
-    # Every count is read back through a 16-bit slice, which extracts to a
-    # signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
-    # encoding note at the top of the file).
+    # Every count is read back through a 16-bit slice, which used to extract
+    # to a signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
+    # encoding note at the top of the file; the spare bit is kept).
     for h in hdr[1:4] + hdr[5:7]:
         assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
     words = list(hdr)
