@@ -20,7 +20,7 @@ report a worst-case bound. See docs/source/designs/tinytpu_isa.rst.
 TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
 
   * `TPU_TB` unset (the DEFAULT, and the only mode the published cycle counts
-    252 / 383 / 591 / 667 / 919 come from): one GEMM call per shape, operands
+    172 / 262 / 418 / 484 / 686 come from): one GEMM call per shape, operands
     in [-4, 4] from seed 0 -- the distribution Gemmini's `allo_cmp.c` fills,
     kept so the comparison is like for like -- `C` zeroed, and only the
     `M x N` region compared. It is a PERFORMANCE testbench. It cannot see a
@@ -31,7 +31,9 @@ TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
     calls the kernel several times in one simulation -- corner operands
     ({-128, -127, -1, 0, 1, 126, 127}), uniform full-range int8, a directed
     case whose results sit exactly on the clip and ReLU boundaries, a mid
-    range, and `isa_dsl.vector_program` -- each with `C` prefilled with random
+    range, `isa_dsl.vector_program`, and `isa_dsl.ar_distance_program` at
+    the accumulator's distance contract (a case only RTL can fail: every
+    simulator ignores the dependence pragma) -- each with `C` prefilled with random
     bytes and the WHOLE of `C` compared against `isa_ref`/numpy, so the
     region must be exact and everything outside it untouched. The calls share
     one RTL instance, so each sees the `spad`/`vr`/`ar` the previous left.
@@ -145,7 +147,9 @@ def stress_testbench(M, K, N):
     """`TPU_TB=stress`: several calls on one RTL instance, whole `C` checked.
     The cases are the ones `stress_isa.py` runs for the scored shapes."""
     from examples.accelerator.tinytpu_vitis import isa_ref
-    from examples.accelerator.tinytpu_vitis.isa_dsl import vector_program
+    from examples.accelerator.tinytpu_vitis.isa_dsl import (
+        vector_program, ar_distance_program)
+    from examples.accelerator.tinytpu_vitis.microarch_isa import AR_RAW_DIST
     from examples.accelerator.tinytpu_vitis.stress_isa import (
         operands, boundary_operands, gemm_gold)
     crng = np.random.default_rng(4321 + M * 10000 + K * 100 + N)
@@ -164,6 +168,14 @@ def stress_testbench(M, K, N):
     C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
     prog = vector_program(8)
     cases.append(("vector_program(8) full", prog, A, B, C0,
+                  isa_ref.run(prog, A, B, C0)))
+    # The accumulator's dependence claim, at the edge of the contract that
+    # makes it true: every `ar` read exactly AR_RAW_DIST iterations after its
+    # write. Only the RTL can fail this; every simulator ignores the pragma.
+    A, B = operands("full", 951)
+    C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
+    prog = ar_distance_program(AR_RAW_DIST)
+    cases.append((f"ar_distance({AR_RAW_DIST}) full", prog, A, B, C0,
                   isa_ref.run(prog, A, B, C0)))
 
     src = ["#include <cstdio>\n#include <cstdint>\n",

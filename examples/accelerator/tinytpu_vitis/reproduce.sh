@@ -16,7 +16,7 @@
 # 3. stress_isa.py -- the correctness gate, must print STRESS OK;
 # 4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
 #    csynth, one cosim per shape -- and compares the cycle counts with the
-#    published 252 / 383 / 591 / 667 / 919.
+#    published 172 / 262 / 418 / 484 / 686.
 #
 # Needs: the `allo` conda env, LLVM at $LLVM_BUILD_DIR (default below), and
 # Vitis HLS 2023.2 at the path `cosim.py` names in VITIS. ~6 min with
@@ -25,7 +25,7 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
-EXPECTED="4x4x4=252 8x8x8=383 12x12x12=591 16x16x8=667 16x16x16=919"
+EXPECTED="4x4x4=172 8x8x8=262 12x12x12=418 16x16x8=484 16x16x16=686"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate allo
@@ -71,7 +71,7 @@ out=$("$PY" stress_isa.py | tail -1); echo "$out"; grep -q "STRESS OK" <<<"$out"
 
 echo "== cosim.py, default testbench (csynth once, then one cosim per shape)"
 "$PY" cosim.py | tee "$LOGS/cosim-reproduce.log"
-# The summary table: "  16x16x16   919", shape fields space-padded.
+# The summary table: "  16x16x16   686", shape fields space-padded.
 got=$(awk '/^  shape +cycles/{t=1; next} t && /^ +[0-9]/ {c=$NF; $NF=""; s=$0;
       gsub(/ /,"",s); printf "%s=%s ", s, c}' "$LOGS/cosim-reproduce.log" | sed 's/ $//')
 echo "   expected: $EXPECTED"

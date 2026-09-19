@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
+    DMA_SRC_B, DMA_TO_VR,
     MAXDIM, T, SPAD_ROWS, NVR, NAR, check_program, expand,
 )
 
@@ -48,14 +49,15 @@ def run(prog, A, B, C):
     for op, nr, f0, f1, f2, f3 in expand(prog):
         for r in range(nr):
             if op == OP_DMA_LD:
-                src = A if f0 == 0 else B
-                spad[f3 + r] = src[f1 + r, f2 * T:(f2 + 1) * T]
+                src = B if f0 & DMA_SRC_B else A
+                dst = vr if f0 & DMA_TO_VR else spad
+                dst[f3 + r] = src[f1 + r, f2 * T:(f2 + 1) * T]
             elif op == OP_VLD:
                 vr[f0 + r] = spad[f1 + r]
             elif op == OP_MM:
                 # PE(i, j) holds lane j of weight row i and taps lane i of the
                 # activation word, so column j is sum_i act[i] * W[i][j].
-                W = vr[f3:f3 + T]
+                W = spad[f3:f3 + T]
                 psum = vr[f0 + r] @ W
                 base = ar[f1 + r] if f2 == 1 else 0
                 ar[f1 + r] = _wrap32(base + psum)
