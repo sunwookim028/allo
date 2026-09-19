@@ -233,7 +233,7 @@ rewriting them away.</p>
 combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
 streams as top-level inputs (fork issue #12), and the nested sub-region Stream
-compile-time-constant shape constraint (fork issue #4; relates to item 3). The
+compile-time-constant shape constraint (fork issue #4; item <a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a>). The
 living fork-vs-upstream feature map is the pinned fork issue
 <a class="reference external" href="https://github.com/sunwookim028/allo/issues/13">https://github.com/sunwookim028/allo/issues/13</a>.</p>
 <section id="register">
@@ -517,6 +517,22 @@ bitwise ops, so every bitwise op is rejected there.</p></td>
 <td><p>not sized (warn; or reset-time init; or elide – see item)</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> on branch <a class="reference external" href="https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact">impact-limits</a></p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a></p></td>
+<td><p>REPRODUCES</p></td>
+<td><p>frontend</p></td>
+<td><p>A called sub-region is type-checked with the <em>caller’s</em> globals:
+<code class="docutils literal notranslate"><span class="pre">ASTContext(global_vars=ctx.global_vars.copy(),</span> <span class="pre">...)</span></code> at
+<code class="docutils literal notranslate"><span class="pre">builder.py:2838</span></code> (re-parsed via <code class="docutils literal notranslate"><span class="pre">inspect.getsource</span></code> at <code class="docutils literal notranslate"><span class="pre">:2825</span></code>).
+A <code class="docutils literal notranslate"><span class="pre">Stream[T,</span> <span class="pre">d][N]</span></code> whose <code class="docutils literal notranslate"><span class="pre">N</span></code> (or <code class="docutils literal notranslate"><span class="pre">Stream</span></code> itself) is defined only
+in the sub-region’s module fails <code class="docutils literal notranslate"><span class="pre">infer.py:90</span></code> (“stream array shape
+should be a compile time constant”) or “Unsupported type <code class="docutils literal notranslate"><span class="pre">Stream</span></code>”.
+Fork issue #4.</p></td>
+<td><p>none on TinyTPU-isa (one region); blocks composing regions across
+modules. Workaround: import the sub-region’s globals into the caller</p></td>
+<td><p>~5 lines (merge the callee’s own module globals over the caller’s);
+not prototyped</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py">new_subregion_foreign_globals.py</a></p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -678,7 +694,7 @@ not restated here: combinational wires (fork issue #9), HLS dependence pragma
 (fork issue #10), shared mutable memory across kernels (fork issue #11; relates
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
 nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
-relates to item 3).</p>
+item <a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a>, not item 3 as an earlier revision said).</p>
 <section id="region-scope-stateful-lowering-is-incomplete-on-main">
 <span id="limitation-1"></span><h3>1. Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering is incomplete on <code class="docutils literal notranslate"><span class="pre">main</span></code><a class="headerlink" href="#region-scope-stateful-lowering-is-incomplete-on-main" title="Link to this heading"><span>¶</span></a></h3>
 <div class="admonition-status-re-verified-2026-09-19 admonition">
@@ -1759,6 +1775,32 @@ TinyTPU-isa (<code class="docutils literal notranslate"><span class="pre">v_mems
 Stateful <code class="docutils literal notranslate"><span class="pre">memref.global</span></code> path (correct only for the first invocation); or
 elide the fill when every element is provably written before it is read.</p>
 </section>
+<section id="h-a-sub-region-from-another-module-is-type-checked-against-the-caller-s-globals">
+<span id="limitation-h"></span><h3>H. A sub-region from another module is type-checked against the caller’s globals<a class="headerlink" href="#h-a-sub-region-from-another-module-is-type-checked-against-the-caller-s-globals" title="Link to this heading"><span>¶</span></a></h3>
+<p>Found 2026-09-19 while re-checking fork issue #4; it had no row until then, and
+the register previously cross-referenced #4 to item 3, which is a different,
+already-fixed simulator bug.</p>
+<p>When a region calls a sub-region, <code class="docutils literal notranslate"><span class="pre">builder.py</span></code> builds the callee with
+<code class="docutils literal notranslate"><span class="pre">ASTContext(global_vars=ctx.global_vars.copy(),</span> <span class="pre">...)</span></code> (<code class="docutils literal notranslate"><span class="pre">builder.py:2838</span></code>) –
+the <strong>calling</strong> region’s globals, not those of the module that defines the
+sub-region. So a sub-region declaring <code class="docutils literal notranslate"><span class="pre">fifo:</span> <span class="pre">Stream[int32,</span> <span class="pre">4][N_SUB]</span></code>, with
+<code class="docutils literal notranslate"><span class="pre">N_SUB</span></code> and <code class="docutils literal notranslate"><span class="pre">Stream</span></code> imported only in its own module, fails when called from
+another module: <code class="docutils literal notranslate"><span class="pre">infer.py:90</span></code> reports “stream array shape should be a compile
+time constant”, or “Unsupported type <code class="docutils literal notranslate"><span class="pre">Stream</span></code>” if the caller does not import
+<code class="docutils literal notranslate"><span class="pre">Stream</span></code> either. The same sub-region builds fine on its own. Upstream has the
+same code.</p>
+<p>Workaround: import the sub-region’s shape constants and <code class="docutils literal notranslate"><span class="pre">Stream</span></code> into the
+calling module; composition then runs and gives the right result.</p>
+<p>The repro, <a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py">new_subregion_foreign_globals.py</a>,
+runs both variants and prints <code class="docutils literal notranslate"><span class="pre">REPRODUCES</span></code> while the caller-lacks-globals
+variant fails. That variant surfaces as <code class="docutils literal notranslate"><span class="pre">SystemExit:</span> <span class="pre">1</span></code> rather than an
+exception because <code class="docutils literal notranslate"><span class="pre">customize()</span></code> exits on frontend errors (item
+<a class="reference internal" href="#limitation-c"><span class="std std-ref">C</span></a>); the real message is on stderr. The sub-region and the
+working variant are written as generated modules, because a nested definition
+trips the separate re-parse <code class="docutils literal notranslate"><span class="pre">IndentationError</span></code> of upstream issue #588.</p>
+<p>Fix: merge the callee’s own module globals over the caller’s when building a
+sub-region – about five lines, not yet prototyped.</p>
+</section>
 </section>
 </section>
 
@@ -1833,6 +1875,7 @@ elide the fill when every element is provably written before it is read.</p>
 <li><a class="reference internal" href="#e-item-5-extended-same-type-shadowing-of-a-region-parameter">E. Item 5 extended: same-type shadowing of a region parameter</a></li>
 <li><a class="reference internal" href="#f-the-aie-cpp-style-typing-rules-reject-every-bitwise-op">F. The AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> typing rules reject every bitwise op</a></li>
 <li><a class="reference internal" href="#g-0-on-an-array-is-a-runtime-zero-fill-loop">G. <code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code> on an array is a runtime zero-fill loop</a></li>
+<li><a class="reference internal" href="#h-a-sub-region-from-another-module-is-type-checked-against-the-caller-s-globals">H. A sub-region from another module is type-checked against the caller’s globals</a></li>
 </ul>
 </li>
 </ul>
