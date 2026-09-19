@@ -73,6 +73,17 @@ Mechanical enforcement, not instructions:
    golden reference computed with a monkeypatched numpy is `tamper` even when
    the patch dodges the static policy (tested: a patch through a method's
    `self`). The nonce never reaches a verdict or log.
+3d. **The design stays parametric and documented** (added after the first
+   paid run, whose accepted diff hard-coded `T = 4` and deleted the 260-line
+   design docstring -- both invisible to a gate that only evaluates T=4 /
+   MAXDIM=16 and reads no comments). The frozen `param_check.py` rebuilds the
+   candidate at `TPU_MAXDIM=8` and `12` and requires the build to report that
+   MAXDIM and to be bit-exact at every GEMM shape of the configuration and on
+   random programs (`gate:param`). The policy requires `T` and `MAXDIM` to be
+   defined once as `int(os.environ.get("TPU_T"/"TPU_MAXDIM", <int>))` and
+   never rebound, and refuses a net loss of more than 15 comment/docstring
+   lines against the frozen ref (rewording and additions are free). T itself
+   is not varied: main's design supports only T=4.
 4. **The memory model is not the candidate's.** Every `TPU_*` variable is
    scrubbed before `cosim.py` runs, so `-m_axi_latency` stays at its
    default 0, which is the setting that matches Gemmini's harness. `-random_stall`
@@ -236,7 +247,8 @@ No git worktree is created per worker. Each worker's spec, logs and
 | File | Role |
 | --- | --- |
 | `evaluate.py` | frozen two-tier evaluator; one JSON verdict per candidate |
-| `gate_runner.py` | frozen: runs bench_isa / stress_isa / cosim and vouches for the verdict with a nonce |
+| `gate_runner.py` | frozen: runs bench_isa / stress_isa / param_check / cosim and vouches for the verdict with a nonce |
+| `param_check.py` | frozen: the parametricity gate, candidate rebuilt at MAXDIM 8 and 12 |
 | `spec_policy.py` | frozen: what an editable file may contain |
 | `accept.py` | clean-checkout, five-shape acceptance of a claimed winner |
 | `allo_tool.py` | the MCP surface: read spec / read frozen reference / replace_text, patch, insert / functional check / score |
@@ -250,6 +262,26 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `smoke.py` | the cheapest end-to-end check |
 | `test_harness.py` | LLM-free end-to-end test of all of the above; run before spending |
 | `fake_model.py` | scripted OpenAI-compatible model that `test_harness.py` points opencode at |
+
+## First paid run on CHIA2026, 2026-09-19: one verified win, and two holes
+
+`chia_runs/isa-run1-20260919/` (its README has the per-worker detail): 2
+workers (`front-end`, `tail`) x <= 3 iterations, $30 cap, main @ `476a70d8`,
+**$28.54** (opencode's DB, all counted against CHIA2026's $100 cap), 100 min.
+
+- **front-end iter 1**: `dma_ld`'s operand bursts widened to 4 rows an
+  iteration. Re-verified by `accept.py` on a clean checkout: **172 / 262 / 376
+  / 425 / 627** (0 / 0 / -42 / -59 / -59), bit-exact, stress_isa 492/492, RTL
+  stress 0 mismatches, 2.431 ns; BRAM18K 42 -> 98. The same diff hard-coded
+  `T = 4` and deleted the design docstring, so it is not landable as written;
+  re-expressed parametrically with the docstring intact (no model call) it
+  gives the same numbers. Both led to the guards in 3d.
+- Everything else was rejected: a deadlocking program rewrite, a no-op whose
+  debug session misreported a large improvement, and a relay-kernel change
+  that was 4 cycles worse.
+- Three of five sessions hit opencode's 40-minute timeout. The loop's
+  per-call accounting records those as $0.00; the DB (what the caps use)
+  charges them in full ($22.17).
 
 ## Capped smoke run, 2026-09-19: nothing improved, and what it exposed
 
@@ -330,6 +362,7 @@ client and its timeout, `OpenCodeLLM`, keep-or-rewind, `variants.jsonl`,
 | b `spad ... = 0` back (part of b4be2b10 reverted) | bit-exact, worse | 661 / 1280 (+409 / +361), loop rejects it as not better |
 | c PE partial sum int16 | bench passes, stress_isa rejects | `gate:stress`, 247/486 runs exact (was 40/60 under the old `stress.py`) |
 | d mvout's `c_dst.put` dropped | 240 s timeout, nothing left running | `gate:bench_isa` TIMEOUT at 242 s, no process under the work dir, `read_spec` 0.12 s meanwhile |
+| g parametricity / documentation | refused / `gate:param` | literal T, literal or second MAXDIM, deleted docstring refused by the tools and on disk; rewording allowed; `WPR = 4` passes bench+stress at 16 and fails `gate:param`; unmodified design 69/69 at MAXDIM 8, 186/186 at 12 |
 | e frozen-file / import-time attacks (22), forged verdicts | all refused | all refused. A narrowed datapath that prints `STRESS OK`/`ALL EXACT` and exits 0 at import forges the stdout of `stress_isa.py` (rc 0) but gets no `CHIA-GATE` line from the runner; a numpy RNG patch through a method's `self` passes the static policy and is refused by the runner |
 | f concurrent evaluations | responsive, no cross-talk | two cosims at once, `read_spec` worst 0.07 s; same-tool calls serialise |
 | accept on b | correct, not a win | ok, `claim: not-better`: 661 / 776 / 968 / 1028 / 1280, +409 / +393 / +377 / +361 / +361 over the five shapes, clock 2.431 ns |
