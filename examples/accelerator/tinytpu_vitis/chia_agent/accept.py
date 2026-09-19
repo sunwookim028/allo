@@ -102,7 +102,7 @@ def main():
 
         rc, o, sec = sh([ALLO_PYTHON, f"{PKG}/bench_isa.py"], wt, env,
                         out / "bench_isa.log")
-        result["bench_isa"] = {"rc": rc, "last": o.strip().splitlines()[-1:],
+        result["bench_isa"] = {"rc": rc, "last": [l.strip() for l in o.strip().splitlines()[-1:]],
                                "seconds": sec}
         rc2, o2, sec2 = sh([ALLO_PYTHON, f"{PKG}/chia_agent/stress.py"], wt, env,
                            out / "stress.log")
