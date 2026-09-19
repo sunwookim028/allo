@@ -17,6 +17,29 @@ Why cosim rather than the synthesis report: the loop bounds are now runtime
 data (that is what makes the design workload-independent), so csynth can only
 report a worst-case bound. See `RESULTS_ISA.md`.
 
+TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
+
+  * `TPU_TB` unset (the DEFAULT, and the only mode the published cycle counts
+    252 / 383 / 591 / 667 / 919 come from): one GEMM call per shape, operands
+    in [-4, 4] from seed 0 -- the distribution Gemmini's `allo_cmp.c` fills,
+    kept so the comparison is like for like -- `C` zeroed, and only the
+    `M x N` region compared. It is a PERFORMANCE testbench. It cannot see a
+    narrowed accumulator (a T-deep partial sum of [-4, 4] fits in 9 bits), a
+    wrong clip boundary, a unit ignoring a field GEMM never varies, a design
+    that relies on `C` arriving zeroed, or state left by an earlier call.
+  * `TPU_TB=stress`: a CORRECTNESS testbench on the same RTL. Per shape it
+    calls the kernel several times in one simulation -- corner operands
+    ({-128, -127, -1, 0, 1, 126, 127}), uniform full-range int8, a directed
+    case whose results sit exactly on the clip and ReLU boundaries, a mid
+    range, and `isa_dsl.vector_program` -- each with `C` prefilled with random
+    bytes and the WHOLE of `C` compared against `isa_ref`/numpy, so the
+    region must be exact and everything outside it untouched. The calls share
+    one RTL instance, so each sees the `spad`/`vr`/`ar` the previous left.
+    Its cycle column is the minimum over those calls; it is not the headline.
+
+The functional equivalent of `TPU_TB=stress` is `stress_isa.py` (seconds, on
+Allo's simulator); run that first. This mode is for what only RTL can show.
+
 Three toolchain fixes are needed and are applied here:
   * a real C++ testbench -- `df.build(mode=...)` handles only csim/csyn and the
     emitted `host.cpp` is an OpenCL/XRT host;
@@ -47,9 +70,19 @@ _ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
 # of T, since one vmatpush-equivalent is a whole packed word of T lanes.
 SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]
 if os.environ.get("TPU_SHAPES"):        # e.g. TPU_SHAPES=4x4x4,16x16x16
-    _want = {tuple(int(x) for x in t.split("x"))
-             for t in os.environ["TPU_SHAPES"].split(",")}
-    SHAPES = [s for s in SHAPES if s in _want]
+    # Any shape the build can express, not only the five scored ones.
+    SHAPES = [tuple(int(x) for x in t.split("x"))
+              for t in os.environ["TPU_SHAPES"].split(",")]
+    for _s in SHAPES:
+        assert all(d % T == 0 and d <= MAXDIM for d in _s), (
+            f"TPU_SHAPES: {_s} is not a multiple of T={T} within MAXDIM={MAXDIM}")
+
+TB_MODE = os.environ.get("TPU_TB", "default")   # "default" or "stress"; see top
+assert TB_MODE in ("default", "stress"), f"TPU_TB={TB_MODE!r}"
+# Where the Vitis project goes. Default: next to this file, whatever the cwd.
+PRJ = os.path.abspath(os.environ.get(
+    "TPU_PRJ", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "isa_sweep.prj")))
 
 # Memory-model knobs, for asking how much of the result is an ideal AXI slave.
 # `-m_axi_latency` is the read latency HLS schedules against (DEFAULT 0, i.e. a
@@ -103,6 +136,63 @@ int main() {{
            carr("gold", gold.reshape(-1), "int8_t"),
            f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n",
            body]
+    return "".join(src)
+
+
+def stress_testbench(M, K, N):
+    """`TPU_TB=stress`: several calls on one RTL instance, whole `C` checked.
+    The cases are the ones `stress_isa.py` runs for the scored shapes."""
+    from examples.accelerator.tinytpu_vitis import isa_ref
+    from examples.accelerator.tinytpu_vitis.isa_dsl import vector_program
+    from examples.accelerator.tinytpu_vitis.stress_isa import (
+        operands, boundary_operands, gemm_gold)
+    crng = np.random.default_rng(4321 + M * 10000 + K * 100 + N)
+    cases = []
+    for i, (dist, relu) in enumerate((("corner", False), ("full", True),
+                                      ("boundary", False), ("mid", True))):
+        seed = 900 + i
+        A, B = (boundary_operands(M, K, N, seed) if dist == "boundary"
+                else operands(dist, seed))
+        C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
+        prog = gemm_program(M, K, N, relu)
+        gold = gemm_gold(A, B, M, K, N, relu, C0)
+        assert (isa_ref.run(prog, A, B, C0) == gold).all()
+        cases.append((f"gemm{'.relu' if relu else ''} {dist}", prog, A, B, C0, gold))
+    A, B = operands("full", 950)
+    C0 = crng.integers(-128, 128, MAXDIM * MAXDIM).astype(np.int8)
+    prog = vector_program(8)
+    cases.append(("vector_program(8) full", prog, A, B, C0,
+                  isa_ref.run(prog, A, B, C0)))
+
+    src = ["#include <cstdio>\n#include <cstdint>\n",
+           'extern "C" void tinytpu_isa(uint64_t *, int8_t *, int8_t *, int8_t *);\n',
+           f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n"]
+    calls = []
+    for i, (name, prog, A, B, C0, gold) in enumerate(cases):
+        words = assemble(prog)
+        imem = np.zeros(IMEM_SIZE, np.uint64)
+        imem[: len(words)] = np.array(words, np.uint64)
+        src += [carr(f"imem{i}", imem, "uint64_t"),
+                carr(f"A{i}", A.reshape(-1), "int8_t"),
+                carr(f"B{i}", B.reshape(-1), "int8_t"),
+                carr(f"C0_{i}", C0, "int8_t"),
+                carr(f"gold{i}", gold, "int8_t")]
+        calls.append(f"""
+  for (int i = 0; i < {MAXDIM * MAXDIM}; i++) C[i] = C0_{i}[i];
+  tinytpu_isa(imem{i}, A{i}, B{i}, C);
+  n_in = n_out = 0;
+  for (int i = 0; i < {MAXDIM}; i++)
+    for (int j = 0; j < {MAXDIM}; j++)
+      if (C[i * {MAXDIM} + j] != gold{i}[i * {MAXDIM} + j]) {{
+        if ({'i < %d && j < %d' % (M, N) if name.startswith('gemm') else '1'}) n_in++; else n_out++;
+      }}
+  printf("TB {M}x{K}x{N} case {i} {name:24s} wrong = %d, clobbered outside = %d\\n", n_in, n_out);
+  bad += n_in + n_out;""")
+    src.append("int main() {\n  int bad = 0, n_in, n_out;" + "".join(calls) + f"""
+  printf("TB {M}x{K}x{N} stress mismatches = %d over {len(cases)} calls\\n", bad);
+  return bad == 0 ? 0 : 1;
+}}
+""")
     return "".join(src)
 
 
@@ -165,9 +255,12 @@ def cycles(prj):
 
 
 def main():
-    prj = os.path.abspath("isa_sweep.prj")
+    prj = PRJ
+    tb = stress_testbench if TB_MODE == "stress" else testbench
     print(f"TinyTPU-isa: ONE build -- {T}x{T} array, MAXDIM={MAXDIM}; "
-          f"sweeping {len(SHAPES)} shapes as data")
+          f"sweeping {len(SHAPES)} shapes as data; testbench={TB_MODE}"
+          + ("" if TB_MODE == "default" else
+             " (correctness mode: cycles are NOT the published numbers)"))
 
     s = customize(tinytpu_isa)
     schedule(s)
@@ -193,23 +286,38 @@ def main():
             wrap_io=(os.environ.get("TPU_WRAP", "0") == "1"),
             configs={"align_value": 64})
     patch_axi_depths(prj)
-    open(os.path.join(prj, "tb.cpp"), "w").write(testbench(*SHAPES[0]))
+    open(os.path.join(prj, "tb.cpp"), "w").write(tb(*SHAPES[0]))
     print("  synthesizing once ...", flush=True)
     vitis(prj, TCL_SYN, "csynth.log")
 
-    results = {}
+    results, ok = {}, True
     for (M, K, N) in SHAPES:
-        open(os.path.join(prj, "tb.cpp"), "w").write(testbench(M, K, N))
+        open(os.path.join(prj, "tb.cpp"), "w").write(tb(M, K, N))
+        # A stale report from the previous shape must not be read as this one's.
+        rpt = os.path.join(prj, "out.prj/solution1/sim/report/tinytpu_isa_cosim.rpt")
+        if os.path.exists(rpt):
+            os.remove(rpt)
         text = vitis(prj, TCL_COSIM, f"cosim_{M}x{K}x{N}.log")
         mm = [l.strip() for l in text.splitlines() if "mismatches" in l]
         n = cycles(prj)
         results[(M, K, N)] = n
-        tag = mm[0] if mm else "no TB line"
-        print(f"  {M:2d}x{K:2d}x{N:2d}  cycles={n}   {tag}", flush=True)
-    print("\n  shape      cycles")
+        good = (n is not None and bool(mm)
+                and re.search(r"mismatches = 0\b", mm[-1]) is not None)
+        ok &= good
+        if TB_MODE == "stress":
+            for l in text.splitlines():
+                if l.startswith("TB ") and " case " in l:
+                    print("    " + l.strip())
+        tag = mm[-1] if mm else "no TB line"
+        print(f"  {M:2d}x{K:2d}x{N:2d}  cycles={n}   {tag}"
+              + ("" if good else "   <-- FAIL"), flush=True)
+    print("\n  shape      cycles" + ("   (min over the stress calls)"
+                                    if TB_MODE == "stress" else ""))
     for k, v in results.items():
         print(f"  {k[0]:2d}x{k[1]:2d}x{k[2]:2d}   {v}")
-    return 0
+    print("  COSIM " + ("OK" if ok else "FAILED")
+          + f" (testbench={TB_MODE})")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
