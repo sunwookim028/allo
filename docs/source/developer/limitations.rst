@@ -41,7 +41,7 @@ Related feature-gap tracking lives as fork issues and is not restated here:
 combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
 streams as top-level inputs (fork issue #12), and the nested sub-region Stream
-compile-time-constant shape constraint (fork issue #4; relates to item 3). The
+compile-time-constant shape constraint (fork issue #4; item :ref:`H <limitation-h>`). The
 living fork-vs-upstream feature map is the pinned fork issue
 https://github.com/sunwookim028/allo/issues/13.
 
@@ -301,6 +301,21 @@ Open
        (measured, ``v_memset``); the shipped design avoids it
      - not sized (warn; or reset-time init; or elide -- see item)
      - ``v_memset`` on branch `impact-limits <https://github.com/sunwookim028/allo/tree/impact-limits/examples/accelerator/tinytpu_vitis/impact>`__
+   * - :ref:`H <limitation-h>`
+     - REPRODUCES
+     - frontend
+     - A called sub-region is type-checked with the *caller's* globals:
+       ``ASTContext(global_vars=ctx.global_vars.copy(), ...)`` at
+       ``builder.py:2838`` (re-parsed via ``inspect.getsource`` at ``:2825``).
+       A ``Stream[T, d][N]`` whose ``N`` (or ``Stream`` itself) is defined only
+       in the sub-region's module fails ``infer.py:90`` ("stream array shape
+       should be a compile time constant") or "Unsupported type ``Stream``".
+       Fork issue #4.
+     - none on TinyTPU-isa (one region); blocks composing regions across
+       modules. Workaround: import the sub-region's globals into the caller
+     - ~5 lines (merge the callee's own module globals over the caller's);
+       not prototyped
+     - `new_subregion_foreign_globals.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py>`__
 
 .. _limitations-closed:
 
@@ -450,7 +465,7 @@ not restated here: combinational wires (fork issue #9), HLS dependence pragma
 (fork issue #10), shared mutable memory across kernels (fork issue #11; relates
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
 nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
-relates to item 3).
+item :ref:`H <limitation-h>`, not item 3 as an earlier revision said).
 
 .. _limitation-1:
 
@@ -1549,3 +1564,37 @@ The right semantics are one of: warn; initialise at reset through the existing
 Stateful ``memref.global`` path (correct only for the first invocation); or
 elide the fill when every element is provably written before it is read.
 
+
+.. _limitation-h:
+
+H. A sub-region from another module is type-checked against the caller's globals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found 2026-09-19 while re-checking fork issue #4; it had no row until then, and
+the register previously cross-referenced #4 to item 3, which is a different,
+already-fixed simulator bug.
+
+When a region calls a sub-region, ``builder.py`` builds the callee with
+``ASTContext(global_vars=ctx.global_vars.copy(), ...)`` (``builder.py:2838``) --
+the **calling** region's globals, not those of the module that defines the
+sub-region. So a sub-region declaring ``fifo: Stream[int32, 4][N_SUB]``, with
+``N_SUB`` and ``Stream`` imported only in its own module, fails when called from
+another module: ``infer.py:90`` reports "stream array shape should be a compile
+time constant", or "Unsupported type ``Stream``" if the caller does not import
+``Stream`` either. The same sub-region builds fine on its own. Upstream has the
+same code.
+
+Workaround: import the sub-region's shape constants and ``Stream`` into the
+calling module; composition then runs and gives the right result.
+
+The repro, `new_subregion_foreign_globals.py
+<https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py>`__,
+runs both variants and prints ``REPRODUCES`` while the caller-lacks-globals
+variant fails. That variant surfaces as ``SystemExit: 1`` rather than an
+exception because ``customize()`` exits on frontend errors (item
+:ref:`C <limitation-c>`); the real message is on stderr. The sub-region and the
+working variant are written as generated modules, because a nested definition
+trips the separate re-parse ``IndentationError`` of upstream issue #588.
+
+Fix: merge the callee's own module globals over the caller's when building a
+sub-region -- about five lines, not yet prototyped.
