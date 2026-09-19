@@ -65,10 +65,10 @@ Branch layout (as of 2026-09-19)
 |                            |                          | **Rebasing main onto it is never**       |
 |                            |                          | **automatic — it is an explicit call.**  |
 +----------------------------+--------------------------+------------------------------------------+
-| ``chia-isa``               | ``main``                 | CHIA agentic co-design, retargeted at    |
-|                            |                          | TinyTPU-isa: harness, sandboxed          |
-|                            |                          | evaluator, GCP pre-flight gate. Lands on |
-|                            |                          | ``main`` once a paid run proves it.      |
+| ``chia-isa``               | ``main``                 | **Landed on main 2026-09-19** (the CHIA  |
+|                            |                          | loop, ``tinytpu_vitis/chia_agent/``) and |
+|                            |                          | deleted. History and raw run output:     |
+|                            |                          | tag ``chia-isa-run1-evidence``.          |
 +----------------------------+--------------------------+------------------------------------------+
 | ``chia-codesign``          | ``kkkaishao/allo`` (ACT) | **Retired 2026-09-19**, tag              |
 |                            |                          | ``chia-codesign-final`` (``629c2767``).  |
