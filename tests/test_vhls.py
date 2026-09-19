@@ -783,5 +783,124 @@ int main() {
     np.testing.assert_array_equal(np.array(out, dtype=np.int32), golden)
 
 
+def _loop_body(code, header_re):
+    """The lines of the loop whose header matches `header_re`, header first,
+    up to (not including) the next `for (`."""
+    lines = code.splitlines()
+    i = next(k for k, l in enumerate(lines) if re.search(header_re, l))
+    body = [lines[i]]
+    for l in lines[i + 1 :]:
+        if "for (" in l:
+            break
+        body.append(l)
+    return body
+
+
+def test_dependence_pragma():
+    """`s.dependence` emits `#pragma HLS dependence` inside the named loop,
+    for a local buffer (by its name) and for an argument (by its C name)."""
+
+    def kernel(A: int32[16], B: int32[16], n: int32[1]):
+        buf: int32[16] = 0
+        for i in range(n[0]):
+            buf[A[i]] = buf[A[i]] + B[i]
+        for j in range(16):
+            B[j] = buf[j]
+
+    s = allo.customize(kernel)
+    s.dependence("i", "buf", dep_type="inter", dependent=False)
+    s.dependence(
+        "kernel:i", "B", direction="RAW", distance=4, dependent=True, dep_class="array"
+    )
+    code = str(s.build(target="vhls"))
+    print(code)
+    # B is the second argument; its emitted name is whatever the signature says.
+    b_name = re.search(
+        r"void kernel\(\s*int32_t \w+\[16\],\s*int32_t (\w+)\[16\]", code
+    )
+    assert b_name, code
+    body = _loop_body(code, r"for \(int \w+ = 0; \w+ < \w+; \w+ \+= 1\)")
+    assert "#pragma HLS dependence variable=buf inter false" in "\n".join(body), body
+    assert (
+        f"#pragma HLS dependence variable={b_name.group(1)} array inter RAW "
+        "distance=4 true" in "\n".join(body)
+    ), body
+    # Only the loop it was applied to carries it.
+    assert code.count("#pragma HLS dependence") == 2
+
+    # The simulator ignores the pragma: same answer either way.
+    np_A = np.array([0, 1, 0, 2] * 4, dtype=np.int32)
+    np_B = np.arange(16, dtype=np.int32)
+    gold = np.zeros(16, dtype=np.int32)
+    for i in range(16):
+        gold[np_A[i]] += np_B[i]
+    s.build()(np_A, np_B, np.array([16], dtype=np.int32))
+    np.testing.assert_array_equal(np_B, gold)
+
+    inc = _vitis_include_dir()
+    if inc is not None and shutil.which("g++") is not None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src = os.path.join(tmpdir, "kernel.cpp")
+            with open(src, "w", encoding="utf-8") as f:
+                f.write(code)
+            subprocess.run(
+                ["g++", "-w", "-fsyntax-only", "-std=c++14", f"-I{inc}", src],
+                check=True,
+            )
+
+
+def test_dependence_pragma_rejects_bad_claims():
+    def kernel(A: int32[16]):
+        for i in range(16):
+            tmp: int32[4] = 0
+            tmp[i % 4] = A[i]
+            A[i] = tmp[(i + 1) % 4]
+
+    s = allo.customize(kernel)
+    with pytest.raises(Exception, match="inter/intra"):
+        s.dependence("i", "A", dep_type="across")
+    with pytest.raises(Exception, match="RAW/WAR/WAW"):
+        s.dependence("i", "A", direction="RWA")
+    with pytest.raises(Exception, match="distance"):
+        s.dependence("i", "A", distance=2)  # a distance on a false claim
+    with pytest.raises(Exception, match="declared inside the loop"):
+        s.dependence("i", "tmp")
+
+
+def test_dependence_pragma_dataflow_region():
+    """Reachable on a dataflow region the way `s.partition` is: through
+    `allo.dataflow.customize`, naming the kernel instance's loop."""
+    import allo.dataflow as df
+    from allo.ir.types import Stream
+
+    @df.region()
+    def top(X: int32[8], Y: int32[8]):
+        q: Stream[int32, 4]
+
+        @df.kernel(mapping=[1], args=[X])
+        def prod(lx: int32[8]):
+            for i in range(8):
+                q.put(lx[i])
+
+        @df.kernel(mapping=[1], args=[Y])
+        def cons(ly: int32[8]):
+            acc: int32[8] = 0
+            n: int32 = 8
+            for x in range(n):
+                v: int32 = q.get()
+                acc[v & 7] = acc[v & 7] + v
+            for j in range(8):
+                ly[j] = acc[j]
+
+    s = df.customize(top)
+    s.dependence("cons_0:x", "acc", dep_type="inter", dependent=False)
+    code = str(s.build(target="vhls"))
+    print(code)
+    cons = code[code.index("void cons_0(") :]
+    body = _loop_body(cons, r"for \(int \w+ = 0; \w+ < \w+; \w+ \+= 1\)")
+    assert "#pragma HLS dependence variable=acc inter false" in "\n".join(body), body
+    assert code.count("#pragma HLS dependence") == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

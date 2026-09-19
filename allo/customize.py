@@ -831,6 +831,118 @@ class Schedule:
         self.get_loops(func)[band_name][axis].loop.attributes["pipeline_ii"] = ii
 
     @wrapped_apply
+    def dependence(
+        self,
+        axis,
+        target,
+        dep_type="inter",
+        direction=None,
+        distance=None,
+        dependent=False,
+        dep_class=None,
+    ):
+        """
+        Tells HLS about the loop-carried (or intra-iteration) dependences of
+        one array in one loop -- Vitis's ``#pragma HLS dependence``, emitted
+        inside the loop:
+
+            #pragma HLS dependence variable=<target> [<dep_class>] <dep_type>
+                    [<direction>] [distance=<distance>] <dependent>
+
+        The claim is the programmer's. ``dependent=False`` removes the
+        dependence from the scheduler's view, which is what lets a loop whose
+        index is not affine in the induction variable (a flattened row loop,
+        say) pipeline at II=1; if the claim is false the RTL computes a wrong
+        answer while every software simulation, which ignores the pragma,
+        still passes.
+
+        Parameters
+        ----------
+        axis: str | LoopWrapper
+            The loop, as for ``pipeline`` (``"func:loop"`` or a loop handle).
+        target: str | MockBuffer
+            The array: a local buffer or an argument of the loop's function.
+            A bare name is looked up in the loop's function.
+        dep_type: str
+            ``"inter"`` (across iterations) or ``"intra"`` (within one).
+        direction: str | None
+            ``"RAW"``, ``"WAR"`` or ``"WAW"``; None claims all three.
+        distance: int | None
+            The inter-iteration distance of a true dependence; only with
+            ``dep_type="inter"`` and ``dependent=True``.
+        dependent: bool
+            Whether the dependence exists (True) or is claimed absent (False).
+        dep_class: str | None
+            ``"array"`` or ``"pointer"``; None leaves Vitis's default.
+        """
+        from ._mlir.ir import ArrayAttr, BoolAttr, DictAttr
+
+        if dep_type not in ("inter", "intra"):
+            raise AlloValueError(
+                f"dependence: dep_type {dep_type!r} is not inter/intra"
+            )
+        if direction is not None and direction not in ("RAW", "WAR", "WAW"):
+            raise AlloValueError(
+                f"dependence: direction {direction!r} is not RAW/WAR/WAW"
+            )
+        if dep_class is not None and dep_class not in ("array", "pointer"):
+            raise AlloValueError(
+                f"dependence: dep_class {dep_class!r} is not array/pointer"
+            )
+        if distance is not None:
+            if not (dependent and dep_type == "inter"):
+                raise AlloValueError(
+                    "dependence: a distance only describes a true "
+                    "(dependent=True) inter-iteration dependence"
+                )
+            if not isinstance(distance, int) or distance < 1:
+                raise AlloValueError(f"dependence: distance {distance!r} must be >= 1")
+
+        func, axis = self._get_func_and_axis(axis)
+        band_name, axis = find_loop_in_bands(func, axis)
+        loop = self.get_loops(func)[band_name][axis].loop
+        func_name = func.attributes["sym_name"].value
+        if isinstance(target, str):
+            if ":" in target:
+                buf_func, buf_name = target.split(":")
+            else:
+                buf_func, buf_name = func_name, target
+            target = MockBuffer(buf_func, buf_name)
+        if target.func != func_name:
+            raise AlloValueError(
+                f"dependence: {target.func}:{target.name} is not in the loop's "
+                f"function {func_name}"
+            )
+        _, idx, mlir_target = find_buffer(self.module, target, self.func_args)
+        entry = {
+            "type": StringAttr.get(dep_type),
+            "dependent": BoolAttr.get(bool(dependent)),
+        }
+        if isinstance(mlir_target, MockArg):
+            entry["arg_index"] = IntegerAttr.get(IntegerType.get_signless(64), idx)
+        else:
+            parent = mlir_target.operation.parent
+            while parent is not None:
+                if parent.operation == loop.operation:
+                    raise AlloValueError(
+                        f"dependence: {target.name} is declared inside the loop"
+                    )
+                parent = parent.parent
+            entry["variable"] = StringAttr.get(target.name)
+        if direction is not None:
+            entry["direction"] = StringAttr.get(direction)
+        if distance is not None:
+            entry["distance"] = IntegerAttr.get(IntegerType.get_signless(64), distance)
+        if dep_class is not None:
+            entry["class"] = StringAttr.get(dep_class)
+        old = (
+            list(loop.attributes["dependence"])
+            if "dependence" in loop.attributes
+            else []
+        )
+        loop.attributes["dependence"] = ArrayAttr.get(old + [DictAttr.get(entry)])
+
+    @wrapped_apply
     def parallel(self, axis):
         """
         Instantiates a loop with index `axis` to be computed in parallel with the loops it is nested with.
