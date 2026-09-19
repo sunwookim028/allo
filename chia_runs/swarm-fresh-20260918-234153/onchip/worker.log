@@ -1,0 +1,325 @@
+2026-09-18 23:42:43,643	INFO worker.py:1810 -- Connecting to existing Ray cluster at address: 128.84.48.164:6379...
+2026-09-18 23:42:43,707	INFO worker.py:2004 -- Connected to Ray cluster. View the dashboard at [1m[32m127.0.0.1:8265 [39m[22m
+2026-09-18 23:42:43,712	WARNING working_dir.py:86 -- Directory '__pycache__' is now ignored by default when packaging the working directory. To disable this behavior, set the `RAY_OVERRIDE_RUNTIME_ENV_DEFAULT_EXCLUDES=''` environment variable.
+2026-09-18 23:42:43,712	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-wt/examples/accelerator/tinytpu/chia_agent/.rayignore')]
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/ray/_private/worker.py:2052: FutureWarning: Tip: In future versions of Ray, Ray will no longer override accelerator visible devices env var if num_gpus=0 or num_gpus=None (default). To enable this behavior and turn off this error message, set RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  warnings.warn(
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+[36m(_ToolServerActor pid=941731)[0m INFO:     Started server process [941731]
+[36m(_ToolServerActor pid=941731)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=941731)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=941731)[0m ERROR:    [Errno 98] error while attempting to bind on address ('128.84.48.164', 8000): address already in use
+[36m(_ToolServerActor pid=941731)[0m INFO:     Waiting for application shutdown.
+[36m(_ToolServerActor pid=941731)[0m INFO:     Application shutdown complete.
+[36m(_ToolServerActor pid=941731)[0m INFO:     Started server process [941731]
+[36m(_ToolServerActor pid=941731)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=941731)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=941731)[0m INFO:     Uvicorn running on http://128.84.48.164:8001 (Press CTRL+C to quit)
+tinytpuonchip started at 128.84.48.164:8001 on node a2a65c84e82fa914fca11e0ae87ea9558ebc4985b3886a2a2e015c87
+========================================================================
+Baseline: synthesizing the unmodified design
+========================================================================
+  total_cycles=126432 (roofline 2454) [(8, 8, 8)=14432c, (8, 16, 32)=112000c] Fmax=411.02MHz LUT=8515 FF=9111 DSP=20 BRAM=26
+OpenCodeLLM is experimental: only exercised by unit tests so far, not validated in production.
+========================================================================
+Iteration 1/2 — best so far 126432 cycles
+========================================================================
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59934 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59934 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59934 - "GET /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59946 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59946 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59946 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40352 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40352 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52992 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52992 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:58506 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:58506 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34042 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34042 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34042 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34042 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51874 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51874 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:58070 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:58070 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57374 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57374 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43358 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43358 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:42836 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:42836 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37300 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37300 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52424 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52424 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41468 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41468 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41468 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41468 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59380 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59380 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50026 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50026 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56900 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56900 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39862 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39862 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39862 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39862 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36722 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36722 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50040 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50040 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:32950 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:32950 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45584 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45584 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40240 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40240 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39148 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39148 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33034 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33034 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:53752 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:53752 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60100 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60100 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49682 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49682 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50554 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50554 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43374 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43374 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60488 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60488 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54824 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54824 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37036 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37036 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60710 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60710 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60712 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60712 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49488 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49488 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49496 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49496 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37648 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37648 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41892 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41892 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43160 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43160 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35416 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35416 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35706 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35706 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60744 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60744 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36748 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36748 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54408 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54408 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54408 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54408 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51974 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51974 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41068 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41068 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36648 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36648 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36648 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36648 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44230 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44230 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:42368 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:42368 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55784 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55784 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49480 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49480 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49480 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49480 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36006 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36006 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33216 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33216 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33216 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33216 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38514 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54254 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54254 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54254 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54254 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38668 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56756 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56756 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51350 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51350 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49564 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49564 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43932 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43932 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51898 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51898 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51898 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51898 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40736 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40736 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40736 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:40736 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41782 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41782 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60196 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60196 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:46512 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:46512 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34522 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34522 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45030 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45030 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41186 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:41186 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43196 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43196 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34926 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:34926 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48422 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48422 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39702 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39702 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54158 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54158 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36364 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:36364 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56376 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:56376 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55738 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55738 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60474 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60474 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60474 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:60474 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33520 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33520 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44598 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44598 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35344 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:35344 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54264 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54264 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48008 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48008 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49370 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:49370 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50446 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50446 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57266 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57266 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57274 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57274 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33168 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33168 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57342 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57342 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59094 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59094 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59100 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59100 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48386 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48386 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48838 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48838 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54608 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:54608 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48968 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48968 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48972 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48972 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44546 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44546 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44754 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:44754 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59380 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:59380 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48066 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48066 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48078 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:48078 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:47420 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:47420 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:47432 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:47432 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33606 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33606 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50454 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:50454 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38388 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38388 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38398 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:38398 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57134 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:57134 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33676 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:33676 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43934 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43934 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43934 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43934 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45616 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:45616 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51780 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:51780 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39150 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39150 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39166 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:39166 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55090 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:55090 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52204 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:52204 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43330 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:43330 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37054 - "POST /tinytpuonchip/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=941731)[0m INFO:     128.84.48.164:37054 - "POST /tinytpuonchip/mcp HTTP/1.1" 202 Accepted
+*** SIGTERM received at time=1789776678 on cpu 9 ***
+PC: @     0x771967898e51  (unknown)  (unknown)
+    @     0x771967845330  (unknown)  (unknown)
+    @     0x77196789bd6e        224  pthread_cond_timedwait
+    @     0x77196599bc7f       1184  ray::core::GetRequest::Wait()
+    @     0x77196599ddd7       1328  ray::core::CoreWorkerMemoryStore::GetImpl()
+    @     0x77196599e829         64  ray::core::CoreWorkerMemoryStore::Get()
+    @     0x77196599ea2f        208  ray::core::CoreWorkerMemoryStore::Get()
+    @     0x7719658457d6       1488  ray::core::CoreWorker::GetObjects()
+    @     0x771965846460        160  ray::core::CoreWorker::Get()
+    @     0x77196577de00        272  __pyx_pw_3ray_7_raylet_10CoreWorker_35get_objects()
+    @     0x614a5e29cdcb  (unknown)  _PyEval_EvalFrameDefault
+    @     0x614a5e4d0840  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474: *** SIGTERM received at time=1789776678 on cpu 9 ***
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474: PC: @     0x771967898e51  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x771967845330  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196789bd6e        224  pthread_cond_timedwait
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196599bc7f       1184  ray::core::GetRequest::Wait()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196599ddd7       1328  ray::core::CoreWorkerMemoryStore::GetImpl()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196599e829         64  ray::core::CoreWorkerMemoryStore::Get()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196599ea2f        208  ray::core::CoreWorkerMemoryStore::Get()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x7719658457d6       1488  ray::core::CoreWorker::GetObjects()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x771965846460        160  ray::core::CoreWorker::Get()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x77196577de00        272  __pyx_pw_3ray_7_raylet_10CoreWorker_35get_objects()
+[2026-09-19 00:11:18,907 E 941654 941654] logging.cc:474:     @     0x614a5e29cdcb  (unknown)  _PyEval_EvalFrameDefault
+[2026-09-19 00:11:18,908 E 941654 941654] logging.cc:474:     @     0x614a5e4d0840  (unknown)  (unknown)
+[36m(_ToolServerActor pid=941731)[0m INFO:     Shutting down
+[36m(_ToolServerActor pid=941731)[0m INFO:     Waiting for connections to close. (CTRL+C to force quit)

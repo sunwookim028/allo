@@ -1,0 +1,54 @@
+--- a/isa.py
++++ b/isa.py
+@@ -183,7 +183,7 @@
+ 
+     @I.compute
+     def _(w, x, z):
+-        return primitive.matmul(x, primitive.transpose(w, [0, 2, 1]))
++        return primitive.matmul(x, w)
+ 
+ 
+ # --- Layer lowering: C[M,N] = A[M,K] @ B[K,N] over the fixed 4x4 systolic
+@@ -244,16 +244,12 @@
+                             d=x_tile + row * MATMUL_TILE,
+                             n=MATMUL_TILE,
+                         )
+-                    # Transpose B[K,N] while staging it as W[N,K].  Scalar DMA
+-                    # is deliberate: it is the existing ISA's general transpose
+-                    # primitive, not a hidden compiler-side data reorder.
+                     for row in range(MATMUL_TILE):
+-                        for col in range(MATMUL_TILE):
+-                            dma_load(
+-                                s=b + (k + row) * N + n + col,
+-                                d=w_tile + col * MATMUL_TILE + row,
+-                                n=1,
+-                            )
++                        dma_load(
++                            s=b + (k + row) * N + n,
++                            d=w_tile + row * MATMUL_TILE,
++                            n=MATMUL_TILE,
++                        )
+                     if k == 0:
+                         matmul(w=w_tile, x=x_tile, z=z_tile)
+                     else:
+--- a/microarch.py
++++ b/microarch.py
+@@ -124,8 +124,7 @@
+ # --- Systolic array: Z = X @ W^T over 4x4 tiles in BRAM -------------------- #
+ @tpu.unit
+ def mxu(bram: f32[BRAM_SIZE], w_addr: i32, x_addr: i32, z_addr: i32):
+-    """4x4 matmul reading row-major tiles X@``x_addr``, W@``w_addr`` and writing
+-    Z@``z_addr``. The weight is consumed transposed (Z[i,j] = sum_k X[i,k]*W[j,k]).
++    """4x4 matmul reading row-major tiles X@``x_addr``, W@``w_addr`` and writing Z@``z_addr``.
+ 
+     The X and W tiles are first staged into small on-chip register files (``Xt`` /
+     ``Wt``); the dot product then reads them in parallel instead of hammering the
+@@ -140,7 +139,7 @@
+         for j in arange(SYS_DIM, name="j"):
+             acc: f32 = 0.0
+             for k in arange(SYS_DIM, name="k"):
+-                acc += Xt[i, k] * Wt[j, k]
++                acc += Xt[i, k] * Wt[k, j]
+             bram[z_addr + i * SYS_DIM + j] = acc
+ 
+ 

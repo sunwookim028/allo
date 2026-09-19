@@ -1,0 +1,280 @@
+2026-09-18 23:41:58,092	INFO worker.py:1810 -- Connecting to existing Ray cluster at address: 128.84.48.164:6379...
+2026-09-18 23:41:58,170	INFO worker.py:2004 -- Connected to Ray cluster. View the dashboard at [1m[32m127.0.0.1:8265 [39m[22m
+2026-09-18 23:41:58,176	WARNING working_dir.py:86 -- Directory '__pycache__' is now ignored by default when packaging the working directory. To disable this behavior, set the `RAY_OVERRIDE_RUNTIME_ENV_DEFAULT_EXCLUDES=''` environment variable.
+2026-09-18 23:41:58,177	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-wt/examples/accelerator/tinytpu/chia_agent/.rayignore')]
+2026-09-18 23:41:58,180	INFO packaging.py:691 -- Creating a file package for local module '/home/sk3463/allo-chia-wt/examples/accelerator/tinytpu/chia_agent'.
+2026-09-18 23:41:58,180	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-wt/examples/accelerator/tinytpu/chia_agent/.rayignore')]
+2026-09-18 23:41:58,183	INFO packaging.py:463 -- Pushing file package 'gcs://_ray_pkg_7805b9daf3171fa5.zip' (0.05MiB) to Ray cluster...
+2026-09-18 23:41:58,184	INFO packaging.py:476 -- Successfully pushed file package 'gcs://_ray_pkg_7805b9daf3171fa5.zip'.
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/ray/_private/worker.py:2052: FutureWarning: Tip: In future versions of Ray, Ray will no longer override accelerator visible devices env var if num_gpus=0 or num_gpus=None (default). To enable this behavior and turn off this error message, set RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  warnings.warn(
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+[36m(_ToolServerActor pid=938382)[0m INFO:     Started server process [938382]
+[36m(_ToolServerActor pid=938382)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=938382)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=938382)[0m INFO:     Uvicorn running on http://128.84.48.164:8000 (Press CTRL+C to quit)
+tinytpudram started at 128.84.48.164:8000 on node a2a65c84e82fa914fca11e0ae87ea9558ebc4985b3886a2a2e015c87
+========================================================================
+Baseline: synthesizing the unmodified design
+========================================================================
+  total_cycles=126432 (roofline 2454) [(8, 8, 8)=14432c, (8, 16, 32)=112000c] Fmax=411.02MHz LUT=8515 FF=9111 DSP=20 BRAM=26
+OpenCodeLLM is experimental: only exercised by unit tests so far, not validated in production.
+========================================================================
+Iteration 1/2 — best so far 126432 cycles
+========================================================================
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37532 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37532 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37532 - "GET /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37548 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37548 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37548 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37250 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37250 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51418 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51418 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:50716 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:50716 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47898 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47898 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47900 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47900 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33074 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33074 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47002 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:47010 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:58104 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:58104 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40582 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40582 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38124 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38124 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56298 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56298 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38646 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38646 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37596 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37596 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45844 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:57370 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:57370 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+I have applied the architectural change to fix the DRAM staging bottleneck.
+
+**What was changed and why it costs fewer cycles:**
+I updated the ISA semantics of `matmul` and its corresponding `mxu` microarchitecture to perform standard matrix multiplication (`X @ W`) instead of transposed multiplication (`X @ W^T`). This architectural change allowed the compiler's `gemm` macro to stage the `B` matrix from DRAM using 4 coalesced row-block DMA loads per tile, completely eliminating the previous 16 scalar DMA loads that were being used to manually transpose the tile during staging. Since each `dma_load` incurs a fixed AXI read latency, reducing the number of transactions per `B` tile from 16 to 4 dramatically reduces the time spent stalling on DRAM. 
+
+The synthesized cycle count for the `8x16x32` GEMM benchmark has successfully dropped from **126,432** down to **61,632** cycles! All compiler and hardware verification checks have passed.
+  total_cycles=61632 (roofline 2454) [(8, 8, 8)=7232c, (8, 16, 32)=54400c] Fmax=411.02MHz LUT=8515 FF=9111 DSP=20 BRAM=26
+  ACCEPTED (-64800 cycles vs best) after 458s
+========================================================================
+Iteration 2/2 — best so far 61632 cycles
+========================================================================
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40058 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40058 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40058 - "GET /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40074 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40074 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40074 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40476 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40476 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39198 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39198 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39206 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39206 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39206 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39206 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51638 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51638 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51638 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51638 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39954 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39954 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45820 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45820 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:53492 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:53492 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59192 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59192 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59192 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59192 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:34700 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:34700 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37416 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37416 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45600 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45600 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45600 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45600 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48958 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51376 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51376 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38964 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38964 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38964 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38964 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46616 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46616 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:55122 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:55122 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52804 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52804 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41968 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41968 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51380 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51380 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59990 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59990 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:36714 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:36714 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33800 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33800 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:55910 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:55910 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48588 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48588 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56554 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56554 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56602 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:56602 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38510 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:38510 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42128 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42128 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40474 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:40474 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43038 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43038 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43054 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43054 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33098 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33098 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33102 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33102 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51744 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51744 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51744 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51744 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51344 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51344 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33488 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:33488 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59404 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:59404 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:34088 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:34088 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:49496 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:49496 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60386 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60386 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:32782 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:32782 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:50372 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:50372 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60052 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60052 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60062 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60062 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60062 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60062 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39906 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39906 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39906 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39906 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:44414 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:44414 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37764 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:37764 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52348 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52348 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52360 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52360 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52276 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52276 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52276 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:52276 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39602 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:39602 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41594 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41594 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41610 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:41610 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35082 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35082 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43818 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43818 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43820 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:43820 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35046 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35046 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35046 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:35046 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45020 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45020 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42860 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42860 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46770 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46770 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46786 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:46786 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51170 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:51170 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:57512 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:57512 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48880 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48880 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48880 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48880 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60936 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60936 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60938 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60938 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42576 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:42576 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48632 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:48632 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45210 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:45210 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60148 - "POST /tinytpudram/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=938382)[0m INFO:     128.84.48.164:60148 - "POST /tinytpudram/mcp HTTP/1.1" 202 Accepted
+*** SIGTERM received at time=1789776678 on cpu 16 ***
+PC: @     0x70428b298e51  (unknown)  (unknown)
+    @     0x70428b245330  (unknown)  (unknown)
+    @     0x70428b29bd6e        224  pthread_cond_timedwait
+    @     0x70428939bc7f       1184  ray::core::GetRequest::Wait()
+    @     0x70428939ddd7       1328  ray::core::CoreWorkerMemoryStore::GetImpl()
+    @     0x70428939e829         64  ray::core::CoreWorkerMemoryStore::Get()
+    @     0x70428939ea2f        208  ray::core::CoreWorkerMemoryStore::Get()
+    @     0x7042892457d6       1488  ray::core::CoreWorker::GetObjects()
+    @     0x704289246460        160  ray::core::CoreWorker::Get()
+    @     0x70428917de00        272  __pyx_pw_3ray_7_raylet_10CoreWorker_35get_objects()
+    @     0x630d068ecdcb  (unknown)  _PyEval_EvalFrameDefault
+    @     0x630d06b20840  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474: *** SIGTERM received at time=1789776678 on cpu 16 ***
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474: PC: @     0x70428b298e51  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428b245330  (unknown)  (unknown)
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428b29bd6e        224  pthread_cond_timedwait
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428939bc7f       1184  ray::core::GetRequest::Wait()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428939ddd7       1328  ray::core::CoreWorkerMemoryStore::GetImpl()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428939e829         64  ray::core::CoreWorkerMemoryStore::Get()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428939ea2f        208  ray::core::CoreWorkerMemoryStore::Get()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x7042892457d6       1488  ray::core::CoreWorker::GetObjects()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x704289246460        160  ray::core::CoreWorker::Get()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x70428917de00        272  __pyx_pw_3ray_7_raylet_10CoreWorker_35get_objects()
+[2026-09-19 00:11:18,907 E 935625 935625] logging.cc:474:     @     0x630d068ecdcb  (unknown)  _PyEval_EvalFrameDefault
+[2026-09-19 00:11:18,908 E 935625 935625] logging.cc:474:     @     0x630d06b20840  (unknown)  (unknown)
+[36m(_ToolServerActor pid=938382)[0m INFO:     Shutting down
+[36m(_ToolServerActor pid=938382)[0m INFO:     Waiting for connections to close. (CTRL+C to force quit)
