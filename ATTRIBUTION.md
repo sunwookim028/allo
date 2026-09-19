@@ -47,11 +47,23 @@ Re-publishing them under a name of ours would fork Kai's work rather than cite
 it, and would immediately be the stale copy. Reference `kai/allo-rtlgen` and
 `kai/act` read-only instead.
 
-## Open: consent is not recorded anywhere
+## Basis for use
 
-Both merges (`882f7dd6`, `29cb1d99`) are plain merge commits with no co-author
-trailers, and neither `CODESIGN.md` nor `notes/CHIA_CHECKPOINT.md` states the
-terms under which this code was taken. **Nothing in this tree records that Kai
-agreed to the import, or on what basis.** That is a question for Kai and should
-be settled before any of this is published, submitted, or landed on `main` —
-particularly efforts (2) and (3), which are substantially his.
+Decided by the project owner on 2026-09-19: this work is used **in good faith**
+on the basis that
+
+* it is **public** -- https://github.com/kkkaishao/allo, branches `allov2`,
+  `act` and `allo-rtlgen`;
+* it is **acknowledged explicitly**, here and in the published documentation
+  (https://sunwookim028.github.io/allo/), with the exact upstream branch and
+  commit for every imported component; and
+* this project adds **substantial work of its own** on top of it.
+
+This records the owner's decision, not a statement from Kai: both merges
+(`882f7dd6`, `29cb1d99`) are plain merge commits with no co-author trailers, and
+no correspondence with him is recorded in this tree. The earlier note here that
+this was not for publication until settled with him is withdrawn.
+
+What follows from the attribution above is unchanged: cite his branches rather
+than re-publish copies of them under a name of ours, and credit him wherever
+these components are described.
