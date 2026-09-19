@@ -57,7 +57,7 @@ def main() -> int:
                        "single line listing the names of the @df.kernel functions "
                        "defined inside the tinytpu_isa region in microarch_isa.py, "
                        "comma separated, and nothing else.",
-                       Budget(1.0, int(started * 1000)), "smoke", calls)
+                       Budget(5.0, int(started * 1000)), "smoke", calls)
         text = str(response.result)
         print(f"      model replied: {text.strip()[:300]}")
         print("[3/3] checking the reply came from the spec...")
