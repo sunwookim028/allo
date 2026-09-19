@@ -21,11 +21,11 @@ https://github.com/sunwookim028/allo/issues/13.
    commits; check `git branch -a` for the current set (branches come and go,
    so do not hardcode names here).
 
-## Branch layout (as of 2026-09-17)
+## Branch layout (as of 2026-09-19)
 
 | Branch | Lineage | Role |
 | --- | --- | --- |
-| `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 81 ahead, 0 behind `upstream/main` (`8bafb0dc`) as of this writing. |
+| `main` | cornell-zhang | Fork integration branch: upstream plus fork-local features. **Not** a mirror of upstream — 130 ahead, 0 behind `upstream/main` (`094ab413`, upstream #612) as of the 2026-09-19 reconciliation merge `dc6b8fa6`. |
 | `upstream` | cornell-zhang | Mirror of `upstream/main`, tracking the `upstream` remote. Refresh it to see what has landed; diff `main` against it to see what the fork carries. **Rebasing `main` onto it is never automatic — it is an explicit call.** |
 | `chia-codesign` | `kkkaishao/allo` (ACT) | The CHIA / TinyTPU co-design artifact. A separate codebase, not a feature branch — see below. |
 | `upstream-omp-team-size` | cornell-zhang | One commit on `upstream/main`: upstream draft PR #611 (simulator OpenMP team sized to the section count). Delete after it merges, per the procedure above. |
