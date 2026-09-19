@@ -203,7 +203,7 @@ Layer 4b — HLS backends
 
 **TAPA**: not supported. The TAPA overrides (``try_write`` / ``try_read``) were
 removed in 2026-07 — TAPA is not used in the mesh flow and the dead codepath was a
-maintenance burden (see ``notes/ASIC_HLS_EXPLORATION.md``). The hooks in
+maintenance burden (see :doc:`/extensions/catapult_systemc`). The hooks in
 ``EmitBaseHLS.h`` have empty default bodies, but they are never reached: the op
 falls through to ``visitUnhandledOp`` and the emitter reports "can't be correctly
 emitted", so a non-blocking op built for ``target="tapa"`` **fails the build**
@@ -246,6 +246,16 @@ Based on synthesis experiments in ``tests/dataflow/hls_synth_streams.py``:
      - 1,457 (+2.8%)
      - 260 (+4.8%)
      - 7
+
+.. note::
+
+   The FF and II figures in this table are labelled estimated and disagree with
+   the measured record. The primary record,
+   :doc:`/records/vitis_nb_streams` (Vitis HLS 2023.2, U280, 2026-03-08),
+   measured the same two designs at LUT 1417 / 1457 but **FF 1325 / 1369**, and
+   reported pipeline II 7 for the blocking design and ``undef`` (statically
+   unbounded spin-wait) for the non-blocking one. Where the two disagree, use
+   the record.
 
 Non-blocking operations add only ~O(1) LUTs per stream (one comparator + branch).
 The success bit propagation is the main scheduling concern in HLS — keep it in control
@@ -290,4 +300,4 @@ Files Modified (PR Scope)
 See Also
 --------
 
-- ``docs/source/dive/dataflow.rst`` — Dataflow programming model overview
+- :doc:`/dive/dataflow` — Dataflow programming model overview

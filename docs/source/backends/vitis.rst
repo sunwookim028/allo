@@ -333,6 +333,177 @@ You can specify the target device and clock frequency through the ``configs`` di
 - **Embedded**: ``ultra96v2``, ``pynqz2``, ``zedboard``
 
 
+Aligned ``m_axi`` Pointers and Port Widening
+--------------------------------------------
+Vitis HLS can widen an ``m_axi`` port so that a long burst of narrow elements
+(e.g. ``int8``) moves many bytes per beat instead of one. The Tcl setting is
+``config_interface -m_axi_max_widen_bitwidth <bits>``, but Vitis only widens a
+port whose pointer it knows to be aligned. By default Allo emits the top
+function's array arguments as plain ``T *name`` pointers, so Vitis assumes
+1-byte alignment and **declines to widen, silently**: the setting is accepted,
+csynth completes, and the ports stay at the element width with no diagnostic.
+
+Allo can emit an alignment promise on every array argument of the top function.
+It is opt-in, through the ``align_value`` key of ``configs``:
+
+.. code-block:: python
+
+   mod = s.build(
+       target="vitis_hls",
+       mode="csyn",
+       project="design.prj",
+       configs={"align_value": 64},   # bytes
+   )
+
+With it, each array parameter of the top function is emitted as
+
+.. code-block:: cpp
+
+   int8_t *__attribute__((align_value(64))) v0,
+
+next to the usual ``#pragma HLS interface m_axi port=v0 offset=slave
+bundle=gmem0``. The attribute is added in ``postprocess_hls_code``
+(``allo/backend/vitis.py``) when a ``vitis_hls`` project is generated; scalar
+arguments are unaffected, and without the key the output is unchanged.
+
+Allo does not add ``-m_axi_max_widen_bitwidth`` itself; put it in your own
+synthesis script alongside the alignment:
+
+.. code-block:: tcl
+
+   config_interface -m_axi_max_widen_bitwidth 512
+
+**Measured effect.** On the TinyTPU-isa accelerator (:doc:`/designs/tinytpu_isa`),
+``align_value`` 64 plus ``-m_axi_max_widen_bitwidth 512`` took gmem0 to **bit
+width 512** and gmem1/gmem2 to 32, and two burst loops from II=4 to II=1;
+``csynth.log`` shows one port at 512, two at 32, and zero ``HLS 214-307``
+messages. Without the alignment, the same setting left every port at 8 bits.
+Together with removing a hidden memset it took the design from 1457 to 919
+cycles at 16x16x16 (:ref:`tinytpu-history-prefixes`).
+
+.. note::
+
+   ``[HLS 214-307] Could not widen since type i8 size is greater than or equal
+   to alignment 1(bytes)`` is what small standalone probes report. On the full
+   design it did **not** appear -- the refusal was silent. Probes also showed
+   that ``__attribute__((aligned(N)))`` on the element type is the wrong lever
+   (Vitis tests the pointer *parameter*), and that ``align_value`` alone is
+   necessary but not sufficient to widen every probe kernel. See
+   :ref:`limitation-23`.
+
+**It is a promise.** ``align_value`` tells Vitis the pointer *is* N-byte
+aligned; the host must keep that promise, which is why it is opt-in rather than
+always emitted. XRT buffers are 4 KB aligned, so it holds on hardware for free.
+In C/RTL co-simulation the testbench *is* the host, so testbench arrays must be
+declared aligned too (``static alignas(64) int8_t A[...]``). A design that wants
+wide accesses without the promise can instead declare its operands with a wider
+element type (e.g. ``UInt(32)`` words holding four ``int8`` lanes), which reaches
+II=1 with no alignment and no widen setting at all.
+
+
+RTL Co-Simulation of Dataflow Designs
+-------------------------------------
+``df.build(target="vitis_hls", mode=...)`` handles ``csim`` and ``csyn``; the
+other ``vitis_hls`` modes route to the ``XDEVICE`` Makefile flow, and the emitted
+``host.cpp`` is an OpenCL/XRT host -- which is not what Vitis ``cosim_design``
+wants. ``mode="cosim"`` is not wired into ``df.build`` (:ref:`limitation-16`).
+Running C/RTL co-simulation on an Allo dataflow design therefore needs a small
+external driver. ``examples/accelerator/tinytpu_vitis/cosim.py`` (~180 lines) is
+a working one and shows the four things any such driver has to do:
+
+1. **A plain C++ testbench.** Build the project with ``mode="csyn"`` to get
+   ``kernel.cpp``, then write a ``tb.cpp`` whose ``main`` calls the top function
+   directly on static arrays and compares against a reference. ``cosim.py``
+   generates it from the same inputs and numpy reference the Allo simulator
+   run uses, so the vectors cannot drift from the design.
+2. **Explicit** ``m_axi`` **depths.** Cosim has to know how much memory to model
+   behind each port and fails otherwise (``A depth specification is required
+   for MAXI interface port 'gmem0' for cosimulation``). Allo emits the interface
+   pragmas without a depth, so the driver patches ``depth=<words>`` into each
+   ``#pragma HLS interface m_axi ... bundle=gmemN`` line, in the port order of
+   the top function.
+3. **Aligned testbench arrays** if the kernel was built with ``align_value``
+   (above): ``static alignas(64)``.
+4. **A linker Vitis can use on this host** (next section): pass
+   ``-ldflags "-B/usr/bin"`` to ``cosim_design``.
+
+The synthesis and co-simulation scripts ``cosim.py`` drives, with the
+project's part and clock:
+
+.. code-block:: tcl
+
+   # run.tcl for csynth -- run once
+   open_project out.prj -reset
+   open_solution -reset solution1 -flow_target vivado
+   set_top tinytpu_isa
+   add_files kernel.cpp
+   add_files -tb tb.cpp -cflags "-std=gnu++0x"
+   set_part {xcu280-fsvh2892-2L-e}
+   create_clock -period 3.33
+   config_interface -m_axi_max_widen_bitwidth 512
+   # config_interface -m_axi_latency <n>     (optional, see below)
+   csynth_design
+   exit
+
+.. code-block:: tcl
+
+   # run.tcl for cosim -- run once per testbench
+   open_project out.prj
+   open_solution solution1
+   set_top tinytpu_isa
+   cosim_design -trace_level none -rtl verilog -ldflags "-B/usr/bin"
+   exit
+
+Because ``cosim_design`` runs one testbench per invocation, a sweep over
+workloads can rewrite ``tb.cpp`` and re-run only the cosim script against the
+same project: ``csynth_design`` runs once, so the RTL under test is identical for
+every workload. The cycle count is read from
+``out.prj/solution1/sim/report/<top>_cosim.rpt``.
+
+**Memory-model knobs.** Cosim's AXI slave answers immediately unless told
+otherwise: ``-m_axi_latency`` defaults to 0. ``config_interface -m_axi_latency
+<n>`` (at csynth time) makes HLS schedule against an ``n``-cycle read latency,
+and ``cosim_design -random_stall`` stalls the top-level interfaces at random.
+State which one a number was measured with; on TinyTPU-isa, latency 64 costs 75%
+at the smallest shape and 23% at the largest (:doc:`/designs/gemmini_comparison`).
+In ``cosim.py`` these are ``TPU_AXI_LATENCY=<n>`` and ``TPU_RANDOM_STALL=1``.
+
+**Why cosim rather than the csynth report.** When loop trip counts are runtime
+data -- any instruction-programmable design -- csynth can only report a
+worst-case bound derived from the index ranges, and it can be off by orders of
+magnitude (91,407 vs 4,133 and 2.259e+08 vs 1,176 on TinyTPU-isa; see
+:ref:`tinytpu-isa-csynth-bound`). Cosim is the cycle count. Cosim also compiles
+an ``AESL_deadlock_detect_unit`` into the RTL testbench, so it reports
+deadlocks.
+
+**C simulation runs dataflow processes in declaration order.** In ``csim`` the
+processes of a ``dataflow`` region are called sequentially, in source order, so a
+consumer declared before its producer reads an empty stream and aborts with
+``ERROR [HLS SIM]: an hls::stream is read while empty``. Kernel declaration order
+inside a ``@df.region()`` is therefore load-bearing for ``csim`` (not for RTL),
+and designs with bidirectional handshakes cannot pass ``csim`` at all. See
+:ref:`limitation-15` and :doc:`/developer/dataflow_semantics`.
+
+
+Vitis 2023.2 Linker vs. Newer glibc
+-----------------------------------
+Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux
+distributions. Both the ``csim`` and ``cosim`` links fail with
+
+.. code-block:: text
+
+   unknown type [0x13] section '.relr.dyn'
+   ...
+   cannot find libm.so.6
+
+The fix is a compiler-driver flag, not a ``PATH`` override: ``-B/usr/bin`` points
+the driver at the system linker (2.42 on the host these results were produced
+on) while leaving the rest of the Vitis toolchain in place. Pass it to
+``cosim_design -ldflags "-B/usr/bin"`` (and equivalently to any ``csim_design``
+link). Any new Vitis flow on such a host needs the equivalent. Host toolchain
+details are on :doc:`/developer/toolchains`.
+
+
 Conclusion
 ----------
 This example illustrates the process of defining a GEMM kernel using the Allo ADL and generating HLS code for FPGA acceleration with the Vitis HLS backend. The approach supports various synthesis modes (sw_emu, hw_emu, hw) to cater to different design and verification needs.
