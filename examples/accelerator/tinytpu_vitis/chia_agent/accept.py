@@ -8,8 +8,9 @@ convenience, not evidence. A claim is accepted only by this script:
    microarch_isa.py and isa_dsl.py -- anything else is refused),
 3. that checkout's own `mlir/` bindings built in-tree against $LLVM_BUILD_DIR
    (~40 s; no symlink into any other checkout),
-4. `bench_isa.py`, main's `stress_isa.py` (the correctness gate) and
-   `cosim.py` with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
+4. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
+   `cosim.py`, and `cosim.py` again with `TPU_TB=stress` (the RTL correctness
+   testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
    project goes) -- so all five SHAPES, default memory model -- each run from
    that checkout under `chia_agent/gate_runner.py`, which vouches for each
    verdict with a per-run nonce instead of trusting printed lines,
@@ -66,6 +67,13 @@ BASELINES = {
      "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
         {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
          "16x16x16": 919},
+    # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
+    # II=1 via s.dependence). Main's published numbers; re-measured by a no-diff
+    # control through this script, chia_runs/accept-control-476a70d8/.
+    ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+     "8f2e9aa9f518ef320cab163adc95e05737c777be"):
+        {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418, "16x16x8": 484,
+         "16x16x16": 686},
 }
 
 
@@ -122,6 +130,8 @@ def main():
     ap.add_argument("--ref", default="HEAD")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--no-rtl-stress", action="store_true",
+                    help="skip cosim.py's TPU_TB=stress correctness testbench")
     ap.add_argument("--baseline", type=Path,
                     help="a control run's accept.json (default: recorded BASELINES)")
     a = ap.parse_args()
@@ -225,12 +235,35 @@ def main():
             t = xml.read_text()
             result["estimated_ns"] = float(re.search(
                 r"<EstimatedClockPeriod>([\d.]+)", t).group(1))
+        # The RTL correctness testbench (main's cosim.py TPU_TB=stress): several
+        # calls on one RTL instance, corner/full/boundary/mid operands, C
+        # prefilled and compared in full, plus a vector program. It is what
+        # catches an RTL-only failure the simulator cannot, e.g. a dependence
+        # pragma that is false at a short read-after-write distance.
+        rtl_ok = True
+        if not a.no_rtl_stress:
+            cos2 = wt / ".cosim_stress"
+            cos2.mkdir()
+            ok4, rc4, o4, sec4 = vouched(
+                "cosim", wt, cos2,
+                dict(env, TPU_PRJ=str(cos2 / "isa_sweep.prj"), TPU_TB="stress"),
+                out / "cosim_stress.log", cos2)
+            untouched("cosim stress")
+            lines4 = [l.strip() for l in o4.splitlines()
+                      if re.match(r"\s*\d+x\s*\d+x\s*\d+\s+cycles=", l)]
+            rtl_ok = (ok4 and len(lines4) == 5
+                      and all(re.search(r"stress mismatches = 0 over \d+ calls$", l)
+                              for l in lines4)
+                      and "COSIM OK (testbench=stress)" in o4)
+            result["cosim_rtl_stress"] = {"vouched": ok4, "ok": rtl_ok,
+                                          "shapes": lines4, "seconds": sec4}
         exact = all(v["tb"] == f"TB {s} mismatches = 0 / "
                     f"{int(s.split('x')[0]) * int(s.split('x')[2])}"
                     and v["cycles"] is not None for s, v in result["cosim"].items())
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
                         and ok2 and ok3 and len(result["cosim"]) == 5
-                        and exact and result.get("estimated_ns", 99) <= 3.33)
+                        and exact and result.get("estimated_ns", 99) <= 3.33
+                        and rtl_ok)
         if a.baseline:
             base = {s: v["cycles"] for s, v in
                     json.loads(a.baseline.read_text())["cosim"].items()}

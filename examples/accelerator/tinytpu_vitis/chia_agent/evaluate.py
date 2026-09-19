@@ -88,12 +88,12 @@ PKG = "examples/accelerator/tinytpu_vitis"
 #: from what is COMMITTED, never from the working tree. Only a person, in a
 #: commit, can change them.
 FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
-#: main's commit this branch is based on (after the 2026-09-19 rebase onto the
-#: baseline hardening). The design's own evaluator -- cosim.py, bench_isa.py
+#: main's commit this branch is based on (476a70d8: the gap-attribution stack,
+#: 172 / 262 / 418 / 484 / 686, and AR_RAW_DIST in check_program). The design's own evaluator -- cosim.py, bench_isa.py
 #: and the stress gate with its reference model -- must be byte-identical to
 #: it, so this branch cannot drift from how main measures and verifies the
 #: design. Moving it is a deliberate, reviewed commit.
-MAIN_BASE = "e620576d"
+MAIN_BASE = "476a70d8"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
@@ -340,7 +340,7 @@ def check_memory_model(prj: Path):
 
 def score(tree, env, work: Path, shapes, verify_now):
     prj = work / "isa_sweep.prj"
-    # cosim.py (main @ e620576d) puts its project next to itself by default,
+    # cosim.py (main since e620576d) puts its project next to itself by default,
     # which is the read-only tree here; TPU_PRJ is a path, not a memory-model
     # knob, and is the only TPU_* variable set.
     env = dict(env, TPU_SHAPES=",".join(shapes), TPU_PRJ=str(prj))

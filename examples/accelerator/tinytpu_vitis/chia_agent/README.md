@@ -30,7 +30,7 @@ Mechanical enforcement, not instructions:
    `git show HEAD:...`, the spec directory supplies only the two editable
    files, and any other file there is ignored. `cosim.py`, `bench_isa.py`,
    `stress_isa.py`, `isa_ref.py` and `kpn_model.py` are also checked
-   byte-identical to main @ `e620576d` (`MAIN_BASE` in `evaluate.py`), so the
+   byte-identical to main @ `476a70d8` (`MAIN_BASE` in `evaluate.py`), so the
    loop measures and verifies the design exactly as main does. `loop.py`
    refuses to start if any frozen path is dirty in the working tree.
 3. **Import-time code is policed.** The evaluator imports the two editable

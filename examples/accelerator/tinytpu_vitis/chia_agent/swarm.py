@@ -39,44 +39,60 @@ DEFAULT_CALL_USD = 3.5  # as loop.py
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parents[3]
 
-#: Framings of the same objective, each grounded in something measured on this
-#: design (docs/source/designs/tinytpu_history.rst, gemmini_comparison.rst). Each worker gets one angle to start
-#: from; none of them is an instruction to make a particular change.
+#: Framings of the same objective, each grounded in something MEASURED on the
+#: design as shipped at main @ 476a70d8 (172 / 262 / 418 / 484 / 686). The
+#: previous angles -- the vru tier, the per-mm weight prologue, accu at II=2 --
+#: are exactly what e24e433b landed, so they are gone. The facts come from
+#: chia_runs/timeline-476a70d8-16x16x16/ (per-process cosim timeline, measured)
+#: and gemmini_comparison.rst's attribution (whose residual split is an
+#: ESTIMATE, labelled as such). Each worker gets one angle to start from; none
+#: is an instruction to make a particular change.
 STRATEGIES = (
     (
-        "operand-path",
-        """Look at the operand delivery path spm -> vru -> array. At 16x16x16,
-208 of the 464 words vru handles are overhead rather than MACs, and the 64
-B-side vld words cross vru twice. Gemmini has no vector-register tier between
-its scratchpad and the array. Is the vru tier paying for itself here?""",
+        "front-end",
+        """The front of the 16x16x16 run, measured (per-process cosim timeline
+of the shipped design, window 47-688, reference `timeline_16x16x16`): dma_ld
+runs 211 cycles back to back (68-279) and no PE computes before cycle 285 --
+about 238 of the 641 cycles pass before the first MAC. vru runs 74 cycles,
+then is blocked 60 (226-286) until the array starts. The docs' attribution
+estimates (not measured) ~84 cycles of the remaining gap to Gemmini as operand
+staging plus the serial DMA ahead of the first weight. What in that prologue
+is forced by data dependence, and what is ordering?""",
     ),
     (
-        "weight-prologue",
-        """Look at the per-`mm` weight prologue: every mm instruction first
-pushes T weight words into the array before any MAC, and that prologue is
-serial with the MACs. Gemmini hides the equivalent with double-buffered weight
-registers (preload into one set while computing with the other).""",
+        "tail",
+        """The back of the 16x16x16 run, measured (same timeline): the last PE
+finishes at 624, accu runs 312-653 in four ~80-cycle bursts each followed by a
+5-cycle block, and dma_st alternates 38 cycles running with 47 starved and
+finishes at 688, 35 cycles after accu. The sequencer is blocked 134 of its
+cycles. The docs' attribution lists the drain as part of the (estimated,
+unbuilt) residual. Where does the tail's time go, and what of it overlaps work
+that could already have finished?""",
     ),
     (
-        "accumulator",
-        """Look at the accumulator: its read-add-write into a register file is
-a real recurrence and synthesizes at II=2. An earlier flat-accumulator attempt
-bought 2.3% for 13.7x the flip-flops in that unit and was reverted
-(tinytpu_history.rst, "accu: flat at II=1 ... REVERTED"), so weigh area as
-well as cycles.""",
+        "small-shape",
+        """The fixed cost. Least squares over the five shapes gives a fixed
+74.5 cycles plus 21.70 per dynamic instruction; at 4x4x4 the design takes 172
+against Gemmini's 144-161 (docs: tinytpu_isa.rst, gemmini_comparison.rst).
+Region start (s_axilite programming) sits inside the cosim window. Which part
+of the fixed cost is the design's?""",
     ),
 )
 
 BASE_TASK = """Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.
-Current cosim cycles (all five shapes, for context): 4x4x4=252, 8x8x8=383,
-12x12x12=591, 16x16x8=667, 16x16x16=919. A matched 4x4 int8 Gemmini, measured
-over the same window, takes 161(or 144)/220/347/391/593, so this design is
-1.55-1.8x slower. The search scores 4x4x4 + 16x16x16; a winner is re-verified
-bit-exact at all five shapes.
+Current cosim cycles (all five shapes, bit-exact, main @ 476a70d8):
+4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686. A matched 4x4
+int8 Gemmini, measured over the same window, takes 144-161/220/347/391/593, so
+this design is 1.07-1.24x slower. The search scores 4x4x4 + 16x16x16; a winner
+is re-verified bit-exact at all five shapes, by stress_isa, and by the RTL
+stress testbench.
 
-Known, measured, still open (context -- not a list of instructions): vru word
-count (208 of 464 words at 16x16x16 are overhead); the per-mm T-word weight
-prologue (Gemmini double-buffers weights); the accumulator's II=2 recurrence.
+Already landed (do not re-propose): program prefetch 8 words a cycle, weights
+by scratchpad address with per-PE double-buffered weight loaders (wld), A no
+longer through spad->vld->vr, accu at II=1 via s.dependence (valid only
+because check_program enforces AR_RAW_DIST=4 between an accumulator write and
+a read of it -- a closer read is an RTL-only failure the simulator does not
+show), sequencer-precomputed row counts.
 
 Your starting angle:
 {angle}

@@ -13,7 +13,7 @@ Nothing here calls a real model. Two scripted "agents" drive the real harness:
 
 Cases, each with an expected verdict:
 
-  a  no-op (re-save the unmodified design)   scores exactly 252 / 919
+  a  no-op (re-save the unmodified design)   scores exactly 172 / 686 (main @ 476a70d8)
   b  `spad ... = 0` (part of b4be2b10 reverted) bit-exact, scored WORSE
   c  PE partial sum narrowed to int16          passes bench_isa, REJECTED by
                                                stress_isa
@@ -76,9 +76,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("mcp").setLevel(logging.WARNING)
 
 #: The unmodified design (README, accept.py control run).
-BASELINE = {"4x4x4": 252, "16x16x16": 919}
-BASELINE_ALL = {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
-                "16x16x16": 919}
+BASELINE = {"4x4x4": 172, "16x16x16": 686}
+BASELINE_ALL = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418, "16x16x8": 484,
+                "16x16x16": 686}
 GATE_TIMEOUT = 240
 
 #: (file, old, new): exact, unique replacements on the HEAD design.
@@ -648,7 +648,7 @@ class Suite:
         check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
               bool(fake.log) and len(fake.log[0]["tools"]) == 7
-              and all("tpuoperandpath_" in t for t in fake.log[0]["tools"]))
+              and all("tpufrontend_" in t for t in fake.log[0]["tools"]))
 
     # accept --------------------------------------------------------------
     def phase_accept(self):

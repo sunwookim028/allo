@@ -52,6 +52,10 @@ REFERENCE = {
     "tinytpu_history.rst": "docs/source/designs/tinytpu_history.rst",
     "gemmini_comparison.rst": "docs/source/designs/gemmini_comparison.rst",
     "limitations.rst": "docs/source/developer/limitations.rst",
+    # Measured per-process cosim timeline of the shipped design at 16x16x16.
+    "timeline_16x16x16": "chia_runs/timeline-476a70d8-16x16x16/README.md",
+    "timeline_16x16x16.txt": "chia_runs/timeline-476a70d8-16x16x16/timeline.txt",
+    "timeline_16x16x16_rle.txt": "chia_runs/timeline-476a70d8-16x16x16/rle.txt",
 }
 
 
@@ -184,7 +188,9 @@ class AlloSpecTool(ChiaTool):
         its ISA, and how to verify a change), tinytpu_history.rst (what was
         tried, measured, and reverted), gemmini_comparison.rst (the Gemmini
         comparison and where the gap comes from), limitations.rst (Allo
-        frontend/simulator limitations and workarounds). Returns
+        frontend/simulator limitations and workarounds), timeline_16x16x16 /
+        timeline_16x16x16.txt / timeline_16x16x16_rle.txt (the shipped
+        design's measured per-process cosim timeline at 16x16x16). Returns
         ``max_lines`` lines from ``start_line`` (1-based).
         """
         rel = REFERENCE.get(name)
