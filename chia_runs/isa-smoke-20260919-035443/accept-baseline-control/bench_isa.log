@@ -1,0 +1,25 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16, imem 56; sweeping 5 shape(s)
+  generated == hand-written word-for-word at all 5 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 5 shapes
+  gemm       4x 4x 4 flat    6 static ->   6 dynamic  wrong=0/16
+  gemm       4x 4x 4 loop   12 static ->   6 dynamic  wrong=0/16
+  gemm.relu  4x 4x 4 flat    7 static ->   7 dynamic  wrong=0/16
+  gemm.relu  4x 4x 4 loop   13 static ->   7 dynamic  wrong=0/16
+  gemm       8x 8x 8 flat   15 static ->  15 dynamic  wrong=0/64
+  gemm       8x 8x 8 loop   16 static ->  15 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 flat   17 static ->  17 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 loop   17 static ->  17 dynamic  wrong=0/64
+  gemm      12x12x12 flat   28 static  SKIP (needs 64 words > imem 56)
+  gemm      12x12x12 loop   16 static ->  28 dynamic  wrong=0/144
+  gemm.relu 12x12x12 flat   31 static  SKIP (needs 70 words > imem 56)
+  gemm.relu 12x12x12 loop   17 static ->  31 dynamic  wrong=0/144
+  gemm      16x16x 8 flat   25 static  SKIP (needs 58 words > imem 56)
+  gemm      16x16x 8 loop   16 static ->  25 dynamic  wrong=0/128
+  gemm.relu 16x16x 8 flat   27 static  SKIP (needs 62 words > imem 56)
+  gemm.relu 16x16x 8 loop   17 static ->  27 dynamic  wrong=0/128
+  gemm      16x16x16 flat   45 static  SKIP (needs 98 words > imem 56)
+  gemm      16x16x16 loop   16 static ->  45 dynamic  wrong=0/256
+  gemm.relu 16x16x16 flat   49 static  SKIP (needs 106 words > imem 56)
+  gemm.relu 16x16x16 loop   17 static ->  49 dynamic  wrong=0/256
+  vadd+relu 16x16x16    9 instrs  wrong=0/64
+  ALL EXACT

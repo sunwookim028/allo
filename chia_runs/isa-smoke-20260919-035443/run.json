@@ -1,0 +1,16 @@
+{
+ "t0_ms": 1789790083336,
+ "workers": [
+  "operand-path",
+  "weight-prologue"
+ ],
+ "iterations": 3,
+ "budget_usd": 15.0,
+ "model": "google-vertex/gemini-3.1-pro-preview",
+ "head": "7ef0135c9315b0fdfa7ada298edbe32ec87e6e82",
+ "task_template": "Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.\nCurrent cosim cycles (all five shapes, for context): 4x4x4=252, 8x8x8=383,\n12x12x12=591, 16x16x8=667, 16x16x16=919. A matched 4x4 int8 Gemmini, measured\nover the same window, takes 161(or 144)/220/347/391/593, so this design is\n1.55-1.8x slower. The search scores 4x4x4 + 16x16x16; a winner is re-verified\nbit-exact at all five shapes.\n\nKnown, measured, still open (context -- not a list of instructions): vru word\ncount (208 of 464 words at 16x16x16 are overhead); the per-mm T-word weight\nprologue (Gemmini double-buffers weights); the accumulator's II=2 recurrence.\n\nYour starting angle:\n{angle}\n",
+ "strategies": {
+  "operand-path": "Look at the operand delivery path spm -> vru -> array. At 16x16x16,\n208 of the 464 words vru handles are overhead rather than MACs, and the 64\nB-side vld words cross vru twice. Gemmini has no vector-register tier between\nits scratchpad and the array. Is the vru tier paying for itself here?",
+  "weight-prologue": "Look at the per-`mm` weight prologue: every mm instruction first\npushes T weight words into the array before any MAC, and that prologue is\nserial with the MACs. Gemmini hides the equivalent with double-buffered weight\nregisters (preload into one set while computing with the other)."
+ }
+}
