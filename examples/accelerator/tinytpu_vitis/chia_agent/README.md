@@ -35,7 +35,21 @@ Mechanical enforcement, not instructions:
    files, so `spec_policy.py` (itself executed from git) refuses file I/O,
    process spawning, `exec`/`eval`, `sys.modules`, dunder attribute access,
    `os.environ` writes, and any `examples.*` import other than the two spec
-   modules. It runs at edit time and again at evaluation time.
+   modules. It runs at edit time and again at evaluation time. It also refuses
+   numpy's file writers (`savetxt`, `tofile`, `save*`, `dump`, `memmap`,
+   `.lib`): `test_harness.py` showed `np.savetxt` at import time overwriting the
+   tree's `stress.py`, so an int16-narrowed datapath passed the gate with
+   `STRESS OK: forged`.
+3b. **The candidate runs in a sandbox, and the tree is verified.** Every
+   process that imports the candidate (import check, `bench_isa.py`,
+   `stress.py`, `cosim.py`) runs under `bwrap`: the filesystem read-only, the
+   evaluation tree read-only as well, only the work directory and a private
+   `/tmp` writable, in its own PID namespace. After each stage the tree must
+   equal what was composed byte for byte (nothing changed, nothing added), and
+   the checkout's `allo/` and `tinytpu_vitis/` must be as they were; otherwise
+   the verdict is `tamper`. Tree files are also mode 0444, for hosts without
+   `bwrap`. The gate requires the exact line `STRESS OK: 60/60 runs exact`.
+   `accept.py` applies the same policy, sandbox and tamper check.
 4. **The memory model is not the candidate's.** Every `TPU_*` variable is
    scrubbed before `cosim.py` runs, so `-m_axi_latency` stays at its
    default 0, which is the setting that matches Gemmini's harness. `-random_stall`
@@ -100,9 +114,13 @@ A search:
 ```bash
 conda activate chia_env
 set -a; source chia.env; set +a
-ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
+# Tool servers bind the node's routable address by default, unauthenticated;
+# on a single host bind loopback instead (read in the tools' Ray actors).
+TINYTPU_TOOL_HOST=127.0.0.1 ray start --head --resources='{"opencode_creds": 2}' \
+  --include-dashboard=false
 cd examples/accelerator/tinytpu_vitis/chia_agent
-python smoke.py                                         # ~30 s, ~$0.05
+python test_harness.py                                  # ~35 min, $0 -- see below
+python smoke.py                                         # ~30 s, ~$0.05 (Vertex)
 python swarm.py --workers 2 --iterations 3 --budget-usd 15
 python accept.py --diff ../../../../chia_runs/<run>/<worker>/best.diff \
                  --out  ../../../../chia_runs/<run>/accept-<worker>
@@ -132,6 +150,8 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `swarm.py` | K searches on different starting angles, global spend cap, report |
 | `spend.py` | USD from opencode's DB since a timestamp |
 | `smoke.py` | the cheapest end-to-end check |
+| `test_harness.py` | LLM-free end-to-end test of all of the above; run before spending |
+| `fake_model.py` | scripted OpenAI-compatible model that `test_harness.py` points opencode at |
 
 ## Capped smoke run, 2026-09-19: nothing improved, and what it exposed
 
@@ -188,4 +208,35 @@ the objective):
    unique) is now the preferred edit.
 
 The fixed loop has **not** been exercised against the model: that needs more
-than the $15 this run was capped at.
+than the $15 this run was capped at. It has been exercised end to end without
+one; see the next section.
+
+## `test_harness.py`: the whole harness, no LLM, $0
+
+Run it before any paid search (`conda activate chia_env; python
+test_harness.py`, ~35 min, mostly cosim; `--phases e,c` is a 1-minute subset).
+It clears every cloud credential variable first, so it cannot reach Vertex.
+
+Two scripted agents drive the real code. An MCP client (the `mcp` package,
+streamable HTTP, which is opencode's transport) talks to `AlloSpecTool` servers
+hosted by CHIA on Ray actors. Then the real `swarm.py -> loop.py -> opencode`
+path runs with opencode pointed at `fake_model.py`, an OpenAI-compatible
+endpoint on localhost that replays tool calls. That covers opencode's MCP
+client and its timeout, `OpenCodeLLM`, keep-or-rewind, `variants.jsonl`,
+`best.diff`, `summary.json` and the spend accounting. It ends with one
+`accept.py`.
+
+| case | expected | measured 2026-09-19 |
+| --- | --- | --- |
+| a no-op (re-save) | exactly 252 / 919 | 252 / 919, over MCP and via opencode's `score_cycles` mid-turn |
+| b `spad ... = 0` back (part of b4be2b10 reverted) | bit-exact, worse | 661 / 1280 (+409 / +361), loop rejects it as not better |
+| c PE partial sum int16 | bench passes, stress rejects | `gate:stress`, 40/60 runs exact |
+| d mvout's `c_dst.put` dropped | 240 s timeout, nothing left running | `gate:bench_isa` TIMEOUT at 242 s, no process under the work dir, `read_spec` 0.12 s meanwhile |
+| e frozen-file / import-time attacks (17) | all refused | all refused; the numpy writers only after the fix |
+| f concurrent evaluations | responsive, no cross-talk | two cosims at once, `read_spec` worst 0.07 s; same-tool calls serialise |
+| accept on b | correct, not a win | see `accept.py`'s `claim` |
+
+What it cannot show is how a real model behaves: whether Gemini calls the tools
+sensibly, how long its turns are, and what they cost. The opencode -> MCP ->
+score path returning a score mid-turn after more than 60 s is shown, with the
+scripted model standing in for Gemini.

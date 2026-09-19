@@ -116,14 +116,15 @@ def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dic
         for e in entries:
             if e["kind"] != "candidate":
                 continue
-            v = e["verdict"]
+            v = e.get("verdict") or {}   # None: no change was made, not scored
             rows.append({"iteration": e["iteration"], "accepted": e["accepted"],
                          "ok": v.get("ok"), "stage": v.get("stage"),
                          "cycles": v.get("cycles"), "total": v.get("total_cycles"),
                          "llm_usd": e.get("llm_usd")})
             print(f"  {worker:<16} iter {e['iteration']}: "
                   + (f"cosim {v['cycles']} total {v['total_cycles']}"
-                     if v.get("ok") else f"FAILED at {v.get('stage')}")
+                     if v.get("ok") else f"FAILED at {v.get('stage')}"
+                     if v else f"not scored ({e.get('reason')})")
                   + f"  {'ACCEPTED' if e['accepted'] else 'rejected'}"
                   + f"  ${e.get('llm_usd', 0):.2f}")
             if e["accepted"] and (summary["best"] is None

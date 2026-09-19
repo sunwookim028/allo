@@ -20,9 +20,19 @@ import tempfile
 import threading
 from pathlib import Path
 
+import ray
 from chia.base.tools.ChiaTool import ChiaTool
 
 from spec_policy import policy_violations
+
+#: CHIA binds each tool server to `ray.util.get_node_ip_address()`, which on a
+#: Ray worker is the host's routable address -- an unauthenticated server
+#: anyone on the network can call. Set TINYTPU_TOOL_HOST=127.0.0.1 in the
+#: environment `ray start` runs in (single-host runs) to bind loopback instead.
+#: This module is imported in the tool's actor before the server starts.
+_TOOL_HOST = os.environ.get("TINYTPU_TOOL_HOST")
+if _TOOL_HOST:
+    ray.util.get_node_ip_address = lambda *args, **kwargs: _TOOL_HOST
 
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: Read-only context the agent may look at. Served from git HEAD.
@@ -54,7 +64,7 @@ class AlloSpecTool(ChiaTool):
             "TINYTPU_ALLO_PYTHON": allo_python,
             "LLVM_BUILD_DIR": llvm_build_dir,
         }
-        self._lock = None
+        self._lock = threading.Lock()
         assert all(path.is_file() for path in self.sources.values()), self.sources
         self.mcp.add_tool(self.read_spec, name=f"{self.name}_read_spec")
         self.mcp.add_tool(self.read_reference, name=f"{self.name}_read_reference")
@@ -67,11 +77,17 @@ class AlloSpecTool(ChiaTool):
 
     def __getstate__(self):
         # The tool is re-pickled on every prompt; a Lock cannot be.
-        state = super().__getstate__()
-        state = dict(state) if isinstance(state, dict) else state
-        if isinstance(state, dict):
-            state["_lock"] = None
+        state = dict(super().__getstate__())
+        state["_lock"] = None
         return state
+
+    def __setstate__(self, state):
+        # A fresh lock per unpickled copy, made HERE rather than lazily in
+        # evaluate(): two MCP calls arrive on two threads at once, and a lazy
+        # `if self._lock is None` lets both create a lock, so two evaluations
+        # would share one work directory -- each wiping the other's.
+        super().__setstate__(state)
+        self._lock = threading.Lock()
 
     # -- Variant bookkeeping. Deliberately *not* MCP tools: the search harness
     # -- accepts or rewinds a candidate, the agent does not get to choose.
@@ -90,12 +106,17 @@ class AlloSpecTool(ChiaTool):
             chunks.extend(difflib.unified_diff(before, after, f"a/{name}", f"b/{name}"))
         return "".join(chunks)
 
-    def evaluate(self, gate_only: bool = False, shapes: str | None = None) -> dict:
-        """Run the frozen evaluator on the spec dir; return its JSON verdict."""
-        if self._lock is None:
-            self._lock = threading.Lock()
+    def evaluate(self, gate_only: bool = False, shapes: str | None = None,
+                 work: str = "agent") -> dict:
+        """Run the frozen evaluator on the spec dir; return its JSON verdict.
+
+        `work` names a subdirectory of the work dir. The agent's MCP calls run
+        in the tool's actor and the loop's own re-scoring runs in the driver --
+        two copies of this object, two locks -- so they get separate
+        directories: an agent evaluation still running after its opencode call
+        timed out must not be wiped by the harness's next one."""
         cmd = [sys.executable, self.evaluator, "--spec-dir", str(self.spec_dir),
-               "--work", str(self.work_dir)]
+               "--work", str(self.work_dir / work)]
         if gate_only:
             cmd.append("--gate-only")
         if shapes:
