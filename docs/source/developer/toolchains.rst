@@ -118,7 +118,7 @@ Python for cosim vs. Python for ``allo``
 
 The ``allo`` conda env is **python 3.12** (``3.12.13``); the miniconda **base** env
 is **python 3.14** (``3.14.6``). This matters because CMake picks them
-independently: ``/home/sk3463/allo-chia-wt/build/CMakeCache.txt`` records
+independently: the retired ``chia-codesign`` worktree's ``build/CMakeCache.txt`` recorded
 ``Python3`` as the env's 3.12 but ``Python`` as base 3.14, and nanobind took its
 suffix from the latter — ``NB_SUFFIX=.cpython-314-x86_64-linux-gnu.so``. The
 chia worktree's bindings are therefore tagged ``cpython-314`` and the 3.12
@@ -134,60 +134,26 @@ venv is a prerequisite for ``allo/backend/rtl/sim/`` on ``chia-codesign``.
 LLVM/MLIR builds and worktrees
 ------------------------------
 
-Two LLVM builds, one submodule: check the version before trusting a build
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One LLVM build, at the pinned revision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are **two** LLVM/MLIR builds on this host and they are different LLVM
-versions. Verified 2026-09-18:
+Since 2026-09-19 there is **one** LLVM/MLIR build that matters:
+``/home/sk3463/llvm-allo-6b09f739/build`` (LLVM ``22.0.0git`` at ``6b09f739``), the
+revision ``main`` pins for ``externals/llvm-project``. ``LLVM_BUILD_DIR`` points
+at it, and every worktree's ``mlir/build`` is configured against it. ``git
+status`` on ``main`` is clean: the submodule checkout is at the pin.
 
-+-------------------------------------------+--------+---------------------------+----------------------------------------------+---------------------------------------------------+
-| Build                                     | Size   | ``llvm-config --version`` | ``VCSRevision.h`` ``LLVM_REVISION``          | Configured ``LLVM_SOURCE_DIR``                    |
-+===========================================+========+===========================+==============================================+===================================================+
-| ``/home/sk3463/llvm-allo-6b09f739/build`` | 11 GB  | ``22.0.0git``             | ``6b09f739c4d085dc39eb9ff220c786bc3aa8c7fb`` | its own out-of-tree checkout                      |
-| (external, what ``LLVM_BUILD_DIR`` points |        |                           |                                              |                                                   |
-| at)                                       |        |                           |                                              |                                                   |
-+-------------------------------------------+--------+---------------------------+----------------------------------------------+---------------------------------------------------+
-| ``externals/llvm-project/build``          | 3.9 GB | ``23.0.0git``             | ``040a641988f6ed6f4fab250706ca2b620c1de2d8`` | ``/home/sk3463/allo/externals/llvm-project/llvm`` |
-| (in-tree)                                 |        |                           |                                              |                                                   |
-+-------------------------------------------+--------+---------------------------+----------------------------------------------+---------------------------------------------------+
-
-``git status`` **showing** ``M externals/llvm-project`` **is the correct state, not
-dirt. Do not "fix" it.** ``main`` records the pin ``6b09f739`` (LLVM 22), but the
-working checkout is deliberately at ``040a6419`` (LLVM 23), because the in-tree
-build above was configured against those sources and ``chia-codesign`` links
-against that build.
-
-This was gotten wrong once, on 2026-09-18: the drift was read as accidental and
-the submodule was checked back out to the pin. Nothing on ``main`` noticed --
-``main`` does not use this submodule at all, its ``allo/_mlir`` points at the
-external ``llvm-allo-6b09f739`` tree -- but it silently put LLVM 22 sources under
-``chia-codesign``'s LLVM 23 binaries (see the worktree section below). It was
-restored the same day.
-
-So: the checked-out revision serves ``chia-codesign``, the recorded pin serves
-``main``, and they are not the same revision. That is a structural consequence of
-two worktrees sharing one submodule, and the real fix is rule 2 below, not a
-``git submodule update``.
-
-Practical rule: ``externals/llvm-project/build`` **is not the project's build.**
-``LLVM_BUILD_DIR`` and ``mlir/build`` both point at the external 6b09f739 tree
-(``mlir/build/CMakeCache.txt`` records
-``LLVM_DIR=/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm``). Before using
-any LLVM build here, run ``<build>/bin/llvm-config --version`` and compare
-``VCSRevision.h`` against ``git submodule status``; a 3.9 GB directory in the right
-place is not evidence.
-
-*Not verified:* the reason given for the LLVM 23 build was that CIRCT requires
-LLVM 23, and that CIRCT was removed from ``externals/`` on 2026-09-18. What is
-checkable today: ``externals/`` on ``main`` holds only ``llvm-project`` and
-``past-python-bindings``, and ``main`` **has never tracked** ``externals/circt`` --
-its ``.gitmodules`` has no such entry and no commit on ``main`` touches one. CIRCT
-is a ``chia-codesign`` submodule (``git ls-tree chia-codesign externals/`` lists it,
-and ``/home/sk3463/allo-chia-wt/externals/circt`` is populated). So there was
-nothing tracked on ``main`` to delete; if a CIRCT tree was removed it was
-untracked, and that cannot be confirmed from git. The 2026-09-18 submodule
-checkout is likewise inferred from the mtime of ``externals/llvm-project/.git``,
-not from a reflog.
+Before that date the submodule checkout was deliberately left at ``040a6419``
+(LLVM 23), because the ``chia-codesign`` worktree linked against an in-tree
+LLVM 23 build of it (``externals/llvm-project/build``, 3.9 GB) and imported
+four Python binding files through absolute symlinks into ``main``'s submodule
+checkout. That made ``M externals/llvm-project`` the *correct* state, and
+checking the pin out silently put LLVM 22 sources under LLVM 23 binaries --
+which happened once, on 2026-09-18, and was reverted. Retiring
+``chia-codesign`` (tag ``chia-codesign-final``) removed the only consumer, so
+the in-tree LLVM 23 build was deleted and the pin restored. If a future branch
+needs a different LLVM, give it its own out-of-tree build rather than checking
+out the shared submodule.
 
 Never point one worktree's build at another worktree's tree
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -196,8 +162,10 @@ cmake preserves mtimes, so a cross-worktree build dependency leaves **nothing
 looking stale**. No rebuild is triggered, no warning is printed, and the symptom
 surfaces much later as an unexplained ABI or dialect mismatch.
 
-The current arrangement, verified 2026-09-18 -- the second worktree already
-does this:
+The worked example is the arrangement that caused the 2026-09-18 incident. It
+no longer exists -- the ``chia-codesign`` worktree was retired on 2026-09-19
+(tag ``chia-codesign-final``) -- and is kept here because the rule below was
+learned from it:
 
 +----------------------+----------------------------------------------------------+-------------------------------------------------------------------+
 |                      | ``/home/sk3463/allo`` (``main``)                         | ``/home/sk3463/allo-chia-wt`` (``chia-codesign``)                 |
