@@ -9,9 +9,13 @@ delete a worker's `variants.jsonl` along with its checkout, which is how an
 earlier run on chia-codesign had to rescue its logs by hand. Every artefact a
 worker writes is already under `--run-dir`.
 
-Spend: the cap is global. Each loop refuses to start a model call that would
-pass it (projected from the largest call seen), and this process polls the
-opencode DB and kills every worker outright if the cap is reached anyway.
+Spend: `--budget-usd` is required, and the pre-flight gate (`preflight.py`)
+runs before any worker starts: the project must bill CHIA2026, Vertex AI must
+be enabled, and CHIA's cumulative spend on CHIA2026 plus this cap must fit
+`CHIA_TOTAL_CAP_USD`. The per-run cap is global across workers. Each loop
+refuses to start a model call that would pass it (projected from the largest
+call seen), and this process polls the opencode DB and kills every worker
+outright if the cap is reached anyway.
 
     python chia_agent/swarm.py --workers 2 --iterations 3 --budget-usd 15
 """
@@ -27,6 +31,7 @@ import sys
 import time
 from pathlib import Path
 
+import preflight
 from spend import spent_since
 
 DEFAULT_CALL_USD = 3.5  # as loop.py
@@ -35,7 +40,7 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parents[3]
 
 #: Framings of the same objective, each grounded in something measured on this
-#: design (RESULTS_ISA.md / COMPARISON.md). Each worker gets one angle to start
+#: design (docs/source/designs/tinytpu_history.rst, gemmini_comparison.rst). Each worker gets one angle to start
 #: from; none of them is an instruction to make a particular change.
 STRATEGIES = (
     (
@@ -56,8 +61,9 @@ registers (preload into one set while computing with the other).""",
         "accumulator",
         """Look at the accumulator: its read-add-write into a register file is
 a real recurrence and synthesizes at II=2. An earlier flat-accumulator attempt
-bought 2.3% for 13.7x the flip-flops in that unit and was reverted (audit item
-21 in RESULTS_ISA.md), so weigh area as well as cycles.""",
+bought 2.3% for 13.7x the flip-flops in that unit and was reverted
+(tinytpu_history.rst, "accu: flat at II=1 ... REVERTED"), so weigh area as
+well as cycles.""",
     ),
 )
 
@@ -162,7 +168,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--iterations", type=int, default=3)
-    parser.add_argument("--budget-usd", type=float, default=15.0)
+    # Required: no run starts without an explicit per-run spend cap.
+    parser.add_argument("--budget-usd", type=float, required=True)
     parser.add_argument("--run-dir", type=Path, default=REPO_ROOT / "chia_runs"
                         / f"isa-{time.strftime('%Y%m%d-%H%M%S')}")
     parser.add_argument("--stagger", type=float, default=60.0)
@@ -172,9 +179,13 @@ def main() -> None:
     strategies = list(STRATEGIES)[: args.workers]
     started = time.time()
     t0_ms = int(started * 1000)
+    # Before any worker: which account and project this run charges, and
+    # whether its cap fits. Cheap (gcloud reads), no model call.
+    charge = preflight.require(args.budget_usd, run_t0_ms=t0_ms)
     (run_dir / "run.json").write_text(json.dumps({
         "t0_ms": t0_ms, "workers": [w for w, _ in strategies],
         "iterations": args.iterations, "budget_usd": args.budget_usd,
+        "preflight": charge,
         "model": os.environ.get("TINYTPU_OPENCODE_MODEL"),
         "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
                                capture_output=True, text=True).stdout.strip(),
