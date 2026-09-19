@@ -1,0 +1,76 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 5 shapes as data; testbench=stress (correctness mode: cycles are NOT the published numbers)
+  synthesizing once ...
+    TB 4x4x4 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 4x4x4 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+   4x 4x 4  cycles=647   TB 4x4x4 stress mismatches = 0 over 6 calls
+    TB 8x8x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 8x8x8 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+   8x 8x 8  cycles=710   TB 8x8x8 stress mismatches = 0 over 6 calls
+    TB 12x12x12 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 12x12x12 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+  12x12x12  cycles=827   TB 12x12x12 stress mismatches = 0 over 6 calls
+    TB 16x16x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 16x16x8 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+  16x16x 8  cycles=827   TB 16x16x8 stress mismatches = 0 over 6 calls
+    TB 16x16x16 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 0 gemm corner              wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 1 gemm.relu full           wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 2 gemm boundary            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 3 gemm.relu mid            wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 4 vector_program(8) full   wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 5 ar_distance(4) full      wrong = 0, clobbered outside = 0
+  16x16x16  cycles=827   TB 16x16x16 stress mismatches = 0 over 6 calls
+
+  shape      cycles   (min over the stress calls)
+   4x 4x 4   647
+   8x 8x 8   710
+  12x12x12   827
+  16x16x 8   827
+  16x16x16   827
+  COSIM OK (testbench=stress)
+CHIA-GATE cosim OK <nonce>

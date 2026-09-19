@@ -1,0 +1,14 @@
+pre-flight: scripted test model at http://127.0.0.1:34769/v1; no cloud model can be reached, billing checks skipped; spend cap $5.00
+launching worker 'front-end'
+worker 'front-end' exited with 0
+==============================================================================
+Swarm results (all cycle counts are RTL cosim)
+==============================================================================
+  front-end        iter 1: not scored (no diff)  rejected  $0.00
+  front-end        iter 2: cosim {'16x16x16': 1056, '4x4x4': 647} total 1703  rejected  $0.00
+  front-end        iter 3: FAILED at gate:stress  rejected  $0.00
+  front-end        iter 4: not scored (no diff)  rejected  $0.00
+
+  baseline {'16x16x16': 686, '4x4x4': 172}
+  best     no candidate beat the baseline
+  spend    $0.00 (15 model messages); wall 11.8 min

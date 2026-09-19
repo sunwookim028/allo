@@ -1,0 +1,334 @@
+ninja: Entering directory `mlir/build'
+[1/333] Building Passes.h.inc...
+[2/333] Building Passes.h.inc...
+[3/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/AffineExpr.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/AffineExpr.h
+[4/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/AffineMap.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/AffineMap.h
+[5/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Bindings/Python/Interop.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Bindings/Python/Interop.h
+[6/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/BuiltinAttributes.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/BuiltinAttributes.h
+[7/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/BuiltinTypes.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/BuiltinTypes.h
+[8/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Conversion.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Conversion.h
+[9/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Debug.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Debug.h
+[10/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Diagnostics.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Diagnostics.h
+[11/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/AMDGPU.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/AMDGPU.h
+[12/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Arith.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Arith.h
+[13/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Async.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Async.h
+[14/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/ControlFlow.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/ControlFlow.h
+[15/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/EmitC.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/EmitC.h
+[16/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Func.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Func.h
+[17/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/GPU.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/GPU.h
+[18/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/IRDL.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/IRDL.h
+[19/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Index.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Index.h
+[20/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/LLVM.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/LLVM.h
+[21/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Linalg.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Linalg.h
+[22/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/MLProgram.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/MLProgram.h
+[23/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Math.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Math.h
+[24/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/MemRef.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/MemRef.h
+[25/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/NVGPU.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/NVGPU.h
+[26/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/NVVM.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/NVVM.h
+[27/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/OpenMP.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/OpenMP.h
+[28/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/PDL.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/PDL.h
+[29/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Quant.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Quant.h
+[30/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/ROCDL.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/ROCDL.h
+[31/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/SMT.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/SMT.h
+[32/333] Building AlloDialect.cpp.inc...
+[33/333] Building AlloDialect.h.inc...
+[34/333] Building AlloOps.cpp.inc...
+[35/333] Building AlloOps.h.inc...
+[36/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/SCF.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/SCF.h
+[37/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/SPIRV.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/SPIRV.h
+[38/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Shape.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Shape.h
+[39/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/SparseTensor.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/SparseTensor.h
+[40/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Tensor.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Tensor.h
+[41/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Transform.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Transform.h
+[42/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Transform/Interpreter.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Transform/Interpreter.h
+[43/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Dialect/Vector.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Dialect/Vector.h
+[44/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/ExecutionEngine.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/ExecutionEngine.h
+[45/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/IR.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/IR.h
+[46/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/IntegerSet.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/IntegerSet.h
+[47/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Interfaces.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Interfaces.h
+[48/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Pass.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Pass.h
+[49/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/RegisterEverything.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/RegisterEverything.h
+[50/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Rewrite.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Rewrite.h
+[51/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Support.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Support.h
+[52/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Target/ExportSMTLIB.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Target/ExportSMTLIB.h
+[53/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Target/LLVMIR.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Target/LLVMIR.h
+[54/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/include/mlir-c/Transforms.h -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/include/mlir-c/Transforms.h
+[55/333] Copying python source /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/include/allo/Bindings/allo/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/__init__.py
+[56/333] Copying python source /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/include/allo/Bindings/allo/dialects/allo.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/allo.py
+[57/333] Copying python source /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/include/allo/Bindings/allo/exceptions.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/exceptions.py
+[58/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/affine.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/affine.py
+[59/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_affine_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_affine_enum_gen.py
+[60/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_affine_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_affine_ops_gen.py
+[61/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/amdgpu.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/amdgpu.py
+[62/333] Building dialects/_allo_ops_gen.py...
+[63/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_amdgpu_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_amdgpu_enum_gen.py
+[64/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_amdgpu_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_amdgpu_ops_gen.py
+[65/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/async_dialect/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/async_dialect/__init__.py
+[66/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/async_dialect/passes/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/async_dialect/passes/__init__.py
+[67/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_async_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_async_ops_gen.py
+[68/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/bufferization.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/bufferization.py
+[69/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_bufferization_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_bufferization_enum_gen.py
+[70/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_bufferization_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_bufferization_ops_gen.py
+[71/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/builtin.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/builtin.py
+[72/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_builtin_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_builtin_ops_gen.py
+[73/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/complex.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/complex.py
+[74/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_complex_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_complex_ops_gen.py
+[75/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/index.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/index.py
+[76/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_index_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_index_enum_gen.py
+[77/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_index_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_index_ops_gen.py
+[78/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/cf.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/cf.py
+[79/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_cf_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_cf_ops_gen.py
+[80/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/func.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/func.py
+[81/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_func_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_func_ops_gen.py
+[82/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/openacc.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/openacc.py
+[83/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_acc_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_acc_ops_gen.py
+[84/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/gpu/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/gpu/__init__.py
+[85/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/gpu/passes/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/gpu/passes/__init__.py
+[86/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_gpu_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_gpu_enum_gen.py
+[87/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_gpu_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_gpu_ops_gen.py
+[88/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/__init__.py
+[89/333] Building AlloTransformOps.cpp.inc...
+[90/333] Building AlloTransformOps.h.inc...
+[91/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/__init__.py
+[92/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/dump_oplib.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/dump_oplib.py
+[93/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/__init__.py
+[94/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/affine.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/affine.py
+[95/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/comprehension.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/comprehension.py
+[96/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/config.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/config.py
+[97/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/dsl.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/dsl.py
+[98/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/emitter.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/emitter.py
+[99/333] Copying python source /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/include/allo/Bindings/dialects/_allo_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_allo_ops_gen.py
+[100/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/scalar_expr.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/scalar_expr.py
+[101/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/types.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/types.py
+[102/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/lang/yaml_helper.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/lang/yaml_helper.py
+[103/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/ops/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/ops/__init__.py
+[104/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/opdsl/ops/core_named_ops.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/opdsl/ops/core_named_ops.py
+[105/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/linalg/passes/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/linalg/passes/__init__.py
+[106/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_linalg_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_linalg_enum_gen.py
+[107/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_linalg_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_linalg_ops_gen.py
+[108/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/llvm.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/llvm.py
+[109/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_llvm_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_llvm_enum_gen.py
+[110/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_llvm_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_llvm_ops_gen.py
+[111/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/pdl.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/pdl.py
+[112/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_pdl_extension_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_pdl_extension_ops_gen.py
+[113/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/smt.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/smt.py
+[114/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_smt_extension_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_smt_extension_ops_gen.py
+[115/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/debug.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/debug.py
+[116/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_debug_extension_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_debug_extension_ops_gen.py
+[117/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/tune.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/tune.py
+[118/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_tune_extension_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_tune_extension_ops_gen.py
+[119/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/_mlir/dialects/transform/__init__.pyi -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/_mlir/dialects/transform/__init__.pyi
+[120/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/__init__.py
+[121/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_enum_gen.py
+[122/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_transform_ops_gen.py
+[123/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/extras/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/extras/__init__.py
+[124/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/interpreter/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/interpreter/__init__.py
+[125/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/bufferization.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/bufferization.py
+[126/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_bufferization_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_bufferization_transform_ops_gen.py
+[127/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/gpu.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/gpu.py
+[128/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_gpu_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_gpu_transform_ops_gen.py
+[129/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/loop.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/loop.py
+[130/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_loop_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_loop_transform_ops_gen.py
+[131/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/memref.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/memref.py
+[132/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_memref_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_memref_transform_ops_gen.py
+[133/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/nvgpu.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/nvgpu.py
+[134/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_nvgpu_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_nvgpu_transform_ops_gen.py
+[135/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/structured.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/structured.py
+[136/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_structured_transform_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_structured_transform_enum_gen.py
+[137/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_structured_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_structured_transform_ops_gen.py
+[138/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/sparse_tensor.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/sparse_tensor.py
+[139/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_sparse_tensor_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_sparse_tensor_transform_ops_gen.py
+[140/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/tensor.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/tensor.py
+[141/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_tensor_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_tensor_transform_ops_gen.py
+[142/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/vector.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/vector.py
+[143/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_vector_transform_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_vector_transform_enum_gen.py
+[144/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_vector_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_vector_transform_ops_gen.py
+[145/333] Building AlloTypes.cpp.inc...
+[146/333] Building AlloTypes.h.inc...
+[147/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/transform/xegpu.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/transform/xegpu.py
+[148/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_xegpu_transform_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_xegpu_transform_ops_gen.py
+[149/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/math.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/math.py
+[150/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_math_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_math_ops_gen.py
+[151/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/arith.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/arith.py
+[152/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_arith_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_arith_enum_gen.py
+[153/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_arith_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_arith_ops_gen.py
+[154/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/memref.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/memref.py
+[155/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_memref_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_memref_ops_gen.py
+[156/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/shard.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/shard.py
+[157/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_shard_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_shard_enum_gen.py
+[158/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_shard_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_shard_ops_gen.py
+[159/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/ml_program.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/ml_program.py
+[160/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_ml_program_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_ml_program_ops_gen.py
+[161/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/nvgpu.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/nvgpu.py
+[162/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_nvgpu_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_nvgpu_enum_gen.py
+[163/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_nvgpu_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_nvgpu_ops_gen.py
+[164/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/nvvm.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/nvvm.py
+[165/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_nvvm_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_nvvm_enum_gen.py
+[166/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_nvvm_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_nvvm_ops_gen.py
+[167/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/rocdl.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/rocdl.py
+[168/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_rocdl_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_rocdl_ops_gen.py
+[169/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/_mlir/dialects/quant.pyi -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/_mlir/dialects/quant.pyi
+[170/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/quant.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/quant.py
+[171/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/emitc.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/emitc.py
+[172/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_emitc_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_emitc_ops_gen.py
+[173/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/_mlir/dialects/pdl.pyi -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/_mlir/dialects/pdl.pyi
+[174/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/pdl.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/pdl.py
+[175/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_pdl_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_pdl_ops_gen.py
+[176/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/openmp.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/openmp.py
+[177/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_omp_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_omp_ops_gen.py
+[178/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/scf.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/scf.py
+[179/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_scf_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_scf_ops_gen.py
+[180/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/shape.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/shape.py
+[181/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_shape_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_shape_ops_gen.py
+[182/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/sparse_tensor.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/sparse_tensor.py
+[183/333] Building AlloAttrs.cpp.inc...
+[184/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_sparse_tensor_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_sparse_tensor_enum_gen.py
+[185/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_sparse_tensor_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_sparse_tensor_ops_gen.py
+[186/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/smt.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/smt.py
+[187/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_smt_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_smt_enum_gen.py
+[188/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_smt_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_smt_ops_gen.py
+[189/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/spirv.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/spirv.py
+[190/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_spirv_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_spirv_ops_gen.py
+[191/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/tensor.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/tensor.py
+[192/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_tensor_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_tensor_ops_gen.py
+[193/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/tosa.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/tosa.py
+[194/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_tosa_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_tosa_ops_gen.py
+[195/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/ub.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/ub.py
+[196/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_ub_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_ub_ops_gen.py
+[197/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/vector.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/vector.py
+[198/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_vector_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_vector_enum_gen.py
+[199/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_vector_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_vector_ops_gen.py
+[200/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/irdl.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/irdl.py
+[201/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_irdl_enum_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_irdl_enum_gen.py
+[202/333] Copying python source /home/sk3463/llvm-allo-6b09f739/build/tools/mlir/python/dialects/_irdl_ops_gen.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_irdl_ops_gen.py
+[203/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/__init__.py
+[204/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/_mlir/py.typed -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/_mlir/py.typed
+[205/333] Building AlloAttrs.h.inc...
+[206/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/dialects/_ods_common.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/dialects/_ods_common.py
+[207/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/ir.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/ir.py
+[208/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/passmanager.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/passmanager.py
+[209/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/rewrite.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/rewrite.py
+[210/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/extras/meta.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/extras/meta.py
+[211/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/extras/types.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/extras/types.py
+[212/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/_mlir_libs/_mlirExecutionEngine.pyi -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/_mlir_libs/_mlirExecutionEngine.pyi
+[213/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/execution_engine.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/execution_engine.py
+[214/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/runtime/__init__.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/runtime/__init__.py
+[215/333] Copying python source /home/sk3463/llvm-allo-6b09f739/mlir/python/mlir/runtime/np_to_memref.py -> /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build/tools/allo/_mlir/runtime/np_to_memref.py
+[216/333] Building AlloEnums.h.inc...
+[217/333] Building AlloEnums.cpp.inc...
+[218/333] Building CXX object lib/CAPI/SharedLib/CMakeFiles/allo_runtime_utils.dir/AlloRuntimeUtils.cpp.o
+[219/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/implicit.cpp.o
+[220/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_static_property.cpp.o
+[221/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/trampoline.cpp.o
+[222/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/error.cpp.o
+[223/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_internals.cpp.o
+[224/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_ndarray.cpp.o
+[225/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/common.cpp.o
+[226/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_func.cpp.o
+[227/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_type.cpp.o
+[228/333] Building CXX object include/allo/Bindings/CMakeFiles/nanobind-static.dir/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_enum.cpp.o
+[229/333] Linking CXX static library include/allo/Bindings/libnanobind-static.a
+[230/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirAsyncPasses.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/AsyncPasses.cpp.o
+[231/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirGPUPasses.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/GPUPasses.cpp.o
+[232/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsAMDGPU.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectAMDGPU.cpp.o
+[233/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirLinalgPasses.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/LinalgPasses.cpp.o
+[234/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsGPU.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectGPU.cpp.o
+[235/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/AlloAttributes.cpp.o
+[236/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/Dialects.cpp.o
+[237/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/AlloTypes.cpp.o
+[238/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsLinalg.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectLinalg.cpp.o
+[239/333] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitCatapultHLS.cpp.o
+[240/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/__/__/Transforms/Passes.cpp.o
+[241/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/Passes.cpp.o
+[242/333] Building CXX object lib/Support/CMakeFiles/obj.MLIRAlloSupport.dir/Liveness.cpp.o
+[243/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsLLVM.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectLLVM.cpp.o
+[244/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/Passes.cpp.o
+[245/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirTransformInterpreter.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/TransformInterpreter.cpp.o
+[246/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsTransform.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectTransform.cpp.o
+[247/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsNVGPU.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectNVGPU.cpp.o
+[248/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirSparseTensorPasses.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/SparseTensorPasses.cpp.o
+[249/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsPDL.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectPDL.cpp.o
+[250/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._allo.dso.dir/__/__/__/lib/Bindings/AlloAttributes.cpp.o
+[251/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._allo.dso.dir/__/__/__/lib/Bindings/AlloTypes.cpp.o
+[252/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsSparseTensor.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectSparseTensor.cpp.o
+[253/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsIRDL.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectIRDL.cpp.o
+[254/333] Linking CXX shared library lib/liballo_runtime_utils.so.22.0git
+[255/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsQuant.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectQuant.cpp.o
+[256/333] Creating library symlink lib/liballo_runtime_utils.so
+[257/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirDialectsSMT.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/DialectSMT.cpp.o
+[258/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/LegalizeCast.cpp.o
+[259/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirRegisterEverything.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/RegisterEverything.cpp.o
+[260/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlirExecutionEngine.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/ExecutionEngineModule.cpp.o
+[261/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/MainModule.cpp.o
+[262/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/Utils.cpp.o
+[263/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/TransformationUtils.cpp.o
+[264/333] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitVivadoHLS.cpp.o
+[265/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/RemoveStrideMap.cpp.o
+[266/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/Pass.cpp.o
+[267/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRInterfaces.cpp.o
+[268/333] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitIntelHLS.cpp.o
+[269/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/LowerTransformLayoutOps.cpp.o
+[270/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/UnifyKernels.cpp.o
+[271/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/Rewrite.cpp.o
+[272/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/MoveReturnToInput.cpp.o
+[273/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._allo.dso.dir/__/__/__/lib/Bindings/AlloModule.cpp.o
+[274/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/MemRefDCE.cpp.o
+[275/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitBaseHLS.cpp.o
+[276/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/AnyWidthInteger.cpp.o
+[277/333] Building CXX object lib/Support/CMakeFiles/obj.MLIRAlloSupport.dir/Utils.cpp.o
+[278/333] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitXlsHLS.cpp.o
+[279/333] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitTapaHLS.cpp.o
+[280/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/LowerMemCopyOps.cpp.o
+[281/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/LowerBitOps.cpp.o
+[282/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/LowerCompositeType.cpp.o
+[283/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/DataPlacement.cpp.o
+[284/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRModule.cpp.o
+[285/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/FixedPointToInteger.cpp.o
+[286/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRAffine.cpp.o
+[287/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitXlsHLS.cpp.o
+[288/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/CopyOnWrite.cpp.o
+[289/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitCatapultHLS.cpp.o
+[290/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRTypes.cpp.o
+[291/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/AlloToLLVM.cpp.o
+[292/333] Building CXX object lib/Conversion/CMakeFiles/obj.MLIRAlloConversion.dir/LowerPrintOps.cpp.o
+[293/333] Building CXX object lib/Transforms/CMakeFiles/obj.MLIRAlloPasses.dir/LoopTransformations.cpp.o
+[294/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRAttributes.cpp.o
+[295/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/__/__/Transforms/LoopTransformations.cpp.o
+[296/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitIntelHLS.cpp.o
+[297/333] Building CXX object lib/Dialect/CMakeFiles/obj.MLIRAllo.dir/AlloOps.cpp.o
+[298/333] Building CXX object lib/Dialect/CMakeFiles/obj.MLIRAllo.dir/AlloDialect.cpp.o
+[299/333] Linking CXX static library lib/Dialect/libMLIRAllo.a
+[300/333] Linking CXX static library lib/Support/libMLIRAlloSupport.a
+[301/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitTapaHLS.cpp.o
+[302/333] Linking CXX static library lib/Conversion/libMLIRAlloConversion.a
+[303/333] Linking CXX static library lib/Transforms/libMLIRAlloPasses.a
+[304/333] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitVivadoHLS.cpp.o
+[305/333] Linking CXX static library lib/Translation/libMLIRAlloEmitHLSCpp.a
+[306/333] Linking CXX static library lib/CAPI/Translation/libMLIRAlloCAPIEmitHLSCpp.a
+[307/333] Building CXX object include/allo/Bindings/CMakeFiles/AlloMLIRPythonModules.extension._mlir.dso.dir/home/sk3463/llvm-allo-6b09f739/mlir/lib/Bindings/Python/IRCore.cpp.o
+[308/333] Building CXX object lib/TransformOps/CMakeFiles/obj.MLIRAlloTransformOps.dir/AlloTransformOps.cpp.o
+[309/333] Linking CXX static library lib/TransformOps/libMLIRAlloTransformOps.a
+[310/333] Building CXX object lib/CAPI/Dialect/CMakeFiles/obj.MLIRAlloCAPI.dir/Registration.cpp.o
+[311/333] Linking CXX static library lib/CAPI/Dialect/libMLIRAlloCAPI.a
+[312/333] Linking CXX shared library tools/allo/_mlir/libAlloMLIRAggregateCAPI.so.22.0git
+[313/333] Creating library symlink tools/allo/_mlir/libAlloMLIRAggregateCAPI.so
+[314/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsIRDL.cpython-312-x86_64-linux-gnu.so
+[315/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirRegisterEverything.cpython-312-x86_64-linux-gnu.so
+[316/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirLinalgPasses.cpython-312-x86_64-linux-gnu.so
+[317/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsGPU.cpython-312-x86_64-linux-gnu.so
+[318/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirExecutionEngine.cpython-312-x86_64-linux-gnu.so
+[319/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsTransform.cpython-312-x86_64-linux-gnu.so
+[320/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsLinalg.cpython-312-x86_64-linux-gnu.so
+[321/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsAMDGPU.cpython-312-x86_64-linux-gnu.so
+[322/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsSparseTensor.cpython-312-x86_64-linux-gnu.so
+[323/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirGPUPasses.cpython-312-x86_64-linux-gnu.so
+[324/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsNVGPU.cpython-312-x86_64-linux-gnu.so
+[325/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsPDL.cpython-312-x86_64-linux-gnu.so
+[326/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirAsyncPasses.cpython-312-x86_64-linux-gnu.so
+[327/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirTransformInterpreter.cpython-312-x86_64-linux-gnu.so
+[328/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirSparseTensorPasses.cpython-312-x86_64-linux-gnu.so
+[329/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsSMT.cpython-312-x86_64-linux-gnu.so
+[330/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsLLVM.cpython-312-x86_64-linux-gnu.so
+[331/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsQuant.cpython-312-x86_64-linux-gnu.so
+[332/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_allo.cpython-312-x86_64-linux-gnu.so
+[333/333] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlir.cpython-312-x86_64-linux-gnu.so

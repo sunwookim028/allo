@@ -1,0 +1,94 @@
+-- The CXX compiler identification is GNU 13.3.0
+-- The C compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.3")
+-- Found zstd: /usr/lib/x86_64-linux-gnu/libzstd.so
+-- Found LibXml2: /usr/lib/x86_64-linux-gnu/libxml2.so (found version "2.9.14")
+-- Using MLIRConfig.cmake in: /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir
+-- Using LLVMConfig.cmake in: /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm
+-- Linker detection: GNU ld
+-- Performing Test LLVM_USES_LIBSTDCXX
+-- Performing Test LLVM_USES_LIBSTDCXX - Success
+-- Performing Test LLVM_DEFAULT_TO_GLIBCXX_USE_CXX11_ABI
+-- Performing Test LLVM_DEFAULT_TO_GLIBCXX_USE_CXX11_ABI - Success
+-- Performing Test C_SUPPORTS_FPIC
+-- Performing Test C_SUPPORTS_FPIC - Success
+-- Performing Test CXX_SUPPORTS_FPIC
+-- Performing Test CXX_SUPPORTS_FPIC - Success
+-- Building with -fPIC
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Success
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Success
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG - Success
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG - Success
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL - Success
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP - Failed
+-- Performing Test C_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG
+-- Performing Test C_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG - Failed
+-- Performing Test CXX_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG
+-- Performing Test CXX_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG - Success
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS - Failed
+-- Looking for os_signpost_interval_begin
+-- Looking for os_signpost_interval_begin - not found
+-- Looking for flock
+-- Looking for flock - found
+-- Using Python binding
+-- Found Python3: /home/sk3463/miniconda3/envs/allo/bin/python (found version "3.12.13") found components: Interpreter Development.Module
+-- Found Python: /home/sk3463/miniconda3/envs/allo/bin/python (found version "3.12.13") found components: Interpreter Development.Module
+-- Found python include dirs: /home/sk3463/miniconda3/envs/allo/include/python3.12
+-- Found python libraries: 
+-- Found numpy v: 
+-- Python extension suffix for modules: 'cpython-312-x86_64-linux-gnu'
+-- Checking for nanobind in python path...
+-- found (/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/cmake)
+-- Performing Test NB_HAS_MTLS_GNU2
+-- Performing Test NB_HAS_MTLS_GNU2 - Success
+-- Found nanobind v2.15.0: /home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include
+-- Python prefix = '', suffix = '', extension = '
+CMake Warning (dev) at /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:286 (install):
+  Policy CMP0177 is not set: install() DESTINATION paths are normalized.  Run
+  "cmake --help-policy CMP0177" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+Call Stack (most recent call first):
+  /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:272 (_mlir_python_install_sources)
+  include/allo/Bindings/CMakeLists.txt:46 (declare_mlir_python_extension)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:286 (install):
+  Policy CMP0177 is not set: install() DESTINATION paths are normalized.  Run
+  "cmake --help-policy CMP0177" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+Call Stack (most recent call first):
+  /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:272 (_mlir_python_install_sources)
+  include/allo/Bindings/CMakeLists.txt:46 (declare_mlir_python_extension)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:286 (install):
+  Policy CMP0177 is not set: install() DESTINATION paths are normalized.  Run
+  "cmake --help-policy CMP0177" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+Call Stack (most recent call first):
+  /home/sk3463/llvm-allo-6b09f739/build/lib/cmake/mlir/AddMLIRPython.cmake:272 (_mlir_python_install_sources)
+  include/allo/Bindings/CMakeLists.txt:46 (declare_mlir_python_extension)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Performing Test LLVM_LINKER_SUPPORTS_B_SYMBOLIC_FUNCTIONS
+-- Performing Test LLVM_LINKER_SUPPORTS_B_SYMBOLIC_FUNCTIONS - Success
+-- Configuring done (1.8s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789845862/mlir/build

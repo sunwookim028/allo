@@ -1,0 +1,90 @@
+{
+ "a": {
+  "cosim_seconds": 163.3,
+  "cycles": {
+   "16x16x16": 686,
+   "4x4x4": 172
+  },
+  "frozen_ref": "ac54229240ebe64db11865577e53d729f1539c4f",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "param": {
+    "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_MAXDIM=8": "PARAM OK: 69/69 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 21 random programs; 3 seeds skipped as ungeneratable at this MAXDIM)"
+   },
+   "seconds": 26.1,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "vouched": true
+  },
+  "invariants": {
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "ok": true,
+  "sandbox": true,
+  "seconds": 190.9,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "synth": {
+   "area": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "ff": 17481,
+    "lut": 26583,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 858
+ },
+ "b": {
+  "cosim_seconds": 165.3,
+  "cycles": {
+   "16x16x16": 1056,
+   "4x4x4": 647
+  },
+  "frozen_ref": "ac54229240ebe64db11865577e53d729f1539c4f",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "param": {
+    "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_MAXDIM=8": "PARAM OK: 69/69 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 21 random programs; 3 seeds skipped as ungeneratable at this MAXDIM)"
+   },
+   "seconds": 27.2,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "vouched": true
+  },
+  "invariants": {
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "ok": true,
+  "sandbox": true,
+  "seconds": 194.0,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "synth": {
+   "area": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "ff": 17494,
+    "lut": 26701,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 1703
+ }
+}

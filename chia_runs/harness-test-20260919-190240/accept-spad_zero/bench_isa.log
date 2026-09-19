@@ -1,0 +1,26 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16, imem 56; sweeping 5 shape(s)
+  generated == hand-written word-for-word at all 5 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 5 shapes
+  gemm       4x 4x 4 flat    4 static ->   4 dynamic  wrong=0/16
+  gemm       4x 4x 4 loop   10 static ->   4 dynamic  wrong=0/16
+  gemm.relu  4x 4x 4 flat    5 static ->   5 dynamic  wrong=0/16
+  gemm.relu  4x 4x 4 loop   11 static ->   5 dynamic  wrong=0/16
+  gemm       8x 8x 8 flat   10 static ->  10 dynamic  wrong=0/64
+  gemm       8x 8x 8 loop   13 static ->  10 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 flat   12 static ->  12 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 loop   14 static ->  12 dynamic  wrong=0/64
+  gemm      12x12x12 flat   18 static ->  18 dynamic  wrong=0/144
+  gemm      12x12x12 loop   13 static ->  18 dynamic  wrong=0/144
+  gemm.relu 12x12x12 flat   21 static ->  21 dynamic  wrong=0/144
+  gemm.relu 12x12x12 loop   14 static ->  21 dynamic  wrong=0/144
+  gemm      16x16x 8 flat   16 static ->  16 dynamic  wrong=0/128
+  gemm      16x16x 8 loop   13 static ->  16 dynamic  wrong=0/128
+  gemm.relu 16x16x 8 flat   18 static ->  18 dynamic  wrong=0/128
+  gemm.relu 16x16x 8 loop   14 static ->  18 dynamic  wrong=0/128
+  gemm      16x16x16 flat   28 static  SKIP (needs 64 words > imem 56)
+  gemm      16x16x16 loop   13 static ->  28 dynamic  wrong=0/256
+  gemm.relu 16x16x16 flat   32 static  SKIP (needs 72 words > imem 56)
+  gemm.relu 16x16x16 loop   14 static ->  32 dynamic  wrong=0/256
+  vadd+relu 16x16x16    7 instrs  wrong=0/64
+  ALL EXACT
+CHIA-GATE bench_isa OK <nonce>

@@ -1,0 +1,106 @@
+pre-flight: scripted test model at http://127.0.0.1:34769/v1; no cloud model can be reached, billing checks skipped; spend cap $5.00
+2026-09-19 19:12:36,678	INFO worker.py:1669 -- Using address 128.84.48.164:36727 set in the environment variable RAY_ADDRESS
+2026-09-19 19:12:36,688	INFO worker.py:1810 -- Connecting to existing Ray cluster at address: 128.84.48.164:36727...
+2026-09-19 19:12:36,838	INFO worker.py:2013 -- Connected to Ray cluster.
+2026-09-19 19:12:36,844	WARNING working_dir.py:86 -- Directory '__pycache__' is now ignored by default when packaging the working directory. To disable this behavior, set the `RAY_OVERRIDE_RUNTIME_ENV_DEFAULT_EXCLUDES=''` environment variable.
+2026-09-19 19:12:36,845	INFO packaging.py:392 -- Ignoring upload to cluster for these files: [PosixPath('/home/sk3463/allo-chia-isa/examples/accelerator/tinytpu_vitis/chia_agent/.rayignore')]
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/ray/_private/worker.py:2052: FutureWarning: Tip: In future versions of Ray, Ray will no longer override accelerator visible devices env var if num_gpus=0 or num_gpus=None (default). To enable this behavior and turn off this error message, set RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  warnings.warn(
+/home/sk3463/miniconda3/envs/chia_env/lib/python3.10/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Started server process [3273073]
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=3273073)[0m ERROR:    [Errno 98] error while attempting to bind on address ('127.0.0.1', 8000): address already in use
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Waiting for application shutdown.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Application shutdown complete.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Started server process [3273073]
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=3273073)[0m ERROR:    [Errno 98] error while attempting to bind on address ('127.0.0.1', 8001): address already in use
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Waiting for application shutdown.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Application shutdown complete.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Started server process [3273073]
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Waiting for application startup.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Application startup complete.
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Uvicorn running on http://127.0.0.1:8002 (Press CTRL+C to quit)
+tpufrontend started at 127.0.0.1:8002 on node fc04741d1d4f99ec5ec9c4e444d2ec1efc5b124eb9e3fd835700f2e2
+========================================================================
+Baseline: gate + cosim of the unmodified design
+========================================================================
+  cosim total=858 [16x16x16=686, 4x4x4=172] est_clock=2.431ns LUT=26583 FF=17481 DSP=14 BRAM18K=42
+OpenCodeLLM is experimental: only exercised by unit tests so far, not validated in production.
+========================================================================
+Iteration 1/4 -- best so far 858 cosim cycles {'16x16x16': 686, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34008 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34008 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34008 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:34016 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter1] $0.00, 5 turns, 233s; run total $0.00
+No-op: re-saved the design unchanged.
+  no change was made; nothing to score
+========================================================================
+Iteration 2/4 -- best so far 858 cosim cycles {'16x16x16': 686, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40710 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40710 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40710 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40712 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40712 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40712 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40712 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40712 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter2] $0.00, 3 turns, 34s; run total $0.00
+Re-added the spad zero-fill.
+  cosim total=1703 [16x16x16=1056, 4x4x4=647] est_clock=2.431ns LUT=26701 FF=17494 DSP=14 BRAM18K=42
+  REJECTED (+845 cosim cycles vs best) after 215s
+========================================================================
+Iteration 3/4 -- best so far 858 cosim cycles {'16x16x16': 686, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49180 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49180 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49180 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49182 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49182 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:49182 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter3] $0.00, 2 turns, 3s; run total $0.00
+Narrowed the PE partial sum to int16.
+  candidate failed at gate:stress (debug attempt 1)
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40500 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40500 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40500 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:40504 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+  [iter3-debug1] $0.00, 1 turns, 3s; run total $0.00
+I cannot fix this.
+  REJECTED (gate:stress) after 32s
+========================================================================
+Iteration 4/4 -- best so far 858 cosim cycles {'16x16x16': 686, '4x4x4': 172}
+========================================================================
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45684 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45684 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45684 - "GET /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 200 OK
+[36m(_ToolServerActor pid=3273073)[0m INFO:     127.0.0.1:45690 - "POST /tpufrontend/mcp HTTP/1.1" 202 Accepted
+  [iter4] $0.00, 4 turns, 3s; run total $0.00
+Tried to edit the frozen files.
+  no change was made; nothing to score
+========================================================================
+Search complete
+  baseline : cosim total=858 [16x16x16=686, 4x4x4=172] est_clock=2.431ns LUT=26583 FF=17481 DSP=14 BRAM18K=42
+  best     : cosim total=858 [16x16x16=686, 4x4x4=172] est_clock=2.431ns LUT=26583 FF=17481 DSP=14 BRAM18K=42
+  llm spend (this worker): $0.00 over 5 calls
+[36m(_ToolServerActor pid=3273073)[0m INFO:     Shutting down

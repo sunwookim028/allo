@@ -1,0 +1,2 @@
+  PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)
+CHIA-GATE param_check OK <nonce>
