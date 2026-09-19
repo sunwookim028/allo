@@ -8,7 +8,7 @@ Each unit is a generator yielding `('get', ch)` (and receiving the token) or
 `('put', ch, token)`, written to mirror its `df.kernel` in `microarch_isa.py`
 statement for statement on the channel side: the same header reads, the same
 flat row loops fetching an instruction when the row counter runs out, the same
-`spm` header word plus T weight words per `mm`, the same weight loaders and
+`vmu` header word plus T weight words per `mm`, the same weight loaders and
 flat PEs. A cooperative scheduler runs them against FIFOs of depth `QD` (and
 the weight queues `wq` at their fixed depth 4).
 
@@ -41,20 +41,20 @@ def build(prog):
     dyn = U.expand(prog)
 
     def seq():
-        for ch, w in (("c_dld", hdr[1]), ("c_dld", hdr[7]), ("c_spm", hdr[2]),
-                      ("c_spm", hdr[4]), ("c_vru", hdr[3]), ("c_acc", hdr[5]),
+        for ch, w in (("c_dld", hdr[1]), ("c_dld", hdr[7]), ("c_vmu", hdr[2]),
+                      ("c_vmu", hdr[4]), ("c_vru", hdr[3]), ("c_acc", hdr[5]),
                       ("c_dst", hdr[6])):
             yield ("put", ch, w)
         for op, nr, f0, f1, f2, f3 in dyn:
             if op == U.OP_DMA_LD:
                 yield ("put", "c_dld", (op, nr, f0))
-                yield ("put", "c_vru" if f0 & U.DMA_TO_VR else "c_spm", (op, nr, f0))
+                yield ("put", "c_vmu", (op, nr, f0))
             elif op == U.OP_VLD:
-                yield ("put", "c_spm", (op, nr, f0))
+                yield ("put", "c_vmu", (op, nr, f0))
                 yield ("put", "c_vru", (op, nr, f0))
             elif op == U.OP_MM:
-                # spm's copy: its own work count T + 1, the array's rows in f1
-                yield ("put", "c_spm", (op, T + 1, nr))
+                # vmu's copy: its own work count T + 1, the array's rows in f1
+                yield ("put", "c_vmu", (op, T + 1, nr))
                 yield ("put", "c_vru", (op, nr, f0))
                 yield ("put", "c_acc", (op, nr, f0))
             elif op == U.OP_VADD:
@@ -83,25 +83,25 @@ def build(prog):
         yield ("get", "c_dld")                       # the A/B spans
 
         def body(word, r):
-            yield ("put", "dma2vr" if word[2] & U.DMA_TO_VR else "dma2sp", 0)
+            yield ("put", "dma2vm", 0)
         yield from flat("c_dld", n_row, body)
 
-    def spm():
-        n_row = (yield ("get", "c_spm")) & 0xFFFF
-        mw = yield ("get", "c_spm")
+    def vmu():
+        n_row = (yield ("get", "c_vmu")) & 0xFFFF
+        mw = yield ("get", "c_vmu")
         yield ("put", "wcol0", (mw & 0xFFFF, mw >> 16))   # the array's counts
 
         def body(word, r):
             op = word[0]
             if op == U.OP_DMA_LD:
-                yield ("get", "dma2sp")
+                yield ("get", "dma2vm")
             elif op == U.OP_VLD:
-                yield ("put", "sp2vr", 0)
+                yield ("put", "vm2vr", 0)
             elif r == 0:
                 yield ("put", "wcol0", word[2])      # header: this mm's rows
             else:
                 yield ("put", "wcol0", "w")          # T weight words
-        yield from flat("c_spm", n_row, body)
+        yield from flat("c_vmu", n_row, body)
 
     def vru():
         n_word = (yield ("get", "c_vru")) & 0xFFFF
@@ -110,10 +110,8 @@ def build(prog):
             op = word[0]
             if op == U.OP_MM:
                 yield ("put", "acol0", 0)            # one activation word
-            elif op == U.OP_VLD:
-                yield ("get", "sp2vr")
             else:
-                yield ("get", "dma2vr")
+                yield ("get", "vm2vr")
         yield from flat("c_vru", n_word, body)
 
     def chain_in(i, j):
@@ -182,7 +180,7 @@ def build(prog):
             yield ("get", "ac2sp")
         yield from flat("c_dst", n_row, body)
 
-    procs = {"sequencer": seq(), "dma_ld": dma_ld(), "spm": spm(), "vru": vru(),
+    procs = {"sequencer": seq(), "dma_ld": dma_ld(), "vmu": vmu(), "vru": vru(),
              "accu": accu(), "dma_st": dma_st()}
     for i in range(T):
         for j in range(T):

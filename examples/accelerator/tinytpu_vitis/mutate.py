@@ -67,16 +67,16 @@ MUTANTS = [
      "w = q[0:8]", "w = q[0:8]", "if w == 0:\n                    w = q[0:8]"),
     ("wld_rows_from_weight", "wld sends the weight lane as the PE's row count",
      "q[8:20] = hdr[0:12]", "hdr[0:12]", "ww[0:12]"),
-    # --- the scratchpad: weights for mm, and vld ---
-    ("spm_weight_off_by_one", "spm streams weight rows f3+1.. instead of f3..",
+    # --- the VMEM: weights for mm, and vld ---
+    ("vmu_weight_off_by_one", "vmu streams weight rows f3+1.. instead of f3..",
      "ra = f3 + r - 1", "f3 + r - 1", "f3 + r"),
-    ("spm_vld_off_by_one", "vld reads spad one row late",
+    ("vmu_vld_off_by_one", "vld reads vmem one row late",
      "ra: int32 = f1 + r\n", "f1 + r", "f1 + r + 1"),
     # --- the vregs: the A path ---
     ("vru_act_off_by_one", "vru streams activation rows one row late",
      "vv: UInt(VW) = vr[f0 + r]", "vr[f0 + r]", "vr[f0 + r + 1]"),
-    ("vru_dma_ignores_f3", "a dma_ld into the vregs lands at f0 + r, not f3 + r",
-     "wa = f3 + r", "f3 + r", "f0 + r"),
+    ("vru_vld_dst_ignored", "vld writes vr[r], ignoring its destination base f0",
+     "vr[f0 + r] = vm2vr.get()", "vr[f0 + r]", "vr[r]"),
     # --- DMA ---
     ("dma_ld_src_swapped", "dma_ld reads B for src A and A for src B",
      "if (f0 & DMA_SRC_B) == 0:", "== 0:", "!= 0:"),

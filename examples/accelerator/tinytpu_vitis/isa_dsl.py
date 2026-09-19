@@ -4,7 +4,7 @@
 """A loop-nest generator for TinyTPU-isa: nesting depth IS the AGU level.
 
 **This is a code generator, not a compiler.** It chooses nothing. The author
-writes the tiling, the loop order, the scratchpad and vreg layout, which tile
+writes the tiling, the loop order, the VMEM and vreg layout, which tile
 is peeled, and which address term walks which loop; this module derives the
 *encoding* of what was written. There is no cost model here, no tile-size
 search, no legality repair -- ask it for a bad nest and it raises, it does not
@@ -37,7 +37,7 @@ is the only way to name that level:
 
     with k.loop(Nt, "n") as nb:                  # level 0
         with k.loop(Kt, "k") as kb:              # level 1
-            k.mm(A_VR, AR_C, Ref(B_SP).at(nb, MAXDIM).at(kb, T), rows=M)
+            k.mm(A_VR, AR_C, Ref(B_VM).at(nb, MAXDIM).at(kb, T), rows=M)
 
 Swap those two `with` statements and every address term follows, because `nb`
 and `kb` carry their levels with them.
@@ -49,7 +49,7 @@ induction variable -- so `Ref.shift` is derived from a region whose stride was
 padded to a power of two precisely to make that legal, and `load()` passes a
 single `(shift, level)` pair. Ours is three `(target, level, stride)` terms
 with arbitrary 11-bit strides, any number of which may land on the *same*
-field: the `mm` inside the k loop names its weights at `B_SP + nb*MAXDIM +
+field: the `mm` inside the k loop names its weights at `B_VM + nb*MAXDIM +
 kb*T`, two terms on `f3`, which their encoding cannot say at all.
 
 So `Ref` here is not a staged region with a shift. It is a base plus an ordered
@@ -61,7 +61,7 @@ second instruction word.
 
 ## What it does not do
 
-No register allocation (`B_SP`, `A_VR`, `AR_C` are the author's names for the
+No register allocation (`B_VM`, `A_VR`, `AR_C` are the author's names for the
 author's layout), no scheduling, no peeling. `gemm_program` below peels the
 first k-tile because the *author* decided that carrying `f2=0` on it is how you
 say "overwrite the accumulator" without a predicate -- the generator has no
@@ -81,7 +81,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
     OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
     OP_VRELU, enc, enc_agu,
-    A_VR, AR_C, B_SP, DMA_SRC_B, DMA_TO_VR, MAXDIM, MAXROWS, T,
+    A_VM, A_VR, AR_C, B_VM, DMA_SRC_B, MAXDIM, MAXROWS, T,
 )
 
 _TARGETS = (AGU_F0, AGU_F1, AGU_F2, AGU_F3)
@@ -117,7 +117,7 @@ class Iv:
 class Ref:
     """An address: a base, plus the loops it walks.
 
-    `Ref(B_SP).at(nb, MAXDIM).at(kb, T)` is `B_SP + nb*MAXDIM + kb*T`, and it
+    `Ref(B_VM).at(nb, MAXDIM).at(kb, T)` is `B_VM + nb*MAXDIM + kb*T`, and it
     encodes as two AGU terms on whichever field it is passed as. Immutable, so
     a base held in a variable can be `.at()`-ed twice without the first
     derivation leaking into the second.
@@ -184,25 +184,24 @@ class Program:
     def nop(self):
         self._ins(OP_NOP)
 
-    def dma_ld(self, src, dram_row=0, col_block=0, spad=None, vr=None, rows=0):
-        """DRAM -> scratchpad (`spad=`) or operand vregs (`vr=`), exactly one
-        of the two. `src` is 0 for A, 1 for B."""
-        if (spad is None) == (vr is None):
-            raise NestError(f"{self.name}: dma_ld needs exactly one of spad=, vr=")
-        f0 = (DMA_SRC_B if src else 0) | (DMA_TO_VR if vr is not None else 0)
-        self._ins(OP_DMA_LD, f0, dram_row, col_block,
-                  vr if vr is not None else spad, nr=rows)
+    def dma_ld(self, src, dram_row=0, col_block=0, vmem=None, rows=0):
+        """DRAM -> VMEM, the only place DMA writes. `src` is 0 for A, 1
+        for B."""
+        if vmem is None:
+            raise NestError(f"{self.name}: dma_ld needs vmem=")
+        self._ins(OP_DMA_LD, DMA_SRC_B if src else 0, dram_row, col_block,
+                  vmem, nr=rows)
 
-    def vld(self, vr, spad, rows):
-        """Scratchpad -> operand vregs, `rows` packed words."""
-        self._ins(OP_VLD, vr, spad, nr=rows)
+    def vld(self, vr, vmem, rows):
+        """VMEM -> operand vregs, `rows` packed words."""
+        self._ins(OP_VLD, vr, vmem, nr=rows)
 
-    def mm(self, vr_a, ar, spad_w, rows, acc=False):
+    def mm(self, vr_a, ar, vmem_w, rows, acc=False):
         """One k-tile into the array: `rows` activation rows from the vregs at
-        `vr_a`, T weight rows from the scratchpad at `spad_w`. `acc`
+        `vr_a`, T weight rows from the VMEM at `vmem_w`. `acc`
         accumulates into `ar`, else overwrites -- which is why a k loop wants
         its first tile peeled."""
-        self._ins(OP_MM, vr_a, ar, int(acc), spad_w, nr=rows)
+        self._ins(OP_MM, vr_a, ar, int(acc), vmem_w, nr=rows)
 
     def vadd(self, ar_d, ar_s1, ar_s2, rows):
         self._ins(OP_VADD, ar_d, ar_s1, ar_s2, nr=rows)
@@ -272,14 +271,14 @@ def gemm_program(M, K, N, relu=False):
 
     Every decision here is the author's and is visible in the source: A goes
     straight into the vregs one column block per k-tile, B into the
-    scratchpad one column block per n-tile, and each `mm` names its T weight
+    VMEM one column block per n-tile, and each `mm` names its T weight
     rows there; the output loop is n outermost and k innermost; the first
     k-tile is peeled so it can carry `acc=False` (overwrite the accumulator)
     without a predicate on the induction variable.
 
     What is *not* here is any AGU level. `nb` and `kb` are objects yielded by
-    the nest, and `B_SP + nb*MAXDIM + kb*T` is written as
-    `Ref(B_SP).at(nb, MAXDIM).at(kb, T)` -- reorder the two `with` statements
+    the nest, and `B_VM + nb*MAXDIM + kb*T` is written as
+    `Ref(B_VM).at(nb, MAXDIM).at(kb, T)` -- reorder the two `with` statements
     and the encoding follows.
     """
     assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
@@ -289,25 +288,26 @@ def gemm_program(M, K, N, relu=False):
     Kt, Nt = K // T, N // T
     k = Program(f"gemm{'.relu' if relu else ''} {M}x{K}x{N}")
 
-    # --- A: one dma_ld per column block, straight into the vregs ---
+    # --- A: one dma_ld per column block into VMEM, then vld into the vregs ---
     with k.loop(Kt, "kA") as kb:
         k.dma_ld(src=0, dram_row=0,
                  col_block=Ref().at(kb, 1),
-                 vr=Ref(A_VR).at(kb, MAXDIM), rows=M)
-    # --- B: one per column block, into the scratchpad ---
+                 vmem=Ref(A_VM).at(kb, MAXDIM), rows=M)
+        k.vld(Ref(A_VR).at(kb, MAXDIM), Ref(A_VM).at(kb, MAXDIM), rows=M)
+    # --- B: one per column block, into the VMEM ---
     with k.loop(Nt, "nB") as nb:
         k.dma_ld(src=1, dram_row=0,
                  col_block=Ref().at(nb, 1),
-                 spad=Ref(B_SP).at(nb, MAXDIM), rows=K)
+                 vmem=Ref(B_VM).at(nb, MAXDIM), rows=K)
 
     # --- the output loop ---
     with k.loop(Nt, "n") as nb:
         #   peeled first k-tile: overwrite the accumulator
-        k.mm(A_VR, AR_C, Ref(B_SP).at(nb, MAXDIM), rows=M, acc=False)
+        k.mm(A_VR, AR_C, Ref(B_VM).at(nb, MAXDIM), rows=M, acc=False)
         if Kt > 1:
             with k.loop(Kt - 1, "k") as kb:
                 k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
-                     Ref(B_SP + T).at(nb, MAXDIM).at(kb, T), rows=M, acc=True)
+                     Ref(B_VM + T).at(nb, MAXDIM).at(kb, T), rows=M, acc=True)
         if relu:
             k.vrelu(AR_C, AR_C, rows=M)
         k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
@@ -317,15 +317,16 @@ def gemm_program(M, K, N, relu=False):
 def vector_program(M=8):
     """Every field a GEMM leaves constant, varied -- a TEST program, not a
     kernel. The shipped GEMM always has `dma_ld`/`mvout` DRAM row 0, one
-    accumulator region, A only in the vregs, B only in the scratchpad, no
-    `vld`, and `vrelu` in place (`f0 == f1`); a unit that ignored any of those
-    would pass `bench_isa` exactly. Here:
+    accumulator region, A only as activations, B only as weights, and
+    `vrelu` in place (`f0 == f1`); a unit that ignored any of those would
+    pass `bench_isa` exactly. Here:
 
-      * `dma_ld` from nonzero DRAM rows and column blocks, both sources into
-        both memories (A into the scratchpad, B into the vregs too);
-      * `vld` moving scratchpad rows into the vregs as activations;
+      * `dma_ld` from nonzero DRAM rows and column blocks, both sources, to
+        VMEM rows away from the GEMM layout;
+      * `vld` moving VMEM rows into the vregs as activations, B's as well as
+        A's;
       * `mm` into two accumulator regions away from 0, one of them accumulated,
-        with weights from two scratchpad regions, one of them A's rows;
+        with weights from two VMEM regions, one of them A's rows;
       * `vadd` with three distinct regions, `vrelu` with a distinct destination;
       * `mvout` from nonzero `ar`, to nonzero DRAM rows and column blocks, and
         through a loop whose AGU walks `f0`, `f1` and `f2` at once.
@@ -333,12 +334,13 @@ def vector_program(M=8):
     Its gold is `isa_ref.run`, not a formula."""
     assert 2 * M <= MAXDIM and M % 2 == 0
     k = Program(f"vector {M}")
-    k.dma_ld(src=0, dram_row=3, col_block=1, spad=40, rows=M)   # A -> spad
-    k.dma_ld(src=1, dram_row=2, col_block=2, vr=30, rows=M)     # B -> vr
-    k.dma_ld(src=1, dram_row=5, col_block=3, spad=100, rows=2 * T)
-    k.vld(10, 40, rows=M)                    # activations 1: A rows via spad
-    k.mm(10, 20, 100, rows=M)                # ar20 = act1 @ W1 (spad 100..)
-    k.mm(30, 40, 100 + T, rows=M)            # ar40 = act2 @ W2 (spad 104..)
+    k.dma_ld(src=0, dram_row=3, col_block=1, vmem=40, rows=M)   # A -> vmem
+    k.dma_ld(src=1, dram_row=2, col_block=2, vmem=200, rows=M)  # B -> vmem
+    k.vld(30, 200, rows=M)                   # ... -> vr: activations 2
+    k.dma_ld(src=1, dram_row=5, col_block=3, vmem=100, rows=2 * T)
+    k.vld(10, 40, rows=M)                    # activations 1: A rows via vmem
+    k.mm(10, 20, 100, rows=M)                # ar20 = act1 @ W1 (vmem 100..)
+    k.mm(30, 40, 100 + T, rows=M)            # ar40 = act2 @ W2 (vmem 104..)
     k.mm(10, 40, 40, rows=M, acc=True)       # ar40 += act1 @ (A rows 40..)
     k.vadd(60, 20, 40, rows=M)               # ar60 = ar20 + ar40
     k.vrelu(80, 60, rows=M)                  # ar80 = relu(ar60)
@@ -370,8 +372,9 @@ def ar_distance_program(dist):
     n = dist
     assert 1 <= n and 2 * n <= MAXDIM
     k = Program(f"ar distance {dist}")
-    k.dma_ld(src=0, dram_row=0, col_block=0, vr=0, rows=n)
-    k.dma_ld(src=1, dram_row=0, col_block=1, spad=0, rows=T)
+    k.dma_ld(src=0, dram_row=0, col_block=0, vmem=0, rows=n)
+    k.vld(0, 0, rows=n)
+    k.dma_ld(src=1, dram_row=0, col_block=1, vmem=0, rows=T)
     k.mm(0, 10, 0, rows=n)                   # ar10+i written at i
     k.mm(0, 10, 0, rows=n, acc=True)         # acc read at n+i: distance n
     k.vrelu(30, 10, rows=n)                  # read at 2n+i: distance n

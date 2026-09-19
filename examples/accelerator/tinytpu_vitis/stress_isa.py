@@ -26,7 +26,7 @@ here re-proves it). This gate runs on the same simulator build and adds:
     `vadd`/`vrelu` destinations), and random valid programs, both against
     `isa_ref.run` -- the ISA as numpy;
   * **many invocations of one build**, so a later run sees the state an
-    earlier one left in `spad`/`vr`/`ar`, which nothing clears;
+    earlier one left in `vmem`/`vr`/`ar`, which nothing clears;
   * **`kpn_model` on every distinct program first**, so a program whose
     header counts and dispatch disagree is reported with the blocked units
     instead of hanging the simulator, and **the validator's controls**:
@@ -54,7 +54,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     gemm_program_flat, gemm_program_handwritten, vadd_program,
     OP_DMA_LD, OP_DMA_ST, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
     OP_LOOP, OP_ENDLOOP, AGU_F0, AGU_F1,
-    MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, SPAD_ROWS, NVR, NAR, AR_RAW_DIST,
+    MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, VMEM_ROWS, NVR, NAR, AR_RAW_DIST,
 )
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     Program, Ref, gemm_program, vector_program, ar_distance_program,
@@ -157,8 +157,8 @@ def random_program(seed):
     ri = lambda lo, hi: int(rng.integers(lo, hi + 1))   # noqa: E731
     hi_win = bool(rng.integers(0, 2))
     lo = {m: (s - 64 if hi_win else 0)
-          for m, s in (("spad", SPAD_ROWS), ("vr", NVR), ("ar", NAR))}
-    wr = {"spad": np.zeros(SPAD_ROWS, bool), "vr": np.zeros(NVR, bool),
+          for m, s in (("vmem", VMEM_ROWS), ("vr", NVR), ("ar", NAR))}
+    wr = {"vmem": np.zeros(VMEM_ROWS, bool), "vr": np.zeros(NVR, bool),
           "ar": np.zeros(NAR, bool)}
     ar_at = np.full(NAR, -AR_RAW_DIST)   # accu iteration of each row's last write
     acc = {"it": 0}                      # accu iterations issued so far
@@ -182,17 +182,17 @@ def random_program(seed):
             ar_at[row] = acc["it"] + t
         acc["it"] += n_it
 
-    def dma_ld(to=None, n=None):
+    def dma_ld(n=None):
+        # DMA writes only VMEM; the vregs are reached by `vld`
         n = n or ri(1, MAXDIM)
-        to = to or ("vr" if rng.integers(0, 2) else "spad")
-        s = place(to, n)
+        s = place("vmem", n)
         k.dma_ld(src=ri(0, 1), dram_row=ri(0, MAXDIM - n),
-                 col_block=ri(0, WPR - 1), rows=n, **{to: s})
-        wr[to][s:s + n] = True
+                 col_block=ri(0, WPR - 1), rows=n, vmem=s)
+        wr["vmem"][s:s + n] = True
 
     def vld():
         n = ri(1, 24)
-        s = run_of("spad", n)
+        s = run_of("vmem", n)
         if s is None:
             return False
         d = place("vr", n)
@@ -202,7 +202,7 @@ def random_program(seed):
 
     def mm():
         n = ri(1, MAXDIM)
-        w, a = run_of("spad", T), run_of("vr", n)
+        w, a = run_of("vmem", T), run_of("vr", n)
         if w is None or a is None:
             return False
         d = run_of("ar", n) if rng.integers(0, 2) else None   # accumulate onto
@@ -263,12 +263,13 @@ def random_program(seed):
         acc["it"] += trip * n
         return True
 
-    dma_ld("spad", ri(T, MAXDIM))        # weights
-    dma_ld("vr")                         # activations
+    dma_ld(ri(T, MAXDIM))                # weights
+    dma_ld()                             # activations, once vld'd
     for _ in range(ri(0, 2)):
         dma_ld()
     while not mm():
         dma_ld()
+        vld()
     ops = [dma_ld, vld, mm, lambda: vec("vadd"), lambda: vec("vrelu"),
            mvout, mvout_loop]
     budget = ri(8, MAX_STATIC - 4)
@@ -295,9 +296,9 @@ def _bad_programs():
         "mm accumulate onto unwritten ar": [ld, vw, (enc(OP_MM, f2=1, nr=4), 0), out()],
         "vadd second source unwritten": [ld, vw, mm0, (enc(OP_VADD, f0=8, f1=0, f2=4, nr=4), 0), out(8)],
         "vrelu source unwritten": [ld, vw, mm0, (enc(OP_VRELU, f0=0, f1=20, nr=4), 0), out()],
-        "mm weights never loaded into spad": [ld, vw, (enc(OP_MM, f3=40, nr=4), 0), out()],
-        "mm activations only in spad, never in vr": [ld, (enc(OP_MM, f0=8, nr=4), 0), out()],
-        "dma_ld f0 outside source|destination": [(enc(OP_DMA_LD, f0=4, nr=4), 0), ld, vw, mm0, out()],
+        "mm weights never loaded into vmem": [ld, vw, (enc(OP_MM, f3=40, nr=4), 0), out()],
+        "mm activations only in vmem, never in vr": [ld, (enc(OP_MM, f0=8, nr=4), 0), out()],
+        "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, mm0, out()],
         # The accumulator distance contract, one iteration inside it. Relative
         # to AR_RAW_DIST on purpose: whether the contract is wide enough for
         # the RTL is a question only cosim can answer (TPU_TB=stress runs
@@ -307,7 +308,7 @@ def _bad_programs():
         **({"mvout of a 1-row mm's row, 1 accu iteration later": [
             ld, vw, (enc(OP_MM, nr=1), 0), (enc(OP_MVOUT, nr=1), 0)]}
            if AR_RAW_DIST > 1 else {}),
-        "mm consumes a vld copy of unwritten spad": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), mm0, out()],
+        "mm consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), mm0, out()],
         # Loop semantics: the body is fine on iteration 0 and reads ar 4..7,
         # which nothing wrote, on iteration 1.
         "loop iteration 1 reads unwritten ar": [

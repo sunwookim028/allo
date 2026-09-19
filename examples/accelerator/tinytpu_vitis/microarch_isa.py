@@ -8,7 +8,7 @@ read them with `git show e2451b81:examples/accelerator/tinytpu_vitis/<file>`.
   * `microarch.py`     -- output-stationary, Vitis-legal, but `acc += a*b` is a
                           loop-carried dependence so `Final II = 7`.
   * `microarch_ws.py`  -- weight-stationary, II=1 per MAC, array at 100% of
-                          roofline -- but *one* opcode, no scratchpad, no vector
+                          roofline -- but *one* opcode, no VMEM, no vector
                           unit. Operands stream from DRAM straight into the
                           array. A fast fixed-function GEMM, not a programmable
                           accelerator.
@@ -24,15 +24,15 @@ meet, and where each one lands:
      `f2` field selects overwrite or accumulate, so the shipped GEMM program
      emits no `vadd` at all, and `vadd_program` exists to keep the vector unit
      exercised.
-  3. **A scratchpad with pure SIMD access.** One row of `spad` *is* one
+  3. **A VMEM with pure SIMD access.** One row of `vmem` *is* one
      `UInt(T*8)` packed word of T int8 lanes. There is no per-lane addressing
      anywhere: one port, one row per cycle, which is what makes T lanes per
      cycle come out of a single-ported memory.
-  4. **Explicit data movement.** `dma_ld` moves DRAM rows into the scratchpad
-     or straight into the vregs, `vld` moves scratchpad rows into the vregs,
+  4. **Explicit data movement.** `dma_ld` moves DRAM rows into the VMEM
+     or straight into the vregs, `vld` moves VMEM rows into the vregs,
      and `mvout` retires accumulator rows to DRAM.
   5. **A streaming interface between the memories and the array ports.**
-     Activations stream from the vregs, weights from the scratchpad; packed
+     Activations stream from the vregs, weights from the VMEM; packed
      words travel on daisy chains, and each PE taps its own lane.
 
 ## Why chains rather than T-way fan-out
@@ -47,7 +47,7 @@ exactly one stream and the border PEs daisy-chain it, `L2_A[i] -> L2_A[i+1]`.
 
 So every distribution here is a chain, and every chain carries *packed words*:
 
-    spm --hdr,W--> wcol[0] --v--> wld(i,0) --> wcol[i+1]     (down column 0)
+    vmu --hdr,W--> wcol[0] --v--> wld(i,0) --> wcol[i+1]     (down column 0)
                                     |    +--wq--> PE(i,0)    (its own weight)
                                     +-------> wrow[i,0] --> wld(i,1) --> ...
                                                              (east, lane j)
@@ -123,7 +123,7 @@ than counted.
 
 **What could not be split, and why the arms stay in one process.** The obvious
 alternative -- one process per opcode, fed by per-opcode queues -- founders on
-one owner per memory. `spad` lives in `spm` and is written by `dma_ld` and read
+one owner per memory. `vmem` lives in `vmu` and is written by `dma_ld` and read
 by `vld` and `mm`; `vr` lives in `vru` and is written by `vld` and `dma_ld` and
 read by `mm`; `ar` lives in `accu` and is touched by all four of its opcodes.
 Allo enforces single reader and single writer (Vitis itself would share an array
@@ -134,7 +134,7 @@ inside a pipelined body instead of as sub-loops the scheduler must serialize.
 
 Four traps a naive flattening falls into, and what each unit does instead:
 
-  * **T+1 writes to one FIFO in one iteration.** `spm` emits a header word and
+  * **T+1 writes to one FIFO in one iteration.** `vmu` emits a header word and
     T weight words per `mm`; in the fetch branch that would schedule the whole
     loop at II=T+1. It charges the prologue T+1 *iterations* instead -- the
     same cycles, II=1 everywhere else.
@@ -143,7 +143,7 @@ Four traps a naive flattening falls into, and what each unit does instead:
     `Final II = 2` on every unit. Hoisting the increment costs nothing.
   * **a row count that depends on the decoded opcode** (`cnt = nr`, or
     `T + 1` for an `mm`) is a carried dependence on the counter and closes the
-    loop at `Final II = 2` -- measured in `spm` and `accu`. The sequencer
+    loop at `Final II = 2` -- measured in `vmu` and `accu`. The sequencer
     precomputes each unit's count and sends it in that unit's copy of `nr`.
   * **a read in each arm.** The obvious transcription synthesized to one read
     port per arm on one memory (`vru` II=2, `accu` II=3). Every unit reads its
@@ -262,7 +262,7 @@ II=1.
 int8 lanes, int32 accumulation, `mvout` clipping to int8 -- Gemmini's default
 config (`inputType = SInt(8.W)`, `accType = SInt(32.W)`) and its `mvout`
 behaviour under `ACC_SCALE_IDENTITY` with shift 0, which is what `allo_cmp.c`
-passes. Packing is what makes the SIMD scratchpad work, and packing needs
+passes. Packing is what makes the SIMD VMEM work, and packing needs
 integers, so unlike `microarch_ws.py` (at `e2451b81`) there is no fp32 switch here.
 """
 
@@ -297,7 +297,7 @@ import allo.dataflow as df
 #
 # The rule this imposed: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
 # is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
-# a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
+# a 2047 maximum, which is comfortably above VMEM_ROWS and NVR.
 #
 # `nr` is the row count for *every* instruction that has one, and it is only 7
 # bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
@@ -308,26 +308,25 @@ import allo.dataflow as df
 # design. Narrowing the field narrows the bound. Gemmini does the same thing:
 # its mvin/mvout carry an explicit, bounded row count.
 OP_NOP = 0
-OP_DMA_LD = 1     # f0=src|dst f1=dram_row0 f2=col_block f3=spad0|vr0   nr=rows
+OP_DMA_LD = 1     # f0=src f1=dram_row0 f2=col_block f3=vmem0          nr=rows
 OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
-OP_VLD = 3        # f0=vr0  f1=spad0                            nr=rows
-OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=spad_w     nr=rows
+OP_VLD = 3        # f0=vr0  f1=vmem0                            nr=rows
+OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=vmem_w     nr=rows
 OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
 OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
 OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
 OP_ENDLOOP = 9    # close the innermost loop
 
-# `dma_ld`'s f0: bit 0 is the SOURCE matrix, bit 1 the DESTINATION memory.
-#   0: A -> spad    1: B -> spad    2: A -> vr    3: B -> vr
-# f3 is then a scratchpad row or a vreg. The shipped GEMM uses 2 (activations
-# straight into the vregs) and 1 (weights into the scratchpad, where `mm`
-# names them).
+# `dma_ld`'s f0 is the SOURCE matrix: 0 A, 1 B. The destination is always
+# VMEM (MiniTPU: DMA moves only between DRAM and VMEM). TinyTPU-isa v1 also
+# had a destination bit that sent A straight into the operand vregs (the A
+# bypass); alignment increment 1 removed it, so activations reach the vregs by
+# `vld` from VMEM, as on MiniTPU.
 DMA_SRC_B = 1
-DMA_TO_VR = 2
 
 # ---- THE WRITE-BEFORE-READ CONTRACT (`mm` acc, `vadd`, `vrelu`, `mvout`) ----
-# `spad`, `vr` and `ar` are NOT cleared by the hardware. Their `= 0`
+# `vmem`, `vr` and `ar` are NOT cleared by the hardware. Their `= 0`
 # initialisers were removed to delete a 514-cycle memset, so at `ap_start`
 # each holds whatever the previous invocation (or power-up) left there. The
 # guarantee moved from the hardware to the program:
@@ -338,9 +337,9 @@ DMA_TO_VR = 2
 #     `vrelu`. `ar` is the accumulator; reading it early is a wrong answer,
 #     not a crash.
 #   * `mm` reads `nr` activation rows of `vr` at f0 and T weight rows of
-#     `spad` at f3; those rows must hold data a `dma_ld` put there (directly,
-#     or into `spad` and then through a `vld`).
-#   * `vld` is a pure copy and MAY copy an unwritten `spad` row, but the copy
+#     `vmem` at f3; those rows must hold data a `dma_ld` put there (directly,
+#     or into `vmem` and then through a `vld`).
+#   * `vld` is a pure copy and MAY copy an unwritten `vmem` row, but the copy
 #     is then unwritten too, and consuming it in an `mm` is an error.
 #
 # ---- THE ACCUMULATOR DISTANCE CONTRACT ----
@@ -388,7 +387,7 @@ def enc_agu(*terms):
     enclosing loop's induction variable. Terms name their target rather than
     being fixed one-per-field, because a single field often needs two: the
     weight `vld` inside the k loop is offset by both the n tile and the k tile,
-    `B_SP + nb*MAXDIM + kb*T`, and a one-term-per-field encoding cannot say it.
+    `B_VM + nb*MAXDIM + kb*T`, and a one-term-per-field encoding cannot say it.
 
     Without this a loop body would reissue identical addresses every iteration
     and simply redo the same work, which is why MiniTPU exports its induction
@@ -463,7 +462,7 @@ MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
 # hoists every argument into a local buffer before the region starts, sized to
 # the *declared* array rather than to the shape being run, and that copy was
 # 907 of the 1586 cycles at 16x16x16 and 90% of them at 4x4x4.
-SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))   # rows, each one packed word
+VMEM_ROWS = int(os.environ.get("TPU_VMEM", 512))   # rows, each one packed word
 NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
 NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
@@ -489,13 +488,14 @@ _KB = MAXDIM // T
 _MAX_STATIC = 24               # longest program shipped, plus headroom
 IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
-# Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
+# VMEM and vreg layout. Fixed offsets in a fixed memory, sized for the
 # largest supported shape rather than for the shape being run.
 KB_MAX = MAXDIM // T           # column blocks in the widest matrix
 assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
-A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)
-B_SP = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
+A_VR = 0                       # A vregs:  kb * MAXDIM + m  (vld'd from VMEM)
+B_VM = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
+A_VM = KB_MAX * MAXDIM         # A words in VMEM: kb * MAXDIM + m, after B
 AR_C = 0                       # the accumulator, up to MAXDIM words
 AR_P = MAXDIM + 1              # scratch region for vector-unit programs
 AR_RAW_DIST = 4                # see THE ACCUMULATOR DISTANCE CONTRACT
@@ -517,15 +517,14 @@ def tinytpu_isa(
     # rather than program length. (A broadcast sequencer put every unit in a
     # cycle with it; measured, the design then needed QD >= ~NPROG.)
     c_dld: Stream[UInt(64), QD]         # sequencer -> dma_ld
-    c_spm: Stream[UInt(64), QD]         # sequencer -> spm
+    c_vmu: Stream[UInt(64), QD]         # sequencer -> vmu
     c_vru: Stream[UInt(64), QD]         # sequencer -> vru
     c_acc: Stream[UInt(64), QD]         # sequencer -> accu
     c_dst: Stream[UInt(64), QD]         # sequencer -> dma_st
 
     # Data paths, all one packed word wide.
-    dma2sp: Stream[UInt(VW), QD]        # dma_ld -> scratchpad
-    dma2vr: Stream[UInt(VW), QD]        # dma_ld -> operand vregs
-    sp2vr: Stream[UInt(VW), QD]         # scratchpad -> vregs  (vld)
+    dma2vm: Stream[UInt(VW), QD]        # dma_ld -> VMEM
+    vm2vr: Stream[UInt(VW), QD]         # VMEM -> vregs  (vld)
     ac2sp: Stream[UInt(VW), QD]         # accumulator -> dma_st (clipped)
 
     # The array's streaming ports. Chains, never fan-out.
@@ -559,9 +558,9 @@ def tinytpu_isa(
         that their own flat row loops read their work count straight out of
         `nr` -- a row count that depends on the decoded opcode inside a flat
         loop closes that loop at `Final II = 2` on the counter (a carried
-        dependence), measured in both `spm` and `accu`:
+        dependence), measured in both `vmu` and `accu`:
 
-          * `spm`'s copy of an `mm` carries `nr = T + 1` (one header word and
+          * `vmu`'s copy of an `mm` carries `nr = T + 1` (one header word and
             T weight words) and the array's row count in `f1`;
           * `accu`'s copy of a `vadd` carries `nr = 2 * rows` (it takes two
             iterations per row, see `accu`). `nr` is 8 bits and a slice is
@@ -593,8 +592,8 @@ def tinytpu_isa(
 
         c_dld.put(ib[1])
         c_dld.put(ib[7])
-        c_spm.put(ib[2])
-        c_spm.put(ib[4])
+        c_vmu.put(ib[2])
+        c_vmu.put(ib[4])
         c_vru.put(ib[3])
         c_acc.put(ib[5])
         c_dst.put(ib[6])
@@ -657,18 +656,15 @@ def tinytpu_isa(
 
                 if op == OP_DMA_LD:
                     c_dld.put(rw)
-                    if f0 >= DMA_TO_VR:
-                        c_vru.put(rw)
-                    else:
-                        c_spm.put(rw)
+                    c_vmu.put(rw)
                 if op == OP_VLD:
-                    c_spm.put(rw)
+                    c_vmu.put(rw)
                     c_vru.put(rw)
                 if op == OP_MM:
                     ws: UInt(64) = rw
                     ws[54:62] = T + 1
                     ws[18:30] = nr
-                    c_spm.put(ws)
+                    c_vmu.put(ws)
                     c_vru.put(rw)
                     c_acc.put(rw)
                 if op == OP_VADD:
@@ -687,10 +683,10 @@ def tinytpu_isa(
 
     @df.kernel(mapping=[1], args=[A, B])
     def dma_ld(lA: int8[MAXDIM * MAXDIM], lB: int8[MAXDIM * MAXDIM]):
-        """DRAM -> scratchpad or operand vregs. Sole reader of A and B.
+        """DRAM -> VMEM or operand vregs. Sole reader of A and B.
 
         Split from the store unit deliberately: a single unit doing both put
-        `spm` and the DMA in a two-process cycle, which deadlocked with every
+        `vmu` and the DMA in a two-process cycle, which deadlocked with every
         body variant tried. Gemmini splits the same way (`LoadController` /
         `StoreController`).
 
@@ -704,11 +700,11 @@ def tinytpu_isa(
         goes, and each row afterwards is one BRAM read.
 
         **Where a row goes is the instruction's.** `f0` bit 0 picks the source
-        matrix, bit 1 the destination: the scratchpad (`dma2sp`), or the
+        matrix, bit 1 the destination: the VMEM (`dma2vm`), or the
         operand vregs directly (`dma2vr`). The shipped GEMM sends A straight to
-        the vregs, so activations skip the `spad -> vld -> vr` double handling
+        the vregs, so activations skip the `vmem -> vld -> vr` double handling
         (-64 cycles at 16x16x16, the `v_design` variant); B goes to the
-        scratchpad, where `spm` streams it into the array as weights.
+        VMEM, where `vmu` streams it into the array as weights.
 
         One flat loop over rows, the instruction fetched on the iteration that
         needs it (the ROW-FLATTENING note above); the burst loops sit outside
@@ -757,40 +753,37 @@ def tinytpu_isa(
                 pw = rbA[(f1 + r) * WPR + f2]
             else:
                 pw = rbB[(f1 + r) * WPR + f2]
-            if f0 >= DMA_TO_VR:
-                dma2vr.put(pw)
-            else:
-                dma2sp.put(pw)
+            dma2vm.put(pw)
 
     @df.kernel(mapping=[1])
-    def spm():
-        """The scratchpad, the only unit that owns it, and the array's WEIGHT
+    def vmu():
+        """The VMEM, the only unit that owns it, and the array's WEIGHT
         port.
 
         Pure SIMD access: an address names a whole `UInt(T*8)` row and there is
         no way to address a lane, which is what lets a single-ported memory
         feed T lanes per cycle.
 
-        **`mm` names its weights by scratchpad address** (`f3`), and this unit
+        **`mm` names its weights by VMEM address** (`f3`), and this unit
         pushes one header word and those T weight rows down `wcol[0]` itself.
         Before, a weight `vld` copied them into the vregs and `vru` pushed them
         from there -- two trips through two memories for T words, and `vru`,
         the critical unit, spending T + 1 of its cycles per `mm` on them.
-        Still ONE owner of `spad` and ONE writer of `wcol[0]`: every restructure
+        Still ONE owner of `vmem` and ONE writer of `wcol[0]`: every restructure
         here is legal under Allo's one-owner rule.
 
         It opens by handing the array its counts (how many `mm`s, how many
         wavefront rows between them) on the chain it uses for headers.
 
-        The three arms share one flat row loop with ONE `spad` read per
+        The three arms share one flat row loop with ONE `vmem` read per
         iteration at a muxed address and one write, which a dual-port BRAM
-        holds at II=1. `spm`'s copy of an `mm` carries its own work count
+        holds at II=1. `vmu`'s copy of an `mm` carries its own work count
         (`T + 1`) in `nr` and the array's row count in `f1` (see
         `sequencer`)."""
-        spad: UInt(VW)[SPAD_ROWS]
-        nw: UInt(64) = c_spm.get()
+        vmem: UInt(VW)[VMEM_ROWS]
+        nw: UInt(64) = c_vmu.get()
         n_row: int32 = nw[0:16]
-        mw: UInt(64) = c_spm.get()
+        mw: UInt(64) = c_vmu.get()
         nmo: UInt(VW) = 0
         nmo[0:32] = mw[0:32]        # mm count | wavefront rows << 16
         wcol[0].put(nmo)
@@ -802,7 +795,7 @@ def tinytpu_isa(
         for x in range(n_row):
             r += 1
             if r >= cnt:
-                w0: UInt(64) = c_spm.get()
+                w0: UInt(64) = c_vmu.get()
                 op = w0[0:6]
                 f1 = w0[18:30]
                 f3 = w0[42:54]
@@ -816,11 +809,11 @@ def tinytpu_isa(
                 if r == 0:
                     ra = f3
             if op == OP_DMA_LD:
-                spad[f3 + r] = dma2sp.get()
+                vmem[f3 + r] = dma2vm.get()
             else:
-                lw: UInt(VW) = spad[ra]
+                lw: UInt(VW) = vmem[ra]
                 if op == OP_VLD:
-                    sp2vr.put(lw)
+                    vm2vr.put(lw)
                 else:
                     ow: UInt(VW) = lw
                     if r == 0:
@@ -828,17 +821,17 @@ def tinytpu_isa(
                         hdr[0:12] = f1
                         ow = hdr
                     wcol[0].put(ow)
-            # No write-back branch: the scratchpad is input-only. Results
+            # No write-back branch: the VMEM is input-only. Results
             # leave through the accumulator, which is a separate memory.
 
     @df.kernel(mapping=[1])
     def vru():
         """Operand vector registers, and the array's ACTIVATION port.
 
-        Written by `vld` (from the scratchpad) and by a `dma_ld` addressed to
+        Written by `vld` (from the VMEM) and by a `dma_ld` addressed to
         the vregs (straight from DRAM); read by `mm`, which streams `nr`
         activation rows down `acol[0]`. Weights no longer pass through here
-        (see `spm`), so an `mm` costs this unit exactly `nr` cycles.
+        (see `vmu`), so an `mm` costs this unit exactly `nr` cycles.
 
         **This was the critical unit.** At 16x16x16 it ran 465 cycles back to
         back -- 464 words, of which 80 were the per-`mm` header and weights and
@@ -866,15 +859,8 @@ def tinytpu_isa(
                 vv: UInt(VW) = vr[f0 + r]
                 acol[0].put(vv)
             else:
-                wa: int32 = f0 + r
-                if op == OP_DMA_LD:
-                    wa = f3 + r
-                wv: UInt(VW) = 0
-                if op == OP_VLD:
-                    wv = sp2vr.get()
-                else:
-                    wv = dma2vr.get()
-                vr[wa] = wv
+                # `vld`: the only way into the vregs (increment 1).
+                vr[f0 + r] = vm2vr.get()
 
     @df.kernel(mapping=[T, T])
     def wld():
@@ -1159,27 +1145,29 @@ def gemm_program_handwritten(M, K, N, relu=False):
     p = []
     ins = lambda w, agu=0: p.append((w, agu))
 
-    # --- A: one dma_ld per column block, straight into the vregs ---
+    # --- A: one dma_ld per column block into VMEM, then vld into the vregs ---
     ins(enc(OP_LOOP, nr=Kt))
-    ins(enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=0, f3=A_VR, nr=M),
+    ins(enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_VM, nr=M),
         enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+    ins(enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
+        enc_agu((AGU_F0, 0, MAXDIM), (AGU_F1, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
-    # --- B: one per column block, into the scratchpad ---
+    # --- B: one per column block, into the VMEM ---
     ins(enc(OP_LOOP, nr=Nt))
-    ins(enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_SP, nr=K),
+    ins(enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=K),
         enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
 
     # --- the output loop: level 0 is nb, level 1 is kb ---
     ins(enc(OP_LOOP, nr=Nt))
     #   peeled first k-tile: overwrite the accumulator. Weights by
-    #   scratchpad address: B_SP + nb*MAXDIM
-    ins(enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_SP, nr=M),
+    #   VMEM address: B_VM + nb*MAXDIM
+    ins(enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_VM, nr=M),
         enc_agu((AGU_F3, 0, MAXDIM)))
     if Kt > 1:
         ins(enc(OP_LOOP, nr=Kt - 1))
-        #   f3 needs BOTH tiles: B_SP + nb*MAXDIM + (kb+1)*T
-        ins(enc(OP_MM, f0=A_VR + MAXDIM, f1=AR_C, f2=1, f3=B_SP + T, nr=M),
+        #   f3 needs BOTH tiles: B_VM + nb*MAXDIM + (kb+1)*T
+        ins(enc(OP_MM, f0=A_VR + MAXDIM, f1=AR_C, f2=1, f3=B_VM + T, nr=M),
             enc_agu((AGU_F0, 1, MAXDIM), (AGU_F3, 0, MAXDIM), (AGU_F3, 1, T)))
         ins(enc(OP_ENDLOOP))
     if relu:
@@ -1203,16 +1191,18 @@ def gemm_program_flat(M, K, N, relu=False):
     Kt, Nt = K // T, N // T
     p = []
     for kb in range(Kt):
-        p.append((enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=kb,
-                      f3=A_VR + kb * MAXDIM, nr=M), 0))
+        p.append((enc(OP_DMA_LD, f0=0, f1=0, f2=kb,
+                      f3=A_VM + kb * MAXDIM, nr=M), 0))
+        p.append((enc(OP_VLD, f0=A_VR + kb * MAXDIM, f1=A_VM + kb * MAXDIM,
+                      nr=M), 0))
     for nb in range(Nt):
         p.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
-                      f3=B_SP + nb * MAXDIM, nr=K), 0))
+                      f3=B_VM + nb * MAXDIM, nr=K), 0))
     for nb in range(Nt):
         for kb in range(Kt):
             p.append((enc(OP_MM, f0=A_VR + kb * MAXDIM, f1=AR_C,
                           f2=(1 if kb else 0),
-                          f3=B_SP + nb * MAXDIM + kb * T, nr=M), 0))
+                          f3=B_VM + nb * MAXDIM + kb * T, nr=M), 0))
         if relu:
             p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
         p.append((enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M), 0))
@@ -1226,10 +1216,11 @@ def vadd_program(M, K, N):
     Computes A@B twice into two accumulator regions, adds them, ReLUs the sum
     and retires it: `relu(2 * (A @ B))` on the first output tile."""
     return [(w, 0) for w in [
-        enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=0, f3=A_VR, nr=M),
-        enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_SP, nr=T),
-        enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_SP, nr=M),
-        enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=B_SP, nr=M),
+        enc(OP_DMA_LD, f0=0, f1=0, f2=0, f3=A_VM, nr=M),
+        enc(OP_VLD, f0=A_VR, f1=A_VM, nr=M),
+        enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=B_VM, nr=T),
+        enc(OP_MM, f0=A_VR, f1=AR_C, f2=0, f3=B_VM, nr=M),
+        enc(OP_MM, f0=A_VR, f1=AR_P, f2=0, f3=B_VM, nr=M),
         enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
         enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
         enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]]
@@ -1327,17 +1318,17 @@ def check_program(prog):
 
     What it checks, per dynamic issue:
 
-      * **write-before-read** on `spad`, `vr` and `ar` -- the contract at the
+      * **write-before-read** on `vmem`, `vr` and `ar` -- the contract at the
         opcode table. Written-ness is tracked per row and propagated through
         `vld` (a copy of an unwritten row is unwritten); it is an error only
-        where a value is *consumed*: `mm` reading `vr` and `spad`, and
+        where a value is *consumed*: `mm` reading `vr` and `vmem`, and
         `mm`-acc / `vadd` / `vrelu` / `mvout` reading `ar`.
       * **the accumulator distance contract**: every `ar` read comes at least
         `AR_RAW_DIST` `accu` iterations after the write it depends on, which
         is what makes `schedule()`'s dependence claim on `ar` true.
       * **bounds** on every memory and on `C`/`A`/`B`: an out-of-range row is
         silent corruption in RTL, not an exception.
-      * **`nr >= 1`** on every data op. `dma_ld`, `spm`, `vru` and `dma_st` run
+      * **`nr >= 1`** on every data op. `dma_ld`, `vmu`, `vru` and `dma_st` run
         one flat loop over the SUM of their rows and fetch an instruction
         whenever the row counter runs out, so a zero-row instruction is
         fetched as if it had one row -- it desynchronises the unit, it is not
@@ -1348,7 +1339,7 @@ def check_program(prog):
         have accepted; this is the only place that can see it.
       * structure: balanced loops, depth <= LOOP_DEPTH, trip >= 1 (the
         sequencer is a do-while), AGU terms naming a loop that is open, no
-        retired opcode, `mm` f2 in {0, 1}, `dma_ld` f0 in {0, 1, 2, 3}.
+        retired opcode, `mm` f2 in {0, 1}, `dma_ld` f0 in {0, 1}.
 
     Raises `ProgramError` naming the static instruction, the loop iteration,
     and the rows; returns None."""
@@ -1384,11 +1375,11 @@ def check_program(prog):
     if depth:
         raise ProgramError(f"{depth} loop(s) never closed")
 
-    written = {"spad": [False] * SPAD_ROWS, "vr": [False] * NVR,
+    written = {"vmem": [False] * VMEM_ROWS, "vr": [False] * NVR,
                "ar": [False] * NAR}
     ar_wrote = [-AR_RAW_DIST] * NAR   # accu iteration of each row's last write
     it = 0                            # accu iterations issued so far
-    size = {"spad": SPAD_ROWS, "vr": NVR, "ar": NAR}
+    size = {"vmem": VMEM_ROWS, "vr": NVR, "ar": NAR}
 
     for pc, ivs, op, nr, f0, f1, f2, f3 in _trace(prog):
         where = (f"instruction {pc} ({_OPNAME[op]}"
@@ -1433,22 +1424,22 @@ def check_program(prog):
             ar_wrote[row] = at
 
         if op == OP_DMA_LD:
-            if f0 not in (0, 1, 2, 3):
-                raise ProgramError(f"{where}: f0={f0}, must be source (0 A, 1 B) "
-                                   f"| destination (0 spad, 2 vr)")
+            if f0 not in (0, 1):
+                raise ProgramError(f"{where}: f0={f0}, must be the source "
+                                   f"(0 A, 1 B); DMA only writes VMEM")
             if f2 >= WPR or f1 + nr > MAXDIM:
                 raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
                                    f"col block {f2} outside the {MAXDIM}x{MAXDIM} operand")
-            for r in span("vr" if f0 & DMA_TO_VR else "spad", f3, nr):
-                written["vr" if f0 & DMA_TO_VR else "spad"][r] = True
+            for r in span("vmem", f3, nr):
+                written["vmem"][r] = True
         elif op == OP_VLD:
-            src = span("spad", f1, nr)
+            src = span("vmem", f1, nr)
             for d, s in zip(span("vr", f0, nr), src):
-                written["vr"][d] = written["spad"][s]
+                written["vr"][d] = written["vmem"][s]
         elif op == OP_MM:
             if f2 not in (0, 1):
                 raise ProgramError(f"{where}: f2={f2}, must be 0 (overwrite) or 1 (accumulate)")
-            need("spad", span("spad", f3, T), "weights")
+            need("vmem", span("vmem", f3, T), "weights")
             need("vr", span("vr", f0, nr), "activations")
             dst = span("ar", f1, nr)
             for i, r in enumerate(dst):      # row by row, as `accu` runs it
@@ -1483,7 +1474,7 @@ def assemble(prog, check=True):
 
         imem[0] static instruction count   imem[4] mm count | mm rows << 16
         imem[1] dma_ld  rows               imem[5] accu   iterations
-        imem[2] spm     rows               imem[6] dma_st rows
+        imem[2] vmu     rows               imem[6] dma_st rows
         imem[3] vru     rows               imem[7] A rows | B rows << 16
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
@@ -1494,10 +1485,10 @@ def assemble(prog, check=True):
     what it is promised has to be the sum of `nr` over the instructions it is
     sent, with the two per-unit adjustments the flattened bodies make:
 
-      * `spm` charges an `mm` `T + 1` iterations -- the header and the T
+      * `vmu` charges an `mm` `T + 1` iterations -- the header and the T
         weight rows it pushes down `wcol` -- whatever the `mm`'s own `nr`;
       * `accu` charges a `vadd` two iterations per row;
-      * a `dma_ld` goes to `spm` or to `vru` by its destination bit, never
+      * a `dma_ld` goes to `vmu` or to `vru` by its destination bit, never
         both.
 
     A unit promised the wrong number here does not produce a wrong answer, it
@@ -1531,12 +1522,11 @@ def assemble(prog, check=True):
     n_mm = count(OP_MM)
     mm_rows = rows(OP_MM)
     assert n_mm < (1 << 15) and mm_rows < (1 << 15), "array counts overflow"
-    ld_vr = sum(e[1] for e in ev if e[0] == OP_DMA_LD and e[2] & DMA_TO_VR)
-    ld_sp = rows(OP_DMA_LD) - ld_vr
+    ld_sp = rows(OP_DMA_LD)
     hdr = [len(prog),
            rows(OP_DMA_LD),
            ld_sp + rows(OP_VLD) + n_mm * (T + 1),
-           ld_vr + rows(OP_VLD) + mm_rows,
+           rows(OP_VLD) + mm_rows,
            n_mm | (mm_rows << 16),
            rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
            rows(OP_MVOUT),

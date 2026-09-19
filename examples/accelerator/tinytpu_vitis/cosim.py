@@ -36,7 +36,7 @@ TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
     simulator ignores the dependence pragma) -- each with `C` prefilled with random
     bytes and the WHOLE of `C` compared against `isa_ref`/numpy, so the
     region must be exact and everything outside it untouched. The calls share
-    one RTL instance, so each sees the `spad`/`vr`/`ar` the previous left.
+    one RTL instance, so each sees the `vmem`/`vr`/`ar` the previous left.
     Its cycle column is the minimum over those calls; it is not the headline.
     Each per-case line appears twice: cosim runs the testbench once in C, then
     again against the RTL; the summary line is the RTL's.

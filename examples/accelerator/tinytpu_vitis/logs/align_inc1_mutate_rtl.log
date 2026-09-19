@@ -1,0 +1,8 @@
+
+  mutant          bench_isa      stress_isa     cosim          caught first by
+  ar_claim_false  pass           pass           CAUGHT         cosim
+
+  ar_claim_false  FALSE DEPENDENCE CLAIM: the contract admits an ar read one accu iteration after its write, so the `inter false` pragma on ar is untrue for programs the assembler accepts
+
+  logs: /home/sk3463/allo-align/examples/accelerator/tinytpu_vitis/.mutants/<mutant>/<level>.log
+  MUTATE OK: all 1 mutants run were caught
