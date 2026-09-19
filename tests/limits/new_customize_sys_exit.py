@@ -1,6 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""NEW (not in ALLO_SHORTCOMINGS.md): any frontend error inside
+"""Register item C (docs/source/developer/limitations.rst): any frontend error inside
 `allo.customize` (type inference or IR building) prints a traceback and calls
 `sys.exit(1)`. A library that exits the interpreter cannot be handled by
 `except Exception`: a sweep, a notebook, or a test harness that expects to

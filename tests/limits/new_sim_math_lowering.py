@@ -1,6 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""NEW (not in ALLO_SHORTCOMINGS.md): the dataflow simulator cannot lower the
+"""Register item A (docs/source/developer/limitations.rst): the dataflow simulator cannot lower the
 `math` dialect, so `allo.exp` / `allo.log` (the documented workaround for
 item 4) fail on `target="simulator"` with
 `cannot be converted to LLVM IR: ... for op: math.exp`.

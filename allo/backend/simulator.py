@@ -93,7 +93,7 @@ def _build_spin_wait_loop(module: Module, replace_ip: InsertionPoint) -> Inserti
     the stall path exists in one place.  That matters because this is where a
     per-channel deadlock report would hook in -- recording which PE is blocked
     on which stream and at what occupancy, instead of the silent hang described
-    in notes/ALLO_SHORTCOMINGS.md #11.  Doing so needs a runtime shared library
+    in docs/source/developer/limitations.rst (item 11).  Doing so needs a runtime shared library
     to call into; the host-side timeout in `LLVMOMPModule.__call__` is the
     cheap first tier.
     """
@@ -1393,7 +1393,7 @@ def _inject_omp_parallel_sections(pe_call_define_ops):
     (the OpenMP default is the core count) never starts the sections that
     would unblock it: a dataflow graph of more PEs than cores hung forever,
     silently, with no indication of which process was blocked on which
-    channel. See notes/ALLO_SHORTCOMINGS.md #11.
+    channel. See docs/source/developer/limitations.rst (item 11).
     """
     assert len(pe_call_define_ops) > 0
     omp_ip = InsertionPoint(beforeOperation=list(pe_call_define_ops.keys())[0])
@@ -1746,7 +1746,7 @@ it is stuck, the cause is one of:
   * a stream nobody ever puts to, got from by a PE that therefore never
     returns.
 The OpenMP team is sized to the instance count ({total_pes}), so this is not
-the team-too-small deadlock of notes/ALLO_SHORTCOMINGS.md #11.
+the team-too-small deadlock of docs/source/developer/limitations.rst (item 11).
 
 A native backtrace names the kernel function each thread is spinning in,
 which is the closest thing to a per-channel answer available today. It

@@ -1,6 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""NEW (not in ALLO_SHORTCOMINGS.md): a scalar `Stream.get()` result is never
+"""Register item B (docs/source/developer/limitations.rst): a scalar `Stream.get()` result is never
 implicitly cast to the destination type. `x: int8 = s.get()` or
 `b[i] = s.get()` with an int32 stream and an int8 destination fails IR
 verification (`'affine.store' op value to store must have the same type as

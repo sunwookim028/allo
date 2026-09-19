@@ -320,7 +320,7 @@ class CosimHarness:
       - Testbench must call kernel function directly (not via OpenCL)
       - Currently supports designs with flat array arguments only
 
-    See also: DATAFLOW_SEMANTICS.md for execution model discussion.
+    See also: docs/source/developer/dataflow_semantics.rst for execution model discussion.
     """
 
     _COSIM_TCL_TEMPLATE = """\

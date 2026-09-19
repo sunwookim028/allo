@@ -425,7 +425,7 @@ assert T >= 4, "a packed operand word must be at least 32 bits"
 # the array is T*T kernel instances and the chains are T and T*T stream
 # arrays, so T=16 is 262 instances and ~800 streams. That was unrunnable
 # until the simulator's OpenMP team was sized to the section count
-# (notes/ALLO_SHORTCOMINGS.md #11); before that fix it hung with no output.
+# (docs/source/developer/limitations.rst, item 11); before that fix it hung with no output.
 VW = T * 8                     # packed operand word: T int8 lanes
 AW = T * 32                    # packed accumulator word: T int32 lanes
 
@@ -1029,7 +1029,7 @@ def tinytpu_isa(
             16x16x16), and `ar` scales with T so the area grows with the array
             while the 2.3% does not. `#pragma HLS dependence variable=ar inter
             false` buys the same II for no area and Allo emits no such pragma;
-            that gap is what this priced. Full numbers in `RESULTS_ISA.md`.
+            that gap is what this priced. Full numbers in docs/source/designs/tinytpu_history.rst.
 
         So the nested loop is not the only thing that closes, but it is the one
         that is worth the area, and it keeps `mm` at II=1 where the GEMM

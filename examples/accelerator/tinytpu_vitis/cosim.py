@@ -15,7 +15,7 @@ once and the RTL under test is identical for every shape.
 
 Why cosim rather than the synthesis report: the loop bounds are now runtime
 data (that is what makes the design workload-independent), so csynth can only
-report a worst-case bound. See `RESULTS_ISA.md`.
+report a worst-case bound. See docs/source/designs/tinytpu_isa.rst.
 
 TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
 
