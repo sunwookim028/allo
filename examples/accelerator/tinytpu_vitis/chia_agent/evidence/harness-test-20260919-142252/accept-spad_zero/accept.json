@@ -1,0 +1,66 @@
+{
+ "ref": "8906de004c2ba75615d824374f6ceeb7a197ab66",
+ "diff": "/home/sk3463/allo-chia-isa/chia_runs/harness-test-20260919-142252/spad_zero.diff",
+ "ok": true,
+ "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset",
+ "policy": [],
+ "checkout_status": [
+  "M examples/accelerator/tinytpu_vitis/microarch_isa.py"
+ ],
+ "allo_resolves_to": "/home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789828789/allo/__init__.py",
+ "sandbox": true,
+ "bench_isa": {
+  "rc": 0,
+  "last": [
+   "ALL EXACT"
+  ],
+  "seconds": 5.1
+ },
+ "stress": {
+  "rc": 0,
+  "last": [
+   "STRESS OK: 60/60 runs exact (full-range operands, sentinel-filled C, 10 shapes)"
+  ],
+  "seconds": 5.0
+ },
+ "cosim": {
+  "4x4x4": {
+   "cycles": 661,
+   "tb": "TB 4x4x4 mismatches = 0 / 16"
+  },
+  "8x8x8": {
+   "cycles": 776,
+   "tb": "TB 8x8x8 mismatches = 0 / 64"
+  },
+  "12x12x12": {
+   "cycles": 968,
+   "tb": "TB 12x12x12 mismatches = 0 / 144"
+  },
+  "16x16x8": {
+   "cycles": 1028,
+   "tb": "TB 16x16x8 mismatches = 0 / 128"
+  },
+  "16x16x16": {
+   "cycles": 1280,
+   "tb": "TB 16x16x16 mismatches = 0 / 256"
+  }
+ },
+ "cosim_seconds": 266.0,
+ "estimated_ns": 2.431,
+ "baseline": {
+  "4x4x4": 252,
+  "8x8x8": 383,
+  "12x12x12": 591,
+  "16x16x8": 667,
+  "16x16x16": 919
+ },
+ "delta": {
+  "4x4x4": 409,
+  "8x8x8": 393,
+  "12x12x12": 377,
+  "16x16x8": 361,
+  "16x16x16": 361
+ },
+ "delta_total": 1901,
+ "claim": "not-better"
+}

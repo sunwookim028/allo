@@ -1,0 +1,69 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16, imem 56; sweeping 5 shape(s)
+  generated == hand-written word-for-word at all 5 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 5 shapes
+Traceback (most recent call last):
+  File "/home/sk3463/allo-chia-isa/allo/customize.py", line 1370, in customize
+    tree = TypeInferer()(ctx_type_inf, tree)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 285, in __call__
+    res = method(ctx, node)
+          ^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 992, in visit_Module
+    visit_stmt(ctx, stmt)
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 285, in __call__
+    res = method(ctx, node)
+          ^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 918, in visit_FunctionDef
+    visit_stmts(ctx, node.body)
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 1646, in visit_stmts
+    results.append(visit_stmt(ctx, stmt))
+                   ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 285, in __call__
+    res = method(ctx, node)
+          ^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 918, in visit_FunctionDef
+    visit_stmts(ctx, node.body)
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 1646, in visit_stmts
+    results.append(visit_stmt(ctx, stmt))
+                   ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 285, in __call__
+    res = method(ctx, node)
+          ^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/infer.py", line 1515, in visit_With
+    symbolic_cond, loops_to_unroll = get_symbolic_expr(
+                                     ^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 472, in get_symbolic_expr
+    new_tree = node_transformer.visit(expr_node)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/miniconda3/envs/allo/lib/python3.12/ast.py", line 407, in visit
+    return visitor(node)
+           ^^^^^^^^^^^^^
+  File "/home/sk3463/miniconda3/envs/allo/lib/python3.12/ast.py", line 492, in generic_visit
+    new_node = self.visit(old_value)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/miniconda3/envs/allo/lib/python3.12/ast.py", line 407, in visit
+    return visitor(node)
+           ^^^^^^^^^^^^^
+  File "/home/sk3463/allo-chia-isa/allo/ir/visitor.py", line 458, in visit_Name
+    raise ValueError("Fail to resolve the expression as symbolic expression.")
+ValueError: Fail to resolve the expression as symbolic expression.
+
+Error: Fail to resolve the expression as symbolic expression.
+╭──────────────── Traceback (most recent call last): Line: 869 ────────────────╮
+│  864:                 if r <= T:                                             │
+│  865:                     wcol[0].put(vv)                                    │
+│  866:                 else:                                                  │
+│  867:                     acol[0].put(vv)                                    │
+│  868:                                                                        │
+│  869:     def pe_stub_ignored():                                             │
+│  870:         """One processing element. Weight-stationary, and it decodes   │
+│ nothing.                                                                     │
+│  871:                                                                        │
+│  872:         Its loop counts **`mm` instructions**, not program             │
+│ instructions: the                                                            │
+│  873:         sequencer sends `mm` only to the units that execute it, so the │
+│ array                                                                        │
+╰──────────────────────────────── Source Code ─────────────────────────────────╯
+
+{"frozen_ref": "68dfbc53a91531dbd4257b3d4f4e4e1f981dd700", "invariants": {"IMEM_SIZE": 56, "MAXDIM": 16, "T": 4}, "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape", "ok": false, "seconds": 2.4, "shapes": ["4x4x4", "16x16x16"], "stage": "gate:bench_isa"}
+rc=1

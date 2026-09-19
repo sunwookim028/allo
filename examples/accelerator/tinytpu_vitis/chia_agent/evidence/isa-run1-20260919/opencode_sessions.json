@@ -1,0 +1,96 @@
+{
+ "source": "~/.local/share/opencode/opencode.db, session table",
+ "total_usd": 28.5384,
+ "sessions": [
+  {
+   "session": "ses_f4551e185ffeVSvzFSmp7zxr2a",
+   "time_created_ms": 1789838368379,
+   "cost_usd": 5.171030200000001,
+   "model": {
+    "id": "gemini-3.1-pro-preview",
+    "providerID": "google-vertex",
+    "variant": "default"
+   },
+   "tokens": {
+    "input": 1666978,
+    "output": 48460,
+    "reasoning": 29724,
+    "cache_read": 4494331
+   },
+   "worker": "tpufrontend",
+   "tool_calls": 49
+  },
+  {
+   "session": "ses_f4550ebccffeEmKNDRHahsjVps",
+   "time_created_ms": 1789838431283,
+   "cost_usd": 4.356430200000001,
+   "model": {
+    "id": "gemini-3.1-pro-preview",
+    "providerID": "google-vertex",
+    "variant": "default"
+   },
+   "tokens": {
+    "input": 1177868,
+    "output": 15487,
+    "reasoning": 41700,
+    "cache_read": 6572251
+   },
+   "worker": "tputail",
+   "tool_calls": 87
+  },
+  {
+   "session": "ses_f45301b4affey0xxSZ1tpBzneB",
+   "time_created_ms": 1789840581814,
+   "cost_usd": 8.778789999999999,
+   "model": {
+    "id": "gemini-3.1-pro-preview",
+    "providerID": "google-vertex",
+    "variant": "default"
+   },
+   "tokens": {
+    "input": 1957193,
+    "output": 73213,
+    "reasoning": 104210,
+    "cache_read": 13676640
+   },
+   "worker": "tpufrontend",
+   "tool_calls": 86
+  },
+  {
+   "session": "ses_f452c4116ffeSg7udGFkpb15F6",
+   "time_created_ms": 1789840834282,
+   "cost_usd": 1.1997626,
+   "model": {
+    "id": "gemini-3.1-pro-preview",
+    "providerID": "google-vertex",
+    "variant": "default"
+   },
+   "tokens": {
+    "input": 356919,
+    "output": 9458,
+    "reasoning": 12124,
+    "cache_read": 1134703
+   },
+   "worker": "tputail",
+   "tool_calls": 33
+  },
+  {
+   "session": "ses_f4520900affedXffSBUz6IMLwh",
+   "time_created_ms": 1789841600501,
+   "cost_usd": 9.0323404,
+   "model": {
+    "id": "gemini-3.1-pro-preview",
+    "providerID": "google-vertex",
+    "variant": "default"
+   },
+   "tokens": {
+    "input": 2082195,
+    "output": 27737,
+    "reasoning": 94581,
+    "cache_read": 17000672
+   },
+   "worker": "tputail",
+   "tool_calls": 111
+  }
+ ]
+}
