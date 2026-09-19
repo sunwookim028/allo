@@ -1,0 +1,59 @@
+{
+ "workers": {
+  "operand-path": [
+   {
+    "iteration": 1,
+    "accepted": false,
+    "ok": null,
+    "stage": null,
+    "cycles": null,
+    "total": null,
+    "llm_usd": 0
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 1280,
+     "4x4x4": 661
+    },
+    "total": 1941,
+    "llm_usd": 0
+   },
+   {
+    "iteration": 3,
+    "accepted": false,
+    "ok": false,
+    "stage": "gate:stress",
+    "cycles": null,
+    "total": null,
+    "llm_usd": 0
+   },
+   {
+    "iteration": 4,
+    "accepted": false,
+    "ok": null,
+    "stage": null,
+    "cycles": null,
+    "total": null,
+    "llm_usd": 0
+   }
+  ]
+ },
+ "baseline": {
+  "16x16x16": 919,
+  "4x4x4": 252
+ },
+ "best": null,
+ "spend": {
+  "usd": 0.0,
+  "messages": 15,
+  "input": 15,
+  "output": 15,
+  "cache_read": 0
+ },
+ "wall_seconds": 570.7,
+ "hard_cap_hit": false
+}

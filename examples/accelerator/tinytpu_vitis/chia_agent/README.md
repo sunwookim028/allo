@@ -328,13 +328,16 @@ client and its timeout, `OpenCodeLLM`, keep-or-rewind, `variants.jsonl`,
 | --- | --- | --- |
 | a no-op (re-save) | exactly 252 / 919 | 252 / 919, over MCP and via opencode's `score_cycles` mid-turn |
 | b `spad ... = 0` back (part of b4be2b10 reverted) | bit-exact, worse | 661 / 1280 (+409 / +361), loop rejects it as not better |
-| c PE partial sum int16 | bench passes, stress rejects | `gate:stress`, 40/60 runs exact |
+| c PE partial sum int16 | bench passes, stress_isa rejects | `gate:stress`, 247/486 runs exact (was 40/60 under the old `stress.py`) |
 | d mvout's `c_dst.put` dropped | 240 s timeout, nothing left running | `gate:bench_isa` TIMEOUT at 242 s, no process under the work dir, `read_spec` 0.12 s meanwhile |
-| e frozen-file / import-time attacks (17) | all refused | all refused; the numpy writers only after the fix |
+| e frozen-file / import-time attacks (22), forged verdicts | all refused | all refused. A narrowed datapath that prints `STRESS OK`/`ALL EXACT` and exits 0 at import forges the stdout of `stress_isa.py` (rc 0) but gets no `CHIA-GATE` line from the runner; a numpy RNG patch through a method's `self` passes the static policy and is refused by the runner |
 | f concurrent evaluations | responsive, no cross-talk | two cosims at once, `read_spec` worst 0.07 s; same-tool calls serialise |
 | accept on b | correct, not a win | ok, `claim: not-better`: 661 / 776 / 968 / 1028 / 1280, +409 / +393 / +377 / +361 / +361 over the five shapes, clock 2.431 ns |
 
 Full run: 43/43 cases in 22.3 min, $0.00, `chia_runs/harness-test-20260919-142252/`.
+After the rebase onto main @ `e620576d` (stress_isa gate, gate_runner, pre-flight):
+49/49 cases in 22.8 min, $0.00, `chia_runs/harness-test-20260919-152522/`; the
+loop phase took the pre-flight's test-model path (no cloud checks, $5 run cap).
 
 What it cannot show is how a real model behaves: whether Gemini calls the tools
 sensibly, how long its turns are, and what they cost. The opencode -> MCP ->
