@@ -23,7 +23,7 @@ from pathlib import Path
 import ray
 from chia.base.tools.ChiaTool import ChiaTool
 
-from spec_policy import policy_violations
+from spec_policy import doc_violations, policy_violations
 
 #: CHIA binds each tool server to `ray.util.get_node_ip_address()`, which on a
 #: Ray worker is the host's routable address -- an unauthenticated server
@@ -48,6 +48,7 @@ REFERENCE = {
     "stress_isa.py": "examples/accelerator/tinytpu_vitis/stress_isa.py",
     "isa_ref.py": "examples/accelerator/tinytpu_vitis/isa_ref.py",
     "evaluate.py": "examples/accelerator/tinytpu_vitis/chia_agent/evaluate.py",
+    "param_check.py": "examples/accelerator/tinytpu_vitis/chia_agent/param_check.py",
     "tinytpu_isa.rst": "docs/source/designs/tinytpu_isa.rst",
     "tinytpu_history.rst": "docs/source/designs/tinytpu_history.rst",
     "gemmini_comparison.rst": "docs/source/designs/gemmini_comparison.rst",
@@ -161,7 +162,11 @@ class AlloSpecTool(ChiaTool):
         except SyntaxError as error:
             return (f"Rejected: the edit leaves {name} unparseable -- {error.msg} "
                     f"at line {error.lineno}. The file is unchanged.")
-        problems = policy_violations(name, source)
+        base = subprocess.run(
+            ["git", "show", f"HEAD:examples/accelerator/tinytpu_vitis/{name}"],
+            cwd=self.repo, capture_output=True, text=True).stdout
+        problems = policy_violations(name, source) + (
+            doc_violations(name, base, source) if base else [])
         if problems:
             return ("Rejected: the edit is outside what a spec may contain -- "
                     + "; ".join(problems)
@@ -184,7 +189,8 @@ class AlloSpecTool(ChiaTool):
         (the correctness gate: 492 runs at 476a70d8, full-range operands, 64 shapes, whole
         C compared, vector and random programs), isa_ref.py (what each
         instruction means -- the reference stress_isa checks against),
-        evaluate.py (how the score is computed), tinytpu_isa.rst (the design,
+        evaluate.py (how the score is computed), param_check.py (the
+        parametricity gate: the design rebuilt at MAXDIM 8 and 12 must be exact), tinytpu_isa.rst (the design,
         its ISA, and how to verify a change), tinytpu_history.rst (what was
         tried, measured, and reverted), gemmini_comparison.rst (the Gemmini
         comparison and where the gap comes from), limitations.rst (Allo

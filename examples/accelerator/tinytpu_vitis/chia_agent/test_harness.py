@@ -25,12 +25,17 @@ Cases, each with an expected verdict:
                                                static policy cannot see
   f  concurrent evaluations                    server answers in seconds, no
                                                cross-contamination
+  g  parametricity / documentation guards     literal T/MAXDIM and a deleted
+                                               docstring refused by the edit
+                                               tools and the evaluator; a unit
+                                               specialised to MAXDIM=16 REJECTED
+                                               at gate:param
   accept  accept.py on (b)                     bit-exact at all five shapes, and
                                                reported as NOT a win
 
     conda activate chia_env
     python test_harness.py                       # everything, ~35 min
-    python test_harness.py --phases e,c          # cheap subset, ~2 min
+    python test_harness.py --phases e,c,g        # cheap subset, ~3 min
     python test_harness.py --phases e,c,d,abf,loop,accept
 
 Writes `<run-dir>/results.json` and exits non-zero if any case failed.
@@ -39,6 +44,7 @@ Writes `<run-dir>/results.json` and exits non-zero if any case failed.
 from __future__ import annotations
 
 import argparse
+import ast
 import asyncio
 import difflib
 import json
@@ -90,6 +96,11 @@ MUTANTS = {
     # c: [-4, 4] operands never overflow 16 bits at K <= 16; full-range ones do.
     "narrow16": ("microarch_isa.py", "o: int32 = p + av * wv",
                  "o: int16 = p + av * wv"),
+    # g: specialised to the scored MAXDIM: identical at MAXDIM=16, wrong at 8/12.
+    # Passes the static policy (T/MAXDIM themselves stay parameters).
+    "wpr_literal": ("microarch_isa.py",
+                    "WPR = MAXDIM // T              # packed words per DRAM row\n",
+                    "WPR = 4                        # packed words per DRAM row\n"),
     # d: mvout never reaches dma_st, so accu blocks on a full ac2sp.
     "deadlock": ("microarch_isa.py",
                  "                    c_acc.put(rw)\n                    c_dst.put(rw)\n",
@@ -472,6 +483,68 @@ class Suite:
               and v.get("stage") == "gate:stress")
         self.reset("tpta")
 
+    # g ------------------------------------------------------------------
+    async def phase_g(self):
+        """The two holes the first paid run exposed (its accepted diff
+        hard-coded T and deleted the 260-line design docstring)."""
+        print("== g: parametricity and documentation guards", flush=True)
+        A, spec = self.A, self.specs["tpta"]
+        micro = head("microarch_isa.py")
+        t_def = 'T = int(os.environ.get("TPU_T", 4))'
+        md_def = 'MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))'
+        doc = ast.get_docstring(ast.parse(micro), clean=False)
+        edits = {
+            "literal T": {"path": "microarch_isa.py", "old": t_def, "new": "T = 4"},
+            "literal MAXDIM": {"path": "microarch_isa.py", "old": md_def,
+                               "new": "MAXDIM = 16"},
+            "second MAXDIM definition": {"path": "microarch_isa.py", "old": t_def,
+                                         "new": t_def + "\nMAXDIM = 16"},
+            "module docstring deleted": {"path": "microarch_isa.py", "old": doc,
+                                         "new": "TinyTPU-isa"},
+        }
+        for label, args in edits.items():
+            self.reset("tpta")
+            before = self.spec("tpta")
+            reply = await A.call("replace_text", timeout=60, **args)
+            check(f"g.edit: {label}", "Rejected, spec unchanged",
+                  f"{reply.splitlines()[0][:120]!r}, unchanged={self.spec('tpta') == before}",
+                  reply.startswith("Rejected") and self.spec("tpta") == before)
+        # The first paid run's candidate shape, written straight to disk.
+        self.reset("tpta")
+        (spec / "microarch_isa.py").write_text(
+            micro.replace(doc, "TinyTPU-isa", 1).replace(t_def, "T = 4", 1))
+        v = await A.verdict("run_functional_check")
+        det = v.get("detail", "")
+        check("g.on-disk literal T + deleted docstring -> evaluator",
+              "ok=false at stage policy, naming both",
+              f"ok={v.get('ok')} stage={v.get('stage')}",
+              not v.get("ok") and v.get("stage") == "policy"
+              and "'T' must be defined" in det and "comments/docstrings" in det)
+        # A documentation EDIT (same length, reworded) is allowed.
+        self.reset("tpta")
+        r = await A.call("replace_text", timeout=60, path="microarch_isa.py",
+                         old="the machine both were aiming at",
+                         new="the machine both of them were aiming at")
+        check("g.edit: docstring reworded", "Replaced (edits are fine)", r[:60],
+              r.startswith("Replaced"))
+        # Past the static policy: a unit specialised to MAXDIM=16.
+        self.reset("tpta")
+        f, old, new = MUTANTS["wpr_literal"]
+        r = await A.call("replace_text", timeout=60, path=f, old=old, new=new)
+        v = await A.verdict("run_functional_check")
+        check("g.wpr_literal", "edit accepted; bench+stress pass at 16; REJECTED at "
+              "gate:param", f"{r[:40]!r}; ok={v.get('ok')} stage={v.get('stage')} "
+              f"{(v.get('detail') or '')[:80]!r}",
+              r.startswith("Replaced") and not v.get("ok")
+              and v.get("stage") == "gate:param")
+        # The unmodified design passes it, at both configurations.
+        self.reset("tpta")
+        v = await A.verdict("run_functional_check")
+        param = (v.get("gate") or {}).get("param", {})
+        check("g.unmodified passes gate:param", "ok, PARAM OK at MAXDIM 8 and 12",
+              param, v.get("ok") and len(param) == 2)
+        self.reset("tpta")
+
     # d ------------------------------------------------------------------
     async def phase_d(self):
         print("== d: deadlock (one stream put dropped)", flush=True)
@@ -673,7 +746,7 @@ class Suite:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phases", default="e,c,d,abf,loop,accept")
+    ap.add_argument("--phases", default="e,c,g,d,abf,loop,accept")
     ap.add_argument("--run-dir", type=Path, default=REPO / "chia_runs"
                     / f"harness-test-{time.strftime('%Y%m%d-%H%M%S')}")
     a = ap.parse_args()
@@ -684,7 +757,7 @@ def main() -> int:
     suite = Suite(run_dir)
     try:
         for ph in phases:
-            if ph in ("e", "c", "d", "abf"):
+            if ph in ("e", "c", "d", "abf", "g"):
                 asyncio.run(getattr(suite, f"phase_{ph}")())
             elif ph in ("loop", "accept"):
                 getattr(suite, f"phase_{ph}")()

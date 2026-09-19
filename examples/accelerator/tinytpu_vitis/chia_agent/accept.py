@@ -164,7 +164,11 @@ def main():
             ["git", "show", f"{ref}:{PKG}/chia_agent/spec_policy.py"], cwd=REPO,
             capture_output=True, check=True).stdout, "spec_policy.py", "exec"), policy)
         problems = [p for f in ("microarch_isa.py", "isa_dsl.py") for p in
-                    policy["policy_violations"](f, (wt / PKG / f).read_text())]
+                    policy["policy_violations"](f, (wt / PKG / f).read_text())
+                    + policy["doc_violations"](f, subprocess.run(
+                        ["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
+                        capture_output=True, text=True, check=True).stdout,
+                        (wt / PKG / f).read_text())]
         result["policy"] = problems
         if problems:
             raise SystemExit(f"refusing: spec policy: {problems}")
@@ -215,6 +219,21 @@ def main():
         result["stress_isa"] = {"rc": rc2, "vouched": ok2, "seconds": sec2,
                                 "line": [l.strip() for l in o2.splitlines()
                                          if "STRESS OK" in l or "STRESS FAILED" in l][-1:]}
+        # Parametricity, as in the search's gate: rebuilt at other MAXDIMs,
+        # exact (param_check.py, frozen at --ref).
+        result["param"], param_ok = {}, True
+        for cfg in ({"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"}):
+            tag = ",".join(f"{k}={v}" for k, v in cfg.items())
+            okp, rcp, op, secp = vouched("param_check", wt, wt, dict(env, **cfg),
+                                         out / f"param_check_{tag}.log", cos,
+                                         timeout=GATE_TIMEOUT)
+            untouched(f"param_check {tag}")
+            mp = re.search(r"^  PARAM OK: (\d+)/(\d+) runs exact", op, re.M)
+            good = okp and mp is not None and mp.group(1) == mp.group(2)
+            param_ok &= good
+            result["param"][tag] = {"ok": good, "seconds": secp,
+                                    "line": [l.strip() for l in op.splitlines()
+                                             if "PARAM " in l][-1:]}
         # cosim.py puts its project next to itself by default; keep it in the
         # writable .cosim directory instead.
         ok3, rc3, o3, sec3 = vouched("cosim", wt, cos,
@@ -261,7 +280,7 @@ def main():
                     f"{int(s.split('x')[0]) * int(s.split('x')[2])}"
                     and v["cycles"] is not None for s, v in result["cosim"].items())
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
-                        and ok2 and ok3 and len(result["cosim"]) == 5
+                        and ok2 and ok3 and param_ok and len(result["cosim"]) == 5
                         and exact and result.get("estimated_ns", 99) <= 3.33
                         and rtl_ok)
         if a.baseline:

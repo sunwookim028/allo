@@ -37,7 +37,7 @@ unforgeable:
 Only then is `CHIA-GATE <check> OK <nonce>` printed; the evaluator requires
 that exact line. The check's own output passes through unchanged, for the log.
 
-    printf '%s\\n' NONCE | python gate_runner.py {bench_isa|stress_isa|cosim} [args...]
+    printf '%s\\n' NONCE | python gate_runner.py {bench_isa|stress_isa|cosim|param_check} [args...]
 """
 
 import importlib
@@ -53,6 +53,7 @@ CHECKS = {
     "bench_isa": os.path.join(DESIGN, "bench_isa.py"),
     "stress_isa": os.path.join(DESIGN, "stress_isa.py"),
     "cosim": os.path.join(DESIGN, "cosim.py"),
+    "param_check": os.path.join(HERE, "param_check.py"),
 }
 #: Module-name prefixes whose attributes the checks compute with.
 WATCHED = ("numpy", "allo", "builtins")

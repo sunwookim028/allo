@@ -31,6 +31,12 @@ The two tiers:
    `CHIA-GATE <check> OK <nonce>` line -- a fresh nonce per run, handed over on
    stdin before the candidate is imported -- never the check's own printed
    `ALL EXACT` / `STRESS OK`, which the candidate's code could print itself.
+   Then the parametricity gate: `param_check.py` rebuilds the candidate at
+   TPU_MAXDIM=8 and 12 and requires it to honour the parameter and be exact at
+   every GEMM shape of that configuration (and on random programs), so a win
+   that only exists at the scored T=4 / MAXDIM=16 is rejected (`gate:param`).
+   The policy also refuses a literal T/MAXDIM and a net loss of more than 15
+   comment/docstring lines against the frozen ref.
 2. **score** -- `cosim.py` (Vitis HLS 2023.2 csynth + xsim C/RTL cosim), one
    testbench per shape, each bit-exact against numpy. The score is the SUM of
    cosim cycles over the requested shapes. It is an RTL measurement.
@@ -97,11 +103,18 @@ MAIN_BASE = "476a70d8"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
+PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
 FROZEN = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
     GATE_RUNNER,
+    PARAM_CHECK,
 ]
+#: The parametricity gate: configurations the candidate is rebuilt at and must
+#: be exact at (param_check.py), besides the scored T=4 / MAXDIM=16. MAXDIM
+#: only: main's design supports T=4 alone (it fails check_program at TPU_T=8).
+#: 12 is deliberately not a power of two.
+PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"}]
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
@@ -170,7 +183,8 @@ def compose(spec_dir: Path, tree: Path, ref: str):
         if not src.is_file():
             raise Reject("setup", f"spec dir has no {name}")
         text = src.read_text(encoding="utf-8")
-        problems = policy_violations(name, text)
+        problems = policy_violations(name, text) + policy["doc_violations"](
+            name, git_show(ref, f"{PKG}/{name}").decode("utf-8"), text)
         if problems:
             raise Reject("policy", "; ".join(problems))
         (tree / PKG / name).write_text(text, encoding="utf-8")
@@ -295,9 +309,22 @@ def gate(tree, env, work, verify_now):
     m = re.search(r"^  STRESS OK: (\d+)/(\d+) runs exact", out2, re.M)
     if not ok2 or not m or m.group(1) != m.group(2):
         raise Reject("gate:stress", out2[-4000:])
+    # 3. Parametricity: the same candidate, rebuilt at other MAXDIMs, must
+    # build, honour the parameter, and be exact (param_check.py).
+    param, sec3 = {}, 0.0
+    for cfg in PARAM_CONFIGS:
+        ok3, rc3, out3, s3 = vouched("param_check", tree, dict(env, **cfg), work,
+                                     tree, GATE_TIMEOUT)
+        sec3 += s3
+        tag = ",".join(f"{k}={v}" for k, v in cfg.items())
+        verify_now(f"param_check {tag}")
+        m3 = re.search(r"^  PARAM OK: (\d+)/(\d+) runs exact", out3, re.M)
+        if not ok3 or not m3 or m3.group(1) != m3.group(2):
+            raise Reject("gate:param", f"at {tag}:\n" + out3[-4000:])
+        param[tag] = lines_with(out3, "PARAM OK")[0]
     return {"bench_isa": "ALL EXACT", "stress": lines_with(out2, "STRESS OK")[0],
-            "stress_runs": int(m.group(1)), "vouched": True,
-            "seconds": round(sec + sec2, 1)}
+            "stress_runs": int(m.group(1)), "param": param, "vouched": True,
+            "seconds": round(sec + sec2 + sec3, 1)}
 
 
 def lines_with(text, needle):

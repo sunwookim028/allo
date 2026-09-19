@@ -299,4 +299,111 @@ def policy_violations(name: str, source: str) -> list[str]:
                 f"{'try' if isinstance(node, ast.Try) else 'with'} block, which "
                 f"would run on import"
             )
+    problems += parameter_violations(name, source)
     return sorted(set(problems))
+
+
+# -- parametricity ---------------------------------------------------------
+#: The design's size parameters and the only form their definition may take in
+#: microarch_isa.py: `NAME = int(os.environ.get("TPU_NAME", <int>))`. The gate
+#: scores T=4, MAXDIM=16, so a literal `T = 4` or `MAXDIM = 16` specialises the
+#: design to the evaluator's configuration; `param_check.py` rebuilds at other
+#: MAXDIMs and needs the parameter honoured. (The first paid run's accepted
+#: diff replaced the T definition with `T = 4`.)
+PARAMETERS = {"T": "TPU_T", "MAXDIM": "TPU_MAXDIM"}
+
+
+def _is_env_param(value, env_name) -> bool:
+    return (isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+            and value.func.id == "int" and len(value.args) == 1
+            and not value.keywords
+            and isinstance(value.args[0], ast.Call)
+            and ast.unparse(value.args[0].func) == "os.environ.get"
+            and len(value.args[0].args) == 2
+            and isinstance(value.args[0].args[0], ast.Constant)
+            and value.args[0].args[0].value == env_name
+            and isinstance(value.args[0].args[1], ast.Constant)
+            and isinstance(value.args[0].args[1].value, int))
+
+
+def parameter_violations(name: str, source: str) -> list[str]:
+    """T and MAXDIM must stay environment parameters, defined once, in
+    microarch_isa.py, and must not be rebound anywhere in either file."""
+    tree = ast.parse(source, filename=name)
+    defs = {p: [] for p in PARAMETERS}
+    problems = []
+    for node in ast.walk(tree):
+        targets = []
+        if isinstance(node, ast.Assign):
+            targets = [(t, node.value) for t in node.targets]
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            targets = [(node.target, node.value if not isinstance(node, ast.AugAssign)
+                        else None)]
+        elif isinstance(node, (ast.For, ast.comprehension)):
+            targets = [(node.target, None)]
+        elif isinstance(node, ast.NamedExpr):
+            targets = [(node.target, None)]
+        for t, value in targets:
+            for n in _bound_names(t):
+                if n in PARAMETERS:
+                    defs[n].append((node, value))
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            for n in node.names:
+                if n in PARAMETERS:
+                    problems.append(f"{name}: declares '{n}' global/nonlocal; "
+                                    f"it is a design parameter")
+    for p, env in PARAMETERS.items():
+        good = [d for d in defs[p] if d[1] is not None and _is_env_param(d[1], env)
+                and d[0] in tree.body]
+        if name == "microarch_isa.py":
+            if len(defs[p]) != 1 or len(good) != 1:
+                problems.append(
+                    f"{name}: '{p}' must be defined exactly once, at module level, "
+                    f"as {p} = int(os.environ.get(\"{env}\", <default>)) -- it is a "
+                    f"design parameter, and the gate also builds the design at "
+                    f"other values of it")
+        elif defs[p]:
+            problems.append(f"{name}: assigns '{p}', a design parameter defined in "
+                            f"microarch_isa.py")
+    return problems
+
+
+# -- documentation -----------------------------------------------------------
+#: How many lines of comment + docstring text a candidate may remove from a
+#: spec file, net, relative to the file at the frozen ref. Additions and edits
+#: are free; wholesale deletion is not (the first paid run's accepted diff
+#: deleted the 260-line design docstring of microarch_isa.py).
+DOC_LOSS_MAX = 15
+
+
+def doc_lines(source: str) -> list[str]:
+    """Non-blank lines of comments and docstrings (module, class, function)."""
+    import io
+    import tokenize
+    out = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(source).readline):
+            if tok.type == tokenize.COMMENT:
+                txt = tok.string.lstrip("#").strip()
+                if txt:
+                    out.append(txt)
+    except (tokenize.TokenError, IndentationError):
+        pass
+    tree = ast.parse(source)
+    for node in [tree, *ast.walk(tree)]:
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                             ast.AsyncFunctionDef)):
+            doc = ast.get_docstring(node, clean=True)
+            if doc:
+                out += [l.strip() for l in doc.splitlines() if l.strip()]
+    return out
+
+
+def doc_violations(name: str, base_source: str, source: str) -> list[str]:
+    """Refuse a net loss of more than DOC_LOSS_MAX comment/docstring lines."""
+    before, after = len(doc_lines(base_source)), len(doc_lines(source))
+    if before - after > DOC_LOSS_MAX:
+        return [f"{name}: removes {before - after} lines of comments/docstrings "
+                f"(from {before} to {after}; at most {DOC_LOSS_MAX} may go). "
+                f"Edit or add documentation; do not delete it"]
+    return []
