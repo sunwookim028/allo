@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP,
-    OP_VADD, OP_VRELU, OP_MVOUT,
+    OP_VADD, OP_VRELU, OP_VST, OP_VMEMST,
     DMA_SRC_B,
     MAXDIM, T, VMEM_ROWS, NVREG, check_program, expand,
 )
@@ -76,6 +76,8 @@ def run(prog, A, B, C):
                 vr[f0 + r] = _wrap32(vr[f1 + r] + vr[f2 + r])
             elif op == OP_VRELU:
                 vr[f0 + r] = np.maximum(vr[f1 + r], 0)
-            elif op == OP_MVOUT:
-                C[f1 + r, f2 * T:(f2 + 1) * T] = np.clip(vr[f0 + r], -128, 127)
+            elif op == OP_VST:
+                vmem[f1 + r] = np.clip(vr[f0 + r], -128, 127)   # saturated
+            elif op == OP_VMEMST:
+                C[f1 + r, f2 * T:(f2 + 1) * T] = vmem[f3 + r]
     return C.reshape(-1)

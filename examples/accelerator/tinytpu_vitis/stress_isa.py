@@ -53,7 +53,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     tinytpu_isa, assemble, check_program, ProgramError, enc, enc_agu,
     gemm_program_flat, gemm_program_handwritten, vadd_program,
     OP_DMA_LD, OP_DMA_ST, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
-    OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OUTQ,
+    OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OP_VST, OP_VMEMST, OUTQ,
     OP_LOOP, OP_ENDLOOP, AGU_F0, AGU_F1,
     MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, VMEM_ROWS, NVREG, VR_RAW_DIST,
     SCORED_SHAPES, VEC_M,
@@ -274,28 +274,41 @@ def random_program(seed):
         commit(writes, n_it)
         return True
 
-    def mvout():
+    def vst():
         n = ri(1, MAXDIM)
         s = run_of("vr", n)
         if s is None or not reads_ok([(s + i, i) for i in range(n)]):
             return False
-        k.mvout(s, dram_row=ri(0, MAXDIM - n), col_block=ri(0, WPR - 1), rows=n)
+        d = place("vmem", n)
+        k.vst(s, d, rows=n)
+        wr["vmem"][d:d + n] = True
         commit([], n)
         return True
 
-    def mvout_loop():
+    def vmemst():
+        n = ri(1, MAXDIM)
+        s = run_of("vmem", n)
+        if s is None:
+            return False
+        k.vmemst(s, dram_row=ri(0, MAXDIM - n), col_block=ri(0, WPR - 1), rows=n)
+        return True
+
+    def vmemst_loop():
         # the AGU on three fields of one instruction at once
         if WPR < 2:
             return False                 # one column block: nothing to walk
         trip, n = ri(2, min(3, WPR)), ri(1, min(4, MAXDIM // 3))
-        s = run_of("vr", trip * n)
-        if s is None or not reads_ok([(s + i, i) for i in range(trip * n)]):
+        s = run_of("vmem", trip * n)
+        if s is None:
             return False
         with k.loop(trip) as i:
-            k.mvout(Ref(s).at(i, n), dram_row=Ref(0).at(i, n),
-                    col_block=Ref(0).at(i, 1), rows=n)
-        commit([], trip * n)
+            k.vmemst(Ref(s).at(i, n), dram_row=Ref(0).at(i, n),
+                     col_block=Ref(0).at(i, 1), rows=n)
         return True
+
+    def mvout():
+        # retire: vregs -> VMEM -> DRAM, as MiniTPU does
+        return vst() and vmemst()
 
     dma_ld(ri(T, MAXDIM))                # weights
     dma_ld()                             # activations, once vld'd
@@ -307,7 +320,7 @@ def random_program(seed):
     while pop():                         # something to read before vec/mvout
         pass
     ops = [dma_ld, vld, mm, pop, lambda: vec("vadd"), lambda: vec("vrelu"),
-           mvout, mvout_loop]
+           vst, vmemst, vmemst_loop, mvout]
     budget = ri(8, MAX_STATIC - 10)   # mm, the drain pops and the last mvout overshoot it
     while len(k.words) < budget:
         ops[int(rng.integers(0, len(ops)))]()
@@ -333,49 +346,54 @@ def _bad_programs():
     wp = lambda v=0, n=4: (enc(OP_VMATPUSH, f0=v, nr=n), 0)  # noqa: E731
     wo = lambda a=0, n=4: (enc(OP_VMATPOP, f0=a, nr=n), 0)   # noqa: E731
     mm0 = [wl(), wp(), wo()]
-    out = lambda a=0: (enc(OP_MVOUT, f0=a, nr=4), 0)  # noqa: E731
+    VO = 300                                 # a VMEM row nothing else uses
+    out = lambda a=0: [(enc(OP_VST, f0=a, f1=VO, nr=4), 0),         # noqa: E731
+                       (enc(OP_VMEMST, f3=VO, nr=4), 0)]
     U = 2 * T + 8        # one vreg file: rows here are written by nothing below
     return {
-        "mvout before any write to the vregs": [ld, out()],
-        "vadd second source unwritten": [ld, vw, *mm0, (enc(OP_VADD, f0=U + 8, f1=0, f2=U, nr=4), 0), out(U + 8)],
-        "vrelu source unwritten": [ld, vw, *mm0, (enc(OP_VRELU, f0=0, f1=U, nr=4), 0), out()],
-        "vmatload weights never vld'd into vr": [ld, vw, wl(40), wp(), wo(), out()],
-        "vmatpush activations only in vmem, never in vr": [ld, vw, wl(), wp(U), wo(), out()],
-        "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, *mm0, out()],
+        "vst before any write to the vregs": [ld, *out()],
+        "vadd second source unwritten": [ld, vw, *mm0, (enc(OP_VADD, f0=U + 8, f1=0, f2=U, nr=4), 0), *out(U + 8)],
+        "vrelu source unwritten": [ld, vw, *mm0, (enc(OP_VRELU, f0=0, f1=U, nr=4), 0), *out()],
+        "vmatload weights never vld'd into vr": [ld, vw, wl(40), wp(), wo(), *out()],
+        "vmatpush activations only in vmem, never in vr": [ld, vw, wl(), wp(U), wo(), *out()],
+        "dma_ld with the retired vreg destination bit (f0=2)": [(enc(OP_DMA_LD, f0=2, nr=4), 0), ld, vw, *mm0, *out()],
         # The vreg distance contract, one iteration inside it. Relative
         # to VR_RAW_DIST on purpose: whether the contract is wide enough for
         # the RTL is a question only cosim can answer (TPU_TB=stress runs
         # ar_distance_program(VR_RAW_DIST); mutate.py's `ar_claim_false`).
         **({f"ar reads at distance VR_RAW_DIST - 1 = {VR_RAW_DIST - 1}":
             ar_distance_program(VR_RAW_DIST - 1)} if VR_RAW_DIST > 1 else {}),
-        **({"mvout of a 1-row pop's row, 1 vpu iteration later": [
-            ld, vw, wl(), wp(0, 1), wo(0, 1), (enc(OP_MVOUT, nr=1), 0)]}
+        **({"vst of a 1-row pop's row, 1 vpu iteration later": [
+            ld, vw, wl(), wp(0, 1), wo(0, 1), (enc(OP_VST, f1=VO, nr=1), 0),
+            (enc(OP_VMEMST, f3=VO, nr=1), 0)]}
            if VR_RAW_DIST > 1 else {}),
-        "vmatpush consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), *mm0, out()],
+        "vmatpush consumes a vld copy of unwritten vmem": [ld, (enc(OP_VLD, f0=0, f1=100, nr=4), 0), *mm0, *out()],
         # Loop semantics: the body is fine on iteration 0 and reads ar 4..7,
         # which nothing wrote, on iteration 1.
         "loop iteration 1 reads unwritten vregs": [
             ld, vw, wl(), wp(), wo(U), (enc(OP_LOOP, nr=2), 0),
-            (enc(OP_MVOUT, f0=U, f1=0, nr=4), enc_agu((AGU_F0, 0, 4), (AGU_F1, 0, 4))),
+            (enc(OP_VST, f0=U, f1=VO, nr=4), enc_agu((AGU_F0, 0, 4), (AGU_F1, 0, 4))),
             (enc(OP_ENDLOOP), 0)],
-        "zero-row vld (hangs the machine)": [ld, (enc(OP_VLD, nr=0), 0), vw, *mm0, out()],
-        "loop trip count 0": [ld, vw, *mm0, (enc(OP_LOOP, nr=0), 0), out(), (enc(OP_ENDLOOP), 0)],
-        "AGU term names a closed loop": [ld, vw, *mm0, (enc(OP_MVOUT, nr=4), enc_agu((AGU_F1, 0, 4)))],
-        "vr row past NVREG": [ld, vw, wl(), wp(), wo(NVREG - 2), out(NVREG - 2)],
-        "mvout past the last C row": [ld, vw, *mm0, (enc(OP_MVOUT, f1=MAXDIM - 2, nr=4), 0)],
-        "retired dma_st opcode": [ld, vw, *mm0, out(), (enc(OP_DMA_ST, nr=4), 0)],
-        "retired mm opcode": [ld, vw, (enc(OP_MM, nr=4), 0), out()],
-        "unbalanced loop": [ld, vw, *mm0, (enc(OP_LOOP, nr=2), 0), out()],
+        "zero-row vld (hangs the machine)": [ld, (enc(OP_VLD, nr=0), 0), vw, *mm0, *out()],
+        "loop trip count 0": [ld, vw, *mm0, (enc(OP_LOOP, nr=0), 0), *out(), (enc(OP_ENDLOOP), 0)],
+        "AGU term names a closed loop": [ld, vw, *mm0, (enc(OP_VST, f1=VO, nr=4), enc_agu((AGU_F1, 0, 4)))],
+        "vr row past NVREG": [ld, vw, wl(), wp(), wo(NVREG - 2), *out(NVREG - 2)],
+        "vmemst past the last C row": [ld, vw, *mm0, *out()[:1], (enc(OP_VMEMST, f1=MAXDIM - 2, f3=VO, nr=4), 0)],
+        "vmemst of VMEM rows nothing wrote": [ld, vw, *mm0, (enc(OP_VMEMST, f3=VO + 100, nr=4), 0)],
+        "retired mvout opcode": [ld, vw, *mm0, (enc(OP_MVOUT, nr=4), 0)],
+        "retired dma_st opcode": [ld, vw, *mm0, *out(), (enc(OP_DMA_ST, nr=4), 0)],
+        "retired mm opcode": [ld, vw, (enc(OP_MM, nr=4), 0), *out()],
+        "unbalanced loop": [ld, vw, *mm0, (enc(OP_LOOP, nr=2), 0), *out()],
         # The array's queue.
-        "vmatload moving T-1 rows": [ld, vw, wl(0, T - 1), wp(), wo(), out()],
-        "vmatpush with no vmatload before it": [ld, vw, wp(), wo(), out()],
-        "two vmatloads with no push between": [ld, vw, wl(), wl(), wp(), wo(), out()],
+        "vmatload moving T-1 rows": [ld, vw, wl(0, T - 1), wp(), wo(), *out()],
+        "vmatpush with no vmatload before it": [ld, vw, wp(), wo(), *out()],
+        "two vmatloads with no push between": [ld, vw, wl(), wl(), wp(), wo(), *out()],
         # rebalanced afterwards, so only the pop rule can reject it
-        "vmatpop of more rows than are pushed": [ld, vw, wl(), wp(0, 4), wo(0, 8), wp(0, 4), out()],
-        "pushed rows never popped": [ld, vw, *mm0, out(), wl(), wp()],
+        "vmatpop of more rows than are pushed": [ld, vw, wl(), wp(0, 4), wo(0, 8), wp(0, 4), *out()],
+        "pushed rows never popped": [ld, vw, *mm0, *out(), wl(), wp()],
         "more than OUTQ rows un-popped": [ld, vw, wl()] + [wp()] * (OUTQ // 4 + 1)
-                                         + [wo(0, 4)] * (OUTQ // 4 + 1) + [out()],
-        "the last vmatload is never pushed": [ld, vw, *mm0, out(), wl()],
+                                         + [wo(0, 4)] * (OUTQ // 4 + 1) + [*out()],
+        "the last vmatload is never pushed": [ld, vw, *mm0, *out(), wl()],
     }
 
 

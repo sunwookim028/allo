@@ -79,9 +79,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
-    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
+    OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_VST, OP_VMEMST, OP_NOP, OP_VADD, OP_VLD,
     OP_VRELU, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, enc, enc_agu,
-    A_VM, A_VR, AR_C, AR_P, B_VM, B_VR, DMA_SRC_B, MAXDIM, MAXROWS, T, WPR,
+    A_VM, A_VR, AR_C, AR_P, B_VM, B_VR, C_VM, DMA_SRC_B, MAXDIM, MAXROWS, T, WPR,
     VEC_M,
 )
 
@@ -216,9 +216,15 @@ class Program:
     def vrelu(self, ar_d, ar_s, rows):
         self._ins(OP_VRELU, ar_d, ar_s, nr=rows)
 
-    def mvout(self, ar, dram_row=0, col_block=0, rows=0):
-        """Accumulator -> DRAM, clipped to int8 on the way."""
-        self._ins(OP_MVOUT, ar, dram_row, col_block, nr=rows)
+    def vst(self, vr, vmem, rows):
+        """vregs -> VMEM, `rows` rows, each int32 lane saturated to int8
+        (the narrowing v1's `mvout` did)."""
+        self._ins(OP_VST, vr, vmem, nr=rows)
+
+    def vmemst(self, vmem, dram_row=0, col_block=0, rows=0):
+        """VMEM -> C: `rows` VMEM rows to C rows `dram_row..`, column block
+        `col_block`."""
+        self._ins(OP_VMEMST, 0, dram_row, col_block, vmem, nr=rows)
 
     def emit(self):
         """The `(word, agu_word)` list `assemble()` takes."""
@@ -331,13 +337,16 @@ def gemm_program(M, K, N, relu=False):
             k.vmatpop(AR_C, rows=M)
         if relu:
             k.vrelu(AR_C, AR_C, rows=M)
-        k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
+        # MiniTPU's output path: vst to VMEM, then vmemst to DRAM
+        k.vst(AR_C, Ref(C_VM).at(nb, MAXDIM), rows=M)
+        k.vmemst(Ref(C_VM).at(nb, MAXDIM), dram_row=0,
+                 col_block=Ref().at(nb, 1), rows=M)
     return k.emit()
 
 
 def vector_program(M=None):
     """Every field a GEMM leaves constant, varied -- a TEST program, not a
-    kernel. The shipped GEMM always has `dma_ld`/`mvout` DRAM row 0, one
+    kernel. The shipped GEMM always has `dma_ld`/`vmemst` DRAM row 0, one
     accumulator region, A only as activations, B only as weights, one push
     per load popped at once, and `vrelu` in place (`f0 == f1`); a unit that
     ignored any of those would pass `bench_isa` exactly. Here:
@@ -349,7 +358,7 @@ def vector_program(M=None):
         queue and the output FIFO both hold more than one tile), and one
         push drained by two pops;
       * `vadd` with three distinct regions, `vrelu` with a distinct destination;
-      * `mvout` from nonzero `ar`, to nonzero DRAM rows and column blocks, and
+      * `vst` from nonzero vregs to VMEM and `vmemst` to nonzero DRAM rows and column blocks, and
         through a loop whose AGU walks `f0`, `f1` and `f2` at once.
 
     Every address is derived from T and MAXDIM (M defaults to VEC_M), so the
@@ -391,11 +400,17 @@ def vector_program(M=None):
     k.vadd(a2, a2, a3, rows=M)               # a2 += a3
     k.vadd(a4, a1, a2, rows=M)               # a4 = a1 + a2
     k.vrelu(a5, a4, rows=M)                  # a5 = relu(a4)
-    k.mvout(a4, dram_row=0, col_block=c(1), rows=M)
-    k.mvout(a1, dram_row=1, col_block=c(0), rows=M)
-    with k.loop(2, "half") as i:             # a5.. -> C rows M.., blocks 2, 3
-        k.mvout(Ref(a5).at(i, h), dram_row=Ref(M).at(i, h),
-                col_block=Ref(c(2)).at(i, 1 if WPR > c(2) + 1 else 0), rows=h)
+    vo = vw + 2 * T + 8                      # VMEM output rows
+    k.vst(a4, vo, rows=M)
+    k.vst(a1, vo + M, rows=M)
+    with k.loop(2, "half") as i:             # a5.. -> VMEM, two halves
+        k.vst(Ref(a5).at(i, h), Ref(vo + 2 * M).at(i, h), rows=h)
+    k.vmemst(vo, dram_row=0, col_block=c(1), rows=M)
+    k.vmemst(vo + M, dram_row=1, col_block=c(0), rows=M)
+    with k.loop(2, "out") as i:              # -> C rows M.., blocks 2, 3: the
+        k.vmemst(Ref(vo + 2 * M).at(i, h),   # AGU on three fields at once
+                 dram_row=Ref(M).at(i, h),
+                 col_block=Ref(c(2)).at(i, 1 if WPR > c(2) + 1 else 0), rows=h)
     return k.emit()
 
 
@@ -403,7 +418,7 @@ def ar_distance_program(dist):
     """The accumulator distance contract, exercised AT its edge -- a TEST
     program. Reads of `ar` land exactly `dist` `accu` iterations after the
     write they depend on, through every kind of read `accu` has -- `vrelu`,
-    `vadd`'s first and second source, and `mvout` -- and after every kind of
+    `vadd`'s first and second source, and `vst` -- and after every kind of
     write: a pop, a `vrelu` and a `vadd` (two iterations a row).
 
     With `dist = AR_RAW_DIST` it is the tightest program `check_program`
@@ -428,17 +443,24 @@ def ar_distance_program(dist):
     k.vmatpop(10, rows=n)                    # ar10+i written at i
     k.vrelu(30, 10, rows=n)                  # read at n+i: distance n
     k.vadd(40, 30, 10, rows=n)               # 1st source row 0: distance n
-    k.mvout(40, dram_row=0, col_block=0, rows=n)   # last row: distance n
+    vo = 200                                 # VMEM output rows
+    k.vst(40, vo, rows=n)                    # last row: distance n
     if n >= 2:
         k.vmatpop(50, rows=n - 1)            # ar50+i written n-1 rows long
         k.vadd(60, 40, 50, rows=n - 1)       # 2nd source row 0: distance n
         k.vmatpop(70, rows=1)                # drain the queue
-        k.mvout(10, dram_row=n, col_block=1 % WPR, rows=n)   # spacer
-        k.mvout(60, dram_row=0, col_block=2 % WPR, rows=n - 1)
-        k.mvout(70, dram_row=2 * n - 1, col_block=3 % WPR, rows=1)
+        k.vst(10, vo + n, rows=n)            # spacer
+        k.vst(60, vo + 2 * n, rows=n - 1)
+        k.vst(70, vo + 3 * n, rows=1)
+        k.vmemst(vo, dram_row=0, col_block=0, rows=n)
+        k.vmemst(vo + n, dram_row=n, col_block=1 % WPR, rows=n)
+        k.vmemst(vo + 2 * n, dram_row=0, col_block=2 % WPR, rows=n - 1)
+        k.vmemst(vo + 3 * n, dram_row=2 * n - 1, col_block=3 % WPR, rows=1)
     else:
         k.vmatpop(50, rows=n)
-        k.mvout(50, dram_row=n, col_block=1 % WPR, rows=n)
+        k.vst(50, vo + n, rows=n)
+        k.vmemst(vo, dram_row=0, col_block=0, rows=n)
+        k.vmemst(vo + n, dram_row=n, col_block=1 % WPR, rows=n)
     return k.emit()
 
 

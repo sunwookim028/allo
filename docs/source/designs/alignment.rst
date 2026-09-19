@@ -702,6 +702,16 @@ setup as v1's published numbers.
        GEMM kernels overlap the same way). The program is 25 static
        instructions, so the imem grows from 24 to 32 slots, which is the +2
        prefetch cycles at 4x4x4.
+   * - **inc 4**: output via VREG -> ``vst`` -> VMEM -> ``vmemst``
+     - 206
+     - 1519
+     - +7 / +5
+     - +34 / +833
+     - ``mvout`` retired. ``vst`` saturates each int32 lane to int8 on its
+       way into VMEM (the narrowing ``mvout`` did), and ``vmemst`` moves VMEM
+       rows to C. VMEM's owner now also sits on a cycle with the ``vpu``
+       (``vld`` out, ``vst`` back), so its loop is ``style=flp`` too. Nearly
+       free: the ``vpu`` did the same row work for ``mvout``.
 
 Reading the table: the whole cost so far is where MiniTPU does work that v1
 did not have to. A DMA into VMEM and then a ``vld`` replaces v1's DMA straight

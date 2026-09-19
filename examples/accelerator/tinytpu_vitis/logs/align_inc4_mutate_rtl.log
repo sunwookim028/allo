@@ -1,0 +1,8 @@
+
+  mutant          bench_isa      stress_isa     cosim          caught first by
+  vr_claim_false  pass           pass           CAUGHT         cosim
+
+  vr_claim_false  FALSE DEPENDENCE CLAIM: the contract admits a vreg read one vpu iteration after its write, so the `inter false` pragma on vreg is untrue for programs the assembler accepts
+
+  logs: /home/sk3463/allo-align/examples/accelerator/tinytpu_vitis/.mutants/<mutant>/<level>.log
+  MUTATE OK: all 1 mutants run were caught

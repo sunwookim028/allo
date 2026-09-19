@@ -309,18 +309,21 @@ import allo.dataflow as df
 # its mvin/mvout carry an explicit, bounded row count.
 OP_NOP = 0
 OP_DMA_LD = 1     # f0=src f1=dram_row0 f2=col_block f3=vmem0          nr=rows
-OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
+OP_DMA_ST = 2     # (retired: results leave via OP_VST + OP_VMEMST)
 OP_VLD = 3        # f0=vr0  f1=vmem0                            nr=rows
 OP_MM = 4         # (retired: split into vmatload / vmatpush / vmatpop)
 OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
-OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
+OP_MVOUT = 7      # (retired: split into vst + vmemst, increment 4)
 OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
 OP_ENDLOOP = 9    # close the innermost loop
 # MiniTPU's M slot (alignment increment 2). The array computes Y = X W.
 OP_VMATLOAD = 10  # f0=vr_w: T weight rows, W row i = vr[f0 + i]    nr=T
 OP_VMATPUSH = 11  # f0=vr_a: activation rows                        nr=rows
 OP_VMATPOP = 12   # f0=ar_d: the oldest un-popped result rows       nr=rows
+# MiniTPU's output path (alignment increment 4): VREG -> VMEM -> DRAM.
+OP_VST = 13       # f0=vr_s f1=vmem_d  (int32 lanes saturated to int8) nr=rows
+OP_VMEMST = 14    # f1=dram_row0 f2=col_block f3=vmem_s  VMEM -> C       nr=rows
 
 # `dma_ld`'s f0 is the SOURCE matrix: 0 A, 1 B. The destination is always
 # VMEM (MiniTPU: DMA moves only between DRAM and VMEM). TinyTPU-isa v1 also
@@ -344,7 +347,7 @@ DMA_SRC_B = 1
 # dependence through `vreg` (`s.dependence`, limitations register item 21).
 # That is true only if no row is read too soon after it was written: counting
 # `vpu` iterations -- one per row of every instruction it runs (`vld`,
-# `vmatload`, `vmatpush`, `vmatpop`, `vrelu`, `mvout`), two per `vadd` row
+# `vmatload`, `vmatpush`, `vmatpop`, `vrelu`, `vst`), two per `vadd` row
 # (first source on the even one; second source and the write on the odd one)
 # -- a read of a vreg row must come at least VR_RAW_DIST iterations after the
 # write it depends on. Every GEMM satisfies it with room to spare, and
@@ -497,6 +500,7 @@ assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
 B_VM = 0                       # B words:  nb * MAXDIM + k  (weights)
 A_VM = KB_MAX * MAXDIM         # A words in VMEM: kb * MAXDIM + m, after B
+C_VM = 2 * KB_MAX * MAXDIM     # C words in VMEM: nb * MAXDIM + m (vst, vmemst)
 # ONE vreg file (increment 3): A, B, the accumulator and the popped k-tile
 # are regions of it.
 A_VR = 0                       # A rows:  kb * MAXDIM + m  (vld'd from VMEM)
@@ -539,7 +543,8 @@ def tinytpu_isa(
     # Data paths, all one packed word wide.
     dma2vm: Stream[UInt(VW), QD]        # dma_ld -> VMEM
     vm2vr: Stream[UInt(VW), QD]         # VMEM -> vregs  (vld)
-    ac2sp: Stream[UInt(VW), QD]         # accumulator -> dma_st (clipped)
+    vr2vm: Stream[UInt(VW), QD]         # vregs -> VMEM  (vst, saturated)
+    vm2dst: Stream[UInt(VW), QD]        # VMEM -> dma_st (vmemst)
 
     # The array's streaming ports. Chains, never fan-out.
     wcol: Stream[UInt(VW), QD][T]       # counts, then weight words, down column 0
@@ -695,8 +700,11 @@ def tinytpu_isa(
                     c_vpu.put(wv)
                 if op == OP_VRELU:
                     c_vpu.put(rw)
-                if op == OP_MVOUT:
+                if op == OP_VST:
                     c_vpu.put(rw)
+                    c_vmu.put(rw)
+                if op == OP_VMEMST:
+                    c_vmu.put(rw)
                     c_dst.put(rw)
                 pc += 1
 
@@ -783,11 +791,15 @@ def tinytpu_isa(
 
         Pure SIMD access: an address names a whole `UInt(T*8)` row and there is
         no way to address a lane. Written by `dma_ld` (the only place DMA
-        writes) and read by `vld` (VMEM -> vregs). Since increment 2 it no
-        longer feeds the array: MiniTPU's `vmatload` takes its weights from
-        VREGs, so B travels VMEM -> `vld` -> vregs -> `vmatload` like A.
+        writes) and by `vst`; read by `vld` (VMEM -> vregs) and by `vmemst`
+        (VMEM -> DRAM). MiniTPU's two ports -- compute (`vld`/`vst`) and DMA
+        (`vmemld`/`vmemst`) -- are here one owner process doing one row of one
+        instruction per iteration, in program order.
 
-        One flat row loop, ONE `vmem` access per iteration."""
+        **On a cycle since increment 4** (`vld` out to the vpu, `vst` back),
+        so its loop is pipelined `style=flp` like the vpu's.
+
+        One flat row loop, ONE `vmem` read or write per iteration."""
         vmem: UInt(VW)[VMEM_ROWS]
         nw: UInt(64) = c_vmu.get()
         n_row: int32 = nw[0:16]
@@ -805,17 +817,38 @@ def tinytpu_isa(
                 f3 = w0[42:54]
                 cnt = w0[54:62]
                 r = 0
+            isw: int32 = 0
             if op == OP_DMA_LD:
-                vmem[f3 + r] = dma2vm.get()
+                isw = 1
+            if op == OP_VST:
+                isw = 1
+            if isw == 1:
+                # the one write: a DMA row (at f3) or a vst row (at f1)
+                wv: UInt(VW) = 0
+                wa: int32 = f1 + r
+                if op == OP_DMA_LD:
+                    wv = dma2vm.get()
+                    wa = f3 + r
+                else:
+                    wv = vr2vm.get()
+                vmem[wa] = wv
             else:
-                vm2vr.put(vmem[f1 + r])
+                # the one read: a vld row (at f1) or a vmemst row (at f3)
+                ra: int32 = f1 + r
+                if op == OP_VMEMST:
+                    ra = f3 + r
+                rv: UInt(VW) = vmem[ra]
+                if op == OP_VLD:
+                    vm2vr.put(rv)
+                else:
+                    vm2dst.put(rv)
 
     @df.kernel(mapping=[1])
     def vpu():
         """THE VREG FILE -- one file, one owner -- and every unit that reads or
         writes it: MiniTPU's V slot (`vadd`, `vrelu`), the VREG side of its M
         slot (`vmatload`/`vmatpush` read, `vmatpop` writes) and of its MEM
-        slot (`vld` writes; `mvout`, until `vst` exists, reads).
+        slot (`vld` writes, `vst` reads).
 
         **One file, int32 lanes.** A row is T int32 lanes (`UInt(AW)`): wide
         enough for a popped result, and `vld` sign-extends an int8 VMEM row
@@ -843,7 +876,7 @@ def tinytpu_isa(
         Vitis there is no carried dependence through `vreg`, and
         `check_program` makes it true by keeping every read at least
         `VR_RAW_DIST` vpu iterations after the write it depends on -- now for
-        every reader: `vmatload`, `vmatpush`, `vadd`, `vrelu`, `mvout`."""
+        every reader: `vmatload`, `vmatpush`, `vadd`, `vrelu`, `vst`."""
         nw: UInt(64) = c_vpu.get()
         n_it: int32 = nw[0:16]
         mw: UInt(64) = c_vpu.get()
@@ -910,7 +943,9 @@ def tinytpu_isa(
                     if re < 0:
                         re = 0
                     z[32 * e3 : 32 * (e3 + 1)] = re
-            elif op == OP_MVOUT:
+            elif op == OP_VST:
+                # MiniTPU's vst, with the int8 narrowing v1's mvout did:
+                # the lane saturates to [-128, 127] on its way to VMEM
                 dw = 0
                 ow: UInt(VW) = 0
                 with allo.meta_for(T) as e4:
@@ -921,7 +956,7 @@ def tinytpu_isa(
                         te = -128
                     tc: int8 = te
                     ow[8 * e4 : 8 * (e4 + 1)] = tc
-                ac2sp.put(ow)
+                vr2vm.put(ow)
             else:
                 # vmatload / vmatpush: the low 8 bits of each lane
                 dw = 0
@@ -1044,13 +1079,13 @@ def tinytpu_isa(
 
     @df.kernel(mapping=[1], args=[C])
     def dma_st(lC: int8[MAXDIM * MAXDIM]):
-        """Accumulator -> DRAM. Sole writer of C.
+        """VMEM -> DRAM (`vmemst`). Sole writer of C.
 
         Declared **last on purpose**. Allo emits the process calls in
         declaration order, and Vitis `csim` executes a dataflow region in that
         order, so a consumer declared before its producer reads an empty stream:
             ERROR [HLS SIM]: an hls::stream is read while empty
-        `dma_st` consumes what `accu` produces, so it has to come after it. The
+        `dma_st` consumes what `vmu` produces, so it has to come after it. The
         order has no effect on the generated hardware -- in RTL the processes
         are concurrent -- but it decides whether `csim` works, and `csim` is the
         fast functional check."""
@@ -1063,13 +1098,13 @@ def tinytpu_isa(
         for x in range(n_row):
             r += 1
             if r >= cnt:
-                # Only `mvout` reaches this queue, so there is no opcode test.
+                # Only `vmemst` reaches this queue, so there is no opcode test.
                 w0: UInt(64) = c_dst.get()
                 f1 = w0[18:30]
                 f2 = w0[30:42]
                 cnt = w0[54:62]
                 r = 0
-            qw: UInt(VW) = ac2sp.get()
+            qw: UInt(VW) = vm2dst.get()
             with allo.meta_for(T) as e:
                 ov: int8 = qw[8 * e : 8 * (e + 1)]
                 lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
@@ -1146,8 +1181,10 @@ def gemm_program_handwritten(M, K, N, relu=False):
         ins(enc(OP_VMATPOP, f0=AR_C, nr=M))
     if relu:
         ins(enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M))
-    ins(enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M),
-        enc_agu((AGU_F2, 0, 1)))
+    #   MiniTPU's output path: vst to VMEM, then vmemst to DRAM
+    ins(enc(OP_VST, f0=AR_C, f1=C_VM, nr=M), enc_agu((AGU_F1, 0, MAXDIM)))
+    ins(enc(OP_VMEMST, f1=0, f2=0, f3=C_VM, nr=M),
+        enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
     ins(enc(OP_ENDLOOP))
     return p
 
@@ -1188,7 +1225,8 @@ def gemm_program_flat(M, K, N, relu=False):
         pop(Kt - 1)
         if relu:
             p.append((enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M), 0))
-        p.append((enc(OP_MVOUT, f0=AR_C, f1=0, f2=nb, nr=M), 0))
+        p.append((enc(OP_VST, f0=AR_C, f1=C_VM + nb * MAXDIM, nr=M), 0))
+        p.append((enc(OP_VMEMST, f1=0, f2=nb, f3=C_VM + nb * MAXDIM, nr=M), 0))
     return p
 
 
@@ -1209,7 +1247,8 @@ def vadd_program(M, K, N):
         enc(OP_VMATPOP, f0=AR_P, nr=M),
         enc(OP_VADD, f0=AR_C, f1=AR_C, f2=AR_P, nr=M),
         enc(OP_VRELU, f0=AR_C, f1=AR_C, nr=M),
-        enc(OP_MVOUT, f0=AR_C, f1=0, f2=0, nr=M)]]
+        enc(OP_VST, f0=AR_C, f1=C_VM, nr=M),
+        enc(OP_VMEMST, f1=0, f2=0, f3=C_VM, nr=M)]]
 
 
 def expand(prog):
@@ -1291,8 +1330,8 @@ _OPNAME = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
            OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
            OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop",
            OP_VMATLOAD: "vmatload", OP_VMATPUSH: "vmatpush",
-           OP_VMATPOP: "vmatpop"}
-_RETIRED = (OP_DMA_ST, OP_MM)
+           OP_VMATPOP: "vmatpop", OP_VST: "vst", OP_VMEMST: "vmemst"}
+_RETIRED = (OP_DMA_ST, OP_MM, OP_MVOUT)
 
 
 def check_program(prog):
@@ -1311,7 +1350,7 @@ def check_program(prog):
         the opcode table. Written-ness is tracked per row and propagated
         through `vld` (a copy of an unwritten row is unwritten); it is an
         error only where a value is *consumed*: `vmatload`, `vmatpush`,
-        `vadd`, `vrelu` and `mvout` reading vregs.
+        `vadd`, `vrelu` and `vst` reading vregs.
       * **the vreg distance contract**: every vreg read comes at least
         `VR_RAW_DIST` `vpu` iterations after the write it depends on, which
         is what makes `schedule()`'s dependence claim on `vreg` true.
@@ -1479,10 +1518,14 @@ def check_program(prog):
                 vr_read(src[i], it + i, "a source")
                 vr_write(dst[i], it + i)
             it += nr
-        elif op == OP_MVOUT:
-            for i, r in enumerate(span("vr", f0, nr)):
-                vr_read(r, it + i, "the value to retire")
+        elif op == OP_VST:
+            for i, (r, d) in enumerate(zip(span("vr", f0, nr),
+                                           span("vmem", f1, nr))):
+                vr_read(r, it + i, "the value to store")
+                written["vmem"][d] = True
             it += nr
+        elif op == OP_VMEMST:
+            need("vmem", span("vmem", f3, nr), "the rows to store")
             if f2 >= WPR or f1 + nr > MAXDIM:
                 raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
                                    f"block {f2} outside the {MAXDIM}x{MAXDIM} result")
@@ -1544,12 +1587,12 @@ def assemble(prog, check=True):
     assert n_ld < (1 << 15) and push_rows < (1 << 15), "array counts overflow"
     hdr = [len(prog),
            rows(OP_DMA_LD),
-           rows(OP_DMA_LD, OP_VLD),
+           rows(OP_DMA_LD, OP_VLD, OP_VST, OP_VMEMST),
            rows(OP_VLD, OP_VMATLOAD, OP_VMATPUSH, OP_VMATPOP, OP_VRELU,
-                OP_MVOUT) + 2 * rows(OP_VADD),
+                OP_VST) + 2 * rows(OP_VADD),
            n_ld | (push_rows << 16),
            0,                                  # retired (was accu's count)
-           rows(OP_MVOUT),
+           rows(OP_VMEMST),
            a_span | (b_span << 16)]
     assert len(hdr) == NHDR
     # Every count is read back through a 16-bit slice, which used to extract
@@ -1604,4 +1647,7 @@ def schedule(s):
         for j in range(T):
             s.pipeline(f"pe_{i}_{j}:x", style="flp")
             s.pipeline(f"wld_{i}_{j}:c", style="flp")
+    # vmu too, since increment 4: it puts vld rows to the vpu and gets vst
+    # rows back in the same loop
+    s.pipeline("vmu_0:x", style="flp")
     return s

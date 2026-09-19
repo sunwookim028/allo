@@ -53,8 +53,11 @@ def build(prog):
                 yield ("put", "c_vpu", (op, nr, f0))
             elif op == U.OP_VADD:
                 yield ("put", "c_vpu", (op, 2 * nr, f0))
-            elif op == U.OP_MVOUT:
+            elif op == U.OP_VST:
                 yield ("put", "c_vpu", (op, nr, f0))
+                yield ("put", "c_vmu", (op, nr, f0))
+            elif op == U.OP_VMEMST:
+                yield ("put", "c_vmu", (op, nr, f0))
                 yield ("put", "c_dst", (op, nr, f0))
             elif op in (U.OP_VMATLOAD, U.OP_VMATPUSH, U.OP_VMATPOP, U.OP_VRELU):
                 yield ("put", "c_vpu", (op, nr, f0))
@@ -84,10 +87,15 @@ def build(prog):
         n_row = (yield ("get", "c_vmu")) & 0xFFFF
 
         def body(word, r):
-            if word[0] == U.OP_DMA_LD:
+            op = word[0]
+            if op == U.OP_DMA_LD:
                 yield ("get", "dma2vm")
-            else:
+            elif op == U.OP_VST:
+                yield ("get", "vr2vm")
+            elif op == U.OP_VLD:
                 yield ("put", "vm2vr", 0)
+            else:
+                yield ("put", "vm2dst", 0)
         yield from flat("c_vmu", n_row, body)
 
     def vpu():
@@ -111,8 +119,8 @@ def build(prog):
                 pend[0] = 0
             elif op == U.OP_VMATPOP:
                 yield ("get", "mxo")
-            elif op == U.OP_MVOUT:
-                yield ("put", "ac2sp", 0)
+            elif op == U.OP_VST:
+                yield ("put", "vr2vm", 0)
         yield from flat("c_vpu", n_it, body)
 
     def chain_in(i, j):
@@ -166,7 +174,7 @@ def build(prog):
         n_row = (yield ("get", "c_dst")) & 0xFFFF
 
         def body(word, r):
-            yield ("get", "ac2sp")
+            yield ("get", "vm2dst")
         yield from flat("c_dst", n_row, body)
 
     procs = {"sequencer": seq(), "dma_ld": dma_ld(), "vmu": vmu(), "vpu": vpu(),
