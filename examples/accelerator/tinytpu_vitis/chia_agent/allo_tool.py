@@ -27,11 +27,14 @@ from spec_policy import policy_violations
 
 #: CHIA binds each tool server to `ray.util.get_node_ip_address()`, which on a
 #: Ray worker is the host's routable address -- an unauthenticated server
-#: anyone on the network can call. Set TINYTPU_TOOL_HOST=127.0.0.1 in the
-#: environment `ray start` runs in (single-host runs) to bind loopback instead.
+#: anyone on the network can call, able to edit the candidate and start Vitis
+#: runs. So the DEFAULT is loopback. A multi-host swarm, where opencode and the
+#: tool server sit on different nodes, must opt in explicitly with
+#: TINYTPU_TOOL_HOST=node (Ray's routable address) or a specific address -- and
+#: should then add authentication or a firewall, which this module does not.
 #: This module is imported in the tool's actor before the server starts.
-_TOOL_HOST = os.environ.get("TINYTPU_TOOL_HOST")
-if _TOOL_HOST:
+_TOOL_HOST = os.environ.get("TINYTPU_TOOL_HOST", "127.0.0.1")
+if _TOOL_HOST != "node":
     ray.util.get_node_ip_address = lambda *args, **kwargs: _TOOL_HOST
 
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
