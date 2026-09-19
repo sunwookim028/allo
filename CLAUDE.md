@@ -55,6 +55,10 @@ cd docs && make html SPHINXBUILD=~/.cache/docs-tools/venv/bin/sphinx-build O="-D
 # output: docs/build/html (gitignored)
 ```
 
+To publish, push `main` first, then run `docs/publish.sh` (`--dry-run` builds
+only). It refuses a dirty tree or an unpushed HEAD, so the live site always
+matches a commit on `origin/main`, and pushes to `gh-pages`.
+
 Upstream's `sphinx_build.yml` runs on upstream's self-hosted runner, so it
 does not build the fork's site; build locally.
 
