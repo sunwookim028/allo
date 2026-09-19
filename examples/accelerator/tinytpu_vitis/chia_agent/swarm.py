@@ -29,6 +29,8 @@ from pathlib import Path
 
 from spend import spent_since
 
+DEFAULT_CALL_USD = 3.5  # as loop.py
+
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parents[3]
 
@@ -75,11 +77,12 @@ Your starting angle:
 """
 
 
-def launch(worker, angle, run_dir: Path, iterations, budget, t0_ms):
+def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms):
     log_dir = run_dir / worker
     log_dir.mkdir(parents=True, exist_ok=True)
     work = REPO_ROOT / ".chia_scratch" / run_dir.name / worker
-    env = os.environ | {"CHIA_RUN_T0_MS": str(t0_ms), "CHIA_BUDGET_USD": str(budget)}
+    env = os.environ | {"CHIA_RUN_T0_MS": str(t0_ms),
+                        "CHIA_BUDGET_USD": str(soft_budget)}
     command = [sys.executable, "-u", str(AGENT_DIR / "loop.py"),
                "--task", BASE_TASK.format(angle=angle),
                "--iterations", str(iterations),
@@ -139,13 +142,19 @@ def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dic
     return summary
 
 
-def kill(procs):
+def kill(procs, opencode_too=False):
     for _, p in procs:
         if p.poll() is None:
             try:
                 os.killpg(p.pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
+    if opencode_too:
+        # opencode runs as a grandchild of a Ray worker, outside the loops'
+        # process groups, and would keep spending after its driver died. Match
+        # this checkout's own install only.
+        subprocess.run(["pkill", "-f", str(AGENT_DIR / "node_modules")],
+                       capture_output=True)
 
 
 def main() -> None:
@@ -170,6 +179,10 @@ def main() -> None:
                                capture_output=True, text=True).stdout.strip(),
         "task_template": BASE_TASK, "strategies": dict(strategies)}, indent=1))
 
+    # Each loop checks "spent + its next call <= cap" on its own, so two loops
+    # can pass that check at the same moment. Reserve one projected call per
+    # other worker; the hard cap below is the backstop.
+    soft = args.budget_usd - DEFAULT_CALL_USD * (len(strategies) - 1)
     procs = []
     capped = False
     try:
@@ -178,14 +191,14 @@ def main() -> None:
                 time.sleep(args.stagger)
             print(f"launching worker '{worker}'", flush=True)
             procs.append((worker, launch(worker, angle, run_dir, args.iterations,
-                                         args.budget_usd, t0_ms)))
+                                         soft, t0_ms)))
         while any(p.poll() is None for _, p in procs):
             spent = spent_since(t0_ms)["usd"]
             if spent >= args.budget_usd:
                 print(f"HARD CAP: spent ${spent:.2f} >= ${args.budget_usd:.2f}; "
                       f"killing workers", flush=True)
                 capped = True
-                kill(procs)
+                kill(procs, opencode_too=True)
                 break
             time.sleep(15)
         for worker, p in procs:
