@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """The operand vector registers, their sole owner, and the array's activation
-port. See ``docs/source/designs/tinytpu_isa.rst``."""
+port. Written by `vld` from the scratchpad and by a `dma_ld` addressed here,
+read by `mm`. See ``docs/source/designs/tinytpu_isa.rst``."""
 
 from __future__ import annotations
 
@@ -16,33 +17,36 @@ from ..compose import unit
     isa=("OP_MM", "OP_DMA_LD", "OP_VLD"),
 )
 def vru():
-    nw: UInt(64) = c_vru.get()
-    n_word: int32 = nw[0:16]
+    count_word: UInt(64) = c_vru.get()
+    n_word: int32 = count_word[0:16]
     vr: UInt(VW)[NVR]
     op: int32 = 0
-    f0: int32 = 0
-    f3: int32 = 0
-    cnt: int32 = 0
-    r: int32 = -1               # advanced at the TOP: see the II note
-    for x in range(n_word):
-        r += 1
-        if r >= cnt:
-            w0: UInt(64) = c_vru.get()
-            op = w0[0:6]
-            f0 = w0[6:18]
-            f3 = w0[42:54]
-            cnt = w0[54:62]
-            r = 0
+    vr_base: int32 = 0          # mm: the activation rows; vld: the destination
+    dma_base: int32 = 0
+    instr_rows: int32 = 0
+    row: int32 = -1             # advanced at the top: hoisting this holds II=1
+    for work in range(n_word):
+        row += 1
+        if row >= instr_rows:
+            word: UInt(64) = c_vru.get()
+            op = word[0:6]
+            vr_base = word[6:18]
+            dma_base = word[42:54]
+            instr_rows = word[54:62]
+            row = 0
+        # ONE vr read and ONE vr write per iteration, each at a muxed address
+        # and the write from a muxed source: that is what holds II=1 in the
+        # unit that used to be the critical one.
         if op == OP_MM:
-            vv: UInt(VW) = vr[f0 + r]
-            acol[0].put(vv)
+            activation: UInt(VW) = vr[vr_base + row]
+            acol[0].put(activation)
         else:
-            wa: int32 = f0 + r
+            write_row: int32 = vr_base + row
             if op == OP_DMA_LD:
-                wa = f3 + r
-            wv: UInt(VW) = 0
+                write_row = dma_base + row
+            write_word: UInt(VW) = 0
             if op == OP_VLD:
-                wv = sp2vr.get()
+                write_word = sp2vr.get()
             else:
-                wv = dma2vr.get()
-            vr[wa] = wv
+                write_word = dma2vr.get()
+            vr[write_row] = write_word

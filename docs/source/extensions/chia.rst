@@ -133,6 +133,27 @@ it, **what each instruction means is part of the contract**: the agent may
 change how the hardware executes the ISA and which instructions the generator
 emits, not an instruction's semantics.
 
+.. warning::
+
+   **The loop is blocked until this list is updated.** The design is no longer
+   two files: the hardware moved into a unit library under
+   ``examples/accelerator/tinytpu_vitis/ip/`` (:doc:`/designs/tinytpu_library`),
+   and ``microarch_isa.py`` is now only the instantiation. A CHIA agent whose
+   editable set is ``("microarch_isa.py", "isa_dsl.py")`` can therefore no
+   longer change the microarchitecture at all.
+
+   The breakage is gated rather than silent: ``chia_agent/test_harness.py``,
+   the documented $0 preflight for any paid run, fails, because all four of
+   its mutant specs and its ``ANCHOR`` patch text that has moved. **Do not run
+   a paid loop until it passes again.** What has to change is listed on
+   :doc:`/designs/tinytpu_library` -- ``EDITABLE`` in ``allo_tool.py`` and
+   ``evaluate.py``, the flat spec-directory mapping in ``AlloSpecTool``,
+   ``evaluate.compose`` and ``loop.seed_spec``, the allowed-file set and pinned
+   control blobs in ``accept.py``, ``test_harness.py``'s ``MUTANTS`` and
+   ``ANCHOR``, and the file list in ``loop.py``'s agent prompt.
+   ``param_check.py`` and ``gate_runner.py`` need no change: they work through
+   ``microarch_isa``'s module attributes, which are unchanged.
+
 The evaluator
 ~~~~~~~~~~~~~
 

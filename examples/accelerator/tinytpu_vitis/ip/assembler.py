@@ -12,6 +12,8 @@ an unwritten row, or an `ar` row too soon after writing it, is a wrong answer.
 Both are rejected here. See ``docs/source/designs/tinytpu_isa.rst``.
 """
 
+from collections import namedtuple
+
 from .isa import (AGU_TERMS, LOOP_DEPTH, OPCODE_NAMES, OP_DMA_LD, OP_DMA_ST,
                   OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
                   OP_VLD, OP_VRELU, NHDR, DMA_SRC_B, DMA_TO_VR)
@@ -21,6 +23,12 @@ from .isa import (AGU_TERMS, LOOP_DEPTH, OPCODE_NAMES, OP_DMA_LD, OP_DMA_ST,
 # `isa_dsl.ar_distance_program(d)`: d=1 -> 4 cells wrong, d=2 -> 20 wrong,
 # d=3, 4, 5 -> 0. This is the first safe distance plus one of margin.
 AR_RAW_DIST = 4
+
+#: One instruction the sequencer will issue, with its address fields resolved.
+Issue = namedtuple("Issue", "op nr f0 f1 f2 f3")
+#: The same, with where it came from: `pc` its static slot, `ivs` the live
+#: induction variables of the loops open around it.
+TracedIssue = namedtuple("TracedIssue", "pc ivs op nr f0 f1 f2 f3")
 
 
 class ProgramError(ValueError):
@@ -44,49 +52,48 @@ class Assembler:
                      "ar": params.NAR}
 
     def expand(self, prog):
-        """One `(opcode, rows, f0, f1, f2, f3)` tuple per instruction the
-        sequencer will issue, with the AGU resolved as it resolves it."""
-        return [e[2:] for e in self.trace(prog)]
+        """One `Issue` per instruction the sequencer will issue, with the AGU
+        resolved exactly as it resolves it."""
+        return [Issue(*traced[2:]) for traced in self.trace(prog)]
 
     def trace(self, prog):
-        """`expand`, with where each dynamic issue came from: yields
-        `(pc, ivs, op, nr, f0, f1, f2, f3)`, `ivs` the live induction
-        variables. The one place the assembler mirrors the sequencer."""
+        """`expand`, with each issue's origin: the one place the assembler
+        mirrors the sequencer's control flow."""
         pc = 0
         stack = []
-        iv_now = [0] * LOOP_DEPTH
+        live_iv = [0] * LOOP_DEPTH
         guard = 0
         while pc < len(prog):
             guard += 1
             if guard > 1 << 22:
                 raise AssertionError("program does not terminate")
-            w0, w1 = prog[pc]
-            op = w0 & 0x3F
+            control_word, agu_word = prog[pc]
+            op = control_word & 0x3F
             if op == OP_LOOP:
-                trip = (w0 >> 54) & 0xFF
-                iv_now[len(stack)] = 0
-                stack.append([pc + 1, 0, trip])
+                live_iv[len(stack)] = 0
+                stack.append([pc + 1, 0, (control_word >> 54) & 0xFF])
                 pc += 1
             elif op == OP_ENDLOOP:
-                fr = stack[-1]
-                fr[1] += 1
-                if fr[1] < fr[2]:
-                    iv_now[len(stack) - 1] = fr[1]
-                    pc = fr[0]
+                body, iteration, trip = frame = stack[-1]
+                frame[1] = iteration = iteration + 1
+                if iteration < trip:
+                    live_iv[len(stack) - 1] = iteration
+                    pc = body
                 else:
                     stack.pop()
                     pc += 1
             else:
-                f = [(w0 >> sh) & 0xFFF for sh in (6, 18, 30, 42)]
-                for t in range(AGU_TERMS):
-                    base = 19 * t
-                    tw = (w1 >> base) & 0xF
-                    lw = (w1 >> (base + 4)) & 0x7
-                    st = (w1 >> (base + 7)) & 0xFFF
-                    if tw != 0:
-                        f[tw - 1] += iv_now[lw] * st
-                yield (pc, tuple(iv_now[:len(stack)]), op, (w0 >> 54) & 0xFF,
-                       f[0], f[1], f[2], f[3])
+                fields = [(control_word >> sh) & 0xFFF
+                          for sh in (6, 18, 30, 42)]
+                for term in range(AGU_TERMS):
+                    base = 19 * term
+                    target = (agu_word >> base) & 0xF
+                    level = (agu_word >> (base + 4)) & 0x7
+                    stride = (agu_word >> (base + 7)) & 0xFFF
+                    if target != 0:
+                        fields[target - 1] += live_iv[level] * stride
+                yield TracedIssue(pc, tuple(live_iv[:len(stack)]), op,
+                                  (control_word >> 54) & 0xFF, *fields)
                 pc += 1
 
     # pylint: disable=too-many-branches, too-many-statements, too-many-locals
@@ -99,8 +106,8 @@ class Assembler:
         if not prog:
             raise ProgramError("empty program")
         depth = 0
-        for pc, (w0, w1) in enumerate(prog):
-            op = w0 & 0x3F
+        for pc, (control_word, agu_word) in enumerate(prog):
+            op = control_word & 0x3F
             name = OPCODE_NAMES.get(op)
             where = f"instruction {pc} ({name or f'opcode {op}'})"
             if name is None or op == OP_DMA_ST:
@@ -108,30 +115,34 @@ class Assembler:
             if op == OP_LOOP:
                 if depth >= LOOP_DEPTH:
                     raise ProgramError(f"{where}: nesting exceeds LOOP_DEPTH={LOOP_DEPTH}")
-                if (w0 >> 54) & 0xFF < 1:
+                if (control_word >> 54) & 0xFF < 1:
                     raise ProgramError(f"{where}: trip count 0 still runs the body once")
                 depth += 1
             elif op == OP_ENDLOOP:
                 if depth == 0:
                     raise ProgramError(f"{where}: endloop with no open loop")
                 depth -= 1
-            for t in range(AGU_TERMS):
-                tw = (w1 >> (19 * t)) & 0xF
-                lw = (w1 >> (19 * t + 4)) & 0x7
-                if tw == 0:
+            for term in range(AGU_TERMS):
+                target = (agu_word >> (19 * term)) & 0xF
+                level = (agu_word >> (19 * term + 4)) & 0x7
+                if target == 0:
                     continue
-                if op in (OP_LOOP, OP_ENDLOOP, OP_NOP) or tw > 4 or lw >= depth:
+                if (op in (OP_LOOP, OP_ENDLOOP, OP_NOP) or target > 4
+                        or level >= depth):
                     raise ProgramError(
-                        f"{where}: AGU term {t} targets field {tw - 1} with loop "
-                        f"level {lw}, but {depth} loop(s) are open here -- the "
-                        f"sequencer would use a stale iv_now[{lw}]")
+                        f"{where}: AGU term {term} targets field {target - 1} "
+                        f"with loop level {level}, but {depth} loop(s) are open "
+                        f"here -- the sequencer would use a stale "
+                        f"live_iv[{level}]")
         if depth:
             raise ProgramError(f"{depth} loop(s) never closed")
 
         written = {"spad": [False] * p.SPAD_ROWS, "vr": [False] * p.NVR,
                    "ar": [False] * p.NAR}
-        ar_wrote = [-self.ar_raw_dist] * p.NAR  # accu iteration of the last write
-        it = 0                            # accu iterations issued so far
+        # The accu step each `ar` row was last written on, and how many steps
+        # the program has issued so far: the distance contract counts in steps.
+        ar_written_at = [-self.ar_raw_dist] * p.NAR
+        accu_step = 0
         size = self.size
 
         for pc, ivs, op, nr, f0, f1, f2, f3 in self.trace(prog):
@@ -145,7 +156,7 @@ class Assembler:
                 return range(base, base + n)
 
             def need(mem, rows, what):
-                bad = [r for r in rows if not written[mem][r]]
+                bad = [row for row in rows if not written[mem][row]]
                 if bad:
                     raise ProgramError(
                         f"{where}: reads {mem} row(s) {bad} as {what} before any "
@@ -162,20 +173,19 @@ class Assembler:
                 raise ProgramError(f"{where}: nr=0 desynchronises the unit's "
                                    f"flat row loop; drop the instruction instead")
 
-            def ar_read(row, at, what):
-                # the distance contract: `at` is the accu iteration of the read
+            def ar_read(row, step, what):
                 need("ar", [row], what)
-                if at - ar_wrote[row] < self.ar_raw_dist:
+                if step - ar_written_at[row] < self.ar_raw_dist:
                     raise ProgramError(
                         f"{where}: reads ar row {row} as {what} "
-                        f"{at - ar_wrote[row]} accu iteration(s) after it was "
+                        f"{step - ar_written_at[row]} accu step(s) after it was "
                         f"written; the accumulator's dependence claim needs "
                         f">= AR_RAW_DIST={self.ar_raw_dist} (see the "
                         f"accumulator distance contract)")
 
-            def ar_write(row, at):
+            def ar_write(row, step):
                 written["ar"][row] = True
-                ar_wrote[row] = at
+                ar_written_at[row] = step
 
             if op == OP_DMA_LD:
                 if f0 not in (0, 1, 2, 3):
@@ -185,41 +195,44 @@ class Assembler:
                     raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
                                        f"col block {f2} outside the "
                                        f"{p.MAXDIM}x{p.MAXDIM} operand")
-                for r in span("vr" if f0 & DMA_TO_VR else "spad", f3, nr):
-                    written["vr" if f0 & DMA_TO_VR else "spad"][r] = True
+                memory = "vr" if f0 & DMA_TO_VR else "spad"
+                for row in span(memory, f3, nr):
+                    written[memory][row] = True
             elif op == OP_VLD:
-                src = span("spad", f1, nr)
-                for d, s in zip(span("vr", f0, nr), src):
-                    written["vr"][d] = written["spad"][s]
+                # A copy of an unwritten row is unwritten too.
+                for dest, source in zip(span("vr", f0, nr),
+                                        span("spad", f1, nr)):
+                    written["vr"][dest] = written["spad"][source]
             elif op == OP_MM:
                 if f2 not in (0, 1):
                     raise ProgramError(f"{where}: f2={f2}, must be 0 (overwrite) or 1 (accumulate)")
                 need("spad", span("spad", f3, p.T), "weights")
                 need("vr", span("vr", f0, nr), "activations")
-                dst = span("ar", f1, nr)
-                for i, r in enumerate(dst):      # row by row, as `accu` runs it
+                # Row by row, one accu step each, as `accu` runs it.
+                for i, row in enumerate(span("ar", f1, nr)):
                     if f2 == 1:
-                        ar_read(r, it + i, "the accumulate base")
-                    ar_write(r, it + i)
-                it += nr
+                        ar_read(row, accu_step + i, "the accumulate base")
+                    ar_write(row, accu_step + i)
+                accu_step += nr
             elif op == OP_VADD:
-                s1, s2, dst = (span("ar", f1, nr), span("ar", f2, nr),
-                               span("ar", f0, nr))
-                for i in range(nr):              # two iterations per row
-                    ar_read(s1[i], it + 2 * i, "a source")
-                    ar_read(s2[i], it + 2 * i + 1, "a source")
-                    ar_write(dst[i], it + 2 * i + 1)
-                it += 2 * nr
+                first = span("ar", f1, nr)
+                second = span("ar", f2, nr)
+                dest = span("ar", f0, nr)
+                for i in range(nr):              # two accu steps per row
+                    ar_read(first[i], accu_step + 2 * i, "a source")
+                    ar_read(second[i], accu_step + 2 * i + 1, "a source")
+                    ar_write(dest[i], accu_step + 2 * i + 1)
+                accu_step += 2 * nr
             elif op == OP_VRELU:
-                src, dst = span("ar", f1, nr), span("ar", f0, nr)
+                source, dest = span("ar", f1, nr), span("ar", f0, nr)
                 for i in range(nr):
-                    ar_read(src[i], it + i, "a source")
-                    ar_write(dst[i], it + i)
-                it += nr
+                    ar_read(source[i], accu_step + i, "a source")
+                    ar_write(dest[i], accu_step + i)
+                accu_step += nr
             elif op == OP_MVOUT:
-                for i, r in enumerate(span("ar", f0, nr)):
-                    ar_read(r, it + i, "the value to retire")
-                it += nr
+                for i, row in enumerate(span("ar", f0, nr)):
+                    ar_read(row, accu_step + i, "the value to retire")
+                accu_step += nr
                 if f2 >= p.WPR or f1 + nr > p.MAXDIM:
                     raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
                                        f"block {f2} outside the "
@@ -230,9 +243,15 @@ class Assembler:
         counts.
 
             imem[0] static instruction count   imem[4] mm count | mm rows << 16
-            imem[1] dma_ld  rows               imem[5] accu   iterations
+            imem[1] dma_ld  rows               imem[5] accu   steps
             imem[2] spm     rows               imem[6] dma_st rows
-            imem[3] vru     rows               imem[7] A rows | B rows << 16
+            imem[3] vru     words              imem[7] A rows | B rows << 16
+
+        These are WORK counts, not instruction counts, with the two per-unit
+        adjustments the flattened bodies make: `spm` charges an `mm` T + 1
+        iterations whatever its own row count, `accu` charges a `vadd` two
+        steps per row, and a `dma_ld` goes to `spm` or to `vru` by its
+        destination bit, never both.
 
         `check=False` exists only so a test can put a known-bad program on the
         machine and watch it fail; nothing that ships passes it.
@@ -240,46 +259,49 @@ class Assembler:
         p = self.p
         if check:
             self.check(prog)
-        ev = self.expand(prog)
+        issues = self.expand(prog)
 
         def rows(*ops):
-            return sum(e[1] for e in ev if e[0] in ops)
+            return sum(issue.nr for issue in issues if issue.op in ops)
 
         def count(*ops):
-            return sum(1 for e in ev if e[0] in ops)
+            return sum(1 for issue in issues if issue.op in ops)
 
-        def span(src):
-            # The DRAM row span `dma_ld` must burst for one source matrix: the
+        def dram_span(source):
+            # The DRAM row span `dma_ld` must burst for one operand matrix: the
             # highest row any of its `dma_ld`s names, after the AGU is resolved.
-            return max([e[3] + e[1] for e in ev
-                        if e[0] == OP_DMA_LD and (e[2] & DMA_SRC_B) == src] + [0])
+            return max([issue.f1 + issue.nr for issue in issues
+                        if issue.op == OP_DMA_LD
+                        and (issue.f0 & DMA_SRC_B) == source] + [0])
 
-        a_span, b_span = span(0), span(1)
+        a_span, b_span = dram_span(0), dram_span(1)
         assert a_span <= p.MAXDIM and b_span <= p.MAXDIM, (
             f"dma_ld row span {a_span}/{b_span} exceeds MAXDIM={p.MAXDIM}")
 
         n_mm = count(OP_MM)
         mm_rows = rows(OP_MM)
         assert n_mm < (1 << 15) and mm_rows < (1 << 15), "array counts overflow"
-        ld_vr = sum(e[1] for e in ev if e[0] == OP_DMA_LD and e[2] & DMA_TO_VR)
-        ld_sp = rows(OP_DMA_LD) - ld_vr
-        hdr = [len(prog),
-               rows(OP_DMA_LD),
-               ld_sp + rows(OP_VLD) + n_mm * (p.T + 1),
-               ld_vr + rows(OP_VLD) + mm_rows,
-               n_mm | (mm_rows << 16),
-               rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
-               rows(OP_MVOUT),
-               a_span | (b_span << 16)]
-        assert len(hdr) == NHDR
+        rows_to_vr = sum(issue.nr for issue in issues
+                         if issue.op == OP_DMA_LD and issue.f0 & DMA_TO_VR)
+        rows_to_spad = rows(OP_DMA_LD) - rows_to_vr
+        header = [len(prog),
+                  rows(OP_DMA_LD),
+                  rows_to_spad + rows(OP_VLD) + n_mm * (p.T + 1),
+                  rows_to_vr + rows(OP_VLD) + mm_rows,
+                  n_mm | (mm_rows << 16),
+                  rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
+                  rows(OP_MVOUT),
+                  a_span | (b_span << 16)]
+        assert len(header) == NHDR
         # Every count is read back through a 16-bit slice, which used to
         # extract to a signed ap_int<16>, so the usable range stops at 2^15 - 1.
-        for h in hdr[1:4] + hdr[5:7]:
-            assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
-        words = list(hdr)
-        for w0, w1 in prog:
-            words.append(int(w0))
-            words.append(int(w1))
+        for count_field in header[1:4] + header[5:7]:
+            assert 0 <= count_field < (1 << 15), (
+                f"header count {count_field} does not fit 15 bits")
+        words = list(header)
+        for control_word, agu_word in prog:
+            words.append(int(control_word))
+            words.append(int(agu_word))
         assert len(words) <= p.IMEM_SIZE, (
             f"{len(words)} words > IMEM_SIZE={p.IMEM_SIZE}")
         return words

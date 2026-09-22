@@ -26,52 +26,55 @@ def dma_load_directives(s, ctx):
     isa=("DMA_SRC_B", "DMA_TO_VR"),
     directives=dma_load_directives,
 )
-def dma_ld(lA: int8[MAXDIM * MAXDIM], lB: int8[MAXDIM * MAXDIM]):
-    nw: UInt(64) = c_dld.get()
-    n_row: int32 = nw[0:16]
-    sw: UInt(64) = c_dld.get()  # the DRAM row span of each source matrix
-    na: int32 = sw[0:16]
-    nb: int32 = sw[16:32]
+def dma_ld(dram_a: int8[MAXDIM * MAXDIM], dram_b: int8[MAXDIM * MAXDIM]):
+    count_word: UInt(64) = c_dld.get()
+    n_row: int32 = count_word[0:16]
+    span_word: UInt(64) = c_dld.get()
+    a_rows: int32 = span_word[0:16]
+    b_rows: int32 = span_word[16:32]
 
-    # One burst per matrix, each covering exactly that matrix's own span.
-    # Merging the two into one loop bounded by `max(na, nb)` was measured
-    # and moved nothing: the bursts are hidden behind the prefetch.
-    rbA: UInt(VW)[MAXDIM * WPR]
-    rbB: UInt(VW)[MAXDIM * WPR]
-    for ia in range(na * WPR):
-        pa: UInt(VW) = 0
-        with allo.meta_for(T) as e:
-            av: int8 = lA[ia * T + e]
-            pa[8 * e : 8 * (e + 1)] = av
-        rbA[ia] = pa
-    for ic in range(nb * WPR):
-        pb: UInt(VW) = 0
-        with allo.meta_for(T) as e2:
-            bv: int8 = lB[ic * T + e2]
-            pb[8 * e2 : 8 * (e2 + 1)] = bv
-        rbB[ic] = pb
+    # One variable-length burst per matrix, covering exactly the DRAM rows the
+    # program names: a per-row strided read is a separate four-beat AXI
+    # transaction per row (`[HLS 214-115] Multiple burst reads of length 4`,
+    # II=4). Merging the two into one loop bounded by max(a_rows, b_rows)
+    # halves the burst time and was measured to move nothing -- the bursts are
+    # already hidden behind the sequencer's prefetch.
+    a_onchip: UInt(VW)[MAXDIM * WPR]
+    b_onchip: UInt(VW)[MAXDIM * WPR]
+    for a_word in range(a_rows * WPR):
+        packed_a: UInt(VW) = 0
+        with allo.meta_for(T) as a_lane:
+            a_value: int8 = dram_a[a_word * T + a_lane]
+            packed_a[8 * a_lane : 8 * (a_lane + 1)] = a_value
+        a_onchip[a_word] = packed_a
+    for b_word in range(b_rows * WPR):
+        packed_b: UInt(VW) = 0
+        with allo.meta_for(T) as b_lane:
+            b_value: int8 = dram_b[b_word * T + b_lane]
+            packed_b[8 * b_lane : 8 * (b_lane + 1)] = b_value
+        b_onchip[b_word] = packed_b
 
-    f0: int32 = 0
-    f1: int32 = 0
-    f2: int32 = 0
-    cnt: int32 = 0
-    r: int32 = -1               # advanced at the TOP: see the II note
-    for x in range(n_row):
-        r += 1
-        if r >= cnt:
+    route: int32 = 0
+    dram_row0: int32 = 0
+    col_block: int32 = 0
+    instr_rows: int32 = 0
+    row: int32 = -1             # advanced at the top: hoisting this holds II=1
+    for work in range(n_row):
+        row += 1
+        if row >= instr_rows:
             # Only `dma_ld` reaches this queue, so there is no opcode test.
-            w0: UInt(64) = c_dld.get()
-            f0 = w0[6:18]
-            f1 = w0[18:30]
-            f2 = w0[30:42]
-            cnt = w0[54:62]
-            r = 0
-        pw: UInt(VW) = 0
-        if (f0 & DMA_SRC_B) == 0:
-            pw = rbA[(f1 + r) * WPR + f2]
+            word: UInt(64) = c_dld.get()
+            route = word[6:18]
+            dram_row0 = word[18:30]
+            col_block = word[30:42]
+            instr_rows = word[54:62]
+            row = 0
+        packed: UInt(VW) = 0
+        if (route & DMA_SRC_B) == 0:
+            packed = a_onchip[(dram_row0 + row) * WPR + col_block]
         else:
-            pw = rbB[(f1 + r) * WPR + f2]
-        if f0 >= DMA_TO_VR:
-            dma2vr.put(pw)
+            packed = b_onchip[(dram_row0 + row) * WPR + col_block]
+        if route >= DMA_TO_VR:
+            dma2vr.put(packed)
         else:
-            dma2sp.put(pw)
+            dma2sp.put(packed)
