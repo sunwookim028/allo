@@ -275,6 +275,29 @@ it does not travel**, and a recipient who cannot reproduce it says so rather
 than adopting it. Two agents refused a coordinator's figure on exactly that
 ground tonight, and both were right to.
 
+**Four checkers can pass a program the hardware will not run.** Measured on
+2026-09-22 while trying to confirm two extra encodable loop nests: the reference
+model says correct, the program validator accepts, the cycle model runs, the
+dataflow simulator completes and is correct, and Vitis **csim** reports zero
+mismatches — and Vitis **cosim does not complete.** Two row-tiled mappings sat
+at ``Inter-Transaction Progress 0/1`` with the simulator process still at 99 %
+CPU after **32 minutes**, against about two minutes for the shipped mapping. No
+deadlock is *reported*, so it is not called one.
+
+Two consequences, and the second is the uncomfortable one. **An encodable count
+is not a runnable count**: five nests are encodable by the encoder and the
+reference model, three are confirmed on RTL, and the smaller number is the one
+any hardware claim has to use. And **two of those four checkers are derived from
+the assembler's own header**, so neither can see an error in the header formula
+itself — agreement among them is weaker evidence than it looks, because they
+share a premise.
+
+The general lesson is about verification chains rather than about this design:
+**a stack of cheap checks that all pass is not a substitute for the expensive
+one, when some of the cheap checks are derived from the same source.** The
+flow now reports which tier a result belongs to and never *picks* a mapping that
+only the cheap checks have cleared.
+
 **Report resources and clock beside cycles, always.** A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist
