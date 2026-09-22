@@ -17,7 +17,9 @@ from act.nest import (  # noqa: E402
 )
 from act.target import Target, register  # noqa: E402
 from examples.accelerator.tinytpu_vitis import isa_ref  # noqa: E402
-from examples.accelerator.tinytpu_vitis.act_machine import MACHINE  # noqa: E402
+from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
+    MACHINE, steps_of,
+)
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     NestError, Program, Ref,
 )
@@ -275,7 +277,7 @@ class TinyTpu(Target):
         return program
 
     def steps(self, program):
-        return self.machine.steps(expand(program))
+        return steps_of(program)
 
     def emits(self, program):
         return len(expand(program))

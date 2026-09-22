@@ -10,9 +10,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from act.machine import Machine, Opcode, Space  # noqa: E402
 from act.schedule import Region  # noqa: E402
+from act.schedule import Step  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD, OP_MM,
-    OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU, SPAD_ROWS, T,
+    AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD,
+    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU,
+    SPAD_ROWS, T, expand,
 )
 
 # The fields of `allo.encoding.Encoding` on branch `act-abstractions`
@@ -30,6 +32,7 @@ SPAD, VR, AR = "spad", "vr", "ar"
 
 SEQUENCER_II = 5
 ISSUE = ("sequencer", lambda **_: SEQUENCER_II)
+ISSUE_COST = ("sequencer", SEQUENCER_II)
 
 
 def dram(tensor, col_block):
@@ -86,3 +89,45 @@ MACHINE = Machine(
     name="tinytpu-isa",
     spaces=(Space(SPAD, SPAD_ROWS), Space(VR, NVR), Space(AR, NAR)),
     opcodes=(DMA_LD, VLD, MM, VADD, VRELU, MVOUT))
+
+
+def is_control(prog):
+    """One bool per sequencer fetch: True for `loop`/`endloop`, else False.
+
+    The sequencer fetches these and the units never see them, so `expand` drops
+    them -- but the loop stack is what holds the sequencer at `SEQUENCER_II`, so
+    a cost model that does not charge them undercharges a deep nest. The walk
+    mirrors `microarch_isa._trace`'s control flow and nothing else; the AGU
+    resolution stays there, and the data fetches are paired with `expand`.
+    """
+    pc, stack = 0, []
+    while pc < len(prog):
+        op = prog[pc][0] & 0x3F
+        if op == OP_LOOP:
+            stack.append([pc + 1, 0, (prog[pc][0] >> 54) & 0xFF])
+            yield True
+            pc += 1
+        elif op == OP_ENDLOOP:
+            frame = stack[-1]
+            frame[1] += 1
+            yield True
+            if frame[1] < frame[2]:
+                pc = frame[0]
+            else:
+                stack.pop()
+                pc += 1
+        else:
+            yield False
+            pc += 1
+
+
+def steps_of(prog):
+    """Every sequencer fetch as a step, in issue order."""
+    data = iter(expand(prog))
+    out = []
+    for index, control in enumerate(is_control(prog)):
+        if control:
+            out.append(Step(index=index, loads=(ISSUE_COST,)))
+        else:
+            out.append(MACHINE.step(index, next(data)))
+    return tuple(out)

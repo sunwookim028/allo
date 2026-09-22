@@ -22,8 +22,11 @@ from examples.accelerator.tinytpu_vitis import cosim  # noqa: E402
 from examples.accelerator.tinytpu_vitis.act_compile import (  # noqa: E402
     compile_one, extents_of,
 )
+from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+    gemm_program,
+)
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    schedule, tinytpu_isa,
+    expand, schedule, tinytpu_isa,
 )
 from act import target, workloads  # noqa: E402
 from examples.accelerator.tinytpu_vitis import act_target  # noqa: E402,F401
@@ -47,6 +50,9 @@ def main(argv=None):
     ap.add_argument("workload", nargs="?", default="gemm.relu")
     ap.add_argument("shape", nargs="?", default="16x16x16")
     ap.add_argument("--top", type=int, default=2)
+    ap.add_argument("--baseline", action="store_true",
+                    help="also measure isa_dsl.gemm_program, the hand-written "
+                         "generator's program for the same shape")
     args = ap.parse_args(argv)
 
     machine = target.get("tinytpu-isa")
@@ -70,12 +76,20 @@ def main(argv=None):
     cosim.vitis(prj, cosim.TCL_SYN, "csynth.log")
 
     rows = []
+    if args.baseline:
+        hand = gemm_program(*shape, relu=bool(workload.epilogue))
+        cycles, exact = measure(prj, shape, bool(workload.epilogue), hand,
+                                "baseline")
+        print(f"  {'hand-written':14s} {len(hand):3d} instr "
+              f"{len(expand(hand)):4d} dyn             cycles={cycles}  "
+              f"{'exact' if exact else 'MISMATCH'}", flush=True)
     for rank, candidate in enumerate(chosen):
         cycles, exact = measure(prj, shape, bool(workload.epilogue),
                                 candidate.program, candidate.label)
         rows.append((candidate, cycles, exact))
-        print(f"  {candidate.label:14s} makespan {candidate.cost[0]:5d} "
-              f"emits {candidate.cost[1]:4d}  cycles={cycles}  "
+        print(f"  {candidate.label:14s} {len(candidate.program):3d} instr "
+              f"{len(expand(candidate.program)):4d} dyn  model "
+              f"{candidate.cost[0]:5d}  cycles={cycles}  "
               f"{'exact' if exact else 'MISMATCH'}", flush=True)
     measured = [(c.label, n) for c, n, ok in rows if n is not None and ok]
     if len(measured) < 2:

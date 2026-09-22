@@ -12,12 +12,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
 from act import workloads  # noqa: E402
 from act.nest import INTRINSIC, OUTER, Loop, Refused  # noqa: E402
-from act.search import Problem, search  # noqa: E402
+from act.search import Problem, price, search  # noqa: E402
 
 pytest.importorskip("allo._mlir", reason="the target needs the bindings")
 
 from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
-    ENCODING,
+    ENCODING, SEQUENCER_II, is_control, steps_of,
 )
 from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
     CAUSE_KIND, TINYTPU, roles_of,
@@ -26,7 +26,9 @@ from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES  # noqa: E402
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     gemm_program,
 )
-from examples.accelerator.tinytpu_vitis.microarch_isa import T  # noqa: E402
+from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
+    T, expand,
+)
 
 
 def shipped_nest(M, K, N):
@@ -131,3 +133,53 @@ def test_the_cost_is_a_makespan_and_an_emit_count():
         assert makespan == plan.makespan
         assert emits == TINYTPU.emits(candidate.program)
         assert makespan >= max(plan.unit_load.values())
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+def test_the_fetch_walk_agrees_with_the_shipped_expand(shape):
+    program = gemm_program(*shape, relu=True)
+    kinds = list(is_control(program))
+    assert sum(1 for control in kinds if not control) == len(expand(program))
+    assert len(steps_of(program)) == len(kinds)
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+@pytest.mark.parametrize("name", ["gemm", "gemm.relu"])
+def test_the_search_is_never_worse_than_the_hand_written_generator(name, shape):
+    workload = workloads.get(name)
+    size = extents(workload, shape)
+    result = search(Problem(workload, size), TINYTPU)
+    hand = gemm_program(*shape, relu=name.endswith("relu"))
+    assert result.best.cost <= price(TINYTPU, hand).cost, (
+        f"{name} {shape}: the search picked {result.best.label} at "
+        f"{result.best.cost}, worse than the hand-written "
+        f"{price(TINYTPU, hand).cost}")
+
+
+@pytest.mark.parametrize("shape", [s for s in SHAPES if s != (4, 4, 4)])
+def test_the_search_reproduces_the_hand_written_program_where_it_is_optimal(
+        shape):
+    workload = workloads.get("gemm.relu")
+    result = search(Problem(workload, extents(workload, shape)), TINYTPU)
+    assert result.best.program == gemm_program(*shape, relu=True)
+
+
+def test_at_one_tile_per_rank_the_search_beats_the_generator():
+    workload = workloads.get("gemm")
+    shape = (4, 4, 4)
+    result = search(Problem(workload, extents(workload, shape)), TINYTPU)
+    hand = gemm_program(*shape)
+    assert len(result.best.program) < len(hand)
+    assert TINYTPU.emits(result.best.program) == TINYTPU.emits(hand)
+    assert result.best.cost[0] < price(TINYTPU, hand).cost[0]
+
+
+def test_the_sequencer_is_charged_for_the_loop_stack():
+    workload = workloads.get("gemm.relu")
+    program = TINYTPU.lower(workload, {"M": 16, "K": 16, "N": 16},
+                            shipped_nest(16, 16, 16))
+    control = sum(1 for kind in is_control(program) if kind)
+    assert control > 0
+    plan = TINYTPU.steps(program)
+    charged = sum(dict(step.loads).get("sequencer", 0) for step in plan)
+    assert charged == len(plan) * SEQUENCER_II

@@ -456,20 +456,141 @@ committed as ``tests/act/test_tinytpu.py``.
 ``--gate`` compiles 12 problems and verifies **every** encodable mapping of each
 against numpy in 1.3 s, printing one grep-able verdict line.
 
+Two kinds of gap: cannot express, cannot refuse
+-----------------------------------------------
+
+A failing build hides two opposite problems, and the census now sorts every
+refusal into one of them (``act_target.CAUSE_KIND``). This vocabulary is from
+the abstractions work on branch ``act-abstractions`` (``65ae98c6``), which found
+that four of the five gaps it examined were of the second kind.
+
+``express``
+   The instruction word has no field, or no room, for what the nest asks. The
+   design is fine and the encoding is not, and the repair is a wider word or a
+   new field. ``acc-peel``, ``AGU_TERMS``, ``LOOP_DEPTH``, ``capacity``.
+
+``refuse``
+   The machine would accept the program and produce a wrong answer or hang.
+   Only a hand-written check says no, and the repair is a checker. This is
+   ``ar-distance`` -- and it is why ``check_program`` has to exist outside
+   ``allo/`` at all, since ``s.dependence`` makes a claim that no Allo pass
+   verifies.
+
+At ``gemm.relu`` 16x16x16 that is **1,166 express against 55 refuse** by first
+cause, and 1,166 against 930 counting every cause a nest violates.
+
+The distinction cuts the other way too, and it is worth stating because it is
+easy to misread ``acc-peel`` as a limit of Allo. It is not: expressed at the
+Allo level, the predicate a reduction needs is ``scf.if`` on
+``cmpi eq, index_cast(k), 0``, and **Allo builds that happily**. Nothing in
+Allo refuses it and no primitive removes it. The refusal is our ISA's encoding
+meeting a compiler that cannot check encodings -- which is exactly the hole
+``allo/encoding.py`` on that branch fills. ``act_machine.ENCODING`` states
+TinyTPU-isa's budgets in that record's field names, so the two sides state one
+budget rather than two once the branches meet.
+
+What this flow should emit next
+-------------------------------
+
+Today ``act/`` chooses a mapping for a **fixed** design and emits instructions
+for it. The stated end state is the other direction: a library of parametrized,
+modular IPs that compose into different architectures. The useful fact, from the
+same branch, is that **the composable IR already exists** -- ``df.customize``
+emits each unit as a ``func.func`` with explicit ``!allo.stream<i32,4>``
+arguments and an ``stypes`` attribute for port direction, with the region
+constructing the streams and wiring by ``call``, and parametrized units
+instantiated at two sizes in one program already work and are covered by the
+dataflow test suite. What is missing is only the *source syntax*: ``Stream`` has
+no ``__class_getitem__``, and stream ops are keyed to construct sites rather
+than values.
+
+So the emission target for a generated design is that IR form, not the
+closure-nested source form this design uses -- where all seven units are
+``@df.kernel`` closures inside one ``@df.region`` sharing about fifteen
+region-scope streams by capture, so no unit is separable, importable or testable
+on its own. ``act/machine.py`` is deliberately the same information a generator
+for that form would need: units, the work each does per issue, and the spaces
+they read and write. Turning that declaration into ``func.func`` units is the
+next piece of work, and nothing here forecloses it.
+
 Where the cost model is honest and where it is not
 --------------------------------------------------
 
-``makespan`` is a model, not a measurement. Its work counts are grounded -- each
-one comes from ``assemble``'s header, plus the sequencer's ``II=5`` -- but its
-dependence edges are finish-to-start at instruction granularity, so it charges
-no row-level overlap, and the dynamic stream ``expand`` yields omits
-``LOOP``/``ENDLOOP``, which the sequencer does issue. It is for ranking. Only
-``cosim.py`` measures, and ``act_cosim.py`` exists so the ranking can be checked
-against it:
+``makespan`` is a model, not a measurement. Every work count in it is read off
+``assemble``'s header -- the counts the units are actually promised -- plus the
+sequencer's ``II=5``, and the sequencer is charged for its ``LOOP``/``ENDLOOP``
+fetches as well as the data issues, which ``expand`` drops. ``act_machine``
+recovers those from the program by mirroring ``_trace``'s control flow and
+nothing else; a test pins the data fetches to ``expand``'s own stream.
+
+Charging the loop stack is the difference between a model that ranks and a model
+that misleads. Without it the top two mappings at ``gemm.relu`` 16x16x16 came out
+509 against 512 -- the model preferring a 60-emit mapping over the shipped
+32-emit one by 0.6%. With it they are 642 against 517, the shipped mapping
+first, and the whole ranking becomes monotone in the emit count. The correction
+is grounded rather than fitted: the ``II=5`` the sequencer closes at *is* the
+loop-stack recurrence, so a model that does not charge the loop instructions is
+undercharging exactly the nests that use them most.
+
+What it still does not model: dependence edges are finish-to-start at
+instruction granularity, so no row-level overlap is charged. At ``gemm.relu``
+16x16x16 the model says 517 where cosim measures 750, about 31% low. It ranks;
+it does not measure.
+
+The ranking, checked against cosim
+----------------------------------
+
+``act_cosim.py`` measures the mappings the search ranks, and
+``--baseline`` measures ``isa_dsl.gemm_program`` for the same shape beside them:
 
 .. code-block:: bash
 
-   TPU_PRJ=/tmp/act-cosim.prj python act_cosim.py gemm.relu 16x16x16 --top 2
+   TPU_PRJ=/tmp/act-cosim.prj python act_cosim.py gemm 4x4x4 --top 1 --baseline
+
+Measured 2026-09-22 on this host, one synthesis per project, default testbench:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 14 14 14
+
+   * - program
+     - static
+     - dynamic
+     - model
+     - **cosim**
+   * - ``gemm`` 16x16x16, shipped mapping (``cosim.py``)
+     - 13
+     - 28
+     - 453
+     - **686**
+   * - ``gemm.relu`` 16x16x16, shipped mapping
+     - 14
+     - 32
+     - 517
+     - **750**
+
+The first row reproduces the published 16x16x16 figure exactly, and it is worth
+recording what the second row settles: the published
+**172 / 262 / 418 / 484 / 686 are plain** ``gemm``, because ``cosim.py``'s
+``testbench(M, K, N)`` leaves ``relu`` at its default. ``gemm.relu`` at the same
+shape is 750, and 750 - 686 = **64**, which is exactly the four ``vrelu``
+instructions' 64 ``accu`` rows. The delta is accounted for to the cycle, which
+is the best evidence available that the units' work counts are the right model
+of this machine.
+
+Where the search beats the hand-written generator
+-------------------------------------------------
+
+At four of the five shapes the search's choice **is** ``isa_dsl.gemm_program``,
+word for word. At 4x4x4 it is not: every tile count is 1 there, so the mapspace
+offers a single nest with no emitted loops, and the program it lowers drops a
+trip-1 hardware loop the hand-written generator keeps -- 8 static instructions
+against 10, the same 4 dynamic issues, and a model cost of 40 against 50.
+
+That is the whole shape of what a mapper buys on this machine today: it
+reproduces a carefully hand-tuned choice where that choice is right, and it
+removes overhead the generator could not see because the generator has no cost
+model at all. It is a small win, and it is the honest size of the win.
 
 
 Corrections to This Page's Earlier Numbers
