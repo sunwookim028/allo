@@ -1005,6 +1005,14 @@ conclusions are stable from 0 to 100, the knob does not matter and can be
 disclosed and forgotten. If they invert somewhere in that range, **the inversion
 is the finding**.
 
+And when a ranking does invert, **the inversion point in seconds is the
+interesting quantity, not the inversion point in cycles**: seconds say which
+real memory systems the candidate is good for, where cycles only say which
+simulator settings it is good for. MiniTPU's ranking inverted somewhere between
+40 and 92 cycles at 187.5 MHz — 213 to 490 ns — and it was the nanosecond
+figure that let them say their board sits nearer the low end rather than merely
+that one knob value beat another.
+
 One caveat on transplanting the number at all: theirs is a ZCU104's memory
 system seen through a descriptor-based DMA with two channels and 32-byte beats,
 on an AXI port that is not on the memory controller's clock. Our AXI slave is a
