@@ -162,13 +162,22 @@ def _junit(path: Path, rel: str) -> dict:
 
 def run_file(rel: str, work: Path, timeout: int, env: dict) -> dict:
     xml = work / (rel.replace("/", "__") + ".xml")
-    cmd = [sys.executable, "-m", "pytest", rel, "-q", "--no-header",
+    # cwd is a WRITABLE scratch directory, and the test path is absolute.
+    # Several tests write relative paths (`df.build`'s default project is
+    # `top.prj` in the cwd, and `test_mlp.py` writes weight files), and under
+    # the evaluation sandbox the checkout is read-only: with cwd=<slot> eleven
+    # tests failed on an UNMODIFIED tree, which would have made every
+    # comparison meaningless. `--rootdir` keeps conftest discovery anchored to
+    # the checkout.
+    cwd = work / "cwd"
+    cwd.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-m", "pytest", str(REPO / rel), "-q", "--no-header",
            "-p", "no:cacheprovider", "--import-mode=importlib",
-           f"--junitxml={xml}"]
+           f"--rootdir={REPO}", f"--junitxml={xml}"]
     t = time.time()
     # errors="replace": an MLIR abort or a Vitis log can put non-UTF-8 bytes on
     # this pipe, and a decode error here would take down the whole gate.
-    p = subprocess.Popen(cmd, cwd=REPO, env=env, text=True, encoding="utf-8",
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, text=True, encoding="utf-8",
                          errors="replace", stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                          start_new_session=True)

@@ -67,9 +67,12 @@ def files(tier: str) -> list[str]:
     return out
 
 
-def run_one(name: str, env: dict) -> dict:
+def run_one(name: str, env: dict, cwd: Path) -> dict:
     t = time.time()
-    p = subprocess.Popen([sys.executable, str(LIMITS / name)], cwd=REPO,
+    # A writable scratch cwd, as in suite_runner: these repros build HLS
+    # projects with relative default paths, and the evaluation checkout is
+    # read-only.
+    p = subprocess.Popen([sys.executable, str(LIMITS / name)], cwd=cwd,
                          env=env, text=True, encoding="utf-8",
                          errors="replace", stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -91,14 +94,17 @@ def run_one(name: str, env: dict) -> dict:
 def run(argv) -> tuple[int, dict]:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tier", default="fast", choices=("fast", "full"))
+    ap.add_argument("--work", default=None)
     a = ap.parse_args(argv)
+    cwd = Path(a.work or f"/tmp/limits-{os.getpid()}").resolve() / "cwd"
+    cwd.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env["PYTHONPATH"] = str(REPO) + os.pathsep + env.get("PYTHONPATH", "")
     env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     report = {"tier": a.tier, "items": [], "seconds": 0.0}
     t0 = time.time()
     for name in files(a.tier):
-        r = run_one(name, env)
+        r = run_one(name, env, cwd)
         print(f"  {'v' if r['produced_a_verdict'] else 'X'} {name}: "
               f"{r['verdicts'] or 'NO VERDICT'} ({r['seconds']}s)", flush=True)
         report["items"].append(r)
@@ -129,10 +135,12 @@ def compare(baseline: dict, now: dict) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tier", default="fast", choices=("fast", "full"))
+    ap.add_argument("--work", default=None)
     ap.add_argument("--record", type=Path)
     ap.add_argument("--against", type=Path)
     a = ap.parse_args()
-    rc, report = run(["--tier", a.tier])
+    rc, report = run(["--tier", a.tier]
+                     + (["--work", a.work] if a.work else []))
     if a.record:
         a.record.write_text(json.dumps(report, indent=1, sort_keys=True))
         print(f"recorded {len(report['verdicts'])} verdicts -> {a.record}")

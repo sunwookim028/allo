@@ -397,12 +397,25 @@ def gate_import(slot, env, work, out):
     return {"allo": m.group(1), "seconds": sec}
 
 
-def gate_tests(slot, env, work, out, tier):
-    baseline_file = BASELINE_DIR / f"suite_{'full' if tier == 'accept' else 'fast'}.json"
-    if not baseline_file.exists():
-        raise Reject("setup", f"no recorded test baseline at {baseline_file}; "
-                              f"run suite_runner.py --record first")
+def gate_tests(slot, env, work, out, tier, record=False):
+    """Allo's own suites against the recorded baseline.
+
+    The baseline is RECORDED BY THIS FUNCTION on a `--record-baseline` run, not
+    by invoking `suite_runner.py` by hand. That is not tidiness: a hand-run
+    baseline is measured outside the bubblewrap sandbox, with a writable
+    checkout, and it does not reproduce inside it. Measured 2026-09-22: a
+    no-patch control against a hand-recorded baseline showed ELEVEN
+    regressions on an unmodified tree (eight in `tests/test_verify.py`, plus
+    `test_df_unit::test_uint` and two in `test_stream_of_blocks`), every one an
+    artifact of the environment rather than of any candidate. A baseline that
+    does not reproduce makes every delta meaningless, so the baseline now
+    comes from the same vouched, sandboxed path a candidate does.
+    """
     suite_tier = "full" if tier == "accept" else "fast"
+    baseline_file = BASELINE_DIR / f"suite_{suite_tier}.json"
+    if not record and not baseline_file.exists():
+        raise Reject("setup", f"no recorded test baseline at {baseline_file}; "
+                              f"run evaluate_abs.py --record-baseline first")
     ok, rc, o, sec = vouched("pytest", slot, slot, env, work,
                              SUITE_TIMEOUT[tier],
                              args=["--tier", suite_tier,
@@ -412,8 +425,16 @@ def gate_tests(slot, env, work, out, tier):
     if not ok or report is None:
         raise Reject("gate:tests", f"the suite runner did not complete:\n"
                                    f"{o[-4000:]}")
-    cmp = suite_runner.compare(json.loads(baseline_file.read_text()), report)
     (out / "suite.json").write_text(json.dumps(report, indent=1))
+    if record:
+        BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+        baseline_file.write_text(json.dumps(report, indent=1, sort_keys=True))
+        return {"seconds": sec, "tier": suite_tier, "RECORDED": str(baseline_file),
+                "tests": len(report["outcomes"]),
+                "already_failing": sorted(
+                    k for k, v in report["outcomes"].items()
+                    if v not in suite_runner._GOOD)}
+    cmp = suite_runner.compare(json.loads(baseline_file.read_text()), report)
     if not cmp["ok"]:
         raise Reject("gate:tests", json.dumps(
             {k: cmp[k] for k in ("regressions", "disappeared",
@@ -460,19 +481,21 @@ def gate_cases(slot, env, work, out, names, csyn: bool):
     return res
 
 
-def gate_limits(slot, env, work, out, tier):
-    baseline_file = BASELINE_DIR / "limits.json"
-    if not baseline_file.exists():
-        raise Reject("setup", f"no recorded limits baseline at {baseline_file}")
+def gate_limits(slot, env, work, out, tier, record=False):
+    """tests/limits/ verdicts against the recorded baseline; same rule as
+    gate_tests -- the baseline is recorded from inside the sandbox."""
     lim_tier = "full" if tier == "accept" else "fast"
+    baseline_file = BASELINE_DIR / "limits.json"
+    if not record and not baseline_file.exists():
+        raise Reject("setup", f"no recorded limits baseline at {baseline_file}")
     # limits_runner spawns a subprocess per repro, which by design provokes
     # MLIR aborts and `sys.exit(1)`; it is not vouched, because its verdict is
     # a COMPARISON against a recorded baseline, made here, and every repro is
     # a frozen file from git. Its output is the input to that comparison.
     rc, o, sec = run([ALLO_PYTHON, str(slot / "chia_abstraction" /
                                        "limits_runner.py"),
-                      "--tier", lim_tier], slot, env, LIMITS_TIMEOUT[tier],
-                     writable=work, ro=slot)
+                      "--tier", lim_tier, "--work", str(work / "limits")],
+                     slot, env, LIMITS_TIMEOUT[tier], writable=work, ro=slot)
     (out / "limits.log").write_text(o)
     _, report = None, None
     try:
@@ -480,6 +503,12 @@ def gate_limits(slot, env, work, out, tier):
     except (ValueError, json.JSONDecodeError):
         raise Reject("gate:limits", f"limits_runner produced no JSON:\n"
                                     f"{o[-4000:]}")
+    if record:
+        BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+        baseline_file.write_text(json.dumps(report, indent=1, sort_keys=True))
+        return {"seconds": sec, "tier": lim_tier,
+                "RECORDED": str(baseline_file),
+                "verdicts": report["verdicts"], "silent": report["silent"]}
     cmp = limits_runner.compare(json.loads(baseline_file.read_text()), report)
     if not cmp["ok"]:
         raise Reject("gate:limits", json.dumps(
@@ -648,7 +677,8 @@ def main():
         check("the import gate")
 
         # 4. Allo's own suites, against the measured baseline
-        stage("tests", lambda: gate_tests(slot, env, work, a.out, a.tier))
+        stage("tests", lambda: gate_tests(slot, env, work, a.out,
+                                          a.tier, a.record_baseline))
         check("the test suites")
 
         # 5. correctness on every design case
@@ -659,7 +689,8 @@ def main():
                  else design_cases.LOOP_CASES)
         stage("cases", lambda: gate_cases(slot, env, work, a.out, names, False))
         check("the design cases")
-        stage("limits", lambda: gate_limits(slot, env, work, a.out, a.tier))
+        stage("limits", lambda: gate_limits(slot, env, work, a.out,
+                                            a.tier, a.record_baseline))
         check("tests/limits")
 
         # 6. PPA
