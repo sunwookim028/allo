@@ -234,8 +234,10 @@ shape as data, all five benchmark shapes are bit-exact in RTL
 co-simulation, and the design takes <strong>172 / 262 / 418 / 484 / 686</strong> cycles
 at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code>,
 <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>). Measured over the same window on both sides, the
-design is <strong>1.07-1.24x slower</strong> than Gemmini at all five shapes; see
-<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
+design is <strong>1.07-1.24x slower</strong> than Gemmini at these five shapes. Over ten
+shapes at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the deficit <strong>converges to 1.09x at 64x64x64</strong> at
+<strong>74.1 % of peak</strong>, and the two smallest shapes do not clear Gemmini’s
+measurement spread; see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
 <p>Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> the shipped design took <strong>252 / 383 / 591 / 667 / 919</strong>
 (1.55-1.8x behind Gemmini). The step between the two is the gap
 attribution’s measured design stack, landed as the design

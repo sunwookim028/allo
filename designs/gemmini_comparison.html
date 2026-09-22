@@ -221,12 +221,24 @@
 distribution. The design under test is <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p><strong>Result, 2026-09-19: TinyTPU-isa is 1.07-1.24x slower than Gemmini at all
-five shapes</strong> (<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>) when both sides are measured over the same
-window: the accelerator plus its dispatch, with near-zero memory latency on
-both. Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> it was <strong>1.55-1.8x</strong> slower (252 / 383 / 591 / 667
-/ 919 cycles); the step is the gap attribution’s measured design stack,
-landed as the design (<a class="reference internal" href="#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).</p>
+<p><strong>Result, superseded in scope on 2026-09-22 — read both lines.</strong></p>
+<p>Over the five original shapes at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> (<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>), measured on
+both sides over the same window — the accelerator plus its dispatch, with
+near-zero memory latency on both — TinyTPU-isa is <strong>1.07-1.24x slower than
+Gemmini</strong>. That measurement stands and it is what the body of this page
+analyses. Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> it was <strong>1.55-1.8x</strong> slower (252 / 383 / 591 /
+667 / 919 cycles); the step is the gap attribution’s measured design stack
+(<a class="reference internal" href="#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).</p>
+<p>Over <strong>ten</strong> shapes at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>, with Gemmini reported as a median of
+five trials, the deficit <strong>converges</strong>: 1.27x at 16x16x16, 1.26x at 32³,
+1.13x at 48³ and <strong>1.09x at 64³</strong>, with the design reaching <strong>74.1 % of
+peak</strong> and still climbing. At the two smallest shapes the difference <strong>does
+not clear Gemmini’s measurement spread</strong> and is not a supportable claim
+either way. So the 1.07-1.24x range is a statement about pipeline depth at
+small shapes, not about steady-state efficiency, and a reader wanting “how
+far behind is this design” should take <strong>1.09x at 64x64x64</strong> — or <strong>1.04x</strong>
+with the burst-widening candidate, which is not landed and costs +123 %
+block RAM.</p>
 <p>The earlier claim, “faster at all five shapes”, compared our
 accelerator-only count with Gemmini’s <code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>, and about 395
 cycles of that call is Rocket driver software. <strong>That claim is withdrawn</strong>,
