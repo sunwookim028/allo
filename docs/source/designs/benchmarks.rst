@@ -85,15 +85,9 @@ one verdict, because the questions are not the same question.
      .187, i.e. roughly 24 750 cycles at 187.5 MHz.
 
    So: **no machine's host is counted anywhere on this page**, which is the
-   consistent choice, and it is stated rather than assumed.
-
-   That accounting turned out to be worth more than fairness. MiniTPU's
-   per-launch host cost was volunteered by its own side so the comparison
-   would be honest, and putting ~24 750 cycles beside Gemmini's ~395 of
-   driver is what made the number look absurd rather than normal --- both of
-   the subsequent wins that doubled their board throughput came out of it.
-   **Naming the window is not only a reporting discipline; it is where the
-   optimisations were hiding.**
+   consistent choice, and it is stated rather than assumed. What that
+   accounting turned up on MiniTPU's side is in `Earlier measurements and
+   corrections`_.
 
    **Both sides are idealised memory, and ours is a knob rather than a
    model.** Every cycle figure here is at ``TPU_AXI_LATENCY=0`` unless the row
@@ -596,6 +590,9 @@ claim, which no simulator can see) needs a cosim of its own and was not run.
      - STRESS OK 630/630, 96 shapes
      - bit-exact, 8 shapes (T=8 table)
 
+The published MAXDIM=16 row was 172/262/418/484/686 before this work; see
+`Earlier measurements and corrections`_.
+
 .. warning::
 
    **The sampled shape set is a WEAKENING of the stress gate at large MAXDIM,
@@ -642,69 +639,7 @@ of them hard-coded constants masquerading as design limits:
   ``SHAPES`` is re-exported from ``shapes.py`` (the one definition) and is
   read *positionally* by ``act_compile``, ``kpn_model``, ``isa_dsl``,
   ``tests/act/test_tinytpu.py`` and --- through ``accept.BASELINES`` against
-  ``shapes.NAMES`` --- the CHIA harness. An earlier revision of this work put
-  the ``TPU_SET``/``TPU_SHAPES`` knobs on ``SHAPES`` itself, which would have
-  silently changed what all of those measured.
-
-
-.. _benchmarks-one-cycle:
-
-The published row moved by one cycle, and why
-=============================================
-
-When this work landed, ``reproduce.sh`` printed ``DIFFERS``:
-
-.. code-block:: text
-
-   expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
-   got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
-
-**Exactly one cycle faster at every shape**, every testbench bit-exact, and
-reproduced independently by two separate runs. A delta that does not scale
-with the work is a **fixed-cost** change, so it cannot be the burst loop's
-per-iteration behaviour.
-
-**The cause, measured rather than inferred, and isolated to one variable.**
-Rebuilding on current ``main`` with the memory sizes the design used to carry
---- ``TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128`` and *nothing else changed*, so
-the derived-size expression, the two ceiling assertions, the test-window floor
-and the parametric burst loop are all still present --- returns **every one of
-the five published numbers exactly**:
-
-.. code-block:: text
-
-   TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
-     4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
-
-So **the memory sizing accounts for the entire shift and nothing else in that
-work changed cycles at all** --- in particular the parametric burst loop is
-cycle-neutral at ``DMA_WORDS=1``, which is the same thing it was shown to be
-at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:
-
-    the scratchpad and vreg files are now **derived** as
-    :math:`\text{MAXDIM}^2/T`, which is 64 rows each at MAXDIM=16 against the
-    literal 512 and 256 they replaced; a 64-row file is not implemented the
-    way a 512-row one is (BRAM 42 -> 40 says two memories left block RAM), and
-    the shorter operand read path takes one cycle out of the **fixed** term.
-
-That is why the delta is uniform: it is one cycle of pipeline depth in the
-operand path, paid once per run rather than once per work item.
-
-It is a (very small) **improvement**, not a regression, and it changes no
-conclusion on this page --- one cycle is 0.6% at 4x4x4 and 0.005% at
-64x64x64, and both of the shapes where it is largest were already inside
-Gemmini's measurement spread. Every comparison here was measured *after* the
-change, so only the historical row needed restating.
-
-.. note::
-
-   **The gate is what caught it.** ``reproduce.sh`` carries the published
-   numbers as expectations and refused to pass, minutes after the merge, on a
-   one-cycle shift in a refactor whose functional gates were all green. That
-   is the whole argument for wiring published numbers into a check rather than
-   into prose: correctness is not cycles, and the resource counts moving
-   (BRAM 42 -> 40, FF 17 481 -> 17 075, LUT 26 583 -> 26 558 at an unchanged
-   2.431 ns) proved the netlist had changed without saying by how much.
+  ``shapes.NAMES`` --- the CHIA harness. [#sweepknobs]_
 
 
 .. _benchmarks-matched:
@@ -1052,35 +987,14 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 T=8 vs Gemmini DIM=8, both at MAXDIM=64
 ---------------------------------------
 
-.. note::
-
-   **The T=8 cycle column was re-measured on current ``main`` and is
-   unchanged.** It had been taken before the parametric ``DMA_WORDS``
-   refactor, which is the exposure that moved the published MAXDIM=16 row by
-   one cycle (:ref:`benchmarks-one-cycle`). Re-run from a fresh ``csynth``:
-
-   .. code-block:: text
-
-      8x8x8     285   (was 285)      16x16x16   493   (was 493)
-      16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
-
-   every one bit-exact and identical. That is consistent with the mechanism
-   rather than merely reassuring: at T=8/MAXDIM=64 the memory *sizes* do not
-   change (``OPERAND_ROWS`` is 512 either way), only ``rbA``/``rbB`` grew by
-   one word --- which is what took BRAM 58 -> 62 and nothing else. **The
-   burst loop is now shown cycle-neutral at ``DMA_WORDS=1`` in three
-   independent configurations**: T=4/MAXDIM=16, T=4/MAXDIM=64 and
-   T=8/MAXDIM=64. That is what licenses the widening being a pure opt-in.
-
-   The entry most exposed was **16x16x8**, the only shape where this design
-   beats Gemmini on a supportable margin, and it returned 424 exactly.
-
 The second matched point, and **it does not agree with the first**, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
 ``gemmini/allo_bare_steady.c`` at ``DIM=8``, Gemmini as **median of five
 trials**, which drops 4x4x4 and 12x12x12 because they are not multiples of 8
 --- the same ``runnable()`` rule our own side applies on T, so **both machines
-drop the same shapes**.
+drop the same shapes**. Our cycle column was re-measured on current ``main``
+after the parametric ``DMA_WORDS`` refactor and is unchanged; see `Earlier
+measurements and corrections`_.
 
 .. list-table::
    :header-rows: 1
@@ -1174,11 +1088,8 @@ at T=8) leaves the weight chain least amortised.
 
    **Settled at five trials.** The DIM=8 column above is the median of five,
    with the full min-max spread; the per-shape spread is 16-45 cycles, the
-   same roughly-constant band measured at DIM=4. An earlier revision of this
-   page read three shapes as wins from best-of-two and then downgraded all
-   three to "level" as a precaution; the five-trial measurement shows the
-   precaution was one shape too strong. **One win is supportable, two are
-   level.**
+   same roughly-constant band measured at DIM=4. **One win is supportable,
+   two are level.** [#bestoftwo]_
 
 The reason we are ahead there rather than behind is the reason the latency set
 exists: at T=8, 16x16x16 is only four tile-matmuls, so the machine with the
@@ -1587,16 +1498,8 @@ comparison at that shape should carry more than five trials.
 
 Consequence, stated once and applied everywhere: **the uncertainty on a
 cross-machine difference is Gemmini's alone**, and a claimed difference
-smaller than it is unsupportable.
-
-**Every steady-state conclusion on this page clears that bar by two to three
-orders of magnitude.** The 1 748-cycle deficit at 64x64x64 is 874x the
-2-cycle spread there; the -960-cycle burst saving is 480x it. **The one number
-that does not clear it is 4x4x4**, where a 13-cycle deficit sits inside a
-10-cycle spread --- so *the 1.06x at 4x4x4 is not a supportable claim of a
-difference* and is reported only as part of a sign that is consistent across
-all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
-155-cycle deficit, so it survives.
+smaller than it is unsupportable. The earlier reading of that same bar is kept
+in `Earlier measurements and corrections`_.
 
 .. note::
 
@@ -1881,3 +1784,125 @@ config patches for both matched points are committed at
    :doc:`tinytpu_isa` for the design, :doc:`gemmini_comparison` for the
    latency-set comparison at MAXDIM=16 and the gap attribution,
    :doc:`minitpu` for MiniTPU.
+
+
+Earlier measurements and corrections
+====================================
+
+Moved out of the sections above: superseded figures, readings that were
+withdrawn, and the accounts of how particular numbers moved.
+
+Why naming the window mattered
+------------------------------
+
+That accounting turned out to be worth more than fairness. MiniTPU's
+per-launch host cost was volunteered by its own side so the comparison would
+be honest, and putting ~24 750 cycles beside Gemmini's ~395 of driver is what
+made the number look absurd rather than normal --- both of the subsequent wins
+that doubled their board throughput came out of it. **Naming the window is not
+only a reporting discipline; it is where the optimisations were hiding.**
+
+.. _benchmarks-one-cycle:
+
+The published row moved by one cycle, and why
+---------------------------------------------
+
+When this work landed, ``reproduce.sh`` printed ``DIFFERS``:
+
+.. code-block:: text
+
+   expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
+   got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+
+**Exactly one cycle faster at every shape**, every testbench bit-exact, and
+reproduced independently by two separate runs. A delta that does not scale
+with the work is a **fixed-cost** change, so it cannot be the burst loop's
+per-iteration behaviour.
+
+**The cause, measured rather than inferred, and isolated to one variable.**
+Rebuilding on current ``main`` with the memory sizes the design used to carry
+--- ``TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128`` and *nothing else changed*, so
+the derived-size expression, the two ceiling assertions, the test-window floor
+and the parametric burst loop are all still present --- returns **every one of
+the five published numbers exactly**:
+
+.. code-block:: text
+
+   TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
+     4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
+
+So **the memory sizing accounts for the entire shift and nothing else in that
+work changed cycles at all** --- in particular the parametric burst loop is
+cycle-neutral at ``DMA_WORDS=1``, which is the same thing it was shown to be
+at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:
+
+    the scratchpad and vreg files are now **derived** as
+    :math:`\text{MAXDIM}^2/T`, which is 64 rows each at MAXDIM=16 against the
+    literal 512 and 256 they replaced; a 64-row file is not implemented the
+    way a 512-row one is (BRAM 42 -> 40 says two memories left block RAM), and
+    the shorter operand read path takes one cycle out of the **fixed** term.
+
+That is why the delta is uniform: it is one cycle of pipeline depth in the
+operand path, paid once per run rather than once per work item.
+
+It is a (very small) **improvement**, not a regression, and it changes no
+conclusion on this page --- one cycle is 0.6% at 4x4x4 and 0.005% at
+64x64x64, and both of the shapes where it is largest were already inside
+Gemmini's measurement spread. Every comparison here was measured *after* the
+change, so only the historical row needed restating.
+
+.. note::
+
+   **The gate is what caught it.** ``reproduce.sh`` carries the published
+   numbers as expectations and refused to pass, minutes after the merge, on a
+   one-cycle shift in a refactor whose functional gates were all green. That
+   is the whole argument for wiring published numbers into a check rather than
+   into prose: correctness is not cycles, and the resource counts moving
+   (BRAM 42 -> 40, FF 17 481 -> 17 075, LUT 26 583 -> 26 558 at an unchanged
+   2.431 ns) proved the netlist had changed without saying by how much.
+
+The T=8 column, re-measured
+---------------------------
+
+**The T=8 cycle column was re-measured on current ``main`` and is
+unchanged.** It had been taken before the parametric ``DMA_WORDS`` refactor,
+which is the exposure that moved the published MAXDIM=16 row by one cycle
+(:ref:`benchmarks-one-cycle`). Re-run from a fresh ``csynth``:
+
+.. code-block:: text
+
+   8x8x8     285   (was 285)      16x16x16   493   (was 493)
+   16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
+
+every one bit-exact and identical. That is consistent with the mechanism
+rather than merely reassuring: at T=8/MAXDIM=64 the memory *sizes* do not
+change (``OPERAND_ROWS`` is 512 either way), only ``rbA``/``rbB`` grew by one
+word --- which is what took BRAM 58 -> 62 and nothing else. **The burst loop
+is now shown cycle-neutral at ``DMA_WORDS=1`` in three independent
+configurations**: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
+what licenses the widening being a pure opt-in.
+
+The entry most exposed was **16x16x8**, the only shape where this design beats
+Gemmini on a supportable margin, and it returned 424 exactly.
+
+An earlier reading of the same bar
+----------------------------------
+
+**Every steady-state conclusion on this page clears that bar by two to three
+orders of magnitude.** The 1 748-cycle deficit at 64x64x64 is 874x the
+2-cycle spread there; the -960-cycle burst saving is 480x it. **The one number
+that does not clear it is 4x4x4**, where a 13-cycle deficit sits inside a
+10-cycle spread --- so *the 1.06x at 4x4x4 is not a supportable claim of a
+difference* and is reported only as part of a sign that is consistent across
+all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
+155-cycle deficit, so it survives.
+
+.. rubric:: Footnotes
+
+.. [#sweepknobs] An earlier revision of this work put the
+   ``TPU_SET``/``TPU_SHAPES`` knobs on ``SHAPES`` itself, which would have
+   silently changed what all of those measured.
+
+.. [#bestoftwo] An earlier revision of this page read three shapes as wins
+   from best-of-two and then downgraded all three to "level" as a precaution;
+   the five-trial measurement shows the precaution was one shape too strong.
