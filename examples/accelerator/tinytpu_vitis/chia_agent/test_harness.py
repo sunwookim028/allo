@@ -91,7 +91,7 @@ logging.getLogger("mcp").setLevel(logging.WARNING)
 #: `evaluate` loads it by path and this takes the names from there rather than
 #: writing them out a sixth time. The cycles are positional against it.
 import control  # noqa: E402
-from evaluate import ALL_SHAPES  # noqa: E402
+from evaluate import ALL_SHAPES, PARAM_CONFIGS  # noqa: E402
 
 #: The unmodified design (README, accept.py control run).
 BASELINE_ALL = dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686)))
@@ -191,6 +191,16 @@ def mutate(name: str) -> str:
     text = head(f)
     assert text.count(old) == 1, name
     return text.replace(old, new, 1)
+
+
+def tails(swarm_output: str, worker: Path | None, lines=15) -> str:
+    """The last lines of what the swarm and its worker said, for a failure
+    whose cause is in them."""
+    out = ["-- swarm --", *swarm_output.splitlines()[-lines:]]
+    log = worker / "worker.log" if worker else None
+    if log and log.exists():
+        out += ["-- worker.log --", *log.read_text().splitlines()[-lines:]]
+    return "\n".join(out)
 
 
 def unified(name: str, before: str, after: str) -> str:
@@ -567,12 +577,18 @@ class Suite:
               f"{(v.get('detail') or '')[:80]!r}",
               r.startswith("Replaced") and not v.get("ok")
               and v.get("stage") == "gate:param")
-        # The unmodified design passes it, at both configurations.
+        # The unmodified design passes it, at every configuration the gate
+        # names -- taken from PARAM_CONFIGS, not restated here, because this
+        # check asserted "8 and 12" for a while after a third configuration
+        # (varying T) was added and was no longer checking the whole gate.
         self.reset("tpta")
         v = await A.verdict("run_functional_check")
         param = (v.get("gate") or {}).get("param", {})
-        check("g.unmodified passes gate:param", "ok, PARAM OK at MAXDIM 8 and 12",
-              param, v.get("ok") and len(param) == 2)
+        want = {",".join(f"{k}={v2}" for k, v2 in cfg.items())
+                for cfg in PARAM_CONFIGS}
+        check("g.unmodified passes gate:param",
+              f"ok, PARAM OK at all {len(want)}: {sorted(want)}", param,
+              v.get("ok") and set(param) == want)
         self.reset("tpta")
 
     # d ------------------------------------------------------------------
@@ -694,9 +710,20 @@ class Suite:
         (self.run_dir / "loop-swarm.log").write_text(p.stdout + p.stderr)
         (self.run_dir / "loop-fake-model.json").write_text(
             json.dumps(fake.log, indent=1, default=str))
-        worker = next(d for d in run_dir.iterdir() if d.is_dir())
-        entries = [json.loads(l) for l in (worker / "variants.jsonl").read_text()
-                   .splitlines() if l.strip()]
+        worker = next((d for d in run_dir.iterdir() if d.is_dir()), None)
+        log = worker / "variants.jsonl" if worker else None
+        if log is None or not log.exists():
+            # Report why the loop produced nothing, rather than dying on the
+            # absent file: the cause is in the swarm's and the worker's output,
+            # and a FileNotFoundError here sends the next reader after the
+            # wrong thing (a refused pre-flight, a dirty frozen path and a
+            # tool server that never started all look like this).
+            check("loop.ran", "the loop wrote variants.jsonl",
+                  f"swarm exited {p.returncode}, no variants.jsonl under "
+                  f"{run_dir}:\n" + tails(p.stdout + p.stderr, worker), False)
+            return
+        entries = [json.loads(l) for l in log.read_text().splitlines()
+                   if l.strip()]
         by = {(e["kind"], e["iteration"]): e for e in entries}
         print(f"  swarm exited {p.returncode} after {time.time() - t:.0f}s; "
               f"{len(fake.log)} model sessions; fake errors {fake.errors}")
@@ -818,11 +845,12 @@ class Suite:
               crossed, crossed.startswith("measured by 'cosim'"))
         # The cross-check: a prose-only edit moves the blobs, and the check
         # must still compare -- that silent "no-baseline" is what it replaces.
-        agree = control.crosscheck(dict(BASELINE_ALL), design)
+        agree = control.crosscheck(dict(BASELINE_ALL), design, "cosim")
         check("control.crosscheck-agrees", "agree, against the published numbers",
               f"{agree['status']} vs {agree['against'][:40]}",
               agree["status"] == "agree" and not control.banner(agree))
-        moved = control.crosscheck(dict(BASELINE_ALL, **{"4x4x4": 171}), design)
+        moved = control.crosscheck(dict(BASELINE_ALL, **{"4x4x4": 171}), design,
+                                   "cosim")
         check("control.crosscheck-disagrees-loudly", "DISAGREES, with a banner",
               f"{moved['status']} delta={moved['delta']['4x4x4']}",
               moved["status"] == "DISAGREES"
@@ -830,12 +858,20 @@ class Suite:
         recorded = control.crosscheck(dict(BASELINE_ALL), dict(zip(
             ("microarch_isa.py", "isa_dsl.py"),
             ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-             "8f2e9aa9f518ef320cab163adc95e05737c777be"))))
+             "8f2e9aa9f518ef320cab163adc95e05737c777be"))), "cosim")
         check("control.crosscheck-recorded-design", "agree, against its own entry",
               f"{recorded['status']} vs {recorded['against'][:40]}",
               recorded["status"] == "agree"
               and recorded["against"].startswith("the control recorded"))
-        search = control.crosscheck(dict(BASELINE), design)
+        # Another driver measures another program on the same hardware, so this
+        # driver's numbers are not its cross-check: it has none until measured.
+        other = control.crosscheck(dict(BASELINE_ALL), design, "codesign_cosim")
+        check("control.crosscheck-unrecorded-driver",
+              "UNRECORDED, loud, not silently checked against cosim's numbers",
+              f"{other['status']} recorded={other['recorded']}",
+              other["status"] == "UNRECORDED" and other["recorded"] is None
+              and "UNRECORDED" in control.banner(other).upper())
+        search = control.crosscheck(dict(BASELINE), design, "cosim")
         check("control.crosscheck-search-shapes",
               "agree over the two scored shapes alone",
               f"{search['status']} {search['compared']}",

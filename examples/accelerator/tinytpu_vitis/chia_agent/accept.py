@@ -383,8 +383,8 @@ def main():
         # The cross-check is on the CONTROL, so it is reported even for a
         # candidate that was rejected: the tools may have moved under both.
         if not ctl.get("problems"):
-            result["crosscheck"] = control.crosscheck(ctl["cycles"],
-                                                      result["design"])
+            result["crosscheck"] = control.crosscheck(
+                ctl["cycles"], result["design"], ctl["driver"])
         if not result["ok"]:
             result["claim"] = "rejected"
         elif ctl.get("problems"):
@@ -405,7 +405,8 @@ def main():
         if not a.keep:
             subprocess.run(["git", "worktree", "remove", "--force", str(wt)],
                            cwd=REPO, capture_output=True)
-    if (result.get("crosscheck") or {}).get("status") == "DISAGREES":
+    cc = result.get("crosscheck") or {}
+    if cc and cc.get("status") != "agree":
         raise SystemExit(3)
 
 

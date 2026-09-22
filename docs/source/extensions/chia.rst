@@ -176,7 +176,12 @@ Mechanical enforcement, not instructions:
 4. **Sandbox.** Every process that imports the candidate runs under ``bwrap``:
    read-only filesystem and tree, only the work directory writable, own PID
    namespace. The tree and the checkout's tracked files are compared byte for
-   byte after each stage (``tamper``).
+   byte after each stage (``tamper``). A ``tamper`` verdict on a run that
+   should have been clean is, in practice, usually a **person or another agent
+   editing the checkout while a measurement was in flight** -- suspect that
+   before the candidate. ``accept.py`` is immune by construction: it measures
+   in its own ``git worktree`` at ``--ref``, so an edit elsewhere in the
+   checkout cannot reach it.
 5. **Vouched verdicts.** A printed ``STRESS OK`` proves nothing when the
    candidate runs in the same process: on the branch, a candidate that printed
    it and raised ``SystemExit(0)`` at import passed the old gate with an int16
@@ -247,6 +252,11 @@ Mechanical enforcement, not instructions:
     driver's difference as the candidate's win: at 4x4x4 the mapper's program
     is 24 instruction words against the hand-written 28, same four dynamic
     issues, bit-exact -- a free -3 cycles for every candidate in that mode.
+
+    ``control.RECORDED`` is therefore keyed ``(driver, the two blobs)`` and
+    ``control.PUBLISHED`` by driver: a driver with nothing recorded is
+    ``UNRECORDED`` and exits 3 with its measured numbers printed, to be
+    recorded, rather than quietly checked against the other driver's.
 
     ``control.RECORDED`` and the published numbers are a **cross-check**, not
     the control. They used to *be* the control, keyed by the blob ids of the

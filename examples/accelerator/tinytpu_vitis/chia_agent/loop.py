@@ -265,7 +265,7 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         baseline = tool.evaluate(work="harness")
         print(f"  {summarize(baseline)}", flush=True)
         design = control.blobs("HEAD")
-        cross = (control.crosscheck(baseline["cycles"], design)
+        cross = (control.crosscheck(baseline["cycles"], design, "cosim")
                  if baseline.get("ok") else None)
         _record(log_path, {"iteration": 0, "kind": "baseline", "accepted": True,
                            "head": head, "design": design, "crosscheck": cross,
