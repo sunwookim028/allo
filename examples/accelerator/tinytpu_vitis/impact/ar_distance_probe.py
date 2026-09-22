@@ -7,7 +7,8 @@ d = 1..5, one call each on one RTL instance, the whole of C compared.
 
 Programs below AR_RAW_DIST are assembled with check=False: they are exactly
 what `check_program` refuses, run to show why. Each result line appears twice,
-C simulation first, then RTL. Output behind logs/cosim_isa_ar_distance.log."""
+C simulation first, then RTL. Output behind
+dev/records/tinytpu/logs/cosim_isa_ar_distance.log."""
 import os, sys, re
 import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 4)))

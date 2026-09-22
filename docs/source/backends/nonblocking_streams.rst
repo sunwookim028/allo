@@ -251,7 +251,7 @@ Based on synthesis experiments in ``tests/dataflow/hls_synth_streams.py``:
 
    The FF and II figures in this table are labelled estimated and disagree with
    the measured record. The primary record,
-   :doc:`/records/vitis_nb_streams` (Vitis HLS 2023.2, U280, 2026-03-08),
+   ``dev/records/vitis_nb_streams.rst`` (Vitis HLS 2023.2, U280, 2026-03-08),
    measured the same two designs at LUT 1417 / 1457 but **FF 1325 / 1369**, and
    reported pipeline II 7 for the blocking design and ``undef`` (statically
    unbounded spin-wait) for the non-blocking one. Where the two disagree, use

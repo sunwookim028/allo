@@ -155,10 +155,10 @@ def chia2026_spend(before_ms: int | None = None) -> dict:
 
 def _runs(repo: Path) -> list[dict]:
     """CHIA runs recorded under chia_runs/ (live output) and the tracked
-    evidence/ directory, as [t0, t1) windows."""
+    dev/records/tinytpu/chia-evidence/ directory, as [t0, t1) windows."""
     runs = []
     found = [*(repo / "chia_runs").glob("*/run.json"),
-             *(Path(__file__).resolve().parent / "evidence").glob("*/run.json")]
+             *(repo / "dev/records/tinytpu/chia-evidence").glob("*/run.json")]
     seen = set()
     for rj in sorted(found, key=lambda p: p.parent.name):
         if rj.parent.name in seen:

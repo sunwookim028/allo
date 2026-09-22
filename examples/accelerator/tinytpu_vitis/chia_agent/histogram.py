@@ -298,7 +298,7 @@ def as_text(results, shapes):
 
 
 def as_rst(results, shapes):
-    """A reST list-table per shape, for docs/source/records/."""
+    """A reST list-table per shape, for dev/records/."""
     out = []
     for (M, K, N) in shapes:
         tag = f"{M}x{K}x{N}"

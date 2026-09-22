@@ -45,7 +45,7 @@ REPO_ROOT = AGENT_DIR.parents[3]
 #: design as shipped at main @ 476a70d8 (172 / 262 / 418 / 484 / 686). The
 #: previous angles -- the vru tier, the per-mm weight prologue, accu at II=2 --
 #: are exactly what e24e433b landed, so they are gone. The facts come from
-#: evidence/timeline-476a70d8-16x16x16/ (per-process cosim timeline, measured)
+#: dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/ (per-process cosim timeline, measured)
 #: and gemmini_comparison.rst's attribution (whose residual split is an
 #: ESTIMATE, labelled as such). Each worker gets one angle to start from; none
 #: is an instruction to make a particular change.

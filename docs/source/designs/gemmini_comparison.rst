@@ -207,7 +207,7 @@ elaborated chipyard tree, not argued from documentation.
 ``TestHarness.sv``. That ``SimDRAM`` fork only instantiates DRAMSim2 given
 ``+dramsim``; otherwise it is ``mm_magic_t`` at ~1-2 cycle AXI latency.
 Re-running the existing simulator and ELF both ways gives ``MLP 4.8.8.4`` = 1146
-without and 1174 with, and ``logs/gemmini_int8_dim4.log`` records 1146 with no
+without and 1174 with, and ``dev/records/tinytpu/logs/gemmini_int8_dim4.log`` records 1146 with no
 DRAMSim banner. **All five headline shapes are bit-identical either way**,
 because ``fill()`` plus the warm-up leaves A/B/C resident in L1/L2. Both sides
 are idealised. Disclosed, not corrected for.
@@ -264,8 +264,8 @@ answers immediately. That is Vitis's default and it was never stated, so it is
 stated here, along with what happens when it is not true.
 
 Rebuilding the design at a given read latency and cosimulating it there
-(``cosim.py`` with ``TPU_AXI_LATENCY``; ``logs/cosim_isa_landed_axi_latency.log``,
-and ``logs/cosim_isa_axi_latency_sweep.log`` for the pre-landing design):
+(``cosim.py`` with ``TPU_AXI_LATENCY``; ``dev/records/tinytpu/logs/cosim_isa_landed_axi_latency.log``,
+and ``dev/records/tinytpu/logs/cosim_isa_axi_latency_sweep.log`` for the pre-landing design):
 
 .. list-table::
    :header-rows: 1
@@ -542,7 +542,7 @@ Applying and running
 
 ``~/chipyard/env.sh`` activates Chipyard's own conda environment and so replaces
 the ``allo`` one; source it in a separate shell (``dev/toolchains.rst``).
-Raw Gemmini output is in ``logs/gemmini_int8_dim4.log``.
+Raw Gemmini output is in ``dev/records/tinytpu/logs/gemmini_int8_dim4.log``.
 
 ``allo_cmp.c`` measures what a user gets: ``tiled_matmul_auto``, driver and all.
 ``allo_bare5.c`` measures what the hardware does: ``rdcycle`` -> 5 ``config``\ s
@@ -562,7 +562,7 @@ Things that cost time to learn
   because of this; do not expect to get numbers from the shipped benchmarks.
 * **One Verilator run takes about 80 s**, not the 22 minutes an earlier
   revision of this page claimed -- wrong by ~17x, and contradicted by this
-  repository's own ``logs/gemmini_int8_dim4.log``, which records
+  repository's own ``dev/records/tinytpu/logs/gemmini_int8_dim4.log``, which records
   ``walltime 85.786 s; speed 13.101 us/s``. Re-measured: **79.6 s at
   14.1 us/s** for ``allo_cmp``. So the five-shape sweep *is* interactive and
   needs no special budgeting; the ``allo_bare5.c`` window run quoted above is
@@ -1087,7 +1087,7 @@ therefore quoted as a range, 35-95 (65 averaged over both orders).
 between 42 and 93 cycles at the three shapes the branch did not measure (262
 against 220, 418 against 347, 484 against 391). The branch estimated where the
 16x16x16 residual sits from the stack's per-process timelines
-(``impact/results/``): operand staging (~84 cycles), the serial DMA ahead of
+(``dev/records/tinytpu/impact-results/``): operand staging (~84 cycles), the serial DMA ahead of
 the first weight, and the drain (~142). That split is an **estimate**, and no
 change against it has been built or measured.
 
@@ -1101,7 +1101,7 @@ Variants
 ^^^^^^^^
 
 Every variant is the pre-landing ``microarch_isa.py`` (``7a24c21e``, the
-``base`` row) plus asserted textual patches (``make_variants.py``), so its diff
+``base`` row) plus asserted textual patches, so its diff
 is exactly the change being priced. A
 variant counts only if the Allo simulator is ``ALL EXACT`` (``bench_variant.py``:
 gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
@@ -1238,7 +1238,7 @@ in the instruction word fixed it in both ``spm`` (``v_wdirect``) and ``accu``;
 the landed sequencer does the same.
 
 The pre-landing design's per-process timeline at 16x16x16
-(``impact/results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
+(``dev/records/tinytpu/impact-results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
 (``s_axilite`` programming, inside the cosim window), 47-120 program prefetch,
 120-204 operand bursts, 204-334 128 DMA rows through ``spm``, 334-799 ``vru``
 running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
@@ -1255,21 +1255,27 @@ per memory").
 Reproducing the attribution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-From ``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
+The variant generator that produced these numbers, ``make_variants.py``, is
+gone: it patched the pre-landing baseline textually and had gone stale
+against the landed design (it named a scratchpad constant, ``A_SP``, that the
+shipped ISA no longer defines), and the CHIA harness's own candidate/diff
+pipeline (``chia_agent/evaluate.py``, ``chia_agent/accept.py``) is the
+maintained way to measure a new variant today. The table above and the raw
+per-run output it was measured from (``dev/records/tinytpu/impact-results/``)
+are the durable record; they are not re-derived by re-running anything.
+
+Once a variant's ``.py`` file exists (however it was produced), from
+``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
 
 .. code-block:: bash
 
    source env.sh                    # conda allo, LLVM_BUILD_DIR, OMP, TMPDIR
-   python make_variants.py          # writes v_base.py and v_*.py from 7a24c21e
    python pyrun.py bench_variant.py v_design_dep                     # simulator
    TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py v_design_dep runs/v_design_dep
    ./profile.sh runs/v_design_dep   # per-process timeline of the last shape
 
-``make_variants.py`` reads its baseline from git at ``7a24c21e`` -- the design
-the table calls ``base`` -- not the shipped file, so the variants keep
-measuring what the table says; it gives them the baseline's own hand-written
-program, since ``isa_dsl`` now targets the landed ISA. ``cosim_variant.py
-base`` builds the *shipped* design; the pre-landing one is ``v_base``.
+``cosim_variant.py base`` builds the *shipped* design; the pre-landing one
+would have been ``v_base``.
 ``pyrun.py`` strips the conda env's editable finder, so ``allo`` resolves to
 this checkout. ``cosim_variant.py`` reuses ``../cosim.py`` (``align_value`` 64,
 widen 512, ``-B/usr/bin``, ``m_axi`` depths) and adds only a

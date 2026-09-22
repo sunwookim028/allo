@@ -405,7 +405,7 @@ Both counts come straight off the header ``assemble`` writes, so the gate
 needs no new model of the machine -- it reads the number the assembler already
 had to compute. The two constants are least squares over the five published
 cosim points, which are Vitis measurements this fork attributes to
-``logs/cosim_isa_landed_sweep.log`` at ``e24e433b``. The gate passes a
+``dev/records/tinytpu/logs/cosim_isa_landed_sweep.log`` at ``e24e433b``. The gate passes a
 submission whose estimate is within 10% of the reference submission's, and
 ``--cosim`` measures only what passes.
 
@@ -505,8 +505,8 @@ What the cheap gate is worth
 
 Measured with ``act/calibrate.py``, which runs one ``csynth_design`` and then
 one ``cosim_design`` per program on that same RTL. Everything in this section
-was measured in this session (``logs/cosim_act_corpus_sweep.log`` and
-``logs/cosim_act_relu_hang.log``); ``PUBLISHED_CYCLES`` in ``cycles.py`` is the
+was measured in this session (``dev/records/tinytpu/logs/cosim_act_corpus_sweep.log`` and
+``dev/records/tinytpu/logs/cosim_act_relu_hang.log``); ``PUBLISHED_CYCLES`` in ``cycles.py`` is the
 only attributed number on the page.
 
 .. code-block:: bash

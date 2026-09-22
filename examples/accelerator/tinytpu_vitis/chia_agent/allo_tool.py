@@ -64,9 +64,9 @@ REFERENCE = {
     "gemmini_comparison.rst": "docs/source/designs/gemmini_comparison.rst",
     "limitations.rst": "docs/source/developer/limitations.rst",
     # Measured per-process cosim timeline of the shipped design at 16x16x16.
-    "timeline_16x16x16": "examples/accelerator/tinytpu_vitis/chia_agent/evidence/timeline-476a70d8-16x16x16/README.md",
-    "timeline_16x16x16.txt": "examples/accelerator/tinytpu_vitis/chia_agent/evidence/timeline-476a70d8-16x16x16/timeline.txt",
-    "timeline_16x16x16_rle.txt": "examples/accelerator/tinytpu_vitis/chia_agent/evidence/timeline-476a70d8-16x16x16/rle.txt",
+    "timeline_16x16x16": "dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/README.md",
+    "timeline_16x16x16.txt": "dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/timeline.txt",
+    "timeline_16x16x16_rle.txt": "dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/rle.txt",
 }
 
 

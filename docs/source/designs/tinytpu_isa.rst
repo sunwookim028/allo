@@ -436,6 +436,18 @@ pushes, ``accu`` charges a ``vadd`` two iterations per row, and a ``dma_ld``
 counts for ``spm`` or ``vru`` by its destination. ``imem[7]`` is the DRAM row
 span ``dma_ld`` bursts for each operand matrix.
 
+``expand()`` yields one ``(opcode, row count, f0, f1, f2, f3)`` tuple per
+dynamic issue, and the resolved address fields travel alongside the row count
+for the same reason: ``dma_ld`` now bursts, so it needs the DRAM row span
+before its first instruction arrives (``imem[7]``, above), and ``f1`` is an
+AGU target in the general case, not a constant readable off the static
+encoding. Mirroring the sequencer's control flow here is also what makes
+``bench_isa.py``'s loop-vs-flat equivalence check strict: the two program
+forms must agree on every resolved address, not only on the opcode and
+row-count stream. ``assemble()`` runs every program through ``check_program()``
+first; ``check=False`` exists only so a test can put a known-bad program on
+the machine and watch it fail -- nothing that ships passes it.
+
 ``IMEM_SIZE`` is ``NHDR + IWORDS * 24`` (the longest program shipped, plus
 headroom). The program is pulled on-chip by one burst of ``IMEM_SIZE`` words
 before anything runs, so imem size is startup time whether the program uses it
@@ -706,17 +718,19 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
    * - ``kpn_model.py``
      - a KPN model of the channel graph with bounded FIFOs and deadlock
        reporting
-   * - ``logs/``
-     - the csynth/cosim reports and sweep logs behind the numbers on these
-       pages
    * - ``gemmini/``
      - the patches and benchmarks for the matched Gemmini baseline
        (:ref:`gemmini-reproduce`)
    * - ``impact/``
      - the gap attribution's variants (generated from the pre-landing
-       baseline), their raw results and timelines, the Vitis shared-array
-       probe, and the RTL probe of the accumulator's dependence claim
-       (:ref:`gemmini-attribution-reproduce`)
+       baseline), the Vitis shared-array probe, and the RTL probe of the
+       accumulator's dependence claim (:ref:`gemmini-attribution-reproduce`)
+
+The csynth/cosim reports and sweep logs behind the numbers on these pages,
+and the gap attribution's raw results and timelines, are evidence rather than
+part of the design: they live under ``dev/records/tinytpu/logs/`` and
+``dev/records/tinytpu/impact-results/`` at the repository root, not in
+``examples/``.
 
 .. code-block:: bash
 
@@ -750,7 +764,7 @@ Since the fix recorded in :ref:`limitation-11` the simulator sizes its OpenMP
 team to the section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process
 design. ``kpn_model.py`` is driven by the assembled header (``ef112868``);
 every shipped program completes in it at FIFO depth **1**. See
-:doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the Vitis install.
+``dev/toolchains.rst`` for ``LLVM_BUILD_DIR`` and the Vitis install.
 Older reproduce instructions, and the thread count the recorded numbers were
 produced at, are in `Earlier measurements and corrections`_.
 
@@ -863,7 +877,7 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
    ``none`` control through the same loader), each run through ``bench_isa``
    and ``stress_isa``, and through the ``TPU_TB=stress`` cosim for the one
    RTL-only mutant (and for any mutant on request). **All 34 are caught**
-   (``logs/mutate_landed.log``). 20 fail ``bench_isa``. 13 get past it and are
+   (``dev/records/tinytpu/logs/mutate_landed.log``). 20 fail ``bench_isa``. 13 get past it and are
    caught **only** by ``stress_isa``: ``pe_psum_int16`` (int16 partial sum),
    ``clip_hi_off_by_one`` and ``clip_lo_off_by_one`` (both clip bounds),
    ``vadd_dst_is_src1`` and ``vrelu_dst_is_src`` (vadd/vrelu destination),
@@ -900,6 +914,15 @@ as unwritten. The same walk enforces the accumulator distance contract
 (:ref:`tinytpu-isa-dependence`). It also rejects out-of-range rows, bad loop nesting
 (unbalanced or over-deep loops, trip 0, AGU terms naming a closed loop),
 zero-row instructions, and the retired ``dma_st`` opcode.
+
+Two of ``check_program()``'s checks exist only because the walk is exact
+rather than conservative: it rejects a resolved field that has climbed past
+``2**11`` (the range ``enc()`` admits) -- the sequencer writes the resolved
+sum back into the 12-bit field, so an AGU term can push it out of range, and
+this walk is the only place that can see it -- and it enforces the structural
+shape an instruction must have (``mm``'s ``f2`` in ``{0, 1}``, ``dma_ld``'s
+``f0`` in ``{0, 1, 2, 3}``) rather than trusting the encoder. Every rejection
+names the static instruction, the loop iteration, and the rows.
 
 Two design facts the hardening found:
 
@@ -952,7 +975,7 @@ there. In the synthesized loop (II=1, depth 6) the ``ar`` load issues in
 pipeline state 5 and the store lands in state 7, so a row read one or two
 iterations after it was written returns its **old** value. Measured in RTL
 with ``isa_dsl.ar_distance_program(d)``, every read exactly ``d`` iterations
-after its write (``logs/cosim_isa_ar_distance.log``,
+after its write (``dev/records/tinytpu/logs/cosim_isa_ar_distance.log``,
 ``impact/ar_distance_probe.py``):
 
 .. list-table::
@@ -1020,9 +1043,9 @@ at every shape: the derived memory sizing that landed afterwards takes one
 cycle out of the fixed term (`Earlier measurements and corrections`_). Every
 other column -- instruction counts, mismatches, the pre-landing comparison --
 is unaffected. Measured by Vitis ``cosim`` (xsim), one build,
-``-m_axi_latency 0`` (``logs/cosim_isa_landed_sweep.log``), against the
+``-m_axi_latency 0`` (``dev/records/tinytpu/logs/cosim_isa_landed_sweep.log``), against the
 pre-landing build that was shipped until then
-(``logs/cosim_isa_widened_sweep.log``):
+(``dev/records/tinytpu/logs/cosim_isa_widened_sweep.log``):
 
 .. list-table::
    :header-rows: 1
@@ -1067,7 +1090,7 @@ pre-landing build that was shipped until then
 The two shapes the gap attribution measured (172 and 686, :ref:`gemmini-gap-attribution`)
 reproduce exactly; the other three were first measured on this build.
 ``TPU_TB=stress`` cosim at 4x4x4 and 16x16x16: 0 wrong over 6 calls each
-(``logs/cosim_isa_landed_stress.log``).
+(``dev/records/tinytpu/logs/cosim_isa_landed_stress.log``).
 
 Utilization against the 4x4 array's peak is 2.3% / 12.2% / 25.8% / 26.4% /
 37.3% (was 1.6% / 8.4% / 18.3% / 19.2% / 27.9%). Least squares against dynamic
@@ -1181,7 +1204,7 @@ Resources
 
 What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
 pre-landing design re-synthesized with the same toolchain
-(``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``).
+(``dev/records/tinytpu/logs/csynth_isa_prelanding.rpt``, ``dev/records/tinytpu/logs/csynth_isa_landed.rpt``).
 Both columns are the ``e24e433b`` netlist; the derived memory sizing that
 landed on 2026-09-22 took BRAM 42 -> 40, FF 17,481 -> 17,075 and
 LUT 26,583 -> 26,558 at an unchanged 2.431 ns

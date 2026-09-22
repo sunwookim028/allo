@@ -212,7 +212,7 @@ The rest of this page records the fork's working knowledge of Catapult, gathered
 dataflow designs with it. Catapult is installed on one server the project uses,
 ``zhang-21.ece.cornell.edu`` (RHEL 8.10, glibc 2.28), and all Catapult synthesis runs there. It is
 **not** installed on ``ace-01``, the host where most other work in this fork is done (see
-:doc:`/developer/toolchains`).
+``dev/toolchains.rst``).
 
 Installation
 ~~~~~~~~~~~~
@@ -401,7 +401,7 @@ From Allo, pass the sub-function names as ``configs={"sub_funcs": [...]}``; ``co
 **FIFO depth inference.** With block synthesis Catapult selects FIFO depth automatically from the
 throughput ratio of producer and consumer. Example: MT throughput 69 cycles, CT throughput 298
 cycles -> ratio 4.3x -> Catapult infers depth=16 to buffer a full burst without stalling. The full
-per-module results for that design are in :doc:`/records/catapult_decoupled_2x1`.
+per-module results for that design are in ``dev/records/catapult_decoupled_2x1.rst``.
 
 Reading the Reports
 ~~~~~~~~~~~~~~~~~~~
@@ -498,7 +498,7 @@ An earlier revision of these notes said the conda ``allo`` env "already sets ``L
 ``build-rhel8`` and must not be overridden. **That was corrected on 2026-09-18**: neither
 ``conda activate allo`` nor ``conda run`` sets ``LLVM_BUILD_DIR``, and the simulator asserts
 ``LLVM_BUILD_DIR is not set`` without it. Export it yourself, pointing at the build appropriate
-for the host (see :doc:`/developer/pitfalls` and :doc:`/developer/toolchains`), and build the
+for the host (see :doc:`/developer/pitfalls` and ``dev/toolchains.rst``), and build the
 project with ``pip install -v -e .``.
 
 The end-to-end driver the earlier bring-up used, ``tests/dataflow/catapult_synth_decoupled_2x1.py``
@@ -513,7 +513,7 @@ Two Catapult code generators exist for Allo, and they should not be confused:
 - **The C++ emitter** (this backend: ``mlir/lib/Translation/EmitCatapultHLS.cpp``,
   ``allo/backend/catapult.py``) came from upstream PR #543 (Feb 2026). This fork added
   non-blocking stream support to it (2026-04-14) and the synthesis bring-up recorded in
-  :doc:`/records/catapult_decoupled_2x1`. It emits ``ac_channel`` C++.
+  ``dev/records/catapult_decoupled_2x1.rst``. It emits ``ac_channel`` C++.
 - **The SystemC emitter** lives on a separate fork, ``choonsik1/allo:SystemC-emitter``, with a
   different type set -- ``Stream`` / ``Channel`` / ``Wire`` over MatchLib Connections. It is
   described in :doc:`/extensions/catapult_systemc`.

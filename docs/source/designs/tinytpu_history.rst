@@ -107,8 +107,8 @@ accelerator design: TinyTPU-isa", 19 files); the last commit containing them is
      - output-stationary feeder/drainer restructure; Vitis-legal, but
        ``acc += a*b`` is a loop-carried dependence so ``Final II = 7``
    * - ``tinytpu_vitis/microarch_ws.py``, ``bench_ws.py``, ``RESULTS_WS.md``,
-       ``logs/csyn_int8_8x8x8.log``,
-       ``logs/csynth_{int8_8x8x8,int8_16x16x16,fp32_8x8x8}.rpt``
+       ``csyn_int8_8x8x8.log``,
+       ``csynth_{int8_8x8x8,int8_16x16x16,fp32_8x8x8}.rpt``
      - weight-stationary, one opcode, II=1 per MAC at 100% of roofline
        (interval 74 at 8x8x8, down from 168 once the feeders and accumulator
        were partitioned) -- but *one* opcode, no scratchpad, no vector unit;
@@ -177,7 +177,7 @@ First synthesis and co-simulation
 
 The csynth bound and the ``nr`` narrowing (91407 -> 4133) are on
 :ref:`tinytpu-isa-csynth-bound`. Per unit at 8x8x8 after the narrowing
-(``logs/csynth_isa_8x8x8.rpt``), 0 errors, ``dataflow``, 22 processes:
+(``dev/records/tinytpu/logs/csynth_isa_8x8x8.rpt``), 0 errors, ``dataflow``, 22 processes:
 
 .. code-block:: text
 
@@ -1165,8 +1165,8 @@ patch. The changes are listed on :ref:`tinytpu-isa-landing`.
      - 686
 
 Bit-exact at every shape in the default testbench and at 4x4x4 and 16x16x16
-in ``TPU_TB=stress`` (``logs/cosim_isa_landed_sweep.log``,
-``logs/cosim_isa_landed_stress.log``); est. clock unchanged at 2.431 ns; +2,593
+in ``TPU_TB=stress`` (``dev/records/tinytpu/logs/cosim_isa_landed_sweep.log``,
+``dev/records/tinytpu/logs/cosim_isa_landed_stress.log``); est. clock unchanged at 2.431 ns; +2,593
 FF and +6,617 LUT, no BRAM or DSP (:doc:`tinytpu_isa`, "Resources"). The
 variants interacted (the bottleneck moved from ``vru`` to the PE prologue to
 ``accu``), so the stack was measured at all five shapes rather than assumed:
