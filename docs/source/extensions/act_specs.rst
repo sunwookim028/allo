@@ -152,11 +152,23 @@ That rule is what lets ``bmk,bkn->bmn`` be placed without a new field.
 The corpus
 ==========
 
-Seventeen specs. The first six are the shapes this fork measures --
-``bench_isa.py``'s ``SHAPES`` and the 172 / 262 / 418 / 484 / 686 cosim points
-on :doc:`/designs/tinytpu_isa` -- so the corpus agrees with the published
-benchmark set rather than inventing a parallel one. The other eleven exist
-because a corpus of square GEMMs would teach a mapper nothing.
+Twenty-two specs, in three groups.
+
+The first six are the shapes this fork measures -- ``bench_isa.py``'s
+``LATENCY`` set and the 172 / 262 / 418 / 484 / 686 cosim points on
+:doc:`/designs/tinytpu_isa`. The last five are the ``STEADY`` set that
+``bench_isa.py`` gains on the ``benchmark-set`` branch, whose accounting is in
+``docs/source/designs/benchmarks.rst`` there -- cubic 32, 48 and 64 plus
+64x32x64 and
+32x64x32, big enough that MACs per cycle characterises the machine rather than
+its pipeline fill. Both sets are taken rather than reinvented, so there is one
+benchmark set in this tree and not two. The steady shapes do not fit
+``main``'s ``MAXDIM = 16`` build and are reported ``SKIPPED`` with the reason
+until ``TPU_MAXDIM`` is raised; a workload spec is a property of the workload,
+not of one elaboration.
+
+The eleven in the middle exist because a corpus of square GEMMs would teach a
+mapper nothing.
 
 .. list-table::
    :header-rows: 1
@@ -229,6 +241,23 @@ because a corpus of square GEMMs would teach a mapper nothing.
      - ``mk->m``
      - a contraction whose output is a vector, written as one column of a
        word the machine can only write whole
+   * - ``gemm_steady_32x32x32``
+     - ``mk,kn->mn``
+     - eight times the headline shape's MACs, so the fixed pipeline term stops
+       dominating
+   * - ``gemm_steady_48x48x48``
+     - ``mk,kn->mn``
+     - a tile count that is not a power of two in any rank
+   * - ``gemm_steady_64x64x64``
+     - ``mk,kn->mn``
+     - the largest shape the widened build holds
+   * - ``gemm_steady_64x32x64``
+     - ``mk,kn->mn``
+     - half the reduction at the same output size, which separates the
+       wavefront-row term from the tile-count term
+   * - ``gemm_steady_32x64x32``
+     - ``mk,kn->mn``
+     - M and K swapped against the above: same MACs, opposite aspect
 
 ``python act/judge.py specs`` prints this list with each ``stresses`` line.
 
