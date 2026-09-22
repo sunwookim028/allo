@@ -358,6 +358,10 @@ def gemm_tiled(M, K, N, Mt=None, relu=False):
 
     `Mt` defaults to the largest band the machine holds: `nr` is one field, so
     at most MAXROWS rows, and the band must fit the accumulator and the vregs.
+    The largest rather than a convenient one, because a band count above 1
+    puts the program in the family of limitations item 24 -- more than one
+    output column block, more than one row block, an accumulate step -- whose
+    cosim does not complete. At NAR=136 that is M > 136.
     """
     Mt = _band(M, NAR, NVR) if Mt is None else Mt
     if M % Mt or K % T or N % T:

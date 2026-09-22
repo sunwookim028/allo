@@ -663,6 +663,20 @@ for either -- that nest is still four levels deep. Where a fifth level does
 become necessary is a trip count past 511, which must then be factored into two
 nested loops.
 
+One caveat, and it is somebody else's open item
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every shape measured here uses ONE row band: ``gemm_tiled`` takes the largest
+band the accumulator holds, and ``NAR`` is 136 at the shipped build, so M up to
+136 is one band and 128x768x768 is one band of 128. Past that -- M=256 is two
+bands of 128 -- the program becomes exactly the shape of
+:ref:`limitations item 24 <limitations>`: more than one output column block,
+more than one ROW block, and an accumulate step, which is the family whose
+cosim does not complete. That item is open, it was found by a different tree
+from a different generator, and nothing here fixes or worsens it; it is
+recorded because it says where the next RTL measurement will stop, and it is
+why the mapping takes the largest band it can rather than a convenient one.
+
 What it measured
 ~~~~~~~~~~~~~~~~
 
