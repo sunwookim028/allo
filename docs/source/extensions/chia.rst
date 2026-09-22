@@ -217,7 +217,7 @@ Mechanical enforcement, not instructions:
 Every accepted diff is still read by a person.
 
 Running two tracks on one host: ``ray stop`` is global
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **``ray stop`` matches Ray processes by name across the entire host**, so it
 kills raylets belonging to every worktree rather than only the one it is run
