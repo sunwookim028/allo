@@ -1513,7 +1513,8 @@ What the widening costs, at every latency (it does not vary with the knob):
      - 31 396
      - **116**
      - 14
-     - 2.431 ns (but see the warning below: not ASIC-synthesisable)
+     - 2.431 ns (dual-ported form; see the warning below --- the shipped
+       variant of this experiment is banked)
    * - delta
      - +6 513 (+37%)
      - +4 842 (+18%)
@@ -1553,14 +1554,56 @@ BRAM more than doubles, which is the real price.
    substrate. The BRAM number alone does not say that, which is why it is
    written here beside it.
 
-   Whether the widening *needs* that primitive is a separate question and is
-   being measured rather than argued: the buffers can be **cyclically banked
-   by** ``DMA_WORDS`` instead, so write ``w`` always lands in bank ``w`` and
-   every bank has one writer. That is the same widening expressed in a way
-   both substrates can build. If it keeps the -720 / -960 the optimisation was
-   real and the dual port incidental; if it loses it, the gain *was* the
-   second write port and largely evaporates off-FPGA, which would settle the
-   decision against landing.
+   **Measured, and the widening survives without the primitive.** The buffers
+   are now **cyclically banked by** ``DMA_WORDS``, so write ``w`` always lands
+   in bank ``w`` and every bank has exactly one writer --- the same widening
+   expressed in a way both substrates can build. The result is the strongest
+   of the three possible outcomes:
+
+   .. list-table::
+      :header-rows: 1
+
+      * - build
+        - 48^3
+        - 64^3
+        - rbA write ports
+        - FF
+        - LUT
+        - BRAM
+      * - shipped (``DMA_WORDS=1``)
+        - 10 289
+        - 22 123
+        - 1
+        - 17 488
+        - 26 554
+        - 52
+      * - widened, dual-ported
+        - 9 569
+        - 21 163
+        - **2 (DC rejects)**
+        - 24 001
+        - 31 396
+        - 116
+      * - **widened, banked**
+        - **9 569**
+        - **21 163**
+        - **1**
+        - 25 026
+        - 33 799
+        - **100**
+
+   **Identical cycles, to the cycle.** Banking keeps the entire -720 / -960,
+   so **the gain was the widening and not the second write port** --- the
+   optimisation is real and it is portable. Audited across every RAM module in
+   the build: all seven have one write port, where the rejected export's
+   ``rbA`` had two. The ``ELAB-366`` cause is removed rather than worked
+   around.
+
+   It also costs *less* block RAM than the dual-ported form (+92% over the
+   shipped control rather than +123%), trading that for +43% FF and +27% LUT.
+   So the decision is back on the table on its merits, and what it now reads
+   as is: **-720 / -960 cycles for +43% FF, +27% LUT, +92% BRAM, at an
+   unchanged clock, on a design that synthesises to standard cells.**
 
 (The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
 parametric burst buffers carry ``DMA_WORDS`` words of rounding headroom in

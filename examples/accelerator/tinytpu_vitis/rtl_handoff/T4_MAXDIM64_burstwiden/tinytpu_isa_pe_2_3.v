@@ -89,19 +89,19 @@ reg    ap_done_reg;
 wire    ap_CS_fsm_state1;
 reg    internal_ap_ready;
 reg    v3143_blk_n;
-wire   [15:0] trunc_ln4992_fu_43_p1;
-reg   [15:0] trunc_ln4992_reg_47;
+wire   [15:0] trunc_ln4996_fu_43_p1;
+reg   [15:0] trunc_ln4996_reg_47;
 reg    ap_block_state1;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_idle;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_ready;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3143_read;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3106_read;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3119_read;
-wire   [31:0] grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_din;
-wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_write;
-reg    grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_idle;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_ready;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3143_read;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3106_read;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3119_read;
+wire   [31:0] grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_din;
+wire    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_write;
+reg    grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg;
 reg   [2:0] ap_NS_fsm;
 wire    ap_NS_fsm_state2;
 wire    ap_CS_fsm_state3;
@@ -115,37 +115,37 @@ initial begin
 #0 start_once_reg = 1'b0;
 #0 ap_done_reg = 1'b0;
 #0 ap_CS_fsm = 3'd1;
-#0 grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg = 1'b0;
+#0 grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg = 1'b0;
 end
 
-tinytpu_isa_pe_2_3_Pipeline_VITIS_LOOP_5004_1 grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30(
+tinytpu_isa_pe_2_3_Pipeline_VITIS_LOOP_5008_1 grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30(
     .ap_clk(ap_clk),
     .ap_rst(ap_rst),
-    .ap_start(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start),
-    .ap_done(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done),
-    .ap_idle(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_idle),
-    .ap_ready(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_ready),
+    .ap_start(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start),
+    .ap_done(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done),
+    .ap_idle(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_idle),
+    .ap_ready(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_ready),
     .v3143_dout(v3143_dout),
     .v3143_num_data_valid(3'd0),
     .v3143_fifo_cap(3'd0),
     .v3143_empty_n(v3143_empty_n),
-    .v3143_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3143_read),
+    .v3143_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3143_read),
     .v3106_dout(v3106_dout),
     .v3106_num_data_valid(4'd0),
     .v3106_fifo_cap(4'd0),
     .v3106_empty_n(v3106_empty_n),
-    .v3106_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3106_read),
+    .v3106_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3106_read),
     .v3119_dout(v3119_dout),
     .v3119_num_data_valid(4'd0),
     .v3119_fifo_cap(4'd0),
     .v3119_empty_n(v3119_empty_n),
-    .v3119_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3119_read),
-    .v3123_din(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_din),
+    .v3119_read(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3119_read),
+    .v3123_din(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_din),
     .v3123_num_data_valid(4'd0),
     .v3123_fifo_cap(4'd0),
     .v3123_full_n(v3123_full_n),
-    .v3123_write(grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_write),
-    .empty(trunc_ln4992_reg_47)
+    .v3123_write(grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_write),
+    .empty(trunc_ln4996_reg_47)
 );
 
 always @ (posedge ap_clk) begin
@@ -162,7 +162,7 @@ always @ (posedge ap_clk) begin
     end else begin
         if ((ap_continue == 1'b1)) begin
             ap_done_reg <= 1'b0;
-        end else if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
+        end else if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
             ap_done_reg <= 1'b1;
         end
     end
@@ -170,12 +170,12 @@ end
 
 always @ (posedge ap_clk) begin
     if (ap_rst == 1'b1) begin
-        grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg <= 1'b0;
+        grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg <= 1'b0;
     end else begin
         if (((1'b1 == ap_CS_fsm_state1) & (1'b1 == ap_NS_fsm_state2))) begin
-            grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg <= 1'b1;
-        end else if ((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_ready == 1'b1)) begin
-            grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg <= 1'b0;
+            grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg <= 1'b1;
+        end else if ((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_ready == 1'b1)) begin
+            grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg <= 1'b0;
         end
     end
 end
@@ -194,7 +194,7 @@ end
 
 always @ (posedge ap_clk) begin
     if (((1'b0 == ap_block_state1) & (1'b1 == ap_CS_fsm_state1))) begin
-        trunc_ln4992_reg_47 <= trunc_ln4992_fu_43_p1;
+        trunc_ln4996_reg_47 <= trunc_ln4996_fu_43_p1;
     end
 end
 
@@ -209,7 +209,7 @@ end
 assign ap_ST_fsm_state2_blk = 1'b0;
 
 always @ (*) begin
-    if ((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done == 1'b0)) begin
+    if ((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done == 1'b0)) begin
         ap_ST_fsm_state3_blk = 1'b1;
     end else begin
         ap_ST_fsm_state3_blk = 1'b0;
@@ -217,7 +217,7 @@ always @ (*) begin
 end
 
 always @ (*) begin
-    if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
+    if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
         ap_done = 1'b1;
     end else begin
         ap_done = ap_done_reg;
@@ -233,7 +233,7 @@ always @ (*) begin
 end
 
 always @ (*) begin
-    if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
+    if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
         internal_ap_ready = 1'b1;
     end else begin
         internal_ap_ready = 1'b0;
@@ -258,7 +258,7 @@ end
 
 always @ (*) begin
     if ((1'b1 == ap_CS_fsm_state3)) begin
-        v3106_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3106_read;
+        v3106_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3106_read;
     end else begin
         v3106_read = 1'b0;
     end
@@ -266,7 +266,7 @@ end
 
 always @ (*) begin
     if ((1'b1 == ap_CS_fsm_state3)) begin
-        v3119_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3119_read;
+        v3119_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3119_read;
     end else begin
         v3119_read = 1'b0;
     end
@@ -274,7 +274,7 @@ end
 
 always @ (*) begin
     if ((1'b1 == ap_CS_fsm_state3)) begin
-        v3123_write = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_write;
+        v3123_write = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_write;
     end else begin
         v3123_write = 1'b0;
     end
@@ -292,7 +292,7 @@ always @ (*) begin
     if (((1'b0 == ap_block_state1) & (1'b1 == ap_CS_fsm_state1))) begin
         v3143_read = 1'b1;
     end else if ((1'b1 == ap_CS_fsm_state3)) begin
-        v3143_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3143_read;
+        v3143_read = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3143_read;
     end else begin
         v3143_read = 1'b0;
     end
@@ -311,7 +311,7 @@ always @ (*) begin
             ap_NS_fsm = ap_ST_fsm_state3;
         end
         ap_ST_fsm_state3 : begin
-            if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
+            if (((grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_done == 1'b1) & (1'b1 == ap_CS_fsm_state3))) begin
                 ap_NS_fsm = ap_ST_fsm_state1;
             end else begin
                 ap_NS_fsm = ap_ST_fsm_state3;
@@ -335,12 +335,12 @@ end
 
 assign ap_ready = internal_ap_ready;
 
-assign grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_ap_start_reg;
+assign grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_ap_start_reg;
 
 assign start_out = real_start;
 
-assign trunc_ln4992_fu_43_p1 = v3143_dout[15:0];
+assign trunc_ln4996_fu_43_p1 = v3143_dout[15:0];
 
-assign v3123_din = grp_pe_2_3_Pipeline_VITIS_LOOP_5004_1_fu_30_v3123_din;
+assign v3123_din = grp_pe_2_3_Pipeline_VITIS_LOOP_5008_1_fu_30_v3123_din;
 
 endmodule //tinytpu_isa_pe_2_3
