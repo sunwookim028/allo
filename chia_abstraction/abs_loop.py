@@ -270,7 +270,14 @@ def run(args, budget: Budget) -> int:
                        "CHIA_TOOL_BASE_PORT": os.environ.get(
                            "CHIA_TOOL_BASE_PORT", "8400"),
                        "CHIA_TOOL_MAX_PORT": os.environ.get(
-                           "CHIA_TOOL_MAX_PORT", "8499")}}
+                           "CHIA_TOOL_MAX_PORT", "8499"),
+                       # The worker inherits the RAYLET's environment, not the
+                       # driver's, so `opencode` is only on its PATH if the
+                       # head happened to be started from a shell that had
+                       # sourced chia.env. Ours was not, and CHIA reported
+                       # `[Errno 2] No such file or directory: 'opencode'` --
+                       # for free, because a failed call costs nothing.
+                       "PATH": os.environ.get("PATH", "")}}
     # CHIA_RAY_ADDRESS pins this loop to ITS OWN head. `address="auto"` reads
     # the host's newest GCS address file, and this host runs several tracks at
     # once: "auto" found two clusters, connected to another track's, and then
