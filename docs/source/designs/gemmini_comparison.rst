@@ -927,3 +927,44 @@ Things that cost time to learn
 * ``gemmini_counter.h`` exposes 8 hardware counters that were never read.
   Roughly an hour of work if a future comparison wants per-unit attribution
   rather than total cycles.
+
+Counting host overhead symmetrically
+------------------------------------
+
+This page's window analysis established that a flat **~393-413 cycles** of
+Rocket driver software sits inside Gemmini's end-to-end figure, independent of
+shape — which is 72 % of the 4x4x4 number and nearly the whole gap between the
+two windows. Our own figures are Vitis cosim counts from ``ap_start`` to
+``ap_done``, and so contain no host at all.
+
+MiniTPU's owner supplied the symmetric datum, unprompted, and it is the reason
+to state this as a methodological rule rather than as a point in our favour:
+**their per-launch host work is about 132 microseconds with a 44-microsecond
+register-access floor, measured on board .187** — roughly **24,750 cycles at
+187.5 MHz** — and their testbench numbers do not include it either.
+
+So the rule for any comparison on this page, and for the benchmark set
+generally:
+
+- **Name the window for every figure.** What is inside it, where it starts, and
+  where it stops. A cycle count without its window is not a measurement.
+- **Count every machine's host, or none of them.** Counting Gemmini's driver
+  while omitting our own or MiniTPU's host time is unfair to Gemmini, and a
+  comparison that omits all of them is fine *provided it says so*. What is not
+  acceptable is letting one machine's overhead count while another's vanishes.
+- **Where both windows are cheap to report, report both.** For Gemmini this
+  costs nothing, because the driver-inclusive and accelerator-only figures come
+  out of the same run.
+
+This is the same failure mode as the withdrawn claim recorded above: a number
+that is true of the measurement but not of the thing being measured. Two of
+those have now been caught by comparing notes across designs rather than by
+inspection, which is an argument for continuing to do so.
+
+Gemmini at a matched array size is being built independently by both sides as of
+2026-09-22 — deliberately twice, because neither side's Gemmini figure has ever
+been reproduced by anyone, and a disagreement between two independent builds of
+the same nominal configuration would be more informative than either number
+alone. Reproducing a build means recording the config object, array dimensions,
+datatypes, scratchpad and accumulator sizes, the chipyard and gemmini commits,
+the harness, and exactly what is inside the counter window.
