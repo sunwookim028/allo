@@ -217,9 +217,10 @@ The evaluator
   ``TPU_TB=stress`` RTL testbench (several calls on one RTL instance, whole
   ``C`` compared -- what sees an RTL-only failure such as a dependence pragma
   that is false at a short read-after-write distance). ``claim`` is ``win``
-  only against the recorded baseline, itself measured by a no-diff run
-  (``evidence/accept-control-476a70d8/``: 172 / 262 / 418 / 484 / 686, RTL
-  stress 0 mismatches at every shape).
+  only against a control ``accept.py`` measured itself, in the same run and
+  off the same build (guard 10); the published 172 / 262 / 418 / 484 / 686
+  (``evidence/accept-control-476a70d8/``) are what that measurement is
+  cross-checked against.
 
 Guards
 ~~~~~~
@@ -239,7 +240,12 @@ Mechanical enforcement, not instructions:
 4. **Sandbox.** Every process that imports the candidate runs under ``bwrap``:
    read-only filesystem and tree, only the work directory writable, own PID
    namespace. The tree and the checkout's tracked files are compared byte for
-   byte after each stage (``tamper``).
+   byte after each stage (``tamper``). A ``tamper`` verdict on a run that
+   should have been clean is, in practice, usually a **person or another agent
+   editing the checkout while a measurement was in flight** -- suspect that
+   before the candidate. ``accept.py`` is immune by construction: it measures
+   in its own ``git worktree`` at ``--ref``, so an edit elsewhere in the
+   checkout cannot reach it.
 5. **Vouched verdicts.** A printed ``STRESS OK`` proves nothing when the
    candidate runs in the same process: on the branch, a candidate that printed
    it and raised ``SystemExit(0)`` at import passed the old gate with an int16
@@ -276,6 +282,72 @@ Mechanical enforcement, not instructions:
 9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
    swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
    authentication.
+10. **A measured control** (``control.py``). A win is "fewer cycles than the
+    unmodified design", so both numbers have to come from one machine, one
+    Vitis install and one build. ``accept.py`` measures the control itself:
+    ``cosim.py`` on the *committed* design, all five shapes, in the same
+    ``git worktree`` and off the same ``mlir/`` build, **before** the
+    candidate's diff is applied -- the checkout is asserted pristine
+    immediately before and after. Nothing a candidate does can reach that
+    number: not a byte of it exists on disk when the cycles are taken, its
+    processes are sandboxed to their work directory (guard 4) and so cannot
+    write a control record either, and the control's cosim verdict is
+    nonce-vouched (guard 5) like every other. ``accept.json`` records it as
+    ``control`` -- cycles, the two editable files' blob ids, the ref, the
+    estimated clock, the wall time, when it was measured -- so an accepted
+    result can be re-derived against the same control.
+    ``--control <control-run>/accept.json`` reuses one control for the rest of
+    a run's candidates; a record for another design, not vouched, not measured
+    on a pristine checkout, short of a shape or missing the clock is refused
+    (``claim: no-control``), never silently used. A cosim that flakes at one
+    shape lands in the same place -- ``no-control``, before the candidate is
+    measured at all, and the run is repeated rather than compared against
+    something else. Cost: one five-shape cosim, ~4.5 min, once per run. The search's own baseline (``loop.py``, iteration
+    0) was already a self-measurement; it now records the design's blobs and
+    cross-checks itself too.
+
+    The control and the candidate are measured by the **same driver** --
+    ``accept.py``'s one ``DRIVER``, threaded into both passes, recorded in the
+    record, and refused by ``control.unusable`` if a reused record names
+    another. A second driver (the co-design mode's mapper-driven
+    ``codesign_cosim``) describes the same hardware with a different program,
+    so a control measured by one and a candidate by the other shows the
+    driver's difference as the candidate's win: at 4x4x4 the mapper's program
+    is 24 instruction words against the hand-written 28, same four dynamic
+    issues, bit-exact -- a free -3 cycles for every candidate in that mode.
+
+    ``control.RECORDED`` is therefore keyed ``(driver, the two blobs)`` and
+    ``control.PUBLISHED`` by driver: a driver with nothing recorded is
+    ``UNRECORDED`` and exits 3 with its measured numbers printed, to be
+    recorded, rather than quietly checked against the other driver's.
+
+    ``control.RECORDED`` and the published numbers are a **cross-check**, not
+    the control. They used to *be* the control, keyed by the blob ids of the
+    two editable files -- and a prose-only edit to ``microarch_isa.py``
+    (docstring corrections, two dead constants) moved the key, so acceptance
+    reported ``no-baseline`` and could accept nothing. Failing closed was
+    right; keying a control on a file's bytes was not. As a cross-check the
+    same table cannot block and cannot go quiet: a design whose blobs are not
+    recorded is compared against the published five-shape numbers instead, and
+    a disagreement prints a banner and exits 3, because it means either the
+    toolchain moved or the design changed behaviour and no result of that run
+    can be trusted until a person says which. A design whose cycles
+    deliberately move gets its entry in ``control.RECORDED`` in the same
+    commit.
+
+    The comparison is exact -- no tolerance -- because *this* side is
+    deterministic: the five shapes reproduce to the cycle, run to run and
+    across independent re-measurements, so two measurements of one
+    configuration that differ are a finding, never noise to average. (The
+    Gemmini column of the comparison is the noisy one, up to 20 cycles of
+    trial-to-trial spread; the two sides' tolerances are not the same and this
+    check applies only to ours.) And a published number differing from an
+    in-run one is not automatically an error in either: the co-design mode's
+    control measures 169 at 4x4x4 against the published 172 because its mapper
+    emits a 24-word program where the hand-written one has 28, bit-exact and
+    fully accounted for. That is the case for measuring the control per run
+    rather than publishing one -- a control has to come from the same run as
+    the thing it controls.
 
 Every accepted diff is still read by a person.
 
@@ -323,7 +395,9 @@ Environment (once): the ``allo`` env with this checkout's ``mlir/build``,
    python test_harness.py --phases e,c    # ~1 min, $0; full suite ~30 min, $0
    python preflight.py --budget-usd 30    # the gate alone, $0
    python swarm.py --workers 2 --iterations 3 --budget-usd 30
-   python accept.py --diff <run>/<worker>/best.diff --out <run>/accept-<worker>
+   python accept.py --out <run>/control                 # the run's control, once
+   python accept.py --diff <run>/<worker>/best.diff --out <run>/accept-<worker> \
+       --control <run>/control/accept.json              # or omit it and measure again
    ray stop                               # and remove the Ray session directory
 
 **Billing.** CHIA runs on the dedicated project ``chia2026-tinytpu``, billed to
@@ -344,13 +418,15 @@ is only in the Cloud Console.
 
 ``test_harness.py`` runs the whole harness with no LLM (a scripted
 OpenAI-compatible model on localhost; every cloud credential variable is
-cleared): **e** frozen-file and import-time attacks, forged verdicts,
-sandbox; **c** an int16 partial sum rejected by stress; **g** the
+cleared): **control** the control record a claim may rest on and its
+cross-check; **e** frozen-file and import-time attacks, forged verdicts,
+sandbox, and that a candidate can neither write nor fake a control record;
+**c** an int16 partial sum rejected by stress; **g** the
 parametricity and documentation guards; **d** a deadlock killed at 240 s;
 **abf** no-op and a slower design scored concurrently; **loop** the real
 ``swarm -> loop -> opencode -> MCP`` path; **accept** ``accept.py`` on a
-correct-but-slower diff. 57/57 at landing
-(``evidence/harness-test-20260919-190240/``).
+correct-but-slower diff, against a control measured in that same run. 57/57
+at landing (``evidence/harness-test-20260919-190240/``).
 
 First paid run, 2026-09-19
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

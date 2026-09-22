@@ -258,7 +258,8 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `gate_runner.py` | frozen: runs bench_isa / stress_isa / param_check / cosim and vouches for the verdict with a nonce |
 | `param_check.py` | frozen: the parametricity gate, candidate rebuilt at MAXDIM 8 and 12 |
 | `spec_policy.py` | frozen: what an editable file may contain |
-| `accept.py` | clean-checkout, five-shape acceptance of a claimed winner |
+| `accept.py` | clean-checkout, five-shape acceptance of a claimed winner, against a control it measures in the same run |
+| `control.py` | the control record a claim may rest on, and the cross-check against the published numbers |
 | `allo_tool.py` | the MCP surface: read spec / read frozen reference / replace_text, patch, insert / functional check / score |
 | `llm.py` | CHIA's OpenCodeLLM with a 40-minute MCP request timeout |
 | `loop.py` | one search: baseline, propose from best, harness re-scores, keep or rewind |

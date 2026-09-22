@@ -10,7 +10,12 @@ agent's word or the agent's own tool output:
   score  cosim.py at the search shapes           (RTL cosim cycles, ~2-4 min)
 
 A candidate is kept only if it passes both and strictly lowers the summed cosim
-cycles; otherwise the spec is rewound and the next iteration is told why.
+cycles; otherwise the spec is rewound and the next iteration is told why. What
+it is lowered against is measured, not looked up: iteration 0 scores the
+unmodified design in this environment, records the design's blob ids with it,
+and cross-checks it against the published numbers (`control.py`) so that a
+toolchain that moved is loud at the start of the run rather than implicit in
+every verdict after it.
 
 A spend cap is enforced before every model call: if this run's spend (opencode's
 own DB, over the sessions titled with the run's tag, every worker) plus the
@@ -33,6 +38,7 @@ import ray
 from chia.base.ChiaFunction import get
 from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
+import control
 import preflight
 from allo_tool import AlloSpecTool, EDITABLE
 from llm import IsaOpenCodeLLM
@@ -275,8 +281,16 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         print("=" * 72)
         baseline = tool.evaluate(work="harness")
         print(f"  {summarize(baseline)}", flush=True)
+        design = control.blobs("HEAD")
+        cross = (control.crosscheck(baseline["cycles"], design, "cosim")
+                 if baseline.get("ok") else None)
         _record(log_path, {"iteration": 0, "kind": "baseline", "accepted": True,
-                           "head": head, "verdict": baseline})
+                           "head": head, "design": design, "crosscheck": cross,
+                           "verdict": baseline})
+        if cross:
+            print(f"  cross-check against {cross['against']}: "
+                  f"{cross['status']} {cross['delta']}", flush=True)
+            print(control.banner(cross), end="", flush=True)
         if not baseline.get("ok"):
             print(baseline.get("detail", "")[-3000:])
             return 1
