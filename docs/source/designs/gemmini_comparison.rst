@@ -234,7 +234,7 @@ Variants
 ~~~~~~~~
 
 Every variant is the pre-landing ``microarch_isa.py`` (``7a24c21e``, the
-``base`` row) plus asserted textual patches (``make_variants.py``), so its diff
+``base`` row) plus asserted textual patches, so its diff
 is exactly the change being priced. A
 variant counts only if the Allo simulator is ``ALL EXACT`` (``bench_variant.py``:
 gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
@@ -388,26 +388,31 @@ per memory").
 Reproducing the attribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-From ``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
+The variant generator that produced these numbers, ``make_variants.py``, is
+gone: it patched the pre-landing baseline textually and had gone stale
+against the landed design (it named a scratchpad constant, ``A_SP``, that the
+shipped ISA no longer defines), and the CHIA harness's own candidate/diff
+pipeline (``chia_agent/evaluate.py``, ``chia_agent/accept.py``) is the
+maintained way to measure a new variant today. The table above and the raw
+per-run output it was measured from (``dev/records/tinytpu/impact-results/``)
+are the durable record; they are not re-derived by re-running anything.
+
+Once a variant's ``.py`` file exists (however it was produced), from
+``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
 
 .. code-block:: bash
 
    source env.sh                    # conda allo, LLVM_BUILD_DIR, OMP, TMPDIR
-   python make_variants.py          # writes v_base.py and v_*.py from 7a24c21e
    python pyrun.py bench_variant.py v_design_dep                     # simulator
    TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py v_design_dep runs/v_design_dep
    ./profile.sh runs/v_design_dep   # per-process timeline of the last shape
 
-``make_variants.py`` reads its baseline from git at ``7a24c21e`` -- the design
-the table calls ``base`` -- not the shipped file, so the variants keep
-measuring what the table says; it gives them the baseline's own hand-written
-program, since ``isa_dsl`` now targets the landed ISA. ``cosim_variant.py
-base`` builds the *shipped* design; the pre-landing one is ``v_base``.
-``pyrun.py`` strips the conda env's editable finder, so ``allo`` resolves to
-this checkout. ``cosim_variant.py`` reuses ``../cosim.py`` (``align_value`` 64,
-widen 512, ``-B/usr/bin``, ``m_axi`` depths) and adds only a
-``patch_kernel(prj)`` hook for variants that edit the emitted C++.
-``profile.sh`` re-runs cosim with ``-enable_dataflow_profiling``, then re-runs
+``cosim_variant.py base`` builds the *shipped* design; the pre-landing one
+would have been ``v_base``. ``pyrun.py`` strips the conda env's editable
+finder, so ``allo`` resolves to this checkout. ``cosim_variant.py`` reuses
+``../cosim.py`` (``align_value`` 64, widen 512, ``-B/usr/bin``, ``m_axi``
+depths) and adds only a ``patch_kernel(prj)`` hook for variants that edit the
+emitted C++. ``profile.sh`` re-runs cosim with ``-enable_dataflow_profiling``, then re-runs
 the xsim snapshot so the monitor's CSVs survive (cosim deletes them).
 ``analyze_df.py`` and ``rle_df.py`` turn them into per-process
 run/starve/block counts and run-length traces. Raw outputs, timelines and the
