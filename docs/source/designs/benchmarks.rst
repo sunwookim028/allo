@@ -653,7 +653,7 @@ Matched against Gemmini
 =======================
 
 What is matched, and what is not
--------------------------------
+--------------------------------
 
 .. list-table::
    :header-rows: 1
@@ -708,7 +708,7 @@ opponent. ``dataflow = BOTH`` means Gemmini carries an output-stationary
 datapath neither benchmark uses, which favours us if it favours anyone.
 
 The Gemmini builds, in terms another team can reproduce
-------------------------------------------------------
+-------------------------------------------------------
 
 Stated exhaustively because **neither side's Gemmini figure has ever been
 reproduced by anyone**, and two independent builds of the same nominal
