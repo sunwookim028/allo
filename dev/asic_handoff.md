@@ -125,3 +125,61 @@ ones. Our T=4 array has 16 PEs; a per-PE figure also makes the T=4 and T=8
 designs directly comparable to each other, which the totals are not.
 
 Everything else in this file stands unchanged.
+
+## Answers to the two open questions (2026-09-22, late)
+
+**1. Yes — commit the other session's Gemmini DIM=4 results, with the settings
+read out of the build directories rather than assumed.** Logic-only 382,026 and
+full 990,938 existing only on scratch is exactly how a result gets lost, and
+reading the settings out is the same discipline that made the T=8 row usable:
+every DC and mflowgen parameter compared, and the standard-cell library matched
+by checksum, because two runs can agree on every setting and still resolve a
+different `stdcells.db`. Record it as *"run by another session, settings
+verified identical"* — provenance, not a caveat, since the check removes the
+doubt rather than raising one. If any setting differs, say which and do not
+average over it.
+
+With our T=4 MAXDIM=64 logic-only in flight, that completes the approved pair.
+DIM=8 and the capacity-matched pair remain unstarted and unapproved.
+
+**2. The 4x per-PE spread is the more interesting finding, and it deserves
+promotion from caveat to result.** 617 to 2,533 µm² across sixteen instances of
+what the source says is one repeated unit means **the array is not homogeneous
+after synthesis**. The mean is the least informative thing about that
+distribution.
+
+What would settle it, in order of value:
+
+- **Is the spread positional?** Corner and edge PEs have operands that are
+  constant, unconnected or immediately terminated, so constant propagation and
+  dead-logic removal should hit them hardest. If the cheap PEs are the corners
+  and the expensive ones the interior, that is a clean mechanism and a
+  reportable one. If the spread is *not* positional, that is more surprising
+  and worth more.
+- **Does it scale?** The same measurement at T=8 says whether the effect is a
+  fixed boundary cost — in which case it shrinks as a fraction with array size,
+  which is a real argument about how systolic arrays amortise — or something
+  else.
+
+This matters beyond curiosity: **a per-PE mean is only a fair basis for
+comparison against another design's per-PE figure if the underlying
+distribution is tight.** At 4x spread ours is not, so the comparison against
+Gemmini's 453 µm²/PE at 22 nm should be stated as a range, with the mean
+labelled as a mean.
+
+Keep the three caveats already committed — the node scaling is a rule of thumb,
+the two PEs may not contain the same functions, and the mean hides the spread.
+The second is the one most likely to be decisive and the hardest to check
+without their netlist.
+
+**On the PE-array hierarchy line not existing:** reporting that, rather than
+producing a plausible number by another route and calling it the same thing,
+was the right call. The flattening effort that dissolves the instances is the
+same setting that makes these runs comparable to each other, so it should not
+be changed to recover a hierarchy line; the name-prefix sum is the correct
+substitute and is correctly labelled as a different kind of number.
+
+**And the duplicate-detection point should be a standing practice**: three
+near-duplicate runs caught tonight by checking disk before launching. Two
+sessions with the same tools and the same repository will converge on the same
+work unless one of them looks first.
