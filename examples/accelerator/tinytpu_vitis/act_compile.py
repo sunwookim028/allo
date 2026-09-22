@@ -23,6 +23,9 @@ from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
 from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
     CAUSE_KIND,
 )
+from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+    gemm_program,
+)
 from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES  # noqa: E402
 
 GATE = [("gemm", s) for s in SHAPES] + [("gemm.relu", s) for s in SHAPES] + [
@@ -55,7 +58,7 @@ def show(result, machine, top, verify):
     if not result.best:
         raise SystemExit("every nest was refused")
     print(f"\n  {'mapping':16s} {'rows':>4s} {'static':>6s} {'words':>5s} "
-          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s} {'staging':>9s}"
+          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s} {'rtl':>9s}"
           f"  isa_ref")
     for candidate in result.ranked(top):
         counts = machine.report(candidate.program)
@@ -68,13 +71,15 @@ def show(result, machine, top, verify):
               f"{intrinsic_rows(candidate.nest):>4d} "
               f"{counts['static']:>6d} {counts['words']:>5d} "
               f"{counts['dynamic']:>5d} {plan.makespan:>8d} "
-              f"{unit + ' ' + str(load):>12s} {staging(candidate.nest):>9s}"
+              f"{unit + ' ' + str(load):>12s} "
+              f"{measured(candidate.program, result.problem):>9s}"
               f"  {verdict}")
-    if any(staging(c.nest) == "in-nest" for c in result.ranked(top)):
-        print("  in-nest staging is ENCODABLE but not confirmed on the RTL: "
-              "two such mappings\n  passed isa_ref, the KPN model, the "
-              "simulator and csim, and did not finish cosim.\n  See "
-              "docs/source/extensions/act.rst, \"three tiers of evidence\".")
+    if any(measured(c.program, result.problem) != "measured"
+           for c in result.ranked(top)):
+        print("  unproven means no cosim has run THIS program. Some legal "
+              "programs do not\n  finish cosim while every cheap check "
+              "passes, and no predicate is known that\n  separates them -- "
+              "limitations item 24. Measure one with act_cosim.py.")
     return result.best
 
 
@@ -128,14 +133,18 @@ def intrinsic_rows(nest):
     return max(l.factor for l in nest if l.level == "intrinsic")
 
 
-def staging(nest):
-    """Whether the operand transfers hoist out of the emitted nest.
+def measured(program, problem):
+    """Whether RTL cosim has run this exact program.
 
-    Not a claim about why: it is the structural property the mappings that fail
-    to finish cosim share, and the one the confirmed mappings do not have.
+    Evidence, not structure. Every attempt to predict which programs finish
+    cosim from their shape has failed (limitations item 24), so the only honest
+    column is whether the machine has been asked.
     """
-    emitted = [l for l in nest if l.level != "intrinsic"]
-    return "in-nest" if any(l.rank == "M" for l in emitted) else "prologue"
+    shape = tuple(problem.extents[rank] for rank in problem.workload.ranks)
+    if len(shape) != 3:
+        return "unproven"
+    hand = gemm_program(*shape, relu=bool(problem.workload.epilogue))
+    return "measured" if program == hand else "unproven"
 
 
 def gate(machine):

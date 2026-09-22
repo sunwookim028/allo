@@ -68,7 +68,7 @@ does not build the fork's site; build locally.
 
 `examples/accelerator/tinytpu_vitis/`. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
-checks the published cycle counts (172/262/418/484/686; 252/383/591/667/919
+checks the published cycle counts (171/261/417/483/685; 252/383/591/667/919
 before `e24e433b`):
 
 ```bash

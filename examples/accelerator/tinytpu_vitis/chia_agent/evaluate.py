@@ -110,7 +110,7 @@ FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
 #: order and every cycle count are unchanged; `git diff 476a70d8 acb080bd --
 #: examples/accelerator/tinytpu_vitis/{cosim,bench_isa,stress_isa}.py` is the
 #: whole of it.
-MAIN_BASE = "acb080bd"
+MAIN_BASE = "f59a65f6"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
     "shapes.py")]
