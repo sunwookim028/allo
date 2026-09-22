@@ -476,9 +476,9 @@ What the cheap gate is worth
 
 Measured with ``act/calibrate.py``, which runs one ``csynth_design`` and then
 one ``cosim_design`` per program on that same RTL. Everything in this section
-was measured in this session
-(``logs/cosim_act_corpus_sweep.log``); ``PUBLISHED_CYCLES`` is the only
-attributed number on the page.
+was measured in this session (``logs/cosim_act_corpus_sweep.log`` and
+``logs/cosim_act_relu_hang.log``); ``PUBLISHED_CYCLES`` in ``cycles.py`` is the
+only attributed number on the page.
 
 .. code-block:: bash
 
@@ -531,6 +531,13 @@ attributed number on the page.
      - **686**
      - +0.9%
      - yes
+   * - ``gemm_relu_16x16x16``
+     - ``accu``
+     - 384
+     - 796
+     - 750
+     - +6.1%
+     - no
    * - ``gemm_reuse_m_16x16x4``
      - ``vru``
      - 128
@@ -566,6 +573,13 @@ attributed number on the page.
      - 371
      - +2.6%
      - no
+   * - ``relu_16x16``
+     - ``accu``
+     - 192
+     - 484
+     - *never*
+     - --
+     - no
 
 Two things fall out of the left column before the model is even discussed.
 **The five published cycle counts reproduce exactly** -- 172 / 262 / 418 /
@@ -578,8 +592,9 @@ both with 0 of 256 bytes wrong. The third, ``relu_16x16`` (``mn->mn``), is
 :ref:`the one that does not <act-specs-rtl-hang>`.
 
 On the model: **in sample, max error 9.2% over the five points it is fitted
-to; out of sample, max error 13.9% and mean absolute error 6.0% over the five
-held-out specs measured.** The two worst cases are both ones where ``spm`` is
+to; out of sample, max error 13.9% and mean absolute error 6.0% over the six
+held-out specs that produced a cycle number.** The two worst cases are both
+ones where ``spm`` is
 the critical unit at a small work count, where what the design is actually
 doing is filling the array's weight and activation chains -- a term the model
 does not have, because ``max`` over the unit counts cannot see a pipeline it
