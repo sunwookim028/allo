@@ -393,8 +393,9 @@ The concession that became the win
 The rule first, because it is the part that transfers: **an overhead you
 exclude from a window is an overhead you cannot see, so put the excluded
 quantity beside someone else's** -- the comparison is what makes an absurd
-value look absurd. What follows is the episode that established it, and it is
-a method finding rather than an architectural one.
+value look absurd. What follows is the episode that established it: the most
+instructive thing to come out of comparing two designs, and a method finding
+rather than an architectural one.
 
 While establishing that a fair comparison must **count every machine's host or
 none of them** (:doc:`/designs/gemmini_comparison`), MiniTPU's owner volunteered

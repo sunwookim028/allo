@@ -1399,8 +1399,8 @@ The one-owner rule was charged to Vitis as well as to Allo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Correction, 2026-09-19: the one-owner rule is Allo's, not Vitis's.**
-`One owner per memory`_ charged it to both until this date; only the Allo half
-holds. A Vitis 2023.2 probe (`impact/probe_shared/
+`One owner per memory`_ charged it to both until this date, citing
+``HLS 200-779 / 200-979`` as a Vitis refusal; only the Allo half holds. A Vitis 2023.2 probe (`impact/probe_shared/
 <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
 shows that ``#pragma HLS stream variable=buf type=unsync`` makes Vitis share
 an on-chip array between two processes, one per BRAM port (``HLS 200-824``,
