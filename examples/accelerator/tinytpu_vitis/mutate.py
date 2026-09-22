@@ -5,7 +5,7 @@
 
 A harness that has only ever seen the correct design has never been shown to
 fail. This applies one deliberate single-point bug at a time to
-`microarch_isa.py` -- in a copy under `.mutants/`, never in place -- runs each
+the design -- in a copy under `.mutants/`, never in place -- runs each
 verification level against the mutant, and prints which level caught it:
 
     bench_isa    the published functional sweep ([-4, 4] operands, seed 0)
@@ -34,9 +34,10 @@ untrue for programs the assembler accepts, and the `TPU_TB=stress` testbench's
 `TPU_SHAPES` says otherwise. With `--no-rtl` they are reported as not run, not
 as caught.
 
-Every mutant's `old` text must occur exactly once after its anchor, so a
-refactor of the design makes this script fail loudly instead of silently
-testing nothing.
+Every mutant's anchor must occur exactly once across the whole design
+(`microarch_isa.py` plus the `ip` unit library, `DESIGN` below), and its `old`
+text must occur after it, so a refactor that moves or renames anchored code
+makes this script fail loudly instead of silently testing nothing.
 """
 
 import os
@@ -47,12 +48,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-SRC = os.path.join(HERE, "microarch_isa.py")
 WORK = os.path.join(HERE, ".mutants")
-MOD = "examples.accelerator.tinytpu_vitis.microarch_isa"
+
+# The design: the shipped instantiation, and the unit library it composes. A
+# mutant names no file -- its anchor has to occur exactly once across all of
+# them, which is a stronger claim than uniqueness within one file, and is what
+# locates the mutation.
+DESIGN = ["microarch_isa.py"] + sorted(
+    os.path.relpath(os.path.join(d, f), HERE)
+    for d, _, fs in os.walk(os.path.join(HERE, "ip")) for f in fs
+    if f.endswith(".py"))
 
 # (name, what it models, anchor, old, new). `old` is replaced once, at its
-# first occurrence after `anchor`; `anchor` must be unique in the file.
+# first occurrence after `anchor`; `anchor` must be unique across `DESIGN`.
 MUTANTS = [
     ("none", "control: the design unmodified", None, None, None),
     # --- the array ---
@@ -64,7 +72,7 @@ MUTANTS = [
      "a = aw[8 * i : 8 * (i + 1)]", "aw[8 * i : 8 * (i + 1)]", "aw[8 * j : 8 * (j + 1)]"),
     ("pe_shadow_not_swapped", "weight double buffer: the PE keeps its first nonzero "
      "weight instead of taking the next mm's from wq",
-     "w = q[0:8]", "w = q[0:8]", "if w == 0:\n                    w = q[0:8]"),
+     "w = q[0:8]", "w = q[0:8]", "if w == 0:\n                w = q[0:8]"),
     ("wld_rows_from_weight", "wld sends the weight lane as the PE's row count",
      "q[8:20] = hdr[0:12]", "hdr[0:12]", "ww[0:12]"),
     # --- the scratchpad: weights for mm, and vld ---
@@ -100,8 +108,8 @@ MUTANTS = [
     ("loop_extra_trip", "loop back-edge test <= (one extra iteration)",
      "nxt: int32 = lp_iv[sp - 1] + 1", "if nxt < lp_trip", "if nxt <= lp_trip"),
     ("vrelu_rows_short", "the sequencer's vrelu carries one row fewer",
-     "                if op == OP_VRELU:\n                    c_acc.put(rw)",
-     "c_acc.put(rw)", "rw[54:62] = nr - 1\n                    c_acc.put(rw)"),
+     "            if op == OP_VRELU:\n                c_acc.put(rw)",
+     "c_acc.put(rw)", "rw[54:62] = nr - 1\n                c_acc.put(rw)"),
     # --- the accumulator and the vector ALU ---
     ("mm_acc_dropped", "mm ignores the accumulate flag",
      "base: UInt(AW) = 0", "if f2 == 1:", "if f2 == 2:"),
@@ -110,10 +118,10 @@ MUTANTS = [
     ("mm_dst_base_ignored", "mm writes ar[r], ignoring its f1 base",
      "wa = f1 + rr", "wa = f1 + rr", "wa = rr"),
     ("vrelu_dst_is_src", "vrelu writes its source row, not f0",
-     "            if op == OP_MM:\n                wa = f1 + rr", "if op == OP_MM:",
+     "        if op == OP_MM:\n            wa = f1 + rr", "if op == OP_MM:",
      "if op != OP_VADD:"),
     ("vadd_dst_is_src1", "vadd writes its first source, not f0",
-     "            if op == OP_MM:\n                wa = f1 + rr", "if op == OP_MM:",
+     "        if op == OP_MM:\n            wa = f1 + rr", "if op == OP_MM:",
      "if op != OP_VRELU:"),
     ("relu_off_by_one", "ReLU threshold off by one (-1 survives)",
      "ue: int32 = rv[32 * e3", "if re < 0:", "if re < -1:"),
@@ -124,10 +132,10 @@ MUTANTS = [
     ("vadd_holds_stale_x", "vadd's first operand register is never loaded",
      "xr = rv", "xr = rv", "xr = xr"),
     ("vrelu_src_base_ignored", "vrelu reads ar[r], ignoring its f1 base",
-     "            if op == OP_MVOUT:\n                ra = f0 + rr",
-     "ra = f0 + rr", "ra = f0 + rr\n            if op == OP_VRELU:\n                ra = rr"),
+     "        if op == OP_MVOUT:\n            ra = f0 + rr",
+     "ra = f0 + rr", "ra = f0 + rr\n        if op == OP_VRELU:\n            ra = rr"),
     ("mvout_src_base_ignored", "mvout reads ar[r], ignoring its f0 base",
-     "            if op == OP_MVOUT:\n                ra = f0 + rr", "ra = f0 + rr", "ra = rr"),
+     "        if op == OP_MVOUT:\n            ra = f0 + rr", "ra = f0 + rr", "ra = rr"),
     ("clip_hi_off_by_one", "mvout clip upper bound 128, not 127",
      "te: int32 = rv[32 * e4", "if te > 127:", "if te > 128:"),
     ("clip_lo_off_by_one", "mvout clip lower bound -129, not -128",
@@ -137,7 +145,7 @@ MUTANTS = [
      "def span(src):", "e[3] + e[1] for e in ev", "e[3] + e[1] - 1 for e in ev"),
     ("ar_contract_unenforced", "check_program stops enforcing the accumulator "
      "distance contract",
-     "if at - ar_wrote[row] < AR_RAW_DIST:", "< AR_RAW_DIST:", "< 1:"),
+     "if at - ar_wrote[row] < self.ar_raw_dist:", "< self.ar_raw_dist:", "< 1:"),
     ("ar_claim_false", "FALSE DEPENDENCE CLAIM: the contract admits an ar read one "
      "accu iteration after its write, so the `inter false` pragma on ar is untrue "
      "for programs the assembler accepts",
@@ -155,36 +163,48 @@ LEVELS = {
     "cosim": ("cosim.py", [], "COSIM OK", 7200),
 }
 
+# The mutant tree shadows the design: its copy of every design file goes in
+# front of the real one on the package's search path, so `microarch_isa` and
+# every `ip` submodule resolve to the mutated copy while the harness scripts
+# themselves still come from the checkout.
 SHIM = """
-import importlib.util, runpy, sys
+import runpy, sys
 sys.path.insert(0, {repo!r})
 import examples.accelerator.tinytpu_vitis as pkg
-spec = importlib.util.spec_from_file_location({mod!r}, {path!r})
-m = importlib.util.module_from_spec(spec)
-sys.modules[{mod!r}] = m
-spec.loader.exec_module(m)
-pkg.microarch_isa = m
+pkg.__path__ = [{overlay!r}] + list(pkg.__path__)
 sys.argv = [{script!r}] + {args!r}
 runpy.run_path({script!r}, run_name="__main__")
 """
 
 
-def mutant_source(name):
-    src = open(SRC).read()
+def locate(name, anchor):
+    """The one design file the anchor occurs in, exactly once."""
+    counts = {f: open(os.path.join(HERE, f)).read().count(anchor)
+              for f in DESIGN}
+    hits = [f for f, n in counts.items() if n]
+    assert len(hits) == 1 and counts[hits[0]] == 1, (
+        f"{name}: anchor must occur exactly once in the design, found "
+        + ", ".join(f"{n}x in {f}" for f, n in counts.items() if n))
+    return hits[0]
+
+
+def mutant_tree(name):
+    """-> {relative design path: source text}, one file of it mutated."""
+    tree = {f: open(os.path.join(HERE, f)).read() for f in DESIGN}
     _, _, anchor, old, new = next(m for m in MUTANTS if m[0] == name)
     if anchor is None:
-        return src
-    assert src.count(anchor) == 1, f"{name}: anchor found {src.count(anchor)}x"
-    a = src.index(anchor)
-    i = src.find(old, a)
-    assert i >= 0, f"{name}: {old!r} not found after its anchor"
-    return src[:i] + new + src[i + len(old):]
+        return tree
+    path = locate(name, anchor)
+    src = tree[path]
+    i = src.find(old, src.index(anchor))
+    assert i >= 0, f"{name}: {old!r} not found after its anchor in {path}"
+    tree[path] = src[:i] + new + src[i + len(old):]
+    return tree
 
 
 def run_level(name, level):
     """-> ('pass' | 'CAUGHT' | 'CAUGHT (hang)', log path)"""
     d = os.path.join(WORK, name)
-    path = os.path.join(d, "microarch_isa.py")
     script, args, marker, timeout = LEVELS[level]
     env = dict(os.environ)
     if level == "cosim":
@@ -192,7 +212,7 @@ def run_level(name, level):
         if name in RTL_ONLY:
             env.setdefault("TPU_SHAPES", "4x4x4")
         env["TPU_PRJ"] = os.path.join(d, "cosim.prj")
-    shim = SHIM.format(repo=REPO, mod=MOD, path=path,
+    shim = SHIM.format(repo=REPO, overlay=d,
                        script=os.path.join(HERE, script), args=args)
     log = os.path.join(d, f"{level}.log")
     with open(log, "w") as f:
@@ -211,8 +231,10 @@ def run_level(name, level):
 def evaluate(name, levels):
     d = os.path.join(WORK, name)
     shutil.rmtree(d, ignore_errors=True)
-    os.makedirs(d)
-    open(os.path.join(d, "microarch_isa.py"), "w").write(mutant_source(name))
+    for rel, text in mutant_tree(name).items():
+        path = os.path.join(d, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w").write(text)
     return {lv: run_level(name, lv)[0] for lv in levels}
 
 
@@ -223,7 +245,7 @@ def main(argv):
     known = {m[0] for m in MUTANTS}
     assert set(names) <= known, f"unknown mutant(s): {set(names) - known}"
     for n in names:                       # fail fast on a stale anchor
-        mutant_source(n)
+        mutant_tree(n)
     functional = ["bench_isa", "stress_isa"]
 
     def levels_of(n):
