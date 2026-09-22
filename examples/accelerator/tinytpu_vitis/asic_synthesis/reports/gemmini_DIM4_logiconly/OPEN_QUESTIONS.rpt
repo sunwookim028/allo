@@ -1,0 +1,41 @@
+The two open questions, answered off the Gemmini DIM=4 logic-only mapped database
+
+Method, and its limits. DC flattens at flatten_effort 3, so almost nothing survives as
+a hierarchical instance: report_area -hierarchy carries only mod (108,515.8), ex_controller
+(40,085.4), reservation_station (36,663.6), mod_1 (32,562.1) and counters (11,192.5).
+The figures below are therefore NAME-PREFIX SUMS over flattened leaf cells, the same
+method and the same caveats as our PE array: a flattened cell keeps a name derived from
+its original hierarchy, but logic merged across a boundary is attributed by name alone,
+and these groups do not sum to the design. Treat them as magnitudes, not as a budget.
+
+Q1. DOES ANYTHING INSIDE THE Gemmini BOUNDARY FETCH INSTRUCTIONS? No evidence of it.
+Cells matching *fetch*: 0. Matching *rocc*: 0. What does exist is command handling --
+*cmd* matches 7,013 cells, 31,715.18 um2 -- which is the queue and decode for commands
+ARRIVING over RoCC, not a fetch unit issuing reads to memory. That is consistent with
+the module cut: Gemmini's instructions come from Rocket, which the cut removes. So the
+symmetry argument for excluding our gmem0 holds on this evidence, with the caveat that
+absence of a matching name is weaker than absence of a structure.
+
+Q2. DO StreamReader / StreamWriter / XactTracker CARRY ADAPTER MASS COMPARABLE TO OURS?
+No, and the gap is the largest single fact in this comparison.
+  *reader*   2,266 cells    10,246.85 um2
+  *writer*   1,604 cells     7,253.29 um2
+  *xact*     1,412 cells     6,385.06 um2
+  total                     23,885.20 um2  = 6.3% of Gemmini's 382,026.00 logic
+(*Stream* and *Xact* with capitals match nothing; the flattened names are lower-case.)
+Ours, from the hierarchy report of T4_MAXDIM64_shipped_logiconly, where these ARE still
+instances:
+  gmem0_m_axi_U            705,486.0 um2
+  gmem1_m_axi_U             56,643.4
+  gmem2_m_axi_U             56,661.5
+  gmem3_m_axi_U             21,368.6
+  total                    840,159.5 um2  = 60.2% of our 1,396,966.00 logic
+So our four AXI adapters are about 35x Gemmini's DMA path in absolute area, and ten
+times its share of the design. This is written as a structural difference, not as a
+Gemmini advantage to be claimed: TileLink at this width does not produce this structure,
+and our adapters are what Vitis emits for m_axi ports. It does say where our logic went.
+
+FrontendTLB, the one arguable cut, reported both ways as asked:
+  tlb_*   658 cells   2,975.48 um2   (0.78% of Gemmini's logic)
+  *tlb*   890 cells   4,024.58 um2   (1.05%)
+Including or excluding it moves nothing at this scale.
