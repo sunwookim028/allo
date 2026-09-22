@@ -260,6 +260,21 @@ measurement is.</p>
 covering forged verdicts, frozen-file tampering, sandbox escape attempts,
 deadlock, and a correct-but-slower diff. An agentic result whose harness is
 only ever exercised by the agent is not evidence.</p>
+<div class="admonition-status-of-that-suite-2026-09-22 admonition">
+<p class="admonition-title">Status of that suite, 2026-09-22</p>
+<p>It does <strong>not</strong> currently pass at 57. Two cases fail. One is a <strong>stale
+assertion</strong>: the parametricity phase expects the two configurations that
+existed before a third, varying <code class="docutils literal notranslate"><span class="pre">T</span></code>, was added — all three print
+<code class="docutils literal notranslate"><span class="pre">PARAM</span> <span class="pre">OK</span></code>, so the code is right and the test’s expectation is behind it.
+The other is an unresolved crash in the loop phase, where a fake-model run
+produced no <code class="docutils literal notranslate"><span class="pre">variants.jsonl</span></code> and the test reported the missing artefact
+rather than whatever failed upstream of it. Neither is caused by the freeze
+reference, which was checked by proving every frozen file byte-identical
+across the two refs.</p>
+<p>Recorded rather than quietly re-run to green, because a guard suite that
+nobody notices has stopped passing is worse than no guard suite. The “57”
+is what it was at landing and is not a current measurement.</p>
+</div>
 </section>
 <section id="what-the-agents-actually-tried-to-get-away-with">
 <h2>What the agents actually tried to get away with<a class="headerlink" href="#what-the-agents-actually-tried-to-get-away-with" title="Link to this heading"><span>¶</span></a></h2>
