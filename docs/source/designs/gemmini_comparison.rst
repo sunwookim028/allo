@@ -1013,8 +1013,33 @@ simulator settings it is good for. MiniTPU's ranking inverted somewhere between
 figure that let them say their board sits nearer the low end rather than merely
 that one knob value beat another.
 
-So **the sweep is the primary form and any single latency value is a
-convenience**, not the other way round. One argument for that comes from the
+**Measured, and it changes what this knob is.** The grid was run — shipped
+design against the burst-widened candidate at ``m_axi_latency`` 0, 16, 64, 88
+and 100 — and the candidate's advantage is **exactly -720 cycles at 48x48x48 and
+-960 at 64x64x64 at every one of the five points**, with the last two predicted
+from the first three and returning to the cycle. There is no inversion and no
+sensitivity: the knob did not choose the design. The mechanism is that the
+widening removes burst iterations (1536 to 96, and 2048 to 128) and the saving
+is exactly *half* of each, so the A and B bursts overlap and only one is ever
+critical.
+
+And the knob is **non-monotonic** — latency 16 beats latency 0, for both
+variants. That is decisive about what it is: ``m_axi_latency`` is a **scheduling
+directive to the HLS tool, not a memory latency model.** So **no row of that
+sweep may be read as "what this design does against a memory of that
+latency"**, and the sweep is not evidence about real memory systems. It bounds
+how much this *directive* can move a conclusion, which is a narrower and much
+less interesting claim than the one made below before the grid was run.
+
+What survives is the discipline rather than the instrument: report the range
+over which a conclusion holds, and do not let a knob you cannot interpret decide
+a design. What does *not* survive is the idea that our sweep is a better
+epistemic position than a fitted memory model — it is not a memory model at all,
+and a fitted one at least attempts the right quantity. Our position is that we
+have no memory model and should say so.
+
+The paragraph below was written before the grid was run and is kept because the
+reasoning is still right about fitted knobs, and wrong about ours: One argument for that comes from the
 other side of the comparison, against their own interest: a *fitted* knob
 invites belief — 92 cycles was carried for months, looked authoritative, and
 inverted a ranking — whereas a latency of zero is so obviously not a claim about
