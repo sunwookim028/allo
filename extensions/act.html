@@ -955,8 +955,11 @@ it does not measure.</p>
 </tr>
 </tbody>
 </table>
-<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce the published <strong>172 / 262 / 418 / 484 / 686</strong>
-exactly, all five, so the harness is the one those figures came from. The
+<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce <strong>172 / 262 / 418 / 484 / 686</strong> exactly, all five,
+so the harness is the one those figures came from. (That was the published row
+when this was measured. It moved to <strong>171 / 261 / 417 / 483 / 685</strong> on
+2026-09-22 when the memory sizing became derived; the reproduction above is of
+the design as it then stood, and is not a disagreement.) The
 <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> row settles what they are: <strong>plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because
 <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default.
 <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 750, and 750 - 686 = <strong>64</strong>, exactly the four

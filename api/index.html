@@ -251,7 +251,7 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.reshape" title="allo.customize.Schedule.reshape"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reshape</span></code></a>(target, shape)</p></td>
 <td><p>Takes an array in the kernel, <cite>target</cite>, for example if the array is <cite>B</cite>, then would be <cite>target</cite> would be <cite>&lt;schedule&gt;.B</cite>, and reshapes it to tuple <cite>shape</cite>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.pipeline" title="allo.customize.Schedule.pipeline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline</span></code></a>(axis[, initiation_interval, rewind])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.pipeline" title="allo.customize.Schedule.pipeline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline</span></code></a>(axis[, initiation_interval, ...])</p></td>
 <td><p>Pipelines a loop with index <cite>axis</cite> into <cite>initiation_interval</cite> stages.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.dependence" title="allo.customize.Schedule.dependence"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dependence</span></code></a>(axis, target[, dep_type, ...])</p></td>
@@ -407,7 +407,7 @@ instead of immediately writing them to memory in a systolic array.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="allo.customize.Schedule.pipeline">
-<span class="sig-name descname"><span class="pre">pipeline</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initiation_interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rewind</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.pipeline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.pipeline" title="Link to this definition"><span>¶</span></a></dt>
+<span class="sig-name descname"><span class="pre">pipeline</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initiation_interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rewind</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.pipeline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.pipeline" title="Link to this definition"><span>¶</span></a></dt>
 <dd><p>Pipelines a loop with index <cite>axis</cite> into <cite>initiation_interval</cite> stages.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -416,6 +416,20 @@ instead of immediately writing them to memory in a systolic array.</p>
 <li><p><strong>initiation_interval</strong> (<em>int</em>) – The initiation_interval to be used when pipelining.</p></li>
 <li><p><strong>rewind</strong> (<em>bool</em>) – If true, rewinding is allowed, allowing continuous loop pipelining.
 This is only effective for perfect loop nests inside a top level function.</p></li>
+<li><p><strong>style</strong> (<em>str</em><em> | </em><em>None</em>) – <p>Vitis’s pipeline control style: <code class="docutils literal notranslate"><span class="pre">&quot;stp&quot;</span></code> (stall, the tool’s
+default), <code class="docutils literal notranslate"><span class="pre">&quot;flp&quot;</span></code> (flushable) or <code class="docutils literal notranslate"><span class="pre">&quot;frp&quot;</span></code> (free-running),
+emitted as <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">pipeline</span> <span class="pre">...</span> <span class="pre">style=&lt;style&gt;</span></code>.</p>
+<p>It exists for a failure no simulation shows. A process that puts a
+request on one stream and gets the response on another inside one
+pipelined loop can deadlock in RTL under <code class="docutils literal notranslate"><span class="pre">stp</span></code>, because the
+blocked read of a later iteration freezes the earlier iteration’s
+put; a flushable or free-running pipeline keeps the earlier
+iterations draining. <strong>Which styles survive depends on the loop
+shape, and the choice is a measurement, not a rule</strong>: see
+<code class="docutils literal notranslate"><span class="pre">docs/source/backends/vitis.rst</span></code>. Only the Vivado/Vitis emitter
+writes <code class="docutils literal notranslate"><span class="pre">style=</span></code>; building a styled loop for another HLS backend
+is refused rather than silently dropped.</p>
+</p></li>
 </ul>
 </dd>
 </dl>
@@ -423,7 +437,7 @@ This is only effective for perfect loop nests inside a top level function.</p></
 
 <dl class="py method">
 <dt class="sig sig-object py" id="allo.customize.Schedule.dependence">
-<span class="sig-name descname"><span class="pre">dependence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'inter'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dependent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.dependence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.dependence" title="Link to this definition"><span>¶</span></a></dt>
+<span class="sig-name descname"><span class="pre">dependence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'inter'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dependent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dep_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">because</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.dependence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.dependence" title="Link to this definition"><span>¶</span></a></dt>
 <dd><p>Tells HLS about the loop-carried (or intra-iteration) dependences of
 one array in one loop – Vitis’s <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>, emitted
 inside the loop:</p>
@@ -439,6 +453,18 @@ index is not affine in the induction variable (a flattened row loop,
 say) pipeline at II=1; if the claim is false the RTL computes a wrong
 answer while every software simulation, which ignores the pragma,
 still passes.</p>
+<p><strong>The rule.</strong> A claim that the IR <em>disproves</em> – a dependence provable
+at a distance the claim denies – raises
+<code class="docutils literal notranslate"><span class="pre">allo.dependence.DependenceError</span></code>, here and again after every later
+primitive. The check is one-sided: it refuses a demonstrably false
+claim, it never confirms a true one, and it never refuses a claim just
+because no proof was found. Asserting away what the compiler cannot
+prove is the whole point of the primitive.</p>
+<p><strong>The obligation.</strong> Everything the rule accepts is therefore still the
+author’s to discharge, outside the compiler; <code class="docutils literal notranslate"><span class="pre">because</span></code> records what
+the claim rests on, and every claim is listed in
+<code class="docutils literal notranslate"><span class="pre">s.dependence_obligations</span></code>. Omitting <code class="docutils literal notranslate"><span class="pre">because</span></code> warns
+(<code class="docutils literal notranslate"><span class="pre">allo.dependence.UndeclaredPremise</span></code>).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -451,6 +477,8 @@ A bare name is looked up in the loop’s function.</p></li>
 <code class="docutils literal notranslate"><span class="pre">dep_type=&quot;inter&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">dependent=True</span></code>.</p></li>
 <li><p><strong>dependent</strong> (<em>bool</em>) – Whether the dependence exists (True) or is claimed absent (False).</p></li>
 <li><p><strong>dep_class</strong> (<em>str</em><em> | </em><em>None</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;array&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;pointer&quot;</span></code>; None leaves Vitis’s default.</p></li>
+<li><p><strong>because</strong> (<em>str</em><em> | </em><em>None</em>) – What makes the claim true, in the author’s words. Nothing checks
+it; it is emitted beside the pragma and recorded as an obligation.</p></li>
 </ul>
 </dd>
 </dl>

@@ -1363,18 +1363,25 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 </section>
 <section id="t-8-vs-gemmini-dim-8-both-at-maxdim-64">
 <h3>T=8 vs Gemmini DIM=8, both at MAXDIM=64<a class="headerlink" href="#t-8-vs-gemmini-dim-8-both-at-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p><strong>The T=8 cycle column carries an unresolved exposure and is provisional
-until it is re-measured.</strong> It was taken <em>before</em> the parametric
-<code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor landed, which is the same exposure that moved the
-published MAXDIM=16 row by one cycle (<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). There
-the cause was the memory sizing, which does <strong>not</strong> change at
-T=8/MAXDIM=64 — only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by one word, which is what took
-BRAM 58 -&gt; 62 — so the expectation is no change. <strong>That is a prediction,
-not a measurement</strong>, and the re-run is in flight. The number most exposed
-is the 16x16x8 win, since it is the only shape where this design beats
-Gemmini on a supportable margin.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The T=8 cycle column was re-measured on current ``main`` and is
+unchanged.</strong> It had been taken before the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code>
+refactor, which is the exposure that moved the published MAXDIM=16 row by
+one cycle (<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). Re-run from a fresh <code class="docutils literal notranslate"><span class="pre">csynth</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>8x8x8     285   (was 285)      16x16x16   493   (was 493)
+16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
+</pre></div>
+</div>
+<p>every one bit-exact and identical. That is consistent with the mechanism
+rather than merely reassuring: at T=8/MAXDIM=64 the memory <em>sizes</em> do not
+change (<code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> is 512 either way), only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by
+one word — which is what took BRAM 58 -&gt; 62 and nothing else. <strong>The
+burst loop is now shown cycle-neutral at ``DMA_WORDS=1`` in three
+independent configurations</strong>: T=4/MAXDIM=16, T=4/MAXDIM=64 and
+T=8/MAXDIM=64. That is what licenses the widening being a pure opt-in.</p>
+<p>The entry most exposed was <strong>16x16x8</strong>, the only shape where this design
+beats Gemmini on a supportable margin, and it returned 424 exactly.</p>
 </div>
 <p>The second matched point, and <strong>it does not agree with the first</strong>, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
