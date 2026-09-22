@@ -527,11 +527,82 @@ by the cost model, which is the right outcome for a mapper rather than a
 refusal.
 
 Both extra nests pass ``isa_ref.run``, and ``--gate`` verifies every encodable
-mapping of every registered workload at every shape, so the claim is checked
-rather than argued.
+mapping of every registered workload at every shape. **But that is not enough
+to claim them, and the check that says so is below.** Read with the next
+section, the reconciliation is: 5 encodable by the encoder and the reference
+model, **3 confirmed on the RTL**, and the other tree's 3 is the better-grounded
+number for any claim about the hardware.
 
-**Five nests are encodable** (the prototype found three), and all five compute
-the spec, checked against ``isa_ref.run``. The shipped ``N4>K4`` mapping is one
+.. _act-encodable-tiers:
+
+"Encodable" has three tiers of evidence
+---------------------------------------
+
+Attempting to cosim the two extra nests turned up something worth more than the
+count. For ``gemm.relu`` at 16x16x16:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 29 29
+
+   * - checker
+     - shipped ``N4>K4``
+     - ``N4>M2>K4`` (row-tiled)
+   * - ``isa_ref.run`` (numpy, the ISA's meaning)
+     - correct
+     - correct
+   * - ``check_program`` / ``assemble``
+     - accepts
+     - accepts
+   * - ``kpn_model.run`` (channel protocol, bounded FIFOs)
+     - runs, minimum depth 1
+     - runs, minimum depth 1
+   * - ``df.build(target="simulator")``
+     - completes, correct
+     - completes, correct
+   * - Vitis **csim**
+     - ``mismatches = 0``
+     - ``mismatches = 0``
+   * - Vitis **cosim** (RTL)
+     - **750 cycles**
+     - **did not complete**
+
+Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
+at ``Inter-Transaction Progress: 0 / 1`` with the simulator burning a full core,
+one of them for over half an hour, where the shipped mapping's whole run --
+synthesis, csim and cosim -- takes about two minutes. No deadlock is *reported*,
+so this page does not call it one; what is measured is that the transaction does
+not complete.
+
+The lesson is the one this design's own history already taught once, when the
+dataflow simulator passed a bug that only cosim caught: **four checkers agreeing
+is not evidence about the RTL.** Two of those four are derived from
+``assemble``'s header, so they cannot see an error in the header formula itself;
+``isa_ref`` is a model of the ISA, not of the machine; and csim compiles the
+units' C without their handshakes. Only cosim exercises the streams.
+
+So a mapper on this machine can report two different things, and should say
+which: *encodable* -- the encoder accepts it and the reference model agrees --
+and *confirmed* -- the RTL ran it. ``act_compile.py`` reports the first, and its
+``check`` column says so. Anything published as a property of the hardware needs
+``act_cosim.py``.
+
+One reassurance, and it is a test rather than a hope: at every shape and every
+registered workload the mapping the flow **picks** is in the prologue-staging,
+RTL-confirmed class -- ``tests/act/test_tinytpu.py`` asserts it. The unconfirmed
+mappings are ranked, reported and never chosen, and ``act_compile.py`` prints a
+``staging`` column plus a warning whenever any of them appear.
+
+This is also the sharpest ``cannot refuse`` gap found in this work, and it is
+not in the ISA: some property of a program with a data transfer *inside* the
+emitted nest, rather than all of them hoisted into a prologue, is not being
+checked by anything that can be run in seconds. Finding it is the highest-value
+next step for this flow, because until it is found the mapspace beyond
+prologue-only staging cannot be trusted, and that is most of it.
+
+**Five nests are encodable** (the prototype found three) and all five compute
+the spec against ``isa_ref.run`` -- but only three are confirmed on the RTL; see
+:ref:`act-encodable-tiers`. The shipped ``N4>K4`` mapping is one
 of them, and ``act_target`` re-emits the shipped ``gemm``/``gemm.relu`` program
 **word for word** at all five ``bench_isa.SHAPES`` -- the regression anchor,
 committed as ``tests/act/test_tinytpu.py``.

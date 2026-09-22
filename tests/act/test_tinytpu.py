@@ -223,3 +223,15 @@ def test_the_one_validated_pair_got_the_order_right():
         assert model_margin > real_margin, (
             f"{shape}: the model understated the gap, which the reported "
             f"caveat does not cover")
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+@pytest.mark.parametrize("name", ["gemm", "gemm.relu"])
+def test_the_pick_never_needs_the_unconfirmed_staging(name, shape):
+    workload = workloads.get(name)
+    result = search(Problem(workload, extents(workload, shape)), TINYTPU)
+    roles = roles_of(workload)
+    emitted = [l for l in result.best.nest if l.level != INTRINSIC]
+    assert not any(l.rank == roles.row for l in emitted), (
+        f"{name} {shape}: the pick {result.best.label} stages operands inside "
+        f"the nest, which no cosim has confirmed")

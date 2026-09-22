@@ -55,7 +55,8 @@ def show(result, machine, top, verify):
     if not result.best:
         raise SystemExit("every nest was refused")
     print(f"\n  {'mapping':16s} {'rows':>4s} {'static':>6s} {'words':>5s} "
-          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s}  check")
+          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s} {'staging':>9s}"
+          f"  isa_ref")
     for candidate in result.ranked(top):
         counts = machine.report(candidate.program)
         plan = candidate.priced.schedule
@@ -67,7 +68,13 @@ def show(result, machine, top, verify):
               f"{intrinsic_rows(candidate.nest):>4d} "
               f"{counts['static']:>6d} {counts['words']:>5d} "
               f"{counts['dynamic']:>5d} {plan.makespan:>8d} "
-              f"{unit + ' ' + str(load):>12s}  {verdict}")
+              f"{unit + ' ' + str(load):>12s} {staging(candidate.nest):>9s}"
+              f"  {verdict}")
+    if any(staging(c.nest) == "in-nest" for c in result.ranked(top)):
+        print("  in-nest staging is ENCODABLE but not confirmed on the RTL: "
+              "two such mappings\n  passed isa_ref, the KPN model, the "
+              "simulator and csim, and did not finish cosim.\n  See "
+              "docs/source/extensions/act.rst, \"three tiers of evidence\".")
     return result.best
 
 
@@ -119,6 +126,16 @@ def verdict(result):
 
 def intrinsic_rows(nest):
     return max(l.factor for l in nest if l.level == "intrinsic")
+
+
+def staging(nest):
+    """Whether the operand transfers hoist out of the emitted nest.
+
+    Not a claim about why: it is the structural property the mappings that fail
+    to finish cosim share, and the one the confirmed mappings do not have.
+    """
+    emitted = [l for l in nest if l.level != "intrinsic"]
+    return "in-nest" if any(l.rank == "M" for l in emitted) else "prologue"
 
 
 def gate(machine):
