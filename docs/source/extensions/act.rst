@@ -568,6 +568,16 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - 32
      - 517
      - **750**
+   * - ``gemm`` 4x4x4, ``isa_dsl.gemm_program``
+     - 10
+     - 4
+     - 50
+     - **172**
+   * - ``gemm`` 4x4x4, the search's choice
+     - 8
+     - 4
+     - 40
+     - **169**
 
 The first row reproduces the published 16x16x16 figure exactly, and it is worth
 recording what the second row settles: the published
@@ -587,10 +597,18 @@ offers a single nest with no emitted loops, and the program it lowers drops a
 trip-1 hardware loop the hand-written generator keeps -- 8 static instructions
 against 10, the same 4 dynamic issues, and a model cost of 40 against 50.
 
+Cosim, in the table above: **169 cycles against 172**, both exact. The
+hand-written program reproduces the published 172 for that shape to the cycle,
+and the search's program is 3 cycles faster. The model predicted a 10-cycle
+saving and the machine gave 3, which is the expected direction of error for a
+model that charges a fixed ``II`` per fetch and no overlap.
+
 That is the whole shape of what a mapper buys on this machine today: it
 reproduces a carefully hand-tuned choice where that choice is right, and it
-removes overhead the generator could not see because the generator has no cost
-model at all. It is a small win, and it is the honest size of the win.
+removes overhead the generator could not see, because the generator has no cost
+model at all. Three cycles in 172 is a small win, and it is the honest size of
+the win -- what matters is that it is a *measured* win, chosen by a cost model
+and confirmed by RTL, with the functional check passing in both cases.
 
 
 Corrections to This Page's Earlier Numbers
