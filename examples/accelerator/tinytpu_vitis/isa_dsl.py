@@ -88,7 +88,15 @@ _TARGETS = (AGU_F0, AGU_F1, AGU_F2, AGU_F3)
 
 
 class NestError(Exception):
-    """A nest the hardware cannot run, named at the point it was written."""
+    """A nest the hardware cannot run, named at the point it was written.
+
+    `code` is the constant that refused it, for a caller grouping refusals by
+    cause rather than by matching on the message.
+    """
+
+    def __init__(self, message, code=None):
+        super().__init__(message)
+        self.code = code
 
 
 class Iv:
@@ -164,13 +172,13 @@ class Program:
                 f"{self.name}: loop {name!r} has trip count {trips}. The "
                 f"sequencer tests the back edge after the body, so a trip "
                 f"count below 1 would still run it once -- guard the `with` "
-                f"instead.")
+                f"instead.", code="trip-count")
         if level >= LOOP_DEPTH:
             nest = " > ".join([iv.name for iv in self._open] + [name])
             raise NestError(
                 f"{self.name}: loop {name!r} would open level {level}, but "
                 f"the sequencer's loop stack is LOOP_DEPTH={LOOP_DEPTH} "
-                f"levels deep. The nest is {nest}.")
+                f"levels deep. The nest is {nest}.", code="LOOP_DEPTH")
         iv = Iv(level, name, self)
         self.words.append((enc(OP_LOOP, nr=trips), 0))
         self._open.append(iv)
@@ -245,7 +253,7 @@ class Program:
                 f"{self.name}: instruction at index {len(self.words)} needs "
                 f"{len(terms)} address terms; one instruction word carries "
                 f"AGU_TERMS={AGU_TERMS}. The terms are "
-                f"{[(t, l, s) for t, l, s in terms]}.")
+                f"{[(t, l, s) for t, l, s in terms]}.", code="AGU_TERMS")
         self.words.append((enc(op, *bases, nr=nr), enc_agu(*terms)))
 
     def _check(self, iv, op):
