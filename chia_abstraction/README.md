@@ -225,6 +225,77 @@ per-run one. The split between the two tracks is recorded in
 pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
 
+## The held-out rediscovery run, 2026-09-22
+
+Given only `symptom.md` — never told the primitive exists, working from
+`a4151ca0`, where it never has — the agent produced a 162-line candidate
+across five files in one 24.8-minute turn.
+
+**Four-way outcome: `same-abstraction`. NOT YET VERIFIED TO WORK** — see the
+gate result below. Until it passes, the honest phrasing is "produced a
+candidate graded `same-abstraction`, not yet verified to work". If it fails
+the gate that is still a strong result and a more interesting one: reaching
+the right abstraction and getting it wrong is a different finding from not
+reaching it.
+
+What it produced:
+
+- `Schedule.dependence(target, axis, dep_type="inter", direction="RAW",
+  distance=0, true_false="false")` — the same name and essentially the same
+  signature as the fork's real `s.dependence`;
+- four `AlloValueError` validations against closed sets, before any IR is
+  touched;
+- a `dependence` `ArrayAttr` of `DictAttr` on the loop, **appended to rather
+  than overwritten** — step 2 of the pattern, exactly;
+- an emitter branch in `EmitVivadoHLS.cpp` (+81);
+- **rejecters in `EmitCatapultHLS.cpp`, `EmitTapaHLS.cpp` and
+  `EmitIntelHLS.cpp`** (+4 each), e.g. `emitError(op, "Catapult HLS does not
+  support the dependence directive")`.
+
+### The attribution, which must not be collapsed
+
+**The prompt supplied the five-place pattern, told it to reject rather than
+ignore, and told it to state what is a promise — so the shape is guided. What
+is the agent's is the diagnosis, that a dependence assertion is the right
+abstraction for this symptom, and the decision to add the rejecters.**
+
+An unqualified "an agent rediscovered `s.dependence`" would be the most
+damaging overstatement available here, and it is one sentence away.
+
+### On a filed, still-open defect its version is better than the tree's
+
+The original human commit (`bbea2af0`) did **not** write the rejecters.
+Issues **#23, #24 and #31** exist precisely because `EmitCatapultHLS.cpp`,
+`EmitTapaHLS.cpp` and `EmitIntelHLS.cpp` ignore a directive instead of
+rejecting it — all three are "ignored instead of rejected". The agent's
+version closes that shape of defect for this directive; the tree's does not.
+
+### It noticed the claim is a promise
+
+From its own docstring, unprompted as to content:
+
+> *"If what it expresses is a PROMISE rather than a fact (e.g. false
+> dependence claim), a false claim would produce wrong RTL while every
+> software simulation stayed exact."*
+
+That is the thing the original commit's own register entry had to admit
+afterwards.
+
+### Differences from the tree's version — evidence it reconstructed rather than recalled
+
+A reader deciding whether this was memorisation will look for exactly these:
+
+| | the tree (`bbea2af0`) | the agent |
+| --- | --- | --- |
+| argument order | `(axis, target)` | `(target, axis)` |
+| the claim | `dependent=False` (bool) | `true_false="false"` (string) |
+| distance | `>= 1`, and only with `dependent=True` | `>= 0` allowed |
+| `dep_class` | `array` / `pointer` | absent |
+| declared-inside-the-loop check | present | absent |
+| function arguments | `arg_index` path | absent |
+
+A recall would not differ in those ways.
+
 ## Two findings worth keeping, beyond the harness
 
 **The design track's one verified win classifies as `trade`, not `win`, and is
@@ -260,6 +331,27 @@ measuring rather than accepting:
    iterations with no tools and no error. Silent, plausible, and it consumes
    budget. General rule, now enforced: **a harness that cannot prove its tools
    are reachable has no business starting a paid run.**
+
+## Two things about money that anyone building on this harness must know
+
+**1. `response.usage` reports $0.00 for calls that cost real money.** Measured
+here: `[iter1] $0.00, ? turns, 1488s` for a turn that cost **$4.46** in
+opencode's database. Any budget logic, cap, or cost report that reads `usage`
+is blind to exactly the long, expensive calls it most needs to see. **Read the
+database, never `usage`.** `spend.spent_since` reads the database and is live:
+measured moving $0.62 over 45 seconds with a call in flight.
+
+**2. A per-run cap must sum only that run's own sessions.**
+`chia_agent/spend.py:spent_since(t0)` sums every opencode message on the
+ACCOUNT since `t0`. Its docstring says over-counting is "the safe direction"
+— **that sentence is true for one track at a time and false for two, and it
+should be corrected where it sits.** With two tracks concurrent it does not
+merely over-count, it stops the WRONG RUN: this pilot's counter read **$15.82
+against a $15 cap, of which $4.46 was this run** and the rest was the
+co-design track's two workers. `Budget` here now sums only sessions this loop
+has seen return; the CUMULATIVE cap stays account-wide, which is correct,
+because the account is shared. The heavier-spending track is the more exposed
+one — to a premature stop, not to an overrun.
 
 ## Running two tracks on one host
 
