@@ -483,13 +483,33 @@ MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))     # largest M, K, N supported
 # The sizes are now that expression, with the env var kept as an override for
 # probing a deliberately-undersized build.
 OPERAND_ROWS = (MAXDIM // T) * MAXDIM              # rows the GEMM layout names
-SPAD_ROWS = int(os.environ.get("TPU_SPAD", OPERAND_ROWS))   # each one a packed word
-NVR = int(os.environ.get("TPU_NVR", OPERAND_ROWS))          # operand vector registers
+# ...and a FLOOR, because the GEMM is not the only program the machine runs.
+# `stress_isa.random_program` addresses a fixed 64-row window in each memory
+# (`lo = SPAD_ROWS - 64` when it picks the high window, then `place` offsets
+# within 64 rows) and it does that INDEPENDENTLY of MAXDIM, so a memory
+# smaller than that window cannot hold a fuzz program at all. Sizing purely
+# to `OPERAND_ROWS` gave 16 rows at MAXDIM=8 and 36 at MAXDIM=12, and
+# `chia_agent/param_check.py` -- whose whole job is to prove the design is
+# parametric rather than overfitted to the scored point -- went from
+# `PARAM OK` to "only 0 of 24 random programs could be generated (need 16)"
+# at both. Every GEMM shape stayed bit-exact; what broke was the fuzzer's
+# room, which is the harder failure to notice because it reads as a harness
+# complaint rather than a design change.
+#
+# So the memories are the larger of what the GEMM addresses and what the test
+# programs address. This is still far below the literals it replaced (64 at
+# MAXDIM=16 against 512) and still scales with MAXDIM where it matters.
+TEST_WINDOW = 64                                   # stress_isa's fuzz window
+SPAD_ROWS = int(os.environ.get(
+    "TPU_SPAD", max(TEST_WINDOW, OPERAND_ROWS)))   # each one a packed word
+NVR = int(os.environ.get(
+    "TPU_NVR", max(TEST_WINDOW, OPERAND_ROWS)))    # operand vector registers
 # `AR_C` is MAXDIM rows and `AR_P` another MAXDIM starting at MAXDIM+1, so the
 # GEMM and vector programs need 2*MAXDIM+2; the 128 floor keeps the
 # fixed-address test programs (`isa_dsl.vector_program` reaches row 112) legal
 # at small MAXDIM, where the derived size would be below them.
-NAR = int(os.environ.get("TPU_NAR", max(128, 2 * MAXDIM + 8)))
+NAR = int(os.environ.get(
+    "TPU_NAR", max(128, TEST_WINDOW, 2 * MAXDIM + 8)))
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 
 # ---- WHAT BOUNDS MAXDIM, AND AT WHAT VALUE ----
