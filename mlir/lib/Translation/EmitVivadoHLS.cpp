@@ -2578,6 +2578,13 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
     // https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Rewinding-Pipelined-Loops-for-Performance
     if (op->hasAttr("rewind"))
       os << " rewind";
+    // stp (the tool's default), flp or frp. A pipelined loop that puts a
+    // request on one stream and gets its response on another can deadlock
+    // under stp, because a blocked read freezes the earlier iteration's put.
+    // Which styles survive depends on the loop shape: see
+    // docs/source/backends/vitis.rst.
+    if (auto style = op->getAttrOfType<StringAttr>("pipeline_style"))
+      os << " style=" << style.getValue();
     os << "\n";
     addIndent();
   }
@@ -2629,6 +2636,11 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
         continue;
       }
       reduceIndent();
+      if (auto because = dep.getAs<StringAttr>("because")) {
+        indent();
+        os << "// dependence obligation, checked by no tool: "
+           << because.getValue() << "\n";
+      }
       indent();
       os << "#pragma HLS dependence variable=" << getName(var);
       if (auto cls = dep.getAs<StringAttr>("class"))
