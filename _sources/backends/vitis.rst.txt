@@ -487,6 +487,62 @@ and designs with bidirectional handshakes cannot pass ``csim`` at all. See
 :ref:`limitation-15` and :doc:`/developer/dataflow_semantics`.
 
 
+.. _vitis-pipeline-style:
+
+``s.pipeline(style=)``: the pipeline control style
+--------------------------------------------------
+
+``s.pipeline(axis, initiation_interval, rewind, style="stp"|"flp"|"frp")``
+appends ``style=<style>`` to the ``#pragma HLS pipeline`` the Vivado/Vitis
+emitter writes, stored as a ``pipeline_style`` attribute on the loop beside
+``rewind``. Fork-only, lifted onto ``main`` from the retired ``tinytpu-align``
+branch (``0038833c``). Tests: ``tests/test_vhls.py::test_pipeline_style`` and
+``::test_pipeline_style_is_refused_where_no_emitter_writes_it``.
+
+.. code-block:: python
+
+   s.pipeline("x", style="flp")
+   # -> #pragma HLS pipeline II=1 style=flp
+
+**Why it exists.** A dataflow process that puts a request on one stream and
+gets the response on another *inside one pipelined loop* can **deadlock in
+RTL** under Vitis's default stall pipeline (``stp``): a blocked read in a later
+iteration freezes the whole pipeline, including the earlier iteration's put, so
+the request that would unblock the read never leaves. A flushable (``flp``) or
+free-running (``frp``) pipeline keeps the earlier iterations draining. Neither
+the dataflow simulator nor ``csim`` models pipeline stalls
+(:doc:`/developer/dataflow_semantics`), so **only cosim shows the difference**
+-- which is what makes this the same shape of gap as
+:ref:`s.dependence <limitation-21>`: a one-word HLS escape hatch that Allo
+could not reach, guarding a failure no simulation reproduces.
+
+.. warning::
+
+   **The style is a measurement, not a rule, and the evidence here is
+   second-hand.** The commit this was lifted from claimed "``stp`` and ``frp``
+   deadlock in cosim, ``flp`` passes". An independent re-measurement found that
+   **``frp`` passes** the repro, so that claim is not carried forward. The same
+   re-measurement found a put-then-get loop that deadlocked under **both**
+   ``stp`` and ``flp``, so the loop shape matters more than any three-way
+   ranking of the styles suggests. Neither result was re-measured in the
+   session that landed this primitive on ``main``: treat the ``frp`` behaviour
+   as *reported by a re-measurement*, not as verified here, and cosim the style
+   on your own loop before relying on it.
+
+   The commit also cited ``align_probes/probe_cycle.py`` as its evidence. That
+   file applies no ``s.pipeline`` at all and demonstrates a different
+   limitation, so the citation is dropped rather than carried over.
+
+**Only one emitter reads it.** ``EmitVivadoHLS.cpp`` writes ``style=``; the
+Intel HLS, Catapult, Tapa and XLS emitters ignore the attribute. Because a
+style is set to stop an RTL deadlock, silently dropping it would restore the
+deadlock the author was fixing, so building a styled loop for one of those
+backends is **refused**, naming the loop and its style
+(``allo/backend/hls.py``, ``check_pipeline_style_reaches_emitter``). An
+unstyled ``s.pipeline`` reaches every backend exactly as before. The LLVM and
+simulator paths are unaffected: they make no claim about RTL scheduling.
+
+
 Vitis 2023.2 Linker vs. Newer glibc
 -----------------------------------
 Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux

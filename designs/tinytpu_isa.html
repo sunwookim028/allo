@@ -1005,14 +1005,31 @@ a blocking C call; compare the watchdog note in <a class="reference internal" hr
 <span id="tinytpu-isa-dependence"></span><h3>The accumulator’s dependence claim<a class="headerlink" href="#the-accumulator-s-dependence-claim" title="Link to this heading"><span>¶</span></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">accu</span></code> is one flat row loop at II=1 because <code class="docutils literal notranslate"><span class="pre">schedule()</span></code> tells Vitis that
 its accumulator carries no dependence across iterations:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">dependence</span><span class="p">(</span><span class="s2">"accu_0:x"</span><span class="p">,</span> <span class="s2">"ar"</span><span class="p">,</span> <span class="n">dep_type</span><span class="o">=</span><span class="s2">"inter"</span><span class="p">,</span> <span class="n">dependent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="c1"># -&gt; #pragma HLS dependence variable=ar inter false   (inside accu's row loop)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">dependence</span><span class="p">(</span>
+    <span class="s2">"accu_0:x"</span><span class="p">,</span> <span class="s2">"ar"</span><span class="p">,</span> <span class="n">dep_type</span><span class="o">=</span><span class="s2">"inter"</span><span class="p">,</span> <span class="n">dependent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">because</span><span class="o">=</span><span class="sa">f</span><span class="s2">"check_program() rejects any program that reads an ar row "</span>
+            <span class="sa">f</span><span class="s2">"within AR_RAW_DIST=</span><span class="si">{</span><span class="n">AR_RAW_DIST</span><span class="si">}</span><span class="s2"> accu iterations of writing "</span>
+            <span class="sa">f</span><span class="s2">"it (THE ACCUMULATOR DISTANCE CONTRACT); assemble() enforces "</span>
+            <span class="sa">f</span><span class="s2">"it, the hardware does not, and only TPU_TB=stress cosim can "</span>
+            <span class="sa">f</span><span class="s2">"see a breach"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1"># -&gt; // dependence obligation, checked by no tool: check_program() rejects ...</span>
+<span class="c1">#    #pragma HLS dependence variable=ar inter false   (inside accu's row loop)</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> is the schedule primitive added for <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>
 (<code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code>). Without the claim the flat loop closes at <code class="docutils literal notranslate"><span class="pre">Final</span> <span class="pre">II</span> <span class="pre">=</span> <span class="pre">3</span></code>:
 the row index is a carried register, so Vitis cannot prove that iteration n’s
 store and iteration n+1’s load of <code class="docutils literal notranslate"><span class="pre">ar</span></code> touch different rows.</p>
+<p>That same carried register is why this claim is an <strong>obligation</strong> and not
+something Allo’s legality rule can settle. The rule (<code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code>,
+added with the 2026-09-22 update to <a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>) refuses a claim only
+when it can <em>prove</em> a dependence at a distance the claim denies; <code class="docutils literal notranslate"><span class="pre">ar[ra]</span></code>
+with <code class="docutils literal notranslate"><span class="pre">ra</span></code> computed per iteration is not affine in the loop’s induction
+variable, so nothing is provable and the claim stands – which is correct, and
+is the reason the primitive exists. <code class="docutils literal notranslate"><span class="pre">because=</span></code> is where the contract below is
+recorded; it is printed above the pragma in <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> and listed in
+<code class="docutils literal notranslate"><span class="pre">s.dependence_obligations</span></code>.</p>
 <p><strong>The claim is not true of the hardware on its own</strong>, and the branch that
 priced it (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code> / <code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code>, which injected the pragma into
 <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code>) never tested where it fails: only GEMM programs were cosimulated

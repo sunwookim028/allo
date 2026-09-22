@@ -806,13 +806,31 @@ its accumulator carries no dependence across iterations:
 
 .. code-block:: python
 
-   s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
-   # -> #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
+   s.dependence(
+       "accu_0:x", "ar", dep_type="inter", dependent=False,
+       because=f"check_program() rejects any program that reads an ar row "
+               f"within AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing "
+               f"it (THE ACCUMULATOR DISTANCE CONTRACT); assemble() enforces "
+               f"it, the hardware does not, and only TPU_TB=stress cosim can "
+               f"see a breach",
+   )
+   # -> // dependence obligation, checked by no tool: check_program() rejects ...
+   #    #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
 
 ``s.dependence`` is the schedule primitive added for :ref:`limitation-21`
 (``bbea2af0``). Without the claim the flat loop closes at ``Final II = 3``:
 the row index is a carried register, so Vitis cannot prove that iteration n's
 store and iteration n+1's load of ``ar`` touch different rows.
+
+That same carried register is why this claim is an **obligation** and not
+something Allo's legality rule can settle. The rule (``allo/dependence.py``,
+added with the 2026-09-22 update to :ref:`limitation-21`) refuses a claim only
+when it can *prove* a dependence at a distance the claim denies; ``ar[ra]``
+with ``ra`` computed per iteration is not affine in the loop's induction
+variable, so nothing is provable and the claim stands -- which is correct, and
+is the reason the primitive exists. ``because=`` is where the contract below is
+recorded; it is printed above the pragma in ``kernel.cpp`` and listed in
+``s.dependence_obligations``.
 
 **The claim is not true of the hardware on its own**, and the branch that
 priced it (``v_accudep`` / ``v_design_dep``, which injected the pragma into

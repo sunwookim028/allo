@@ -210,6 +210,12 @@ Mechanical enforcement, not instructions:
    is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness), T == 4,
    MAXDIM == 16, the 3.33 ns target, and each shape's own cosim log and
    simulated time must agree with the reported cycles.
+9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
+   swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
+   authentication.
+
+Every accepted diff is still read by a person.
+
 Running two tracks on one host: ``ray stop`` is global
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -235,11 +241,6 @@ unscored candidate. And a harness that calls ``ray stop`` unconditionally on
 teardown makes concurrent tracks impossible on one host — prefer stopping only
 your own cluster by address, or simply letting the process exit.
 
-9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
-   swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
-   authentication.
-
-Every accepted diff is still read by a person.
 
 Running it
 ~~~~~~~~~~

@@ -413,7 +413,11 @@ comments and docstrings against the frozen file; rewording is free.</p></li>
 is scrubbed before cosim (<code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0, as Gemmini’s harness), T == 4,
 MAXDIM == 16, the 3.33 ns target, and each shape’s own cosim log and
 simulated time must agree with the reported cycles.</p></li>
+<li><p><strong>Loopback.</strong> The MCP tool servers bind 127.0.0.1 by default; a multi-host
+swarm must opt in with <code class="docutils literal notranslate"><span class="pre">TINYTPU_TOOL_HOST=node</span></code> and bring its own
+authentication.</p></li>
 </ol>
+<p>Every accepted diff is still read by a person.</p>
 </section>
 <section id="running-two-tracks-on-one-host-ray-stop-is-global">
 <h3>Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global<a class="headerlink" href="#running-two-tracks-on-one-host-ray-stop-is-global" title="Link to this heading"><span>¶</span></a></h3>
@@ -435,12 +439,6 @@ wasted spend.</p>
 unscored candidate. And a harness that calls <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> unconditionally on
 teardown makes concurrent tracks impossible on one host — prefer stopping only
 your own cluster by address, or simply letting the process exit.</p>
-<ol class="arabic simple" start="9">
-<li><p><strong>Loopback.</strong> The MCP tool servers bind 127.0.0.1 by default; a multi-host
-swarm must opt in with <code class="docutils literal notranslate"><span class="pre">TINYTPU_TOOL_HOST=node</span></code> and bring its own
-authentication.</p></li>
-</ol>
-<p>Every accepted diff is still read by a person.</p>
 </section>
 <section id="running-it">
 <h3>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h3>

@@ -1425,6 +1425,67 @@ half of them the docstring and argument checks) and 46 of C++, against the
 30-50 sized: larger than sized, not blocked. TinyTPU-isa has used it for its
 accumulator since <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (<a class="reference internal" href="../designs/tinytpu_isa.html#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>); the price
 below is what that recovered.</p>
+</div>
+<div class="admonition-update-2026-09-22-the-claim-is-now-checked-one-sidedly admonition">
+<p class="admonition-title">Update (2026-09-22): the claim is now checked, one-sidedly</p>
+<p>The entry below closed with “<strong>A dependence claim is a contract, and the
+primitive does not check it.</strong> … Nothing in Allo can see a false claim;
+only RTL can.” The first half of that no longer holds, and the second half
+was always too strong: a <em>provably</em> false claim is visible in the IR.</p>
+<p><code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code> is the rule, with <code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code> (20
+tests). The legality sentence:</p>
+<blockquote>
+<div><p>A <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim is legal <strong>unless</strong> the IR proves a dependence on
+the claimed array at a distance the claim denies.</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">inter</span></code> with <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies every distance of one iteration or
+more; <code class="docutils literal notranslate"><span class="pre">inter</span></code> with <code class="docutils literal notranslate"><span class="pre">dependent=True,</span> <span class="pre">distance=d</span></code> denies 1 through
+<code class="docutils literal notranslate"><span class="pre">d-1</span></code>; <code class="docutils literal notranslate"><span class="pre">intra</span></code> with <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies distance 0. A dependence
+provable at a denied distance is refused, at the <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> call and
+again after every later primitive, with an error naming both accesses, the
+direction, the distance and the claim that would be legal instead. A
+dependence that is <strong>not</strong> provable is accepted – that is the whole point
+of the primitive, so the rule must never refuse for lack of proof. It
+therefore catches only demonstrably false claims and <strong>confirms nothing</strong>.</p>
+<p>The analysis is a same-element test over subscripts of the form
+<code class="docutils literal notranslate"><span class="pre">constant</span> <span class="pre">+</span> <span class="pre">sum(coefficient</span> <span class="pre">*</span> <span class="pre">induction</span> <span class="pre">variable)</span></code>. A loaded or carried
+index, a non-uniform stride (<code class="docutils literal notranslate"><span class="pre">A[2*i]</span> <span class="pre">=</span> <span class="pre">A[i]</span></code>), a <code class="docutils literal notranslate"><span class="pre">mod</span></code>/<code class="docutils literal notranslate"><span class="pre">floordiv</span></code>
+subscript, an access under a guard, or an inner loop without constant
+bounds all yield no proof, which is the accepting answer.</p>
+<p><strong>What the evidence is worth.</strong> Every refusal in <code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code>
+is against a kernel constructed to be refused; the rule has never fired on a
+real design here, because there is no false claim in the tree to fire on.
+The real mistake it would catch is a plainly written recurrence
+(<code class="docutils literal notranslate"><span class="pre">C[i]</span> <span class="pre">=</span> <span class="pre">C[i-1]</span> <span class="pre">+</span> <span class="pre">A[i]</span></code>) whose author reaches for <code class="docutils literal notranslate"><span class="pre">inter</span> <span class="pre">false</span></code> to
+silence <code class="docutils literal notranslate"><span class="pre">Unable</span> <span class="pre">to</span> <span class="pre">enforce</span> <span class="pre">a</span> <span class="pre">carried</span> <span class="pre">dependence</span> <span class="pre">constraint</span></code> instead of
+restructuring the loop. See <a class="reference internal" href="extending_allo.html#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a>.</p>
+<p><strong>What is still an obligation</strong>, and now says so: <code class="docutils literal notranslate"><span class="pre">s.dependence(...,</span>
+<span class="pre">because=...)</span></code> records the premise, which appears in
+<code class="docutils literal notranslate"><span class="pre">s.dependence_obligations</span></code> and as <code class="docutils literal notranslate"><span class="pre">//</span> <span class="pre">dependence</span> <span class="pre">obligation,</span> <span class="pre">checked</span> <span class="pre">by</span>
+<span class="pre">no</span> <span class="pre">tool:</span> <span class="pre">...</span></code> above the emitted pragma; omitting it warns
+(<code class="docutils literal notranslate"><span class="pre">allo.dependence.UndeclaredPremise</span></code>). TinyTPU-isa’s claim is the example
+– it is true only because <code class="docutils literal notranslate"><span class="pre">check_program</span></code> enforces THE ACCUMULATOR
+DISTANCE CONTRACT in <code class="docutils literal notranslate"><span class="pre">assemble()</span></code>, outside the compiler – and the rule
+accepts it, as it must. <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">ar_claim_false</span></code> is the standing
+evidence that this half is undecidable: it passes <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>,
+<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> and the rule, and only <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> cosim catches it.</p>
+<p><strong>Two corrections to the text below and to</strong>
+<a class="reference internal" href="extending_allo.html"><span class="doc">Extending Allo’s Abstractions</span></a>. (1) Both pages said the analysis “already exists in
+C++ (<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code>, <code class="docutils literal notranslate"><span class="pre">checkDependence</span></code>)”. <code class="docutils literal notranslate"><span class="pre">allo::checkDependence</span></code>
+(<code class="docutils literal notranslate"><span class="pre">mlir/lib/Support/Utils.cpp:520</span></code>) is <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">true;</span></code> with its body
+commented out since <code class="docutils literal notranslate"><span class="pre">cec32446</span></code> and has no callers – wiring it would have
+refused every claim including TinyTPU-isa’s true one, which is the backwards
+failure the rule is designed against. <code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code> is live but
+answers a question about whole loop bands with no distance. The rule is a
+new analysis in Python. (2) The rule found <strong>no false claim already in the
+tree</strong>: both existing claims (TinyTPU-isa’s <code class="docutils literal notranslate"><span class="pre">ar</span></code>, and the two in
+<code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>) are unprovable and accepted.</p>
+<p><strong>Found and not fixed.</strong> <code class="docutils literal notranslate"><span class="pre">s.split</span></code> rewrites a band onto two new loops and
+carries the <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute onto neither, so a claim made before a
+split disappears silently along with its pragma
+(<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py::test_a_loop_transformation_drops_the_claim_rather_than_moving_it</span></code>).
+A defect in <code class="docutils literal notranslate"><span class="pre">LoopTransformations.cpp</span></code>, not in the rule, and the reason no
+primitive in this tree can currently falsify a standing claim.</p>
 <p>The text below is the item as it stood before the fix.</p>
 </div>
 <p>Vitis takes <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">variable=x</span> <span class="pre">inter</span> <span class="pre">false</span></code> for exactly the case
@@ -1462,7 +1523,10 @@ true only for programs that never read an accumulator row within two
 iterations of writing it: the synthesized loop loads in state 5 and stores in
 state 7, and a distance-1 or -2 read returns the old row in RTL while every
 simulator (Allo’s, and Vitis csim) is exact. The design makes the claim true
-in its assembler. Nothing in Allo can see a false claim; only RTL can.</p></li>
+in its assembler. Nothing in Allo can see a false claim; only RTL can.
+(Superseded in part by the 2026-09-22 update above: a <em>provably</em> false claim
+is now refused. This one is not provable, and is accepted with its premise
+declared.)</p></li>
 <li><p>So the missing primitive is not cosmetic: it is the difference between a
 one-line assertion and a hardware redesign with a real area price.</p></li>
 <li><p><strong>Priority: Medium-High.</strong> It is the standard HLS escape hatch for II

@@ -647,6 +647,54 @@ inside a <code class="docutils literal notranslate"><span class="pre">&#64;df.re
 and designs with bidirectional handshakes cannot pass <code class="docutils literal notranslate"><span class="pre">csim</span></code> at all. See
 <a class="reference internal" href="../developer/limitations.html#limitation-15"><span class="std std-ref">15. Vitis csim executes dataflow processes in declaration order</span></a> and <a class="reference internal" href="../developer/dataflow_semantics.html"><span class="doc">Dataflow Simulation Semantics: Allo vs HLS CSIM</span></a>.</p>
 </section>
+<section id="s-pipeline-style-the-pipeline-control-style">
+<span id="vitis-pipeline-style"></span><h2><code class="docutils literal notranslate"><span class="pre">s.pipeline(style=)</span></code>: the pipeline control style<a class="headerlink" href="#s-pipeline-style-the-pipeline-control-style" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">s.pipeline(axis,</span> <span class="pre">initiation_interval,</span> <span class="pre">rewind,</span> <span class="pre">style=&quot;stp&quot;|&quot;flp&quot;|&quot;frp&quot;)</span></code>
+appends <code class="docutils literal notranslate"><span class="pre">style=&lt;style&gt;</span></code> to the <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">pipeline</span></code> the Vivado/Vitis
+emitter writes, stored as a <code class="docutils literal notranslate"><span class="pre">pipeline_style</span></code> attribute on the loop beside
+<code class="docutils literal notranslate"><span class="pre">rewind</span></code>. Fork-only, lifted onto <code class="docutils literal notranslate"><span class="pre">main</span></code> from the retired <code class="docutils literal notranslate"><span class="pre">tinytpu-align</span></code>
+branch (<code class="docutils literal notranslate"><span class="pre">0038833c</span></code>). Tests: <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_pipeline_style</span></code> and
+<code class="docutils literal notranslate"><span class="pre">::test_pipeline_style_is_refused_where_no_emitter_writes_it</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">"flp"</span><span class="p">)</span>
+<span class="c1"># -&gt; #pragma HLS pipeline II=1 style=flp</span>
+</pre></div>
+</div>
+<p><strong>Why it exists.</strong> A dataflow process that puts a request on one stream and
+gets the response on another <em>inside one pipelined loop</em> can <strong>deadlock in
+RTL</strong> under Vitis’s default stall pipeline (<code class="docutils literal notranslate"><span class="pre">stp</span></code>): a blocked read in a later
+iteration freezes the whole pipeline, including the earlier iteration’s put, so
+the request that would unblock the read never leaves. A flushable (<code class="docutils literal notranslate"><span class="pre">flp</span></code>) or
+free-running (<code class="docutils literal notranslate"><span class="pre">frp</span></code>) pipeline keeps the earlier iterations draining. Neither
+the dataflow simulator nor <code class="docutils literal notranslate"><span class="pre">csim</span></code> models pipeline stalls
+(<a class="reference internal" href="../developer/dataflow_semantics.html"><span class="doc">Dataflow Simulation Semantics: Allo vs HLS CSIM</span></a>), so <strong>only cosim shows the difference</strong>
+– which is what makes this the same shape of gap as
+<a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">s.dependence</span></a>: a one-word HLS escape hatch that Allo
+could not reach, guarding a failure no simulation reproduces.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The style is a measurement, not a rule, and the evidence here is
+second-hand.</strong> The commit this was lifted from claimed “<code class="docutils literal notranslate"><span class="pre">stp</span></code> and <code class="docutils literal notranslate"><span class="pre">frp</span></code>
+deadlock in cosim, <code class="docutils literal notranslate"><span class="pre">flp</span></code> passes”. An independent re-measurement found that
+<strong>``frp`` passes</strong> the repro, so that claim is not carried forward. The same
+re-measurement found a put-then-get loop that deadlocked under <strong>both</strong>
+<code class="docutils literal notranslate"><span class="pre">stp</span></code> and <code class="docutils literal notranslate"><span class="pre">flp</span></code>, so the loop shape matters more than any three-way
+ranking of the styles suggests. Neither result was re-measured in the
+session that landed this primitive on <code class="docutils literal notranslate"><span class="pre">main</span></code>: treat the <code class="docutils literal notranslate"><span class="pre">frp</span></code> behaviour
+as <em>reported by a re-measurement</em>, not as verified here, and cosim the style
+on your own loop before relying on it.</p>
+<p>The commit also cited <code class="docutils literal notranslate"><span class="pre">align_probes/probe_cycle.py</span></code> as its evidence. That
+file applies no <code class="docutils literal notranslate"><span class="pre">s.pipeline</span></code> at all and demonstrates a different
+limitation, so the citation is dropped rather than carried over.</p>
+</div>
+<p><strong>Only one emitter reads it.</strong> <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> writes <code class="docutils literal notranslate"><span class="pre">style=</span></code>; the
+Intel HLS, Catapult, Tapa and XLS emitters ignore the attribute. Because a
+style is set to stop an RTL deadlock, silently dropping it would restore the
+deadlock the author was fixing, so building a styled loop for one of those
+backends is <strong>refused</strong>, naming the loop and its style
+(<code class="docutils literal notranslate"><span class="pre">allo/backend/hls.py</span></code>, <code class="docutils literal notranslate"><span class="pre">check_pipeline_style_reaches_emitter</span></code>). An
+unstyled <code class="docutils literal notranslate"><span class="pre">s.pipeline</span></code> reaches every backend exactly as before. The LLVM and
+simulator paths are unaffected: they make no claim about RTL scheduling.</p>
+</section>
 <section id="vitis-2023-2-linker-vs-newer-glibc">
 <h2>Vitis 2023.2 Linker vs. Newer glibc<a class="headerlink" href="#vitis-2023-2-linker-vs-newer-glibc" title="Link to this heading"><span>¶</span></a></h2>
 <p>Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux
@@ -692,6 +740,7 @@ details are on <a class="reference internal" href="../developer/toolchains.html"
 <li><a class="reference internal" href="#device-and-frequency-configuration">Device and Frequency Configuration</a></li>
 <li><a class="reference internal" href="#aligned-m-axi-pointers-and-port-widening">Aligned <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> Pointers and Port Widening</a></li>
 <li><a class="reference internal" href="#rtl-co-simulation-of-dataflow-designs">RTL Co-Simulation of Dataflow Designs</a></li>
+<li><a class="reference internal" href="#s-pipeline-style-the-pipeline-control-style"><code class="docutils literal notranslate"><span class="pre">s.pipeline(style=)</span></code>: the pipeline control style</a></li>
 <li><a class="reference internal" href="#vitis-2023-2-linker-vs-newer-glibc">Vitis 2023.2 Linker vs. Newer glibc</a></li>
 <li><a class="reference internal" href="#conclusion">Conclusion</a></li>
 </ul>

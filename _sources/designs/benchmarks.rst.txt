@@ -497,9 +497,9 @@ target (``csynth_sweep.py``; reports kept under
      - 64
      - 512
      - 512
-     - 43 910
-     - 70 279
-     - 58
+     - 43 911
+     - 70 281
+     - 62
      - 58
      - 2.431 ns (411 MHz)
 
@@ -576,7 +576,7 @@ claim, which no simulator can see) needs a cosim of its own and was not run.
      - 16
      - ALL EXACT (5 shapes)
      - STRESS OK 492/492, 64 shapes, 18 bad programs rejected
-     - published 172/262/418/484/686
+     - published 171/261/417/483/685
    * - 4
      - 64
      - 16
@@ -645,6 +645,66 @@ of them hard-coded constants masquerading as design limits:
   ``shapes.NAMES`` --- the CHIA harness. An earlier revision of this work put
   the ``TPU_SET``/``TPU_SHAPES`` knobs on ``SHAPES`` itself, which would have
   silently changed what all of those measured.
+
+
+.. _benchmarks-one-cycle:
+
+The published row moved by one cycle, and why
+=============================================
+
+When this work landed, ``reproduce.sh`` printed ``DIFFERS``:
+
+.. code-block:: text
+
+   expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
+   got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+
+**Exactly one cycle faster at every shape**, every testbench bit-exact, and
+reproduced independently by two separate runs. A delta that does not scale
+with the work is a **fixed-cost** change, so it cannot be the burst loop's
+per-iteration behaviour.
+
+**The cause, measured rather than inferred, and isolated to one variable.**
+Rebuilding on current ``main`` with the memory sizes the design used to carry
+--- ``TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128`` and *nothing else changed*, so
+the derived-size expression, the two ceiling assertions, the test-window floor
+and the parametric burst loop are all still present --- returns **every one of
+the five published numbers exactly**:
+
+.. code-block:: text
+
+   TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
+     4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
+
+So **the memory sizing accounts for the entire shift and nothing else in that
+work changed cycles at all** --- in particular the parametric burst loop is
+cycle-neutral at ``DMA_WORDS=1``, which is the same thing it was shown to be
+at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:
+
+    the scratchpad and vreg files are now **derived** as
+    :math:`\text{MAXDIM}^2/T`, which is 64 rows each at MAXDIM=16 against the
+    literal 512 and 256 they replaced; a 64-row file is not implemented the
+    way a 512-row one is (BRAM 42 -> 40 says two memories left block RAM), and
+    the shorter operand read path takes one cycle out of the **fixed** term.
+
+That is why the delta is uniform: it is one cycle of pipeline depth in the
+operand path, paid once per run rather than once per work item.
+
+It is a (very small) **improvement**, not a regression, and it changes no
+conclusion on this page --- one cycle is 0.6% at 4x4x4 and 0.005% at
+64x64x64, and both of the shapes where it is largest were already inside
+Gemmini's measurement spread. Every comparison here was measured *after* the
+change, so only the historical row needed restating.
+
+.. note::
+
+   **The gate is what caught it.** ``reproduce.sh`` carries the published
+   numbers as expectations and refused to pass, minutes after the merge, on a
+   one-cycle shift in a refactor whose functional gates were all green. That
+   is the whole argument for wiring published numbers into a check rather than
+   into prose: correctness is not cycles, and the resource counts moving
+   (BRAM 42 -> 40, FF 17 481 -> 17 075, LUT 26 583 -> 26 558 at an unchanged
+   2.431 ns) proved the netlist had changed without saying by how much.
 
 
 .. _benchmarks-matched:
@@ -991,6 +1051,19 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 
 T=8 vs Gemmini DIM=8, both at MAXDIM=64
 ---------------------------------------
+
+.. warning::
+
+   **The T=8 cycle column carries an unresolved exposure and is provisional
+   until it is re-measured.** It was taken *before* the parametric
+   ``DMA_WORDS`` refactor landed, which is the same exposure that moved the
+   published MAXDIM=16 row by one cycle (:ref:`benchmarks-one-cycle`). There
+   the cause was the memory sizing, which does **not** change at
+   T=8/MAXDIM=64 --- only ``rbA``/``rbB`` grew by one word, which is what took
+   BRAM 58 -> 62 --- so the expectation is no change. **That is a prediction,
+   not a measurement**, and the re-run is in flight. The number most exposed
+   is the 16x16x8 win, since it is the only shape where this design beats
+   Gemmini on a supportable margin.
 
 The second matched point, and **it does not agree with the first**, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
@@ -1781,11 +1854,15 @@ config patches for both matched points are committed at
 
 .. note::
 
-   **The published 172/262/418/484/686 are a MAXDIM=16 measurement**, and the
+   **The published 171/261/417/483/685 are a MAXDIM=16 measurement**, and the
    shipped default is now 64, so ``reproduce.sh`` pins ``TPU_MAXDIM=16``
    explicitly --- it exists to reproduce those numbers and would otherwise
    measure 218/357/563/677/879 and report a difference that is the stride
-   change, not a regression. Both sets are on this page and neither
+   change, not a regression.
+
+   **That row itself moved by one cycle when this work landed**, uniformly at
+   all five shapes: 172/262/418/484/686 became 171/261/417/483/685. See
+   :ref:`benchmarks-one-cycle`. Both sets are on this page and neither
    supersedes the other: the MAXDIM=16 five are the latency benchmark's
    provenance, the MAXDIM=64 sweep is the matched comparison.
 

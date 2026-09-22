@@ -1193,6 +1193,73 @@ compile:
    accumulator since ``e24e433b`` (:ref:`tinytpu-isa-dependence`); the price
    below is what that recovered.
 
+.. admonition:: Update (2026-09-22): the claim is now checked, one-sidedly
+
+   The entry below closed with "**A dependence claim is a contract, and the
+   primitive does not check it.** ... Nothing in Allo can see a false claim;
+   only RTL can." The first half of that no longer holds, and the second half
+   was always too strong: a *provably* false claim is visible in the IR.
+
+   ``allo/dependence.py`` is the rule, with ``tests/test_dependence.py`` (20
+   tests). The legality sentence:
+
+       A ``dependence`` claim is legal **unless** the IR proves a dependence on
+       the claimed array at a distance the claim denies.
+
+   ``inter`` with ``dependent=False`` denies every distance of one iteration or
+   more; ``inter`` with ``dependent=True, distance=d`` denies 1 through
+   ``d-1``; ``intra`` with ``dependent=False`` denies distance 0. A dependence
+   provable at a denied distance is refused, at the ``s.dependence`` call and
+   again after every later primitive, with an error naming both accesses, the
+   direction, the distance and the claim that would be legal instead. A
+   dependence that is **not** provable is accepted -- that is the whole point
+   of the primitive, so the rule must never refuse for lack of proof. It
+   therefore catches only demonstrably false claims and **confirms nothing**.
+
+   The analysis is a same-element test over subscripts of the form
+   ``constant + sum(coefficient * induction variable)``. A loaded or carried
+   index, a non-uniform stride (``A[2*i] = A[i]``), a ``mod``/``floordiv``
+   subscript, an access under a guard, or an inner loop without constant
+   bounds all yield no proof, which is the accepting answer.
+
+   **What the evidence is worth.** Every refusal in ``tests/test_dependence.py``
+   is against a kernel constructed to be refused; the rule has never fired on a
+   real design here, because there is no false claim in the tree to fire on.
+   The real mistake it would catch is a plainly written recurrence
+   (``C[i] = C[i-1] + A[i]``) whose author reaches for ``inter false`` to
+   silence ``Unable to enforce a carried dependence constraint`` instead of
+   restructuring the loop. See :ref:`extending-allo-dependence`.
+
+   **What is still an obligation**, and now says so: ``s.dependence(...,
+   because=...)`` records the premise, which appears in
+   ``s.dependence_obligations`` and as ``// dependence obligation, checked by
+   no tool: ...`` above the emitted pragma; omitting it warns
+   (``allo.dependence.UndeclaredPremise``). TinyTPU-isa's claim is the example
+   -- it is true only because ``check_program`` enforces THE ACCUMULATOR
+   DISTANCE CONTRACT in ``assemble()``, outside the compiler -- and the rule
+   accepts it, as it must. ``mutate.py``'s ``ar_claim_false`` is the standing
+   evidence that this half is undecidable: it passes ``bench_isa``,
+   ``stress_isa`` and the rule, and only ``TPU_TB=stress`` cosim catches it.
+
+   **Two corrections to the text below and to**
+   :doc:`extending_allo`. (1) Both pages said the analysis "already exists in
+   C++ (``analyzeDependency``, ``checkDependence``)". ``allo::checkDependence``
+   (``mlir/lib/Support/Utils.cpp:520``) is ``return true;`` with its body
+   commented out since ``cec32446`` and has no callers -- wiring it would have
+   refused every claim including TinyTPU-isa's true one, which is the backwards
+   failure the rule is designed against. ``analyzeDependency`` is live but
+   answers a question about whole loop bands with no distance. The rule is a
+   new analysis in Python. (2) The rule found **no false claim already in the
+   tree**: both existing claims (TinyTPU-isa's ``ar``, and the two in
+   ``tests/test_vhls.py``) are unprovable and accepted.
+
+   **Found and not fixed.** ``s.split`` rewrites a band onto two new loops and
+   carries the ``dependence`` attribute onto neither, so a claim made before a
+   split disappears silently along with its pragma
+   (``tests/test_dependence.py::test_a_loop_transformation_drops_the_claim_rather_than_moving_it``).
+   A defect in ``LoopTransformations.cpp``, not in the rule, and the reason no
+   primitive in this tree can currently falsify a standing claim.
+
    The text below is the item as it stood before the fix.
 
 Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
@@ -1231,6 +1298,9 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   state 7, and a distance-1 or -2 read returns the old row in RTL while every
   simulator (Allo's, and Vitis csim) is exact. The design makes the claim true
   in its assembler. Nothing in Allo can see a false claim; only RTL can.
+  (Superseded in part by the 2026-09-22 update above: a *provably* false claim
+  is now refused. This one is not provable, and is accepted with its premise
+  declared.)
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II

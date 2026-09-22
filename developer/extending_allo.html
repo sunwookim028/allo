@@ -238,8 +238,10 @@ call that made it, not at the build twenty minutes later;</p></li>
 <p><strong>If you cannot finish the sentence “X is legal if and only if …”, stop.</strong>
 Write the gap down on this page instead of writing the extension. An
 extension that cannot state its own legality rule will be <em>used</em> by an
-agent that cannot tell when it is lying, and the cost of that is measured
-below (see <a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – right mechanism, absent legality rule</span></a>).</p>
+agent that cannot tell when it is lying. If part of the property is not
+decidable, that part is an <strong>obligation</strong> and must be declared as one, never
+implied to be checked; <a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a> is that split,
+worked end to end.</p>
 </div>
 <section id="start-from-the-symptom">
 <h2>Start from the symptom<a class="headerlink" href="#start-from-the-symptom" title="Link to this heading"><span>¶</span></a></h2>
@@ -360,7 +362,7 @@ keeps working because every existing target declares nothing.</p></li>
 <li><p><strong>A rule is decidable from the IR in front of it.</strong> No rule may need a
 measurement, a vendor run, or a promise from the user. If a property is not
 decidable, it is not a rule – see the obligation/rule split under
-<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – right mechanism, absent legality rule</span></a>.</p></li>
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a>.</p></li>
 <li><p><strong>A violation carries its repair.</strong> <code class="docutils literal notranslate"><span class="pre">Violation.repair</span></code> is not
 documentation, it is the payload: the reader is usually an agent that has to
 act on the refusal without a catalogue. A refusal that does not say what to
@@ -447,40 +449,155 @@ absent.</p>
 </section>
 <section id="the-precedents-in-this-tree">
 <h2>The precedents in this tree<a class="headerlink" href="#the-precedents-in-this-tree" title="Link to this heading"><span>¶</span></a></h2>
-<p>Read these before proposing anything. Two are good templates; one is a warning.</p>
-<section id="s-dependence-right-mechanism-absent-legality-rule">
-<span id="extending-allo-dependence"></span><h3><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – right mechanism, absent legality rule<a class="headerlink" href="#s-dependence-right-mechanism-absent-legality-rule" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">allo/customize.py:834</span></code>, fork commit <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code>, register item
-<a class="reference internal" href="limitations.html#limitation-21"><span class="std std-ref">21</span></a>. This is the template for <strong>how</strong> to land a
-primitive on this fork: about 112 lines of Python that attach a <code class="docutils literal notranslate"><span class="pre">dependence</span></code>
-attribute to a loop, 46 lines of C++ in <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> to emit the
-pragma, three tests in <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>. It closed a real defect and it
-is the reason TinyTPU-isa’s accumulator reaches II=1.</p>
-<p>It is also the fork’s own counter-example to point 1 of the standard, and its
-docstring says so: <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> is <em>the programmer’s claim</em>, and</p>
+<p>Read these before proposing anything. All three are templates now; the first
+was this page’s warning until its rule landed, and its history is kept below
+because the shape of the repair is the point.</p>
+<section id="s-dependence-the-rule-obligation-split-worked">
+<span id="extending-allo-dependence"></span><h3><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – the rule/obligation split, worked<a class="headerlink" href="#s-dependence-the-rule-obligation-split-worked" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">allo/customize.py:836</span></code> and <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code>; fork commit <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code>
+for the primitive, and the commit that added <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code> for its
+rule. Register item <a class="reference internal" href="limitations.html#limitation-21"><span class="std std-ref">21</span></a>.</p>
+<p>This is the template for <strong>how</strong> to land a primitive on this fork: about 112
+lines of Python that attach a <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute to a loop, 46 lines of
+C++ in <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> to emit the pragma, three tests in
+<code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>. It closed a real defect and it is the reason
+TinyTPU-isa’s accumulator reaches II=1.</p>
+<p>It was also, for four days, this page’s own counter-example to point 1 of the
+standard. <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> is <em>the programmer’s claim</em>, and its docstring
+said so:</p>
 <blockquote>
 <div><p>if the claim is false the RTL computes a wrong answer while every software
 simulation, which ignores the pragma, still passes.</p>
 </div></blockquote>
-<p>The price of that is on the record: the claim is true only for programs that
-never read an accumulator row within <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> iterations of writing it,
-and the only thing on this host that can see a violation is a <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code>
-cosimulation. Nothing in Allo can.</p>
-<p>The lesson is <strong>not</strong> “don’t ship primitives with unprovable claims” – an
+<p>The lesson was never “don’t ship primitives with unprovable claims” – an
 escape hatch for what the scheduler cannot prove is exactly what the pragma is
-for. The lesson is that such a primitive has two halves and must ship both:</p>
+for. It was that such a primitive has two halves and must ship both, and that
+they must not be confused: a decidable <strong>rule</strong> that is enforced, and an
+undecidable <strong>obligation</strong> that is declared as one so that whoever relies on it
+knows they are discharging it. Both now ship.</p>
+<section id="the-rule">
+<h4>The rule<a class="headerlink" href="#the-rule" title="Link to this heading"><span>¶</span></a></h4>
+<blockquote>
+<div><p>A <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim is legal <strong>unless</strong> the IR proves a dependence on
+the claimed array at a distance the claim denies.</p>
+</div></blockquote>
+<p><em>Denied distances</em> come from the claim itself: <code class="docutils literal notranslate"><span class="pre">inter</span></code> with
+<code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies every distance of one iteration or more; <code class="docutils literal notranslate"><span class="pre">inter</span></code>
+with <code class="docutils literal notranslate"><span class="pre">dependent=True,</span> <span class="pre">distance=d</span></code> denies 1 through <code class="docutils literal notranslate"><span class="pre">d-1</span></code>; <code class="docutils literal notranslate"><span class="pre">intra</span></code> with
+<code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies distance 0, i.e. within one iteration.</p>
+<p><strong>Read the direction of that sentence carefully, because backwards it is worse
+than no rule at all.</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 34.0%" />
+<col style="width: 16.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>What the analysis finds</p></th>
+<th class="head"><p>What happens</p></th>
+<th class="head"><p>Why</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>A dependence <strong>provable</strong> at a denied distance.</p></td>
+<td><p><strong>Refused</strong>, naming both accesses, the direction and the distance, and
+the claim that would be legal instead.</p></td>
+<td><p>The claim is false. Vitis will schedule on it and the RTL will compute a
+wrong answer that no simulation shows.</p></td>
+</tr>
+<tr class="row-odd"><td><p>A dependence that is <strong>not provable</strong>.</p></td>
+<td><p><strong>Accepted.</strong></p></td>
+<td><p>This is the entire purpose of the primitive. Refusing here would remove
+the only thing <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> is for, so the rule must never
+do it.</p></td>
+</tr>
+</tbody>
+</table>
+<p>So the rule can only ever catch a demonstrably false claim. <strong>It never
+confirms a true one</strong>, and a passing check is not evidence that a claim holds.
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code> states that in both directions, including a
+kernel (<code class="docutils literal notranslate"><span class="pre">A[idx[i]]</span> <span class="pre">=</span> <span class="pre">A[idx[i]]</span> <span class="pre">+</span> <span class="pre">1</span></code>) whose dependence is real, is asserted to
+be real by running it, and is accepted anyway.</p>
+<p><strong>What that evidence is worth, stated plainly.</strong> Every refusal in
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code> is against a kernel <em>constructed</em> to be refused.
+The rule has never fired on a real design in this tree – because there is no
+false claim in the tree to fire on. All three live claims (TinyTPU-isa’s <code class="docutils literal notranslate"><span class="pre">ar</span></code>
+and the two in <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>) have subscripts the analysis cannot
+resolve, so they are accepted for exactly the reason the primitive exists. A
+stack of cheap checks agreeing is weaker evidence than it looks, and this one
+has not been tested by a real mistake yet.</p>
+<p>The real mistake it <em>would</em> catch has a recognisable shape: an author pipelines
+a reduction or a sliding window whose recurrence is written plainly in the
+subscripts – <code class="docutils literal notranslate"><span class="pre">C[i]</span> <span class="pre">=</span> <span class="pre">C[i-1]</span> <span class="pre">+</span> <span class="pre">A[i]</span></code>, <code class="docutils literal notranslate"><span class="pre">ar[r]</span> <span class="pre">=</span> <span class="pre">ar[r-1]</span> <span class="pre">+</span> <span class="pre">v</span></code> – meets
+<code class="docutils literal notranslate"><span class="pre">Unable</span> <span class="pre">to</span> <span class="pre">enforce</span> <span class="pre">a</span> <span class="pre">carried</span> <span class="pre">dependence</span> <span class="pre">constraint</span> <span class="pre">(II</span> <span class="pre">=</span> <span class="pre">1,</span> <span class="pre">distance</span> <span class="pre">=</span> <span class="pre">1)</span></code>,
+and reaches for <code class="docutils literal notranslate"><span class="pre">inter</span> <span class="pre">false</span></code> to make the message go away instead of
+restructuring the loop. That claim is false, the IR says so, and the rule
+refuses it. The mistake it cannot catch is the one TinyTPU-isa’s design has
+legitimately: the recurrence runs through a register-computed index, the
+subscript says nothing, and only the obligation covers it.</p>
+<p>What the analysis is: a same-element test over subscripts written as
+<code class="docutils literal notranslate"><span class="pre">constant</span> <span class="pre">+</span> <span class="pre">sum(coefficient</span> <span class="pre">*</span> <span class="pre">induction</span> <span class="pre">variable)</span></code>. Two accesses provably
+alias at distance <code class="docutils literal notranslate"><span class="pre">k</span></code> when their forms agree in every coefficient and the
+constants differ by exactly <code class="docutils literal notranslate"><span class="pre">k</span></code> times the claimed axis’s stride and step.
+Everything else – a subscript that is not affine in the induction variables (a
+loaded index, a carried register), a non-uniform stride (<code class="docutils literal notranslate"><span class="pre">A[2*i]</span> <span class="pre">=</span> <span class="pre">A[i]</span></code>), a
+<code class="docutils literal notranslate"><span class="pre">mod</span></code>/<code class="docutils literal notranslate"><span class="pre">floordiv</span></code> subscript, an access under an <code class="docutils literal notranslate"><span class="pre">scf.if</span></code> or <code class="docutils literal notranslate"><span class="pre">affine.if</span></code>,
+an inner loop whose bounds are not constants – yields <em>no proof</em>, which is the
+accepting answer. Each of those is an incompleteness of the rule, and each
+fails in the safe direction by construction.</p>
+<p>The check runs at the <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> call, before the attribute is written,
+so a refused claim leaves the schedule untouched (point 2 of the standard). It
+then runs again after <strong>every</strong> later primitive, like <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code>, and
+re-derives each claim from the loop attribute the emitter reads rather than
+from anything the schedule remembers.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Correction to this page, in the open.</strong> The text here used to say the
+analysis “already exists in C++ (<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code>, <code class="docutils literal notranslate"><span class="pre">checkDependence</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Support/Utils.h:111</span></code>) and is not wired to the
+primitive”. Half of that is wrong in a way that matters.
+<code class="docutils literal notranslate"><span class="pre">allo::checkDependence</span></code> (<code class="docutils literal notranslate"><span class="pre">mlir/lib/Support/Utils.cpp:520</span></code>) is
+<code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">true;</span></code> with its body commented out since <code class="docutils literal notranslate"><span class="pre">cec32446</span></code>, and it has
+no callers. Wiring it to the primitive would have reported <em>every</em> pair of
+accesses as dependent and refused every claim, including TinyTPU-isa’s true
+one – the exact backwards failure the rule above warns about.
+<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code> is live but answers a different question (which
+dependence kinds run between two whole loop <em>bands</em>, with no distance), so
+it cannot decide a claim either. The rule is a new analysis in Python,
+where the claim is constructed and where the diagnostic can name the
+subscripts as the author wrote them.</p>
+</div>
+</section>
+<section id="the-obligation">
+<h4>The obligation<a class="headerlink" href="#the-obligation" title="Link to this heading"><span>¶</span></a></h4>
+<p>Everything the rule accepts is still the author’s to discharge, so
+<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> now takes <code class="docutils literal notranslate"><span class="pre">because=</span></code>: what the claim rests on, in the
+author’s words. Nothing checks it. It is</p>
 <ul class="simple">
-<li><p>the <strong>rule</strong>, which is decidable and must be enforced: if a dependence <em>is</em>
-provable at a distance the claim denies, the claim is a lie and must be
-refused. The analysis already exists in C++
-(<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code>, <code class="docutils literal notranslate"><span class="pre">checkDependence</span></code>, <code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Support/Utils.h:111</span></code>)
-and is not wired to the primitive.</p></li>
-<li><p>the <strong>obligation</strong>, which is not decidable and must be <em>declared</em> as an
-obligation, so that whoever relies on it knows they are the one discharging
-it.</p></li>
+<li><p>recorded on the schedule as <code class="docutils literal notranslate"><span class="pre">s.dependence_obligations</span></code>, a list of
+<code class="docutils literal notranslate"><span class="pre">Obligation(where,</span> <span class="pre">pragma,</span> <span class="pre">premise)</span></code>;</p></li>
+<li><p>emitted into the generated HLS immediately above the pragma, as
+<code class="docutils literal notranslate"><span class="pre">//</span> <span class="pre">dependence</span> <span class="pre">obligation,</span> <span class="pre">checked</span> <span class="pre">by</span> <span class="pre">no</span> <span class="pre">tool:</span> <span class="pre">...</span></code>, which is where a
+reviewer of the RTL will be standing;</p></li>
+<li><p><strong>required in practice</strong>: omitting it warns
+(<code class="docutils literal notranslate"><span class="pre">allo.dependence.UndeclaredPremise</span></code>) at the call site, saying that the
+claim is accepted but not proven and that discharging it is the author’s.</p></li>
 </ul>
-<p><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> today ships neither half explicitly. Closing that is repair
-work and it outranks a new feature.</p>
+<p>TinyTPU-isa is the worked example, and it is the reason the rule must not
+overreach. <code class="docutils literal notranslate"><span class="pre">accu</span></code>’s <code class="docutils literal notranslate"><span class="pre">ar</span></code> row index is a carried register, so no analysis of
+that kernel can prove or disprove the claim; the claim is true only because
+<code class="docutils literal notranslate"><span class="pre">check_program</span></code> rejects every program that reads an <code class="docutils literal notranslate"><span class="pre">ar</span></code> row within
+<code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> accu iterations of writing it. That guarantee lives in
+<code class="docutils literal notranslate"><span class="pre">assemble()</span></code>, outside the compiler entirely, and <code class="docutils literal notranslate"><span class="pre">because=</span></code> is where
+<code class="docutils literal notranslate"><span class="pre">schedule()</span></code> now says so. The evidence that this half is genuinely
+undecidable is already in the tree: <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">ar_claim_false</span></code> mutant
+sets <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">1</span></code>, and it is the one mutant that passes <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>,
+passes <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>, passes the legality rule, and is caught by
+<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> cosimulation alone. The middle claim was checked directly
+rather than assumed: with <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">1</span></code> the rule still accepts the claim,
+because the falsehood is in <code class="docutils literal notranslate"><span class="pre">assemble()</span></code> and not in the kernel’s IR.</p>
+</section>
 </section>
 <section id="align-value-an-opt-in-that-admits-it-is-not-sufficient">
 <h3><code class="docutils literal notranslate"><span class="pre">align_value</span></code> – an opt-in that admits it is not sufficient<a class="headerlink" href="#align-value-an-opt-in-that-admits-it-is-not-sufficient" title="Link to this heading"><span>¶</span></a></h3>
@@ -599,9 +716,11 @@ dataflow, so acyclicity must <strong>not</strong> be required. The decidable nec
 condition is that every cycle in the wiring graph has positive total stream
 depth. <strong>Deadlock-freedom itself is not decidable from the netlist</strong> – it
 needs per-unit rates – so that half is an obligation, declared as one, not a
-rule. State this limit in the primitive’s docstring; an extension that
-overstates its own guarantee is the failure mode
-<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> already paid for.</p></li>
+rule. State this limit in the primitive’s docstring and give the user a way
+to record what they are relying on, the way
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> takes <code class="docutils literal notranslate"><span class="pre">because=</span></code>: an
+extension that overstates its own guarantee is the failure mode that
+primitive paid for before its rule landed.</p></li>
 </ul>
 <p><strong>Risk.</strong> Moderate, and lower than it looks: the destination IR is already
 emitted and already exercised by the whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code> suite, so this is
@@ -687,9 +806,9 @@ design repeats that by hand.</p>
 implements this instruction” requires a model of instruction semantics to check
 against, and Allo has none – there is no instruction op, no ISA type, nothing
 in the dialect between <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> and the HLS emitter. Without that, a
-<code class="docutils literal notranslate"><span class="pre">tensorize</span></code> primitive would be a promise with no discharger, i.e. exactly
-<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> again, on a much larger
-surface: a wrong <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim costs a wrong pipeline, a wrong
+<code class="docutils literal notranslate"><span class="pre">tensorize</span></code> primitive would be a promise with no discharger, i.e.
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> before its repair, on a much
+larger surface: a wrong <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim costs a wrong pipeline, a wrong
 <code class="docutils literal notranslate"><span class="pre">tensorize</span></code> claim costs a wrong answer.</p>
 <p><strong>What would make it ready.</strong> A checkable instruction semantics. Note the
 narrow path: a <em>structural</em> rule (the band’s shape, rank set and access
@@ -698,11 +817,21 @@ mistakes, while equivalence of the computation is not. If you take that path,
 ship the structural rule as the rule, and declare the semantic half an
 obligation – do not let the structural check imply the semantic one.</p>
 </section>
-<section id="repair-give-s-dependence-its-rule">
-<h3>5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule<a class="headerlink" href="#repair-give-s-dependence-its-rule" title="Link to this heading"><span>¶</span></a></h3>
-<p>Not a new abstraction, which is why it is below the four, but it is the item
-with the best ratio of risk to harm removed. See
-<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – right mechanism, absent legality rule</span></a>.</p>
+<section id="repair-give-s-dependence-its-rule-done">
+<h3>5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule – <strong>done</strong><a class="headerlink" href="#repair-give-s-dependence-its-rule-done" title="Link to this heading"><span>¶</span></a></h3>
+<p>Not a new abstraction, which is why it ranked below the four, but it had the
+best ratio of risk to harm removed. Landed as <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code> with
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code>: the rule refuses a provably false claim, accepts
+an unprovable one, and <code class="docutils literal notranslate"><span class="pre">because=</span></code> carries the half that is not decidable.
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a> is now the precedent for that split rather
+than the warning against skipping it.</p>
+<p>One thing it found and did not fix: <code class="docutils literal notranslate"><span class="pre">s.split</span></code> rewrites a band onto two new
+loops and carries the <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute onto neither, so a claim made
+before a split silently disappears along with its pragma
+(<code class="docutils literal notranslate"><span class="pre">test_a_loop_transformation_drops_the_claim_rather_than_moving_it</span></code>). That is
+a defect in the loop transformations, not in the rule, and it is why no
+primitive in this tree can currently falsify a standing claim. It belongs to
+whoever next touches <code class="docutils literal notranslate"><span class="pre">LoopTransformations.cpp</span></code>.</p>
 </section>
 </section>
 <section id="before-you-claim-an-extension-is-legal">
@@ -753,7 +882,11 @@ things, and every number on it was measured in this tree.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#the-precedents-in-this-tree">The precedents in this tree</a><ul>
-<li><a class="reference internal" href="#s-dependence-right-mechanism-absent-legality-rule"><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – right mechanism, absent legality rule</a></li>
+<li><a class="reference internal" href="#s-dependence-the-rule-obligation-split-worked"><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – the rule/obligation split, worked</a><ul>
+<li><a class="reference internal" href="#the-rule">The rule</a></li>
+<li><a class="reference internal" href="#the-obligation">The obligation</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#align-value-an-opt-in-that-admits-it-is-not-sufficient"><code class="docutils literal notranslate"><span class="pre">align_value</span></code> – an opt-in that admits it is not sufficient</a></li>
 <li><a class="reference internal" href="#check-perfect-affine-kernel-the-in-tree-shape-of-a-gate"><code class="docutils literal notranslate"><span class="pre">check_perfect_affine_kernel</span></code> – the in-tree shape of a gate</a></li>
 <li><a class="reference internal" href="#refusal-as-a-feature">Refusal as a feature</a></li>
@@ -764,7 +897,7 @@ things, and every number on it was measured in this tree.</p>
 <li><a class="reference internal" href="#encoding-and-s-encodable-on">2. <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> and <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code></a></li>
 <li><a class="reference internal" href="#s-peel-axis-count-1-index-set-splitting">3. <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count=1)</span></code> – index-set splitting</a></li>
 <li><a class="reference internal" href="#s-tensorize-band-intrinsic-not-ready">4. <code class="docutils literal notranslate"><span class="pre">s.tensorize(band,</span> <span class="pre">intrinsic)</span></code> – NOT READY</a></li>
-<li><a class="reference internal" href="#repair-give-s-dependence-its-rule">5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule</a></li>
+<li><a class="reference internal" href="#repair-give-s-dependence-its-rule-done">5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule – <strong>done</strong></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#before-you-claim-an-extension-is-legal">Before you claim an extension is legal</a></li>
