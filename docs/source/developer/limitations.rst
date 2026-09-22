@@ -1754,7 +1754,7 @@ characterisation, and a program cannot be screened by counting.
 .. _limitation-24-price:
 
 What ``QD=16`` costs the shipped design
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Raising the depth is a change to the **shipped** design, which the reproduce
 gate pins at five numbers, so it is measured in the same paired form: one

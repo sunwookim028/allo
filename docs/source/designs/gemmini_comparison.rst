@@ -1889,7 +1889,7 @@ at T=8 the correspondence fails outright (32x32x32 has ``Kt=4`` and we are
 not**, and no change has been built against either.
 
 Why we are ahead, at both ends of the shape set
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A win needs a mechanism or it cannot be defended, and the two ends of this
 table win for **different** reasons. That is the part to carry: an earlier
