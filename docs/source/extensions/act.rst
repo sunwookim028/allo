@@ -35,6 +35,10 @@ ACT, and Why We Cite It
 Audited 2026-09-22 against ``chia-codesign-final``: ``allo/exp/dsa/`` is 12
 files, 8,347 lines.
 
+The other side of that connection -- the workload specs a compiler would be
+given and the judge that decides whether what comes out is right, legal and
+fast -- is on :doc:`act_specs`, and contains no part of ACT.
+
 
 Verdict
 =======

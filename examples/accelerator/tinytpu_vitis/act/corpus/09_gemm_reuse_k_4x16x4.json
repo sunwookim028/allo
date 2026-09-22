@@ -1,0 +1,50 @@
+{
+  "name": "gemm_reuse_k_4x16x4",
+  "stresses": "reuse in K: four k-tiles into one accumulator region, which puts every accumulate read at exactly AR_RAW_DIST=4 iterations -- the legality edge",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 4,
+    "k": 16,
+    "n": 4
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

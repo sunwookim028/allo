@@ -1,0 +1,50 @@
+{
+  "name": "gemm_steady_48x48x48",
+  "stresses": "a steady-state shape whose tile count is not a power of two in any rank, so a mapper that only factorises by two has nothing to choose",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 48,
+    "k": 48,
+    "n": 48
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

@@ -8,7 +8,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | Topic | Page |
 | --- | --- |
 | Extending Allo's abstractions: the standard, ranked gaps, `Encoding` | `docs/source/developer/extending_allo.rst` |
-| Allo limitations register (items 1-23, A-G), repros in `tests/limits/` | `docs/source/developer/limitations.rst` |
+| Allo limitations register (items 1-24, A-H), repros in `tests/limits/` | `docs/source/developer/limitations.rst` |
 | Simulator vs csim vs cosim semantics | `docs/source/developer/dataflow_semantics.rst` |
 | `@df.region()` pitfalls | `docs/source/developer/pitfalls.rst` |
 | Toolchains on this host, env, golden tests | `docs/source/developer/toolchains.rst` |

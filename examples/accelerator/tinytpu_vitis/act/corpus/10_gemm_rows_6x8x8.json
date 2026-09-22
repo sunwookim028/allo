@@ -1,0 +1,50 @@
+{
+  "name": "gemm_rows_6x8x8",
+  "stresses": "M=6 does not divide T=4, and rows are the one dimension the ISA leaves free: a mapper that pads M to 8 is legal but writes two rows it must not",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 6,
+    "k": 8,
+    "n": 8
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

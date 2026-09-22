@@ -1,0 +1,14 @@
+  synthesizing once into /home/sk3463/allo/.claude/worktrees/agent-a1f24845a563ff30d/examples/accelerator/tinytpu_vitis/act/act_sweep.prj ...
+  spec                         variant            critical   work  estimate   cosim    error   testbench
+  gemm_4x4x4                   reference               spm      9       188     172    +9.2%   TB gemm_4x4x4 mismatches = 0 / 256
+  gemm_8x8x8                   reference               vru     48       251     262    -4.2%   TB gemm_8x8x8 mismatches = 0 / 256
+  gemm_12x12x12                reference               vru    144       407     418    -2.7%   TB gemm_12x12x12 mismatches = 0 / 256
+  gemm_16x16x8                 reference               vru    192       484     484    +0.1%   TB gemm_16x16x8 mismatches = 0 / 256
+  gemm_16x16x16                reference               vru    320       692     686    +0.9%   TB gemm_16x16x16 mismatches = 0 / 256
+  gemm_relu_16x16x16           reference              accu    384       796    None            no TB line
+  gemm_reuse_m_16x16x4         reference               vru    128       381     383    -0.6%   TB gemm_reuse_m_16x16x4 mismatches = 0 / 256
+  gemm_reuse_n_4x4x16          reference               spm     36       232     269   -13.9%   TB gemm_reuse_n_4x4x16 mismatches = 0 / 256
+  gemm_reuse_k_4x16x4          reference               spm     36       232     256    -9.5%   TB gemm_reuse_k_4x16x4 mismatches = 0 / 256
+  batched_matmul_2x4x4x4       reference               spm     18       202     209    -3.2%   TB batched_matmul_2x4x4x4 mismatches = 0 / 256
+  relu_16x16                   reference              accu    192       484    None            TB relu_16x16 mismatches = 0 / 256
+  row_reduce_16x16             reference               vru    128       381     371    +2.6%   TB row_reduce_16x16 mismatches = 0 / 256

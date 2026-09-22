@@ -1,0 +1,52 @@
+{
+  "name": "relu_16x16",
+  "stresses": "no contraction dimension at all: the array is the only path into the accumulator, so a pointwise workload has to be pushed through mm against a host-placed identity",
+  "einsum": "mn->mn",
+  "dims": {
+    "m": 16,
+    "n": 16
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mn",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "I",
+      "kind": "identity",
+      "rows": 4,
+      "cols": 4,
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "relu",
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}
