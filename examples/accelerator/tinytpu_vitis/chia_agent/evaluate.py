@@ -108,15 +108,21 @@ FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
 #:
 #: History: 476a70d8 was the gap-attribution stack (172 / 262 / 418 / 484 /
 #: 686, and AR_RAW_DIST in check_program). acb080bd moved it for the five-shape
-#: deduplication only. 39ba9aaa is the bump this branch owes: main changed
+#: deduplication only. This bump is the one main owes: main changed
 #: bench_isa.py, stress_isa.py and cosim.py after acb080bd -- `prog=` on
 #: cosim's testbench, and the benchmark work's additions to the two gates --
 #: WITHOUT moving MAIN_BASE with them, so on origin/main today `compose()`
 #: refuses every candidate at stage `setup` with
 #: "cosim.py @ <ref> differs from main @ acb080bd", including the unmodified
 #: control. Measured 2026-09-22. The design's own row moved with it, to
-#: 171 / 261 / 417 / 483 / 685.
-MAIN_BASE = "39ba9aaa"
+#: 171 / 261 / 417 / 483 / 685 at the MAXDIM=16 the published five are
+#: measured at (218 at 4x4x4 on the MAXDIM=64 default).
+#:
+#: 287e4b68 is the commit this branch merged and whose six evaluator files it
+#: carries byte-for-byte. main has moved again since; whoever moves it next
+#: must move it in the same change as the files, which is the rule this bump
+#: exists to restore.
+MAIN_BASE = "287e4b68"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
     "shapes.py")]
@@ -276,6 +282,18 @@ def verify(tree: Path, manifest: dict, checkout: str, after: str):
         raise Reject("tamper", f"after {after}, the checkout's tracked files changed")
 
 
+#: The configuration a candidate is SCORED at, pinned rather than assumed.
+#: Every TPU_* knob is stripped from the environment and this one is set back,
+#: because the design's own default moved to MAXDIM=64 while the published row
+#: and the Gemmini comparison remain a MAXDIM=16 measurement -- `reproduce.sh`
+#: pins the same value for the same reason. Assuming the default WAS the
+#: scored point is what made `check_invariants` start refusing every
+#: candidate, the unmodified control included, once main moved the default
+#: (measured 2026-09-22, stage `invariant`: "T=4 MAXDIM=64; the comparison is
+#: a 4x4 array at MAXDIM 16 and both are frozen").
+SCORED_CONFIG = {"TPU_T": "4", "TPU_MAXDIM": "16"}
+
+
 def env_for(tree: Path):
     env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
     env.update({
@@ -286,6 +304,7 @@ def env_for(tree: Path):
         "OMP_NUM_THREADS": "8",
         "PYTHONDONTWRITEBYTECODE": "1",
     })
+    env.update(SCORED_CONFIG)
     return env
 
 
@@ -327,10 +346,16 @@ def check_invariants(tree, env, work):
     if rc:
         raise Reject("import", out[-3000:])
     inv = json.loads(out.strip().splitlines()[-1])
-    if inv["T"] != 4 or inv["MAXDIM"] != 16:
+    # The pin above sets these; a candidate that reports anything else has
+    # stopped reading them from the environment, which is what this check is
+    # for.
+    if (inv["T"] != int(SCORED_CONFIG["TPU_T"])
+            or inv["MAXDIM"] != int(SCORED_CONFIG["TPU_MAXDIM"])):
         raise Reject("invariant",
-                     f"T={inv['T']} MAXDIM={inv['MAXDIM']}; the comparison is a "
-                     f"4x4 array at MAXDIM 16 and both are frozen")
+                     f"T={inv['T']} MAXDIM={inv['MAXDIM']} with TPU_T and "
+                     f"TPU_MAXDIM pinned to {SCORED_CONFIG['TPU_T']} and "
+                     f"{SCORED_CONFIG['TPU_MAXDIM']}; the comparison is a 4x4 "
+                     f"array at MAXDIM 16 and both are frozen")
     return inv
 
 

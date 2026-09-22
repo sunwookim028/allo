@@ -226,7 +226,8 @@ Instantiating it
    words = wide.assembler.assemble(wide.programs.looped(16, 16, 16))
 
 Two ``TinyTPU`` objects at different parameter sets coexist in one process,
-holding the **same** ``Unit`` objects -- the reuse property, demonstrated:
+holding the **same** ``Unit`` objects -- the reuse property, demonstrated
+(these figures are from before the merge, when the default was MAXDIM=16):
 
 .. code-block:: text
 
@@ -242,6 +243,14 @@ its parameters from ``TPU_T`` / ``TPU_MAXDIM`` / ..., so the sweeps and the
 CHIA parametricity gate keep working unchanged;
 ``chia_agent/param_check.py`` at ``T=8, MAXDIM=32`` reports
 ``PARAM OK: 408/408 runs exact``.
+
+The parameter set is also where the coupling main found lives: the memory
+sizes are derived from T and MAXDIM rather than typed in, because three
+independent literals were big enough at MAXDIM=16 and silently were not above
+it -- the GEMM's operand layout names ``MAXDIM*MAXDIM/T`` rows, which at
+MAXDIM=64 is 1024 against a 256-entry vreg file. ``TpuParams`` takes ``None``
+to mean "derive" and an explicit value as an override, and its
+``__post_init__`` carries the two encoding ceilings.
 
 The refactor moved no number, and that is checked
 =================================================
@@ -262,25 +271,37 @@ the source name to loads, stores, loops and buffers. Normalizing the
 SSA value names makes the two dumps **identical again**, so the emitted C++
 differs only in identifier spelling.
 
-The measured gates, on this branch, after both steps:
+**Step 3, the merge.** ``main`` changed the design while the branch was held
+-- MAXDIM to 64, the memory sizes derived rather than typed in, two
+encoding-ceiling assertions, a parametric operand-burst width, a ``because=``
+obligation on the dependence claim -- and the published row moved with it, to
+171 / 261 / 417 / 483 / 685. The branch was merged and the design
+re-decomposed rather than the old shape reapplied, and the comparison that
+matters is now against ``main``: the MLIR the composed region emits is
+**identical to the MLIR main's monolithic design emits**, 4325 lines, under
+the same normalization. The obligation string is quoted verbatim from main so
+that even the attribute text matches.
+
+Where main's three changes landed is the test of whether the boundaries were
+drawn in the right place: the derived sizing and the ceilings are the
+parameter set (``ip/params.py``), the burst width is one unit's concern
+(``ip/units/dma_load.py``, with ``DMA_WORDS`` a parameter that unit declares),
+and the obligation is the accumulator's own claim
+(``accumulator_directives``). Nothing reached ``compose.py``, ``tinytpu.py``,
+the other seven units, the assembler or the ISA. A change to how the operand
+burst works reached exactly the unit that bursts.
+
+The measured gates, on this branch, after all three steps:
 
 .. code-block:: text
 
    bench_isa      generated == hand-written word-for-word at all 5 shapes
                   ALL EXACT
-   stress_isa     STRESS OK: 492/492 runs exact
+   stress_isa     STRESS OK: 640/640 runs exact (96 shapes)
    act_compile    ACT GATE OK: 12/12 problems, every encodable mapping verified
    mutate.py      MUTATE OK: all 33 mutants run were caught (--no-rtl),
                   and ar_claim_false caught by cosim
    param_check    PARAM OK: 408/408 runs exact at T=8 MAXDIM=32
-   cosim           4x 4x 4   172
-                   8x 8x 8   262
-                  12x12x12   418
-                  16x16x 8   484
-                  16x16x16   686
-                  COSIM OK (testbench=default)
-
--- the published row, to the cycle.
 
 ``mutate.py`` shadows the design tree
 -------------------------------------
@@ -296,10 +317,11 @@ a stronger uniqueness claim than before and is what locates the mutation.
 What the prose deletion was
 ===========================
 
-The design file was 1582 lines, 825 of them comment or docstring (52%),
-including a 264-line module docstring and a 30-to-60-line docstring on each
-unit. The library is 1672 lines with 394 of prose (24%): **431 lines of prose
-deleted**, and the hardware bodies themselves are the same size as before.
+The design file is 1691 lines on ``main``, 904 of them comment or docstring
+(53%), including a 264-line module docstring and a 30-to-60-line docstring on
+each unit. The library is 1787 lines with 449 of prose (25%): **455 lines of
+prose deleted**, and the hardware bodies themselves are the same size as
+before.
 
 Almost none of it was lost. The module docstring was a second copy of
 :doc:`tinytpu_isa` and :doc:`tinytpu_history` -- chains rather than fan-out,

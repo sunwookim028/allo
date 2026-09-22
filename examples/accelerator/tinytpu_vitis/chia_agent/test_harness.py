@@ -106,13 +106,14 @@ MUTANTS = {
                  "psum: int32 = psum_north + activation16 * weight16",
                  "psum: int16 = psum_north + activation16 * weight16"),
     # g: specialised to the scored MAXDIM: identical at the scored
-    # T=4/MAXDIM=64 (WPR=16), wrong at MAXDIM 8 and 12 and at T=8/MAXDIM=32.
+    # T=4/MAXDIM=16 that `evaluate.SCORED_CONFIG` pins (WPR=4), wrong at
+    # MAXDIM 8 and 12 and at T=8/MAXDIM=32.
     # Passes the static policy (T/MAXDIM themselves stay parameters in
     # microarch_isa.py); it hard-codes the DERIVED words-per-row in the unit
     # that uses it, which is where such a specialisation can now hide.
     "wpr_literal": ("ip/units/dma_load.py",
                     "packed = a_onchip[(dram_row0 + row) * WPR + col_block]",
-                    "packed = a_onchip[(dram_row0 + row) * 16 + col_block]"),
+                    "packed = a_onchip[(dram_row0 + row) * 4 + col_block]"),
     # d: mvout never reaches dma_st, so accu blocks on a full ac2sp.
     "deadlock": ("ip/units/sequencer.py",
                  "                c_acc.put(resolved)\n                c_dst.put(resolved)\n",

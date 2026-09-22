@@ -133,26 +133,57 @@ it, **what each instruction means is part of the contract**: the agent may
 change how the hardware executes the ISA and which instructions the generator
 emits, not an instruction's semantics.
 
+.. note::
+
+   **The design is a package now, and the harness takes its file list from one
+   definition.** The hardware moved into a unit library under
+   ``examples/accelerator/tinytpu_vitis/ip/``
+   (:doc:`/designs/tinytpu_library`), so ``chia_agent/design.py`` holds
+   ``EDITABLE`` -- fourteen paths: the ISA, the eight units, the wiring, the
+   assembler, the programs, the instantiation and the generator -- and
+   ``FROZEN_DESIGN`` -- ``ip/compose.py``, ``ip/params.py`` and the package
+   ``__init__`` files. ``allo_tool.py``, ``evaluate.py``, ``loop.py``,
+   ``accept.py`` and ``test_harness.py`` all import it.
+
+   The editable/frozen line is the point of the decomposition rather than an
+   accident of it. ``compose.py`` emits the region's source and so uses
+   ``exec`` and ``open``, constructs this policy refuses -- correctly -- in
+   anything a candidate may write; ``params.py`` owns ``T >= 4`` and
+   ``MAXDIM % T == 0``. Both are machinery. The units are the design, and an
+   agent editing one 60-line unit is a better-scoped experiment than one
+   editing a 1,691-line file, which is what ``read_spec()`` and the prompt now
+   encourage: with no argument it lists the writable files, with a path it
+   returns one.
+
+   **This is prepared, not merged.** It lands with ``design-modular``.
+
 .. warning::
 
-   **The loop is blocked until this list is updated.** The design is no longer
-   two files: the hardware moved into a unit library under
-   ``examples/accelerator/tinytpu_vitis/ip/`` (:doc:`/designs/tinytpu_library`),
-   and ``microarch_isa.py`` is now only the instantiation. A CHIA agent whose
-   editable set is ``("microarch_isa.py", "isa_dsl.py")`` can therefore no
-   longer change the microarchitecture at all.
+   **Two faults in the harness itself, both found while adapting it, both
+   independent of that branch, and both of which stop a run on** ``main``
+   **today** (measured 2026-09-22):
 
-   The breakage is gated rather than silent: ``chia_agent/test_harness.py``,
-   the documented $0 preflight for any paid run, fails, because all four of
-   its mutant specs and its ``ANCHOR`` patch text that has moved. **Do not run
-   a paid loop until it passes again.** What has to change is listed on
-   :doc:`/designs/tinytpu_library` -- ``EDITABLE`` in ``allo_tool.py`` and
-   ``evaluate.py``, the flat spec-directory mapping in ``AlloSpecTool``,
-   ``evaluate.compose`` and ``loop.seed_spec``, the allowed-file set and pinned
-   control blobs in ``accept.py``, ``test_harness.py``'s ``MUTANTS`` and
-   ``ANCHOR``, and the file list in ``loop.py``'s agent prompt.
-   ``param_check.py`` and ``gate_runner.py`` need no change: they work through
-   ``microarch_isa``'s module attributes, which are unchanged.
+   1. ``isa_dsl.py`` **fails its own spec policy.** ``NestError.__init__``
+      calls ``super().__init__(message)`` and ``.__init__`` was not in
+      ``ALLOWED_DUNDER_ATTRS``, so ``compose()`` refuses the UNMODIFIED design
+      -- the control run included. Clean at the old ``MAIN_BASE``
+      ``acb080bd``, refused at ``origin/main``. Fixed by allowing
+      ``__init__``: the ban exists to stop reflection (``__globals__``,
+      ``__subclasses__``), and a constructor call is not that.
+   2. ``MAIN_BASE`` **is stale.** ``compose()`` requires the design's own
+      evaluator to be byte-identical to it, and main changed ``cosim.py``,
+      ``bench_isa.py`` and ``stress_isa.py`` after ``acb080bd`` without moving
+      it, so every candidate is refused at stage ``setup`` with
+      "cosim.py @ <ref> differs from main @ acb080bd". Bumped to
+      ``287e4b68``. The rule the file states -- that it moves in the same
+      change as those files -- is the one to keep.
+
+   A third is a judgement call rather than a fault: ``DOC_LOSS_MAX = 15`` was
+   a per-file budget on a one-file design, so it was also the budget for the
+   whole candidate. Across fourteen files it would allow fourteen times as
+   much deletion, so ``doc_violations_total`` now enforces the total at
+   ``evaluate.compose`` while the edit tool keeps checking per file for fast
+   feedback.
 
 The evaluator
 ~~~~~~~~~~~~~
