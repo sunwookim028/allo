@@ -1305,7 +1305,7 @@ on the parallel. Recorded because a hypothesis that both sides liked and that
 one side has now falsified is worth more than one nobody tested.
 
 The capability gap, which is worse for us than the cycle deficit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
 search. We cannot address a matrix that size at all: our operands are a single
