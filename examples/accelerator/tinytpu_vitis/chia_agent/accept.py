@@ -43,6 +43,8 @@ moved or the design changed behaviour.
     python accept.py --diff RUN/worker/best.diff --out RUN/accept-worker
     python accept.py --out RUN/control                  # no diff: the control
     python accept.py --diff D --out O --control RUN/control/accept.json
+    python accept.py --codesign --diff D --out O   # control and candidate alike
+                                                   # through codesign_cosim
 """
 
 from __future__ import annotations
@@ -106,14 +108,14 @@ def sh(cmd, cwd, env=None, log=None, timeout=7200, stdin=None):
     return rc, out, round(time.time() - t, 1)
 
 
-def vouched(check, wt, cwd, env, log, writable, timeout=7200):
+def vouched(check, wt, cwd, env, log, writable, timeout=7200, args=()):
     """`evaluate.vouch` with this script's sandbox and logging: the check runs
     under the WORKTREE's gate_runner.py (i.e. from git at --ref), and is passed
     only on its nonce line. Returns (ok, rc, out, s)."""
     ok, rc, out, sec = vouch(
         check, wt,
         lambda cmd, stdin: sh(boxed(cmd, writable), cwd, env, None, timeout,
-                              stdin=stdin))
+                              stdin=stdin), args)
     Path(log).write_text(out)
     return ok, rc, out, sec
 
@@ -236,7 +238,18 @@ def main():
     ap.add_argument("--control", type=Path,
                     help="an earlier control run's accept.json: reuse its measured "
                          "control (same design only) instead of measuring again")
+    ap.add_argument("--codesign", action="store_true",
+                    help="accept a CO-DESIGN candidate: also run the frozen "
+                         "mapspace gate (exhaustive enumeration, refusal "
+                         "histogram, every survivor proved against isa_ref), and "
+                         "measure control and candidate alike through "
+                         "codesign_cosim, which cosims the nest the frozen mapper "
+                         "chose rather than the candidate's own gemm_program")
     a = ap.parse_args()
+    # ONE driver for both passes. The mapper's 4x4x4 program is 24 words
+    # against gemm_program's 28, so a control measured by `cosim` would hand
+    # every co-design candidate 3 cycles it did not earn.
+    driver = "codesign_cosim" if a.codesign else DRIVER
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     ref = subprocess.run(["git", "rev-parse", a.ref], cwd=REPO, capture_output=True,
@@ -244,7 +257,8 @@ def main():
     wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
     result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
               "design": control.blobs(ref),
-              "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
+              "driver": driver,
+              "measurement": f"{driver}: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
                              "clean checkout, all five SHAPES, TPU_* unset but "
                              f"{SCORED} and TPU_PRJ"}
     subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
@@ -272,10 +286,10 @@ def main():
         # on disk. A no-diff run IS the control: its own measurement below.
         ctl = None
         if a.control:
-            ctl = reuse_control(a.control, result["design"], DRIVER)
+            ctl = reuse_control(a.control, result["design"], driver)
         elif a.diff:
             ctl = measure_control(wt, env, out, ref, result["design"], tracked,
-                                  a.keep, DRIVER)
+                                  a.keep, driver)
         if ctl:
             result["control"] = ctl
 
@@ -337,9 +351,26 @@ def main():
             result["param"][tag] = {"ok": good, "seconds": secp,
                                     "line": [l.strip() for l in op.splitlines()
                                              if "PARAM " in l][-1:]}
+        # The co-design loop's own gate: the whole mapspace enumerated against
+        # this candidate's hardware, the refusal histogram, the seam identity,
+        # and every survivor proved against isa_ref. All five shapes here, not
+        # the two the search scores.
+        map_ok = True
+        if a.codesign:
+            okm, rcm, om, secm = vouched(
+                "codesign", wt, wt, env, out / "codesign_gate.log", cos,
+                timeout=GATE_TIMEOUT,
+                args=("4x4x4,8x8x8,12x12x12,16x16x8,16x16x16",))
+            untouched("codesign")
+            map_ok = okm and bool(re.search(r"^  MAPSPACE OK$", om, re.M))
+            result["mapspace"] = {
+                "ok": map_ok, "seconds": secm,
+                "seam": [l.strip() for l in om.splitlines() if "SEAM OK" in l],
+                "lines": [l.strip() for l in om.splitlines()
+                          if l.startswith("MAPSPACE ")]}
         # cosim.py puts its project next to itself by default; keep it in the
         # writable .cosim directory instead.
-        candidate, o3 = cosim_pass(wt, env, cos, out, driver=DRIVER)
+        candidate, o3 = cosim_pass(wt, env, cos, out, driver=driver)
         untouched("cosim")
         ok3, result["cosim"] = candidate["vouched"], candidate["rows"]
         result["cosim_seconds"] = candidate["seconds"]
@@ -355,7 +386,7 @@ def main():
             cos2 = wt / ".cosim_stress"
             cos2.mkdir()
             ok4, rc4, o4, sec4 = vouched(
-                "cosim", wt, cos2,
+                driver, wt, cos2,
                 dict(env, TPU_PRJ=str(cos2 / "isa_sweep.prj"), TPU_TB="stress"),
                 out / "cosim_stress.log", cos2)
             untouched("cosim stress")
@@ -371,16 +402,27 @@ def main():
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
                         and ok2 and ok3 and param_ok and exact
                         and result.get("estimated_ns", 99) <= 3.33
-                        and rtl_ok)
+                        and rtl_ok and map_ok)
+        # The measured pair, uncollapsed, as it should be quoted.
+        xml = out / "csynth.xml"
+        if xml.exists():
+            t = xml.read_text()
+            res = {k.lower(): int(m.group(1)) for k in
+                   ("BRAM_18K", "DSP", "FF", "LUT", "URAM")
+                   for m in [re.search(rf"<{k}>(\d+)", t)] if m}
+            result["objective"] = {
+                "cycles": {s: v["cycles"] for s, v in result["cosim"].items()},
+                "resources": dict(res, estimated_ns=result.get("estimated_ns")),
+                "note": "two terms, reported as a pair per shape; never summed"}
         if ctl is None:
             ctl = control.record(
                 cycles={s: v["cycles"] for s, v in result["cosim"].items()},
                 design=result["design"], ref=ref, seconds=candidate["seconds"],
                 estimated_ns=candidate["estimated_ns"], vouched=ok3,
-                pristine_tree=not result["checkout_status"], driver=DRIVER,
+                pristine_tree=not result["checkout_status"], driver=driver,
                 source="no diff was applied: this run's own measurement is "
                        "the control")
-            ctl["problems"] = control.unusable(ctl, result["design"], DRIVER)
+            ctl["problems"] = control.unusable(ctl, result["design"], driver)
             result["control"] = ctl
         # The cross-check is on the CONTROL, so it is reported even for a
         # candidate that was rejected: the tools may have moved under both.

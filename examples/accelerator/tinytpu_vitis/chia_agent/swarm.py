@@ -81,6 +81,117 @@ of the fixed cost is the design's?""",
     ),
 )
 
+#: CO-DESIGN angles (`--codesign`). Each names one of the four constraints that
+#: were MEASURED to collapse the mapspace at 16x16x16, and asks the worker what
+#: the design looks like on the other side of it. None of them says what to
+#: change: the refusal counts are facts, the response is the agent's.
+CODESIGN_STRATEGIES = (
+    (
+        "acc-follows-k",
+        """The binding constraint, measured, and stated as a SYMPTOM rather than
+a diagnosis. 1,150 of the 1,226 enumerated nests die because the encoder cannot
+make `acc` follow the k loop, so the k=0 tile has to be a peelable prefix --
+which pins K innermost and unsplit.
+
+What is measured about it, verified in-tree today:
+
+  * `acc` is field `f2`, and `f2` IS an AGU target. One additive AGU term on it
+    gives acc = [0] at Kt=1 and acc = [0, 1] at Kt=2. The Kt=2 form is a
+    genuine no-peel GEMM and is numerically EXACT against `isa_ref`.
+  * It dies at Kt>=3 with `f2=2, must be 0 (overwrite) or 1 (accumulate)`. The
+    term's growth is ADDITIVE and MONOTONE where the k=0 test needs a step.
+    Staticness is not the obstacle; monotonicity is.
+  * A term on `f2` COSTS ONE of the three AGU terms, and the two constraints
+    are IN SERIES with the first masking the second. The accumulating `mm`
+    names A (f0, one term), acc (f2, one term) and its weights at
+    B_SP + nb*MAXDIM + kb*T (f3, TWO terms): four in all as soon as the program
+    has an n loop at all. Measured, for the no-peel `mm` at each (Kt, Nt) --
+    reproduce it with `histogram.py --interaction`:
+
+        AGU_TERMS=3, every Kt in {2,3,4} x Nt in {1,2,4}:  refused, AGU budget
+        AGU_TERMS=4, Kt=2, any Nt:                         expressible, EXACT
+        AGU_TERMS=4, Kt>=3, any Nt:                        refused, f2 range
+
+    So at three terms the monotonicity limit is never reached and cannot be
+    observed at all; widen the budget and it becomes the binding one. Neither
+    change shows anything alone. Note also that Kt=2 is K <= 8 while the scored
+    shape is 16x16x16 with Kt=4, so four terms plus an additive term is
+    necessary and NOT sufficient.
+  * A rule of the environment, not a hint: `isa_ref.run` iterates
+    `expand(prog)`, i.e. the AGU-RESOLVED fields. A change resolved in the AGU
+    resolution (the sequencer's kernel, with `expand` kept in lockstep) leaves
+    what reaches a unit -- and so the instruction's architectural meaning and
+    the frozen reference model -- untouched. The same change resolved in a
+    unit's decode alters what a field VALUE means, and `isa_ref` will reject
+    it. Both locations are yours to edit; they cost you different things.
+  * A first-cause histogram overstates the prize. Remove the position check and
+    re-census and 897 of those 1,150 are refused by the OTHER acc-peel branch
+    (K split across two emitted loops) and 274 by the encoder's own m/n
+    interleave limitation, with only 12 becoming expressible. Run
+    `histogram.py --second-cause` yourself. Do not assume a fix here frees
+    1,150 nests.
+
+Find a mechanism. Price it: the decoder and the accumulator's write path are
+real area and the clock must still close at 3.33 ns.""",
+    ),
+    (
+        "open",
+        """You get the whole first-cause histogram at 16x16x16 and no preferred
+answer: 1,150 the encoder cannot make `acc` follow the k loop, 54 the encoder's
+own m/n interleave limitation, 17 `AGU_TERMS=3`, 2 the accumulator RAW
+distance, 0 `LOOP_DEPTH`.
+
+Two things are measured and should stop you wasting iterations:
+
+  * `AGU_TERMS=4` (the 64-bit AGU word repacked to four 16-bit terms) raises
+    encodable nests from 3 to 7 and drives the `agu-terms` refusals to zero --
+    and the mapper's CHOSEN nest does not change, so the RTL runs the same
+    stream and the cycle count does not move while the area does. A 6-frame
+    loop stack alone changes not one number. `IMEM_SIZE` 56 -> 104 changes not
+    one number. Read on their own, each of those is a cost with no benefit --
+    but `histogram.py --interaction` shows the address-term budget MASKS a
+    second constraint on the accumulate field, so "alone" may be the problem
+    rather than the change.
+  * The mapping search alone is worth 3 cycles, at one shape: at 4x4x4 the
+    mapper's program is 24 words against the hand-written 28, with the same
+    four dynamic issues.
+
+So the expressible set is not obviously the binding constraint on this machine,
+and one honest outcome of your iteration is to show that it is not. Decide for
+yourself what to attack -- including the intrinsic tile (one `mm` performs rows
+x TxT), the encoder's own 54 refusals, or something the histogram does not name
+at all -- and justify the choice from the numbers before you edit anything.""",
+    ),
+)
+
+CODESIGN_TASK = """Find a TinyTPU-isa DESIGN POINT that a better loop nest can
+use. You propose the hardware and the ISA; a frozen mapper enumerates the whole
+mapspace and cosims the best nest your hardware can encode. Neither the mapper
+nor its selection rule nor any test is reachable from your tools.
+
+The design you start from, measured (RTL cosim, bit-exact, all five shapes):
+4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686 cycles; the
+search scores 4x4x4 and 16x16x16. A matched 4x4 int8 Gemmini takes
+144-161/220/347/391/593 over the same window. Resources at that build, csynth:
+see the pair in the prompt. A winner is re-verified bit-exact at all five
+shapes, by stress_isa, and by the RTL stress testbench.
+
+At 16x16x16 your hardware can encode 3 of 1,226 nests. Raising that number is
+the point of the exercise, and the cycle count is the point of raising it; a
+change that unlocks nests without lowering cycles is a real and reportable
+outcome, not a failure, as long as you say which happened.
+
+Already landed on this design (do not re-propose): program prefetch 8 words a
+cycle, weights by scratchpad address with per-PE double-buffered weight loaders
+(wld), A no longer through spad->vld->vr, accu at II=1 via s.dependence (valid
+only because check_program enforces AR_RAW_DIST=4 between an accumulator write
+and a read of it -- a closer read is an RTL-only failure the simulator does not
+show), sequencer-precomputed row counts.
+
+Your starting angle:
+{angle}
+"""
+
 BASE_TASK = """Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.
 Current cosim cycles (all five shapes, bit-exact, main @ 476a70d8):
 4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686. A matched 4x4
@@ -105,7 +216,8 @@ def run_tag(run_dir: Path, t0_ms: int) -> str:
     return f"chia-run {run_dir.name}@{t0_ms}"
 
 
-def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms):
+def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms,
+           codesign=False):
     log_dir = run_dir / worker
     log_dir.mkdir(parents=True, exist_ok=True)
     work = REPO_ROOT / ".chia_scratch" / run_dir.name / worker
@@ -113,12 +225,15 @@ def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms):
                         "CHIA_RUN_TAG": run_tag(run_dir, t0_ms),
                         "CHIA_BUDGET_USD": str(soft_budget)}
     command = [sys.executable, "-u", str(AGENT_DIR / "loop.py"),
-               "--task", BASE_TASK.format(angle=angle),
+               "--task", (CODESIGN_TASK if codesign
+                          else BASE_TASK).format(angle=angle),
                "--iterations", str(iterations),
                "--log-dir", str(log_dir),
                "--spec-dir", str(log_dir / "spec"),
                "--work-dir", str(work),
                "--tool-name", f"tpu{worker.replace('-', '')}"]
+    if codesign:
+        command.append("--codesign")
     handle = (log_dir / "worker.log").open("w", encoding="utf-8")
     return subprocess.Popen(command, cwd=AGENT_DIR, env=env, stdout=handle,
                             stderr=subprocess.STDOUT, start_new_session=True)
@@ -199,10 +314,16 @@ def main() -> None:
     parser.add_argument("--run-dir", type=Path, default=REPO_ROOT / "chia_runs"
                         / f"isa-{time.strftime('%Y%m%d-%H%M%S')}")
     parser.add_argument("--stagger", type=float, default=60.0)
+    parser.add_argument("--codesign", action="store_true",
+                        help="the CO-DESIGN loop: the workers propose hardware, "
+                             "a frozen mapper enumerates the mapspace "
+                             "exhaustively, and the best nest each candidate can "
+                             "encode is what gets cosimmed")
     args = parser.parse_args()
     run_dir = args.run_dir.resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
-    strategies = list(STRATEGIES)[: args.workers]
+    strategies = list(CODESIGN_STRATEGIES if args.codesign
+                      else STRATEGIES)[: args.workers]
     started = time.time()
     t0_ms = int(started * 1000)
     # Before any worker: which account and project this run charges, and
@@ -215,7 +336,9 @@ def main() -> None:
         "model": os.environ.get("TINYTPU_OPENCODE_MODEL"),
         "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
                                capture_output=True, text=True).stdout.strip(),
-        "task_template": BASE_TASK, "strategies": dict(strategies)}, indent=1))
+        "codesign": args.codesign,
+        "task_template": CODESIGN_TASK if args.codesign else BASE_TASK,
+        "strategies": dict(strategies)}, indent=1))
 
     # Each loop checks "spent + its next call <= cap" on its own, so two loops
     # can pass that check at the same moment. Reserve one projected call per
@@ -229,7 +352,7 @@ def main() -> None:
                 time.sleep(args.stagger)
             print(f"launching worker '{worker}'", flush=True)
             procs.append((worker, launch(worker, angle, run_dir, args.iterations,
-                                         soft, t0_ms)))
+                                         soft, t0_ms, args.codesign)))
         while any(p.poll() is None for _, p in procs):
             spent = run_spend(run_tag(run_dir, t0_ms) + " ", t0_ms)["usd"]
             if spent >= args.budget_usd:

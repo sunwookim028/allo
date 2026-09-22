@@ -1,0 +1,201 @@
+{
+ "cases": [
+  {
+   "case": "k1 no-op reproduces the co-design baseline",
+   "expected": "cycles {'4x4x4': 169, '16x16x16': 686} (published 172 / 686; 4x4x4 differs by the trip-count-1 loop the mapper drops) and the pinned histogram",
+   "actual": {
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 686,
+     "4x4x4": 169
+    },
+    "mapspace": {
+     "16x16x16": {
+      "encodable": 3,
+      "total": 1226,
+      "chosen": "N4>K4 rows=16",
+      "refused": {
+       "acc-peel": 1150,
+       "accumulator-raw-distance": 2,
+       "agu-terms": 17,
+       "emitter": 54
+      }
+     },
+     "4x4x4": {
+      "encodable": 1,
+      "total": 4,
+      "chosen": "- rows=4",
+      "refused": {
+       "accumulator-raw-distance": 2,
+       "agu-terms": 1
+      }
+     }
+    }
+   },
+   "passed": true,
+   "resources": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "estimated_ns": 2.431,
+    "ff": 17481,
+    "lut": 26583,
+    "uram": 0
+   },
+   "scored_nest": {
+    "16x16x16": "N4>K4 rows=16",
+    "4x4x4": "- rows=4"
+   }
+  },
+  {
+   "case": "k2 AGU_TERMS 3->4 unlocks nests",
+   "expected": "gate passes; encodable 3 -> 7 at 16x16x16, agu-terms refusals -> 0, loop-depth appears",
+   "actual": {
+    "ok": true,
+    "stage": null,
+    "mapspace": {
+     "16x16x16": {
+      "encodable": 7,
+      "chosen": "N4>K4 rows=16",
+      "refused": {
+       "acc-peel": 1150,
+       "accumulator-raw-distance": 9,
+       "emitter": 54,
+       "loop-depth": 6
+      }
+     },
+     "4x4x4": {
+      "encodable": 1,
+      "chosen": "- rows=4",
+      "refused": {
+       "accumulator-raw-distance": 3
+      }
+     }
+    }
+   },
+   "passed": true
+  },
+  {
+   "case": "k3 encoder widened by deleting the acc-peel check",
+   "expected": "REJECTED at gate:mapspace, nests WRONG against isa_ref",
+   "actual": {
+    "ok": false,
+    "stage": "gate:mapspace",
+    "isa_ref_lines": [
+     "MAPSPACE 16x16x16: nest K4>N4 rows=16 relu=False is WRONG against isa_ref   <-- FAIL",
+     "MAPSPACE 16x16x16: nest K4>N4 rows=16 relu=True is WRONG against isa_ref   <-- FAIL",
+     "MAPSPACE 16x16x16: nest N2>K4>N2 rows=16 relu=False is WRONG against isa_ref   <-- FAIL"
+    ]
+   },
+   "passed": true
+  },
+  {
+   "case": "k4 seam broken (nest != gemm_program)",
+   "expected": "REJECTED at gate:mapspace, the seam assertion names the differing instruction",
+   "actual": {
+    "ok": false,
+    "stage": "gate:mapspace",
+    "seam": [
+     "AssertionError: seam gemm 4x4x4: instruction 1 differs -- nest 0x0100000000000041/0x0000000040200083 vs gemm_program 0x0100000000000081/0x0000000040200083. The encoder and the shipped program must stay the same generator."
+    ]
+   },
+   "passed": true
+  },
+  {
+   "case": "k5 PE partial sum narrowed to int16",
+   "expected": "REJECTED at gate:stress; no mapspace report is produced",
+   "actual": {
+    "ok": false,
+    "stage": "gate:stress",
+    "mapspace_reported": false,
+    "stress": [
+     "STRESS FAILED: 251/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)"
+    ]
+   },
+   "passed": true
+  },
+  {
+   "case": "k6 the program outgrows IMEM_SIZE",
+   "expected": "the candidate is REJECTED and the refusal names IMEM_SIZE; assemble RAISES rather than truncating, and the mapper attributes the refusal to imem with 0 encodable",
+   "actual": {
+    "verdict": {
+     "ok": false,
+     "stage": "gate:stress",
+     "names_imem": true
+    },
+    "mapper_at_imem_32": {
+     "imem": 32,
+     "encodable": 0,
+     "refused": {
+      "acc-peel": 1150,
+      "emitter": 54,
+      "agu-terms": 17,
+      "imem": 3,
+      "accumulator-raw-distance": 2
+     },
+     "words": null,
+     "raised": "34 words > IMEM_SIZE=32"
+    }
+   },
+   "passed": true
+  },
+  {
+   "case": "k7a a sabotaged mapper in the spec dir is ignored",
+   "expected": "the verdict is the baseline's, mapspace.py coming from git",
+   "actual": {
+    "ok": true,
+    "stage": null,
+    "mapspace": {
+     "16x16x16": 3,
+     "4x4x4": 1
+    }
+   },
+   "passed": true
+  },
+  {
+   "case": "k7b accept.py refuses a diff touching mapspace.py",
+   "expected": "refusing: diff touches [...]",
+   "actual": [
+    "refusing: diff touches ['mapspace.py']"
+   ],
+   "passed": true
+  },
+  {
+   "case": "k7b accept.py refuses a diff touching cosim.py",
+   "expected": "refusing: diff touches [...]",
+   "actual": [
+    "refusing: diff touches ['cosim.py']"
+   ],
+   "passed": true
+  },
+  {
+   "case": "k7b accept.py refuses a diff touching stress_isa.py",
+   "expected": "refusing: diff touches [...]",
+   "actual": [
+    "refusing: diff touches ['stress_isa.py']"
+   ],
+   "passed": true
+  },
+  {
+   "case": "k8 the acc-peel check is present but vacuous",
+   "expected": "the check is STILL IN THE SOURCE and the candidate is REJECTED at gate:mapspace -- detection is behavioural (isa_ref), not textual",
+   "actual": {
+    "check_still_in_source": true,
+    "ok": false,
+    "stage": "gate:mapspace",
+    "encodable_claimed": {},
+    "isa_ref_lines": [
+     "MAPSPACE 16x16x16: nest K4>N4 rows=16 relu=False is WRONG against isa_ref   <-- FAIL",
+     "MAPSPACE 16x16x16: nest K4>N4 rows=16 relu=True is WRONG against isa_ref   <-- FAIL",
+     "MAPSPACE 16x16x16: nest N2>K4>N2 rows=16 relu=False is WRONG against isa_ref   <-- FAIL"
+    ]
+   },
+   "passed": true
+  }
+ ],
+ "passed": 11,
+ "total": 11,
+ "minutes": 6.4,
+ "usd": 0.0,
+ "head": "7557c54dcd64a2f4d6bdc638f5e365763a85d410"
+}
