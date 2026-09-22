@@ -106,13 +106,13 @@ class Claim:
         return None
 
     def repair(self, found):
-        nearest = min(proof.distance for proof in found)
         if self.dep_type == "intra":
             return (
                 "legal if: dependent=True, which keeps the two accesses ordered "
                 "within an iteration; or a body in which they cannot reach the "
                 "same element."
             )
+        nearest = min(proof.distance for proof in found)
         direction = "" if self.direction is None else f", direction={self.direction!r}"
         return (
             f'legal if: dep_type="inter", dependent=True, distance={nearest}'
