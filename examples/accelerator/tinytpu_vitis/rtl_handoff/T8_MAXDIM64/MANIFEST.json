@@ -1,9 +1,0 @@
-{
-  "config": {
-    "TPU_MAXDIM": "64",
-    "TPU_T": "8"
-  },
-  "files": 223,
-  "resources": {},
-  "top": "tinytpu_isa"
-}
