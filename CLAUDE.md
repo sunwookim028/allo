@@ -12,12 +12,19 @@ the page, not to a new `.md` file. The fork-only pages:
 | Allo limitations register (items 1-24, A-H), repros in `tests/limits/` | `docs/source/developer/limitations.rst` |
 | Simulator vs csim vs cosim semantics | `docs/source/developer/dataflow_semantics.rst` |
 | `@df.region()` pitfalls | `docs/source/developer/pitfalls.rst` |
-| Toolchains on this host, env, golden tests | `docs/source/developer/toolchains.rst` |
-| Branch layout, upstream-merge procedure, worktrees | `docs/source/developer/fork_maintenance.rst` |
 | Vitis: `align_value`, cosim, binutils fix | `docs/source/backends/vitis.rst` |
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
+
+Dev notes (not published):
+
+| Topic | Page |
+| --- | --- |
+| Toolchains on this host, env, golden tests | `dev/toolchains.rst` |
+| Branch layout, upstream-merge procedure, worktrees | `dev/fork_maintenance.rst` |
+| Dated measurement records | `dev/records/` |
+| Session report, paper outline, ASIC handoff | `dev/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
 | Dated measurement records | `docs/source/records/` |
@@ -135,6 +142,6 @@ file: `git branch -vv`, `gh pr list -R cornell-zhang/allo`,
   https://github.com/sunwookim028/allo/issues/13.
 - Fork-local file inventory: fork issue #5
   (https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476).
-- Upstream-merge procedure: `docs/source/developer/fork_maintenance.rst`.
+- Upstream-merge procedure: `dev/fork_maintenance.rst`.
 
 See `AGENTS.md` for build instructions, testing, and code style guidelines.

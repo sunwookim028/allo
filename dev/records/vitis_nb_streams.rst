@@ -34,7 +34,7 @@ with its key findings (§4). They are the only blocking-vs-non-blocking LUT/FF
 breakdown at module granularity, and the only place the decoupled-mesh area
 numbers (5355/5300 for 1 MT + 1 CT, 7361/6724 for 2x1) appear at all.
 
-This is the **primary record** for these numbers. :doc:`/backends/nonblocking_streams`
+This is the **primary record** for these numbers. ``docs/source/backends/nonblocking_streams.rst``
 repeats LUT 1417 / 1457 but gives FF as 248 / 260 in a table it labels
 "estimated", where this record measured **1325 / 1369**; where the two
 disagree, this record wins.

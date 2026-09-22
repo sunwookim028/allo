@@ -37,12 +37,12 @@ exist nowhere else: the structural diagram, execution timeline and concurrency
 analysis (§0), and the only per-loop latency and per-module / per-FIFO area
 numbers for ``top_decoupled_2x1`` (§3-4). §1-2 are kept as the context needed to
 read them. The tile totals alone (295 / 67 / 657 / 298 cycles; CT=14991,
-CT=14991, MT=16180) also appear in :doc:`/extensions/catapult_systemc`. The
+CT=14991, MT=16180) also appear in ``docs/source/extensions/catapult_systemc.rst``. The
 "not pursuing Catapult further" decision these numbers originally fed was
 reopened on 2026-09-18, so they are live reference again.
 
 The error cookbook (§5) and synthesis methodology (§6) of the original are
-covered by :doc:`/backends/catapult`.
+covered by ``docs/source/backends/catapult.rst``.
 
 0. Design Visualization
 -----------------------

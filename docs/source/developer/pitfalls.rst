@@ -63,7 +63,7 @@ On ``main`` today:
   ``tests/dataflow/test_df_unit.py::test_region_bare_scalar_arg`` no longer
   exists.
 - The auto-capture → ``s_axilite`` redesign is still open. It is item 4 of the
-  hierarchical-region design record (:doc:`/records/hierarchical_regions`) and
+  hierarchical-region design record (``dev/records/hierarchical_regions.rst``) and
   is tracked in fork issue #7.
 
 Observation: OMP segfault at Python GC exit
@@ -81,7 +81,7 @@ Observation: LLVM_BUILD_DIR must be set BY YOU -- corrected 2026-09-18
 This section used to say the conda ``allo`` env "already sets ``LLVM_BUILD_DIR``" to
 ``/work/shared/common/llvm-project-main/build-rhel8`` and must not be overridden.
 **That is false on this host and contradicted** ``CLAUDE.md``\ **, which is right**
-(its environment notes now live in :doc:`/developer/toolchains`).
+(its environment notes now live in ``dev/toolchains.rst``).
 Checked directly:
 
 .. code-block:: text

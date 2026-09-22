@@ -184,7 +184,7 @@ Where the Code Lives
      - A **separate codebase**, not a feature branch. It descends from Kai
        Shao's ACT fork and shares only a March 2026 ancestor (``76130c63``)
        with ``main``; the two are maintained separately and are not expected
-       to converge (see :doc:`/developer/fork_maintenance`). Carries
+       to converge (see ``dev/fork_maintenance.rst``). Carries
        ``CODESIGN.md`` (the claim register), ``notes/CHIA_CHECKPOINT.md``
        (version pins), ``examples/accelerator/tinytpu/`` and ``chia_runs/``.
 

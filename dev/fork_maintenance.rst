@@ -133,14 +133,14 @@ Where work lands
   table above while they exist. For example, ``sc-wire-guard`` asked whether
   extending the free-running-loop guard fixes ``pe_wire``. The answer was no;
   it is recorded in ``examples/systemc_rtlsim/guard_experiment/`` and in
-  :doc:`/extensions/catapult_systemc`, and the branch is deleted.
+  ``docs/source/extensions/catapult_systemc.rst``, and the branch is deleted.
 
 ``chia-codesign`` is a different codebase, not a feature branch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It shares only a March 2026 ancestor (``76130c63``, upstream #555) with ``main``.
 Kai Shao's ACT fork (https://github.com/kkkaishao/allo) re-architected the
-package (see :doc:`/extensions/act` and :doc:`/extensions/chia`):
+package (see ``docs/source/extensions/act.rst`` and ``docs/source/extensions/chia.rst``):
 
 +-----------+------------------------------------------+------------------------------------------+
 |           | ``main``                                 | ``chia-codesign``                        |
@@ -173,4 +173,4 @@ Live state is judged from git and GitHub, not from a checked-in status file:
 - Fork-local file inventory: fork issue #5
   (https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476).
 - The LLVM builds and worktree layout that the procedure above has to respect
-  are described in :doc:`/developer/toolchains`.
+  are described in ``docs/source/developer/toolchains.rst``.
