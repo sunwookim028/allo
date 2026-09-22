@@ -337,6 +337,64 @@ A reader deciding whether this was memorisation will look for exactly these:
 
 A recall would not differ in those ways.
 
+### Provenance of the surviving claim
+
+From opencode's own database, session `ses_f3674bacdffeBJ...`: **36 reads**,
+all of `allo/customize.py`, the five `Emit*HLS.cpp` emitters,
+`mlir/include/allo/Translation/EmitIntelHLS.h`, `allo/backend/vitis.py`, and
+`docs/source/developer/limitations.rst` lines 1-150. **It never opened
+`microarch_isa.py`**, so it did not see the verbatim pragma in that file's
+comment; what it saw was the `limitations.rst:41` line naming the gap. That is
+why the surviving claim is *implementation*, and why it is not *nothing*.
+
+## A limitation of THIS OBJECTIVE, not of the candidate
+
+**A new abstraction, by construction, has no callers.** The objective scores
+cycles at existing call sites, so it can only reward an extension that pays
+off where the designs already are — which is systematically the opposite of
+the extensions this project most wants, the ones whose value is
+generalisability across design cases.
+
+This candidate is the measured proof: correct, building, validated, bit-exact
+everywhere, every resource flat, and **`neutral`**. `s.dependence` itself would
+have scored `neutral` the day it was written.
+
+`expressive` was meant to cover this and does not: it fires only on
+`newly_expressible` (a design case that did not synthesise now does) or
+`limits_fixed` (a `tests/limits` verdict moving REPRODUCES -> FIXED). A brand
+new primitive with no callers triggers neither.
+
+The guard this collides with — *"you cannot make a design use your primitive;
+it has to pay off where the designs already are"* — exists to stop an agent
+rewriting a design to flatter its own work, and that is still right. The
+resolution is a **harness-authored call site**: derived by introspection from
+the candidate's own `Schedule` method signature, applied to a frozen design,
+and scored as one unit with the primitive. The agent never writes it, so the
+guard holds, and a new abstraction can still show payoff. That is what the
+`heldout.py` G3 step does by hand today; it belongs in the ladder as a rung.
+
+**Not implemented tonight.** Recorded here as a known limitation of the
+objective so that a `neutral` on a new primitive is read correctly.
+
+## Name the disease: a check that fails open
+
+Four instances in one night, in four different instruments:
+
+| instrument | what it reported | what was true |
+| --- | --- | --- |
+| CHIA's tool server | the LLM call returned normally | it never bound to a port; the agent had no tools |
+| `response.usage` | `$0.00` for the turn | the turn cost `$4.46` |
+| a manifest of an export | self-consistent | the export was truncated |
+| **this repo's own leak detector** | **`"leaks": []`** | **14 leaks; `git grep -E` had exited 128** |
+
+The common shape: **a negative result from an instrument is only evidence if
+the instrument can be shown to have run.** Every check here that can return
+"nothing found" should be able to fail loudly and should be able to prove it
+looked. `scan_leaks` now raises on any git failure and returns
+`file:line:text` rather than a bare list length, and
+`test_abs_harness.py` asserts it finds a leak that is known to be present —
+a detector that cannot be shown to detect is not a detector.
+
 ## Two findings worth keeping, beyond the harness
 
 **The design track's one verified win classifies as `trade`, not `win`, and is
