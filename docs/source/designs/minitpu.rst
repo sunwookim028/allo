@@ -309,6 +309,73 @@ Consequence: **the rescued report's 8-stage TinyTPU scaling plan rests on the
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.**
 Not reproduced here; what survives of it is §5.
 
+What aligning to MiniTPU's semantics costs
+------------------------------------------
+
+An experiment, now stopped, asked whether TinyTPU-isa could be made
+semantically comparable to MiniTPU so the two machines' cycle counts would mean
+the same thing. Six increments were built and independently re-measured; the
+answer is that the alignment is expensive enough to stop pursuing, and that
+result is the finding.
+
+The variant lives on the branch ``tinytpu-align`` (``10ee6882``), which is
+**not merged into main** and is kept as the record: the repros, the verification
+logs, the csynth report and the per-unit table are all in that commit. The
+shipped design (:doc:`/designs/tinytpu_isa`) is unaffected and remains the
+baseline for every performance claim.
+
+Measured, by cosim, at the five benchmark shapes: **216 / 408 / 809 / 933 /
+1521** cycles with zero mismatches, against the shipped design's 172 / 262 /
+418 / 484 / 686 — **1.26x to 2.22x the cycles**. At ``T=8`` the variant measures
+302 / 474 / 699, also exact. Functional gates pass throughout: bench ``ALL
+EXACT``, stress 487/487, 34 crafted bad programs rejected against 390 generated
+programs accepted, and 42 mutants caught (41 by the functional gates, one only
+by RTL cosim).
+
+The cycles are not the whole cost, and this is what stopped the track.
+Synthesis of the same build (xcu280, 3.33 ns target, ``T=4``, ``MAXDIM=16``)
+estimates **3.782 ns with -1.35 ns of top-level slack** — the variant does not
+close at the shipped design's frequency, where the shipped design estimates
+2.431 ns with margin. The critical path is in ``vpu_0`` and ``vmu_0``, the two
+units the MiniTPU-semantics increments created and the only two carrying
+``style=flp`` loops; every other unit still reports 2.431 ns. So the honest
+comparison multiplies a 1.26-2.22x cycle cost by a roughly 1.56x longer clock,
+and the variant's resources are BRAM 41 / DSP 21 / FF 17,918 / LUT 24,244
+against the shipped design's BRAM 42 / DSP 14 / FF 17,481 / LUT 26,583.
+
+Where the cycles went, per increment, at 4x4x4 and 16x16x16:
+
+============================= ================= ==================================
+Increment                     Cycles            Step
+============================= ================= ==================================
+1 (``b3793f85``)              176 / 750         +4 / +64
+2 (``8f113313``)              186 / 1216        **+10 / +466**
+3 (``7b087c44``)              197 / 1904        **+11 / +688**
+3b (``c565ebea``)             199 / 1514        +2 / -390
+4 and 5a (branch HEAD)        216 / 1521        +17 / +7
+============================= ================= ==================================
+
+The two large steps are increments 2 and 3, and they are real: each was
+re-measured independently at its own commit with zero mismatches. Increment 3b
+recovered 390 cycles of increment 3's 688.
+
+Three claims the building agent made were corrected by the re-measurement, and
+are recorded on the branch: there are 42 mutants rather than 41; ``frp``
+**passes** the pipeline-style repro rather than deadlocking as the register
+said; and a 72-bit stream does not "run clean" — 65, 72 and 96 bits all corrupt
+the simulator heap, and what varies is only whether the overrun lands somewhere
+fatal (see :doc:`/developer/limitations`). Two documentation defects also stand
+on that branch: ``DELAY`` is described as an honoured minimum issue spacing but
+appears nowhere in the implementation, and a cited ``isa_dsl.eltwise_program``
+does not exist.
+
+One piece of the experiment was judged worth keeping independently of it:
+``s.pipeline(style=)`` (``0038833c``), a ~20-line schedule primitive modelled on
+``rewind`` and covered by ``tests/test_vhls.py::test_pipeline_style``. Any
+cyclic dataflow design needs it. Note that only ``EmitVivadoHLS.cpp`` reads
+``pipeline_style``; the Intel, Catapult, Tapa and XLS emitters ignore it
+silently.
+
 Provenance
 ----------
 

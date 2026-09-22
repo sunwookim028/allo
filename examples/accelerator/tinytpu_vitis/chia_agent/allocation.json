@@ -1,0 +1,25 @@
+{
+ "comment": "How the authorised CHIA2026 spend is divided between the two tracks. The cap the pre-flight gate enforces is CHIA_TOTAL_CAP_USD, a CUMULATIVE ceiling on chia2026_spend() (see spend.py), so a track's env sets it to baseline_usd + this track's allocation. The gate cannot tell the tracks apart, so the split is honoured by each track setting its own ceiling, not by the gate.",
+ "authorised_on": "2026-09-22",
+ "authorised_usd": 300,
+ "baseline_usd": 28.54,
+ "baseline_note": "chia2026_spend() at the time of the split: 6 sessions, run 1 of the design-point search.",
+ "tracks": {
+  "maintaining": {
+   "allocation_usd": 200,
+   "cap_usd": 228.54,
+   "question": "Can agents extend Allo's abstractions -- MLIR dialects, schedule primitives, compiler passes -- so a co-design flow generalises across design cases?",
+   "why_weighted": "The novel contribution, and the harder one: lower success rates, stronger models, more guidance. Weighted 2:1 over using on the user's call.",
+   "worktree": "allo-chia-abs"
+  },
+  "using": {
+   "allocation_usd": 100,
+   "cap_usd": 128.54,
+   "question": "Can agents discover ISA or microarchitectural design points over the abstractions as they stand?",
+   "why_capped": "The pipeline is proven and run 1 already landed, so the marginal dollar buys less here. It still carries the one must-land deliverable: a design point with measured cycles and resources.",
+   "worktree": "allo-codesign"
+  }
+ },
+ "remainder_usd": 500,
+ "remainder_note": "Planned with the morning's evidence in hand, not spent tonight."
+}
