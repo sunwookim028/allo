@@ -346,6 +346,100 @@ Two things to read off this, and they pull in opposite directions:
   steady-state set would need to start where this one ends.
 
 
+.. _benchmarks-msweep:
+
+Does utilisation move with M? Yes --- we amortise
+=================================================
+
+An M-sweep at fixed K=N=64, everything else held, run at both array sizes.
+This answers a question **neither** project had measured, and it was asked
+because MiniTPU's own M-sweep came out **flat**.
+
+.. list-table:: M-sweep, K=N=64, one ``csynth`` per T, every shape bit-exact
+   :header-rows: 1
+   :widths: 8 10 12 12 12 14 16
+
+   * - M
+     - joint?
+     - T=4 cycles
+     - **% of 16**
+     - T=8 cycles
+     - **% of 64**
+     - MACs
+   * - 16
+     - ours alone
+     - 6 891
+     - **59.4%**
+     - 2 539
+     - **40.3%**
+     - 65 536
+   * - 32
+     - **joint**
+     - 11 952
+     - **68.5%**
+     - 4 048
+     - **50.6%**
+     - 131 072
+   * - 64
+     - **joint**
+     - 22 123
+     - **74.1%**
+     - 7 083
+     - **57.8%**
+     - 262 144
+
+**Utilisation rises monotonically with M at both array sizes.** We amortise.
+
+**The mechanism, and it is the predicted one.** The numbers are a straight
+line in M with a single fixed intercept:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - fixed term
+     - marginal, cycles per M row
+     - fixed as % at M=16
+     - at M=64
+   * - T=4
+     - **1 782**
+     - 317.8
+     - 25.9%
+     - 8.1%
+   * - T=8
+     - **1 014**
+     - 94.8
+     - 39.9%
+     - 14.3%
+
+Fitted on M=32 and M=64, the model predicts M=16 to within 24 cycles (T=4)
+and 8 cycles (T=8) --- so the fixed term is paid **once per call**, not once
+per row block, which is exactly what "one program per call with M as an
+internal loop bound" predicts. Tripling M does not triple the fixed cost; it
+divides it.
+
+.. important::
+
+   **What this licenses, and what it does not.** MiniTPU is flat at 33.6%
+   across M=32, 64 and 128, with an identified cause: an emitter issuing one
+   launch per 32 rows, each re-paying the whole fixed term. We are not flat.
+   **So flatness is not a property of how these machines re-enter a launch ---
+   it is specific to that emitter**, and carrying the row-block loop inside
+   the launch would make their structure ours.
+
+   But the comparison is of an **axis, not of shapes**: our sweep is at
+   K=N=64 and theirs at K=N=128, because 128 is past our ceiling
+   (:ref:`benchmarks-workload`) and M=16 is below their 32-row floor. "Does
+   utilisation move with M" is answerable on each machine independently and
+   that is what makes the finding joint; the *numbers* are not comparable
+   across the two columns. Only M ∈ {32, 64} exists on both machines at all,
+   and even there the fixed K and N differ.
+
+   For orientation and not as a comparison, Gemmini over its own M range goes
+   80.7 -> 86.1 -> 95.1% at DIM=4 and 47.3 -> 58.3 -> 79.0% at DIM=16 --- it
+   amortises too, and harder than we do.
+
+
 .. _benchmarks-raising-maxdim:
 
 Raising the build: what a bigger MAXDIM costs
@@ -554,6 +648,22 @@ work. Verbatim:
    isa_dsl.py                    generated == hand-written, word for word
    kpn_model.py                  KPN OK
    pytest tests/act/             98 passed, 4 skipped
+
+.. note::
+
+   **The first ASIC number, and it describes the current design.** DC on
+   FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
+   (T=4, MAXDIM=16) comes out at **1,136,598** standard-cell area, timing MET
+   at +0.21 ns with zero violating and zero hold paths. That **replaces**
+   1,271,692 from an earlier export of a superseded netlist --- **-10.6%** ---
+   and the reason is the same memory-sizing change that took BRAM 42 -> 40 and
+   one cycle off the fixed term (:ref:`benchmarks-one-cycle`). The design got
+   smaller *and* slightly faster, and area and cycles now describe the same
+   design, which they did not before.
+
+   Read it only against our own variants synthesised identically. A 45 nm
+   cell area has no relationship to a BRAM count, and with memories as
+   registers it says as much about the memory treatment as about the datapath.
 
 ``mutate.py`` is the one that matters most here, because ``bench_isa`` and
 ``stress_isa`` both cite it as the evidence that they catch a broken design,
@@ -1403,7 +1513,7 @@ What the widening costs, at every latency (it does not vary with the knob):
      - 31 396
      - **116**
      - 14
-     - 2.431 ns
+     - 2.431 ns (but see the warning below: not ASIC-synthesisable)
    * - delta
      - +6 513 (+37%)
      - +4 842 (+18%)
@@ -1415,6 +1525,42 @@ The clock not moving is worth stating: widening the DMA datapath **does not
 lengthen the critical path**, so the comparison is a pure cycles-for-area
 trade and the two columns can be compared in cycles without converting. The
 BRAM more than doubles, which is the real price.
+
+.. warning::
+
+   **The +123% BRAM and an ASIC elaboration failure are the same fact seen
+   from two substrates, and that changes what the decision is.**
+
+   The widened variant does not synthesise to standard cells. DC rejects it in
+   two minutes --- ``ELAB-366: Net 'ram[0][31]' ... driven by more than one
+   source``, across all 32 bits --- because Vitis satisfies the widened loop's
+   ``DMA_WORDS`` writes per iteration by emitting ``rbA`` as a **true
+   dual-write-port RAM**: two ``always @(posedge clk)`` blocks driving one
+   array, while still naming the module ``_1R1W``. Every RAM in all four
+   exported variants was checked and **it is the only two-write-port memory
+   anywhere; it exists only in the widened build.**
+
+   An FPGA block RAM has two independent write ports, so filling both per
+   cycle is free. **Standard cells have no such primitive**, and with memories
+   mapped to registers two unconditioned writers of one array is a genuine
+   multi-driver. DC is right to refuse it, and the synthesis side is right to
+   report it as not synthesisable rather than bodging a flip-flop dual port:
+   that would be a number describing hardware nobody would build.
+
+   So landing the widening is **not** "spend BRAM to buy cycles". It is
+   "**commit to a dual-write-port memory**", which is a different commitment
+   with different consequences for anyone carrying this design to another
+   substrate. The BRAM number alone does not say that, which is why it is
+   written here beside it.
+
+   Whether the widening *needs* that primitive is a separate question and is
+   being measured rather than argued: the buffers can be **cyclically banked
+   by** ``DMA_WORDS`` instead, so write ``w`` always lands in bank ``w`` and
+   every bank has one writer. That is the same widening expressed in a way
+   both substrates can build. If it keeps the -720 / -960 the optimisation was
+   real and the dual port incidental; if it loses it, the gain *was* the
+   second write port and largely evaporates off-FPGA, which would settle the
+   decision against landing.
 
 (The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
 parametric burst buffers carry ``DMA_WORDS`` words of rounding headroom in

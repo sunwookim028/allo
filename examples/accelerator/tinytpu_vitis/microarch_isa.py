@@ -1677,6 +1677,26 @@ def schedule(s):
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
+    # ---- THE OPERAND BURST BUFFERS, AND WHY THIS PARTITION EXISTS ----
+    # At DMA_WORDS > 1 the burst loop's `meta_for` unrolls to DMA_WORDS writes
+    # of `rbA`/`rbB` per iteration. Left alone, Vitis satisfies that by giving
+    # the array TWO WRITE PORTS -- it emits two `always @(posedge clk)` blocks
+    # driving the same RAM while still naming the module `_1R1W`.
+    #
+    # On an FPGA that is free: a block RAM has two independent write ports.
+    # On standard cells it is not: with memories mapped to registers, two
+    # unconditioned writers of one array is a genuine multi-driver, and DC
+    # rejects it (`ELAB-366: Net 'ram[0][31]' driven by more than one
+    # source`). It was the only two-write-port RAM in any variant.
+    #
+    # Banking says the same thing in a way both substrates can build: write
+    # `w` always lands in bank `w`, so every bank has ONE writer. The widening
+    # is then a property of the loop rather than of a memory primitive that
+    # happens to be free on one target. Whether it survives the change is
+    # measured, not assumed -- see docs/source/designs/benchmarks.rst.
+    if DMA_WORDS > 1:
+        s.partition("dma_ld_0:rbA", Partition.Cyclic, dim=1, factor=DMA_WORDS)
+        s.partition("dma_ld_0:rbB", Partition.Cyclic, dim=1, factor=DMA_WORDS)
     s.dependence(
         "accu_0:x",
         "ar",
