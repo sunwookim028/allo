@@ -100,6 +100,7 @@ logging.getLogger("mcp").setLevel(logging.WARNING)
 #: `evaluate` loads it by path and this takes the names from there rather than
 #: writing them out a sixth time. The cycles are positional against it.
 import control  # noqa: E402
+from design import EDITABLE, IMPORTABLE_MODULES  # noqa: E402
 from evaluate import ALL_SHAPES, PARAM_CONFIGS  # noqa: E402
 
 #: The unmodified design at the scored configuration: reproduce.sh's row, via
@@ -119,26 +120,36 @@ def genuine_control(**changes) -> dict:
         source="measured in this run from git at HEAD, before the candidate "
                "diff was applied"), **changes}
 
-#: (file, old, new): exact, unique replacements on the HEAD design.
+#: (file, old, new): exact, unique replacements on the HEAD design. The paths
+#: are the ones `design.EDITABLE` names -- the hardware is a unit library now
+#: (`docs/source/designs/tinytpu_library.rst`), so a mutant names the unit it
+#: breaks rather than one big file, which is also what makes each one readable.
 MUTANTS = {
     # b: the zero-fill of spad that b4be2b10 removed. At HEAD the DMA burst is
     # II=1, so the 514-cycle memset is no longer hidden behind it.
-    "spad_zero": ("microarch_isa.py", "        spad: UInt(VW)[SPAD_ROWS]\n",
-                  "        spad: UInt(VW)[SPAD_ROWS] = 0\n"),
+    "spad_zero": ("ip/units/scratchpad.py", "    spad: UInt(VW)[SPAD_ROWS]\n",
+                  "    spad: UInt(VW)[SPAD_ROWS] = 0\n"),
     # c: [-4, 4] operands never overflow 16 bits at K <= 16; full-range ones do.
-    "narrow16": ("microarch_isa.py", "o: int32 = p + av * wv",
-                 "o: int16 = p + av * wv"),
-    # g: specialised to the scored MAXDIM: identical at MAXDIM=16, wrong at 8/12.
-    # Passes the static policy (T/MAXDIM themselves stay parameters).
-    "wpr_literal": ("microarch_isa.py",
-                    "WPR = MAXDIM // T              # packed words per DRAM row\n",
-                    "WPR = 4                        # packed words per DRAM row\n"),
+    "narrow16": ("ip/units/pe.py",
+                 "psum: int32 = psum_north + activation16 * weight16",
+                 "psum: int16 = psum_north + activation16 * weight16"),
+    # g: specialised to the scored configuration: identical at the T=4,
+    # MAXDIM=16 `evaluate.SCORED` pins (WPR=4), wrong at MAXDIM 8 and 12 and
+    # at T=8/MAXDIM=32. It passes the static policy (T and MAXDIM themselves
+    # stay parameters in microarch_isa.py) by hard-coding the DERIVED
+    # words-per-row in the unit that uses it.
+    "wpr_literal": ("ip/units/dma_load.py",
+                    "packed = a_onchip[(dram_row0 + row) * WPR + col_block]",
+                    "packed = a_onchip[(dram_row0 + row) * 4 + col_block]"),
     # d: mvout never reaches dma_st, so accu blocks on a full ac2sp.
-    "deadlock": ("microarch_isa.py",
-                 "                    c_acc.put(rw)\n                    c_dst.put(rw)\n",
-                 "                    c_acc.put(rw)\n"),
+    "deadlock": ("ip/units/sequencer.py",
+                 "                c_acc.put(resolved)\n                c_dst.put(resolved)\n",
+                 "                c_acc.put(resolved)\n"),
 }
-ANCHOR = "import allo.dataflow as df\n"
+#: A line that exists in `microarch_isa.py` and runs at import, for the cases
+#: that inject an attack after it: the module's first import, so a payload
+#: placed after it runs before the design is built.
+ANCHOR = "import os\n"
 #: Prints both gates' verdict lines and exits 0 during the candidate's import
 #: in any gate process (they put the tree root first on sys.path).
 FORGE_VERDICT = (
@@ -213,6 +224,25 @@ def tails(swarm_output: str, worker: Path | None, lines=15) -> str:
     return "\n".join(out)
 
 
+def write_design(dest, mutant: str | None = None, attack: str = "") -> None:
+    """Write every writable file from HEAD into `dest`.
+
+    With `mutant`, that one file carries its mutation; with `attack`, the
+    payload is injected after ANCHOR in `microarch_isa.py`. The two used to be
+    one file and composed with a single `replace`; the hardware lives in
+    `ip/units/` now, so a functional mutant and an import-time attack land in
+    different files and the whole design has to be written out.
+    """
+    for rel in EDITABLE:
+        text = mutate(mutant) if mutant and MUTANTS[mutant][0] == rel else head(rel)
+        if attack and rel == "microarch_isa.py":
+            assert text.count(ANCHOR) == 1, "ANCHOR is not unique"
+            text = text.replace(ANCHOR, ANCHOR + attack, 1)
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+
+
 def unified(name: str, before: str, after: str) -> str:
     return "".join(difflib.unified_diff(before.splitlines(keepends=True),
                                         after.splitlines(keepends=True),
@@ -285,7 +315,7 @@ def phase_s():
     import evaluate as ev
     import spec_policy as sp
     # The policy passes the shipped design, as the evaluator runs it.
-    for name in ("microarch_isa.py", "isa_dsl.py"):
+    for name in EDITABLE:
         got = sp.policy_violations(name, head(name)) + sp.doc_violations(
             name, head(name), head(name))
         check(f"s.policy passes the shipped {name}", "no violations",
@@ -326,8 +356,7 @@ def phase_s():
     with tempfile.TemporaryDirectory() as tmp:
         spec = Path(tmp) / "spec"
         spec.mkdir()
-        for name in ev.EDITABLE:
-            (spec / name).write_text(head(name))
+        write_design(spec)
         old = os.environ.get("CHIA_MAIN_BASE")
         os.environ["CHIA_MAIN_BASE"] = "476a70d8"
         try:
@@ -407,6 +436,21 @@ def phase_s():
           and round(sum(mine.values()), 2) == 8.46)
     check("s.cap stops on this run's spend", "stops: $9.46 + $6.00 > $15",
           stopped[:90], "has spent $9.46" in stopped)
+    # The policy's import allow-list and the design definition must agree.
+    # The policy keeps a literal (a candidate must not be able to widen it by
+    # editing design.py's neighbours), so nothing but a test holds them equal.
+    check("s.policy allows exactly the design's modules",
+          f"{len(IMPORTABLE_MODULES)} modules",
+          sorted(set(sp.ALLOWED_EXAMPLES) ^ set(IMPORTABLE_MODULES)) or "equal",
+          set(sp.ALLOWED_EXAMPLES) == set(IMPORTABLE_MODULES))
+    # The documentation budget is the candidate's, not each file's.
+    over = {rel: 2 for rel in EDITABLE}
+    check("s.documentation budget is the whole candidate's",
+          f"{len(EDITABLE)} files losing 2 lines each is refused; one is not",
+          [sp.doc_violations_total(over)[:1],
+           sp.doc_violations_total({EDITABLE[0]: 2})],
+          bool(sp.doc_violations_total(over))
+          and not sp.doc_violations_total({EDITABLE[0]: 2}))
     # Nothing reads opencode's `usage` (CHIA's cost_usd) as money.
     readers = [f"{f.name}:{i}" for f in sorted(AGENT_DIR.glob("*.py"))
                if f.name not in ("fake_model.py", "test_harness.py")
@@ -493,8 +537,7 @@ class Suite:
         self.A, self.B = Client(self.tools["tpta"]), Client(self.tools["tptb"])
 
     def reset(self, name: str):
-        for f in ("microarch_isa.py", "isa_dsl.py"):
-            (self.specs[name] / f).write_text(head(f))
+        write_design(self.specs[name])
 
     def spec(self, name: str, f="microarch_isa.py") -> str:
         return (self.specs[name] / f).read_text()
@@ -523,16 +566,16 @@ class Suite:
         cosim = head("cosim.py")
         forged = cosim.replace("SHAPES", "SHAPES_", 1)
         micro = head("microarch_isa.py")
+        mutant = MUTANTS["spad_zero"][0]
+        spad_diff = unified(mutant, head(mutant), mutate("spad_zero"))
         attacks = {
             "patch cosim.py": ("apply_spec_patch",
                                {"patch": unified("cosim.py", cosim, forged)}),
-            "patch microarch_isa.py + cosim.py": ("apply_spec_patch", {"patch":
-                unified("microarch_isa.py", micro, mutate("spad_zero"))
-                + unified("cosim.py", cosim, forged)}),
-            "patch ../cosim.py": ("apply_spec_patch", {"patch": unified(
-                "microarch_isa.py", micro, mutate("spad_zero")).replace(
-                "a/microarch_isa.py", "a/../cosim.py").replace(
-                "b/microarch_isa.py", "b/../cosim.py")}),
+            f"patch {mutant} + cosim.py": ("apply_spec_patch", {"patch":
+                spad_diff + unified("cosim.py", cosim, forged)}),
+            "patch ../cosim.py": ("apply_spec_patch", {"patch": spad_diff.replace(
+                f"a/{mutant}", "a/../cosim.py").replace(
+                f"b/{mutant}", "b/../cosim.py")}),
             "replace_text cosim.py": ("replace_text", {"path": "cosim.py",
                                                         "old": "SHAPES", "new": "X"}),
             "replace_text ../cosim.py": ("replace_text", {"path": "../cosim.py",
@@ -560,8 +603,7 @@ class Suite:
 
         # Second layer: files that reach the spec dir WITHOUT the edit tools
         # must still be refused by the evaluator, which re-runs the policy.
-        (spec / "microarch_isa.py").write_text(micro.replace(
-            ANCHOR, ANCHOR + IMPORT_ATTACKS["import cosim"], 1))
+        write_design(spec, attack=IMPORT_ATTACKS["import cosim"])
         v = await A.verdict("run_functional_check")
         check("e.on-disk import cosim -> evaluator", "ok=false at stage policy",
               f"ok={v.get('ok')} stage={v.get('stage')}",
@@ -572,15 +614,13 @@ class Suite:
         for label in ("numpy.savetxt over stress_isa.py",
                       "ndarray.tofile over stress_isa.py",
                       "SystemExit forged verdict"):
-            (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
-                ANCHOR, ANCHOR + IMPORT_ATTACKS[label], 1))
+            write_design(spec, "narrow16", IMPORT_ATTACKS[label])
             v = await A.verdict("run_functional_check")
             check(f"e.on-disk narrow16 + {label} -> evaluator", "ok=false",
                   f"ok={v.get('ok')} stage={v.get('stage')}", not v.get("ok"),
                   detail=v.get("detail", "")[-600:])
         # Past the static policy: a monkeypatch through a method's `self`.
-        (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
-            ANCHOR, ANCHOR + METHOD_SELF_PATCH, 1))
+        write_design(spec, "narrow16", METHOD_SELF_PATCH)
         from spec_policy import policy_violations
         missed = not policy_violations("microarch_isa.py", self.spec("tpta"))
         v = await A.verdict("run_functional_check")
@@ -616,11 +656,10 @@ class Suite:
         if work.exists():
             shutil.rmtree(work)
         tree = work / "tree"
-        for rel in ev.FROZEN + [f"{PKG}/isa_dsl.py"]:
+        for rel in ev.FROZEN:
             (tree / rel).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel).write_bytes(ev.git_show("HEAD", rel))
-        (tree / PKG / "microarch_isa.py").write_text(mutate("narrow16").replace(
-            ANCHOR, ANCHOR + FORGE_VERDICT, 1))
+        write_design(tree / PKG, "narrow16", FORGE_VERDICT)
         env = ev.env_for(tree)
         rc, out, _ = ev.run([ALLO_PYTHON, str(tree / PKG / "stress_isa.py")], tree, env,
                             GATE_TIMEOUT, work, tree)
@@ -727,8 +766,8 @@ class Suite:
         # A documentation EDIT (same length, reworded) is allowed.
         self.reset("tpta")
         r = await A.call("replace_text", timeout=60, path="microarch_isa.py",
-                         old="the machine both were aiming at",
-                         new="the machine both of them were aiming at")
+                         old="the shipped instantiation of the `ip` unit library",
+                         new="the shipped instantiation of the `ip` unit library today")
         check("g.edit: docstring reworded", "Replaced (edits are fine)", r[:60],
               r.startswith("Replaced"))
         # Past the static policy: a unit specialised to MAXDIM=16.
@@ -789,7 +828,7 @@ class Suite:
         f, old, new = MUTANTS["spad_zero"]
         r2 = await self.B.call("replace_text", timeout=60, path=f, old=old, new=new)
         assert r.startswith("Replaced") and r2.startswith("Replaced"), (r, r2)
-        diff = unified("microarch_isa.py", head("microarch_isa.py"), self.spec("tptb"))
+        diff = unified(f, head(f), self.spec("tptb", f))
         (self.run_dir / "spad_zero.diff").write_text(diff)
 
         # f1: two evaluations on ONE tool must serialise on its work dir.
@@ -1070,8 +1109,8 @@ class Suite:
         print("== accept: accept.py on (b)", flush=True)
         diff = self.run_dir / "spad_zero.diff"
         if not diff.exists():
-            diff.write_text(unified("microarch_isa.py", head("microarch_isa.py"),
-                                    mutate("spad_zero")))
+            mutant = MUTANTS["spad_zero"][0]
+            diff.write_text(unified(mutant, head(mutant), mutate("spad_zero")))
         out = self.run_dir / "accept-spad_zero"
         p = subprocess.run([ALLO_PYTHON, str(AGENT_DIR / "accept.py"), "--diff",
                             str(diff), "--out", str(out)], cwd=AGENT_DIR,

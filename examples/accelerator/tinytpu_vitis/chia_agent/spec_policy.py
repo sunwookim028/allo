@@ -41,12 +41,30 @@ ALLOWED_IMPORT_ROOTS = frozenset(
         "sys",
     }
 )
-#: The only `examples.*` modules a spec may import: each other. In particular
-#: not `cosim`, `bench_isa` or anything in `chia_agent` -- the evaluator.
+#: The only `examples.*` modules a spec may import: each other, and the frozen
+#: machinery that composes them (`ip.compose`, `ip.params`). In particular not
+#: `cosim`, `bench_isa` or anything in `chia_agent` -- the evaluator. A literal
+#: rather than an import of `design.IMPORTABLE_MODULES`, because
+#: `evaluate.compose` execs this module out of git and a candidate must not be
+#: able to widen it; test_harness's phase `s` asserts the two agree.
 ALLOWED_EXAMPLES = frozenset(
     {
         "examples.accelerator.tinytpu_vitis.microarch_isa",
         "examples.accelerator.tinytpu_vitis.isa_dsl",
+        "examples.accelerator.tinytpu_vitis.ip.isa",
+        "examples.accelerator.tinytpu_vitis.ip.tinytpu",
+        "examples.accelerator.tinytpu_vitis.ip.assembler",
+        "examples.accelerator.tinytpu_vitis.ip.programs",
+        "examples.accelerator.tinytpu_vitis.ip.compose",
+        "examples.accelerator.tinytpu_vitis.ip.params",
+        "examples.accelerator.tinytpu_vitis.ip.units.sequencer",
+        "examples.accelerator.tinytpu_vitis.ip.units.dma_load",
+        "examples.accelerator.tinytpu_vitis.ip.units.scratchpad",
+        "examples.accelerator.tinytpu_vitis.ip.units.vector_regs",
+        "examples.accelerator.tinytpu_vitis.ip.units.weight_loader",
+        "examples.accelerator.tinytpu_vitis.ip.units.pe",
+        "examples.accelerator.tinytpu_vitis.ip.units.accumulator",
+        "examples.accelerator.tinytpu_vitis.ip.units.dma_store",
     }
 )
 #: `os` / `sys` are needed for exactly `os.environ.get`, `os.path.*` and
@@ -413,6 +431,12 @@ def doc_lines(source: str) -> list[str]:
     return out
 
 
+def doc_loss(base_source: str, source: str) -> int:
+    """Net comment/docstring lines removed; negative means documentation was
+    added."""
+    return len(doc_lines(base_source)) - len(doc_lines(source))
+
+
 def doc_violations(name: str, base_source: str, source: str) -> list[str]:
     """Refuse a net loss of more than DOC_LOSS_MAX comment/docstring lines."""
     before, after = len(doc_lines(base_source)), len(doc_lines(source))
@@ -420,4 +444,26 @@ def doc_violations(name: str, base_source: str, source: str) -> list[str]:
         return [f"{name}: removes {before - after} lines of comments/docstrings "
                 f"(from {before} to {after}; at most {DOC_LOSS_MAX} may go). "
                 f"Edit or add documentation; do not delete it"]
+    return []
+
+
+def doc_violations_total(losses: dict[str, int]) -> list[str]:
+    """Refuse a net loss of more than DOC_LOSS_MAX lines across the WHOLE
+    candidate.
+
+    `DOC_LOSS_MAX` is per file, and the design used to be one file, so the two
+    were the same number. It is fourteen files now
+    (`docs/source/designs/tinytpu_library.rst`), and a per-file budget alone
+    would let a candidate delete fourteen times as much documentation as the
+    guard was written to allow. The total restores exactly the original
+    guarantee. The edit tool keeps checking per file, for fast feedback; the
+    evaluator is where the total is enforced.
+    """
+    net = sum(losses.values())
+    if net > DOC_LOSS_MAX:
+        worst = ", ".join(f"{n} (-{d})" for n, d in
+                          sorted(losses.items(), key=lambda kv: -kv[1]) if d > 0)
+        return [f"the candidate removes {net} lines of comments/docstrings "
+                f"across the design (at most {DOC_LOSS_MAX} may go in total): "
+                f"{worst}. Edit or add documentation; do not delete it"]
     return []

@@ -33,39 +33,51 @@ def reproduced() -> dict:
 #: Keyed by driver because a second driver runs a different PROGRAM on the same
 #: hardware, so its numbers are not this one's measured differently.
 PUBLISHED = {"cosim": reproduced()}
-#: Controls measured by earlier no-diff runs: (driver, microarch_isa.py blob,
-#: isa_dsl.py blob) -> cycles. Cross-check only; a design whose cycles
-#: deliberately move gets its entry in the same commit.
+#: Controls measured by earlier no-diff runs: `key(driver, blobs)` -> cycles.
+#: Cross-check only; a design whose cycles deliberately move gets its entry in
+#: the same commit. The pre-decomposition entries are two-file designs, which
+#: is what the design WAS at those commits (`design.EDITABLE` is fourteen
+#: paths since the unit library landed), so they key on the two blobs they had.
+def _two(driver, micro, dsl):
+    return (driver, (("isa_dsl.py", dsl), ("microarch_isa.py", micro)))
+
+
 RECORDED = {
     # main @ e2451b81 (the branch point before the rebase)
-    ("cosim", "ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
-     "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
+    _two("cosim", "ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
+         "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
         dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
     # main @ e620576d (check_program in assemble(), docstring fixes)
-    ("cosim", "cb26d5683338184f02bfcb6be13bc1ace4e5e3e9",
-     "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
+    _two("cosim", "cb26d5683338184f02bfcb6be13bc1ace4e5e3e9",
+         "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
         dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
     # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
     # II=1 via s.dependence). The published numbers until the memory sizing
     # (05169938) took one cycle off every shape.
-    ("cosim", "98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-     "8f2e9aa9f518ef320cab163adc95e05737c777be"):
+    _two("cosim", "98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+         "8f2e9aa9f518ef320cab163adc95e05737c777be"):
         dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686))),
     # codesign-loop @ 9f375cc6, whose mapper picks the nest: measured through
     # `codesign_cosim` (cosim 272 s, every testbench bit-exact, csynth 2.431
-    # ns), blobs read from git at that commit. Four shapes are the published
+    # ns), blobs read from git at that commit. Four shapes were the published
     # numbers because there the mapper's pick IS the canonical nest, word for
     # word; 4x4x4 is 169 because its pick emits 24 instruction words against
     # the hand-written 28, with the same four dynamic issues.
-    ("codesign_cosim", "98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-     "a29a8fbd253d7b3e847be09257739c370d7c0c5d"):
+    _two("codesign_cosim", "98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+         "a29a8fbd253d7b3e847be09257739c370d7c0c5d"):
         dict(zip(ALL_SHAPES, (169, 262, 418, 484, 686))),
 }
 
 
 def blobs(ref: str) -> dict:
-    """The two editable files' git blob ids at `ref` -- the design's identity."""
-    return {name: git_blob(ref, name) for name in EDITABLE}
+    """The editable files' git blob ids at `ref` -- the design's identity."""
+    return {rel: git_blob(ref, rel) for rel in EDITABLE}
+
+
+def key(driver: str, design: dict) -> tuple:
+    """A `RECORDED` key: the driver and every editable file's blob, as a sorted
+    pair list. The design is a package, so "the two blobs" is no longer it."""
+    return (driver, tuple(sorted(design.items())))
 
 
 def git_blob(ref: str, name: str) -> str | None:
@@ -128,7 +140,7 @@ def crosscheck(cycles: dict, design: dict, driver: str) -> dict:
     Shapes the caller did not measure are not compared -- the search measures
     two of the five -- but a shape with no recorded number is a disagreement,
     not something to pass over."""
-    recorded = RECORDED.get((driver, *(design[name] for name in EDITABLE)))
+    recorded = RECORDED.get(key(driver, design))
     against = (f"the control recorded for this design under {driver!r}"
                if recorded else
                f"the published {driver!r} control (this design's blobs are "

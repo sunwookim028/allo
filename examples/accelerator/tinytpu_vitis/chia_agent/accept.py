@@ -12,7 +12,8 @@ convenience, not evidence. A claim is accepted only by this script:
    against (`--control` reuses an earlier control run's, so one measurement
    serves a whole run),
 4. the candidate diff applied with `git apply` (it may touch only
-   microarch_isa.py and isa_dsl.py -- anything else is refused),
+   the files `chia_agent/design.py` names editable -- anything else is
+   refused),
 5. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
    `cosim.py`, and `cosim.py` again with `TPU_TB=stress` (the RTL correctness
    testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except
@@ -69,6 +70,7 @@ import control  # noqa: E402
 #: script imports it. It used to exist here as a second copy; a
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
+from design import EDITABLE  # noqa: E402
 from evaluate import PARAM_CONFIGS, SCORED, vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
@@ -277,7 +279,7 @@ def main():
             diff = a.diff.read_text()
             touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
                 re.findall(r"^--- a/(\S+)", diff, re.M))
-            if not touched or not touched <= {"microarch_isa.py", "isa_dsl.py"}:
+            if not touched or not touched <= set(EDITABLE):
                 raise SystemExit(f"refusing: diff touches {sorted(touched)}")
             (out / "candidate.diff").write_text(diff)
         result["allo_resolves_to"] = build_bindings(wt, env, out)
@@ -304,12 +306,15 @@ def main():
         exec(compile(subprocess.run(
             ["git", "show", f"{ref}:{PKG}/chia_agent/spec_policy.py"], cwd=REPO,
             capture_output=True, check=True).stdout, "spec_policy.py", "exec"), policy)
-        problems = [p for f in ("microarch_isa.py", "isa_dsl.py") for p in
-                    policy["policy_violations"](f, (wt / PKG / f).read_text())
-                    + policy["doc_violations"](f, subprocess.run(
-                        ["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
-                        capture_output=True, text=True, check=True).stdout,
-                        (wt / PKG / f).read_text())]
+        base = {f: subprocess.run(["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
+                                  capture_output=True, text=True,
+                                  check=True).stdout for f in EDITABLE}
+        now = {f: (wt / PKG / f).read_text() for f in EDITABLE}
+        problems = [p for f in EDITABLE for p in
+                    policy["policy_violations"](f, now[f])
+                    + policy["doc_violations"](f, base[f], now[f])]
+        problems += policy["doc_violations_total"](
+            {f: policy["doc_loss"](base[f], now[f]) for f in EDITABLE})
         result["policy"] = problems
         if problems:
             raise SystemExit(f"refusing: spec policy: {problems}")

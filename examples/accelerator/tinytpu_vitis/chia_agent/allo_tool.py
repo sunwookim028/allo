@@ -23,6 +23,7 @@ from pathlib import Path
 import ray
 from chia.base.tools.ChiaTool import ChiaTool
 
+from design import EDITABLE, UNITS
 from spec_policy import doc_violations, policy_violations
 
 #: CHIA binds each tool server to `ray.util.get_node_ip_address()`, which on a
@@ -37,7 +38,6 @@ _TOOL_HOST = os.environ.get("TINYTPU_TOOL_HOST", "127.0.0.1")
 if _TOOL_HOST != "node":
     ray.util.get_node_ip_address = lambda *args, **kwargs: _TOOL_HOST
 
-EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: Read-only context the agent may look at, served from git HEAD: the frozen
 #: code that judges a candidate, then the design's documentation. The docs
 #: pages replaced RESULTS_ISA.md / COMPARISON.md when main moved its notes into
@@ -81,7 +81,7 @@ class AlloSpecTool(ChiaTool):
         #: chose, rather than the program the agent hand-wrote.
         self.codesign = bool(codesign)
         self.spec_dir = Path(spec_dir).resolve()
-        self.sources = {name: self.spec_dir / name for name in EDITABLE}
+        self.sources = {rel: self.spec_dir / rel for rel in EDITABLE}
         self.work_dir = Path(work_dir).resolve()
         # Absolute path to the checkout's own evaluator: the actor runs from a
         # Ray copy of chia_agent/, and the score must not come from that copy.
@@ -194,11 +194,27 @@ class AlloSpecTool(ChiaTool):
                     "The file is unchanged.")
         return None
 
-    def read_spec(self) -> str:
-        """Return both writable files: microarch_isa.py and isa_dsl.py."""
-        return "\n\n".join(
-            f"===== {name} =====\n{path.read_text(encoding='utf-8')}"
-            for name, path in self.sources.items())
+    def read_spec(self, path: str = "") -> str:
+        """Read one writable file, or list them all.
+
+        With no argument: every writable path with its line count -- the eight
+        units under `ip/units/`, the composition `ip/tinytpu.py`, the ISA
+        `ip/isa.py`, the assembler, the programs, `microarch_isa.py` (the
+        parameter set) and `isa_dsl.py` (the program generator). With a path:
+        that file. `ip/compose.py` and `ip/params.py` are frozen machinery and
+        are not writable; read them with `read_reference`.
+        """
+        if not path:
+            rows = [f"  {rel:34s} "
+                    f"{len(p.read_text(encoding='utf-8').splitlines()):4d} lines"
+                    + ("   (a unit)" if rel in UNITS else "")
+                    for rel, p in self.sources.items()]
+            return ("Writable files (read one with read_spec(path=...)):\n"
+                    + "\n".join(rows))
+        target = self.sources.get(path)
+        if target is None:
+            return f"Unknown path; writable files are {list(self.sources)}."
+        return f"===== {path} =====\n{target.read_text(encoding='utf-8')}"
 
     def read_reference(self, name: str, start_line: int = 1,
                        max_lines: int = 400) -> str:
@@ -238,14 +254,15 @@ class AlloSpecTool(ChiaTool):
     def replace_text(self, path: str, old: str, new: str) -> str:
         """Replace one exact occurrence of ``old`` with ``new`` in ``path``.
 
-        The preferred edit. ``path`` is microarch_isa.py or isa_dsl.py; ``old``
+        The preferred edit. ``path`` is one of the writable paths
+        ``read_spec()`` lists (e.g. ``ip/units/pe.py``); ``old``
         must occur exactly once (include enough surrounding lines to make it
         unique, with exact indentation). The result must parse and pass the
         spec policy, or nothing is written.
         """
         target = self.sources.get(path)
         if target is None:
-            return "Rejected: path must be microarch_isa.py or isa_dsl.py."
+            return f"Rejected: path must be one of {list(self.sources)}."
         source = target.read_text(encoding="utf-8")
         n = source.count(old) if old else 0
         if n != 1:
@@ -259,12 +276,12 @@ class AlloSpecTool(ChiaTool):
         return f"Replaced 1 occurrence in {path}."
 
     def apply_spec_patch(self, patch: str) -> str:
-        """Apply a unified diff touching only microarch_isa.py and/or isa_dsl.py.
+        """Apply a unified diff touching only the writable files.
 
-        Use git-style headers ``--- a/microarch_isa.py`` / ``+++ b/microarch_isa.py``
-        (bare file names, no directories). Any other path is rejected: the
-        evaluator, testbench, shapes, golden reference and Vitis settings are
-        frozen.
+        Use git-style headers ``--- a/<path>`` / ``+++ b/<path>`` with the
+        paths ``read_spec()`` lists (e.g. ``ip/units/pe.py``). Any other path
+        is rejected: the evaluator, testbench, shapes, golden reference, Vitis
+        settings and the composition machinery are frozen.
         """
         headers = [l for l in patch.splitlines() if l.startswith(("--- ", "+++ "))]
         if not headers or len(headers) % 2:
@@ -276,14 +293,15 @@ class AlloSpecTool(ChiaTool):
             old_path = old.removeprefix("--- a/").split("\t")[0].strip()
             new_path = new.removeprefix("+++ b/").split("\t")[0].strip()
             if old_path != new_path or old_path not in self.sources:
-                return ("Rejected: patches may touch only microarch_isa.py and "
-                        "isa_dsl.py (bare names). Everything else is frozen.")
+                return (f"Rejected: patches may touch only "
+                        f"{list(self.sources)}. Everything else is frozen.")
             paths.append(old_path)
         if len(paths) != len(set(paths)):
             return "Rejected: each writable file may appear only once per patch."
         with tempfile.TemporaryDirectory(prefix="tinytpu-isa-patch-") as tmp:
             sandbox = Path(tmp)
             for name, source in self.sources.items():
+                (sandbox / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, sandbox / name)
             applied = subprocess.run(
                 ["patch", "--batch", "--forward", "--no-backup-if-mismatch", "-p1"],
@@ -302,12 +320,12 @@ class AlloSpecTool(ChiaTool):
     def insert_after(self, path: str, anchor: str, content: str) -> str:
         """Insert text after the line containing one unique anchor.
 
-        ``path`` must be microarch_isa.py or isa_dsl.py. Prefer a unified diff
-        when a change must update both files together.
+        ``path`` is one of the writable paths ``read_spec()`` lists. Prefer a
+        unified diff when a change must update several files together.
         """
         target = self.sources.get(path)
         if target is None:
-            return "Rejected: path must be microarch_isa.py or isa_dsl.py."
+            return f"Rejected: path must be one of {list(self.sources)}."
         source = target.read_text(encoding="utf-8")
         if source.count(anchor) != 1:
             return f"Rejected: anchor must occur exactly once in {path}."
