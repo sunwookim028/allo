@@ -225,6 +225,66 @@ per-run one. The split between the two tracks is recorded in
 pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
 
+
+## PRE-REGISTRATION -- Pilots A and B, written 2026-09-22 17:19 UTC, BEFORE either ran
+
+Both run on this branch at the commit that adds this section, on ONE tree for
+their duration, with the ref recorded in each run's `summary.json`. Not rebased
+onto `origin/main`: main now carries `dev/SESSION_REPORT.md`, whose lines
+86-94 list five architectural targets including Pilot B's -- rebasing would
+hand Pilot A its answer key. Verified absent from this tree.
+
+Common: `google-vertex/gemini-3.1-pro-preview`, 1 worker each, at most 3
+iterations, 1 debug attempt, **$30 cap each** (per-run cap sums only the run's
+own sessions). Pilots run concurrently in slots 0 and 1. The limitations
+register and the design history are removed from the agent's reference map.
+Exactly what each prompt seeded is `prompt.SEEDED`, reproduced in each run's
+`summary.json`.
+
+Grading, per pilot: the four-way scale (same-abstraction / equal power at a
+different level / instance solved without an abstraction / no solution, with
+the rung where it stopped); **is the abstraction architectural** (does it
+describe the machine, or the tooling -- a gate-passing tooling abstraction is
+graded `tooling`); and **did it state its unchecked premise**. Pilot B is also
+graded mechanically by the probe rung against the measured RTL ground truth.
+
+### Pilot A (open arm: measurements only) -- predictions
+
+- **Which property it names.** Memory write ports 50%, address-term/AGU
+  structure 25%, the `nr` row-count field 10%, something else or tooling 15%.
+- **A confound, stated now:** measurement M3 -- seeded because the brief asked
+  for it -- is the rbA table with "two always-blocks that WRITE" and the DC
+  refusal. It is the most concrete, actionable row in the seed and it points
+  straight at Pilot B's property. **If A names memory ports, that is weak
+  evidence of identification**; it will be reported as "chose the most
+  salient seeded measurement", not as discovery. A choice of a property NOT
+  suggested by M3 is the informative outcome.
+- **How far it gets.** Builds and passes the cheap gates: 50%. Reaches
+  `expressive`: under 10%.
+- **Architectural:** yes, 70% (it is instructed). **States the premise:** 70%.
+
+### Pilot B (directed: write-port property + RTL ground truth) -- predictions
+
+- Proposes a write-port declaration of some form: 90%.
+- **Probe outcome.** The IR encodes a cyclic partition as an affine LAYOUT
+  MAP on the memref type, `(d0) -> (d0 mod 2, d0 floordiv 2)`; the stores
+  carry affine indices `i*2` and `i*2+1`. A check that counts stores per buffer
+  without composing them with the layout map refuses BOTH probes. So:
+  refuses both 45%; separates them correctly and the banked design is
+  confirmed bit-exact (`expressive`) 30%; accepts both 10%; build failure or
+  crash at the probe 15%.
+- **Architectural:** yes, 90%. **States the premise:** 60% -- a port count
+  checked against the access pattern is closer to a fact than a promise, and
+  an agent may reasonably say so.
+
+### What would change the conclusion
+
+If B passes and A does not, the directed-target arm works and the open arm
+does not: agents can implement an architectural legality rule when told the
+property, not find one. If A names a property not suggested by M3 and builds
+it, that is the result the owner asked for. If both fail at the same rung, the
+rung is the finding.
+
 ## The held-out rediscovery run, 2026-09-22
 
 Given only `symptom.md` — never told the primitive exists, working from
