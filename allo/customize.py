@@ -48,6 +48,11 @@ from ._mlir.exceptions import (
 )
 
 from . import primitives as prim
+from .dependence import (
+    Claim,
+    accept as accept_dependence_claim,
+    recheck as recheck_dependence_claims,
+)
 from .encoding import EncodingError, violations as encoding_violations
 from .ir.visitor import ASTContext
 from .ir.utils import MockArg, MockBuffer, parse_ast, get_global_vars
@@ -101,6 +106,7 @@ def wrapped_apply(fn):
         if fn.__name__ != "compose":
             sch.primitive_sequences.append((fn.__name__, list(args[1:]), kwargs))
         sch.recheck_encoding(fn.__name__)
+        sch.recheck_dependence(fn.__name__)
         return res
 
     return wrapper
@@ -143,6 +149,7 @@ class Schedule:
         self.func_instances = func_instances
         self.systolic = check_systolic(self)
         self.encoding = None
+        self.dependence_obligations = []
 
     def get_loops(self, func=None):
         if isinstance(func, str):
@@ -843,6 +850,7 @@ class Schedule:
         distance=None,
         dependent=False,
         dep_class=None,
+        because=None,
     ):
         """
         Tells HLS about the loop-carried (or intra-iteration) dependences of
@@ -858,6 +866,20 @@ class Schedule:
         say) pipeline at II=1; if the claim is false the RTL computes a wrong
         answer while every software simulation, which ignores the pragma,
         still passes.
+
+        **The rule.** A claim that the IR *disproves* -- a dependence provable
+        at a distance the claim denies -- raises
+        ``allo.dependence.DependenceError``, here and again after every later
+        primitive. The check is one-sided: it refuses a demonstrably false
+        claim, it never confirms a true one, and it never refuses a claim just
+        because no proof was found. Asserting away what the compiler cannot
+        prove is the whole point of the primitive.
+
+        **The obligation.** Everything the rule accepts is therefore still the
+        author's to discharge, outside the compiler; ``because`` records what
+        the claim rests on, and every claim is listed in
+        ``s.dependence_obligations``. Omitting ``because`` warns
+        (``allo.dependence.UndeclaredPremise``).
 
         Parameters
         ----------
@@ -877,6 +899,9 @@ class Schedule:
             Whether the dependence exists (True) or is claimed absent (False).
         dep_class: str | None
             ``"array"`` or ``"pointer"``; None leaves Vitis's default.
+        because: str | None
+            What makes the claim true, in the author's words. Nothing checks
+            it; it is emitted beside the pragma and recorded as an obligation.
         """
         from ._mlir.ir import ArrayAttr, BoolAttr, DictAttr
 
@@ -920,6 +945,7 @@ class Schedule:
         entry = {
             "type": StringAttr.get(dep_type),
             "dependent": BoolAttr.get(bool(dependent)),
+            "variable": StringAttr.get(target.name),
         }
         if isinstance(mlir_target, MockArg):
             entry["arg_index"] = IntegerAttr.get(IntegerType.get_signless(64), idx)
@@ -931,13 +957,31 @@ class Schedule:
                         f"dependence: {target.name} is declared inside the loop"
                     )
                 parent = parent.parent
-            entry["variable"] = StringAttr.get(target.name)
         if direction is not None:
             entry["direction"] = StringAttr.get(direction)
         if distance is not None:
             entry["distance"] = IntegerAttr.get(IntegerType.get_signless(64), distance)
         if dep_class is not None:
             entry["class"] = StringAttr.get(dep_class)
+        if because is not None:
+            entry["because"] = StringAttr.get(because)
+        self.dependence_obligations.append(
+            accept_dependence_claim(
+                loop,
+                mlir_target.result,
+                Claim(
+                    target=target.name,
+                    dep_type=dep_type,
+                    direction=direction,
+                    distance=distance,
+                    dependent=bool(dependent),
+                    dep_class=dep_class,
+                    because=because,
+                ),
+                f"{func_name}:{axis}",
+                stacklevel=4,
+            )
+        )
         old = (
             list(loop.attributes["dependence"])
             if "dependence" in loop.attributes
@@ -971,6 +1015,12 @@ class Schedule:
             found = encoding_violations(self.module, self.encoding)
         if found:
             raise EncodingError(self.encoding, found, after=after)
+
+    def recheck_dependence(self, after=None):
+        if not self.dependence_obligations:
+            return
+        with self.module.context:
+            recheck_dependence_claims(self.module, after=after)
 
     @wrapped_apply
     def parallel(self, axis):

@@ -45,8 +45,10 @@ three specific things, and they are the whole of this page:
    **If you cannot finish the sentence "X is legal if and only if ...", stop.**
    Write the gap down on this page instead of writing the extension. An
    extension that cannot state its own legality rule will be *used* by an
-   agent that cannot tell when it is lying, and the cost of that is measured
-   below (see :ref:`extending-allo-dependence`).
+   agent that cannot tell when it is lying. If part of the property is not
+   decidable, that part is an **obligation** and must be declared as one, never
+   implied to be checked; :ref:`extending-allo-dependence` is that split,
+   worked end to end.
 
 
 Start from the symptom
@@ -246,46 +248,138 @@ absent.
 The precedents in this tree
 ===========================
 
-Read these before proposing anything. Two are good templates; one is a warning.
+Read these before proposing anything. All three are templates now; the first
+was this page's warning until its rule landed, and its history is kept below
+because the shape of the repair is the point.
 
 .. _extending-allo-dependence:
 
-``s.dependence`` -- right mechanism, absent legality rule
----------------------------------------------------------
+``s.dependence`` -- the rule/obligation split, worked
+------------------------------------------------------
 
-``allo/customize.py:834``, fork commit ``bbea2af0``, register item
-:ref:`21 <limitation-21>`. This is the template for **how** to land a
-primitive on this fork: about 112 lines of Python that attach a ``dependence``
-attribute to a loop, 46 lines of C++ in ``EmitVivadoHLS.cpp`` to emit the
-pragma, three tests in ``tests/test_vhls.py``. It closed a real defect and it
-is the reason TinyTPU-isa's accumulator reaches II=1.
+``allo/customize.py:836`` and ``allo/dependence.py``; fork commit ``bbea2af0``
+for the primitive, and the commit that added ``allo/dependence.py`` for its
+rule. Register item :ref:`21 <limitation-21>`.
 
-It is also the fork's own counter-example to point 1 of the standard, and its
-docstring says so: ``dependent=False`` is *the programmer's claim*, and
+This is the template for **how** to land a primitive on this fork: about 112
+lines of Python that attach a ``dependence`` attribute to a loop, 46 lines of
+C++ in ``EmitVivadoHLS.cpp`` to emit the pragma, three tests in
+``tests/test_vhls.py``. It closed a real defect and it is the reason
+TinyTPU-isa's accumulator reaches II=1.
+
+It was also, for four days, this page's own counter-example to point 1 of the
+standard. ``dependent=False`` is *the programmer's claim*, and its docstring
+said so:
 
     if the claim is false the RTL computes a wrong answer while every software
     simulation, which ignores the pragma, still passes.
 
-The price of that is on the record: the claim is true only for programs that
-never read an accumulator row within ``AR_RAW_DIST`` iterations of writing it,
-and the only thing on this host that can see a violation is a ``TPU_TB=stress``
-cosimulation. Nothing in Allo can.
-
-The lesson is **not** "don't ship primitives with unprovable claims" -- an
+The lesson was never "don't ship primitives with unprovable claims" -- an
 escape hatch for what the scheduler cannot prove is exactly what the pragma is
-for. The lesson is that such a primitive has two halves and must ship both:
+for. It was that such a primitive has two halves and must ship both, and that
+they must not be confused: a decidable **rule** that is enforced, and an
+undecidable **obligation** that is declared as one so that whoever relies on it
+knows they are discharging it. Both now ship.
 
-* the **rule**, which is decidable and must be enforced: if a dependence *is*
-  provable at a distance the claim denies, the claim is a lie and must be
-  refused. The analysis already exists in C++
-  (``analyzeDependency``, ``checkDependence``, ``mlir/include/allo/Support/Utils.h:111``)
-  and is not wired to the primitive.
-* the **obligation**, which is not decidable and must be *declared* as an
-  obligation, so that whoever relies on it knows they are the one discharging
-  it.
+The rule
+~~~~~~~~
 
-``s.dependence`` today ships neither half explicitly. Closing that is repair
-work and it outranks a new feature.
+    A ``dependence`` claim is legal **unless** the IR proves a dependence on
+    the claimed array at a distance the claim denies.
+
+*Denied distances* come from the claim itself: ``inter`` with
+``dependent=False`` denies every distance of one iteration or more; ``inter``
+with ``dependent=True, distance=d`` denies 1 through ``d-1``; ``intra`` with
+``dependent=False`` denies distance 0, i.e. within one iteration.
+
+**Read the direction of that sentence carefully, because backwards it is worse
+than no rule at all.**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 16 50
+
+   * - What the analysis finds
+     - What happens
+     - Why
+   * - A dependence **provable** at a denied distance.
+     - **Refused**, naming both accesses, the direction and the distance, and
+       the claim that would be legal instead.
+     - The claim is false. Vitis will schedule on it and the RTL will compute a
+       wrong answer that no simulation shows.
+   * - A dependence that is **not provable**.
+     - **Accepted.**
+     - This is the entire purpose of the primitive. Refusing here would remove
+       the only thing ``#pragma HLS dependence`` is for, so the rule must never
+       do it.
+
+So the rule can only ever catch a demonstrably false claim. **It never
+confirms a true one**, and a passing check is not evidence that a claim holds.
+``tests/test_dependence.py`` states that in both directions, including a
+kernel (``A[idx[i]] = A[idx[i]] + 1``) whose dependence is real, is asserted to
+be real by running it, and is accepted anyway.
+
+What the analysis is: a same-element test over subscripts written as
+``constant + sum(coefficient * induction variable)``. Two accesses provably
+alias at distance ``k`` when their forms agree in every coefficient and the
+constants differ by exactly ``k`` times the claimed axis's stride and step.
+Everything else -- a subscript that is not affine in the induction variables (a
+loaded index, a carried register), a non-uniform stride (``A[2*i] = A[i]``), a
+``mod``/``floordiv`` subscript, an access under an ``scf.if`` or ``affine.if``,
+an inner loop whose bounds are not constants -- yields *no proof*, which is the
+accepting answer. Each of those is an incompleteness of the rule, and each
+fails in the safe direction by construction.
+
+The check runs at the ``s.dependence`` call, before the attribute is written,
+so a refused claim leaves the schedule untouched (point 2 of the standard). It
+then runs again after **every** later primitive, like ``s.encodable_on``, and
+re-derives each claim from the loop attribute the emitter reads rather than
+from anything the schedule remembers.
+
+.. note::
+
+   **Correction to this page, in the open.** The text here used to say the
+   analysis "already exists in C++ (``analyzeDependency``, ``checkDependence``,
+   ``mlir/include/allo/Support/Utils.h:111``) and is not wired to the
+   primitive". Half of that is wrong in a way that matters.
+   ``allo::checkDependence`` (``mlir/lib/Support/Utils.cpp:520``) is
+   ``return true;`` with its body commented out since ``cec32446``, and it has
+   no callers. Wiring it to the primitive would have reported *every* pair of
+   accesses as dependent and refused every claim, including TinyTPU-isa's true
+   one -- the exact backwards failure the rule above warns about.
+   ``analyzeDependency`` is live but answers a different question (which
+   dependence kinds run between two whole loop *bands*, with no distance), so
+   it cannot decide a claim either. The rule is a new analysis in Python,
+   where the claim is constructed and where the diagnostic can name the
+   subscripts as the author wrote them.
+
+The obligation
+~~~~~~~~~~~~~~
+
+Everything the rule accepts is still the author's to discharge, so
+``s.dependence`` now takes ``because=``: what the claim rests on, in the
+author's words. Nothing checks it. It is
+
+* recorded on the schedule as ``s.dependence_obligations``, a list of
+  ``Obligation(where, pragma, premise)``;
+* emitted into the generated HLS immediately above the pragma, as
+  ``// dependence obligation, checked by no tool: ...``, which is where a
+  reviewer of the RTL will be standing;
+* **required in practice**: omitting it warns
+  (``allo.dependence.UndeclaredPremise``) at the call site, saying that the
+  claim is accepted but not proven and that discharging it is the author's.
+
+TinyTPU-isa is the worked example, and it is the reason the rule must not
+overreach. ``accu``'s ``ar`` row index is a carried register, so no analysis of
+that kernel can prove or disprove the claim; the claim is true only because
+``check_program`` rejects every program that reads an ``ar`` row within
+``AR_RAW_DIST`` accu iterations of writing it. That guarantee lives in
+``assemble()``, outside the compiler entirely, and ``because=`` is where
+``schedule()`` now says so. The evidence that this half is genuinely
+undecidable is already in the tree: ``mutate.py``'s ``ar_claim_false`` mutant
+sets ``AR_RAW_DIST = 1``, and it is the one mutant that passes ``bench_isa``,
+passes ``stress_isa``, passes the legality rule, and is caught by
+``TPU_TB=stress`` cosimulation alone.
 
 ``align_value`` -- an opt-in that admits it is not sufficient
 -------------------------------------------------------------
@@ -414,9 +508,11 @@ checks on a signature or on one wiring edge.
   condition is that every cycle in the wiring graph has positive total stream
   depth. **Deadlock-freedom itself is not decidable from the netlist** -- it
   needs per-unit rates -- so that half is an obligation, declared as one, not a
-  rule. State this limit in the primitive's docstring; an extension that
-  overstates its own guarantee is the failure mode
-  :ref:`s.dependence <extending-allo-dependence>` already paid for.
+  rule. State this limit in the primitive's docstring and give the user a way
+  to record what they are relying on, the way
+  :ref:`s.dependence <extending-allo-dependence>` takes ``because=``: an
+  extension that overstates its own guarantee is the failure mode that
+  primitive paid for before its rule landed.
 
 **Risk.** Moderate, and lower than it looks: the destination IR is already
 emitted and already exercised by the whole ``tests/dataflow`` suite, so this is
@@ -497,9 +593,9 @@ design repeats that by hand.
 implements this instruction" requires a model of instruction semantics to check
 against, and Allo has none -- there is no instruction op, no ISA type, nothing
 in the dialect between ``affine.for`` and the HLS emitter. Without that, a
-``tensorize`` primitive would be a promise with no discharger, i.e. exactly
-:ref:`s.dependence <extending-allo-dependence>` again, on a much larger
-surface: a wrong ``dependence`` claim costs a wrong pipeline, a wrong
+``tensorize`` primitive would be a promise with no discharger, i.e.
+:ref:`s.dependence <extending-allo-dependence>` before its repair, on a much
+larger surface: a wrong ``dependence`` claim costs a wrong pipeline, a wrong
 ``tensorize`` claim costs a wrong answer.
 
 **What would make it ready.** A checkable instruction semantics. Note the
@@ -509,12 +605,23 @@ mistakes, while equivalence of the computation is not. If you take that path,
 ship the structural rule as the rule, and declare the semantic half an
 obligation -- do not let the structural check imply the semantic one.
 
-5. Repair: give ``s.dependence`` its rule
------------------------------------------
+5. Repair: give ``s.dependence`` its rule -- **done**
+------------------------------------------------------
 
-Not a new abstraction, which is why it is below the four, but it is the item
-with the best ratio of risk to harm removed. See
-:ref:`extending-allo-dependence`.
+Not a new abstraction, which is why it ranked below the four, but it had the
+best ratio of risk to harm removed. Landed as ``allo/dependence.py`` with
+``tests/test_dependence.py``: the rule refuses a provably false claim, accepts
+an unprovable one, and ``because=`` carries the half that is not decidable.
+:ref:`extending-allo-dependence` is now the precedent for that split rather
+than the warning against skipping it.
+
+One thing it found and did not fix: ``s.split`` rewrites a band onto two new
+loops and carries the ``dependence`` attribute onto neither, so a claim made
+before a split silently disappears along with its pragma
+(``test_a_loop_transformation_drops_the_claim_rather_than_moving_it``). That is
+a defect in the loop transformations, not in the rule, and it is why no
+primitive in this tree can currently falsify a standing claim. It belongs to
+whoever next touches ``LoopTransformations.cpp``.
 
 
 Before you claim an extension is legal

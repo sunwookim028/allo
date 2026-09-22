@@ -808,9 +808,21 @@ def test_dependence_pragma():
             B[j] = buf[j]
 
     s = allo.customize(kernel)
-    s.dependence("i", "buf", dep_type="inter", dependent=False)
     s.dependence(
-        "kernel:i", "B", direction="RAW", distance=4, dependent=True, dep_class="array"
+        "i",
+        "buf",
+        dep_type="inter",
+        dependent=False,
+        because="the caller never repeats an index in A",
+    )
+    s.dependence(
+        "kernel:i",
+        "B",
+        direction="RAW",
+        distance=4,
+        dependent=True,
+        dep_class="array",
+        because="B is read here and written only in the next loop",
     )
     code = str(s.build(target="vhls"))
     print(code)
@@ -893,7 +905,13 @@ def test_dependence_pragma_dataflow_region():
                 ly[j] = acc[j]
 
     s = df.customize(top)
-    s.dependence("cons_0:x", "acc", dep_type="inter", dependent=False)
+    s.dependence(
+        "cons_0:x",
+        "acc",
+        dep_type="inter",
+        dependent=False,
+        because="the producer never puts the same value twice in a row",
+    )
     code = str(s.build(target="vhls"))
     print(code)
     cons = code[code.index("void cons_0(") :]

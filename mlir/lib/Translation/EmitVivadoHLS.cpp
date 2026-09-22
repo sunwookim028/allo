@@ -2629,6 +2629,11 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
         continue;
       }
       reduceIndent();
+      if (auto because = dep.getAs<StringAttr>("because")) {
+        indent();
+        os << "// dependence obligation, checked by no tool: "
+           << because.getValue() << "\n";
+      }
       indent();
       os << "#pragma HLS dependence variable=" << getName(var);
       if (auto cls = dep.getAs<StringAttr>("class"))

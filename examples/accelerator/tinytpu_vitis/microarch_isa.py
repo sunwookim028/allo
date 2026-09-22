@@ -1572,11 +1572,27 @@ def schedule(s):
         false`. It is what holds the flat loop at II=1 (Vitis alone closes it
         at 3), and it is true because `check_program` enforces THE
         ACCUMULATOR DISTANCE CONTRACT on every program `assemble()` accepts.
+        That is an obligation, not a rule: `ar`'s row index is a carried
+        register, so no analysis of this kernel can prove or disprove the
+        claim, and `because=` is where the contract is recorded. Allo's
+        legality rule accepts it for exactly that reason; the only thing on
+        this host that can catch a violation is `TPU_TB=stress` cosim.
     """
     top = s.top_func_name
     s.partition(f"{top}:A", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
-    s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
+    s.dependence(
+        "accu_0:x",
+        "ar",
+        dep_type="inter",
+        dependent=False,
+        because=(
+            f"check_program() rejects any program that reads an ar row within "
+            f"AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing it (THE "
+            f"ACCUMULATOR DISTANCE CONTRACT); assemble() enforces it, the "
+            f"hardware does not, and only TPU_TB=stress cosim can see a breach"
+        ),
+    )
     return s
