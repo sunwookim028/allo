@@ -31,6 +31,41 @@ result is the concrete proof that the array matters — an FPGA-only measurement
 hid a structural commitment that a second substrate refused outright
 (Synopsys DC ELAB-366), and the banked rewrite kept every cycle.
 
+**The strongest single piece of evidence for this section is our own
+optimisation, priced.** Banked burst widening buys **55–61% of the steady-state
+deficit** against Gemmini and costs **+74.4% cell area** (3,254,024 µm² against
+1,865,314, the pair differing in the widening alone, both meeting timing at
++0.21 ns). On cycles alone it was the obvious win; with the second axis it
+becomes a question, and the question turned out to be a different one than the
+aggregate number suggested.
+
+`report_area -hierarchy` puts **99.1% of the +1,388,710 delta in two AXI master
+ports** — `gmem1` and `gmem2` growing **13×** when widened to `gmem0`'s data
+width. The scratchpad, vector registers and accumulator **do not move at all**;
+the DMA buffers are 0.9%.
+
+| instance | shipped | widened | change |
+| --- | --- | --- | --- |
+| `gmem1_m_axi_U` | 56,605 | 744,092 | **13.1×** |
+| `gmem2_m_axi_U` | 56,580 | 745,280 | **13.2×** |
+| `gmem0_m_axi_U` | 703,513 | 703,151 | — |
+| `spm_0_U0` / `vru_0_U0` / `accu_0_U0` | 188,053 / 188,017 / 103,857 | 188,299 / 188,046 / 103,837 | — |
+
+Two consequences, and the second is why this must not be written as a verdict.
+
+- **The cost is not an artefact of rendering memories as flip-flops** — the
+  operand arrays are not what grew. It prices widening two master ports and the
+  adapters' outstanding-transaction buffering scaling with that width, which an
+  SRAM design pays too. On the FPGA that buffering is block RAM, which is
+  exactly why Vitis reported +92% BRAM against only +43% FF.
+- **"The optimisation is not worth it" is not yet supportable.** The live
+  question is *do both operand ports need widening, or would one wide port with
+  a shared buffer buy the same cycles?* — one emit-and-synthesise cycle away.
+  What survives now is narrower and still worth the section: **the aggregate
+  +74.4% is real and measured, and the second axis is what made the question
+  visible at all.** The premise holds; it points at the AXI adapters rather
+  than at the optimisation.
+
 **Gap.** **Power is absent.** DC power exists only as "indicative, default
 toggle rates, no activity data", which is not a number this paper can use. And
 the architecture array is one family wide. Both gaps are in the *judge*, not in
