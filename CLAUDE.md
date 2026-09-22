@@ -87,6 +87,23 @@ contract, and no simulator can see a violation -- only the `TPU_TB=stress`
 cosim, which runs `ar_distance_program` at the edge.
 Details: `docs/source/designs/tinytpu_isa.rst` ("Verifying a change").
 
+## ACT (the mapper/compiler flow on `main`)
+
+`act/` is the target-independent core (pure python, importable without the MLIR
+bindings -- `import allo` is not); the TinyTPU-isa target is
+`examples/accelerator/tinytpu_vitis/act_{machine,target,compile,cosim}.py`.
+
+```bash
+python examples/accelerator/tinytpu_vitis/act_compile.py gemm.relu 16x16x16
+python examples/accelerator/tinytpu_vitis/act_compile.py --gate   # ~1.3 s
+pytest tests/act/                                                 # core needs no bindings
+```
+
+Add a workload in one place (`act/workloads.py`); a spec evaluates itself to
+numpy, so it is its own gold. `makespan` is a MODEL over the units
+`assemble()`'s header promises -- only `cosim.py` / `act_cosim.py` measure.
+Kai Shao's ACT is cited, not copied: `docs/source/extensions/act.rst`.
+
 ## Project state
 
 Live state is judged from git/GitHub and the docs, not a checked-in status

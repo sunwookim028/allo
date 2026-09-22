@@ -66,6 +66,8 @@ echo "== bench_isa.py (published functional setup)"
 out=$("$PY" bench_isa.py | tail -1); echo "$out"; grep -q "ALL EXACT" <<<"$out"
 echo "== stress_isa.py (correctness gate)"
 out=$("$PY" stress_isa.py | tail -1); echo "$out"; grep -q "STRESS OK" <<<"$out"
+echo "== act_compile.py --gate (every mapping the search accepts, verified)"
+out=$("$PY" act_compile.py --gate | tail -1); echo "$out"; grep -q "ACT GATE OK" <<<"$out"
 
 [ "${1:-}" = "--no-cosim" ] && { echo "REPRODUCED (functional only)"; exit 0; }
 
