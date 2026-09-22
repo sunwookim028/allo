@@ -521,7 +521,16 @@ Verification per configuration
 Every configuration below is exact on all four gates: ``bench_isa.py``
 (``ALL EXACT``), ``stress_isa.py`` (``STRESS OK``, which includes the program
 validator's controls --- crafted illegal programs rejected, every generated
-one accepted), and RTL cosim bit-exact at every shape reported.
+one accepted), and RTL cosim bit-exact at every shape reported. Beyond those,
+re-run after this work landed:
+
+* ``chia_agent/param_check.py`` at all three ``PARAM_CONFIGS``:
+  **PARAM OK 69/69** at MAXDIM=8, **186/186** at MAXDIM=12, **408/408** at
+  T=8 MAXDIM=32.
+* ``tests/act/`` (which imports ``bench_isa.SHAPES``): **81 passed, 4
+  skipped**.
+* ``isa_dsl.py`` self-test (generated == hand-written, word for word) and
+  ``kpn_model.py`` (**KPN OK**).
 
 .. list-table::
    :header-rows: 1
@@ -558,11 +567,34 @@ one accepted), and RTL cosim bit-exact at every shape reported.
      - STRESS OK 630/630, 96 shapes
      - bit-exact, 8 shapes (T=8 table)
 
-``stress_isa``'s exhaustive shape set is :math:`(\text{MAXDIM}/T)^3`, which is
-64 shapes at MAXDIM=16 but **4096** at MAXDIM=64. Above ``TPU_STRESS_SHAPES``
-(default 96) it becomes a seeded stratified sample that always keeps the
-scored shapes and every extreme; ``TPU_STRESS_SHAPES=0`` restores the
-exhaustive set.
+.. warning::
+
+   **The sampled shape set is a WEAKENING of the stress gate at large MAXDIM,
+   and that should be stated plainly rather than defended.**
+   ``stress_isa``'s exhaustive set is :math:`(\text{MAXDIM}/T)^3` --- 64
+   shapes at MAXDIM=16 but **4096** at MAXDIM=64 --- so above
+   ``TPU_STRESS_SHAPES`` (default 96) it becomes a stratified sample. The
+   sample is deterministic and seeded, so a failure reproduces, and it always
+   keeps the scored shapes and every extreme (each dimension at its smallest
+   and largest). **It is still a sample**, and a bug that lives only at, say,
+   36x52x20 would now be missed at MAXDIM=64 where it would not have been at
+   MAXDIM=16.
+
+   What makes the trade acceptable is the second half: **at MAXDIM=16 the set
+   remains exhaustive at 64 shapes, so the shipped configuration's gate is
+   unchanged** (``STRESS OK 492/492``). ``TPU_STRESS_SHAPES=0`` restores the
+   exhaustive set at any MAXDIM for anyone willing to pay for it.
+
+**The memories carry a floor, not just the GEMM's footprint.** Sizing them
+purely to :math:`\text{MAXDIM}^2/T` was wrong and the CHIA parametricity gate
+caught it: ``PARAM_CONFIGS`` runs the design at MAXDIM=8 and 12, where that
+expression gives 16 and 36 rows, and ``stress_isa.random_program`` addresses a
+fixed **64-row window** in each memory regardless of MAXDIM. Every GEMM shape
+stayed bit-exact while ``param_check`` went to "only 0 of 24 random programs
+could be generated" --- a failure that reads as a harness complaint rather
+than a design change, which is what makes it worth recording. The memories are
+now ``max(TEST_WINDOW, OPERAND_ROWS)``, and the resource table above is
+unaffected because the operand term dominates from MAXDIM=16 up.
 
 Two harness limitations were found and fixed rather than worked around, both
 of them hard-coded constants masquerading as design limits:
@@ -577,6 +609,13 @@ of them hard-coded constants masquerading as design limits:
   "T=4 only" was.**
 * ``bench_isa``'s shape list was unfiltered, so at T=8 it asked for 4x4x4.
   Both sets now pass through ``runnable()``.
+* The set a run sweeps is ``bench_isa.SWEEP``, **not** ``bench_isa.SHAPES``.
+  ``SHAPES`` is re-exported from ``shapes.py`` (the one definition) and is
+  read *positionally* by ``act_compile``, ``kpn_model``, ``isa_dsl``,
+  ``tests/act/test_tinytpu.py`` and --- through ``accept.BASELINES`` against
+  ``shapes.NAMES`` --- the CHIA harness. An earlier revision of this work put
+  the ``TPU_SET``/``TPU_SHAPES`` knobs on ``SHAPES`` itself, which would have
+  silently changed what all of those measured.
 
 
 .. _benchmarks-matched:
