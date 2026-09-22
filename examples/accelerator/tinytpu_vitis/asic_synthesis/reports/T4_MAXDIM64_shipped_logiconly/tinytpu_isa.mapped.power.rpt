@@ -1,0 +1,49 @@
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+Warning: Design has unannotated primary inputs. (PWR-414)
+Warning: Design has unannotated sequential cell outputs. (PWR-415)
+Warning: Design has unannotated black box outputs. (PWR-428)
+ 
+****************************************
+Report : power
+        -hier
+        -analysis_effort low
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 18:21:01 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/builds/t4m64-logic/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: Inactive.
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+--------------------------------------------------------------------------------
+                                       Switch   Int      Leak     Total
+Hierarchy                              Power    Power    Power    Power    %
+--------------------------------------------------------------------------------
+tinytpu_isa                            7.30e+03 3.29e+04 2.42e+07 6.44e+04 100.0
+  accu_0_U0_grp_accu_0_Pipeline_VITIS_LOOP_3795_1_fu_28_ar_U (tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_3795_1_ar_RAM_AUTO_1R1W_DataWidth128_AddressWidth8_AddressRange136)   19.300    0.000    0.000   19.300   0.0
+  vru_0_U0_grp_vru_0_Pipeline_VITIS_LOOP_1058_1_fu_30_vr_U (tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1_spad_RAM_AUTO_1R1W_DataWidth32_AddressWidth10_AddressRange1024)    1.097    0.000    0.000    1.097   0.0
+  spm_0_U0 (tinytpu_isa_spm_0)           34.438  208.227 3.06e+04  273.273   0.4
+    grp_spm_0_Pipeline_VITIS_LOOP_914_1_fu_39_spad_U (tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1_spad_RAM_AUTO_1R1W_DataWidth32_AddressWidth10_AddressRange1024)    2.280    0.000    0.000    2.280   0.0
+  dma_ld_0_1_U0 (tinytpu_isa_dma_ld_0_1)  637.893 6.46e+03 6.33e+06 1.34e+04  20.9
+  sequencer_0_1_U0 (tinytpu_isa_sequencer_0_1)  294.672 1.39e+03 5.81e+05 2.27e+03   3.5
+  gmem3_m_axi_U (tinytpu_isa_gmem3_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS4_USER_RFIFONUM_WIDTH9)  192.374 1.08e+03 3.74e+05 1.65e+03   2.6
+  gmem2_m_axi_U (tinytpu_isa_gmem2_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  295.720 1.73e+03 9.88e+05 3.01e+03   4.7
+  gmem1_m_axi_U (tinytpu_isa_gmem1_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  295.481 1.74e+03 9.88e+05 3.02e+03   4.7
+  gmem0_m_axi_U (tinytpu_isa_gmem0_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH512_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW512_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9) 3.67e+03 1.00e+04 1.23e+07 2.60e+04  40.4
+1

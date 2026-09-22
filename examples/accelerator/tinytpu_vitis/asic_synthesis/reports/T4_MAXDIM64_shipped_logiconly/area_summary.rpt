@@ -1,0 +1,40 @@
+Warning: Layer 'metal1' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal2' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal3' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal4' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal5' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal6' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal7' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal8' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal9' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal10' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+ 
+****************************************
+Report : area
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 18:20:10 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/builds/t4m64-logic/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+Number of ports:                        22886
+Number of nets:                        494931
+Number of cells:                       478410
+Number of combinational cells:         226025
+Number of sequential cells:            247869
+Number of macros/black boxes:               0
+Number of buf/inv:                      40845
+Number of references:                     370
+
+Combinational area:             277857.753826
+Buf/Inv area:                    30279.843427
+Noncombinational area:         1119108.243920
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:               1396965.997746
+Total area:                 undefined
+
