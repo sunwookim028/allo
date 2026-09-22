@@ -249,7 +249,13 @@ def run(args, budget: Budget) -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
     tree = log_dir / "tree"
     ensure_tree(tree, ref)
-    runtime_env = {"working_dir": str(HERE)}
+    # working_dir is this directory; PYTHONPATH additionally puts the design
+    # loop's `chia_agent/` on the worker's path, because the modules this loop
+    # REUSES from it -- `llm`, `preflight`, `spend` -- are pickled into the
+    # remote call and must be importable there. Packaging the repo root instead
+    # would ship 725 MB of node_modules past Ray's 512 MB limit.
+    runtime_env = {"working_dir": str(HERE),
+                   "env_vars": {"PYTHONPATH": str(DESIGN_AGENT)}}
     # CHIA_RAY_ADDRESS pins this loop to ITS OWN head. `address="auto"` reads
     # the host's newest GCS address file, and this host runs several tracks at
     # once: "auto" found two clusters, connected to another track's, and then
