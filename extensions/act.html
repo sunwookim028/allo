@@ -776,12 +776,21 @@ count. For <code class="docutils literal notranslate"><span class="pre">gemm.rel
 </tr>
 </tbody>
 </table>
-<p>Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
-at <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress:</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span></code> with the simulator burning a full core,
-one of them for over half an hour, where the shipped mapping’s whole run –
-synthesis, csim and cosim – takes about two minutes. No deadlock is <em>reported</em>,
-so this page does not call it one; what is measured is that the transaction does
-not complete.</p>
+<p>Two row-tiled mappings were tried and behaved the same way: no completion, with
+the simulator holding a full core, one of them for over half an hour, where the
+shipped mapping’s whole run – synthesis, csim and cosim – takes about two
+minutes. No deadlock is <em>reported</em>, so this page does not call it one; what is
+measured is that the run does not finish.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>An earlier version of this page said the failing runs “sit at
+<code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress:</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span></code>” as though that were a signature. <strong>It
+is not.</strong> <code class="docutils literal notranslate"><span class="pre">109000</span></code> is picoseconds and that line is simply Vitis’s first
+periodic report, printed in every log including passing ones, which then
+print <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">1</span></code> and finish. The observation is only that the second line
+never comes; nothing measured locates the stall. See
+<a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a>, where the failure was reduced.</p>
+</div>
 <p>The lesson is the one this design’s own history already taught once, when the
 dataflow simulator passed a bug that only cosim caught: <strong>four checkers agreeing
 is not evidence about the RTL.</strong> Two of those four are derived from
@@ -794,16 +803,28 @@ and <em>confirmed</em> – the RTL ran it. <code class="docutils literal notrans
 <code class="docutils literal notranslate"><span class="pre">check</span></code> column says so. Anything published as a property of the hardware needs
 <code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code>.</p>
 <p>One reassurance, and it is a test rather than a hope: at every shape and every
-registered workload the mapping the flow <strong>picks</strong> is in the prologue-staging,
-RTL-confirmed class – <code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> asserts it. The unconfirmed
-mappings are ranked, reported and never chosen, and <code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> prints a
-<code class="docutils literal notranslate"><span class="pre">staging</span></code> column plus a warning whenever any of them appear.</p>
+registered workload the mapping the flow <strong>picks</strong> is the one whose program
+cosim has actually measured – <code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> asserts it. The
+unconfirmed mappings are ranked, reported and never chosen.</p>
 <p>This is also the sharpest <code class="docutils literal notranslate"><span class="pre">cannot</span> <span class="pre">refuse</span></code> gap found in this work, and it is
-not in the ISA: some property of a program with a data transfer <em>inside</em> the
-emitted nest, rather than all of them hoisted into a prologue, is not being
-checked by anything that can be run in seconds. Finding it is the highest-value
-next step for this flow, because until it is found the mapspace beyond
-prologue-only staging cannot be trusted, and that is most of it.</p>
+not in the ISA. It is filed as <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a>, reduced there to
+a sixteen-instruction program by the workload-specs track, with a bisection.</p>
+<p><strong>The suspicion this page raised is dead, killed twice.</strong> It was that the
+trigger is a data transfer <em>inside</em> the emitted nest rather than hoisted into a
+prologue – the one feature the failing mappings shared and the shipped one
+lacked. From the small end, four programs built to have exactly that feature all
+complete (169 / 189 / 171 / 186 cycles,
+<code class="docutils literal notranslate"><span class="pre">tests/limits/item24_cosim_small_programs_complete.py</span></code>). From the failing end,
+<strong>both</strong> non-completing programs stage every transfer in a prologue, and both
+mappings that do stage inside the nest complete. In-nest staging is neither
+necessary nor sufficient, which is why this flow ships no staging column: a
+predicate that passes both failures and flags two programs that run is worse
+than none. The bisection also rules out <code class="docutils literal notranslate"><span class="pre">vrelu</span></code>, the hardware loop, and
+monotonicity in size.</p>
+<p>What survives is the consequence, not the cause. The mapspace this flow
+enumerates cannot be trusted past the mappings cosim has actually run, which is
+the real cost of the item and the reason it outranks widening any hardware
+parameter.</p>
 <p><strong>Five nests are encodable</strong> (the prototype found three) and all five compute
 the spec against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> – but only three are confirmed on the RTL; see
 <a class="reference internal" href="#act-encodable-tiers"><span class="std std-ref">“Encodable” has three tiers of evidence</span></a>. The shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> mapping is one

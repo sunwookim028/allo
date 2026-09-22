@@ -1877,7 +1877,13 @@ transfer in a prologue, and <strong>both</strong> <code class="docutils literal 
 issue a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> between <code class="docutils literal notranslate"><span class="pre">mvout</span></code>s inside the output nest, complete
 (256 cycles at 8x8x8, 638 at 16x16x16, 0 of 256 wrong). In-nest staging is
 neither necessary nor sufficient, so a staging column does not separate the
-two classes.</p></li>
+two classes. The same hypothesis was killed independently from the small end:
+<code class="docutils literal notranslate"><span class="pre">tests/limits/item24_cosim_small_programs_complete.py</span></code> cosims four
+deliberately constructed programs at <code class="docutils literal notranslate"><span class="pre">rows=4</span></code> – a prologue-only control, a
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> after an <code class="docutils literal notranslate"><span class="pre">mm</span></code>, a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> inside a loop, and a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>
+sharing a loop body with an <code class="docutils literal notranslate"><span class="pre">mm</span></code> and an <code class="docutils literal notranslate"><span class="pre">mvout</span></code> – and <strong>all four
+complete</strong>, at 169 / 189 / 171 / 186 cycles. Two trees, two directions, one
+dead hypothesis.</p></li>
 <li><p><strong>Not monotone in size.</strong> Halving any one of the three tile counts makes it
 complete, and so does <em>doubling</em> the row count. It is neither “too big” nor
 “too small”, which rules out simple capacity and fill explanations.</p></li>
@@ -1894,6 +1900,12 @@ this design the cheap checks do not substitute for cosim, and two of them
 looks. The action is to find the blocked process, which needs
 <code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-trace_level</span> <span class="pre">all</span></code> on the sixteen-instruction case and a look
 at the stream handshakes – affordable now that the repro is that small.</p></li>
+<li><p><strong>Run the RTL half in its own process group.</strong> Killing <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> does not
+kill <code class="docutils literal notranslate"><span class="pre">xsim</span></code>: one orphaned <code class="docutils literal notranslate"><span class="pre">xsimk</span></code> from a non-completing case here was
+still holding a full core <strong>32 minutes</strong> after its parent died, and several
+agents share this host. <code class="docutils literal notranslate"><span class="pre">item24_cosim_small_programs_complete.py</span></code> starts
+each child with <code class="docutils literal notranslate"><span class="pre">start_new_session=True</span></code> and kills the group on timeout;
+anything that cosims a program which may not finish should do the same.</p></li>
 </ul>
 </section>
 </section>
