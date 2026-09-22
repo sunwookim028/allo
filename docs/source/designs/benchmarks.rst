@@ -497,9 +497,9 @@ target (``csynth_sweep.py``; reports kept under
      - 64
      - 512
      - 512
-     - 43 910
-     - 70 279
-     - 58
+     - 43 911
+     - 70 281
+     - 62
      - 58
      - 2.431 ns (411 MHz)
 
@@ -664,10 +664,22 @@ reproduced independently by two separate runs. A delta that does not scale
 with the work is a **fixed-cost** change, so it cannot be the burst loop's
 per-iteration behaviour.
 
-**The cause, measured rather than inferred.** Rebuilding the same
-configuration with the memory sizes the design used to carry ---
-``TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128``, nothing else changed --- returns
-**172** at 4x4x4. So the cycle is the memory sizing, and specifically:
+**The cause, measured rather than inferred, and isolated to one variable.**
+Rebuilding on current ``main`` with the memory sizes the design used to carry
+--- ``TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128`` and *nothing else changed*, so
+the derived-size expression, the two ceiling assertions, the test-window floor
+and the parametric burst loop are all still present --- returns **every one of
+the five published numbers exactly**:
+
+.. code-block:: text
+
+   TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
+     4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
+
+So **the memory sizing accounts for the entire shift and nothing else in that
+work changed cycles at all** --- in particular the parametric burst loop is
+cycle-neutral at ``DMA_WORDS=1``, which is the same thing it was shown to be
+at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:
 
     the scratchpad and vreg files are now **derived** as
     :math:`\text{MAXDIM}^2/T`, which is 64 rows each at MAXDIM=16 against the
