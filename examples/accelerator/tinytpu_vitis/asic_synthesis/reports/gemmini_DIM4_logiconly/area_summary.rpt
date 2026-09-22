@@ -1,0 +1,40 @@
+Warning: Layer 'metal1' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal2' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal3' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal4' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal5' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal6' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal7' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal8' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal9' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+Warning: Layer 'metal10' is missing the optional 'edge capacitance' attribute. (PSYN-101)
+ 
+****************************************
+Report : area
+Design : Gemmini
+Version: W-2024.09
+Date   : Tue Sep 22 15:35:01 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_gemmini_DIM4_nomem/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+Number of ports:                         7185
+Number of nets:                        219560
+Number of cells:                       201019
+Number of combinational cells:         168099
+Number of sequential cells:             32405
+Number of macros/black boxes:               0
+Number of buf/inv:                      30033
+Number of references:                     345
+
+Combinational area:             235740.373414
+Buf/Inv area:                    18028.150042
+Noncombinational area:          146285.630774
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                382026.004187
+Total area:                 undefined
+

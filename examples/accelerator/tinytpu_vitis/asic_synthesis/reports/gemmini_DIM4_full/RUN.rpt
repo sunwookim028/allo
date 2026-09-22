@@ -1,0 +1,20 @@
+Gemmini DIM=4, int8, capacity-matched export, FULL (memories as flip-flops)
+
+Run by an earlier session on this machine (build /scratch/users/sk3463/build_gemmini_DIM4_full),
+committed here by allo-zhang-21 on 2026-09-22 because the result existed only on scratch.
+RTL: gemmini_rtl/DIM4_int8_capmatched on branch gemmini-area, full sv2v_manifest.f.
+Settings verified identical to our runs by the same comparison recorded in the
+logic-only report beside this one, including the stdcells.db checksum.
+
+  Total cell area          990,938.03
+    combinational          349,404.30
+    noncombinational       641,533.72   (64.7%)
+    macro/black box              0.00
+  Cells                    407,538 leaf: 143,364 sequential, 264,174 combinational
+  Timing                   MET. Design WNS 0.00, TNS 0.00, zero violating paths;
+                           hold WNS 0.00, zero violations. Worst critical-path slack 0.00 ns.
+  Wall                     3,695 s (62 min), 19:36:30Z to 20:38:05Z
+
+Beside our T=4 MAXDIM=64 full run (1,865,313.78): ours is 1.88x. This pair is the weaker
+of the two comparisons -- at DIM=4 the capacities do not line up, and both figures are
+dominated by flip-flop memories. The logic-only pair is the one to quote.

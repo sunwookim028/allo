@@ -1,0 +1,114 @@
+ 
+****************************************
+Report : qor
+Design : Gemmini
+Version: W-2024.09
+Date   : Tue Sep 22 15:34:51 2026
+****************************************
+
+
+  Timing Path Group 'REGIN'
+  -----------------------------------
+  Levels of Logic:              36.00
+  Critical Path Length:          1.53
+  Critical Path Slack:           0.10
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+  Timing Path Group 'REGOUT'
+  -----------------------------------
+  Levels of Logic:              51.00
+  Critical Path Length:          1.76
+  Critical Path Slack:           1.57
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+  Timing Path Group 'ideal_clock'
+  -----------------------------------
+  Levels of Logic:             111.00
+  Critical Path Length:          3.30
+  Critical Path Slack:           0.00
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+
+  Cell Count
+  -----------------------------------
+  Hierarchical Cell Count:        489
+  Hierarchical Port Count:       5858
+  Leaf Cell Count:             200504
+  Buf/Inv Cell Count:           30033
+  Buf Cell Count:                4257
+  Inv Cell Count:               25776
+  CT Buf/Inv Cell Count:            0
+  Combinational Cell Count:    168105
+  Sequential Cell Count:        32399
+  Macro Count:                      0
+  -----------------------------------
+
+
+  Area
+  -----------------------------------
+  Combinational Area:   235740.373414
+  Noncombinational Area:
+                        146285.630774
+  Buf/Inv Area:          18028.150042
+  Total Buffer Area:          3825.35
+  Total Inverter Area:       14202.80
+  Macro/Black Box Area:      0.000000
+  Net Area:                  0.000000
+  Net XLength        :     1723201.50
+  Net YLength        :     1701799.38
+  -----------------------------------
+  Cell Area:            382026.004187
+  Design Area:          382026.004187
+  Net Length        :      3425001.00
+
+
+  Design Rules
+  -----------------------------------
+  Total Number of Nets:        215704
+  Nets With Violations:           115
+  Max Trans Violations:             0
+  Max Cap Violations:               7
+  Max Fanout Violations:          108
+  -----------------------------------
+
+
+  Hostname: zhang-21.ece.cornell.edu
+
+  Compile CPU Statistics
+  -----------------------------------------
+  Resource Sharing:                  139.77
+  Logic Optimization:               5129.04
+  Mapping Optimization:             3958.67
+  -----------------------------------------
+  Overall Compile Time:            10435.78
+  Overall Compile Wall Clock Time:  1584.10
+
+  --------------------------------------------------------------------
+
+  Design  WNS: 0.00  TNS: 0.00  Number of Violating Paths: 0
+
+
+  Design (Hold)  WNS: 0.00  TNS: 0.00  Number of Violating Paths: 0
+
+  --------------------------------------------------------------------
+
+
+1

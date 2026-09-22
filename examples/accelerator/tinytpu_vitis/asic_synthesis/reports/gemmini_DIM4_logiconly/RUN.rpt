@@ -1,0 +1,30 @@
+Gemmini DIM=4, int8, capacity-matched export, LOGIC-ONLY
+
+Run by an earlier session on this machine (build /scratch/users/sk3463/build_gemmini_DIM4_nomem),
+committed here by allo-zhang-21 on 2026-09-22 because the result existed only on scratch.
+RTL: gemmini_rtl/DIM4_int8_capmatched on branch gemmini-area, memory arrays stubbed
+(mem_ext, mem_0_ext, split_mem_ext, split_mem_0_ext), the same scratchpad-and-accumulator
+criterion applied to our side.
+
+SETTINGS VERIFIED IDENTICAL to our runs, read out of the build directory, not assumed:
+clock_period 3.33, topographical true, flatten_effort 3, nthreads 16, gate_clock true,
+high_effort_area_opt false, uniquify_with_design_name false, write_svsim_wrapper false,
+adk view-standard, DC W-2024.09. The SDC reads create_clock [get_ports clock] -period 3.33,
+against ap_clk on our side -- the port name differs, the constraint does not. stdcells.db
+matches ours by md5 (f5560259ca91a4b67336b715b729f94d). design_name/top_module are Gemmini.
+
+  Total cell area          382,026.00
+    combinational          235,740.37
+    noncombinational       146,285.63   (38.3%)
+    macro/black box              0.00
+  Cells                    200,504 leaf: 32,399 sequential, 168,105 combinational
+  Timing                   MET. Design WNS 0.00, TNS 0.00, zero violating paths;
+                           hold WNS 0.00, zero violations. Worst critical-path slack 0.00 ns.
+  Wall                     1,771 s (30 min), 19:06:05Z to 19:35:36Z
+
+Beside our T=4 MAXDIM=64 logic-only (1,396,966.00): ours is 3.66x. Note the shape of the
+difference, not just its size -- Gemmini's logic is 38.3% non-combinational against our
+80.1%, so ours is flop-heavy where theirs is gate-heavy, and 60.2% of ours sits in four
+AXI adapters. Whether Gemmini's StreamReader/StreamWriter/XactTracker carry comparable
+adapter mass is the open question and needs its hierarchy report, which this run can
+still supply from its mapped database.

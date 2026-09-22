@@ -1,0 +1,50 @@
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+Warning: Design has unannotated primary inputs. (PWR-414)
+Warning: Design has unannotated sequential cell outputs. (PWR-415)
+Warning: Design has unannotated black box outputs. (PWR-428)
+ 
+****************************************
+Report : power
+        -hier
+        -analysis_effort low
+Design : Gemmini
+Version: W-2024.09
+Date   : Tue Sep 22 15:35:29 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_gemmini_DIM4_nomem/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: Inactive.
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+--------------------------------------------------------------------------------
+                                       Switch   Int      Leak     Total
+Hierarchy                              Power    Power    Power    Power    %
+--------------------------------------------------------------------------------
+Gemmini                                2.47e+03 1.38e+04 7.58e+06 2.38e+04 100.0
+  spad_spad_mems_0_mem_mem_ext (mem_ext)    4.068    0.000    0.000    4.068   0.0
+  spad_spad_mems_1_mem_mem_ext (mem_ext)    4.431    0.000    0.000    4.431   0.0
+  spad_spad_mems_2_mem_mem_ext (mem_ext)    4.443    0.000    0.000    4.443   0.0
+  spad_spad_mems_3_mem_mem_ext (mem_ext)    4.205    0.000    0.000    4.205   0.0
+  spad_acc_mems_0_mem_mem_mem_0_ext (mem_0_ext)   14.248    0.000    0.000   14.248   0.1
+  spad_acc_mems_1_mem_mem_mem_0_ext (mem_0_ext)   14.103    0.000    0.000   14.103   0.1
+  ex_controller (ExecuteController)     102.527 1.39e+03 8.20e+05 2.32e+03   9.7
+  mod_1 (LoopMatmul)                     64.651  273.905 6.57e+05  995.796   4.2
+  mod (LoopConv)                        316.770 1.59e+03 2.03e+06 3.93e+03  16.5
+  reservation_station (ReservationStation)  309.392  789.134 6.97e+05 1.80e+03   7.5
+  counters (CounterController)          232.200 1.16e+03 2.24e+05 1.62e+03   6.8
+1
