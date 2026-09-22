@@ -976,11 +976,47 @@ side applies on T, so **both machines drop the same shapes**.
      - 53.5%
      - 1.18x slower
 
-**We beat Gemmini at three shapes.** They are all in the latency set, and the
-reason is exactly the reason the latency set exists: at T=8, 16x16x16 is four
-tile-matmuls, so the machine with the shorter pipeline wins and we have the
-shorter pipeline. It is a real win and it is a win at the thing the latency
-set measures.
+.. warning::
+
+   **Two of those three "wins" do not clear the measurement noise, and the
+   claim must be read accordingly.** The Gemmini column above is best-of-two;
+   the five-trial spread measured at DIM=4 is **17-44 cycles, roughly
+   constant in absolute terms**, and there is no reason DIM=8 would be
+   quieter. Against a 36-44 cycle spread:
+
+   .. list-table::
+      :header-rows: 1
+
+      * - shape
+        - our margin
+        - vs ~40-cycle spread
+        - supportable?
+      * - 8x8x8
+        - 27 cycles
+        - 0.7x
+        - **no**
+      * - 16x16x8
+        - 72 cycles
+        - 1.8x
+        - marginal
+      * - 16x16x16
+        - 37 cycles
+        - 0.9x
+        - **no**
+
+   So the honest statement is: **at T=8 we are level with Gemmini on the
+   latency shapes** --- the sign is in our favour at all three, which is
+   itself the evidence, but not one of the individual margins is large enough
+   to claim a specific speedup. That is still a qualitative change from T=4,
+   where we are behind at every shape and behind by margins that *do* clear
+   the noise from 12x12x12 up.
+
+   The five-trial DIM=8 measurement that would settle it is the one piece of
+   this page not yet complete.
+
+The reason we are level there rather than behind is the reason the latency set
+exists: at T=8, 16x16x16 is only four tile-matmuls, so the machine with the
+shorter pipeline is not penalised, and ours is shorter.
 
 At steady state the deficit is a **flat 1.17-1.18x** and does not converge,
 where at T=4 it converged to 1.086x. Two matched points, two different
@@ -1000,7 +1036,7 @@ behaviours:
      - 1.13x
      - **1.086x**
    * - T=8 / DIM=8
-     - **1.08-1.17x faster**
+     - **level** (sign ours, margins inside noise)
      - 1.17x
      - 1.18x
      - **1.18x**
