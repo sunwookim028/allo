@@ -224,6 +224,40 @@ because it is where a fair comparison is usually fudged:
   array**, on both sides equally: with the modules out of the file list DC
   infers nothing for them and the ports become dangling nets. It may therefore
   only ever be compared against another logic-only figure.
+- **The instruction-fetch adapter is excluded, and the reason is symmetry.**
+  `gmem0` — our instruction port — is **60.0% of the published baseline**
+  (681,537 of 1,136,598 µm²), against the scratchpad's 1.1%, the DMA's 2.4% and
+  the sequencer's 2.9%. **Gemmini has no instruction port at all**: its
+  instructions arrive over RoCC from Rocket, which the module cut removes
+  because we have no host. Charging us for the mechanism that replaces the
+  block deleted from their side is not a small distortion when it is 60% of
+  our area. The symmetric pair is *exclude Rocket and our instruction path*;
+  including Rocket would measure a CPU.
+
+  | variant | total | minus `gmem0` | share |
+  | --- | --- | --- | --- |
+  | T=4 MAXDIM=16 baseline | 1,136,598 | **455,061** | 60.0% |
+  | T=4 MAXDIM=64 shipped | 1,865,314 | **1,161,801** | 37.7% |
+  | T=4 MAXDIM=64 widened | 3,254,024 | **2,550,873** | 21.6% |
+  | T=8 MAXDIM=64 | 2,481,926 | **1,783,365** | 28.1% |
+
+  `gmem0` is **essentially constant at ~700k across all four designs** — it
+  scales with neither T, nor MAXDIM, nor the widening, because it is a
+  fixed-width adapter. That is independent evidence for the reading: it is
+  infrastructure, not part of the machine being compared.
+
+- **The correction that runs the other way, stated in the same breath.** Our
+  **sequencer stays in** at ~33k, while Gemmini has no decoder of its own
+  because Rocket decodes for it — so we keep paying for something they get free
+  from an excluded block. Naming both directions is what makes the exclusion
+  defensible rather than convenient.
+
+- **Report two figures, not one.** The excluded figure is the **comparable**
+  one; the full figure is the **buildable** one; and the difference is *what it
+  costs not to have a host*. That is a more interesting sentence than either
+  number alone, and it is the honest description of an architectural difference
+  rather than an adjustment.
+
 - **Logic-only is the headline, capacity-matched is the second figure.** Stock
   Gemmini's 320 KiB as flip-flops is 2,621,440 registers against 200,561
   sequential cells in our entire T=4 design; that number measures the memory
