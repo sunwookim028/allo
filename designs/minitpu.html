@@ -267,8 +267,13 @@ two to compare; the bitstream id is part of the figure.</p>
 <td></td>
 </tr>
 <tr class="row-odd"><td><p>GPT-2 body throughput</p></td>
-<td><p>79.16 tok/s at 32 rows, 129.70 at 256 — <strong>medians of five runs</strong>,
-spread 128.83–130.50 at 256</p></td>
+<td><p><strong>SUPERSEDED 2026-09-22, do not quote.</strong> Was 79.16 tok/s at 32 rows and
+129.70 at 256 (medians of five runs, spread 128.83–130.50 at 256). Two
+commits on MiniTPU’s master have taken the 32-row figure to a <strong>claimed
+160.38 tok/s on this same bitstream at 187.498 MHz</strong> — the hardware did
+not change. Treat 160.38 as provisional pending their full-board suite
+and the 256-row median; what is certain is that the old pair is stale.
+See “The concession that became the win” below.</p></td>
 <td><p>23.255 GFLOP/s, 24.2 % of the 96 GFLOP/s array peak</p></td>
 </tr>
 <tr class="row-even"><td><p>Kernel checks</p></td>
@@ -540,6 +545,36 @@ push→result latency.</p>
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.</strong>
 Not reproduced here; what survives of it is §5.</p>
 </section>
+<section id="the-concession-that-became-the-win">
+<h2>The concession that became the win<a class="headerlink" href="#the-concession-that-became-the-win" title="Link to this heading"><span>¶</span></a></h2>
+<p>The most instructive thing to come out of comparing two designs, and it is a
+method finding rather than an architectural one.</p>
+<p>While establishing that a fair comparison must <strong>count every machine’s host or
+none of them</strong> (<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>), MiniTPU’s owner volunteered
+a figure against their own interest: their per-launch host work is about <strong>132
+microseconds with a 44-microsecond register-access floor</strong>, roughly <strong>24,750
+cycles at 187.5 MHz</strong>, none of which their simulator numbers include. It was
+offered so that a comparison counting Gemmini’s ~390 cycles of driver would not
+quietly omit theirs.</p>
+<p>Stating it next to Gemmini’s ~390 is what made it <strong>absurd rather than
+normal</strong> — two orders of magnitude, for the same job. Within hours, two commits
+on their master attacked exactly that cost, reading a configuration file once
+instead of once per launch and spinning past the slowest launch, and took the
+GPT-2 body from 79.16 to a claimed <strong>160.38 tok/s on the same bitstream</strong>.
+Neither cost was visible to their simulator, which is why both survived as long
+as they did.</p>
+<p>So the fairness adjustment was a <strong>diagnostic</strong>. The honest accounting did not
+merely make the comparison defensible; it located the largest measured win of
+that night, in a quantity nobody had been optimising because nothing in the
+measurement setup showed it.</p>
+<p>The transferable form, and the reason this is recorded on our side too: <strong>an
+overhead you exclude from a window is an overhead you cannot see.</strong> Our cosim
+figures contain no host at all — not a fast host, none — so we have no
+equivalent number to be shocked by yet, and a real deployment eventually will.
+The rule that follows is not only “say what your window excludes” but “put the
+excluded quantity beside someone else’s, because the comparison is what makes an
+absurd value look absurd.”</p>
+</section>
 <section id="what-aligning-to-minitpu-s-semantics-costs">
 <h2>What aligning to MiniTPU’s semantics costs<a class="headerlink" href="#what-aligning-to-minitpu-s-semantics-costs" title="Link to this heading"><span>¶</span></a></h2>
 <p>An experiment, now stopped, asked whether TinyTPU-isa could be made
@@ -661,6 +696,7 @@ be re-derived from source on another host.</p>
 <li><a class="reference internal" href="#what-this-says-about-our-own-cost-model">5. What this says about our own cost model</a></li>
 <li><a class="reference internal" href="#defects-reported-outward-to-that-design-s-owner">6. Defects reported outward to that design’s owner</a></li>
 <li><a class="reference internal" href="#where-the-two-source-trees-disagree">7. Where the two source trees disagree</a></li>
+<li><a class="reference internal" href="#the-concession-that-became-the-win">The concession that became the win</a></li>
 <li><a class="reference internal" href="#what-aligning-to-minitpu-s-semantics-costs">What aligning to MiniTPU’s semantics costs</a></li>
 <li><a class="reference internal" href="#provenance">Provenance</a></li>
 </ul>
