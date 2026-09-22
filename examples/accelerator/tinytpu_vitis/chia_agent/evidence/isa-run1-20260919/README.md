@@ -77,8 +77,20 @@ the extra rows land in `rbA`/`rbB` words no instruction of that program
 names. Nothing touches `accu`, `ar`, the AR_RAW_DIST contract, or any
 initialisation. At MAXDIM=8 and 12 the candidate still builds and is exact
 (`param_check.py` at those configs, 69/69 and 186/186), because the literal
-`MAXDIM = 16` is dead; the literal `T = 4` is live but T=4 is also the only T
-main's design supports (it fails `check_program` at `TPU_T=8`).
+`MAXDIM = 16` is dead. The literal `T = 4` is live, and hard-coding it is why
+this candidate is not landable.
+
+> **Correction, 2026-09-22.** This paragraph originally went on to say that
+> "T=4 is also the only T main's design supports (it fails `check_program` at
+> `TPU_T=8`)". **That is false**, and was the same false claim carried by
+> `docs/source/extensions/chia.rst` and `evaluate.py`. Measured on main:
+> `TPU_T=8 TPU_MAXDIM=32 param_check.py` prints `PARAM OK: 408/408 runs
+> exact`, and `TPU_T=8 TPU_MAXDIM=32 bench_isa.py 32 32 32` prints
+> `ALL EXACT`. What fails at T=8 is the HARNESS, and only at MAXDIM=16: three
+> test-program generators address column block 2, which exists only when
+> MAXDIM/T >= 3, so at T=8/MAXDIM=16 nine of 24 random seeds cannot be
+> generated and `param_check` refuses for want of programs (62/63 runs exact,
+> no wrong answer). The assumption is MAXDIM/T >= 3, not T == 4.
 
 **Not landable as written**: it deletes the design docstring and hard-codes T.
 

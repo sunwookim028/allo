@@ -189,7 +189,7 @@ standing (commit ``a0de6d8d``, 2026-09-18):
 
 - "A minimal ACT pilot was run, using a toy ISA." **No artifact exists.** There
   are no ``pilot`` hits in either repo's notes or git log. If it ran, it ran in
-  ``~/allo-act``, deleted 2026-09-07 (the CHIA checkpoint on
+  a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
   ``chia-codesign``). Nothing in ``chia_runs/`` is it:
   ``20260905-060830/variants.jsonl`` is a single baseline line, and
   ``swarm-20260905-063857/`` is a 6-worker **CHIA LLM-agent** search (best

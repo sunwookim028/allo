@@ -140,7 +140,8 @@ The evaluator
   [-4, 4] setup), main's ``stress_isa.py`` (492 runs: full-range, corner and
   boundary int8 at all 64 shapes, ``C`` prefilled and compared in full, vector
   and random programs against ``isa_ref``, many calls on one build), and
-  ``param_check.py`` at ``TPU_MAXDIM=8`` and ``12`` (below). Negative control:
+  ``param_check.py`` at ``TPU_MAXDIM=8``, ``12`` and ``TPU_T=8
+  TPU_MAXDIM=32`` (below). Negative control:
   an int16 partial sum passes ``bench_isa.py`` and every cosim testbench, and
   ``stress_isa`` rejects it (251/492 exact).
 - **score**: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
@@ -185,12 +186,24 @@ Mechanical enforcement, not instructions:
    <nonce>`` printed, and the evaluator requires that line.
 6. **Parametricity.** The scored configuration is T=4, MAXDIM=16, so a design
    specialised to it would pass everything. ``param_check.py`` rebuilds the
-   candidate at ``TPU_MAXDIM=8`` and ``12``, requires the build to report that
-   MAXDIM, and requires every GEMM shape of the configuration (full-range,
-   corner and boundary operands, ``C`` compared in full) and random programs to
-   be exact (``gate:param``). The policy requires ``T`` and ``MAXDIM`` to stay
-   ``int(os.environ.get(...))`` parameters. T is not varied: the shipped design
-   supports T=4 only.
+   candidate at ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and
+   ``TPU_T=8 TPU_MAXDIM=32``, requires the build to report that configuration,
+   and requires every GEMM shape of it (full-range, corner and boundary
+   operands, ``C`` compared in full) and random programs to be exact
+   (``gate:param``). The policy requires ``T`` and ``MAXDIM`` to stay
+   ``int(os.environ.get(...))`` parameters.
+
+   An earlier revision of this page said "T is not varied: the shipped design
+   supports T=4 only". **That was wrong.** Measured on main,
+   ``TPU_T=8 TPU_MAXDIM=32 param_check.py`` gives ``PARAM OK: 408/408 runs
+   exact`` and ``TPU_T=8 TPU_MAXDIM=32 bench_isa.py 32 32 32`` gives
+   ``ALL EXACT``. What is limited is the **harness**, and the limit is
+   ``MAXDIM/T >= 3``, not ``T == 4``: three test-program generators address
+   column block 2, which exists only at that ratio, so at T=8 with MAXDIM=16
+   (ratio 2) nine of 24 random seeds cannot be generated and ``param_check``
+   refuses for want of programs rather than for a wrong answer.
+   ``param_check.py``'s own docstring described the column-block-2 problem
+   correctly all along; the conclusion drawn from it was the error.
 7. **Documentation.** A candidate may not remove, net, more than 15 lines of
    comments and docstrings against the frozen file; rewording is free.
 8. **Memory model and premises.** Every ``TPU_*`` variable but the project path

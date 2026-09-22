@@ -40,8 +40,9 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
    shape as data, all five benchmark shapes are bit-exact in RTL
    co-simulation, and the design takes **172 / 262 / 418 / 484 / 686** cycles
    at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
-   ``-m_axi_latency 0``). Measured over the same window as ours, Gemmini is
-   **1.07-1.24x faster** at all five shapes; see :doc:`gemmini_comparison`.
+   ``-m_axi_latency 0``). Measured over the same window on both sides, the
+   design is **1.07-1.24x slower** than Gemmini at all five shapes; see
+   :doc:`gemmini_comparison`.
 
    Until ``e24e433b`` the shipped design took **252 / 383 / 591 / 667 / 919**
    (1.55-1.8x behind Gemmini). The step between the two is the gap
@@ -1005,7 +1006,9 @@ What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
 pre-landing design re-synthesized with the same toolchain
 (``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``). The
 estimated clock is **2.431 ns** for both, so the design still meets 3.33 ns
-with the same margin.
+with the same margin. The last row is the remainder, and ``entry_proc`` is in
+it (6,363 FF = 6,360 + 3; 7,809 LUT = 7,780 + 29), so a re-derivation from the
+report's per-module rows matches.
 
 .. list-table::
    :header-rows: 1
@@ -1055,7 +1058,7 @@ with the same margin.
      - 0 -> 0
      - 342 -> 342
      - 511 -> 511
-   * - FIFOs and top level
+   * - FIFOs, ``entry_proc`` and top level
      - 36 -> 36
      - 0 -> 0
      - 6,277 -> 6,363

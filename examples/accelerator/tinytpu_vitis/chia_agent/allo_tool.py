@@ -44,6 +44,9 @@ EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: the docs site; the reST is served as source.
 REFERENCE = {
     "cosim.py": "examples/accelerator/tinytpu_vitis/cosim.py",
+    # The five scored shapes, which cosim.py and bench_isa.py now import from
+    # here rather than each spelling out.
+    "shapes.py": "examples/accelerator/tinytpu_vitis/shapes.py",
     "bench_isa.py": "examples/accelerator/tinytpu_vitis/bench_isa.py",
     "stress_isa.py": "examples/accelerator/tinytpu_vitis/stress_isa.py",
     "isa_ref.py": "examples/accelerator/tinytpu_vitis/isa_ref.py",

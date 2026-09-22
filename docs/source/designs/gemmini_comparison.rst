@@ -104,10 +104,11 @@ Gemmini trial; the 4x4x4 range spans both). Every shape uses exactly one
 rather than assuming it.
 
 The decomposition closes, which is the reason to trust this. ``allo_cmp.c``'s
-total minus this window, per shape: **413, 396, 395, 394, 395**. A flat ~395
-cycles of Rocket software across a 16x range of work is exactly what a per-call
-driver overhead looks like, and it confirms the 72% figure (below)
-independently.
+total minus this window, per shape, **all from trial 1**: **413, 395, 393,
+393, 393**. (An earlier revision published 413 / 396 / 395 / 394 / 395, which
+mixed trials; the conclusion is unchanged.) A flat ~393 cycles of Rocket
+software across a 16x range of work is exactly what a per-call driver overhead
+looks like, and it confirms the 72% figure (below) independently.
 
 Three caveats, none of which flatter us:
 
@@ -864,7 +865,10 @@ Files
      - ``DIM`` 16 -> 4, ``BANK_ROWS``, ``ACC_ROWS``, ``ACC_READ_FULL_WIDTH``.
    * - ``roccTests_Makefile.patch``
      - same
-     - builds ``allo_cmp``.
+     - adds ``allo_cmp`` **and** ``allo_bare5`` to ``tests``. It listed only
+       ``allo_cmp``, so the recipe below could not produce
+       ``allo_bare5-baremetal`` at all; the patch is the committed artefact, so
+       it is what was extended rather than the recipe.
 
 Applying and running
 ~~~~~~~~~~~~~~~~~~~~
@@ -878,7 +882,7 @@ Applying and running
    git apply $G/roccTests_gemmini_h.patch
    git apply $G/roccTests_gemmini_params_h.patch
    git apply $G/roccTests_Makefile.patch
-   cp $G/allo_cmp.c bareMetalC/
+   cp $G/allo_cmp.c $G/allo_bare5.c bareMetalC/
 
    # build the RTL and run
    cd ~/chipyard && source env.sh
@@ -906,9 +910,13 @@ Things that cost time to learn
 * **The stock** ``matmul`` / ``matmul_ws`` **tests print no cycle counts** --
   their ``read_cycles()`` calls are commented out upstream. ``allo_cmp.c`` exists
   because of this; do not expect to get numbers from the shipped benchmarks.
-* **One Verilator run takes about 22 minutes** at ~8.6 us/s simulated. Budget
-  accordingly; the five-shape sweep is not interactive. (The ``allo_bare5.c``
-  window run is the ~90 s one quoted above.)
+* **One Verilator run takes about 80 s**, not the 22 minutes an earlier
+  revision of this page claimed -- wrong by ~17x, and contradicted by this
+  repository's own ``logs/gemmini_int8_dim4.log``, which records
+  ``walltime 85.786 s; speed 13.101 us/s``. Re-measured: **79.6 s at
+  14.1 us/s** for ``allo_cmp``. So the five-shape sweep *is* interactive and
+  needs no special budgeting; the ``allo_bare5.c`` window run quoted above is
+  the same order (~90 s), which is why the two are run together.
 * **Stale binaries silently produce a wrong comparison.** The 54 binaries found
   in ``build/`` were int8 artifacts from an earlier elaboration and would have
   been run against a differently-configured RTL without any error. Rebuild the

@@ -81,10 +81,14 @@ os.environ["TINYTPU_TOOL_HOST"] = "127.0.0.1"
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("mcp").setLevel(logging.WARNING)
 
+#: The five benchmark shapes have one definition (`{PKG}/shapes.py`);
+#: `evaluate` loads it by path and this takes the names from there rather than
+#: writing them out a sixth time. The cycles are positional against it.
+from evaluate import ALL_SHAPES  # noqa: E402
+
 #: The unmodified design (README, accept.py control run).
-BASELINE = {"4x4x4": 172, "16x16x16": 686}
-BASELINE_ALL = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418, "16x16x8": 484,
-                "16x16x16": 686}
+BASELINE_ALL = dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686)))
+BASELINE = {s: BASELINE_ALL[s] for s in ("4x4x4", "16x16x16")}
 GATE_TIMEOUT = 240
 
 #: (file, old, new): exact, unique replacements on the HEAD design.

@@ -77,13 +77,21 @@ Mechanical enforcement, not instructions:
    paid run, whose accepted diff hard-coded `T = 4` and deleted the 260-line
    design docstring -- both invisible to a gate that only evaluates T=4 /
    MAXDIM=16 and reads no comments). The frozen `param_check.py` rebuilds the
-   candidate at `TPU_MAXDIM=8` and `12` and requires the build to report that
-   MAXDIM and to be bit-exact at every GEMM shape of the configuration and on
-   random programs (`gate:param`). The policy requires `T` and `MAXDIM` to be
+   candidate at `TPU_MAXDIM=8`, `TPU_MAXDIM=12` and `TPU_T=8 TPU_MAXDIM=32`
+   and requires the build to report that configuration and to be bit-exact at
+   every GEMM shape of it and on random programs (`gate:param`). The policy
+   requires `T` and `MAXDIM` to be
    defined once as `int(os.environ.get("TPU_T"/"TPU_MAXDIM", <int>))` and
    never rebound, and refuses a net loss of more than 15 comment/docstring
-   lines against the frozen ref (rewording and additions are free). T itself
-   is not varied: main's design supports only T=4.
+   lines against the frozen ref (rewording and additions are free).
+
+   An earlier version of this list said "T itself is not varied: main's design
+   supports only T=4". That was false. Measured: `TPU_T=8 TPU_MAXDIM=32
+   param_check.py` gives `PARAM OK: 408/408 runs exact` and
+   `TPU_T=8 TPU_MAXDIM=32 bench_isa.py 32 32 32` gives `ALL EXACT`. The
+   harness, not the design, carries the assumption, and it is `MAXDIM/T >= 3`:
+   three test-program generators address column block 2, which exists only at
+   that ratio, so T=8 with MAXDIM=16 fails for want of generatable programs.
 4. **The memory model is not the candidate's.** Every `TPU_*` variable is
    scrubbed before `cosim.py` runs, so `-m_axi_latency` stays at its
    default 0, which is the setting that matches Gemmini's harness. `-random_stall`

@@ -902,5 +902,67 @@ def test_dependence_pragma_dataflow_region():
     assert code.count("#pragma HLS dependence") == 1
 
 
+def _vitis_top_signature(code, top):
+    """The argument list of the emitted `extern "C"` top function."""
+    i = code.index(f"void {top}(")
+    return code[i : code.index(") {", i)]
+
+
+def test_align_value_attribute():
+    """`configs={"align_value": N}` puts `__attribute__((align_value(N)))` on
+    every `m_axi` pointer of the vitis_hls top, and on nothing else.
+
+    It is a *promise* to Vitis, not a fact it checks: a false one produces wrong
+    RTL while every software simulation still passes, so its emission is worth
+    asserting. See `docs/source/backends/vitis.rst`."""
+
+    def vadd(A: int32[16], B: int32[16], n: int32):
+        for i in range(16):
+            B[i] = A[i] + n
+
+    s = allo.customize(vadd)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mod = s.build(
+            target="vitis_hls",
+            mode="csim",
+            project=tmpdir,
+            configs={"align_value": 64},
+        )
+        code = mod.hls_code
+    sig = _vitis_top_signature(code, "vadd")
+    attr = "__attribute__((align_value(64)))"
+    # One per array argument, which is exactly what becomes an m_axi port.
+    ports = re.findall(r"#pragma HLS interface m_axi port=(\w+)", code)
+    assert len(ports) == 2, code
+    for port in ports:
+        assert re.search(rf"\*{re.escape(attr)} {port}\b", sig), sig
+    assert sig.count(attr) == len(ports), sig
+    # The scalar argument is not a pointer, so it carries no alignment promise.
+    scalar = [
+        ln for ln in sig.splitlines() if ln.strip() and "*" not in ln and "(" not in ln
+    ]
+    assert scalar, sig
+    assert all(attr not in ln for ln in scalar), scalar
+
+
+def test_align_value_absent_by_default():
+    """No `align_value` key, no attribute: it must be opt-in, because the HOST
+    is the one that has to keep the promise."""
+
+    def vadd(A: int32[16], B: int32[16]):
+        for i in range(16):
+            B[i] = A[i] + 1
+
+    for configs in (None, {}, {"align_value": None}):
+        s = allo.customize(vadd)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mod = s.build(
+                target="vitis_hls", mode="csim", project=tmpdir, configs=configs
+            )
+            code = mod.hls_code
+        assert "align_value" not in code, (configs, code)
+        assert "#pragma HLS interface m_axi" in code, code
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

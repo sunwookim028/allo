@@ -37,7 +37,10 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     gemm_program, assert_matches_handwritten,
 )
 
-SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+# Re-exported: `kpn_model`, `isa_dsl` and `impact/bench_variant.py` import
+# `bench_isa.SHAPES`. The definition itself is in `shapes.py`, which imports
+# nothing, so the CHIA harness (a conda env without `allo`) can read it too.
+from examples.accelerator.tinytpu_vitis.shapes import SHAPES  # noqa: E402
 
 
 def buffers(seed=0):

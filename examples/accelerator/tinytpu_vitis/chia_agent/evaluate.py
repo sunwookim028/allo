@@ -11,9 +11,10 @@ the objective:
     frozen (from git @ FROZEN_REF)          editable (from --spec-dir)
     ------------------------------          --------------------------
     tinytpu_vitis/cosim.py                  tinytpu_vitis/microarch_isa.py
-      SHAPES, the testbench generator,      tinytpu_vitis/isa_dsl.py
+      the testbench generator,              tinytpu_vitis/isa_dsl.py
       the numpy golden reference,
       every Vitis TCL setting
+    tinytpu_vitis/shapes.py       (the five benchmark shapes, one definition)
     tinytpu_vitis/bench_isa.py
     tinytpu_vitis/stress_isa.py   (main's correctness gate)
     tinytpu_vitis/isa_ref.py      (the ISA as numpy; stress_isa's reference)
@@ -32,7 +33,8 @@ The two tiers:
    stdin before the candidate is imported -- never the check's own printed
    `ALL EXACT` / `STRESS OK`, which the candidate's code could print itself.
    Then the parametricity gate: `param_check.py` rebuilds the candidate at
-   TPU_MAXDIM=8 and 12 and requires it to honour the parameter and be exact at
+   TPU_MAXDIM=8, TPU_MAXDIM=12 and TPU_T=8/TPU_MAXDIM=32 (so T is varied too)
+   and requires it to honour the parameters and be exact at
    every GEMM shape of that configuration (and on random programs), so a win
    that only exists at the scored T=4 / MAXDIM=16 is rejected (`gate:param`).
    The policy also refuses a literal T/MAXDIM and a net loss of more than 15
@@ -74,6 +76,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -101,7 +104,8 @@ FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
 #: design. Moving it is a deliberate, reviewed commit.
 MAIN_BASE = "476a70d8"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
-    "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py")]
+    "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
+    "shapes.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
 FROZEN = [
@@ -111,15 +115,38 @@ FROZEN = [
     PARAM_CHECK,
 ]
 #: The parametricity gate: configurations the candidate is rebuilt at and must
-#: be exact at (param_check.py), besides the scored T=4 / MAXDIM=16. MAXDIM
-#: only: main's design supports T=4 alone (it fails check_program at TPU_T=8).
-#: 12 is deliberately not a power of two.
-PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"}]
+#: be exact at (param_check.py), besides the scored T=4 / MAXDIM=16. 12 is
+#: deliberately not a power of two, and the third case VARIES T.
+#:
+#: This list used to say "MAXDIM only: main's design supports T=4 alone (it
+#: fails check_program at TPU_T=8)". That was FALSE. Measured on main,
+#: `TPU_T=8 TPU_MAXDIM=32 param_check.py` prints `PARAM OK: 408/408 runs
+#: exact` and `TPU_T=8 TPU_MAXDIM=32 bench_isa.py 32 32 32` prints
+#: `ALL EXACT`. What is limited is the HARNESS, and the limit is MAXDIM/T >= 3,
+#: not T == 4: three test-program generators address column block 2, which
+#: exists only at that ratio, so at T=8 with MAXDIM=16 nine of 24 random seeds
+#: cannot be generated and param_check refuses for want of programs rather
+#: than for a wrong answer. MAXDIM=32 gives ratio 4 and every seed generates.
+PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"},
+                 {"TPU_T": "8", "TPU_MAXDIM": "32"}]
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
 CHECKOUT_WATCH = ["allo", "examples/__init__.py", PKG]
-ALL_SHAPES = ["4x4x4", "8x8x8", "12x12x12", "16x16x8", "16x16x16"]
+#: The five benchmark shapes come from `{PKG}/shapes.py`, the one definition,
+#: loaded BY PATH: this harness runs in a conda env that has no `allo`, so it
+#: cannot import any design module, and `shapes.py` imports nothing so that it
+#: can. `accept.py` and `test_harness.py` take `ALL_SHAPES` from here.
+def _load_shapes():
+    path = REPO / PKG / "shapes.py"
+    spec = importlib.util.spec_from_file_location("tinytpu_shapes", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+SHAPES = _load_shapes().SHAPES
+ALL_SHAPES = [f"{M}x{K}x{N}" for (M, K, N) in SHAPES]
 SEARCH_SHAPES = ["4x4x4", "16x16x16"]
 TARGET_NS = 3.33
 #: The unmodified design gates in ~5 s per script and cosims in ~125 s. A
@@ -279,20 +306,41 @@ def check_invariants(tree, env, work):
     return inv
 
 
-def vouched(check, tree, env, work, cwd, timeout, args=()):
-    """Run a frozen check under gate_runner.py; (vouched, rc, out, seconds).
+def gate_runner_cmd(root: Path, check, args=()):
+    """The command that runs a frozen check under `root`'s gate_runner.py."""
+    return [ALLO_PYTHON, str(root / GATE_RUNNER), check, *args]
 
-    `vouched` is True only if the output carries `CHIA-GATE <check> OK <nonce>`
-    with the nonce minted here for this run. Nothing the candidate prints can
-    produce it: the runner reads the nonce before the candidate is imported,
-    and prints the line only when the check RETURNED success."""
+
+def vouch(check, root: Path, spawn, args=()):
+    """The nonce-vouched gate call. ONE definition; `accept.py` imports this
+    one rather than keeping a second copy, because it is the primitive that
+    decides whether a candidate's gate really passed.
+
+    `spawn(cmd, stdin)` runs `cmd` and returns `(rc, out, seconds)`; how it is
+    sandboxed and logged is the caller's business. Everything
+    security-relevant is here:
+
+    * the nonce is minted per call and reaches the runner on **stdin** only --
+      never the environment, the command line, or a file the candidate reads;
+    * `vouched` is True only if the output carries
+      `CHIA-GATE <check> OK <nonce>` as a WHOLE line, with this run's nonce.
+      Nothing the candidate prints can produce it: the runner reads the nonce
+      before the candidate is imported and prints the line only when the check
+      RETURNED success;
+    * the nonce is scrubbed from the output that is returned, so it never
+      reaches a verdict, a log, or anything the agent can read.
+
+    Returns `(vouched, rc, out, seconds)`."""
     nonce = secrets.token_hex(16)
-    runner = str(tree / GATE_RUNNER)
-    rc, out, sec = run([ALLO_PYTHON, runner, check, *args], cwd, env, timeout,
-                       work, tree, stdin=nonce + "\n")
+    rc, out, sec = spawn(gate_runner_cmd(root, check, args), nonce + "\n")
     ok = rc == 0 and f"CHIA-GATE {check} OK {nonce}" in out.splitlines()
-    # Never echo the nonce into a verdict or a log the agent can read.
     return ok, rc, out.replace(nonce, "<nonce>"), sec
+
+
+def vouched(check, tree, env, work, cwd, timeout, args=()):
+    """Run a frozen check under gate_runner.py; (vouched, rc, out, seconds)."""
+    return vouch(check, tree, lambda cmd, stdin: run(
+        cmd, cwd, env, timeout, work, tree, stdin=stdin), args)
 
 
 def gate(tree, env, work, verify_now):

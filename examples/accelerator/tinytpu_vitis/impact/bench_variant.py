@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import allo.dataflow as df  # noqa: E402
 
 V = importlib.import_module(sys.argv[1])
-SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+from examples.accelerator.tinytpu_vitis.shapes import SHAPES  # noqa: E402
 MAXDIM, T = V.MAXDIM, V.T
 rng = np.random.default_rng(0)
 A = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)

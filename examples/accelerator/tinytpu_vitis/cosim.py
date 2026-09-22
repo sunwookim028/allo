@@ -69,7 +69,7 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E40
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"
-_ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+from examples.accelerator.tinytpu_vitis.shapes import SHAPES as _ALL  # noqa: E402
 # Only shapes the built array can express: every dimension must be a multiple
 # of T, since one vmatpush-equivalent is a whole packed word of T lanes.
 SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]

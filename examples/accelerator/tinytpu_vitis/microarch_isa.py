@@ -226,12 +226,16 @@ instructions, which is past the longest program this MAXDIM admits (45), so the
 burst build wins everywhere it can be run -- but it would not at a larger
 MAXDIM without also fixing what the marginal term buys.
 
-**What the remaining +5 cycles/instruction is.** `dma_st` still writes `C` with
-the strided pattern -- `[HLS 214-115] Multiple burst writes of length 4 and bit
-width 8`, II=4 -- because a contiguous write-back would have to either clobber
-the columns the program never named or be deferred to the end of the run, where
-it would serialize behind the last `mvout` instead of overlapping the compute
-it currently overlaps. That is the next thing to measure, not an oversight.
+**What the remaining +5 cycles/instruction was -- settled.** At that build
+`dma_st` wrote `C` with the strided pattern -- `[HLS 214-115] Multiple burst
+writes of length 4 and bit width 8`, II=4 -- and neither way of bursting it was
+free: a contiguous write-back would have to either clobber the columns the
+program never named or be deferred to the end of the run, where it would
+serialize behind the last `mvout` instead of overlapping the compute it
+overlaps. So it was measured rather than assumed. A unit-level probe matrix
+found the cause was element width, not the stride (a contiguous int8 write is
+also II=4), and the alignment change below takes `dma_st` to II=1. No open work
+here; the probe matrix is on `docs/source/designs/tinytpu_history.rst`.
 
 **What the operand burst is NOT worth.** Merging the A and B bursts into one
 loop bounded by `max(na, nb)` halves the burst time -- they are separate
@@ -299,8 +303,9 @@ import allo.dataflow as df
 # is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
 # a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
 #
-# `nr` is the row count for *every* instruction that has one, and it is only 7
-# bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
+# `nr` is the row count for *every* instruction that has one, and it is only 8
+# bits wide, 7 of them usable (<= MAXROWS = 127) under the spare-bit rule above.
+# That width is load-bearing, not cosmetic: a
 # synthesis tool bounds a runtime-bounded loop by the *range of the index*, so
 # when the row count came out of a 12-bit field Vitis assumed up to 4095 rows
 # per instruction and reported `Trip = 1023 / 2049` with a top-level latency of
@@ -475,7 +480,6 @@ NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 # number: the sequencer's prefetch is `IMEM_SIZE` words long whatever the
 # program, so every unused slot is startup time -- the same arithmetic as under
 # `wrap_io=True`, which copied the declared length for the same reason.
-_KB = MAXDIM // T
 # With control flow the program is O(nesting), not O(tiles): the looped GEMM is
 # at most 14 instructions (with relu) at every shape, where the unrolled one
 # reaches 32 at 16x16x16. So imem is sized to the longest program shipped (the
@@ -491,7 +495,6 @@ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
 # Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
 # largest supported shape rather than for the shape being run.
-KB_MAX = MAXDIM // T           # column blocks in the widest matrix
 assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
 A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)

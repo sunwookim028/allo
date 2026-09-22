@@ -61,7 +61,7 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
 )
 from examples.accelerator.tinytpu_vitis import isa_ref, kpn_model  # noqa: E402
 
-SCORED = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+from examples.accelerator.tinytpu_vitis.shapes import SHAPES as SCORED  # noqa: E402
 ALL_SHAPES = [s for s in itertools.product(range(T, MAXDIM + 1, T), repeat=3)]
 MAX_STATIC = (IMEM_SIZE - NHDR) // IWORDS
 CORNERS = np.array([-128, -127, -1, 0, 1, 126, 127], np.int8)
