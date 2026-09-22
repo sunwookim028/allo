@@ -462,6 +462,72 @@ Apply schedule primitives before building:
     s.partition("top:C", dim=0, factor=2)
     mod = s.build(target="vitis_hls", mode="hw_emu", project="myproject.prj")
 
+Every primitive below is a method on the ``Schedule`` object ``df.customize``
+returns (``allo/customize.py``); the full parameter lists and validation
+rules are on their docstrings, autodoc'd onto :doc:`/api/index`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 68
+
+   * - Primitive
+     - What it does
+   * - ``s.split(axis, factor)``
+     - Tiles the loop at ``axis`` into two nested loops of size ``factor``.
+   * - ``s.reorder(*args)``
+     - Reorders the nested loops named in ``args`` so the first one listed
+       becomes outermost.
+   * - ``s.unroll(axis, factor=0)``
+     - Unrolls the loop at ``axis`` by ``factor`` (``0`` unrolls fully).
+   * - ``s.fuse(*args)``
+     - Combines the loops named in ``args`` into a single loop.
+   * - ``s.partition(target, partition_type=Partition.Complete, dim=0, factor=0)``
+     - Partitions an array and propagates the new layout to every caller and
+       callee.
+   * - ``s.buffer_at(target, axis)``
+     - Adds an on-chip buffer for values of ``target`` written inside the
+       loop at ``axis``, instead of writing them out immediately.
+   * - ``s.reshape(target, shape)``
+     - Reinterprets an array's shape, e.g. to ``(32, 4, 8)``.
+   * - ``s.pipeline(axis, initiation_interval=1, rewind=False)``
+     - Pipelines the loop at ``axis`` to the given initiation interval.
+   * - ``s.dependence(axis, target, dep_type="inter", direction=None, distance=None, dependent=False, dep_class=None)``
+     - **Fork-only** (not upstream): emits Vitis's ``#pragma HLS dependence``
+       for one array in one loop -- the programmer's claim that the array's
+       accesses across (or within) iterations do not alias, which lets a
+       loop the scheduler cannot otherwise prove independent pipeline at
+       II=1. Like ``align_value`` below, it is a promise: if it is false the
+       RTL computes a wrong answer while every software simulation, which
+       ignores the pragma, still passes. See :doc:`/backends/vitis`.
+   * - ``s.parallel(axis)``
+     - Marks the loop at ``axis`` to be computed in parallel with the loops
+       it is nested with.
+   * - ``s.inline(axis=None)``
+     - Inlines the function at ``axis``.
+   * - ``s.dataflow(axis)``
+     - Applies a dataflow attribute to the function at ``axis``, enabling
+       task-level parallelism for functions using streams or ``s.to``.
+   * - ``s.compute_at(from_loop, target_loop)``
+     - Merges two loops over the same range, moving ``from_loop``'s body to
+       ``target_loop``.
+   * - ``s.reuse_at(target, axis)``
+     - Creates a reuse buffer for an array accessed with sliding-window
+       overlap across iterations of the loop at ``axis``.
+   * - ``s.to(target, dst, axis=None, depth=-1)``
+     - Turns an array into a streaming channel between two stages.
+   * - ``s.unfold(band_name, axes)``
+     - Unrolls a named loop band along one or more axes, producing distinct
+       instances rather than a single unrolled body.
+   * - ``s.compose(schs, id=None, instantiate=None)``
+     - Composes a called kernel's own schedule into the caller's.
+
+**Fork-local backend configuration.** ``s.build(..., configs={...})`` also
+takes backend-specific keys that are not ``Schedule`` methods. ``align_value``
+(Vitis only, **fork-only**, not upstream) is the one in active use:
+``configs={"align_value": 64}`` emits ``__attribute__((align_value(64)))`` on
+every ``m_axi`` pointer argument -- also a promise, not a checked fact; see
+:doc:`/backends/vitis` for what it buys and what it does not.
+
 
 Complete Example: Producer-Consumer
 ===================================
