@@ -250,10 +250,20 @@ def run(args, budget: Budget) -> int:
     tree = log_dir / "tree"
     ensure_tree(tree, ref)
     runtime_env = {"working_dir": str(HERE)}
-    try:
-        ray.init(address="auto", runtime_env=runtime_env)
-    except ConnectionError:
-        ray.init(resources={"opencode_creds": 1}, runtime_env=runtime_env)
+    # CHIA_RAY_ADDRESS pins this loop to ITS OWN head. `address="auto"` reads
+    # the host's newest GCS address file, and this host runs several tracks at
+    # once: "auto" found two clusters, connected to another track's, and then
+    # the fallback `resources=` was rejected because that cluster already
+    # existed. Starting a head on a distinct port and naming it here keeps the
+    # tracks apart without any `ray stop` that could kill another agent's run.
+    addr = os.environ.get("CHIA_RAY_ADDRESS")
+    if addr:
+        ray.init(address=addr, runtime_env=runtime_env)
+    else:
+        try:
+            ray.init(address="auto", runtime_env=runtime_env)
+        except (ConnectionError, ValueError):
+            ray.init(resources={"opencode_creds": 1}, runtime_env=runtime_env)
 
     os.environ["CHIA_ABS_SLOT"] = str(args.slot)
     tool = AlloCompilerTool(
