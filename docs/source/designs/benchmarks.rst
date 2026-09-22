@@ -1247,6 +1247,10 @@ as if it were.
        - 9 569 / 21 163
        - 9 569 / 21 163
        - **to the cycle**
+     * - T=8 MAXDIM=64 (16^3 / 64^3)
+       - 493 / 7 083
+       - 493 / 7 083
+       - **to the cycle**
 
   Each pair is two separate processes, two separate ``csynth_design``
   invocations and two separate project directories --- not a re-read of one
