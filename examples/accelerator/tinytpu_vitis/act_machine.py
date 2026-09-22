@@ -11,9 +11,20 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from act.machine import Machine, Opcode, Space  # noqa: E402
 from act.schedule import Region  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    DMA_SRC_B, DMA_TO_VR, NAR, NVR, OP_DMA_LD, OP_MM, OP_MVOUT, OP_VADD,
-    OP_VLD, OP_VRELU, SPAD_ROWS, T,
+    AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD, OP_MM,
+    OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU, SPAD_ROWS, T,
 )
+
+# The fields of `allo.encoding.Encoding` on branch `act-abstractions`
+# (65ae98c6), by name, so the two sides state one budget rather than two.
+ENCODING = {
+    "name": "tinytpu-isa",
+    "address_terms": AGU_TERMS,
+    "loop_depth": LOOP_DEPTH,
+    "has_predicated_fields": False,
+    "requires_static_trip_counts": True,
+    "requires_affine_addressing": True,
+}
 
 SPAD, VR, AR = "spad", "vr", "ar"
 

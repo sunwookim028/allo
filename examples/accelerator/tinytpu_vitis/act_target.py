@@ -30,6 +30,19 @@ EPILOGUE = {
     "relu": lambda k, dst, src, rows: k.vrelu(dst, src, rows),
 }
 
+# Which kind of gap each refusal is. `express` means the instruction word has no
+# field or no room for what the nest asks; the design is fine and the encoding
+# is not. `refuse` means the machine would accept the program and produce a
+# wrong answer or hang, and only a hand-written check says no -- the class of
+# gap that needs a checker rather than a wider word.
+CAUSE_KIND = {
+    "acc-peel": "express", "AGU_TERMS": "express", "LOOP_DEPTH": "express",
+    "capacity": "express", "intrinsic": "express", "coverage": "express",
+    "spatial": "express", "shape": "express", "shape-class": "express",
+    "trip-count": "express", "resources": "express", "nest": "express",
+    "ar-distance": "refuse", "machine": "refuse",
+}
+
 
 @dataclass(frozen=True)
 class Roles:

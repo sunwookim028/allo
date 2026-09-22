@@ -16,8 +16,11 @@ from act.search import Problem, search  # noqa: E402
 
 pytest.importorskip("allo._mlir", reason="the target needs the bindings")
 
+from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
+    ENCODING,
+)
 from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
-    TINYTPU, roles_of,
+    CAUSE_KIND, TINYTPU, roles_of,
 )
 from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES  # noqa: E402
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
@@ -69,6 +72,22 @@ def test_refusals_carry_a_cause_and_not_a_message_to_match_on():
         "acc-peel", "ar-distance", "AGU_TERMS", "LOOP_DEPTH", "intrinsic",
         "capacity", "machine", "resources", "nest", "trip-count", "coverage",
         "spatial", "shape"}
+
+
+def test_every_cause_is_classified_as_express_or_refuse():
+    workload = workloads.get("gemm.relu")
+    result = search(Problem(workload, {"M": 16, "K": 16, "N": 16}), TINYTPU)
+    for cause in result.census.counts:
+        assert CAUSE_KIND[cause] in ("express", "refuse")
+
+
+def test_the_encoding_budget_is_the_one_the_refusals_cite():
+    assert ENCODING["address_terms"] == 3 and ENCODING["loop_depth"] == 4
+    assert ENCODING["has_predicated_fields"] is False
+    workload = workloads.get("gemm.relu")
+    result = search(Problem(workload, {"M": 16, "K": 16, "N": 16}), TINYTPU)
+    assert "acc-peel" in result.census.counts
+    assert "AGU_TERMS" in result.census.counts
 
 
 def test_the_acc_field_is_what_refuses_most_of_the_mapspace():

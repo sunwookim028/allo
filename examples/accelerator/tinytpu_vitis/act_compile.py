@@ -17,7 +17,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from act import target, workloads  # noqa: E402
 from act.search import Problem, search  # noqa: E402
-from examples.accelerator.tinytpu_vitis import act_target  # noqa: E402,F401
+from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
+    CAUSE_KIND,
+)
 from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES  # noqa: E402
 
 GATE = [("gemm", s) for s in SHAPES] + [("gemm.relu", s) for s in SHAPES] + [
@@ -44,8 +46,9 @@ def show(result, machine, top, verify):
     for cause, count in result.census.rows():
         where, detail = result.census.examples[cause]
         every = result.census.any_counts.get(cause, count)
-        print(f"  {count:6d} first {every:6d} total  {cause:12s} "
-              f"{where}: {detail[:64]}")
+        print(f"  {count:6d} first {every:6d} total  "
+              f"{CAUSE_KIND.get(cause, '?'):8s} {cause:12s} "
+              f"{where}: {detail[:52]}")
     if not result.best:
         raise SystemExit("every nest was refused")
     print(f"\n  {'mapping':16s} {'rows':>4s} {'static':>6s} {'words':>5s} "
