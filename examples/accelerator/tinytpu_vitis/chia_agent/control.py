@@ -53,22 +53,29 @@ def git_blob(ref: str, name: str) -> str | None:
 
 
 def record(*, cycles, design, ref, estimated_ns, seconds, vouched, source,
-           pristine_tree) -> dict:
+           pristine_tree, driver) -> dict:
     """One control measurement, with everything needed to re-derive it."""
     return {"cycles": dict(cycles), "blobs": dict(design), "ref": ref,
             "vouched": bool(vouched), "estimated_ns": estimated_ns,
-            "seconds": seconds, "source": source,
+            "seconds": seconds, "source": source, "driver": driver,
             "pristine_tree": bool(pristine_tree),
             "measured_unix": int(time.time()),
-            "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
-                           "all five SHAPES, TPU_* unset but TPU_PRJ"}
+            "measurement": f"{driver}: Vitis HLS 2023.2 + xsim C/RTL cosim "
+                           f"(RTL), all five SHAPES, TPU_* unset but TPU_PRJ"}
 
 
-def unusable(rec, design: dict) -> list[str]:
-    """Why a claim may not rest on this control record; empty means it may."""
+def unusable(rec, design: dict, driver: str) -> list[str]:
+    """Why a claim may not rest on this control record; empty means it may.
+
+    `driver` is the check that measures the candidate: a control measured by
+    a different one is a comparison between two machines described by two
+    programs, which is how a driver change looks like a win."""
     if not isinstance(rec, dict):
         return ["not a control record"]
     problems = []
+    if rec.get("driver") != driver:
+        problems.append(f"measured by {rec.get('driver')!r}, while the "
+                        f"candidate is measured by {driver!r}")
     if not rec.get("vouched"):
         problems.append("its cosim verdict is not nonce-vouched")
     if not rec.get("pristine_tree"):

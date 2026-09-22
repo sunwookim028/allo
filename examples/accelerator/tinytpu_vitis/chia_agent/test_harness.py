@@ -105,6 +105,7 @@ def genuine_control(**changes) -> dict:
     return {**control.record(
         cycles=dict(BASELINE_ALL), design=control.blobs("HEAD"), ref="HEAD",
         estimated_ns=2.431, seconds=284.0, vouched=True, pristine_tree=True,
+        driver="cosim",
         source="measured in this run from git at HEAD, before the candidate "
                "diff was applied"), **changes}
 
@@ -766,10 +767,11 @@ class Suite:
         check("control.design-identity", "the two editable blobs at HEAD", design,
               design == want and all(design.values()))
         check("control.genuine-record-usable", "no problems",
-              control.unusable(genuine_control(), design) or "none",
-              not control.unusable(genuine_control(), design))
+              control.unusable(genuine_control(), design, "cosim") or "none",
+              not control.unusable(genuine_control(), design, "cosim"))
         forgeries = {
             "verdict not vouched": genuine_control(vouched=False),
+            "measured by another driver": genuine_control(driver="codesign_cosim"),
             "measured on a dirty checkout": genuine_control(pristine_tree=False),
             "another design's control": genuine_control(
                 blobs={f: "0" * 40 for f in design}),
@@ -783,13 +785,13 @@ class Suite:
             "not a record at all": None,
         }
         for label, rec in forgeries.items():
-            problems = control.unusable(rec, design)
+            problems = control.unusable(rec, design, "cosim")
             check(f"control.refused: {label}", "refused, with a reason",
                   problems, bool(problems))
         # accept.py's --control path: the same refusal, through a file.
         peer = self.run_dir / "peer-accept.json"
         peer.write_text(json.dumps({"control": genuine_control()}))
-        reused = accept.reuse_control(peer, design)
+        reused = accept.reuse_control(peer, design, "cosim")
         check("control.reuse-genuine", "reused, and says where from",
               reused["source"][:40], reused["cycles"] == BASELINE_ALL
               and reused["source"].startswith("reused from"))
@@ -797,12 +799,23 @@ class Suite:
             {"control": genuine_control(cycles=dict(BASELINE_ALL, **{"4x4x4": 1}),
                                         blobs={f: "0" * 40 for f in design})}))
         try:
-            accept.reuse_control(peer, design)
+            accept.reuse_control(peer, design, "cosim")
             refused = "accepted a foreign control"
         except accept.NoControl as why:
             refused = str(why)[:80]
         check("control.reuse-foreign-refused", "NoControl, nothing compared",
               refused, refused.startswith("refusing the control in"))
+        # A control measured by another driver describes the same hardware with
+        # a different program: reusing it across drivers is a free win.
+        peer.write_text(json.dumps({"control": genuine_control()}))
+        try:
+            accept.reuse_control(peer, design, "codesign_cosim")
+            crossed = "reused across drivers"
+        except accept.NoControl as why:
+            crossed = str(why).split(": ", 1)[-1][:70]
+        check("control.reuse-across-drivers-refused",
+              "NoControl: the candidate's driver is not the control's",
+              crossed, crossed.startswith("measured by 'cosim'"))
         # The cross-check: a prose-only edit moves the blobs, and the check
         # must still compare -- that silent "no-baseline" is what it replaces.
         agree = control.crosscheck(dict(BASELINE_ALL), design)

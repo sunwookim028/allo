@@ -238,6 +238,16 @@ Mechanical enforcement, not instructions:
     0) was already a self-measurement; it now records the design's blobs and
     cross-checks itself too.
 
+    The control and the candidate are measured by the **same driver** --
+    ``accept.py``'s one ``DRIVER``, threaded into both passes, recorded in the
+    record, and refused by ``control.unusable`` if a reused record names
+    another. A second driver (the co-design mode's mapper-driven
+    ``codesign_cosim``) describes the same hardware with a different program,
+    so a control measured by one and a candidate by the other shows the
+    driver's difference as the candidate's win: at 4x4x4 the mapper's program
+    is 24 instruction words against the hand-written 28, same four dynamic
+    issues, bit-exact -- a free -3 cycles for every candidate in that mode.
+
     ``control.RECORDED`` and the published numbers are a **cross-check**, not
     the control. They used to *be* the control, keyed by the blob ids of the
     two editable files -- and a prose-only edit to ``microarch_isa.py``
@@ -251,6 +261,20 @@ Mechanical enforcement, not instructions:
     can be trusted until a person says which. A design whose cycles
     deliberately move gets its entry in ``control.RECORDED`` in the same
     commit.
+
+    The comparison is exact -- no tolerance -- because *this* side is
+    deterministic: the five shapes reproduce to the cycle, run to run and
+    across independent re-measurements, so two measurements of one
+    configuration that differ are a finding, never noise to average. (The
+    Gemmini column of the comparison is the noisy one, up to 20 cycles of
+    trial-to-trial spread; the two sides' tolerances are not the same and this
+    check applies only to ours.) And a published number differing from an
+    in-run one is not automatically an error in either: the co-design mode's
+    control measures 169 at 4x4x4 against the published 172 because its mapper
+    emits a 24-word program where the hand-written one has 28, bit-exact and
+    fully accounted for. That is the case for measuring the control per run
+    rather than publishing one -- a control has to come from the same run as
+    the thing it controls.
 
 Every accepted diff is still read by a person.
 

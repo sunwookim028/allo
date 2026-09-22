@@ -78,6 +78,10 @@ BWRAP = shutil.which("bwrap")
 #: candidate would otherwise hold the acceptance for the full cosim timeout.
 GATE_TIMEOUT = 600
 COSIM_ROW = r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$"
+#: The frozen check that measures cycles, for the control and the candidate
+#: alike. A mode that scores through another driver passes its own name to
+#: both passes, and `control.unusable` refuses a record from the other one.
+DRIVER = "cosim"
 
 
 class NoControl(SystemExit):
@@ -143,13 +147,18 @@ def build_bindings(wt: Path, env, out: Path) -> str:
     return o.strip()
 
 
-def cosim_pass(wt: Path, env, work: Path, out: Path, prefix=""):
+def cosim_pass(wt: Path, env, work: Path, out: Path, prefix="", driver=DRIVER):
     """One nonce-vouched five-shape cosim with its project inside `work`.
+
+    `driver` is the frozen check that does the measuring, and the control and
+    the candidate must go through the SAME one: a second driver describes the
+    same hardware with a different program, so comparing across two of them
+    shows the driver's difference as the candidate's win.
 
     Returns ({vouched, rows, estimated_ns, seconds}, the run's output)."""
     work.mkdir(parents=True, exist_ok=True)
     prj = work / "isa_sweep.prj"
-    ok, rc, text, sec = vouched("cosim", wt, work, dict(env, TPU_PRJ=str(prj)),
+    ok, rc, text, sec = vouched(driver, wt, work, dict(env, TPU_PRJ=str(prj)),
                                 out / f"{prefix}cosim.log", work)
     for f in prj.glob("cosim_*.log"):
         shutil.copy2(f, out / f"{prefix}{f.name}")
@@ -175,7 +184,7 @@ def five_exact(rows: dict) -> bool:
 
 
 def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
-                    keep: bool) -> dict:
+                    keep: bool, driver=DRIVER) -> dict:
     """The committed design, measured in THIS worktree off THIS build, before
     the candidate's diff exists on disk. That ordering is what a candidate
     cannot get past: no line of it has been written, let alone run, when these
@@ -184,7 +193,7 @@ def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
         raise NoControl(f"refusing to measure the control on a checkout that is "
                         f"not pristine:\n{tracked()}")
     work = wt / ".control"
-    passed, _ = cosim_pass(wt, env, work, out, "control-")
+    passed, _ = cosim_pass(wt, env, work, out, "control-", driver)
     if tracked().strip():
         raise NoControl(f"the control measurement changed tracked files:\n{tracked()}")
     if not keep:
@@ -197,17 +206,19 @@ def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
         cycles={s: v["cycles"] for s, v in passed["rows"].items()},
         design=design, ref=ref, estimated_ns=passed["estimated_ns"],
         seconds=passed["seconds"], vouched=True, pristine_tree=True,
+        driver=driver,
         source=f"measured in this run from git at {ref[:8]}, before the "
                f"candidate diff was applied")
 
 
-def reuse_control(path: Path, design: dict) -> dict:
-    """An earlier control run's record, for the same design, or nothing."""
+def reuse_control(path: Path, design: dict, driver=DRIVER) -> dict:
+    """An earlier control run's record, for the same design and the same
+    measurement driver, or nothing."""
     try:
         rec = (json.loads(path.read_text()) or {}).get("control")
     except (OSError, json.JSONDecodeError) as why:
         raise NoControl(f"cannot read the control in {path}: {why}")
-    problems = control.unusable(rec, design)
+    problems = control.unusable(rec, design, driver)
     if problems:
         raise NoControl(f"refusing the control in {path}: {'; '.join(problems)}")
     return dict(rec, source=f"reused from {path}: {rec['source']}")
@@ -259,10 +270,10 @@ def main():
         # on disk. A no-diff run IS the control: its own measurement below.
         ctl = None
         if a.control:
-            ctl = reuse_control(a.control, result["design"])
+            ctl = reuse_control(a.control, result["design"], DRIVER)
         elif a.diff:
             ctl = measure_control(wt, env, out, ref, result["design"], tracked,
-                                  a.keep)
+                                  a.keep, DRIVER)
         if ctl:
             result["control"] = ctl
 
@@ -326,7 +337,7 @@ def main():
                                              if "PARAM " in l][-1:]}
         # cosim.py puts its project next to itself by default; keep it in the
         # writable .cosim directory instead.
-        candidate, o3 = cosim_pass(wt, env, cos, out)
+        candidate, o3 = cosim_pass(wt, env, cos, out, driver=DRIVER)
         untouched("cosim")
         ok3, result["cosim"] = candidate["vouched"], candidate["rows"]
         result["cosim_seconds"] = candidate["seconds"]
@@ -364,10 +375,10 @@ def main():
                 cycles={s: v["cycles"] for s, v in result["cosim"].items()},
                 design=result["design"], ref=ref, seconds=candidate["seconds"],
                 estimated_ns=candidate["estimated_ns"], vouched=ok3,
-                pristine_tree=not result["checkout_status"],
+                pristine_tree=not result["checkout_status"], driver=DRIVER,
                 source="no diff was applied: this run's own measurement is "
                        "the control")
-            ctl["problems"] = control.unusable(ctl, result["design"])
+            ctl["problems"] = control.unusable(ctl, result["design"], DRIVER)
             result["control"] = ctl
         # The cross-check is on the CONTROL, so it is reported even for a
         # candidate that was rejected: the tools may have moved under both.
