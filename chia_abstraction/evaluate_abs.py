@@ -567,8 +567,15 @@ def gate_probe(slot, env, work, out, diff, probe_calls: Path | None):
         return {"skipped": "the patch adds no Schedule method, so there is no "
                            "new capability to call"}
     calls = json.loads(probe_calls.read_text()) if probe_calls else {}
+    # A declaration carried forward from an earlier iteration may name a
+    # method this candidate no longer adds. That is STALE, not an offence:
+    # drop it and say so. Only a call naming a method the patch DOES add, and
+    # malformed, blocks below.
+    stale = {k: v for k, v in calls.items()
+             if not any(f"s.{m}(" in v for m in added)}
+    calls = {k: v for k, v in calls.items() if k not in stale}
     if not calls:
-        return {"added": added, "declared": False,
+        return {"added": added, "declared": False, "stale_dropped": stale,
                 "note": "the patch adds a Schedule method and declares no "
                         "probe call, so the new capability was never "
                         "exercised. Recorded, not blocking; it cannot earn "
@@ -592,7 +599,8 @@ def gate_probe(slot, env, work, out, diff, probe_calls: Path | None):
         raise Reject("gate:probe", "a declared probe call is not a valid "
                      "call of a method this patch added: "
                      + json.dumps(invalid, indent=1)[-3000:])
-    return {"added": added, "declared": True, **rep, "seconds": sec}
+    return {"added": added, "declared": True, "stale_dropped": stale,
+            **rep, "seconds": sec}
 
 
 # -- 6. PPA -------------------------------------------------------------------

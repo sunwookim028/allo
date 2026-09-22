@@ -442,9 +442,14 @@ def run(args, budget: Budget) -> int:
             print(f"Iteration {it}/{args.iterations} [{args.disposition}]")
             print("=" * 72, flush=True)
             tool.apply(best_diff)
-            # Probe declarations belong to ONE candidate; a stale one from a
-            # rewound iteration must not be scored against the next.
-            (log_dir / "work" / "probe_calls.json").unlink(missing_ok=True)
+            # Probe declarations are CARRIED FORWARD, not cleared. They
+            # belong to the abstraction, which persists across iterations
+            # exactly as the tree does; clearing them made an iteration that
+            # kept its primitive but did not re-declare look as though it had
+            # LOST expressiveness, which is how Pilot A's -98 win was refused
+            # by the dominance rule on a harness artifact. A declaration that
+            # no longer names an added method is dropped as stale by the
+            # evaluator rather than blocking.
             started, n_calls = time.time(), len(calls)
             text = brief.task(args.disposition, args.workload, args.angle,
                               baseline["cases"], history)
@@ -548,11 +553,14 @@ gates pass. The harness re-measures your final tree independently either way.
                 verdict = tool._evaluate("loop", False)  # noqa: SLF001 -- returns a dict
             rung = reached(verdict)
             obj = verdict.get("objective") or {}
-            # `expressive` counts, and ranks above `win`: an abstraction that
-            # makes a second architecture expressible is the project's
-            # standard, and a faster current design is not. objective.KEEP.
-            improved = obj.get("verdict") in objective.KEEP
+            # Kept only if it DOMINATES the best so far -- no worse on any
+            # axis, better on at least one. Membership in KEEP alone is not
+            # enough: the objective is measured against the BASELINE, so a
+            # later slower candidate would otherwise replace a faster one, and
+            # once did (Pilot A iter2's -98 cycles, replaced by iter3's +0).
+            improved, why_kept = objective.dominates(obj, best_obj)
             entry.update(verdict=verdict, reached=rung, accepted=improved,
+                         why_kept=why_kept,
                          diff=diff,
                          objective=obj.get("verdict"),
                          seconds=round(time.time() - started, 1),
@@ -560,8 +568,8 @@ gates pass. The harness re-measures your final tree independently either way.
                                            for c in calls[n_calls:]), 4),
                          llm_calls=calls[n_calls:])
             print(f"  reached `{rung}`: {summarize(verdict)}")
-            print(f"  {'ACCEPTED' if improved else 'REJECTED'} after "
-                  f"{entry['seconds']:.0f}s", flush=True)
+            print(f"  {'ACCEPTED' if improved else 'not kept'}: {why_kept} "
+                  f"(after {entry['seconds']:.0f}s)", flush=True)
             record(log, entry)
             iters.append(entry)
             history.append(

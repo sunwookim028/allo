@@ -197,6 +197,49 @@ def classify(cases: dict, newly_expressible=(), limits_fixed=()) -> dict:
     }
 
 
+def dominates(cand: dict, best: dict | None) -> tuple[bool, str]:
+    """Is `cand` strictly better than `best`? Both are `classify()` results.
+
+    The objective is computed against the BASELINE, so every accepted
+    candidate scores the same way regardless of what came before it. The loop
+    used to keep any candidate whose verdict was in KEEP, which meant a later,
+    SLOWER candidate replaced a faster one. Measured 2026-09-22: Pilot A's
+    iteration 2 was a `win` at -98 cycles on `blocks_stream`; iteration 3 was
+    `expressive` at +0 and replaced it, and the run's `best.diff` is
+    iteration 3's. The -98 survives only in `variants.jsonl`.
+
+    Dominance, not a rank: `cand` must be no worse on ANY axis and better on
+    at least one. Axes are what it makes expressible, and cycles per design
+    case. A candidate that trades one for the other is not kept, for the same
+    reason a `trade` is not: it needs a person to price it.
+    """
+    if best is None:
+        return cand.get("verdict") in KEEP, "first accepted candidate"
+    if cand.get("verdict") not in KEEP:
+        return False, f"verdict {cand.get('verdict')} is not kept"
+    c_expr = set(cand.get("newly_expressible", ())) | set(
+        cand.get("limits_fixed", ()))
+    b_expr = set(best.get("newly_expressible", ())) | set(
+        best.get("limits_fixed", ()))
+    if not c_expr >= b_expr:
+        return False, f"loses expressiveness {sorted(b_expr - c_expr)}"
+    c_cyc = {k: v.get("cycles_now") for k, v in (cand.get("cases") or {}).items()}
+    b_cyc = {k: v.get("cycles_now") for k, v in (best.get("cases") or {}).items()}
+    worse = [k for k, v in c_cyc.items()
+             if isinstance(v, int) and isinstance(b_cyc.get(k), int)
+             and v > b_cyc[k]]
+    if worse:
+        return False, f"more cycles than the best so far on {sorted(worse)}"
+    gained = [k for k, v in c_cyc.items()
+              if isinstance(v, int) and isinstance(b_cyc.get(k), int)
+              and v < b_cyc[k]]
+    if c_expr > b_expr:
+        return True, f"newly expressible {sorted(c_expr - b_expr)}"
+    if gained:
+        return True, f"fewer cycles on {sorted(gained)}"
+    return False, "equal to the best so far on every axis"
+
+
 #: What the loop uses to decide keep-or-rewind. `trade` is NOT kept: a trade
 #: needs a person to price it. `expressive` IS kept, and ranks above `win`:
 #: making a second architecture expressible is the project's standard, and a

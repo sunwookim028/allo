@@ -1,0 +1,191 @@
+diff --git a/allo/customize.py b/allo/customize.py
+index ecb88deb..fb48e6c7 100644
+--- a/allo/customize.py
++++ b/allo/customize.py
+@@ -943,6 +943,107 @@ class Schedule:
+         loop.attributes["dependence"] = ArrayAttr.get(old + [DictAttr.get(entry)])
+ 
+     @wrapped_apply
++    def bind_storage(self, axis, target, storage_type, impl="bram"):
++        """
++        Tells HLS about the hardware memory implementation to use for an array,
++        emitted inside the loop:
++
++            #pragma HLS bind_storage variable=<target> type=<storage_type> impl=<impl>
++
++        This is a promise about the machine's memory ports. If you claim a
++        single-ported memory (e.g., ``type="ram_1p"``) but the loop nest has
++        multiple concurrent writers, Vitis HLS may silently generate wrong RTL
++        with multiple drivers. This method makes a basic static check to refuse
++        obvious violations, but it is an unchecked premise in general.
++
++        Parameters
++        ----------
++        axis: str | LoopWrapper
++            The loop, as for ``pipeline`` (``"func:loop"`` or a loop handle).
++        target: str | MockBuffer
++            The array: a local buffer or an argument of the loop's function.
++            A bare name is looked up in the loop's function.
++        storage_type: str
++            The memory type (e.g., ``"ram_1p"``, ``"ram_2p"``, ``"ram_t2p"``,
++            ``"ram_1wnr"``, ``"ram_s2p"``, ``"fifo"``, ``"rom_1p"``, ``"rom_2p"``, ``"rom_np"``).
++        impl: str
++            The implementation to use (e.g., ``"bram"``, ``"uram"``, ``"lutram"``, ``"srl"``, ``"memory"``).
++        """
++        from ._mlir.ir import ArrayAttr, DictAttr
++        from ._mlir.dialects import affine as affine_d
++
++        valid_types = ("ram_1p", "ram_2p", "ram_t2p", "ram_1wnr", "ram_s2p", "fifo", "rom_1p", "rom_2p", "rom_np")
++        valid_impls = ("bram", "uram", "lutram", "srl", "memory")
++        if storage_type not in valid_types:
++            raise AlloValueError(f"bind_storage: unknown storage_type {storage_type!r}")
++        if impl not in valid_impls:
++            raise AlloValueError(f"bind_storage: unknown impl {impl!r}")
++
++        func, axis = self._get_func_and_axis(axis)
++        band_name, axis = find_loop_in_bands(func, axis)
++        loop = self.get_loops(func)[band_name][axis].loop
++        func_name = func.attributes["sym_name"].value
++
++        if isinstance(target, str):
++            if ":" in target:
++                buf_func, buf_name = target.split(":")
++            else:
++                buf_func, buf_name = func_name, target
++            target = MockBuffer(buf_func, buf_name)
++        if target.func != func_name:
++            raise AlloValueError(
++                f"bind_storage: {target.func}:{target.name} is not in the loop's "
++                f"function {func_name}"
++            )
++        _, idx, mlir_target = find_buffer(self.module, target, self.func_args)
++
++        # write ports available per bank
++        write_ports = {"ram_1p": 1, "ram_2p": 2, "ram_t2p": 2, "ram_1wnr": 1, "ram_s2p": 1, "fifo": 1, "rom_1p": 0, "rom_2p": 0, "rom_np": 0}.get(storage_type, 1)
++        buf_key = f"{target.func}:{target.name}"
++        factor = 1
++        if buf_key in getattr(self, "partitioned_arrays", {}):
++            for _, _, f in self.partitioned_arrays[buf_key]:
++                factor *= f
++        available_writes = write_ports * factor
++
++        writes = 0
++        def count_writes(op):
++            nonlocal writes
++            for inner in op.body.operations:
++                if isinstance(inner, affine_d.AffineStoreOp):
++                    if inner.memref == mlir_target.result:
++                        writes += 1
++                elif hasattr(inner, "body"):
++                    count_writes(inner)
++        count_writes(loop)
++
++        if writes > available_writes:
++            raise AlloValueError(f"bind_storage: loop has {writes} writes to {target.name}, "
++                                 f"but {storage_type} with factor {factor} only provides {available_writes} write ports")
++
++        entry = {
++            "type": StringAttr.get(storage_type),
++            "impl": StringAttr.get(impl),
++        }
++        if isinstance(mlir_target, MockArg):
++            entry["arg_index"] = IntegerAttr.get(IntegerType.get_signless(64), idx)
++        else:
++            parent = mlir_target.operation.parent
++            while parent is not None:
++                if parent.operation == loop.operation:
++                    raise AlloValueError(
++                        f"bind_storage: {target.name} is declared inside the loop"
++                    )
++                parent = parent.parent
++            entry["variable"] = StringAttr.get(target.name)
++
++        old = (
++            list(loop.attributes["bind_storage"])
++            if "bind_storage" in loop.attributes
++            else []
++        )
++        loop.attributes["bind_storage"] = ArrayAttr.get(old + [DictAttr.get(entry)])
++    @wrapped_apply
+     def parallel(self, axis):
+         """
+         Instantiates a loop with index `axis` to be computed in parallel with the loops it is nested with.
+diff --git a/mlir/lib/Translation/EmitCatapultHLS.cpp b/mlir/lib/Translation/EmitCatapultHLS.cpp
+index 69d765f0..8ac16aa8 100644
+--- a/mlir/lib/Translation/EmitCatapultHLS.cpp
++++ b/mlir/lib/Translation/EmitCatapultHLS.cpp
+@@ -294,7 +294,10 @@ void CatapultModuleEmitter::emitLoopDirectives(Operation *op) {
+ 
+   if (auto dataflow = getLoopDirective(op, "dataflow")) {
+     reduceIndent();
+-    indent();
++
++  if (getLoopDirective(op, "bind_storage")) {
++    emitError(op, "Catapult emitter does not support `#pragma HLS bind_storage`");
++  }    indent();
+     os << "#pragma hls_design dataflow\n";
+     addIndent();
+   }
+diff --git a/mlir/lib/Translation/EmitTapaHLS.cpp b/mlir/lib/Translation/EmitTapaHLS.cpp
+index 2a35206a..995ce799 100644
+--- a/mlir/lib/Translation/EmitTapaHLS.cpp
++++ b/mlir/lib/Translation/EmitTapaHLS.cpp
+@@ -2075,7 +2075,10 @@ void allo::hls::TapaModuleEmitter::emitLoopDirectives(Operation *op) {
+ 
+   if (auto factor = getLoopDirective(op, "unroll")) {
+     reduceIndent();
+-    indent();
++
++  if (getLoopDirective(op, "bind_storage")) {
++    emitError(op, "TAPA emitter does not support `#pragma HLS bind_storage`");
++  }    indent();
+     auto val = llvm::dyn_cast<IntegerAttr>(factor).getValue();
+     if (val == 0)
+       os << "#pragma HLS unroll" << "\n";
+diff --git a/mlir/lib/Translation/EmitVivadoHLS.cpp b/mlir/lib/Translation/EmitVivadoHLS.cpp
+index 20d4c6aa..b760bcc3 100644
+--- a/mlir/lib/Translation/EmitVivadoHLS.cpp
++++ b/mlir/lib/Translation/EmitVivadoHLS.cpp
+@@ -2600,6 +2600,42 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
+     addIndent();
+   }
+ 
++  if (auto binds = llvm::dyn_cast_or_null<ArrayAttr>(
++          getLoopDirective(op, "bind_storage"))) {
++    auto func = op->getParentOfType<func::FuncOp>();
++    for (auto entry : binds) {
++      auto bind = llvm::dyn_cast<DictionaryAttr>(entry);
++      if (!bind || !func) {
++        emitError(op, "malformed `bind_storage` loop attribute");
++        continue;
++      }
++      Value var;
++      if (auto idx = bind.getAs<IntegerAttr>("arg_index")) {
++        if (idx.getInt() < (int64_t)func.getNumArguments())
++          var = func.getArgument(idx.getInt());
++      } else if (auto name = bind.getAs<StringAttr>("variable")) {
++        func.walk([&](memref::AllocOp alloc) {
++          auto n = alloc->getAttrOfType<StringAttr>("name");
++          if (!var && n && n.getValue() == name.getValue())
++            var = alloc.getResult();
++        });
++      }
++      if (!var || !isDeclared(var)) {
++        emitError(op, "bind_storage: the named array is not declared before "
++                      "this loop");
++        continue;
++      }
++      reduceIndent();
++      indent();
++      os << "#pragma HLS bind_storage variable=" << getName(var);
++      if (auto type = bind.getAs<StringAttr>("type"))
++        os << " type=" << type.getValue().str();
++      if (auto impl = bind.getAs<StringAttr>("impl"))
++        os << " impl=" << impl.getValue().str();
++      os << "\n";
++      addIndent();
++    }
++  }
+   // `s.dependence(...)` (allo/customize.py): one dictionary per claim, each
+   // naming the array either by its `name` attribute (a local buffer) or by
+   // its position in the enclosing function's arguments.
