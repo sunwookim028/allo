@@ -97,12 +97,20 @@ PKG = "examples/accelerator/tinytpu_vitis"
 #: from what is COMMITTED, never from the working tree. Only a person, in a
 #: commit, can change them.
 FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
-#: main's commit this branch is based on (476a70d8: the gap-attribution stack,
-#: 172 / 262 / 418 / 484 / 686, and AR_RAW_DIST in check_program). The design's own evaluator -- cosim.py, bench_isa.py
-#: and the stress gate with its reference model -- must be byte-identical to
-#: it, so this branch cannot drift from how main measures and verifies the
-#: design. Moving it is a deliberate, reviewed commit.
-MAIN_BASE = "476a70d8"
+#: main's commit this branch is based on. The design's own evaluator --
+#: cosim.py, bench_isa.py, shapes.py and the stress gate with its reference
+#: model -- must be byte-identical to it, so this branch cannot drift from how
+#: main measures and verifies the design. Moving it is a deliberate, reviewed
+#: commit, and it has to move in the SAME change as any edit to those files.
+#:
+#: History: 476a70d8 was the gap-attribution stack (172 / 262 / 418 / 484 /
+#: 686, and AR_RAW_DIST in check_program). acb080bd moves it for the five-shape
+#: deduplication only -- bench_isa.py, stress_isa.py and cosim.py now import
+#: the list from shapes.py instead of each spelling it out. The list, its
+#: order and every cycle count are unchanged; `git diff 476a70d8 acb080bd --
+#: examples/accelerator/tinytpu_vitis/{cosim,bench_isa,stress_isa}.py` is the
+#: whole of it.
+MAIN_BASE = "acb080bd"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
     "shapes.py")]
