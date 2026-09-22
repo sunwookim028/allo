@@ -259,6 +259,22 @@ Proximity to the evidence is what makes overreach easy, which is exactly why the
 check has to come from somewhere else — and why it cannot be delegated to a
 more careful reading by the same author.
 
+**The recurring failure has a name: a number travelling further than its
+derivation.** It happened four times in one night, counted: a test count that
+existed only in a commit message; a scheduler guarantee asserted for a property
+the original work never claimed; a driver-overhead figure used as though the
+opponent's whole window were accelerator time; and a second-cause census relayed
+by a coordinator who had not derived it, which then failed to reproduce in
+another agent's tree. Every one of them was a real measurement of *something*.
+
+The countermeasure that worked was not more care. It was that each figure was
+eventually asked to state how it was derived, by someone who needed to act on
+it — and the ones that could not state it were the ones that were wrong. So the
+rule the project now runs on is that **a number travels with its derivation or
+it does not travel**, and a recipient who cannot reproduce it says so rather
+than adopting it. Two agents refused a coordinator's figure on exactly that
+ground tonight, and both were right to.
+
 **Report resources and clock beside cycles, always.** A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist
