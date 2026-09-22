@@ -65,12 +65,12 @@ two to compare; the bitstream id is part of the figure.
      -
    * - GPT-2 body throughput
      - **160.60 tok/s at 32 rows, 158.04 at 256** — medians of five runs,
-       2026-09-22, bitstream ``0xB1FF21F4`` at 187.498 MHz. **Confirmed on a
-       second board**: .189 measured 160.43 and 158.40 on the same commit, so
-       two boards agree within 0.4 %. 28.4 GFLOP/s, **29.6 % of the 96 GFLOP/s
-       array peak** (was 24.2 %). The earlier 79.16 / 129.70 pair is superseded
-       — **the hardware did not change**; see "The concession that became the
-       win" below.
+       2026-09-22. 28.4 GFLOP/s, **29.6 % of the 96 GFLOP/s array peak**
+       (was 24.2 %).
+     - **Confirmed on a second board**: .189 measured 160.43 and 158.40 on the
+       same commit, agreeing within 0.4 %. Supersedes the earlier
+       79.16 / 129.70 pair — **the hardware did not change**; see "The
+       concession that became the win" below.
    * - Kernel checks
      - 17/17 GPT-2, 6/6 Qwen
      - batch invariance bit-identical for ``B = 1..16`` — read with the
