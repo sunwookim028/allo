@@ -67,8 +67,8 @@ Allo supports several approaches to generate HLS code:
 2. **HLS Emulation, Synthesis, and Execution**:  
    Users may also specify the target as `"xlscc"` but run the designs in our software emulation mode:
 
-   - ``sw_emu``: Software emulation mode, which is similar to C simulation that compiles the program using C compiler 
-   and runs it on the CPU. Depending on the size of your input data, this mode may take within one minute.
+   - ``sw_emu``: Software emulation mode, which is similar to C simulation that compiles the program using C compiler
+     and runs it on the CPU. Depending on the size of your input data, this mode may take within one minute.
 
     .. code-block:: python
 
@@ -82,9 +82,9 @@ The generated XLS project (e.g., in the folder ``gemm.prj``) typically includes:
 
 If you set `use_memory` to `True`, the generated project will also include:
 
-- **rewrites.textproto**: The memory configuration file that is required by the XLS 
-backend to map any memory arrays to the hardware. Without this file or if this file is
-configured wrong, the XLS backend will error out during its IR optimization pass.
+- **rewrites.textproto**: The memory configuration file that is required by the XLS
+  backend to map any memory arrays to the hardware. Without this file or if this file is
+  configured wrong, the XLS backend will error out during its IR optimization pass.
 
 If you are using the software emulation mode, you will also obtain the following files:
 
