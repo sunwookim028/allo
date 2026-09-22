@@ -143,6 +143,20 @@ closed" that was hiding a 514-cycle memset. Two of those were *true
 measurements supporting false conclusions*, which is the failure mode to design
 against — it survives inspection in a way a wrong number does not.
 
+**Cross-design review caught what inspection did not.** Two of the claims above
+were corrected not by re-reading them but by exchanging them with a session
+working on a *different* machine, and in both cases **the receiving side caught
+the overgeneralisation rather than the author**. Once it was a driver-overhead
+figure being used as though the opponent's whole window were accelerator time;
+once it was a measurement noise floor, real on a full SoC, being generalised to
+a deterministic co-simulation where it does not apply. Neither survived one
+round of being told to someone who had to act on it.
+
+This is cheap and it is not the same as testing. A test checks that a number is
+what it was last time; a reader with their own measurements to reconcile checks
+whether the number *means* what it is being used to mean. That is the failure
+mode this project keeps hitting, and it is the one tests do not catch.
+
 **Report resources and clock beside cycles, always.** A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist
