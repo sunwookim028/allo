@@ -66,10 +66,30 @@ os.environ.setdefault("LLVM_BUILD_DIR",
                       "/home/sk3463/llvm-allo-6b09f739/build")
 os.environ.setdefault("OMP_NUM_THREADS", "8")
 
-#: The co-design baseline, measured by this suite's k1 and by
-#: `accept.py --codesign` with no diff. The mapper picks the shipped nest on the
-#: shipped hardware, so the cycles are main's published numbers.
-BASELINE_CYCLES = {"4x4x4": 172, "16x16x16": 686}
+#: The published design-level baseline, main @ 476a70d8: what `cosim.py` measures
+#: on `isa_dsl.gemm_program`. Kept here as a loud cross-check, NOT as the
+#: co-design control -- the co-design control is measured in the same run (k1
+#: below, and `loop.py`'s iteration 0), because `accept.py`'s `BASELINES` table
+#: is keyed on the git blob of the two spec files and prose-only edits move it.
+PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
+                    "16x16x8": 484, "16x16x16": 686}
+#: The CO-DESIGN baseline: the same hardware, running the best nest the frozen
+#: mapper can encode on it. It is not the published number at every shape, and
+#: the difference is understood:
+#:
+#:   16x16x16  686 == published. The mapper's pick IS the canonical nest, so
+#:             the program under the RTL is `gemm_program` word for word.
+#:   4x4x4     169 vs 172. At this shape N/T = K/T = 1, so the enumerator
+#:             offers a nest with no emitted loops at all, while the
+#:             hand-written program keeps a trip-count-1 `loop`/`endloop` pair
+#:             around the output body. Same 4 dynamic issues, two fewer static
+#:             instructions (24 words against 28), three fewer cycles. It is a
+#:             real mapping-side find and it is bit-exact; it is also the whole
+#:             of what the mapping search alone buys on this hardware.
+#:
+#: Measured 2026-09-22 by this suite (k1) at codesign-loop; bit-exact, csynth
+#: 2.431 ns, BRAM18K 42 / DSP 14 / FF 17481 / LUT 26583.
+BASELINE_CYCLES = {"4x4x4": 169, "16x16x16": 686}
 #: The whole refusal histogram at the two scored shapes on the shipped design.
 #: Pinned, not just spot-checked: the point of the loop is that these numbers
 #: move for a stated reason, so an unexplained drift is a failure.
@@ -253,8 +273,10 @@ def k1(run, work):
         and ms.get(s, {}).get("chosen") == e["chosen"]
         and ms.get(s, {}).get("refused") == e["refused"]
         for s, e in BASELINE_MAPSPACE.items())
-    ok = check("k1 no-op reproduces the baseline",
-               f"cycles {BASELINE_CYCLES} and the pinned histogram",
+    ok = check("k1 no-op reproduces the co-design baseline",
+               f"cycles {BASELINE_CYCLES} (published {PUBLISHED_CYCLES['4x4x4']}"
+               f" / {PUBLISHED_CYCLES['16x16x16']}; 4x4x4 differs by the "
+               f"trip-count-1 loop the mapper drops) and the pinned histogram",
                {"ok": v.get("ok"), "stage": v.get("stage"),
                 "cycles": v.get("cycles"),
                 "mapspace": {s: {k: d.get(k) for k in
