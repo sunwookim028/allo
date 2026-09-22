@@ -764,7 +764,12 @@ what a margin costs is a number rather than an argument:
      - 2.431 ns, unchanged
 
 Both are far inside the noise floor, which is the useful result: **these are
-encoding decisions, not area decisions.** What a fourth address term really
+encoding decisions, not area decisions.** The fourth term changes nothing the
+units execute, either: at ``TPU_AGU_TERMS=4`` the header and the resolved
+dynamic stream are identical, word for word, for every program checked --
+three square GEMMs and the tiled 16x128x16 -- so only the AGU word's layout
+and the sequencer's own resolve move. That was checked in Python, not in
+cosim. What a fourth address term really
 costs is the stride range of the other three, and what one more bit of ``nr``
 really cost is that there is now nothing spare in word 0.
 
