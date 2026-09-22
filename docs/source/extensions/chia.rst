@@ -88,7 +88,7 @@ Contributions
   refusal bottleneck migrating and cycles flat exactly as predicted in
   advance.
 - **Why agent-built compiler extensions are hard to evaluate.** A new
-  primitive has no callers, so an agent's abstraction scored neutral *and*
+  primitive has no callers, so an agent-implemented one scored neutral *and*
   passed 291 tests while aborting the compiler on first use -- any gate ladder
   that exercises a compiler only through existing designs cannot see a new
   capability in either direction.
