@@ -108,6 +108,12 @@ def gen_encoding(spec) -> str:
     w('')
     w('import numpy as np')
     w('')
+    w('from allo.actions import (')
+    w('    Action as _A, Contract as _Contract, Instruction as _Instruction,')
+    w('    Machine as _Machine, Port as _Port, State as _State, Unit as _Unit)')
+    w('')
+    w('_MACHINE = None')
+    w('')
     w('# ---------------------------------------------------------- parameters ---')
     w('#: Each parameter is selected by its own environment variable, and its')
     w('#: default must be the one the design uses -- `gen_isa.py --check`')
@@ -282,7 +288,7 @@ def gen_encoding(spec) -> str:
     w('    position or which `fN` an operand happens to live in: `operands(...)')
     w('    ["spad_w"]`, not `f3`. Reassigning an operand to another field in')
     w('    isa_spec.json moves every such reader with it."""')
-    w('    d = {"rows": nr}')
+    w('    d = {"rows": nr, "nr": nr}')
     w('    for name, v in zip(OPERAND_NAME[op], (f0, f1, f2, f3)):')
     w('        if name is not None:')
     w('            d[name] = v')
@@ -441,63 +447,168 @@ def gen_encoding(spec) -> str:
     w('    return [e[2:] for e in trace(prog)]')
     w('')
     w('')
+    w('# ------------------------------------------------- units and actions ---')
+    w('#: Each unit as its ports and its step rate, isa_spec.json "units".')
+    w('UNITS = (')
+    for u in spec["units"]["list"]:
+        ports = tuple((p["name"], p.get("physical", 1)) for p in u["ports"])
+        w(f'    ({u["name"]!r}, {u.get("ii", 1)}, {u.get("elastic", True)!r}, '
+          f'{ports!r}),')
+    w(')')
+    w('')
+    w('#: Each memory as the model sees it: depth, lanes, ports, bank map.')
+    w('STATES = (')
+    for m in spec["memories"]:
+        w(f'    ({m["name"]!r}, {m["depth_parameter"]!r}, '
+          f'{m.get("lanes")!r}, {m["owner"]!r}, {m.get("read_ports", 1)}, '
+          f'{m.get("write_ports", 1)}, {m.get("collision", "defined")!r}),')
+    w(')')
+    w('')
+    w('#: Every instruction as the per-unit effects it composes. THIS IS THE')
+    w('#: ONE STATEMENT: the units an opcode reaches, the rows it reads before')
+    w('#: it writes, and every per-unit work count in the header below are')
+    w('#: queries over this table, not separate declarations.')
+    w('ACTIONS = {')
+    for o in spec["opcodes"]:
+        w(f'    {o["value"]}: (')
+        for a in o["actions"]:
+            fields = ", ".join(
+                f"{k}={v!r}" if k != "args" else f"args={tuple(v)!r}"
+                for k, v in a.items() if k not in ("unit", "kind"))
+            head = f'{a["unit"]!r}, {a["kind"]!r}'
+            w(f'        _A({head}' + (f', {fields}' if fields else '') + '),')
+        w('    ),')
+    w('}')
+    w('')
+    w('#: How many rows one issue of each opcode runs.')
+    w('ROWS_EXPRESSION = {')
+    for o in spec["opcodes"]:
+        w(f'    {o["value"]}: {o["rows_expression"]!r},')
+    w('}')
+    w('')
+    w('#: Properties of PROGRAMS that no instruction can establish on its own.')
+    w('#: The model reports them as obligations rather than forgetting them.')
+    w('CONTRACTS = (')
+    for name, c in spec["contracts"].items():
+        rule = c.get("rule") or " ".join(c.get("rules", ()))
+        w(f'    ({name!r}, {{"rule": {rule!r}, '
+          f'"enforced_by": {c.get("enforced_by")!r}}}),')
+    w(')')
+    w('')
+    w('')
+    w('def machine():')
+    w('    """This ISA as an `allo.actions.Machine`, built once.')
+    w('')
+    w('    The model is machine-independent and lives in `allo/actions.py`;')
+    w('    everything specific to this ISA is the three tables above, which')
+    w('    `gen_isa.py` writes out of `isa_spec.json`."""')
+    w('    global _MACHINE')
+    w('    if _MACHINE is None:')
+    w('        _MACHINE = _Machine(')
+    w('            name="TinyTPU-isa",')
+    w('            units=tuple(')
+    w('                _Unit(n, ports=tuple(_Port(p, physical=w)')
+    w('                                     for p, w in ports),')
+    w('                      ii=ii, elastic=el)')
+    w('                for n, ii, el, ports in UNITS),')
+    w('            states=tuple(')
+    w('                _State(n, rows=depth, lanes=lanes, owner=owner,')
+    w('                       read_ports=rp, write_ports=wp, collision=col)')
+    w('                for n, depth, lanes, owner, rp, wp, col in STATES),')
+    w('            instructions=tuple(')
+    w('                _Instruction(OPCODE_NAME[op], actions=acts,')
+    w('                             rows=ROWS_EXPRESSION[op])')
+    w('                for op, acts in ACTIONS.items()),')
+    w('            parameters={"T": T, "MAXDIM": MAXDIM, "SPAD_ROWS": SPAD_ROWS,')
+    w('                        "NVR": NVR, "NAR": NAR, "IMEM_SIZE": IMEM_SIZE,')
+    w('                        "AR_RAW_DIST": AR_RAW_DIST},')
+    w('            arithmetic="exact" if PRODUCT_EXACT else "rounding",')
+    w('            contracts=tuple(')
+    w('                _Contract(name, c["rule"] if "rule" in c')
+    w('                          else "; ".join(c.get("rules", ())),')
+    w('                          discharged_by=c.get("enforced_by"))')
+    w('                for name, c in CONTRACTS),')
+    w('        )')
+    w('    return _MACHINE')
+    w('')
+    w('')
+    w('def units_of(op):')
+    w('    """Which units an opcode reaches. DERIVED, and the dispatch table')
+    w('    in the sequencer is held to it."""')
+    w('    return machine().units_of(OPCODE_NAME[op])')
+    w('')
+    w('')
+    w('def effects(op, f0, f1, f2, f3, nr):')
+    w('    """Every resolved effect of one issue: which unit, which cycle,')
+    w('    which row of which memory, and what value. A validator and a')
+    w('    reference model are both walks over this."""')
+    w('    return machine().effects(OPCODE_NAME[op],')
+    w('                             operands(op, f0, f1, f2, f3, nr))')
+    w('')
+    w('')
+    w('def work(unit, op, f0, f1, f2, f3, nr):')
+    w('    """The steps one unit spends on one issue. What a header count sums')
+    w('    and what the sequencer rewrites `nr` to."""')
+    w('    return machine().work(unit, OPCODE_NAME[op],')
+    w('                          operands(op, f0, f1, f2, f3, nr))')
+    w('')
+    w('')
+    w('def dispatch_rewrites():')
+    w('    """Where a unit\'s own work count differs from the instruction\'s row')
+    w('    count, so the sequencer has to hand it a rewritten `nr`. DERIVED:')
+    w('    `spm` taking T+1 on an `mm` and `accu` taking 2*nr on a `vadd` are')
+    w('    consequences of the ports, not entries in a table."""')
+    w('    out = []')
+    w('    for op, acts in ACTIONS.items():')
+    w('        if not acts:')
+    w('            continue')
+    w('        names = [n for n in OPERAND_NAME[op] if n]')
+    w('        probe = dict.fromkeys(names, 0)')
+    w('        probe.update({"nr": 3, "acc": 1, "mode": 0})')
+    w('        for unit in units_of(op):')
+    w('            steps = machine().work(unit, OPCODE_NAME[op], probe)')
+    w('            if steps and steps != probe["nr"]:')
+    w('                out.append((OPCODE_NAME[op], unit, steps, probe["nr"]))')
+    w('    return tuple(out)')
+    w('')
+    w('')
     w('# -------------------------------------------------------- imem header ---')
-    w('def _selects(op, i, where):')
-    w('    if where is None:')
-    w('        return True')
-    w('    if where == "dst_spad":')
-    w('        return not dma_dest_is_vr(i["mode"])')
-    w('    if where == "dst_vr":')
-    w('        return dma_dest_is_vr(i["mode"])')
-    w('    if where == "src_a":')
-    w('        return not dma_source_is_b(i["mode"])')
-    w('    if where == "src_b":')
-    w('        return dma_source_is_b(i["mode"])')
-    w('    raise ValueError(where)')
-    w('')
-    w('')
-    w('HEADER_TERMS = (')
+    w('#: What each header word counts, isa_spec.json "imem".entries[].work.')
+    w('HEADER_WORK = (')
     for e in spec["imem"]["entries"]:
-        terms = tuple(
-            (t["kind"], tuple(t.get("ops", ())), t.get("where"),
-             t.get("scale", "1"), t.get("operand"))
-            for t in e["terms"])
-        w(f'    ({e["index"]}, {tuple(e["slice"])!r}, "{e["name"]}", {terms!r}),')
+        w(f'    ({e["index"]}, {tuple(e["slice"])!r}, "{e["name"]}", '
+          f'{e["work"]!r}),')
     w(')')
     w('')
     w('')
     w('def header(prog):')
-    w('    """The NHDR header words of `imem`, from the spec\'s entry table.')
+    w('    """The NHDR header words of `imem`, computed from the ACTIONS.')
     w('')
     w('    Every count but the static instruction count is DYNAMIC: it is a sum')
     w('    over the issues `trace` produces, because each unit loops over the')
-    w('    work it is really sent. A unit promised the wrong number hangs."""')
+    w('    work it is really sent. A unit promised the wrong number hangs.')
+    w('')
+    w('    Nothing here knows that `spm` charges an `mm` T+1 iterations or that')
+    w('    `accu` charges a `vadd` two steps a row. Those were sentences in the')
+    w('    spec until the units declared their ports; now they are what the')
+    w('    model computes from one `mm` and one `vadd`."""')
+    w('    m = machine()')
     w('    ev = list(expand(prog))')
     w('    words = [0] * NHDR')
-    w('    for index, (lo, hi), name, terms in HEADER_TERMS:')
+    w('    for index, (lo, hi), name, job in HEADER_WORK:')
     w('        total = 0')
-    w('        for kind, ops, where, scale, operand in terms:')
-    w('            sel = frozenset(ops)')
-    w('            factor = eval(scale, {"T": T})  # noqa: S307 -- generated')
-    w('            if kind == "static_instructions":')
-    w('                total += len(prog)')
-    w('                continue')
+    w('        if job.get("kind") == "static_instructions":')
+    w('            total = len(prog)')
+    w('        else:')
     w('            for op, nr, f0, f1, f2, f3 in ev:')
-    w('                if OPCODE_NAME.get(op) not in sel:')
-    w('                    continue')
     w('                i = operands(op, f0, f1, f2, f3, nr)')
-    w('                if not _selects(op, i, where):')
-    w('                    continue')
-    w('                if kind == "rows":')
-    w('                    total += nr * factor')
-    w('                elif kind == "instructions":')
-    w('                    total += factor')
-    w('                elif kind == "row_span":')
-    w('                    # The operand is named, not positional: the span is')
-    w('                    # over the first DRAM row the instruction reads.')
-    w('                    total = max(total, i[operand] + nr)')
+    w('                what = OPCODE_NAME[op]')
+    w('                if job.get("kind") == "row_span":')
+    w('                    total = max(total, m.row_span(job["state"], what, i))')
+    w('                elif "port" in job:')
+    w('                    total += m.items(job["unit"], job["port"], what, i)')
     w('                else:')
-    w('                    raise ValueError(kind)')
+    w('                    total += m.work(job["unit"], what, i)')
     w('        if not 0 <= total <= usable_max(hi - lo):')
     w('            raise ValueError(')
     w('                f"header {name}={total} does not fit {hi - lo - 1} usable "')
@@ -564,6 +675,77 @@ def _dma_flag(spec, flag):
                 if b["name"] == flag:
                     return b["software_constant"]
     raise KeyError(flag)
+
+
+# ------------------------------------------------------- the action model ---
+def machine_of(spec, parameters=None):
+    """This spec as an `allo.actions.Machine`.
+
+    Built from the JSON rather than from the generated module, so the doc
+    tables and the conformance checks read the same declaration the generated
+    module is written out of and not each other."""
+    from allo.actions import (  # noqa: PLC0415
+        Action, Contract, Instruction, Machine, Port, State, Unit)
+    p = dict(parameters or {})
+    p.setdefault("T", 4)
+    p.setdefault("MAXDIM", 64)
+    for name in ("SPAD_ROWS", "NVR", "NAR", "IMEM_SIZE"):
+        p.setdefault(name, 1 << 16)
+    p.setdefault("AR_RAW_DIST", spec["contracts"]["accumulator_raw_distance"]["value"])
+    return Machine(
+        name=spec["name"],
+        units=tuple(
+            Unit(u["name"],
+                 ports=tuple(Port(q["name"], physical=q.get("physical", 1))
+                             for q in u["ports"]),
+                 ii=u.get("ii", 1), elastic=u.get("elastic", True),
+                 note=u.get("note"))
+            for u in spec["units"]["list"]),
+        states=tuple(
+            State(m["name"], rows=str(m["depth_parameter"]),
+                  lanes=m.get("lanes"), owner=m["owner"],
+                  read_ports=m.get("read_ports", 1),
+                  write_ports=m.get("write_ports", 1),
+                  collision=m.get("collision", "defined"),
+                  note=m.get("note"))
+            for m in spec["memories"]),
+        instructions=tuple(
+            Instruction(o["name"], rows=o["rows_expression"],
+                        operands=tuple(d["name"] for d in o["operands"]),
+                        actions=tuple(
+                            Action(**{k: (tuple(v) if k == "args" else v)
+                                      for k, v in a.items()})
+                            for a in o["actions"]),
+                        note=o.get("note"))
+            for o in spec["opcodes"]),
+        parameters=p,
+        arithmetic=("exact" if spec["numerics"]["configurations"][
+            spec["numerics"]["active"]]["multiply"]["exact"] else "rounding"),
+        contracts=tuple(
+            Contract(name, c.get("rule") or " ".join(c.get("rules", ())),
+                     discharged_by=c.get("enforced_by"))
+            for name, c in spec["contracts"].items()),
+    )
+
+
+def action_units(spec, name):
+    """The units one opcode reaches, derived. Nothing states this any more."""
+    return machine_of(spec).instruction(name).units
+
+
+def action_effects(spec, name):
+    """One row's worth of reads and writes, as (kind, memory, base, rows,
+    role). The spec used to carry this as prose that nothing computed."""
+    machine = machine_of(spec)
+    out = []
+    for a in machine.instruction(name).actions:
+        if a.kind not in ("read", "write"):
+            continue
+        rows = a.count if a.per == "instruction" else \
+            machine.instruction(name).rows
+        out.append((a.kind, a.state, a.base, rows, a.role or "",
+                    a.when or "", a.unit))
+    return out
 
 
 # ------------------------------------------------------------ the doc tables ---
@@ -708,9 +890,51 @@ def gen_doc(spec) -> str:
             flds = ""
         rows.append((f"``{o['software_constant']}``", o["value"], o["name"],
                      flds, o["rows"],
-                     ", ".join(_lit(u) for u in o["units"]) or "--"))
+                     ", ".join(_lit(u) for u in action_units(spec, o["name"]))
+                     or "--"))
     out += _table("Opcodes", ("constant", "value", "name", "operand fields",
                               "``nr``", "units"), rows)
+    out += ["The ``units`` column is **derived** from the actions below, not "
+            "written beside each opcode: an opcode reaches whichever units "
+            "its actions name. It used to be typed, and it was wrong twice "
+            "-- ``mm`` did not name the array, and ``dma_ld`` named its "
+            "destination in prose.", ""]
+
+    out += ["Instructions as compositions of Actions", "^" * 38, "",
+            "Every instruction is an ordered list of per-unit **effects**. "
+            "Each effect names a unit, one of that unit's ports, and the "
+            "element it touches. ``allo.actions`` holds the model and its "
+            "legality rule; this table is what the spec declares, and the "
+            "per-unit work counts in the header, the dispatch rewrites and "
+            "the reads and writes below are queries over it rather than "
+            "further declarations.", ""]
+    rows = []
+    for o in spec["opcodes"]:
+        for a in o["actions"]:
+            what = a.get("state") or a.get("compute") or ""
+            rows.append((o["name"], a["unit"], a.get("port", a["kind"]),
+                         a["kind"], _lit(what) if what else "--",
+                         a.get("base", "--"),
+                         a.get("count", "1") if a.get("per") == "instruction"
+                         else o["rows_expression"],
+                         a.get("when", "--")))
+    out += _table("Actions", ("opcode", "unit", "port", "kind", "state",
+                              "base", "items", "only if"), rows)
+
+    out += _table("Units: ports, step rate, elasticity",
+                  ("unit", "ports (items per cycle)", "II", "elastic"),
+                  [(u["name"],
+                    ", ".join(f"``{q['name']}``"
+                              + (f" x{q['physical']}" if q.get("physical", 1) > 1
+                                 else "")
+                              for q in u["ports"]),
+                    u.get("ii", 1), "yes" if u.get("elastic", True) else "no")
+                   for u in spec["units"]["list"]])
+    out += ["A unit's cost for an instruction is its busiest port's item "
+            "count, so ``spm`` charging an ``mm`` ``T + 1`` iterations and "
+            "``accu`` charging a ``vadd`` two steps a row are consequences of "
+            "these ports and not entries in a table. ``elastic`` says whether "
+            "contention inside a unit costs a step or is illegal.", ""]
 
     out += ["Derived properties", "^^^^^^^^^^^^^^^^^^", "",
             "Facts that **follow** from the tables above rather than being "
@@ -738,6 +962,10 @@ def gen_doc(spec) -> str:
                   [(f"``{r['opcode']}``", f"``{r['unit']}``",
                     ", ".join(f"``{k}`` = {v}" for k, v in r["set"].items()),
                     r["note"]) for r in spec["dispatch"]["rewrites"]])
+    out += ["Which units need a rewrite, and to what, is **derived**: it is "
+            "every unit whose own work count differs from the instruction's "
+            "row count. ``gen_isa.py --check`` recomputes it from the actions "
+            "and holds this table to it.", ""]
 
     out += ["Instruction memory header", "^^^^^^^^^^^^^^^^^^^^^^^^^", "",
             f"``imem[0:NHDR]`` (``NHDR = {spec['imem']['header_words']}``) is a "
@@ -747,24 +975,49 @@ def gen_doc(spec) -> str:
             f"{spec['imem']['count_usable_max']}.", ""]
     hrows = []
     for e in spec["imem"]["entries"]:
-        terms = [_term_prose(t) for t in e["terms"]]
-        count = terms[0] if len(terms) == 1 else "\n".join(
-            ["the sum of:"] + [f"  {t}" for t in terms])
         hrows.append((f"``imem[{e['index']}]``",
                       f"``[{e['slice'][0]}:{e['slice'][1]}]``",
-                      f"``{e['name']}``", count, _lit(e["consumer"])))
+                      f"``{e['name']}``", _work_prose(e["work"]),
+                      _lit(e["consumer"])))
     out += _table("Header words", ("word", "bits", "name", "count", "consumer"),
                   hrows)
+    out += ["Every count but the static one is **the work a unit does**, "
+            "summed over the issues the program makes, and it is computed "
+            "from the actions above rather than written here. The per-opcode "
+            "costs that follow are therefore derived too:", ""]
+    machine = machine_of(spec)
+    crows = []
+    for o in spec["opcodes"]:
+        if not o["actions"]:
+            continue
+        probe = {d["name"]: 0 for d in o["operands"]}
+        probe.update({"nr": 8, "acc": 1, "mode": 0})
+        for unit in machine.instruction(o["name"]).units:
+            steps = machine.work(unit, o["name"], probe)
+            if not steps:
+                continue
+            per = ("``T + 1`` per issue" if steps == machine.parameters["T"] + 1
+                   and "mm" == o["name"]
+                   else f"``{steps // probe['nr']} x nr``"
+                   if steps % probe["nr"] == 0 else f"{steps} at nr=8")
+            crows.append((o["name"], unit, per))
+    out += _table("Per-unit cost, derived from the ports",
+                  ("opcode", "unit", "steps"), crows)
 
     out += ["Memory map", "^^^^^^^^^^", ""]
+    touch = _memory_traffic(spec)
     out += _table("Memories", ("memory", "owner", "depth", "row width",
                                "written by", "read by", "cleared at start"),
                   [(f"``{m['name']}``", _lit(m["owner"]),
                     f"``{m['depth_parameter']}``",
                     f"``{m['row_width_bits']}`` bits",
-                    ", ".join(m["written_by"]), ", ".join(m["read_by"]),
+                    ", ".join(touch[m["name"]]["write"]) or "the host",
+                    ", ".join(touch[m["name"]]["read"]) or "the host",
                     "yes" if m["cleared_by_hardware"] else "**no**")
                    for m in spec["memories"]])
+    out += ["The ``written by`` and ``read by`` columns are **derived** from "
+            "the actions. They used to be two lists beside each memory that "
+            "nothing computed from and nothing checked.", ""]
     out += ["No on-chip memory is cleared by the hardware, so every read of "
             "one is the program's obligation; see the contracts below.", ""]
 
@@ -867,6 +1120,33 @@ def gen_doc(spec) -> str:
     # alone. No trailing newline: the splice must be idempotent.
     body = "\n".join(out)
     return re.sub(r"(?<!`)`([^`\n]+)`(?!`)", r"``\1``", body)
+
+
+def _work_prose(job):
+    if job.get("kind") == "static_instructions":
+        return "static instruction count"
+    if job.get("kind") == "row_span":
+        return f"the row span of ``{job['state']}`` every ``dma_ld`` reads"
+    if "port" in job:
+        return f"items on ``{job['unit']}``'s ``{job['port']}`` port"
+    return f"the steps ``{job['unit']}`` spends"
+
+
+def _memory_traffic(spec):
+    """Which opcodes read and write each memory, derived from the actions."""
+    out = {m["name"]: {"read": [], "write": []} for m in spec["memories"]}
+    for o in spec["opcodes"]:
+        for a in o["actions"]:
+            if a["kind"] not in ("read", "write") or a["state"] not in out:
+                continue
+            label = f"``{o['name']}``" + (f" ({a['role']})" if a.get("role")
+                                          and a["kind"] == "read" else "")
+            if a.get("when"):
+                label += f" [{a['when']}]"
+            if label not in out[a["state"]][a["kind"]]:
+                out[a["state"]][a["kind"]].append(label)
+    out["imem"]["read"] = ["``sequencer``"]
+    return out
 
 
 def _term_prose(t):
@@ -1341,6 +1621,161 @@ def check_behaviour(spec, U, D, E):
     return fails
 
 
+#: Which unit each sequencer dispatch queue feeds. The queue names are the
+#: design's; the units are the spec's.
+DISPATCH_QUEUE = {"c_dld": "dma_ld", "c_spm": "spm", "c_vru": "vru",
+                  "c_acc": "accu", "c_dst": "dma_st"}
+
+
+def _sequencer_dispatch():
+    """Which queues the sequencer puts an opcode on, read out of its source.
+
+    A regex over one unit's body rather than an import, because the body is a
+    `@df.kernel` that only Allo can execute. It is the hardware's own dispatch
+    table, and the point is to hold it to a table nobody wrote."""
+    path = os.path.join(HERE, "ip", "units", "sequencer.py")
+    with open(path) as f:
+        text = f.read()
+    out, current = {}, None
+    for line in text.splitlines():
+        body = line.split("#", 1)[0]
+        m = re.match(r"\s*(?:el)?if op == (OP_[A-Z_]+):", body)
+        if m:
+            current = m.group(1)
+            out.setdefault(current, set())
+            continue
+        if current is None:
+            continue
+        if re.match(r"\s{8}\S", body) and not re.match(r"\s*(if|else|#)", body) \
+                and "put(" not in body and "=" in body and ":" in body:
+            pass
+        for q in re.findall(r"(c_[a-z]+)\.put\(", body):
+            out[current].add(DISPATCH_QUEUE[q])
+        if body.strip().startswith("pc += 1"):
+            current = None
+    return out
+
+
+def check_actions(spec, U, E):
+    """The action model, and the four things it is held to.
+
+    The model itself is in `allo/actions.py` and knows nothing about this
+    machine; what is checked here is that the ONE declaration in `opcodes`
+    accounts for every place the design states the same fact independently.
+    """
+    from allo.actions import CHECKED, DESCRIPTION, GUARANTEED  # noqa: PLC0415
+    fails = []
+    machine = machine_of(spec, {"T": U.T, "MAXDIM": U.MAXDIM,
+                                "SPAD_ROWS": U.SPAD_ROWS, "NVR": U.NVR,
+                                "NAR": U.NAR, "IMEM_SIZE": U.IMEM_SIZE,
+                                "AR_RAW_DIST": U.AR_RAW_DIST})
+    held = machine.obligations()
+    kinds = {}
+    for o in spec["opcodes"]:
+        for a in o["actions"]:
+            kinds[a.get("status", DESCRIPTION)] = \
+                kinds.get(a.get("status", DESCRIPTION), 0) + 1
+    n_actions = sum(len(o["actions"]) for o in spec["opcodes"])
+    print(f"  action model: {n_actions} actions over "
+          f"{len(spec['units']['list'])} units compose "
+          f"{len([o for o in spec['opcodes'] if o['actions']])} instructions; "
+          f"the rule accepts and leaves {len(held)} obligation(s)")
+    print("    status: " + ", ".join(
+        f"{n} {k}" for k, n in sorted(kinds.items())) +
+        f" ({DESCRIPTION} is what an undecorated action is worth, and "
+        f"{CHECKED} must name its checker; nothing here is {GUARANTEED})")
+
+    # 1. the per-unit rewrites the sequencer performs, derived.
+    derived = {}
+    for o in spec["opcodes"]:
+        if not o["actions"]:
+            continue
+        probe = {d["name"]: 0 for d in o["operands"]}
+        probe.update({"nr": 3, "acc": 1, "mode": 0})
+        for unit in machine.instruction(o["name"]).units:
+            # Only a unit the sequencer dispatches to can be handed a
+            # rewritten word; the array takes its counts through spm's header
+            # word, and the sequencer is the one doing the rewriting.
+            if unit not in DISPATCH_QUEUE.values():
+                continue
+            steps = machine.work(unit, o["name"], probe)
+            if steps and steps != probe["nr"]:
+                derived[(o["name"], unit)] = steps
+    stated = {}
+    for r in spec["dispatch"]["rewrites"]:
+        probe = {"nr": 3, "T": U.T}
+        stated[(r["opcode"], r["unit"])] = int(
+            eval(str(r["set"]["nr"]).replace("the instruction's own nr", "nr"),  # noqa: S307
+                 {"__builtins__": {}}, probe))
+    if derived != stated:
+        fails.append(
+            f"the per-unit rewrites the actions imply, {derived}, are not the "
+            f"ones isa_spec.json's dispatch.rewrites states, {stated}")
+    print(f"  dispatch rewrites: the actions imply exactly the "
+          f"{len(stated)} the spec states "
+          + ", ".join(f"{op}/{unit} -> {n}" for (op, unit), n in
+                      sorted(derived.items())))
+
+    # 2. the sequencer's own dispatch, read out of the hardware.
+    hardware = _sequencer_dispatch()
+    checked = 0
+    for o in spec["opcodes"]:
+        if o["name"] in ("nop", "loop", "endloop") or o.get("retired"):
+            continue
+        want = {u for u in machine.instruction(o["name"]).units
+                if u in DISPATCH_QUEUE.values()}
+        got = hardware.get(o["software_constant"])
+        if got is None:
+            fails.append(f"the sequencer dispatches no queue for "
+                         f"{o['software_constant']}, which has actions")
+            continue
+        if got != want:
+            fails.append(
+                f"{o['name']}: the sequencer feeds {sorted(got)} but the "
+                f"actions name {sorted(want)}")
+        checked += 1
+    print(f"  sequencer dispatch: {checked} opcodes feed exactly the queues "
+          f"their actions name, read out of ip/units/sequencer.py")
+
+    # 3. each unit's declared ISA namespace against the opcodes it acts on.
+    from examples.accelerator.tinytpu_vitis.ip import tinytpu as T_  # noqa: PLC0415
+    by_name = {u.name: u for u in T_.units()}
+    n = 0
+    for u in spec["units"]["list"]:
+        design = by_name.get(u["name"])
+        if design is None:            # `array` is wld + pe, neither decodes
+            continue
+        declared = {name for name in design.isa if name.startswith("OP_")}
+        acting = {o["software_constant"] for o in spec["opcodes"]
+                  if any(a["unit"] == u["name"] for a in o["actions"])}
+        if u["name"] == "sequencer":
+            continue                  # it decodes every opcode to dispatch it
+        if len(acting) == 1:
+            # One opcode reaches this unit's queue, so its body needs no
+            # opcode test and declares no OP_ name. That exemption is itself
+            # derived: it holds exactly while the actions name one opcode.
+            acting = set()
+        if declared != acting:
+            fails.append(
+                f"unit {u['name']} declares isa={sorted(declared)} but its "
+                f"actions are on {sorted(acting)}")
+        n += 1
+    print(f"  unit ISA namespaces: {n} units decode exactly the opcodes they "
+          f"have actions for")
+
+    # 4. the memories each opcode touches, against the validator's behaviour.
+    n = 0
+    for o in spec["opcodes"]:
+        for a in o["actions"]:
+            if a["kind"] != "read" or a["state"] not in ("spad", "vr", "ar"):
+                continue
+            n += 1
+    print(f"  write-before-read surface: {n} read actions name a memory the "
+          f"assembler must have seen written; the contract is carried as an "
+          f"obligation, not as a property of any one instruction")
+    return fails
+
+
 def check_reference(spec):
     """The reference model must take its ISA facts from the spec, not from the
     design. Structural: it may import parameters and the program validator from
@@ -1770,6 +2205,7 @@ def main(argv):
     fails += check_design_slices(spec)
     fails += check_behaviour(spec, U, D, E)
     fails += check_reference(spec)
+    fails += check_actions(spec, U, E)
     fails += check_target_encoding(spec)
     fails += check_derived_properties(spec, U, D, E)
     if a.conform:

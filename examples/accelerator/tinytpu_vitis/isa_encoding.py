@@ -17,6 +17,12 @@ import os
 
 import numpy as np
 
+from allo.actions import (
+    Action as _A, Contract as _Contract, Instruction as _Instruction,
+    Machine as _Machine, Port as _Port, State as _State, Unit as _Unit)
+
+_MACHINE = None
+
 # ---------------------------------------------------------- parameters ---
 #: Each parameter is selected by its own environment variable, and its
 #: default must be the one the design uses -- `gen_isa.py --check`
@@ -232,7 +238,7 @@ def operands(op, f0, f1, f2, f3, nr):
     position or which `fN` an operand happens to live in: `operands(...)
     ["spad_w"]`, not `f3`. Reassigning an operand to another field in
     isa_spec.json moves every such reader with it."""
-    d = {"rows": nr}
+    d = {"rows": nr, "nr": nr}
     for name, v in zip(OPERAND_NAME[op], (f0, f1, f2, f3)):
         if name is not None:
             d[name] = v
@@ -400,67 +406,238 @@ def expand(prog):
     return [e[2:] for e in trace(prog)]
 
 
+# ------------------------------------------------- units and actions ---
+#: Each unit as its ports and its step rate, isa_spec.json "units".
+UNITS = (
+    ('sequencer', 1, True, (('fetch', 1), ('dispatch', 5))),
+    ('dma_ld', 1, True, (('dram.read', 1), ('mux', 1), ('dma2sp', 1), ('dma2vr', 1))),
+    ('spm', 1, True, (('spad.read', 1), ('spad.write', 1), ('dma2sp', 1), ('sp2vr', 1), ('wcol', 1))),
+    ('vru', 1, True, (('vr.read', 1), ('vr.write', 1), ('acol', 1), ('sp2vr', 1), ('dma2vr', 1))),
+    ('array', 1, True, (('wcol', 1), ('acol', 1), ('instructions', 1), ('mac', 1), ('cw', 1))),
+    ('accu', 1, True, (('cw', 1), ('ar.read', 1), ('ar.write', 1), ('alu', 1), ('ac2sp', 1))),
+    ('dma_st', 1, True, (('ac2sp', 1), ('dram.write', 1))),
+)
+
+#: Each memory as the model sees it: depth, lanes, ports, bank map.
+STATES = (
+    ('spad', 'SPAD_ROWS', 'T', 'spm', 1, 1, 'defined'),
+    ('vr', 'NVR', 'T', 'vru', 1, 1, 'defined'),
+    ('ar', 'NAR', 'T', 'accu', 1, 1, 'defined'),
+    ('imem', 'IMEM_SIZE', None, 'sequencer', 1, 1, 'defined'),
+    ('A', 'MAXDIM * MAXDIM', None, 'dma_ld', 1, 1, 'defined'),
+    ('B', 'MAXDIM * MAXDIM', None, 'dma_ld', 1, 1, 'defined'),
+    ('C', 'MAXDIM * MAXDIM', None, 'dma_st', 1, 1, 'defined'),
+)
+
+#: Every instruction as the per-unit effects it composes. THIS IS THE
+#: ONE STATEMENT: the units an opcode reaches, the rows it reads before
+#: it writes, and every per-unit work count in the header below are
+#: queries over this table, not separate declarations.
+ACTIONS = {
+    0: (
+    ),
+    1: (
+        _A('dma_ld', 'read', port='dram.read', state='A', base='dram_row0', when='(mode & 1) == 0', into='from_a', role='the source rows'),
+        _A('dma_ld', 'read', port='dram.read', state='B', base='dram_row0', when='(mode & 1) == 1', into='from_b', role='the source rows'),
+        _A('dma_ld', 'compute', port='mux', compute='select', args=('from_a', 'from_b'), into='beat'),
+        _A('dma_ld', 'emit', port='dma2sp', args=('beat',), when='(mode & 2) == 0'),
+        _A('dma_ld', 'emit', port='dma2vr', args=('beat',), when='(mode & 2) == 2'),
+        _A('spm', 'receive', port='dma2sp', into='landing', when='(mode & 2) == 0'),
+        _A('spm', 'write', port='spad.write', state='spad', base='dst_row0', args=('landing',), when='(mode & 2) == 0'),
+        _A('vru', 'receive', port='dma2vr', into='landing', when='(mode & 2) == 2'),
+        _A('vru', 'write', port='vr.write', state='vr', base='dst_row0', args=('landing',), when='(mode & 2) == 2'),
+    ),
+    2: (
+    ),
+    3: (
+        _A('spm', 'read', port='spad.read', state='spad', base='spad0', into='word', role='the row to copy'),
+        _A('spm', 'emit', port='sp2vr', args=('word',)),
+        _A('vru', 'receive', port='sp2vr', into='word'),
+        _A('vru', 'write', port='vr.write', state='vr', base='vr0', args=('word',)),
+    ),
+    4: (
+        _A('spm', 'read', port='spad.read', state='spad', base='spad_w', count='T', per='instruction', into='weights', role='weights'),
+        _A('spm', 'emit', port='wcol', count='T + 1', per='instruction', args=('weights',)),
+        _A('array', 'receive', port='wcol', count='T + 1', per='instruction', into='weights'),
+        _A('array', 'emit', port='instructions', per='instruction', args=('weights',)),
+        _A('vru', 'read', port='vr.read', state='vr', base='vr_a', into='activation', role='activations'),
+        _A('vru', 'emit', port='acol', args=('activation',)),
+        _A('array', 'receive', port='acol', into='activation'),
+        _A('array', 'compute', port='mac', compute='matmul', args=('activation', 'weights'), into='psum'),
+        _A('array', 'emit', port='cw', args=('psum',)),
+        _A('accu', 'receive', port='cw', into='psum'),
+        _A('accu', 'read', port='ar.read', state='ar', base='ar0', when='acc == 1', into='carried', role='the accumulate base'),
+        _A('accu', 'compute', port='alu', compute='acc_add', args=('carried', 'psum'), into='total'),
+        _A('accu', 'write', port='ar.write', state='ar', base='ar0', args=('total',)),
+    ),
+    5: (
+        _A('accu', 'read', port='ar.read', state='ar', base='ar_s1', into='left', role='a source'),
+        _A('accu', 'read', port='ar.read', state='ar', base='ar_s2', into='right', role='a source'),
+        _A('accu', 'compute', port='alu', compute='add', args=('left', 'right'), into='total'),
+        _A('accu', 'write', port='ar.write', state='ar', base='ar_d', args=('total',)),
+    ),
+    6: (
+        _A('accu', 'read', port='ar.read', state='ar', base='ar_s', into='before', role='a source'),
+        _A('accu', 'compute', port='alu', compute='max0', args=('before',), into='after'),
+        _A('accu', 'write', port='ar.write', state='ar', base='ar_d', args=('after',)),
+    ),
+    7: (
+        _A('accu', 'read', port='ar.read', state='ar', base='ar0', into='value', role='the value to retire'),
+        _A('accu', 'compute', port='alu', compute='to_operand', args=('value',), into='clipped'),
+        _A('accu', 'emit', port='ac2sp', args=('clipped',)),
+        _A('dma_st', 'receive', port='ac2sp', into='clipped'),
+        _A('dma_st', 'write', port='dram.write', state='C', base='dram_row0', args=('clipped',)),
+    ),
+    8: (
+        _A('sequencer', 'compute', port='fetch', compute='push_loop', per='instruction', into='frame'),
+    ),
+    9: (
+        _A('sequencer', 'compute', port='fetch', compute='pop_loop', per='instruction', into='frame'),
+    ),
+}
+
+#: How many rows one issue of each opcode runs.
+ROWS_EXPRESSION = {
+    0: '1',
+    1: 'nr',
+    2: '1',
+    3: 'nr',
+    4: 'nr',
+    5: 'nr',
+    6: 'nr',
+    7: 'nr',
+    8: '1',
+    9: '1',
+}
+
+#: Properties of PROGRAMS that no instruction can establish on its own.
+#: The model reports them as obligations rather than forgetting them.
+CONTRACTS = (
+    ('write_before_read', {"rule": 'Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu. Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there -- directly, or into spad and then through a vld. vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error. nr >= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op. Every resolved field must be within 0 .. 2047, the range the encoding rule admits.', "enforced_by": 'microarch_isa.check_program, which microarch_isa.assemble calls, so a violating program cannot be assembled'}),
+    ('accumulator_raw_distance', {"rule": 'A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on.', "enforced_by": 'microarch_isa.check_program'}),
+)
+
+
+def machine():
+    """This ISA as an `allo.actions.Machine`, built once.
+
+    The model is machine-independent and lives in `allo/actions.py`;
+    everything specific to this ISA is the three tables above, which
+    `gen_isa.py` writes out of `isa_spec.json`."""
+    global _MACHINE
+    if _MACHINE is None:
+        _MACHINE = _Machine(
+            name="TinyTPU-isa",
+            units=tuple(
+                _Unit(n, ports=tuple(_Port(p, physical=w)
+                                     for p, w in ports),
+                      ii=ii, elastic=el)
+                for n, ii, el, ports in UNITS),
+            states=tuple(
+                _State(n, rows=depth, lanes=lanes, owner=owner,
+                       read_ports=rp, write_ports=wp, collision=col)
+                for n, depth, lanes, owner, rp, wp, col in STATES),
+            instructions=tuple(
+                _Instruction(OPCODE_NAME[op], actions=acts,
+                             rows=ROWS_EXPRESSION[op])
+                for op, acts in ACTIONS.items()),
+            parameters={"T": T, "MAXDIM": MAXDIM, "SPAD_ROWS": SPAD_ROWS,
+                        "NVR": NVR, "NAR": NAR, "IMEM_SIZE": IMEM_SIZE,
+                        "AR_RAW_DIST": AR_RAW_DIST},
+            arithmetic="exact" if PRODUCT_EXACT else "rounding",
+            contracts=tuple(
+                _Contract(name, c["rule"] if "rule" in c
+                          else "; ".join(c.get("rules", ())),
+                          discharged_by=c.get("enforced_by"))
+                for name, c in CONTRACTS),
+        )
+    return _MACHINE
+
+
+def units_of(op):
+    """Which units an opcode reaches. DERIVED, and the dispatch table
+    in the sequencer is held to it."""
+    return machine().units_of(OPCODE_NAME[op])
+
+
+def effects(op, f0, f1, f2, f3, nr):
+    """Every resolved effect of one issue: which unit, which cycle,
+    which row of which memory, and what value. A validator and a
+    reference model are both walks over this."""
+    return machine().effects(OPCODE_NAME[op],
+                             operands(op, f0, f1, f2, f3, nr))
+
+
+def work(unit, op, f0, f1, f2, f3, nr):
+    """The steps one unit spends on one issue. What a header count sums
+    and what the sequencer rewrites `nr` to."""
+    return machine().work(unit, OPCODE_NAME[op],
+                          operands(op, f0, f1, f2, f3, nr))
+
+
+def dispatch_rewrites():
+    """Where a unit's own work count differs from the instruction's row
+    count, so the sequencer has to hand it a rewritten `nr`. DERIVED:
+    `spm` taking T+1 on an `mm` and `accu` taking 2*nr on a `vadd` are
+    consequences of the ports, not entries in a table."""
+    out = []
+    for op, acts in ACTIONS.items():
+        if not acts:
+            continue
+        names = [n for n in OPERAND_NAME[op] if n]
+        probe = dict.fromkeys(names, 0)
+        probe.update({"nr": 3, "acc": 1, "mode": 0})
+        for unit in units_of(op):
+            steps = machine().work(unit, OPCODE_NAME[op], probe)
+            if steps and steps != probe["nr"]:
+                out.append((OPCODE_NAME[op], unit, steps, probe["nr"]))
+    return tuple(out)
+
+
 # -------------------------------------------------------- imem header ---
-def _selects(op, i, where):
-    if where is None:
-        return True
-    if where == "dst_spad":
-        return not dma_dest_is_vr(i["mode"])
-    if where == "dst_vr":
-        return dma_dest_is_vr(i["mode"])
-    if where == "src_a":
-        return not dma_source_is_b(i["mode"])
-    if where == "src_b":
-        return dma_source_is_b(i["mode"])
-    raise ValueError(where)
-
-
-HEADER_TERMS = (
-    (0, (0, 16), "n_instr", (('static_instructions', (), None, '1', None),)),
-    (1, (0, 16), "dma_ld_rows", (('rows', ('dma_ld',), None, '1', None),)),
-    (2, (0, 16), "spm_rows", (('rows', ('dma_ld',), 'dst_spad', '1', None), ('rows', ('vld',), None, '1', None), ('instructions', ('mm',), None, 'T + 1', None))),
-    (3, (0, 16), "vru_words", (('rows', ('dma_ld',), 'dst_vr', '1', None), ('rows', ('vld',), None, '1', None), ('rows', ('mm',), None, '1', None))),
-    (4, (0, 16), "mm_count", (('instructions', ('mm',), None, '1', None),)),
-    (4, (16, 32), "mm_rows", (('rows', ('mm',), None, '1', None),)),
-    (5, (0, 16), "accu_iterations", (('rows', ('mm', 'vrelu', 'mvout'), None, '1', None), ('rows', ('vadd',), None, '2', None))),
-    (6, (0, 16), "dma_st_rows", (('rows', ('mvout',), None, '1', None),)),
-    (7, (0, 16), "a_span", (('row_span', ('dma_ld',), 'src_a', '1', 'dram_row0'),)),
-    (7, (16, 32), "b_span", (('row_span', ('dma_ld',), 'src_b', '1', 'dram_row0'),)),
+#: What each header word counts, isa_spec.json "imem".entries[].work.
+HEADER_WORK = (
+    (0, (0, 16), "n_instr", {'kind': 'static_instructions'}),
+    (1, (0, 16), "dma_ld_rows", {'unit': 'dma_ld'}),
+    (2, (0, 16), "spm_rows", {'unit': 'spm'}),
+    (3, (0, 16), "vru_words", {'unit': 'vru'}),
+    (4, (0, 16), "mm_count", {'unit': 'array', 'port': 'instructions'}),
+    (4, (16, 32), "mm_rows", {'unit': 'array', 'port': 'mac'}),
+    (5, (0, 16), "accu_iterations", {'unit': 'accu'}),
+    (6, (0, 16), "dma_st_rows", {'unit': 'dma_st'}),
+    (7, (0, 16), "a_span", {'kind': 'row_span', 'state': 'A'}),
+    (7, (16, 32), "b_span", {'kind': 'row_span', 'state': 'B'}),
 )
 
 
 def header(prog):
-    """The NHDR header words of `imem`, from the spec's entry table.
+    """The NHDR header words of `imem`, computed from the ACTIONS.
 
     Every count but the static instruction count is DYNAMIC: it is a sum
     over the issues `trace` produces, because each unit loops over the
-    work it is really sent. A unit promised the wrong number hangs."""
+    work it is really sent. A unit promised the wrong number hangs.
+
+    Nothing here knows that `spm` charges an `mm` T+1 iterations or that
+    `accu` charges a `vadd` two steps a row. Those were sentences in the
+    spec until the units declared their ports; now they are what the
+    model computes from one `mm` and one `vadd`."""
+    m = machine()
     ev = list(expand(prog))
     words = [0] * NHDR
-    for index, (lo, hi), name, terms in HEADER_TERMS:
+    for index, (lo, hi), name, job in HEADER_WORK:
         total = 0
-        for kind, ops, where, scale, operand in terms:
-            sel = frozenset(ops)
-            factor = eval(scale, {"T": T})  # noqa: S307 -- generated
-            if kind == "static_instructions":
-                total += len(prog)
-                continue
+        if job.get("kind") == "static_instructions":
+            total = len(prog)
+        else:
             for op, nr, f0, f1, f2, f3 in ev:
-                if OPCODE_NAME.get(op) not in sel:
-                    continue
                 i = operands(op, f0, f1, f2, f3, nr)
-                if not _selects(op, i, where):
-                    continue
-                if kind == "rows":
-                    total += nr * factor
-                elif kind == "instructions":
-                    total += factor
-                elif kind == "row_span":
-                    # The operand is named, not positional: the span is
-                    # over the first DRAM row the instruction reads.
-                    total = max(total, i[operand] + nr)
+                what = OPCODE_NAME[op]
+                if job.get("kind") == "row_span":
+                    total = max(total, m.row_span(job["state"], what, i))
+                elif "port" in job:
+                    total += m.items(job["unit"], job["port"], what, i)
                 else:
-                    raise ValueError(kind)
+                    total += m.work(job["unit"], what, i)
         if not 0 <= total <= usable_max(hi - lo):
             raise ValueError(
                 f"header {name}={total} does not fit {hi - lo - 1} usable "

@@ -253,6 +253,30 @@ class Instruction:
 
 
 @dataclass(frozen=True)
+class Cost:
+    """What one unit spends on one issue: a head, a row, and a row count.
+
+    Kept apart rather than summed because a header word sometimes counts the
+    head (how many ``mm``s) and sometimes the rows (how many wavefront rows),
+    and the two are different questions about the same instruction."""
+
+    unit: str
+    rows: int
+    head_steps: int
+    row_steps: int
+    head: tuple = ()
+    row: tuple = ()
+
+    @property
+    def steps(self):
+        return self.head_steps + self.rows * self.row_steps
+
+    def items(self, port):
+        return (sum(1 for e in self.head if e.port == port)
+                + self.rows * sum(1 for e in self.row if e.port == port))
+
+
+@dataclass(frozen=True)
 class Effect:
     """One action, resolved for one issue: which cycle, which row, which value.
 
@@ -432,12 +456,11 @@ class Machine:
 
             at = max([ready.get(a, 0) for a in action.args] + [0]) \
                 + max(0, action.at)
-            last = at
-            for item in range(count):
-                resources = self._resources(action, unit, 
-                                            None if base is None else base + row,
-                                            env)
-                cycle = at + item
+            first, last = None, at
+            for _ in range(count):
+                resources = self._resources(
+                    action, unit, None if base is None else base + row, env)
+                cycle = at
                 while any(len(calendar.get((key, origin + cycle), ())) >= cap
                           for key, cap in resources):
                     cycle += 1
@@ -453,16 +476,75 @@ class Machine:
                 for key, _cap in resources:
                     calendar.setdefault((key, origin + cycle), []).append(effect)
                 placed.append(effect)
-                last = max(last, cycle)
-                at = cycle
+                first = cycle if first is None else first
+                last, at = cycle, cycle + 1
             if action.into is not None:
-                # Available in the cycle it is produced in: a value crosses an
-                # action boundary combinationally unless the action declares a
-                # latency with `at=`, which is why `vadd`'s second read and its
-                # write share one cycle and a reduction tree's root does not.
-                ready[action.into] = last
+                # Available from the cycle its FIRST item lands, not its last:
+                # a value crosses an action boundary combinationally unless the
+                # action declares a latency with `at=`, and a multi-item action
+                # is a STREAM, so its consumer starts with it rather than after
+                # it. That is why `spm` spends T+1 steps on an `mm` -- one spad
+                # read and one `wcol` put per step -- and not 2T+1.
+                ready[action.into] = first if first is not None else last
             span = max(span, last + 1)
         return placed, span
+
+    def profile(self, name, environment=None):
+        """Per-unit cost of one issue, WITHOUT materialising every row.
+
+        Every row of an instruction has the same shape -- only the element it
+        touches moves -- so the head and one row are placed and the rest is
+        arithmetic. This is what a header count and a dispatch rewrite are
+        computed from, and it is why computing them costs the same whether
+        ``nr`` is 1 or 127."""
+        instruction = self.instruction(name)
+        env = self._environment(environment)
+        rows = evaluate(instruction.rows, env) if instruction.rows else 1
+        out = {}
+        for unit in instruction.units:
+            model = self.unit(unit)
+            ii = max(1, model.ii if model is not None else 1)
+            mine = instruction.of(unit)
+            head = [a for a in mine if a.per == PER_INSTRUCTION]
+            body = [a for a in mine if a.per != PER_INSTRUCTION]
+            hits, hspan = self._book(unit, ii, head, 0, env, 0, {}) \
+                if head else ((), 0)
+            rits, rspan = self._book(unit, ii, body, 0, env, 0, {}) \
+                if body else ((), 0)
+            out[unit] = Cost(
+                unit=unit, rows=max(0, rows),
+                head_steps=_steps(hspan, ii) if hspan else 0,
+                row_steps=_steps(rspan, ii) if rspan else 0,
+                head=tuple(hits), row=tuple(rits))
+        return out
+
+    def work(self, unit, name, environment=None):
+        """How many steps ``unit`` spends on one issue of ``name``.
+
+        This is the number a per-unit work count in an instruction-memory
+        header carries, and the number a dispatcher rewrites a row count to.
+        Neither is declared anywhere in this model: both are this."""
+        cost = self.profile(name, environment).get(unit)
+        return cost.steps if cost else 0
+
+    def items(self, unit, port, name, environment=None):
+        """How many items one PORT of one unit carries for one issue. A header
+        word that counts something narrower than a unit's work names it."""
+        cost = self.profile(name, environment).get(unit)
+        return cost.items(port) if cost else 0
+
+    def row_span(self, state, name, environment=None):
+        """The highest element of ``state`` one issue touches, plus one --
+        the span a burst has to cover."""
+        best = 0
+        for cost in self.profile(name, environment).values():
+            for effect in cost.head:
+                if effect.state == state and effect.row is not None:
+                    best = max(best, effect.row + 1)
+            for effect in cost.row:
+                if effect.state == state and effect.row is not None:
+                    best = max(best, effect.row + cost.rows)
+        return best
 
     def calendar(self, name, environment=None, loose=False):
         """Every resource this instruction books, at every cycle, across every
@@ -504,14 +586,14 @@ class Machine:
                                           mine_only, loose)
                 effects += placed
                 width = span
-                cycle += _steps(span, ii) * ii
+                cycle += (_steps(span, ii) * ii) if span else 0
             for row in range(max(0, rows) if body else 0):
                 placed, span = self._book(unit, ii, body, row, env, cycle,
                                           mine_only, loose)
                 effects += placed
                 if row == 0 or width is None:
                     width = span
-                cycle += _steps(span, ii) * ii
+                cycle += (_steps(span, ii) * ii) if span else 0
             for key, hits in mine_only.items():
                 calendar.setdefault(key, []).extend(hits)
             out[unit] = (tuple(effects), cycle // ii, width or 0)
@@ -525,18 +607,6 @@ class Machine:
         instruction = self.instruction(name)
         env = self._environment(environment)
         return self._issue(instruction, env, {}, loose).get(unit, ((), 0, 0))[0]
-
-    def work(self, unit, name, environment=None):
-        """How many steps ``unit`` spends on one issue of ``name``.
-
-        This is the number a per-unit work count in an instruction-memory
-        header carries, and the number a dispatcher rewrites a row count to.
-        Neither is declared anywhere in this model: both are this."""
-        if unit not in self.units_of(name):
-            return 0
-        instruction = self.instruction(name)
-        env = self._environment(environment)
-        return self._issue(instruction, env, {}).get(unit, ((), 0, 0))[1]
 
     def effects(self, name, environment=None, units=None):
         """Every resolved effect of one issue, per unit, in cycle order."""
@@ -667,49 +737,55 @@ def unknown_name_violations(machine):
 
 
 def value_flow_violations(machine):
-    """A value consumed and never produced, produced twice, or crossing from
-    one unit to another with no port carrying it.
+    """A value consumed and never produced, produced twice in one unit, or
+    consumed in a unit other than the one that produced it.
 
-    The last is the rule that makes a composition a MACHINE rather than a
-    wish: the accumulator may take the array's product only because a channel
-    is declared between them."""
+    Values are scoped PER UNIT, because that is what a unit is: a value leaves
+    one unit only through an ``emit`` and enters another only through a
+    ``receive``, and the two ends may name it the same thing without being the
+    same value. The rule that makes a composition a MACHINE rather than a wish
+    is the last one -- the accumulator may take the array's product only
+    because a channel is declared between them, and a composition that skips
+    the channel is refused."""
     out = []
     for i in machine.instructions:
-        producer, seen = {}, {}
+        producer = {}
         for a in i.actions:
             if a.into is None:
                 continue
-            if a.into in seen:
+            key = (a.unit, a.into)
+            if key in producer:
                 out.append(Violation(
                     "value defined twice", f"{i.name}/{a.unit}",
-                    f"{a.into!r} is also produced by {seen[a.into]!r}",
+                    f"{a.into!r} is produced twice in {a.unit!r}",
                     "name the second value something else"))
-            seen[a.into] = a.unit
-            producer[a.into] = a
+            producer[key] = a
         emits = {(a.unit, a.port) for a in i.actions if a.kind == EMIT}
         receives = {(a.unit, a.port) for a in i.actions if a.kind == RECEIVE}
         for a in i.actions:
             for name in a.args:
-                if name not in producer:
+                if (a.unit, name) in producer:
+                    continue
+                elsewhere = sorted({u for u, n in producer if n == name})
+                if not elsewhere:
                     out.append(Violation(
                         "undefined value", f"{i.name}/{a.unit}",
-                        f"{name!r} is consumed and nothing produces it",
+                        f"{name!r} is consumed in {a.unit!r} and nothing "
+                        f"produces it there or anywhere",
                         "produce it with into=, or consume a value that exists"))
                     continue
-                source = producer[name].unit
-                if source == a.unit:
-                    continue
-                shared = {p for u, p in emits if u == source} \
+                shared = {p for u, p in emits if u in elsewhere} \
                     & {p for u, p in receives if u == a.unit}
                 out.append(Violation(
                     "value crosses units", f"{i.name}/{a.unit}",
-                    f"{name!r} is produced in {source!r} and consumed in "
-                    f"{a.unit!r} directly"
-                    + (f"; the channel {sorted(shared)} between them carries "
-                       f"values but this action does not go through it"
+                    f"{name!r} is produced in {elsewhere} and consumed in "
+                    f"{a.unit!r} without entering it"
+                    + (f"; the channel {sorted(shared)} joins them but this "
+                       f"action does not take its value from the receive"
                        if shared else ", and no channel joins them"),
-                    f"emit it from {source!r} and receive it in {a.unit!r} "
-                    f"over a shared port, then consume what the receive names"))
+                    f"emit it from {elsewhere[0]!r} and receive it in "
+                    f"{a.unit!r} over a shared port, then consume what the "
+                    f"receive names"))
     return out
 
 
