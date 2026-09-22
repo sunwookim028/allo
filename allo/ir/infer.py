@@ -41,6 +41,7 @@ from ..utils import (
 )
 from ..memory import DTensor, Layout
 from .utils import parse_ast, get_func_id_from_param_types, resolve_generic_types
+from .units import bind_ports, expand_region_units, is_region, is_unit_instance
 
 
 # pylint: disable=too-many-public-methods
@@ -727,6 +728,8 @@ class TypeInferer(ASTVisitor):
     @staticmethod
     def visit_FunctionDef(ctx: ASTContext, node: ast.FunctionDef):
         # pylint: disable=too-many-nested-blocks,too-many-branches
+        if is_region(node):
+            expand_region_units(node, ctx.global_vars)
         if ctx.top_func is not None:
             # Nested function def
             # Create a new context to avoid name collision
@@ -780,6 +783,9 @@ class TypeInferer(ASTVisitor):
                                     new_ctx.rank = dim
                                     new_ctx.scopes = old_ctx.scopes
                                     new_ctx.global_vars = old_ctx.global_vars.copy()
+                                    new_ctx.global_vars.update(
+                                        getattr(node, "unit_globals", {})
+                                    )
                                     for axis, val in enumerate(dim):
                                         new_ctx.global_vars.update(
                                             {"df.p" + str(axis): val}
@@ -820,6 +826,9 @@ class TypeInferer(ASTVisitor):
                                 new_ctx.rank = sample_dim
                                 new_ctx.scopes = old_ctx.scopes
                                 new_ctx.global_vars = old_ctx.global_vars.copy()
+                                new_ctx.global_vars.update(
+                                    getattr(node, "unit_globals", {})
+                                )
                                 for axis, val in enumerate(sample_dim):
                                     new_ctx.global_vars.update(
                                         {"df.p" + str(axis): val}
@@ -875,11 +884,19 @@ class TypeInferer(ASTVisitor):
                 )
                 # update shape
                 arg.shape = arg.dtensor.get_local_shape()
-                assert ctx.get_symbol(name=arg.arg, allow_missing=True) is None, (
+                # A unit's parameters are its own: it is written outside any
+                # region and wired by position, so a name it shares with a
+                # region-scope symbol is a coincidence and shadows it. A
+                # kernel nested in a region reaches that scope by name, so
+                # there the same coincidence is a conflict.
+                assert is_unit_instance(node) or (
+                    ctx.get_symbol(name=arg.arg, allow_missing=True) is None
+                ), (
                     f"Argument name '{arg.arg}' conflicts with an existing symbol. "
                     f"Please choose a different name to avoid the conflict."
                 )
                 ctx.put_symbol(name=arg.arg, val=arg)
+            bind_ports(ctx, node)
 
             func_name = (
                 node.name if ctx.func_id is None else f"{node.name}_{ctx.func_id}"

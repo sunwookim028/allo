@@ -54,6 +54,7 @@ from .dependence import (
     recheck as recheck_dependence_claims,
 )
 from .encoding import EncodingError, violations as encoding_violations
+from .netlist import NetlistError
 from .ir.visitor import ASTContext
 from .ir.utils import MockArg, MockBuffer, parse_ast, get_global_vars
 from .ir.builder import ASTTransformer
@@ -857,9 +858,9 @@ class Schedule:
                 "rewind"
             ] = UnitAttr.get()
         if style is not None:
-            self.get_loops(func)[band_name][axis].loop.attributes[
-                "pipeline_style"
-            ] = StringAttr.get(style)
+            self.get_loops(func)[band_name][axis].loop.attributes["pipeline_style"] = (
+                StringAttr.get(style)
+            )
         self.get_loops(func)[band_name][axis].loop.attributes["pipeline_ii"] = ii
 
     @wrapped_apply
@@ -1582,6 +1583,10 @@ def customize(
     )
     try:
         tree = TypeInferer()(ctx_type_inf, tree)
+    except NetlistError:
+        # A wiring error is already a located diagnostic with its repair, and
+        # the caller is expected to catch it; do not turn it into an exit.
+        raise
     # pylint: disable=broad-exception-caught
     except Exception as e:
         print(f"{traceback.format_exc()}")

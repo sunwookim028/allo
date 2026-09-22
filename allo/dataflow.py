@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # pylint: disable=no-name-in-module, unexpected-keyword-arg, no-value-for-parameter, global-variable-not-assigned, global-statement, broad-exception-caught
 
+import ast
 import functools
+import inspect
 import itertools
 import os
+import textwrap
 from typing import Union
 from ._mlir.ir import (
     InsertionPoint,
@@ -27,6 +30,10 @@ from .ir.utils import (
 from .backend.simulator import LLVMOMPModule
 from .passes import df_pipeline
 from .backend import AIE_MLIRModule
+
+# pylint: disable=unused-import
+from .netlist import UnitSpec, netlist_of  # netlist_of is re-exported as df.netlist_of
+from .ir.units import expand_region_units
 
 
 def gather(pipes: list):
@@ -122,7 +129,11 @@ def move_stream_to_interface(
                     ):
                         # These don't strictly define direction, but we need to choose one
                         # to avoid the error. Default to 'in' for empty (consumer) and 'out' for full (producer)
-                        direction = "in" if isinstance(use.owner, allo_d.StreamEmptyOp) else "out"
+                        direction = (
+                            "in"
+                            if isinstance(use.owner, allo_d.StreamEmptyOp)
+                            else "out"
+                        )
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
                 if with_stream_type and stream_name not in stream_types_dict:
@@ -319,7 +330,11 @@ def move_stream_to_interface(
                     elif isinstance(
                         use.owner, (allo_d.StreamEmptyOp, allo_d.StreamFullOp)
                     ):
-                        direction = "in" if isinstance(use.owner, allo_d.StreamEmptyOp) else "out"
+                        direction = (
+                            "in"
+                            if isinstance(use.owner, allo_d.StreamEmptyOp)
+                            else "out"
+                        )
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
                 stream_name = op.attributes["name"].value
@@ -576,7 +591,62 @@ def kernel(mapping=None, args=None):
     return actual_decorator
 
 
-def region():
+def check_region_wiring(func):
+    """Refuse an illegal netlist at the ``@df.region()`` that wrote it.
+
+    The same check runs again when the region is customized, on the tree that
+    is actually built. Running it here as well is what makes a wiring mistake
+    a definition-time error rather than a build-time one; a region that
+    instantiates no unit is untouched, and a region whose source or names
+    cannot be resolved this early is simply left to the build.
+    """
+    try:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func))).body[0]
+        global_vars = get_global_vars(func)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return
+    expand_region_units(tree, global_vars)
+
+
+def unit(mapping=None):
+    """Mark the decorated module-level function as a dataflow unit.
+
+    A unit declares its stream ports in its own signature::
+
+        @df.unit()
+        def relay(src: Stream[int32, 4], dst: Stream[int32, 4]):
+            for i in range(N):
+                dst.put(src.get() + 1)
+
+    and a region instantiates it against streams of its own choosing::
+
+        @df.region()
+        def top():
+            a: Stream[int32, 4]
+            b: Stream[int32, 4]
+            c: Stream[int32, 4]
+            first = relay(src=a, dst=b)
+            second = relay(src=b, dst=c)
+
+    so the unit and the region need not agree on a name, and one unit can be
+    instantiated any number of times against different streams. A
+    ``@df.kernel`` nested in a region reaches its streams by lexical name
+    instead, and still does; this is an addition to that, not a replacement.
+
+    The interface is checked here, at the ``@df.unit``: a port is legal if and
+    only if the body uses it at least once and in one direction only. The
+    wiring is checked at the region -- see :mod:`allo.netlist` for the rules
+    and for the one property that is an obligation rather than a rule.
+    """
+
+    def actual_decorator(func):
+        func.__allo_unit__ = UnitSpec(func, mapping)
+        return func
+
+    return actual_decorator
+
+
+def region(deadlock_free_because: str = None):
     """Mark the decorated function as a dataflow region.
 
     A region is a top-level dataflow function whose body declares
@@ -590,9 +660,17 @@ def region():
     Region-scope ``Stateful`` is the natural fit for accelerator
     architectures with a decoder kernel and a compute kernel sharing
     scratchpad/accumulator state (Gemmini-style).
+
+    ``deadlock_free_because`` is the author's premise for why the feedback
+    loops in a netlist of ``@df.unit`` instances drain. Nothing checks it, and
+    a region whose netlist carries feedback without one warns
+    (``allo.netlist.UndeclaredPremise``): deadlock-freedom needs per-unit
+    rates, which a netlist does not carry, so it is an obligation and not a
+    rule. A region with no feedback needs no premise.
     """
 
     def actual_decorator(func):
+        check_region_wiring(func)
         # TODO: ideally this context information should be recorded in the builder
         global _current_region_context
         _current_region_context = {}

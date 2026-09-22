@@ -70,10 +70,11 @@ Start from the symptom
        once: see :ref:`extending-allo-encoding`.
    * - You copied a unit instead of instantiating it; or the same design exists
        several times, differing only in topology.
-     - Allo has no **unit with an interface**. Composition is by lexical
-       capture, so a unit cannot be named, imported or wired.
+     - Allo had no **unit with an interface**. Composition was by lexical
+       capture, so a unit could not be named, imported or wired.
      - A **type** (a stream that can be a port) plus **frontend** support for
-       calls that pass it. Open: :ref:`extending-allo-ports`.
+       calls that pass it. Done: :ref:`extending-allo-ports`, and
+       :ref:`stream-ports` for the rules.
    * - You wanted one iteration of a loop to do something different from the
        rest, and wrote two loop nests by hand.
      - Allo has no **index-set splitting**. ``split`` cuts a loop into a nest;
@@ -447,10 +448,34 @@ one that lets a second design share a representation with it.
 
 .. _extending-allo-ports:
 
-1. A stream that can be a port, so a unit can have an interface
----------------------------------------------------------------
+1. A stream that can be a port, so a unit can have an interface -- **done**
+----------------------------------------------------------------------------
 
-**The gap.** A ``@df.kernel`` cannot name its stream ports. Streams are
+Landed as ``@df.unit`` plus ``allo/netlist.py``; :ref:`stream-ports` is the
+page, and the record below is what was predicted, kept because one half of the
+prediction was wrong in an instructive way.
+
+**What it cost, against the estimate.** No IR change, no C++, no rebuild: about
+420 lines of Python in two new modules (``allo/netlist.py``,
+``allo/ir/units.py``), one method on ``Stream``, and five single-line hooks in
+``allo/ir/infer.py`` / ``allo/ir/builder.py``. The whole ``tests/dataflow``
+suite was the regression net, as predicted, and caught nothing -- because the
+change is an addition: a region that instantiates no unit is not touched at
+all, and there is a test that says so.
+
+**The correction worth reading.** Blocker 2 below -- six ``.clone()`` sites in
+``allo/ir/builder.py`` -- was never touched. It is only a blocker if a port has
+to *become* a block argument in the frontend. It does not:
+``move_stream_to_interface`` already turns a kernel's construct ops into block
+arguments, and it keys them by the op's ``name`` attribute, so a port is a
+construct op carrying the **channel's** name bound to the **unit's** parameter
+name. Binding those two names is the whole of the mechanism. Blocker 1,
+``Stream.__class_getitem__``, was real and is fixed. The lesson is the one at
+the top of this page, applied to a diagnosis rather than a design: the IR
+being right meant even less had to change than the analysis that found it
+believed.
+
+**The gap, as it was.** A ``@df.kernel`` cannot name its stream ports. Streams are
 declared as annotations in a ``@df.region`` body and reached from kernel bodies
 by lexical name, so a unit's interface is not a property of the unit -- it is
 derived, by whole-region analysis (``move_stream_to_interface``), from the
@@ -507,7 +532,14 @@ separately from the units it wires.
 
 **Legality rules that must ship with it.** These are the point of the
 extension: constraints that are whole-program analyses today become local
-checks on a signature or on one wiring edge.
+checks on a signature or on one wiring edge. All five shipped, with one
+correction that only the real design could have found: **a stream array is a
+chain**, read at ``ch[i]`` and written at ``ch[i + 1]`` with a runtime index,
+so for an array port neither *direction is single-valued* nor *single
+producer, single consumer* is decidable. Both rules are therefore scoped to
+scalar ports, and the array case is declared rather than checked -- the same
+split ``design-modular``'s architecture check had already arrived at
+independently. The drafted rules, as drafted:
 
 * *Direction is single-valued.* Within a unit, each stream port is used only
   for ``get``/``empty`` (in) or only for ``put``/``full`` (out). Mixed use is
@@ -535,12 +567,19 @@ checks on a signature or on one wiring edge.
   extension that overstates its own guarantee is the failure mode that
   primitive paid for before its rule landed.
 
-**Risk.** Moderate, and lower than it looks: the destination IR is already
-emitted and already exercised by the whole ``tests/dataflow`` suite, so this is
-a frontend path to an existing IR shape rather than a new IR. The two
-blockers above are located to the line. The risk is concentrated in
+**Risk, as estimated.** Moderate, and lower than it looks: the destination IR
+is already emitted and already exercised by the whole ``tests/dataflow`` suite,
+so this is a frontend path to an existing IR shape rather than a new IR. The
+two blockers above are located to the line. The risk is concentrated in
 ``allo/ir/builder.py`` and ``allo/ir/infer.py``, which the golden tests cover
 densely -- run them at every step.
+
+**Risk, as it turned out.** Lower still. ``allo/ir/builder.py`` took one
+import and two lines. The one defect the work exposed was pre-existing and
+unrelated to ports: ``get_global_vars`` read a region's namespace off the
+``functools.wraps`` wrapper, i.e. ``allo/dataflow.py``'s module dict, and
+every region in the tree resolved its stream declarations correctly only
+because the *caller* happened to import the same names. See :ref:`stream-ports`.
 
 2. ``Encoding`` and ``s.encodable_on``
 --------------------------------------
