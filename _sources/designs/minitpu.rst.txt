@@ -64,14 +64,13 @@ two to compare; the bitstream id is part of the figure.
      - 7.880 W on-chip (vectorless)
      -
    * - GPT-2 body throughput
-     - **SUPERSEDED 2026-09-22, do not quote.** Was 79.16 tok/s at 32 rows and
-       129.70 at 256 (medians of five runs, spread 128.83–130.50 at 256). Two
-       commits on MiniTPU's master have taken the 32-row figure to a **claimed
-       160.38 tok/s on this same bitstream at 187.498 MHz** — the hardware did
-       not change. Treat 160.38 as provisional pending their full-board suite
-       and the 256-row median; what is certain is that the old pair is stale.
-       See "The concession that became the win" below.
-     - 23.255 GFLOP/s, 24.2 % of the 96 GFLOP/s array peak
+     - **160.60 tok/s at 32 rows, 158.04 at 256** — medians of five runs,
+       2026-09-22, bitstream ``0xB1FF21F4`` at 187.498 MHz. **Confirmed on a
+       second board**: .189 measured 160.43 and 158.40 on the same commit, so
+       two boards agree within 0.4 %. 28.4 GFLOP/s, **29.6 % of the 96 GFLOP/s
+       array peak** (was 24.2 %). The earlier 79.16 / 129.70 pair is superseded
+       — **the hardware did not change**; see "The concession that became the
+       win" below.
    * - Kernel checks
      - 17/17 GPT-2, 6/6 Qwen
      - batch invariance bit-identical for ``B = 1..16`` — read with the

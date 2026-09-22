@@ -1190,7 +1190,7 @@ register-access floor, measured on board .187</strong> — roughly <strong>24,75
 187.5 MHz</strong> — and their testbench numbers do not include it either.</p>
 <p>So the rule for any comparison on this page, and for the benchmark set
 generally:</p>
-<ul class="simple">
+<ul>
 <li><p><strong>Name the window for every figure.</strong> What is inside it, where it starts, and
 where it stops. A cycle count without its window is not a measurement.</p></li>
 <li><p><strong>Count every machine’s host, or none of them.</strong> Counting Gemmini’s driver
@@ -1200,6 +1200,24 @@ acceptable is letting one machine’s overhead count while another’s vanishes.
 <li><p><strong>Where both windows are cheap to report, report both.</strong> For Gemmini this
 costs nothing, because the driver-inclusive and accelerator-only figures come
 out of the same run.</p></li>
+<li><p><strong>Report an integer invariant beside every timing.</strong> Kernel invocations, DMA
+descriptors, burst iterations, instruction words, <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> calls — some
+count that cannot drift. A time can always be explained away as noise or a
+slow clock; an integer cannot, and it distinguishes <em>a changed measurement</em>
+from <em>a changed machine</em>.</p>
+<p>The worked example is MiniTPU’s, offered against their own interest. A first
+measurement of an unchanged commit read a <strong>2x regression</strong>, and three things
+were wrong at once: provisioning had silently reprogrammed the part from a
+stale firmware directory, replacing the bitstream under the test; the host
+package was a stale copy missing its committed images, so it rebuilt work per
+launch; and provisioning had chowned a device node and locked the next user
+out. <strong>What caught it was the launch count — 216 against 180, eighteen a layer
+instead of fifteen</strong> — clock-independent, bitstream-independent and integer,
+pointing straight at the host. The wall-clock number alone would have sent
+them looking at the RTL.</p>
+<p>Their rule, now ours: read the identity of what you are measuring <strong>after</strong>
+provisioning, not only before.</p>
+</li>
 </ul>
 <p>This is the same failure mode as the withdrawn claim recorded above: a number
 that is true of the measurement but not of the thing being measured. Two of

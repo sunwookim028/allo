@@ -234,58 +234,7 @@ scratchpad reports; <em>(verified)</em> means re-checked against <code class="do
 MiniTPU’s owner. Two builds are kept, because §2’s noise-floor argument needs
 two to compare; the bitstream id is part of the figure.</p>
 <table class="docutils align-default" id="id1">
-<caption><span class="caption-text">Current: bitstream <code class="docutils literal notranslate"><span class="pre">0xB1FF21F4</span></code>, 187.5 MHz, verified current against MiniTPU’s RTL at its HEAD</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
-<colgroup>
-<col style="width: 24.0%" />
-<col style="width: 38.0%" />
-<col style="width: 38.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"></th>
-<th class="head"><p>value</p></th>
-<th class="head"><p>note</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>CLB LUT</p></td>
-<td><p>194,459 (84.4 %)</p></td>
-<td><p>LUT is the scarce resource, not DSP</p></td>
-</tr>
-<tr class="row-odd"><td><p>CLB registers</p></td>
-<td><p>123,294</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>DSP</p></td>
-<td><p>838</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>WNS</p></td>
-<td><p>+0.053 ns at 200 MHz</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>Power</p></td>
-<td><p>7.880 W on-chip (vectorless)</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>GPT-2 body throughput</p></td>
-<td><p><strong>SUPERSEDED 2026-09-22, do not quote.</strong> Was 79.16 tok/s at 32 rows and
-129.70 at 256 (medians of five runs, spread 128.83–130.50 at 256). Two
-commits on MiniTPU’s master have taken the 32-row figure to a <strong>claimed
-160.38 tok/s on this same bitstream at 187.498 MHz</strong> — the hardware did
-not change. Treat 160.38 as provisional pending their full-board suite
-and the 256-row median; what is certain is that the old pair is stale.
-See “The concession that became the win” below.</p></td>
-<td><p>23.255 GFLOP/s, 24.2 % of the 96 GFLOP/s array peak</p></td>
-</tr>
-<tr class="row-even"><td><p>Kernel checks</p></td>
-<td><p>17/17 GPT-2, 6/6 Qwen</p></td>
-<td><p>batch invariance bit-identical for <code class="docutils literal notranslate"><span class="pre">B</span> <span class="pre">=</span> <span class="pre">1..16</span></code> — read with the
-row-wise qualifier in §4</p></td>
-</tr>
-</tbody>
-</table>
-<table class="docutils align-default" id="id2">
-<caption><span class="caption-text">Earlier: bitstream <code class="docutils literal notranslate"><span class="pre">0xB182E69D</span></code>, read 2026-09-18 under <code class="docutils literal notranslate"><span class="pre">board_package/minitpu/qor/</span></code></span><a class="headerlink" href="#id2" title="Link to this table"><span>¶</span></a></caption>
+<caption><span class="caption-text">Earlier: bitstream <code class="docutils literal notranslate"><span class="pre">0xB182E69D</span></code>, read 2026-09-18 under <code class="docutils literal notranslate"><span class="pre">board_package/minitpu/qor/</span></code></span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
 <colgroup>
 <col style="width: 24.0%" />
 <col style="width: 38.0%" />

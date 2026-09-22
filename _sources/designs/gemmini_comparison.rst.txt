@@ -969,6 +969,25 @@ generally:
 - **Where both windows are cheap to report, report both.** For Gemmini this
   costs nothing, because the driver-inclusive and accelerator-only figures come
   out of the same run.
+- **Report an integer invariant beside every timing.** Kernel invocations, DMA
+  descriptors, burst iterations, instruction words, ``loop_ws`` calls — some
+  count that cannot drift. A time can always be explained away as noise or a
+  slow clock; an integer cannot, and it distinguishes *a changed measurement*
+  from *a changed machine*.
+
+  The worked example is MiniTPU's, offered against their own interest. A first
+  measurement of an unchanged commit read a **2x regression**, and three things
+  were wrong at once: provisioning had silently reprogrammed the part from a
+  stale firmware directory, replacing the bitstream under the test; the host
+  package was a stale copy missing its committed images, so it rebuilt work per
+  launch; and provisioning had chowned a device node and locked the next user
+  out. **What caught it was the launch count — 216 against 180, eighteen a layer
+  instead of fifteen** — clock-independent, bitstream-independent and integer,
+  pointing straight at the host. The wall-clock number alone would have sent
+  them looking at the RTL.
+
+  Their rule, now ours: read the identity of what you are measuring **after**
+  provisioning, not only before.
 
 This is the same failure mode as the withdrawn claim recorded above: a number
 that is true of the measurement but not of the thing being measured. Two of

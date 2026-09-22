@@ -464,6 +464,27 @@ any hardware claim has to use. And <strong>two of those four checkers are derive
 the assembler’s own header</strong>, so neither can see an error in the header formula
 itself — agreement among them is weaker evidence than it looks, because they
 share a premise.</p>
+<p><strong>The obvious explanation was tested and refuted.</strong> The suspicion was that the
+trigger is a transfer <em>inside</em> the emitted nest rather than hoisted into a
+prologue, and a coverage fact made it look stronger still — of the 23 programs
+the named gates run, <strong>none issues a memory load after a compute</strong>, while the
+random-program generator produces one in <strong>314 of 400 seeds</strong>. So the pattern is
+exercised constantly in the simulator and had never reached a co-simulation
+testbench.</p>
+<p>Four minimal programs, each verified against the reference model and by csim,
+then co-simulated under a hard bound: a prologue-only case, a load after a
+compute, a load in a loop before a compute, and a load sharing a loop body with
+a compute. <strong>All four completed.</strong> The hypothesis is dead; the trigger needs
+something those cases lack — nested loops, larger trip counts, an accumulating
+instruction inside a loop, or simply scale.</p>
+<p>Two things worth copying from how that was handled. A <cite>covered / UNCOVERED</cite>
+column had <strong>already been added</strong> to the flow on the strength of the suspicion,
+and it separated the candidates perfectly; it was <strong>reverted</strong> once the
+predicate was refuted, on the grounds that shipping a refuted predicate as a
+warning would mislead the very search it exists to guide. And the coverage gap
+survives as a finding in its own right even though it was not the cause: <strong>a
+pattern can be exercised thousands of times in a simulator and never once on
+RTL</strong>, and nothing in the gate list makes that visible.</p>
 <p>The general lesson is about verification chains rather than about this design:
 <strong>a stack of cheap checks that all pass is not a substitute for the expensive
 one, when some of the cheap checks are derived from the same source.</strong> The
