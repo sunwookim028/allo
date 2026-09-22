@@ -57,9 +57,10 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_DMA_ST, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
     OP_LOOP, OP_ENDLOOP, AGU_F0, AGU_F1,
     MAXDIM, T, WPR, IMEM_SIZE, NHDR, IWORDS, SPAD_ROWS, NVR, NAR, AR_RAW_DIST,
+    DRAM_WORDS,
 )
 from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
-    Program, Ref, gemm_program, vector_program, ar_distance_program,
+    Program, Ref, gemm_program, gemm_tiled, vector_program, ar_distance_program,
 )
 from examples.accelerator.tinytpu_vitis import isa_ref, kpn_model  # noqa: E402
 from examples.accelerator.tinytpu_vitis.bench_isa import (  # noqa: E402
@@ -154,25 +155,27 @@ def gemm_gold(A, B, M, K, N, relu, C0):
     return C.reshape(-1)
 
 
-def execute(mod, prog, A, B, C0):
-    words = assemble(prog)
+def execute(mod, prog, A, B, C0, dram=None):
+    words = assemble(prog, dram)
     imem = np.zeros(IMEM_SIZE, np.uint64)
     imem[: len(words)] = np.array(words, np.uint64)
-    C = C0.copy()
-    mod(imem, A.reshape(-1), B.reshape(-1), C)
-    return C
+    pad = lambda v: np.pad(v.reshape(-1), (0, DRAM_WORDS - v.size))  # noqa: E731
+    C = pad(C0)
+    mod(imem, pad(A), pad(B), C)
+    return C[: C0.size]
 
 
-def compare(tag, got, want, M=None, N=None):
+def compare(tag, got, want, M=None, N=None, cols=None):
     """None if equal, else a line saying how many cells are wrong inside the
     result region and how many were clobbered outside it."""
-    got = got.reshape(MAXDIM, MAXDIM)
-    want = want.reshape(MAXDIM, MAXDIM)
+    cols = MAXDIM if cols is None else cols
+    got = got.reshape(-1, cols)
+    want = want.reshape(-1, cols)
     diff = got != want
     if not diff.any():
         return None
     if M is None:
-        return f"{tag}: {int(diff.sum())}/{MAXDIM * MAXDIM} cells of C wrong"
+        return f"{tag}: {int(diff.sum())}/{diff.size} cells of C wrong"
     inside = int(diff[:M, :N].sum())
     return (f"{tag}: wrong={inside}/{M * N} "
             f"clobbered_outside={int(diff.sum()) - inside}")
@@ -440,6 +443,37 @@ def cases(quick=False):
                isa_ref.run(prog, A, B, C0), None, None)
 
 
+#: Shapes for the TILED program. The first three fit the square too; the rest
+#: do NOT -- a dimension past MAXDIM, or a loop whose trip count is past what
+#: `nr` used to carry -- so they run only because the DMA takes its stride from
+#: the header. Each is kept small enough that `isa_ref` can walk it row by row.
+TILED_SHAPES = [(8, 8, 8), (12, 8, 16), (32, 32, 32),
+                (16, 128, 16), (4, 512, 4), (8, 64, 128)]
+
+
+def tiled_cases(seed0=5000):
+    """`gemm_tiled` against `isa_ref`, at the real geometry of each operand."""
+    for i, (M, K, N) in enumerate(TILED_SHAPES):
+        rng = np.random.default_rng(seed0 + i)
+        relu = bool(i % 2)
+        if max(M * K, K * N, M * N) > DRAM_WORDS:
+            continue
+        prog, dram = gemm_tiled(M, K, N, relu=relu)
+        A = rng.integers(-128, 128, (M, K)).astype(np.int8)
+        B = rng.integers(-128, 128, (K, N)).astype(np.int8)
+        A[0, 0] = B[0, 0] = -128
+        C0 = rng.integers(-128, 128, (M, N)).astype(np.int8)
+        gold = isa_ref.run(prog, A, B, C0, dram)
+        want = np.clip(A.astype(np.int64) @ B.astype(np.int64), -128, 127)
+        if relu:
+            want = np.clip(np.maximum(A.astype(np.int64) @ B.astype(np.int64), 0),
+                           -128, 127)
+        assert (gold.reshape(M, N) == want).all(), (
+            f"isa_ref disagrees with numpy on the tiled {M}x{K}x{N}")
+        yield (f"tiled gemm{'.relu' if relu else ''} {M}x{K}x{N}",
+               prog, A, B, C0, gold, M, N, dram)
+
+
 def main(argv):
     quick = "quick" in argv
     failures = validator_controls()
@@ -448,20 +482,23 @@ def main(argv):
     n = len(failures)
     mod = df.build(tinytpu_isa, target="simulator")
     modelled = {}
-    for tag, prog, A, B, C0, gold, M, N in cases(quick):
+    runs = [c + (None,) for c in cases(quick)]
+    runs += list(tiled_cases())
+    for tag, prog, A, B, C0, gold, M, N, dram in runs:
         n += 1
         # The channel model first: a program the protocol cannot complete
         # would hang the simulator with no message, and this names why.
         key = tuple(prog)
         if key not in modelled:
-            modelled[key] = kpn_model.run(prog)
+            modelled[key] = kpn_model.run(prog, dram)
         live, rep = modelled[key]
         if not live:
             bad = f"{tag}: kpn_model: " + "; ".join(rep[:4])
             failures.append(bad)
             print("  STRESS FAIL", bad, flush=True)
             continue
-        bad = compare(tag, execute(mod, prog, A, B, C0), gold, M, N)
+        bad = compare(tag, execute(mod, prog, A, B, C0, dram), gold, M, N,
+                      cols=None if dram is None else dram.c[1])
         if bad:
             failures.append(bad)
             print("  STRESS FAIL", bad, flush=True)
@@ -470,7 +507,7 @@ def main(argv):
           f"({'quick' if quick else 'full'}: full-range/corner/boundary "
           f"operands, prefilled C compared in full, GEMM at "
           f"{len(SCORED) if quick else len(ALL_SHAPES)} shapes, vector and "
-          f"random programs)")
+          f"random programs, {len(TILED_SHAPES)} tiled)")
     return 0 if not failures else 1
 
 

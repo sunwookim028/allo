@@ -80,7 +80,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
     OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
-    OP_VRELU, enc, enc_agu,
+    OP_VRELU, Dram, enc, enc_agu,
     A_VR, AR_C, B_SP, DMA_SRC_B, DMA_TO_VR, MAXDIM, MAXROWS, T,
     SPAD_ROWS, NVR, NAR,
 )
@@ -321,6 +321,78 @@ def gemm_program(M, K, N, relu=False):
             k.vrelu(AR_C, AR_C, rows=M)
         k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
     return k.emit()
+
+
+def gemm_tiled(M, K, N, Mt=None, relu=False):
+    """GEMM of ANY shape: the matrix is TILED INTO the addressable space.
+
+    `gemm_program` above fits a shape into the machine -- every operand row it
+    names must be an addressable row of a MAXDIM x MAXDIM square, so 128x768x768
+    is not expressible at any encoding this design could reasonably carry (it
+    would want 147,456 operand rows against the 2,047 an 11-bit address field
+    holds). This one fits the MACHINE to the shape instead. Returns
+    `(program, Dram)`: the geometry goes in the header and `dma_ld`/`dma_st`
+    multiply by it, so `A` really is M x K in DRAM, not a padded square.
+
+    The mapping, and every part of it is the author's:
+
+        for each band of Mt rows of C          (level 0)
+          for each column block of C           (level 1)
+            load A's first column block, load B's first k-tile, mm (overwrite)
+            for each remaining k-tile          (level 2)
+              load A's column block, load B's k-tile, mm (accumulate)
+            relu, mvout the band
+
+    What it costs and what it buys. The A tile is re-read once per column
+    block of C, because the accumulator holds ONE column block of the output
+    band (Mt rows) and a k reduction cannot be interrupted -- so the machine's
+    2 KB of operand vregs, not its instruction set, is what decides the DRAM
+    traffic. What it buys is that nothing here grows with M, K or N: the static
+    program is the same 15 instructions at 16x16x16 and at 128x768x768, the
+    deepest nest is 3 of the 4 hardware loop levels, and **no instruction needs
+    more than 2 of the 3 address terms**. The fourth term and the fifth loop
+    level that were expected to be needed for large shapes are needed for a
+    BETTER mapping, not for a legal one (`docs/source/designs/tinytpu_isa.rst`).
+
+    `Mt` defaults to the largest band the machine holds: `nr` is one field, so
+    at most MAXROWS rows, and the band must fit the accumulator and the vregs.
+    """
+    Mt = _band(M, NAR, NVR) if Mt is None else Mt
+    if M % Mt or K % T or N % T:
+        raise NestError(
+            f"gemm_tiled {M}x{K}x{N}: M must be a multiple of the band {Mt} "
+            f"and K, N multiples of T={T}", code="shape")
+    if Mt > MAXROWS or Mt > NAR or Mt > NVR:
+        raise NestError(
+            f"gemm_tiled: a band of {Mt} rows is past nr's {MAXROWS} rows, "
+            f"the {NAR} accumulator rows or the {NVR} vregs", code="band")
+    dram = Dram.gemm(M, K, N)
+    k = Program(f"gemm_tiled{'.relu' if relu else ''} {M}x{K}x{N} band {Mt}")
+    with k.loop(M // Mt, "m") as mo:
+        with k.loop(N // T, "n") as no:
+            k.dma_ld(src=0, dram_row=Ref().at(mo, Mt), col_block=0,
+                     vr=A_VR, rows=Mt)
+            k.dma_ld(src=1, dram_row=0, col_block=Ref().at(no, 1),
+                     spad=B_SP, rows=T)
+            k.mm(A_VR, AR_C, B_SP, rows=Mt, acc=False)
+            if K > T:
+                with k.loop(K // T - 1, "k") as kb:
+                    k.dma_ld(src=0, dram_row=Ref().at(mo, Mt),
+                             col_block=Ref(1).at(kb, 1), vr=A_VR, rows=Mt)
+                    k.dma_ld(src=1, dram_row=Ref(T).at(kb, T),
+                             col_block=Ref().at(no, 1), spad=B_SP, rows=T)
+                    k.mm(A_VR, AR_C, B_SP, rows=Mt, acc=True)
+            if relu:
+                k.vrelu(AR_C, AR_C, rows=Mt)
+            k.mvout(AR_C, dram_row=Ref().at(mo, Mt),
+                    col_block=Ref().at(no, 1), rows=Mt)
+    return k.emit(), dram
+
+
+def _band(M, *limits):
+    """The largest band of rows that divides M and fits every limit."""
+    hi = min(M, MAXROWS, *limits)
+    return next(b for b in range(hi, 0, -1) if M % b == 0)
 
 
 def vector_program(M=8):

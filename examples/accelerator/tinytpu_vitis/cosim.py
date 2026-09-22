@@ -63,9 +63,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from allo.dataflow import customize  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
-    tinytpu_isa, assemble, schedule, MAXDIM, T, IMEM_SIZE,
+    tinytpu_isa, assemble, schedule, DEFAULT_DRAM, DRAM_WORDS, MAXDIM, T,
+    IMEM_SIZE,
 )
-from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
+from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+    gemm_program, gemm_tiled,
+)
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"
@@ -83,6 +86,14 @@ if os.environ.get("TPU_SHAPES"):        # e.g. TPU_SHAPES=4x4x4,16x16x16
 
 TB_MODE = os.environ.get("TPU_TB", "default")   # "default" or "stress"; see top
 assert TB_MODE in ("default", "stress"), f"TPU_TB={TB_MODE!r}"
+# `TPU_TILED=32x512x128` measures the TILED program instead of the square one:
+# the same RTL, a matrix that does not fit the addressable space, and operands
+# of the real geometry rather than a MAXDIM square. Any shape at all, as long
+# as its three matrices fit the DRAM_WORDS an operand port addresses.
+TILED = [tuple(int(x) for x in t.split("x"))
+         for t in os.environ.get("TPU_TILED", "").split(",") if t]
+if TILED:
+    SHAPES = TILED
 # Where the Vitis project goes. Default: next to this file, whatever the cwd.
 PRJ = os.path.abspath(os.environ.get(
     "TPU_PRJ", os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -97,10 +108,19 @@ RANDOM_STALL = os.environ.get("TPU_RANDOM_STALL", "") == "1"
 
 
 def vectors(M, K, N, relu=False, seed=0, prog=None):
+    """Operands, program and gold. In tiled mode the operands are the shape
+    they really are -- A is M x K in DRAM, not the corner of a square."""
     rng = np.random.default_rng(seed)
-    A = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
-    B = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
-    words = assemble(gemm_program(M, K, N, relu) if prog is None else prog)
+    if TILED:
+        prog, dram = gemm_tiled(M, K, N, relu=relu)
+        A = rng.integers(-4, 5, (M, K)).astype(np.int8)
+        B = rng.integers(-4, 5, (K, N)).astype(np.int8)
+    else:
+        dram = DEFAULT_DRAM
+        A = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
+        B = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
+        prog = gemm_program(M, K, N, relu) if prog is None else prog
+    words = assemble(prog, dram)
     imem = np.zeros(IMEM_SIZE, np.uint64)
     imem[: len(words)] = np.array(words, np.uint64)
     gold = A[:M, :K].astype(np.int64) @ B[:K, :N].astype(np.int64)
@@ -120,14 +140,15 @@ def carr(name, vals, ctype):
 
 def testbench(M, K, N, relu=False, prog=None):
     imem, A, B, gold, _ = vectors(M, K, N, relu, prog=prog)
+    stride = N if TILED else MAXDIM
     body = f"""
 int main() {{
-  for (int i = 0; i < {MAXDIM * MAXDIM}; i++) C[i] = 0;
+  for (int i = 0; i < {DRAM_WORDS}; i++) C[i] = 0;
   tinytpu_isa(imem, A, B, C);
   int bad = 0;
   for (int i = 0; i < {M}; i++)
     for (int j = 0; j < {N}; j++)
-      if (C[i * {MAXDIM} + j] != gold[i * {N} + j]) bad++;
+      if (C[i * {stride} + j] != gold[i * {N} + j]) bad++;
   printf("TB {M}x{K}x{N} mismatches = %d / {M * N}\\n", bad);
   return bad == 0 ? 0 : 1;
 }}
@@ -135,10 +156,10 @@ int main() {{
     src = ["#include <cstdio>\n#include <cstdint>\n",
            'extern "C" void tinytpu_isa(uint64_t *, int8_t *, int8_t *, int8_t *);\n',
            carr("imem", imem, "uint64_t"),
-           carr("A", A.reshape(-1), "int8_t"),
-           carr("B", B.reshape(-1), "int8_t"),
+           carr("A", np.pad(A.reshape(-1), (0, DRAM_WORDS - A.size)), "int8_t"),
+           carr("B", np.pad(B.reshape(-1), (0, DRAM_WORDS - B.size)), "int8_t"),
            carr("gold", gold.reshape(-1), "int8_t"),
-           f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n",
+           f"static alignas(64) int8_t C[{DRAM_WORDS}];\n",
            body]
     return "".join(src)
 
@@ -180,19 +201,21 @@ def stress_testbench(M, K, N):
 
     src = ["#include <cstdio>\n#include <cstdint>\n",
            'extern "C" void tinytpu_isa(uint64_t *, int8_t *, int8_t *, int8_t *);\n',
-           f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n"]
+           f"static alignas(64) int8_t C[{DRAM_WORDS}];\n"]
     calls = []
     for i, (name, prog, A, B, C0, gold) in enumerate(cases):
         words = assemble(prog)
         imem = np.zeros(IMEM_SIZE, np.uint64)
         imem[: len(words)] = np.array(words, np.uint64)
+        pad = lambda v: np.pad(np.asarray(v).reshape(-1),
+                               (0, DRAM_WORDS - np.asarray(v).size))
         src += [carr(f"imem{i}", imem, "uint64_t"),
-                carr(f"A{i}", A.reshape(-1), "int8_t"),
-                carr(f"B{i}", B.reshape(-1), "int8_t"),
-                carr(f"C0_{i}", C0, "int8_t"),
-                carr(f"gold{i}", gold, "int8_t")]
+                carr(f"A{i}", pad(A), "int8_t"),
+                carr(f"B{i}", pad(B), "int8_t"),
+                carr(f"C0_{i}", pad(C0), "int8_t"),
+                carr(f"gold{i}", pad(gold), "int8_t")]
         calls.append(f"""
-  for (int i = 0; i < {MAXDIM * MAXDIM}; i++) C[i] = C0_{i}[i];
+  for (int i = 0; i < {DRAM_WORDS}; i++) C[i] = C0_{i}[i];
   tinytpu_isa(imem{i}, A{i}, B{i}, C);
   n_in = n_out = 0;
   for (int i = 0; i < {MAXDIM}; i++)
@@ -212,7 +235,7 @@ def stress_testbench(M, K, N):
 
 def patch_axi_depths(prj):
     """Cosim needs to know how much memory sits behind each m_axi port."""
-    depths = [IMEM_SIZE, MAXDIM * MAXDIM, MAXDIM * MAXDIM, MAXDIM * MAXDIM]
+    depths = [IMEM_SIZE, DRAM_WORDS, DRAM_WORDS, DRAM_WORDS]
     path = os.path.join(prj, "kernel.cpp")
     src = open(path).read()
     def sub(m):

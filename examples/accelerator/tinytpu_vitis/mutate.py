@@ -80,13 +80,15 @@ MUTANTS = [
     # --- DMA ---
     ("dma_ld_src_swapped", "dma_ld reads B for src A and A for src B",
      "if (f0 & DMA_SRC_B) == 0:", "== 0:", "!= 0:"),
-    ("dma_ld_row_ignored", "dma_ld (A path) ignores its DRAM row f1",
-     "pw = rbA[(f1 + r) * WPR + f2]", "(f1 + r) * WPR", "(r) * WPR"),
+    ("dma_ld_row_ignored", "dma_ld ignores its DRAM row f1",
+     "addr: int32 = ((f1 + r) * wpr + f2) * T", "(f1 + r) * wpr", "(r) * wpr"),
+    ("dma_ld_stride_ignored", "dma_ld addresses DRAM at the MAXDIM stride "
+     "instead of the geometry's words per row",
+     "addr: int32 = ((f1 + r) * wpr + f2) * T", "(f1 + r) * wpr", "(f1 + r) * WPR"),
     ("mvout_row_ignored", "dma_st ignores the DRAM row f1",
-     "lC[(f1 + r) * MAXDIM + f2 * T + e] = ov", "(f1 + r) * MAXDIM", "(r) * MAXDIM"),
+     "addr: int32 = ((f1 + r) * wpr_c + f2) * T", "(f1 + r) * wpr_c", "(r) * wpr_c"),
     ("dma_st_accumulates_C", "dma_st adds into C (relies on C arriving zeroed)",
-     "lC[(f1 + r) * MAXDIM + f2 * T + e] = ov", "= ov",
-     "= ov + lC[(f1 + r) * MAXDIM + f2 * T + e]"),
+     "lC[addr + e] = ov", "= ov", "= ov + lC[addr + e]"),
     # --- the sequencer: prefetch, AGU, loops, per-unit words ---
     ("prefetch_lane7_dup", "the 8-wide program prefetch copies word 6 into word 7 of "
      "every group",
@@ -133,8 +135,10 @@ MUTANTS = [
     ("clip_lo_off_by_one", "mvout clip lower bound -129, not -128",
      "te: int32 = rv[32 * e4", "if te < -128:", "if te < -129:"),
     # --- the assembler, and the dependence claim it makes true ---
-    ("assembler_span_short", "assemble() bursts one DRAM row too few",
-     "def span(src):", "e[3] + e[1] for e in ev", "e[3] + e[1] - 1 for e in ev"),
+    ("assembler_geometry_short", "assemble() reports one packed word per DRAM "
+     "row too few, so every row but the first is addressed short",
+     "geom |= w << (16 * which)", "geom |= w << (16 * which)",
+     "geom |= (w - 1) << (16 * which)"),
     ("ar_contract_unenforced", "check_program stops enforcing the accumulator "
      "distance contract",
      "if at - ar_wrote[row] < AR_RAW_DIST:", "< AR_RAW_DIST:", "< 1:"),
