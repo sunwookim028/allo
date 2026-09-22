@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Notes from building a small matrix accelerator &#8212; Allo Documentation</title>
+    <title>Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design &#8212; Allo Documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/basic_mod.css?v=9b2032db" />
     <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
@@ -135,9 +135,9 @@
 
     
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
-        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Notes</span></p>
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Notes from building a small matrix accelerator</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
@@ -215,172 +215,243 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="notes-from-building-a-small-matrix-accelerator">
-<h1>Notes from building a small matrix accelerator<a class="headerlink" href="#notes-from-building-a-small-matrix-accelerator" title="Link to this heading"><span>¶</span></a></h1>
-<p>We built a small chip design for multiplying matrices, wrote it in a Python
-dialect rather than in a hardware language, and measured it two ways: on a
-reconfigurable chip (an FPGA) and through the tool flow that would turn it into
-a real chip. Then we pointed a language model at the compiler behind it and
-asked whether it could invent anything.</p>
-<p>This page is what we learned. It is deliberately short, and every number on it
-came out of a run that can be repeated.</p>
-<section id="the-design">
-<h2>The design<a class="headerlink" href="#the-design" title="Link to this heading"><span>¶</span></a></h2>
-<p>It is a 4-by-4 grid of multipliers with a small instruction set — load some
-numbers, multiply, add, write the answer back. Programs are written for it the
-way programs are written for any processor, and the hardware is generated from
-a description that is about a hundred lines long, assembled from eight reusable
-parts.</p>
-<p>It works. The same five test problems take <strong>171, 261, 417, 483 and 685 clock
-ticks</strong>, every answer exact, reproduced independently three times.</p>
-<p>For comparison we used Gemmini, a well-known open accelerator from Berkeley,
-configured to the same grid size and measured over the same window.</p>
-<p>Our design is slower, and the gap closes as problems get bigger — from 27%
-behind on a small problem to <strong>9% behind on the largest</strong>, where we are running
-at 74% of the theoretical maximum. On one problem shape we are 18% faster.
-The interesting part is <em>why</em>: the loss is almost entirely a fixed setup cost
-paid once per call, and the team behind a different accelerator, measuring
-independently, found the same shape of loss in their own design. The conclusion
-we jointly reached is that Gemmini’s advantage here is its <strong>software</strong>, not its
-hardware.</p>
+  <section id="substrate-disagreement-and-agent-proposed-legality-rules-in-accelerator-co-design">
+<h1>Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design<a class="headerlink" href="#substrate-disagreement-and-agent-proposed-legality-rules-in-accelerator-co-design" title="Link to this heading"><span>¶</span></a></h1>
+<p><strong>Abstract.</strong> We present a programmable GEMM accelerator written in a Python
+accelerator design language, decomposed into eight reusable units, and
+evaluated on both FPGA and a 45 nm standard-cell flow against Gemmini at
+matched array size. Three results follow. First, the two substrates disagree
+about cost so strongly that FPGA-only evaluation is misleading: an optimisation
+that appears inexpensive on FPGA costs <strong>+74.4% cell area</strong>, of which <strong>99.1%
+is two AXI adapters</strong> rather than compute or memory, and the instruction-fetch
+adapter alone is <strong>60.0%</strong> of the baseline design. Second, evaluating on
+multi-layer models rather than GEMM shapes changes that optimisation’s measured
+worth by <strong>four to eight times</strong>, because model depth repays a fixed per-call
+cost that a single large GEMM amortises away. Third, two independent LLM search
+arms — one without the target property in its prompt — proposed the <em>same</em>
+architectural legality rule for memory write ports, and the same unsound form
+of it, which localises the error to the shape of the abstraction rather than to
+either run. We give the corrected shape, and a measured evaluation of modelling
+instructions as compositions of per-unit actions.</p>
+<section id="introduction">
+<h2>1. Introduction<a class="headerlink" href="#introduction" title="Link to this heading"><span>¶</span></a></h2>
+<p>Co-design decisions require cost on more than one axis. A flow that reports
+cycles alone cannot rank a change that trades area for time, and a flow that
+reports one substrate cannot see a structure that is free on that substrate and
+dominant elsewhere. This work reports measurements from a design carried
+through both, and from an agentic loop given write access to the compiler.</p>
+<p>Contributions:</p>
+<ol class="arabic simple">
+<li><p><strong>A substrate-disagreement result with component-level attribution.</strong> Two
+structures that are near-free on FPGA dominate standard-cell area, and we
+attribute the cost to specific instances rather than reporting a total.</p></li>
+<li><p><strong>A workload-dependence result.</strong> The same optimisation measured on GEMM
+shapes and on multi-layer models differs by 4–8×, with a stated mechanism.</p></li>
+<li><p><strong>A convergence result on agent-proposed abstractions.</strong> Two arms produced
+the same architectural legality rule and the same unsoundness; we give the
+corrected form (a schedule over cycles, not a count over resources).</p></li>
+<li><p><strong>A measured evaluation of per-unit action composition</strong> for defining
+instructions, including what it provably cannot check.</p></li>
+</ol>
 </section>
-<section id="three-things-that-surprised-us">
-<h2>Three things that surprised us<a class="headerlink" href="#three-things-that-surprised-us" title="Link to this heading"><span>¶</span></a></h2>
-<section id="the-fpga-lies-about-what-things-cost">
-<h3>1. The FPGA lies about what things cost<a class="headerlink" href="#the-fpga-lies-about-what-things-cost" title="Link to this heading"><span>¶</span></a></h3>
-<p>An FPGA is a chip you can reprogram, so it is the usual place to measure a
-design. It is also, we discovered, systematically misleading about area.</p>
-<p>We had an optimisation that made memory transfers wider and bought back a large
-part of our deficit. On the FPGA it looked cheap. Run through the flow that
-makes a real chip, it costs <strong>74% more silicon</strong>. And 99% of that cost is not
-the arithmetic or the memories at all — it is <strong>two adapters that talk to
-external memory</strong>, which grow thirteen-fold when widened.</p>
-<p>Worse, we then found that the adapter which fetches <em>instructions</em> is <strong>60% of
-our entire chip</strong>, while the arithmetic grid is a rounding error beside it. It
-does not grow when we make the design bigger; it is just always there. None of
-this is visible on an FPGA, where that kind of buffering is nearly free.</p>
-<p>This is not only our problem. Gemmini’s own published measurements say memory
-is <strong>67% of their chip</strong> and the multiplier grid is <strong>11%</strong>. Everyone’s
-intuition about where the silicon goes appears to be wrong in the same
-direction.</p>
+<section id="design">
+<h2>2. Design<a class="headerlink" href="#design" title="Link to this heading"><span>¶</span></a></h2>
+<p>A T×T int8 systolic array with int32 accumulation and a 10-opcode instruction
+set (load, multiply-accumulate, vector add, rectify, move-out, loop). The
+machine is expressed as eight parametrized units composed by an explicit
+architecture description of roughly 100 lines; unit declarations are checked
+against their bodies by recomputing free names from the AST.</p>
+<p>The shipped configuration (T=4, MAXDIM=16) executes five reference shapes in
+<strong>171 / 261 / 417 / 483 / 685 cycles</strong>, bit-exact against a numpy reference,
+reproduced independently three times and enforced by a single command.</p>
 </section>
-<section id="measuring-on-real-programs-changes-the-answer-by-four-to-eight-times">
-<h3>2. Measuring on real programs changes the answer by four to eight times<a class="headerlink" href="#measuring-on-real-programs-changes-the-answer-by-four-to-eight-times" title="Link to this heading"><span>¶</span></a></h3>
-<p>We had been evaluating on matrix-multiply problems of various sizes, which is
-what everyone does. When we built a small suite of actual neural networks and
-measured the same optimisation on those, it was worth <strong>25–34% of the running
-time</strong> instead of the 4–7% the matrix-multiply table showed.</p>
-<p>The reason is simple in hindsight. A real model does not make the problem
-<em>bigger</em>; it makes it <em>longer</em> — many layers, each paying the setup cost again.
-A benchmark of one large problem hides a cost that a benchmark of many small
-ones exposes.</p>
-<p>So an optimisation that looked like a bad trade at +74% silicon for 5% speed
-may well be a good one at +74% for 30%. We have not finished that argument, but
-we would have reached the wrong answer confidently without the second
-measurement.</p>
+<section id="evaluation-methodology">
+<h2>3. Evaluation methodology<a class="headerlink" href="#evaluation-methodology" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Against Gemmini.</strong> Matched array dimension, both sides measured over the same
+window, with host overhead treated symmetrically and the comparison design’s
+own run-to-run spread reported. Our cosim is deterministic; the ±spread in the
+tables is Gemmini’s.</p>
+<p><strong>Area.</strong> The accelerator boundary is the <em>transitive closure of the module
+instantiation graph</em> from Gemmini’s top module — computed, not hand-picked (138
+modules at DIM=4). Rocket, caches and SoC are excluded because we have no host.
+Blocks kept although unexercised — the convolution pipeline, the
+output-stationary datapath, an fp32 scaling pipeline — are kept because
+removing them would tune the opponent.</p>
+<p>Two figures are reported per design. The <strong>logic-only</strong> figure excludes the
+operand scratchpad and accumulator by an identical semantic rule on both sides,
+with stubs supplying empty module headers (omission alone is a link error, not
+a black box), so the boundary is <em>everything that drives the memories and
+nothing inside them</em>. The <strong>capacity-matched</strong> figure is secondary: a total is
+defensible only at DIM=8, where capacities agree to 2%; at DIM=4 a 4.8×
+capacity gap makes a total meaningless in either direction.</p>
+<p><strong>Instruction supply is excluded, symmetrically.</strong> Gemmini has no instruction
+port — its instructions arrive over RoCC from the excluded host. Ours arrive
+from DRAM. Charging us for the mechanism that replaces the deleted block is not
+a small distortion at 60% of area. We report the excluded figure as the
+<em>comparable</em> one and the full figure as the <em>buildable</em> one, and state that the
+difference is the cost of not having a host. The correction running the other
+way is stated alongside: our sequencer is counted while Gemmini’s decode
+happens in an excluded block.</p>
+<p><strong>Frequency</strong> is a synthesis-stage estimate at a 3.33 ns constraint, identical
+flow on both sides, reported as a floor and never as an achieved frequency.</p>
+<p><strong>Power is absent, with cause.</strong> Without SRAM macros and place-and-route, power
+is dominated by clock power into flip-flop arrays and by estimated wire
+capacitance, both larger than the effect under study. Activity annotation
+removes one of three objections and not the other two, so an annotated figure
+would be compromised rather than imprecise. We report no power number.</p>
 </section>
-<section id="a-model-can-invent-a-real-compiler-rule-and-get-it-subtly-wrong">
-<h3>3. A model can invent a real compiler rule — and get it subtly wrong<a class="headerlink" href="#a-model-can-invent-a-real-compiler-rule-and-get-it-subtly-wrong" title="Link to this heading"><span>¶</span></a></h3>
-<p>We gave a language model access to the compiler and a set of measurements, and
-asked it to find something the language could not express.</p>
-<p>It proposed a rule that refuses a design when a memory is written more times
-per cycle than it has ports. That is a genuine hardware constraint: on an FPGA
-a second write port is free, and in a real chip it does not exist at all — our
-synthesis tool rejects such a design outright. The rule correctly refused the
-bad design and correctly accepted the good one, and it stated its own
-assumptions without being asked.</p>
-<p><strong>It is also wrong in both directions</strong>, which we found by trying it on cases
-its author had not considered. It accepts a design where two writes collide
-because it counts memory banks without checking <em>which</em> bank each write lands
-in, and it refuses a design that is perfectly legal because the writes happen
-on different cycles and it does not look at time.</p>
-<p>Two independent attempts, one of which was not told what to look for, produced
-the <em>same</em> flawed shape. That convergence is the useful result:</p>
+<section id="results">
+<h2>4. Results<a class="headerlink" href="#results" title="Link to this heading"><span>¶</span></a></h2>
+<section id="speed">
+<h3>4.1 Speed<a class="headerlink" href="#speed" title="Link to this heading"><span>¶</span></a></h3>
+<p>The deficit against Gemmini <strong>converges with problem size</strong> rather than
+growing: 1.27× at 16³ to <strong>1.09× at 64³</strong>, at 74.1% of peak. At T=8 on one
+shape (16×16×8) we are <strong>1.18× faster</strong>, clearing the comparison’s spread by
+4.8×. The residual is localised to a fixed DMA prologue worth 55–61% of it.
+A second team, measuring an unrelated design, independently found the same
+<em>shape</em> of loss, supporting the joint conclusion that Gemmini’s advantage at
+these sizes is its software rather than its array.</p>
+</section>
+<section id="substrate-disagreement">
+<h3>4.2 Substrate disagreement<a class="headerlink" href="#substrate-disagreement" title="Link to this heading"><span>¶</span></a></h3>
+<p>Widening the operand DMA recovers much of the deficit and appears inexpensive
+on FPGA. In 45 nm it costs <strong>+74.4% cell area</strong> (3,254,024 against 1,865,314
+µm², differing in the widening alone, both meeting timing at +0.21 ns).
+Hierarchical attribution places <strong>99.1% of the delta in two AXI master ports</strong>,
+which grow 13× when widened; the scratchpad, vector registers and accumulator
+do not move. The FPGA reported +43% flip-flops and +92% block RAM for the same
+change — the block-RAM axis being exactly the buffering that dominates in
+standard cells.</p>
+<p>The instruction-fetch adapter is <strong>60.0% of the baseline design</strong> (681,537 of
+1,136,598 µm²) against 1.1% for the scratchpad and 2.9% for the sequencer, and
+is <strong>constant at ≈700k across all four synthesised variants</strong> — independent
+evidence that it is infrastructure rather than part of the machine.</p>
+<p>This is not idiosyncratic. Gemmini’s published breakdown (Intel 22 nm, 16×16
+int8) reports <strong>SRAM at 67.1%</strong> of accelerator area and the spatial array at
+<strong>11.3%</strong>.</p>
+<p>A third instance: a dual-write-port buffer is free on FPGA block RAM and is
+<strong>rejected outright</strong> by the standard-cell flow; a banked rewrite preserves
+every cycle.</p>
+</section>
+<section id="workload-dependence">
+<h3>4.3 Workload dependence<a class="headerlink" href="#workload-dependence" title="Link to this heading"><span>¶</span></a></h3>
+<p>On GEMM shapes the DMA widening is worth <strong>4.3–7.0%</strong> of runtime. On a suite of
+multi-layer models it is worth <strong>25–34%</strong>. The mechanism: a model does not make
+the problem larger, it makes it longer, so a fixed per-call cost is repaid at
+every layer rather than amortised by one large problem. An optimisation ranked
+on GEMM shapes is therefore ranked on the workload least sensitive to the cost
+it removes.</p>
+<p>Three instrument errors surfaced only under the model suite: an analytic cycle
+estimator 26–36% low against the shipped build, a burst-cost law 40% optimistic
+at short layers, and a mapping that does not terminate in cosim at the shipped
+channel depth.</p>
+</section>
+<section id="a-channel-depth-threshold">
+<h3>4.4 A channel-depth threshold<a class="headerlink" href="#a-channel-depth-threshold" title="Link to this heading"><span>¶</span></a></h3>
+<p>Three legal tiled programs never complete at the shipped stream depth and all
+complete bit-exact at twice that depth — same tree, same toolchain, one knob.
+The published shapes move <strong>+4 / +4 / +4 / −1 / −11</strong>: small shapes pay
+pipeline skew, large shapes get <em>faster</em>, because a deeper queue lets the
+sequencer run ahead of the units it dispatches to.</p>
+<p>The cure is not a characterisation. A depth-versus-tile-count predicate does
+not cover the failing family, and the obvious counting rule is refuted by our
+own shipped GEMM, which issues 272 instructions to one unit at the shallow
+depth and completes. The verification gap is identified: our Kahn-process model
+runs the protocol at the declared depth and pronounces these deadlock-free,
+because it does not model the sequencer blocking <em>mid-instruction</em> across the
+queues one instruction fans out to.</p>
+</section>
+</section>
+<section id="agent-proposed-abstractions">
+<h2>5. Agent-proposed abstractions<a class="headerlink" href="#agent-proposed-abstractions" title="Link to this heading"><span>¶</span></a></h2>
+<p>We gave an LLM loop write access to the compiler, a gate ladder, and a seeded
+measurement, and asked for a capability the language lacked.</p>
+<p><strong>Both arms proposed an architectural legality rule for memory write ports</strong>,
+one with the property named in its prompt and one without. Both refused the
+design the synthesis flow rejects and accepted the bit-exact banked rewrite
+with all gates clean; one stated its unchecked premise unprompted.</p>
+<p><strong>Both are unsound in the same two directions</strong>, found by applying them to
+cases their authors had not designed for: a block-partitioned array is
+<em>accepted</em> although both stores land in one bank, and an unpipelined two-store
+loop is <em>refused</em> although the stores occupy different cycles. Convergence
+across an unseeded arm localises the error to the abstraction’s shape:</p>
 <blockquote>
-<div><p>Counting things against a capacity is the wrong shape for this kind of rule.
-It throws away <em>which</em> item is touched <em>when</em>, and both mistakes are that
-lost information coming back.</p>
+<div><p>A predicate over resources is the wrong form for this class of claim.
+Counting occupants against capacity discards <em>which</em> element is touched in
+<em>which</em> cycle, and both failure directions recover exactly that discarded
+information. The sound form is a <strong>calendar</strong> — index map composed with
+initiation interval — and the IR already carries both.</p>
 </div></blockquote>
-<p>The right shape is a calendar — what happens in which cycle — and the compiler
-already knows enough to build one. An engineer on another team, auditing their
-own scheduler against our failure, reached the same conclusion from the
-opposite direction, and their version is safe precisely because it tracks
-cycles instead of counts.</p>
+<p>An independently developed scheduler in another design is safe against both
+directions because its port model is a <em>set of cycles</em> rather than a count. Its
+authors note they also lack the banking that makes the error possible, so the
+finding is predictive rather than comparative.</p>
+<p>Two negative results about the apparatus. A gate ladder that exercises a
+compiler only through existing designs cannot observe a new capability in
+either direction, because a new primitive has no callers. And the loop’s keep
+rule compared each candidate against the <em>baseline</em> rather than the incumbent,
+so it discarded a genuine improvement (−31% LUT, latency 206→149) in favour of
+a later, worse one; reported improvement counts overstate accordingly.</p>
 </section>
+<section id="instructions-as-compositions-of-per-unit-actions">
+<h2>6. Instructions as compositions of per-unit actions<a class="headerlink" href="#instructions-as-compositions-of-per-unit-actions" title="Link to this heading"><span>¶</span></a></h2>
+<p>We evaluated defining an instruction as a sequence of per-unit <em>actions</em> rather
+than restating it in each consumer, by adding one fused instruction both ways
+on otherwise identical trees.</p>
+<p><strong>It does not reduce code</strong>: +79/−1 lines in one file, against +77/−6 across
+three. It reduces <em>the number of independent statements that must agree</em> — from
+five specification regions plus two consumers, to one region plus one declared
+hardware fact. Two of the replaced restatements were already wrong, and a third
+consumer deadlocked on first contact with the new instruction, which is how its
+staleness was discovered.</p>
+<p><strong>The discriminating test.</strong> Two actions, each legal in an instruction of its
+own, compose into an instruction that is not: two units writing one port in one
+cycle. The model refuses it, and the repair is a cycle offset rather than a
+port. A count cannot refuse this — the count is one write per unit, and one
+port per unit is what the machine has. This is the same predicate/calendar
+distinction as §5, reached independently.</p>
+<p><strong>What it cannot check.</strong> Of fifteen deliberately incorrect declarations, five
+are refused structurally and four caught by a cost check; <strong>six are invisible
+to every static check</strong> — a source naming the wrong operand, subtraction for
+addition. The model verifies composition, not arithmetic.</p>
+<p>We therefore recommend it where several consumers would otherwise restate one
+per-unit fact, and <strong>not</strong> as a default, because only one machine has exercised
+it.</p>
 </section>
-<section id="instructions-as-small-composable-pieces">
-<h2>Instructions as small composable pieces<a class="headerlink" href="#instructions-as-small-composable-pieces" title="Link to this heading"><span>¶</span></a></h2>
-<p>That led to a question worth its own experiment: can an instruction be
-<em>defined</em> as a sequence of small per-unit steps — “the register file does this,
-the arithmetic unit does that” — rather than hand-written into every piece of
-software that needs to know about it?</p>
-<p>We built it and added a new instruction both ways to compare.</p>
-<p><strong>It did not save code</strong>: 79 lines the new way against 77 the old way. What it
-did change is how many separate places have to agree — from five parts of a
-specification plus two separate programs, down to one part plus a single stated
-fact about the hardware. Two of the places we replaced turned out to have been
-<em>wrong</em> already, and a third quietly deadlocked the first time it met an
-instruction it had not been told about.</p>
-<p>The sharpest result is a test we could not have run before. Two steps, each
-perfectly legal on its own, combined into one instruction that is not legal —
-two units writing the same port at the same moment. The model refuses it, and
-the repair is to move one of them to a different cycle. A rule that merely
-counts cannot catch this, because the count is one write per unit and one port
-per unit is exactly what the hardware has.</p>
-<p>We also measured what it <em>cannot</em> catch. Of fifteen deliberately broken
-descriptions, five were refused immediately and four more were caught by a cost
-check — but <strong>six were invisible to every check short of running the real
-hardware</strong>: a description naming the wrong input, or subtraction where addition
-was meant. The approach verifies that pieces <em>fit together</em>; it does not verify
-that they compute the right thing.</p>
-<p>Our own conclusion is therefore a qualified one: <strong>worth using where several
-programs would otherwise have to repeat the same fact, not yet worth making the
-default</strong>, because only one machine has tried it.</p>
+<section id="threats-to-validity">
+<h2>7. Threats to validity<a class="headerlink" href="#threats-to-validity" title="Link to this heading"><span>¶</span></a></h2>
+<p>Single machine and single new instruction in §6, with the demonstrating
+instruction chosen by the abstraction’s author. Two arms and one seeded
+measurement in §5; replication under unseeded conditions is not done. The
+agent-proposed rule reached a correct artefact through a factually wrong
+diagnosis — the port count was already declarable; only enforcement was
+missing. Area results carry flip-flop memories rather than SRAM macros, which
+inflates memory-resident structures and understates nothing in the adapters.
+The comparison design’s area is not yet measured. Published third-party area
+figures are a different node, configuration and scope, and are used only as an
+order-of-magnitude check.</p>
+<p><strong>Instrument failures.</strong> Four instruments were observed reporting success
+without having run: a tool server that answered without binding, a cost meter
+reporting zero for a billed call, a self-consistent manifest describing a
+truncated export, and a leak detector that crashed and was read as clean. Three
+further checks were run against the wrong object and passed: an incremental
+documentation build that skips the files it was meant to inspect, a simulation
+run at a different configuration than the one claimed, and a repository check
+reading commit titles rather than contents. We therefore treat a negative
+result as evidence only when the instrument can be shown to have run, on the
+object being claimed.</p>
 </section>
-<section id="what-we-got-wrong">
-<h2>What we got wrong<a class="headerlink" href="#what-we-got-wrong" title="Link to this heading"><span>¶</span></a></h2>
-<p>Every item here was published internally and then withdrawn on measurement. We
-keep the list because the corrections were more instructive than the claims.</p>
-<ul class="simple">
-<li><p>We said a memory-latency knob told us something about real memory systems. It
-does not — the results are not even ordered consistently, so it is a hint to
-the compiler, not a model of anything.</p></li>
-<li><p>We said an optimisation “was not worth it” on the strength of an area number,
-before finding that 99% of the area was in a place that suggested a much
-better question.</p></li>
-<li><p>We said our own measurements had noise. They do not; the noise belonged to
-the design we were comparing against.</p></li>
-<li><p>We twice claimed a language model had implemented something from a
-specification, when the specification had in fact told it the answer.</p></li>
-<li><p>Most often, we checked the wrong thing and it passed: a documentation build
-that skipped the files it was meant to inspect, a hardware simulation run on
-a different configuration than the one being claimed, and a repository check
-that read commit titles rather than their contents. All three came back
-clean.</p></li>
-</ul>
-<p>That last pattern is the most durable lesson here. Over one night, four
-independent instruments were each caught reporting success without having
-actually run — a server that answered without ever starting, a cost meter
-reporting zero for a real charge, a consistent-looking report describing a
-truncated file, and an error detector that crashed and was read as “all clear”.</p>
-<p>The rule we now work by is:</p>
-<blockquote>
-<div><p>A clean result from an instrument is only evidence if the instrument can be
-shown to have run — and to have run on the thing you are claiming.</p>
-</div></blockquote>
-</section>
-<section id="where-it-stands">
-<h2>Where it stands<a class="headerlink" href="#where-it-stands" title="Link to this heading"><span>¶</span></a></h2>
-<p>Solid: the design works and is reproducible; the comparison on speed is
-measured on both sides over the same window; the silicon-area findings are
-measured and attributed to specific components.</p>
-<p>Not yet: we have no area number for the comparison design — those runs are
-queued. We have no power figures at all, and we say so rather than publishing
-an unreliable one: the tool flow we are using would be dominated by effects
-larger than the thing we would be trying to measure.</p>
-<p>Open: whether the instruction-composition idea holds up on a second, different
-machine. That is the next experiment, and it is the one that decides whether
-any of this generalises.</p>
+<section id="conclusion">
+<h2>8. Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"><span>¶</span></a></h2>
+<p>Cycles on one substrate and one workload class are insufficient to rank an
+architectural change: we show a factor of 4–8 from the workload axis and a
+structure at 60% of area that is invisible on the other substrate. An agentic
+loop over a compiler can propose a genuine architectural legality rule, and two
+arms converging on the same unsound form is more informative than either arm
+alone — it identifies the defect as belonging to the abstraction’s shape.
+Modelling instructions as per-unit actions removes duplicated statements
+without removing code, and cannot see arithmetic errors at all. Whether it
+generalises is settled by a second machine, which is the next experiment.</p>
 </section>
 </section>
 
@@ -398,17 +469,21 @@ any of this generalises.</p>
             <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
             <div class="page_toc">
                 <ul>
-<li><a class="reference internal" href="#">Notes from building a small matrix accelerator</a><ul>
-<li><a class="reference internal" href="#the-design">The design</a></li>
-<li><a class="reference internal" href="#three-things-that-surprised-us">Three things that surprised us</a><ul>
-<li><a class="reference internal" href="#the-fpga-lies-about-what-things-cost">1. The FPGA lies about what things cost</a></li>
-<li><a class="reference internal" href="#measuring-on-real-programs-changes-the-answer-by-four-to-eight-times">2. Measuring on real programs changes the answer by four to eight times</a></li>
-<li><a class="reference internal" href="#a-model-can-invent-a-real-compiler-rule-and-get-it-subtly-wrong">3. A model can invent a real compiler rule — and get it subtly wrong</a></li>
+<li><a class="reference internal" href="#">Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design</a><ul>
+<li><a class="reference internal" href="#introduction">1. Introduction</a></li>
+<li><a class="reference internal" href="#design">2. Design</a></li>
+<li><a class="reference internal" href="#evaluation-methodology">3. Evaluation methodology</a></li>
+<li><a class="reference internal" href="#results">4. Results</a><ul>
+<li><a class="reference internal" href="#speed">4.1 Speed</a></li>
+<li><a class="reference internal" href="#substrate-disagreement">4.2 Substrate disagreement</a></li>
+<li><a class="reference internal" href="#workload-dependence">4.3 Workload dependence</a></li>
+<li><a class="reference internal" href="#a-channel-depth-threshold">4.4 A channel-depth threshold</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#instructions-as-small-composable-pieces">Instructions as small composable pieces</a></li>
-<li><a class="reference internal" href="#what-we-got-wrong">What we got wrong</a></li>
-<li><a class="reference internal" href="#where-it-stands">Where it stands</a></li>
+<li><a class="reference internal" href="#agent-proposed-abstractions">5. Agent-proposed abstractions</a></li>
+<li><a class="reference internal" href="#instructions-as-compositions-of-per-unit-actions">6. Instructions as compositions of per-unit actions</a></li>
+<li><a class="reference internal" href="#threats-to-validity">7. Threats to validity</a></li>
+<li><a class="reference internal" href="#conclusion">8. Conclusion</a></li>
 </ul>
 </li>
 </ul>
