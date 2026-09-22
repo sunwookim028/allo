@@ -1,0 +1,5 @@
+  simulator: OK
+  style=stp -> DEADLOCK (// ERROR!!! DEADLOCK DETECTED at 3547000 ns! SIMULATION WILL BE STOPPED! //)
+  style=flp -> PASS (RTL mismatches = 0)
+  style=frp -> PASS (RTL mismatches = 0)
+[item P1] REPRODUCES: styles that do not run in RTL: ['stp']; stp=DEADLOCK (// ERROR!!! DEADLOCK DETECTED at 3547000 ns! SIMULATION WILL BE STOPPED! //), flp=PASS (RTL mismatches = 0), frp=PASS (RTL mismatches = 0)

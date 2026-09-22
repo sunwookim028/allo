@@ -1,0 +1,92 @@
+
+  mutant                    bench_isa      stress_isa     caught first by
+  none                      pass           pass           control passes
+  pe_psum_int16             pass           CAUGHT         stress_isa
+  pe_weight_lane_swapped    CAUGHT         CAUGHT         bench_isa
+  pe_act_lane_swapped       CAUGHT         CAUGHT         bench_isa
+  pe_shadow_not_swapped     CAUGHT         CAUGHT         bench_isa
+  vru_flag_sticky           CAUGHT (hang)  CAUGHT (hang)  bench_isa
+  vmu_vld_off_by_one        CAUGHT         CAUGHT         bench_isa
+  vpu_read_off_by_one       CAUGHT         CAUGHT         bench_isa
+  vpu_vld_dst_ignored       CAUGHT         CAUGHT         bench_isa
+  vpu_vld_zero_extends      pass           CAUGHT         stress_isa
+  vpu_narrow_high_byte      CAUGHT         CAUGHT         bench_isa
+  dma_ld_space_swapped      CAUGHT         CAUGHT         bench_isa
+  dma_ld_stride_ignored     CAUGHT         CAUGHT         bench_isa
+  dma_ld_base_ignored       CAUGHT         CAUGHT         bench_isa
+  dma_st_stride_ignored     CAUGHT         CAUGHT         bench_isa
+  dma_st_accumulates_C      pass           CAUGHT         stress_isa
+  prefetch_lane7_dup        CAUGHT         CAUGHT         bench_isa
+  agu_stride_halved         CAUGHT         CAUGHT         bench_isa
+  agu_f3_dropped            CAUGHT         CAUGHT         bench_isa
+  loop_extra_trip           CAUGHT (hang)  CAUGHT (hang)  bench_isa
+  vrelu_rows_short          CAUGHT (hang)  CAUGHT (hang)  bench_isa
+  pop_ors_old_row           CAUGHT         CAUGHT         bench_isa
+  pop_dst_base_ignored      CAUGHT         CAUGHT         bench_isa
+  vrelu_dst_is_src          pass           CAUGHT         stress_isa
+  vadd_dst_is_src1          pass           CAUGHT         stress_isa
+  relu_off_by_one           CAUGHT         CAUGHT         bench_isa
+  vadd_subtracts            CAUGHT         CAUGHT         bench_isa
+  vadd_src2_is_src1         CAUGHT         CAUGHT         bench_isa
+  vadd_holds_stale_x        CAUGHT         CAUGHT         bench_isa
+  vrelu_src_base_ignored    CAUGHT         CAUGHT         bench_isa
+  vst_src_base_ignored      CAUGHT         CAUGHT         bench_isa
+  vmu_vst_dst_ignored       CAUGHT         CAUGHT         bench_isa
+  vmu_vmemst_off_by_one     CAUGHT         CAUGHT         bench_isa
+  clip_hi_off_by_one        pass           CAUGHT         stress_isa
+  clip_lo_off_by_one        pass           CAUGHT         stress_isa
+  assembler_span_short      CAUGHT         CAUGHT         bench_isa
+  dma_race_unenforced       pass           CAUGHT         stress_isa
+  busy_channel_unenforced   pass           CAUGHT         stress_isa
+  idle_wait_unenforced      pass           CAUGHT         stress_isa
+  outq_unenforced           pass           CAUGHT         stress_isa
+  pop_underflow_unenforced  pass           CAUGHT         stress_isa
+  vr_contract_unenforced    pass           CAUGHT         stress_isa
+  vr_claim_false            pass           pass           NOT RUN (RTL-only: needs cosim)
+
+  none                      control: the design unmodified
+  pe_psum_int16             PE partial sum narrowed int32 -> int16
+  pe_weight_lane_swapped    wld(i,j) hands its PE lane i of the weight word, not j
+  pe_act_lane_swapped       column-0 PE taps activation lane j, not i
+  pe_shadow_not_swapped     weight double buffer: the PE keeps its first nonzero weight instead of taking the next mm's from wq
+  vru_flag_sticky           the weight-switch flag is never cleared, so every pushed row switches weights
+  vmu_vld_off_by_one        vld reads vmem one row late
+  vpu_read_off_by_one       vmatload/vmatpush/vst read vreg rows one late
+  vpu_vld_dst_ignored       vld writes vreg[r], ignoring its destination base f0
+  vpu_vld_zero_extends      vld zero-extends int8 lanes instead of sign-extending
+  vpu_narrow_high_byte      the array gets bits 8..15 of each lane, not the low 8
+  dma_ld_space_swapped      vmemld reads B's beats for A's and A's for B's
+  dma_ld_stride_ignored     vmemld ignores its stride (beat base + r)
+  dma_ld_base_ignored       vmemld ignores its DRAM base (A path: beat r * stride)
+  dma_st_stride_ignored     vmemst ignores its stride
+  dma_st_accumulates_C      dma_st adds into C (relies on C arriving zeroed)
+  prefetch_lane7_dup        the 8-wide program prefetch copies word 6 into word 7 of every group
+  agu_stride_halved         AGU stride field read one bit high (stride/2)
+  agu_f3_dropped            AGU terms targeting f3 are ignored
+  loop_extra_trip           loop back-edge test <= (one extra iteration)
+  vrelu_rows_short          the sequencer's vrelu carries one row fewer
+  pop_ors_old_row           vmatpop ORs the result into the old vreg row (right only if the file arrives zeroed)
+  pop_dst_base_ignored      vmatpop writes vreg[r], ignoring its f0 base
+  vrelu_dst_is_src          vrelu writes its source row, not f0
+  vadd_dst_is_src1          vadd writes its first source, not f0
+  relu_off_by_one           ReLU threshold off by one (-1 survives)
+  vadd_subtracts            vadd computes x - y
+  vadd_src2_is_src1         vadd reads its first source twice (x + x)
+  vadd_holds_stale_x        vadd's first operand register is never loaded
+  vrelu_src_base_ignored    vrelu reads vreg[r], ignoring its f1 base
+  vst_src_base_ignored      vst reads vreg[r], ignoring its f0 base
+  vmu_vst_dst_ignored       a vst row lands at vmem[r], ignoring its f1 base
+  vmu_vmemst_off_by_one     vmemst reads VMEM one row late
+  clip_hi_off_by_one        vst saturation upper bound 128, not 127
+  clip_lo_off_by_one        vst saturation lower bound -129, not -128
+  assembler_span_short      assemble() bursts one DRAM beat too few
+  dma_race_unenforced       check_program stops refusing a VMEM access that races an unfenced descriptor
+  busy_channel_unenforced   check_program lets a descriptor onto a busy channel
+  idle_wait_unenforced      check_program lets a wait name an idle channel
+  outq_unenforced           check_program stops enforcing the output FIFO bound
+  pop_underflow_unenforced  check_program lets a pop take more rows than are pushed
+  vr_contract_unenforced    check_program stops enforcing the vreg distance contract
+  vr_claim_false            FALSE DEPENDENCE CLAIM: the contract admits a vreg read one vpu iteration after its write, so the `inter false` pragma on vreg is untrue for programs the assembler accepts
+
+  logs: /home/sk3463/allo-align/examples/accelerator/tinytpu_vitis/.mutants/<mutant>/<level>.log
+  MUTATE OK: all 41 mutants run were caught; 1 RTL-only mutant(s) not run (--no-rtl): ['vr_claim_false']

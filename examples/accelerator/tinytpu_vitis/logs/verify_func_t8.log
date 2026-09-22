@@ -1,0 +1,10 @@
+=== T=8 MAXDIM=16
+  KPN OK
+  ALL EXACT
+  validator: 34 crafted bad programs rejected, 54 generated programs accepted
+  STRESS OK: 251/251 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 8 shapes, vector and random programs)
+=== T=8 MAXDIM=32
+  KPN OK
+  ALL EXACT
+  validator: 34 crafted bad programs rejected, 390 generated programs accepted
+  STRESS OK: 487/487 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)

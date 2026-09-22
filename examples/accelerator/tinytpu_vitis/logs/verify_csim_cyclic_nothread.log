@@ -1,0 +1,54 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2023.2 (64-bit)
+  **** SW Build 4023990 on Oct 11 2023
+  **** IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+  **** SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /opt/xilinx/Vitis_HLS/2023.2/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] Running '/opt/xilinx/Vitis_HLS/2023.2/bin/unwrapped/lnx64.o/vitis_hls'
+INFO: [HLS 200-10] For user 'sk3463' on host 'en-ec-ace-01.coecis.cornell.edu' (Linux_x86_64 version 6.8.0-138-generic) on Tue Sep 22 02:31:50 UTC 2026
+INFO: [HLS 200-10] On os Ubuntu 24.04.4 LTS
+INFO: [HLS 200-10] In directory '/home/sk3463/allo-align/.verify/csim_cyclic/nothread'
+INFO: [HLS 200-2053] The vitis_hls executable is being deprecated. Consider using vitis-run --mode hls --tcl
+Sourcing Tcl script 'run.tcl'
+INFO: [HLS 200-1510] Running: open_project out.prj -reset 
+INFO: [HLS 200-10] Creating and opening project '/home/sk3463/allo-align/.verify/csim_cyclic/nothread/out.prj'.
+INFO: [HLS 200-1510] Running: open_solution -reset solution1 -flow_target vivado 
+INFO: [HLS 200-10] Creating and opening solution '/home/sk3463/allo-align/.verify/csim_cyclic/nothread/out.prj/solution1'.
+INFO: [HLS 200-10] Cleaning up the solution database.
+INFO: [HLS 200-1505] Using flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2023.2%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_top top 
+INFO: [HLS 200-1510] Running: add_files kernel.cpp 
+INFO: [HLS 200-10] Adding design file 'kernel.cpp' to the project
+INFO: [HLS 200-1510] Running: add_files -tb tb.cpp -cflags -std=gnu++0x 
+INFO: [HLS 200-10] Adding test bench file 'tb.cpp' to the project
+INFO: [HLS 200-1510] Running: set_part xcu280-fsvh2892-2L-e 
+INFO: [HLS 200-1611] Setting target device to 'xcu280-fsvh2892-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 3.33 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 3.33ns.
+INFO: [HLS 200-1510] Running: csim_design -ldflags -B/usr/bin -lpthread 
+INFO: [SIM 211-2] *************** CSIM start ***************
+INFO: [SIM 211-4] CSIM will launch GCC as the compiler.
+INFO: [HLS 200-2036] Building debug C Simulation binaries
+   Compiling ../../../../tb.cpp in debug mode
+   Compiling ../../../../kernel.cpp in debug mode
+   Generating csim.exe
+ERROR [HLS SIM]: an hls::stream is read while empty, which may result in RTL simulation hanging.
+If this is not expected, execute C simulation in debug mode in the GUI and examine the source code location of the blocked hls::stream::read() call to debug.
+If this is expected, add -DALLOW_EMPTY_HLS_STREAM_READS to -cflags to turn this error into a warning and allow empty hls::stream reads to return the default value for the data type.
+@E Simulation failed.
+ERROR: [SIM 211-100] CSim failed with errors.
+INFO: [SIM 211-3] *************** CSIM finish ***************
+INFO: [HLS 200-111] Finished Command csim_design CPU user time: 5.65 seconds. CPU system time: 0.5 seconds. Elapsed time: 7.27 seconds; current allocated memory: 0.000 MB.
+4
+    while executing
+"source run.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel \#0 [list source $tclfile] "
+
+INFO: [HLS 200-112] Total CPU user time: 7.62 seconds. Total CPU system time: 0.78 seconds. Total elapsed time: 9.26 seconds; peak allocated memory: 282.309 MB.
+INFO: [Common 17-206] Exiting vitis_hls at Tue Sep 22 02:31:59 2026...

@@ -1,0 +1,30 @@
+#!/bin/bash
+# Re-measure each increment's cosim cycle counts at 4x4x4 and 16x16x16 by
+# checking out that commit's example directory only (the increments touch
+# nothing outside examples/ and docs/), then restoring HEAD.
+set -uo pipefail
+source $(conda info --base)/etc/profile.d/conda.sh
+conda activate allo
+export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
+export OMP_NUM_THREADS=8
+export PATH=/usr/bin:$PATH
+ROOT=/home/sk3463/allo-align
+export PYTHONPATH=$ROOT
+V=$ROOT/.verify
+cd $ROOT
+for spec in "$@"; do
+    sha=${spec%%:*}; tag=${spec##*:}
+    echo "===== $tag ($sha)"
+    git checkout -q "$sha" -- examples/accelerator/tinytpu_vitis
+    find examples/accelerator/tinytpu_vitis -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
+    rm -rf "$V/sc.prj"
+    ( cd examples/accelerator/tinytpu_vitis && \
+      TPU_SHAPES=4x4x4,16x16x16 TPU_PRJ=$V/sc.prj python -u cosim.py ) \
+        > "$V/spot_$tag.log" 2>&1
+    echo "  rc=$?"
+    tail -12 "$V/spot_$tag.log"
+    rm -rf "$V/sc.prj"
+    git checkout -q HEAD -- examples/accelerator/tinytpu_vitis
+    find examples/accelerator/tinytpu_vitis -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
+done
+echo "===== SPOTCHECK DONE"

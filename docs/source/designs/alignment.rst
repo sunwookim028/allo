@@ -806,6 +806,88 @@ both found by increment 3's cosim:
   pushed rows end the PE loops, which drains them. ``s.pipeline(style=)``
   was added to Allo for this (``0038833c``).
 
+.. _align-area:
+
+Resources and timing, csynth (measured 2026-09-22)
+--------------------------------------------------
+
+The increments above were scored in cycles only. csynth on the xcu280 at the
+3.33 ns target, T = 4, MAXDIM = 16, the same build the cycle counts come from
+(``logs/csynth_align_t4.rpt``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit
+     - BRAM
+     - DSP
+     - FF
+     - LUT
+   * - ``sequencer``
+     - 0
+     - 3
+     - 1,763
+     - 2,978
+   * - ``dma_ld``
+     - 0
+     - 3
+     - 835
+     - 1,147
+   * - ``vmu`` (VMEM's owner)
+     - 1
+     - 0
+     - 176
+     - 664
+   * - ``vpu`` (the VREG file)
+     - 4
+     - 0
+     - 1,161
+     - 1,546
+   * - ``dma_st``
+     - 0
+     - 3
+     - 601
+     - 555
+   * - ``wld`` x16
+     - 0
+     - 0
+     - 829
+     - 4,059
+   * - ``pe`` x16
+     - 0
+     - 12
+     - 5,774
+     - 5,222
+   * - FIFOs, ``entry_proc`` and top level
+     - 36
+     - 0
+     - 6,779
+     - 8,073
+   * - **total**
+     - **41**
+     - **21**
+     - **17,918**
+     - **24,244**
+
+Against v1's landed build (:doc:`tinytpu_isa`, BRAM 42, DSP 14, FF 17,481,
+LUT 26,583) the aligned design is within a few percent on every resource:
+one VMEM and one VREG file cost about what v1's three memories did, and the
+LUTs the ``vpu`` saves over v1's ``vru`` + ``accu`` pay for the extra
+opcodes.
+
+**Timing is the one place the aligned design is worse, and it is worse by a
+lot.** The estimated clock is **3.782 ns**, against **2.431 ns** for v1, and
+3.782 ns *misses* the 3.33 ns target (top-level slack **-1.35 ns**; v1 met it
+with margin). The critical path is in ``vpu_0`` and ``vmu_0`` -- the two units
+increments 3 and 4 created, and the only two whose loops are ``style=flp``;
+every other unit still reports 2.431 ns. So the 1.26x-2.22x cycle cost in the
+table above is **not** the whole cost: at these estimates the same work would
+also need a clock about 1.56x longer, and the aligned design does not close
+at v1's frequency at all. Whether the path is the flushable pipeline itself,
+the 32-bit-lane VREG file, or the ``vld`` sign-extend and ``vst`` saturate in
+the same loop body, has not been measured.
+
+
 .. _align-verification:
 
 Verification of every increment
@@ -838,8 +920,44 @@ Doing so found a real T-dependence in increment 2 (``aw[0:VW] = vv``: Allo
 infers a slice's width from ``upper - lower`` with global names as free
 symbols, so the width silently became 32 bits, right only at T=4), and a
 simulator bug (a ``Stream`` of ``UInt(65)`` corrupts the simulator's heap at
-T=8; 72 and 128 bits run, 96 hangs), now avoided by carrying the weight-switch
-flag on its own 8-bit chain.
+T=8; reduced afterwards to ``tests/limits/align_p3_stream_width.py``, where
+65, 72 and 96 bits all abort in ``free()`` and 64 and 128 survive), now
+avoided by carrying the weight-switch flag on its own 8-bit chain.
+
+
+.. _align-verified:
+
+Independently re-measured (2026-09-22)
+--------------------------------------
+
+Everything below was re-run from this branch by a second agent that did not
+build it, with ``TPU_*`` unset except where named, and every Vitis project
+deleted after its numbers were read. Logs are ``logs/verify_*``.
+
+* ``reproduce.sh``: ALL EXACT, STRESS OK 487/487, and cosim
+  **216 / 408 / 809 / 933 / 1521** with 0 mismatches at each shape --
+  ``REPRODUCED`` (``logs/verify_reproduce.log``).
+* Functional gates at T=4/MAXDIM=16, T=8/MAXDIM=16 and T=8/MAXDIM=32: KPN OK,
+  ALL EXACT, STRESS OK, and the validator rejecting **34** crafted bad
+  programs at each setting (``logs/verify_func_t4.log``,
+  ``logs/verify_func_t8.log``).
+* ``mutate.py --no-rtl``: 41 of 42 mutants caught by ``bench_isa`` or
+  ``stress_isa``, control passes; the 42nd, the RTL-only ``vr_claim_false``,
+  caught by ``TPU_TB=stress`` cosim (``logs/verify_mutate_norTL.log``,
+  ``logs/verify_mutate_rtl.log``).
+* ``TPU_TB=stress`` cosim, 0 wrong and 0 clobbered over 6 calls per shape: at
+  T=4, 4x4x4 and 16x16x16; at T=8, 8x8x8 and 16x16x16
+  (``logs/verify_cosim_stress_t4.log``, ``logs/verify_cosim_t8_stress.log``).
+* T=8 default cosim: **302 / 474 / 699** (``logs/verify_cosim_t8.log``).
+* The per-increment costs, by checking out each increment's example directory
+  and re-running cosim at 4x4x4 and 16x16x16 (``logs/verify_spot_*.log``):
+  inc 1 **176 / 750**, inc 2 **186 / 1216**, inc 3 **197 / 1904**, inc 3b
+  **199 / 1514** -- so +4/+64, +10/+466, +11/+688 and +2/-390 are all real and
+  land on the increments the table attributes them to. inc 4 and inc 5a were
+  not re-run separately; their combined step from inc 3b to HEAD measures
+  +17/+7, which is the table's +7/+5 and +10/+2 summed.
+* Resources and timing: :ref:`align-area`, which the original report omitted.
+
 
 .. _align-status:
 

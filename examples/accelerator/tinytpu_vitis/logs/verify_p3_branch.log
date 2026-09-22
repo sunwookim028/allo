@@ -1,0 +1,6 @@
+    64 bits -> OK over 8 calls
+    65 bits -> died rc=-6: free(): invalid pointer
+    72 bits -> died rc=-6: free(): invalid pointer
+    96 bits -> values exact, then rc=-6 (free(): invalid pointer)
+   128 bits -> OK over 8 calls
+[item P3] REPRODUCES: widths that do not survive 8 calls: [65, 72, 96]; 64=OK over 8 calls, 65=died rc=-6: free(): invalid pointer, 72=died rc=-6: free(): invalid pointer, 96=values exact, then rc=-6 (free(): invalid pointer), 128=OK over 8 calls

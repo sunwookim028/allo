@@ -1,0 +1,3 @@
+  simulator: OK
+  style=default -> DEADLOCK (// ERROR!!! DEADLOCK DETECTED at 3547000 ns! SIMULATION WILL BE STOPPED! //)
+[item P1] REPRODUCES: styles that do not run in RTL: ['default']; default=DEADLOCK (// ERROR!!! DEADLOCK DETECTED at 3547000 ns! SIMULATION WILL BE STOPPED! //)

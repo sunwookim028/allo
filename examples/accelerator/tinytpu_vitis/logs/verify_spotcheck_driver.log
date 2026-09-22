@@ -1,0 +1,67 @@
+##### T=8 stress cosim
+rc=0
+    TB 16x16x16 case 4 vector_program full      wrong = 0, clobbered outside = 0
+    TB 16x16x16 case 5 vr_distance(4) full      wrong = 0, clobbered outside = 0
+  16x16x16  cycles=465   TB 16x16x16 stress mismatches = 0 over 6 calls
+
+  shape      cycles   (min over the stress calls)
+   8x 8x 8   302
+  16x16x16   465
+  COSIM OK (testbench=stress)
+##### the RTL-only mutant (cosim)
+rc=0
+  vr_claim_false  pass           pass           CAUGHT         cosim
+  none            pass           pass           -              control passes
+
+  vr_claim_false  FALSE DEPENDENCE CLAIM: the contract admits a vreg read one vpu iteration after its write, so the `inter false` pragma on vreg is untrue for programs the assembler accepts
+  none            control: the design unmodified
+
+  logs: /home/sk3463/allo-align/examples/accelerator/tinytpu_vitis/.mutants/<mutant>/<level>.log
+  MUTATE OK: all 1 mutants run were caught
+##### spot-check the increments
+===== inc1 (b3793f85)
+  rc=0
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=176   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=750   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   176
+  16x16x16   750
+  COSIM OK (testbench=default)
+===== inc2 (8f113313)
+  rc=0
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=186   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=1216   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   186
+  16x16x16   1216
+  COSIM OK (testbench=default)
+===== inc3 (7b087c44)
+  rc=0
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=197   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=1904   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   197
+  16x16x16   1904
+  COSIM OK (testbench=default)
+===== inc3b (c565ebea)
+  rc=0
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=199   TB 4x4x4 mismatches = 0 / 16
+  16x16x16  cycles=1514   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   199
+  16x16x16   1514
+  COSIM OK (testbench=default)
+===== SPOTCHECK DONE
+##### ALL DONE

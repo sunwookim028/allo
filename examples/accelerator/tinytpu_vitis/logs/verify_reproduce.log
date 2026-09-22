@@ -1,0 +1,25 @@
+== building mlir/build (incremental)
+   allo -> /home/sk3463/allo-align/allo/__init__.py
+== bench_isa.py (published functional setup)
+  ALL EXACT
+== stress_isa.py (correctness gate)
+  STRESS OK: 487/487 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)
+== cosim.py, default testbench (csynth once, then one cosim per shape)
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 5 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=216   TB 4x4x4 mismatches = 0 / 16
+   8x 8x 8  cycles=408   TB 8x8x8 mismatches = 0 / 64
+  12x12x12  cycles=809   TB 12x12x12 mismatches = 0 / 144
+  16x16x 8  cycles=933   TB 16x16x8 mismatches = 0 / 128
+  16x16x16  cycles=1521   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   216
+   8x 8x 8   408
+  12x12x12   809
+  16x16x 8   933
+  16x16x16   1521
+  COSIM OK (testbench=default)
+   expected: 4x4x4=216 8x8x8=408 12x12x12=809 16x16x8=933 16x16x16=1521
+   got:      4x4x4=216 8x8x8=408 12x12x12=809 16x16x8=933 16x16x16=1521
+REPRODUCED

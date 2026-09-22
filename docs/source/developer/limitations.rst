@@ -468,9 +468,16 @@ older iterations' outputs while it waits on its next input: TinyTPU-align's
 PEs are the subtle case. ``#pragma HLS pipeline style=flp`` (flushable)
 keeps older iterations draining. ``frp`` does not help.
 
-* Probe: ``examples/accelerator/tinytpu_vitis/align_probes/probe_cycle.py``,
-  a two-process ping-pong. The Allo simulator passes; Vitis cosim deadlocks
-  under ``stp`` and ``frp`` and passes under ``flp``.
+* Repro: ``tests/limits/align_p1_pipeline_style.py`` (needs ``vitis_hls``,
+  a few minutes per style). ``drv`` gets the previous iteration's response
+  and puts the next request in one pipelined loop; ``wrk`` answers.
+  **Measured 2026-09-22:** ``stp`` (and the pragma with no style at all, i.e.
+  what a checkout without ``0038833c`` can emit) deadlock -- Vitis reports
+  ``DEADLOCK DETECTED`` / ``HLS 200-742``; ``flp`` passes; and **``frp``
+  passes too**, which corrects the earlier claim that ``frp`` does not help.
+  The repro reproduces on ``main`` as well.
+* ``align_probes/probe_cycle.py`` is cited above as the probe, but it applies
+  no ``s.pipeline`` at all, so it shows item P2, not this item.
 * Neither the dataflow simulator nor csim can show it.
 * Fixed by ``0038833c``: ``s.pipeline(axis, ..., style="stp"|"flp"|"frp")``
   (~20 lines, ``tests/test_vhls.py::test_pipeline_style``).
@@ -496,6 +503,12 @@ top function, under ``#ifndef __SYNTHESIS__`` only, to run each process on a
 blocking. Fix in Allo: emit that form for the C model, about 30 lines in the
 emitter.
 
+**Confirmed 2026-09-22** on the two-process cycle of
+``tests/limits/align_p1_pipeline_style.py``: with the rewrite, ``csim_design``
+prints ``TB mismatches = 0``; without it, the same region gives
+``ERROR [HLS SIM]: an hls::stream is read while empty`` and
+``ERROR: [SIM 211-100] CSim failed with errors``.
+
 .. _limitation-sim-odd-width:
 
 P3. The dataflow simulator corrupts its heap on some stream widths above 64 bits
@@ -503,10 +516,20 @@ P3. The dataflow simulator corrupts its heap on some stream widths above 64 bits
 
 With TinyTPU-align at T=8, a ``Stream`` of ``UInt(65)`` produced exact results
 on its first invocation and ``corrupted size vs. prev_size`` (glibc abort) or
-a segfault on the next. The same design with 72 or 128 bits ran clean, and
-with 96 bits it hung. Not reduced to a minimal repro; the bisection is in the
-branch log (increment 2). The design avoids non-power-of-two widths above 64
+a segfault on the next. The design avoids non-power-of-two widths above 64
 bits in streams.
+
+* Repro: ``tests/limits/align_p3_stream_width.py``, one producer, one
+  consumer, one ``Stream[UInt(W)]``, eight calls, each width in its own child
+  process. **Measured 2026-09-22, on this branch and on ``main``:** 64 and
+  128 bits survive; **65, 72 and 96 all abort in ``free()``** ("free():
+  invalid pointer", "corrupted size vs. prev_size", "double free"), sometimes
+  after printing exact values and sometimes before. So the earlier claim that
+  72 bits "ran clean" does not hold in the reduction -- what varies is
+  whether the overrun lands somewhere fatal, not whether it happens.
+* The simulator lowers a stream to a ``memref<(depth+1) x iW>``
+  (``allo/backend/simulator.py``), so the buffer is sized by a rounded byte
+  width while the stores are wider.
 
 .. _limitation-slice-width:
 
@@ -520,6 +543,12 @@ warns ``Cannot infer the bitwidth of the slice, use UInt(32)`` and continues.
 TinyTPU-align's ``aw[0:VW] = vv`` was right at T=4 (VW = 32) and wrong at
 T=8. Fix: resolve global integer names to their values before taking the
 difference (``ctx.global_vars``), and make the fallback an error.
+
+* Repro: ``tests/limits/align_p4_slice_width.py``, which writes the same
+  64-bit value through ``x[0:VW]`` and through ``x[0:64]``.
+  **Measured 2026-09-22, on this branch and on ``main``:** ``x[0:VW]`` keeps
+  only the low 32 bits (``0x00000000cafef00d`` against
+  ``0xdeadbeefcafef00d``), with the warning above.
 
 Surfaced while building the L2 TPU (FlashAttention)
 ---------------------------------------------------
