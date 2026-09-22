@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis.isa_encoding import (  # noqa: E402
     MAXDIM, NAR, NVR, SPAD_ROWS, T,
-    OP_DMA_LD, OP_MM, OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU,
+    OP_DMA_LD, OP_MM, OP_MVOUT, OP_VADD, OP_VADDRELU, OP_VLD, OP_VRELU,
     ACC_DTYPE, OPERAND_DTYPE,
     acc, dma_dest_is_vr, dma_source_is_b, expand, operands, to_operand,
 )
@@ -81,6 +81,9 @@ def run(prog, A, B, C):
                 ar[i["ar0"] + r] = acc(base + psum)
             elif op == OP_VADD:
                 ar[i["ar_d"] + r] = acc(ar[i["ar_s1"] + r] + ar[i["ar_s2"] + r])
+            elif op == OP_VADDRELU:
+                ar[i["ar_d"] + r] = np.maximum(
+                    acc(ar[i["ar_s1"] + r] + ar[i["ar_s2"] + r]), 0)
             elif op == OP_VRELU:
                 ar[i["ar_d"] + r] = np.maximum(ar[i["ar_s"] + r], 0)
             elif op == OP_MVOUT:

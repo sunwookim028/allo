@@ -96,6 +96,7 @@ OP_VRELU = 6
 OP_MVOUT = 7
 OP_LOOP = 8
 OP_ENDLOOP = 9
+OP_VADDRELU = 10
 
 OPCODE_NAME = {
     OP_NOP: "nop",
@@ -108,6 +109,7 @@ OPCODE_NAME = {
     OP_MVOUT: "mvout",
     OP_LOOP: "loop",
     OP_ENDLOOP: "endloop",
+    OP_VADDRELU: "vaddrelu",
 }
 RETIRED = frozenset({OP_DMA_ST})
 
@@ -124,6 +126,7 @@ OPERAND_NAME = {
     OP_MVOUT: ("ar0", "dram_row0", "col_block", None),
     OP_LOOP: (None, None, None, None),
     OP_ENDLOOP: (None, None, None, None),
+    OP_VADDRELU: ("ar_d", "ar_s1", "ar_s2", None),
 }
 
 #: Values `op` field of an opcode admits, where the spec restricts them.
@@ -422,7 +425,7 @@ HEADER_TERMS = (
     (3, (0, 16), "vru_words", (('rows', ('dma_ld',), 'dst_vr', '1', None), ('rows', ('vld',), None, '1', None), ('rows', ('mm',), None, '1', None))),
     (4, (0, 16), "mm_count", (('instructions', ('mm',), None, '1', None),)),
     (4, (16, 32), "mm_rows", (('rows', ('mm',), None, '1', None),)),
-    (5, (0, 16), "accu_iterations", (('rows', ('mm', 'vrelu', 'mvout'), None, '1', None), ('rows', ('vadd',), None, '2', None))),
+    (5, (0, 16), "accu_iterations", (('rows', ('mm', 'vrelu', 'mvout'), None, '1', None), ('rows', ('vadd',), None, '2', None), ('rows', ('vaddrelu',), None, '2', None))),
     (6, (0, 16), "dma_st_rows", (('rows', ('mvout',), None, '1', None),)),
     (7, (0, 16), "a_span", (('row_span', ('dma_ld',), 'src_a', '1', 'dram_row0'),)),
     (7, (16, 32), "b_span", (('row_span', ('dma_ld',), 'src_b', '1', 'dram_row0'),)),

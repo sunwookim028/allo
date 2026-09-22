@@ -631,6 +631,54 @@
         "sequencer"
       ],
       "operands": []
+    },
+    {
+      "name": "vaddrelu",
+      "value": 10,
+      "software_constant": "OP_VADDRELU",
+      "rows": "nr accumulator rows",
+      "units": [
+        "accu"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar_d",
+          "meaning": "first destination accumulator row"
+        },
+        {
+          "field": "f1",
+          "name": "ar_s1",
+          "meaning": "first row of the left source"
+        },
+        {
+          "field": "f2",
+          "name": "ar_s2",
+          "meaning": "first row of the right source"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "ar",
+          "base": "ar_s1",
+          "rows": "nr",
+          "as": "a source"
+        },
+        {
+          "memory": "ar",
+          "base": "ar_s2",
+          "rows": "nr",
+          "as": "a source"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "ar",
+          "base": "ar_d",
+          "rows": "nr"
+        }
+      ],
+      "note": "`vadd` then `vrelu` in one pass: the accumulator already has both the adder and the rectifier, so the composition costs a mux and saves a pass over `ar` and an intermediate row. Two `ar` reads a row, so accu takes two steps a row and the sequencer hands it 2 * nr."
     }
   ],
   "dispatch": {
@@ -661,6 +709,14 @@
           "nr": "2 * nr"
         },
         "note": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
+      },
+      {
+        "opcode": "vaddrelu",
+        "unit": "accu",
+        "set": {
+          "nr": "2 * nr"
+        },
+        "note": "accu takes two iterations per vaddrelu row: first source on the even one, second source, the fused add-and-rectify and the write on the odd one."
       }
     ]
   },
@@ -832,6 +888,13 @@
               "vadd"
             ],
             "scale": "2"
+          },
+          {
+            "kind": "rows",
+            "ops": [
+              "vaddrelu"
+            ],
+            "scale": "2"
           }
         ]
       },
@@ -946,13 +1009,15 @@
       "written_by": [
         "mm",
         "vadd",
-        "vrelu"
+        "vrelu",
+        "vaddrelu"
       ],
       "read_by": [
         "mm (acc = 1)",
         "vadd",
         "vrelu",
-        "mvout"
+        "mvout",
+        "vaddrelu"
       ],
       "cleared_by_hardware": false
     },
@@ -1024,7 +1089,7 @@
         "left there. The guarantee moved from the hardware to the program."
       ],
       "rules": [
-        "Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu.",
+        "Every ar row read by an accumulating mm, by either source of a vadd or a vaddrelu, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd, a vaddrelu or a vrelu.",
         "Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there -- directly, or into spad and then through a vld.",
         "vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error.",
         "nr >= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op.",
@@ -1051,7 +1116,8 @@
         "mm": "1 per row",
         "vrelu": "1 per row",
         "mvout": "1 per row",
-        "vadd": "2 per row: first source on the even iteration, second source and the write on the odd one"
+        "vadd": "2 per row: first source on the even iteration, second source and the write on the odd one",
+        "vaddrelu": "2 per row: first source on the even iteration, second source and the write on the odd one"
       },
       "rule": "A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on.",
       "constraints": [

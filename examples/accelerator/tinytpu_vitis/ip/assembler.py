@@ -19,7 +19,7 @@ from examples.accelerator.tinytpu_vitis.ip.isa import (
     AGU_TERMS, AGU_TERM_BITS, AGU_LEVEL_BITS, DMA_SRC_B, DMA_TO_VR, FIELD_LO,
     FIELD_MASK, LOOP_DEPTH, NHDR, NR_LO, NR_MASK, OPCODE_NAMES, OP_DMA_LD,
     OP_DMA_ST, OP_ENDLOOP, OP_LOOP, OP_MASK, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
-    OP_VLD, OP_VRELU)
+    OP_VADDRELU, OP_VLD, OP_VRELU)
 
 
 def opcode_of(word):
@@ -234,7 +234,7 @@ class Assembler:
                         ar_read(row, accu_step + i, "the accumulate base")
                     ar_write(row, accu_step + i)
                 accu_step += nr
-            elif op == OP_VADD:
+            elif op in (OP_VADD, OP_VADDRELU):
                 first = span("ar", f1, nr)
                 second = span("ar", f2, nr)
                 dest = span("ar", f0, nr)
@@ -309,7 +309,8 @@ class Assembler:
                   rows_to_spad + rows(OP_VLD) + n_mm * (p.T + 1),
                   rows_to_vr + rows(OP_VLD) + mm_rows,
                   n_mm | (mm_rows << 16),
-                  rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
+                  rows(OP_MM, OP_VRELU, OP_MVOUT)
+                  + 2 * rows(OP_VADD, OP_VADDRELU),
                   rows(OP_MVOUT),
                   a_span | (b_span << 16)]
         assert len(header) == NHDR

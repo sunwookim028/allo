@@ -37,7 +37,7 @@ def accumulator_directives(s, ctx):
     reads=("c_acc", "cw"),
     writes=("ac2sp",),
     parameters=("NAR", "AW", "VW", "T"),
-    isa=("OP_MM", "OP_VADD", "OP_VRELU", "OP_MVOUT"),
+    isa=("OP_MM", "OP_VADD", "OP_VRELU", "OP_VADDRELU", "OP_MVOUT"),
     directives=accumulator_directives,
 )
 def accu():
@@ -63,7 +63,12 @@ def accu():
             step = 0
         row: int32 = step
         phase: int32 = 0
+        two_source: int32 = 0
         if op == OP_VADD:
+            two_source = 1
+        if op == OP_VADDRELU:
+            two_source = 1
+        if two_source == 1:
             row = step >> 1
             phase = step - (row << 1)
         read_row: int32 = f1 + row
@@ -72,7 +77,7 @@ def accu():
             write_row = f1 + row
         if op == OP_MVOUT:
             read_row = f0 + row
-        if op == OP_VADD:
+        if two_source == 1:
             if phase == 1:
                 read_row = f2 + row
         read_word: UInt(AW) = ar[read_row]
@@ -98,6 +103,18 @@ def accu():
                     second: int32 = read_word[32 * add_lane : 32 * (add_lane + 1)]
                     added: int32 = first + second
                     write_word[32 * add_lane : 32 * (add_lane + 1)] = added
+        elif op == OP_VADDRELU:
+            if phase == 0:
+                vadd_first = read_word
+                do_write = 0
+            else:
+                with allo.meta_for(T) as fuse_lane:
+                    held: int32 = vadd_first[32 * fuse_lane : 32 * (fuse_lane + 1)]
+                    arriving: int32 = read_word[32 * fuse_lane : 32 * (fuse_lane + 1)]
+                    fused: int32 = held + arriving
+                    if fused < 0:
+                        fused = 0
+                    write_word[32 * fuse_lane : 32 * (fuse_lane + 1)] = fused
         elif op == OP_VRELU:
             with allo.meta_for(T) as relu_lane:
                 before: int32 = read_word[32 * relu_lane : 32 * (relu_lane + 1)]

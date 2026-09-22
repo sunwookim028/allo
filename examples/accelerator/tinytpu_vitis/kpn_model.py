@@ -59,6 +59,8 @@ def build(prog):
                 yield ("put", "c_acc", (op, nr, f0))
             elif op == U.OP_VADD:
                 yield ("put", "c_acc", (op, 2 * nr, f0))
+            elif op == U.OP_VADDRELU:
+                yield ("put", "c_acc", (op, 2 * nr, f0))
             elif op == U.OP_VRELU:
                 yield ("put", "c_acc", (op, nr, f0))
             elif op == U.OP_MVOUT:

@@ -535,6 +535,14 @@ Opcodes
      -
      - none
      - ``sequencer``
+   * - ``OP_VADDRELU``
+     - 10
+     - vaddrelu
+     - | ``f0`` = ar_d: first destination accumulator row
+       | ``f1`` = ar_s1: first row of the left source
+       | ``f2`` = ar_s2: first row of the right source
+     - nr accumulator rows
+     - ``accu``
 
 Derived properties
 ^^^^^^^^^^^^^^^^^^
@@ -596,6 +604,10 @@ The sequencer hands two units a rewritten copy of the word, so each unit's flat 
      - ``accu``
      - ``nr`` = 2 * nr
      - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
+   * - ``vaddrelu``
+     - ``accu``
+     - ``nr`` = 2 * nr
+     - accu takes two iterations per vaddrelu row: first source on the even one, second source, the fused add-and-rectify and the write on the odd one.
 
 Instruction memory header
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -652,6 +664,7 @@ Instruction memory header
      - | the sum of:
        |   rows of ``mm``, ``vrelu``, ``mvout``
        |   rows of ``vadd``, times 2
+       |   rows of ``vaddrelu``, times 2
      - ``accu``
    * - ``imem[6]``
      - ``[0:16]``
@@ -700,8 +713,8 @@ Memory map
      - ``accu``
      - ``NAR``
      - ``T * 32`` bits
-     - mm, vadd, vrelu
-     - mm (acc = 1), vadd, vrelu, mvout
+     - mm, vadd, vrelu, vaddrelu
+     - mm (acc = 1), vadd, vrelu, mvout, vaddrelu
      - **no**
    * - ``imem``
      - ``sequencer``
@@ -739,7 +752,7 @@ Contracts
 
 **Write before read.**
 
-* Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu.
+* Every ar row read by an accumulating mm, by either source of a vadd or a vaddrelu, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd, a vaddrelu or a vrelu.
 * Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there -- directly, or into spad and then through a vld.
 * vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error.
 * nr >= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op.
@@ -747,7 +760,7 @@ Contracts
 
 Enforced by microarch_isa.check_program, which microarch_isa.assemble calls, so a violating program cannot be assembled.
 
-**The accumulator read-after-write distance.** A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on. ``AR_RAW_DIST = 4`` accu iterations; cost per opcode: ``mm`` 1 per row, ``vrelu`` 1 per row, ``mvout`` 1 per row, ``vadd`` 2 per row: first source on the even iteration, second source and the write on the odd one. Enforced by microarch_isa.check_program. Exercised at its edge by isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build.
+**The accumulator read-after-write distance.** A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on. ``AR_RAW_DIST = 4`` accu iterations; cost per opcode: ``mm`` 1 per row, ``vrelu`` 1 per row, ``mvout`` 1 per row, ``vadd`` 2 per row: first source on the even iteration, second source and the write on the odd one, ``vaddrelu`` 2 per row: first source on the even iteration, second source and the write on the odd one. Enforced by microarch_isa.check_program. Exercised at its edge by isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build.
 
 Parameters
 ^^^^^^^^^^
