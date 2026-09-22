@@ -987,6 +987,18 @@ promised more work than it receives does not produce a wrong answer, it
 hangs** -- the one place where the assembler and the microarchitecture are
 coupled.
 
+``expand()`` yields one ``(opcode, row count, f0, f1, f2, f3)`` tuple per
+dynamic issue, and the resolved address fields travel alongside the row count
+for the same reason: ``dma_ld`` now bursts, so it needs the DRAM row span
+before its first instruction arrives (``imem[7]``, above), and ``f1`` is an
+AGU target in the general case, not a constant readable off the static
+encoding. Mirroring the sequencer's control flow here is also what makes
+``bench_isa.py``'s loop-vs-flat equivalence check strict: the two program
+forms must agree on every resolved address, not only on the opcode and
+row-count stream. ``assemble()`` runs every program through ``check_program()``
+first; ``check=False`` exists only so a test can put a known-bad program on
+the machine and watch it fail -- nothing that ships passes it.
+
 ``IMEM_SIZE`` is ``NHDR + IWORDS * 24`` (the longest program shipped, plus
 headroom). The program is pulled on-chip by one burst of ``IMEM_SIZE`` words
 before anything runs, so imem size is startup time whether the program uses it
@@ -1623,6 +1635,15 @@ as unwritten. The same walk enforces the accumulator distance contract
 (:ref:`tinytpu-isa-dependence`). It also rejects out-of-range rows, bad loop nesting
 (unbalanced or over-deep loops, trip 0, AGU terms naming a closed loop),
 zero-row instructions, and the retired ``dma_st`` opcode.
+
+Two of ``check_program()``'s checks exist only because the walk is exact
+rather than conservative: it rejects a resolved field that has climbed past
+``2**11`` (the range ``enc()`` admits) -- the sequencer writes the resolved
+sum back into the 12-bit field, so an AGU term can push it out of range, and
+this walk is the only place that can see it -- and it enforces the structural
+shape an instruction must have (``mm``'s ``f2`` in ``{0, 1}``, ``dma_ld``'s
+``f0`` in ``{0, 1, 2, 3}``) rather than trusting the encoder. Every rejection
+names the static instruction, the loop iteration, and the rows.
 
 Two design facts the hardening found:
 
