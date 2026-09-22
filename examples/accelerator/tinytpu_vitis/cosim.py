@@ -20,7 +20,7 @@ report a worst-case bound. See docs/source/designs/tinytpu_isa.rst.
 TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
 
   * `TPU_TB` unset (the DEFAULT, and the only mode the published cycle counts
-    172 / 262 / 418 / 484 / 686 come from): one GEMM call per shape, operands
+    171 / 261 / 417 / 483 / 685 come from): one GEMM call per shape, operands
     in [-4, 4] from seed 0 -- the distribution Gemmini's `allo_cmp.c` fills,
     kept so the comparison is like for like -- `C` zeroed, and only the
     `M x N` region compared. It is a PERFORMANCE testbench. It cannot see a

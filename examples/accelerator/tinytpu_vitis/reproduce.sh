@@ -9,6 +9,18 @@ set -eo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 # At TPU_MAXDIM=16 (pinned below), which is where these were measured.
+#
+# THESE MOVED BY ONE CYCLE, uniformly, and the cause is measured rather than
+# inferred. They were 172 / 262 / 418 / 484 / 686 while the scratchpad and
+# vreg files were the literals 512 and 256; they are 171 / 261 / 417 / 483 /
+# 685 now that both are DERIVED as MAXDIM^2/T, which is 64 rows each at
+# MAXDIM=16. Rebuilding this configuration with `TPU_SPAD=512 TPU_NVR=256
+# TPU_NAR=128` and nothing else changed returns 172 at 4x4x4, so the cycle is
+# the memory sizing and not the parametric burst loop that landed beside it.
+# A 64-row file is not implemented the way a 512-row one is -- BRAM 42 -> 40
+# says two memories left block RAM -- and a shorter operand read path takes
+# one cycle out of the FIXED term, which is why the delta is the same at
+# every shape regardless of work. It is a (very small) improvement.
 EXPECTED="4x4x4=171 8x8x8=261 12x12x12=417 16x16x8=483 16x16x16=685"
 
 usage() {

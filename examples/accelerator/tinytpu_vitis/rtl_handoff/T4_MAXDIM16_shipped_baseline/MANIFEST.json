@@ -1,9 +1,14 @@
 {
+  "aux_files": [
+    "tinytpu_isa_sequencer_0_1_iv_now_RAM_1WNR_AUTO_1R1W.dat"
+  ],
   "config": {
     "TPU_MAXDIM": "16",
     "TPU_T": "4"
   },
   "files": 145,
+  "layout": "flat",
+  "readmemh_users": [],
   "resources": {
     "BRAM": 40,
     "DSP": 14,
@@ -22,5 +27,6 @@
     "target_ns": 3.33,
     "uncertainty_ns": 0.9
   },
-  "top": "tinytpu_isa"
+  "top": "tinytpu_isa",
+  "top_defined_in": "tinytpu_isa.v"
 }

@@ -105,20 +105,28 @@ def run_point(widen, lat, shapes, keep_verilog=None):
             os.makedirs(REPORTS, exist_ok=True)
             shutil.copyfile(rpt, os.path.join(REPORTS, f"grid_{tag}.rpt"))
         if keep_verilog:
-            export_verilog(prj, keep_verilog)
+            export_verilog(prj, keep_verilog, resources={
+                k: out[k] for k in ("FF", "LUT", "BRAM", "DSP",
+                                    "estimated_ns", "target_ns")
+                if k in out})
     finally:
         shutil.rmtree(prj, ignore_errors=True)
     return out
 
 
-def export_verilog(prj, dest):
-    """Copy the generated Verilog out before the project is deleted."""
+def export_verilog(prj, dest, resources=None):
+    """Copy the generated Verilog out before the project is deleted.
+
+    `resources` is required by `write_design`, which refuses an export with an
+    empty resource record -- that emptiness is the signature of a csynth whose
+    report never appeared, i.e. of a partial RTL directory.
+    """
     src = os.path.join(prj, "out.prj/solution1/syn/verilog")
     if not os.path.isdir(src):
         return
     sys.path.insert(0, HERE)
     from export_rtl import write_design
-    write_design(src, dest)
+    write_design(src, dest, resources=resources)
 
 
 def main(argv):
