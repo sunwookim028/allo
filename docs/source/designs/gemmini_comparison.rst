@@ -27,12 +27,26 @@ distribution. The design under test is :doc:`tinytpu_isa`.
 
 .. important::
 
-   **Result, 2026-09-19: TinyTPU-isa is 1.07-1.24x slower than Gemmini at all
-   five shapes** (``e24e433b``) when both sides are measured over the same
-   window: the accelerator plus its dispatch, with near-zero memory latency on
-   both. Until ``e24e433b`` it was **1.55-1.8x** slower (252 / 383 / 591 / 667
-   / 919 cycles); the step is the gap attribution's measured design stack,
-   landed as the design (:ref:`gemmini-gap-attribution`).
+   **Result, superseded in scope on 2026-09-22 — read both lines.**
+
+   Over the five original shapes at ``MAXDIM=16`` (``e24e433b``), measured on
+   both sides over the same window — the accelerator plus its dispatch, with
+   near-zero memory latency on both — TinyTPU-isa is **1.07-1.24x slower than
+   Gemmini**. That measurement stands and it is what the body of this page
+   analyses. Until ``e24e433b`` it was **1.55-1.8x** slower (252 / 383 / 591 /
+   667 / 919 cycles); the step is the gap attribution's measured design stack
+   (:ref:`gemmini-gap-attribution`).
+
+   Over **ten** shapes at ``MAXDIM=64``, with Gemmini reported as a median of
+   five trials, the deficit **converges**: 1.27x at 16x16x16, 1.26x at 32³,
+   1.13x at 48³ and **1.09x at 64³**, with the design reaching **74.1 % of
+   peak** and still climbing. At the two smallest shapes the difference **does
+   not clear Gemmini's measurement spread** and is not a supportable claim
+   either way. So the 1.07-1.24x range is a statement about pipeline depth at
+   small shapes, not about steady-state efficiency, and a reader wanting "how
+   far behind is this design" should take **1.09x at 64x64x64** — or **1.04x**
+   with the burst-widening candidate, which is not landed and costs +123 %
+   block RAM.
 
    The earlier claim, "faster at all five shapes", compared our
    accelerator-only count with Gemmini's ``tiled_matmul_auto``, and about 395
