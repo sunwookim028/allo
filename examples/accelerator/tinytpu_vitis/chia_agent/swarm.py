@@ -12,10 +12,12 @@ worker writes is already under `--run-dir`.
 Spend: `--budget-usd` is required, and the pre-flight gate (`preflight.py`)
 runs before any worker starts: the project must bill CHIA2026, Vertex AI must
 be enabled, and CHIA's cumulative spend on CHIA2026 plus this cap must fit
-`CHIA_TOTAL_CAP_USD`. The per-run cap is global across workers. Each loop
-refuses to start a model call that would pass it (projected from the largest
-call seen), and this process polls the opencode DB and kills every worker
-outright if the cap is reached anyway.
+`CHIA_TOTAL_CAP_USD`. The per-run cap is global across this run's workers and
+blind to any other run: every session a worker opens is titled with the run's
+tag, and the cap sums those (`spend.run_spend`). Each loop refuses to start a
+model call that would pass it (projected from the largest call seen), and this
+process polls the opencode DB and kills every worker outright if the cap is
+reached anyway.
 
     python chia_agent/swarm.py --workers 2 --iterations 3 --budget-usd 15
 """
@@ -32,7 +34,7 @@ import time
 from pathlib import Path
 
 import preflight
-from spend import spent_since
+from spend import run_spend, spent_since
 
 DEFAULT_CALL_USD = 3.5  # as loop.py
 
@@ -99,11 +101,16 @@ Your starting angle:
 """
 
 
+def run_tag(run_dir: Path, t0_ms: int) -> str:
+    return f"chia-run {run_dir.name}@{t0_ms}"
+
+
 def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms):
     log_dir = run_dir / worker
     log_dir.mkdir(parents=True, exist_ok=True)
     work = REPO_ROOT / ".chia_scratch" / run_dir.name / worker
     env = os.environ | {"CHIA_RUN_T0_MS": str(t0_ms),
+                        "CHIA_RUN_TAG": run_tag(run_dir, t0_ms),
                         "CHIA_BUDGET_USD": str(soft_budget)}
     command = [sys.executable, "-u", str(AGENT_DIR / "loop.py"),
                "--task", BASE_TASK.format(angle=angle),
@@ -154,13 +161,16 @@ def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dic
                 summary["best"] = {"worker": worker, "iteration": e["iteration"],
                                    "total": v["total_cycles"], "cycles": v["cycles"]}
         summary["workers"][worker] = rows
-    spend = spent_since(t0_ms)
+    spend = run_spend(run_tag(run_dir, t0_ms) + " ", t0_ms)
+    window = spent_since(t0_ms)
     summary["spend"] = spend
+    summary["account_window_usd"] = window["usd"]
     summary["wall_seconds"] = round(time.time() - started, 1)
     print(f"\n  baseline {summary['baseline']}")
     print(f"  best     {summary['best'] or 'no candidate beat the baseline'}")
-    print(f"  spend    ${spend['usd']:.2f} ({spend['messages']} model messages); "
-          f"wall {summary['wall_seconds'] / 60:.1f} min")
+    print(f"  spend    ${spend['usd']:.2f} over {len(spend['sessions'])} session(s), "
+          f"{spend['messages']} model messages (the whole account in the same "
+          f"window: ${window['usd']:.2f}); wall {summary['wall_seconds'] / 60:.1f} min")
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
     return summary
 
@@ -199,7 +209,7 @@ def main() -> None:
     # whether its cap fits. Cheap (gcloud reads), no model call.
     charge = preflight.require(args.budget_usd, run_t0_ms=t0_ms)
     (run_dir / "run.json").write_text(json.dumps({
-        "t0_ms": t0_ms, "workers": [w for w, _ in strategies],
+        "t0_ms": t0_ms, "run_tag": run_tag(run_dir, t0_ms), "workers": [w for w, _ in strategies],
         "iterations": args.iterations, "budget_usd": args.budget_usd,
         "preflight": charge,
         "model": os.environ.get("TINYTPU_OPENCODE_MODEL"),
@@ -221,7 +231,7 @@ def main() -> None:
             procs.append((worker, launch(worker, angle, run_dir, args.iterations,
                                          soft, t0_ms)))
         while any(p.poll() is None for _, p in procs):
-            spent = spent_since(t0_ms)["usd"]
+            spent = run_spend(run_tag(run_dir, t0_ms) + " ", t0_ms)["usd"]
             if spent >= args.budget_usd:
                 print(f"HARD CAP: spent ${spent:.2f} >= ${args.budget_usd:.2f}; "
                       f"killing workers", flush=True)

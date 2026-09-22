@@ -54,12 +54,14 @@ def main() -> int:
         print(f"      gate OK: {v['gate']}")
         print("[2/3] one model call through the MCP tool (Vertex AI)...")
         calls = []
-        response = ask(make_llm(tool), tool,
+        t0 = int(started * 1000)
+        budget = Budget(SMOKE_CAP_USD, t0, f"chia-smoke@{t0}", "tpusmoke")
+        response = ask(make_llm(tool, budget.title), tool,
                        "Call tpusmoke_read_spec exactly once. Then reply with a "
                        "single line listing the names of the @df.kernel functions "
                        "defined inside the tinytpu_isa region in microarch_isa.py, "
                        "comma separated, and nothing else.",
-                       Budget(SMOKE_CAP_USD, int(started * 1000)), "smoke", calls)
+                       budget, "smoke", calls)
         text = str(response.result)
         print(f"      model replied: {text.strip()[:300]}")
         print("[3/3] checking the reply came from the spec...")
@@ -68,7 +70,7 @@ def main() -> int:
             print(f"FAIL: reply did not name {missing}")
             return 1
         print(f"SMOKE OK ({time.time() - started:.0f}s, "
-              f"${calls[0].get('cost_usd', 0):.3f})")
+              f"${calls[0]['usd']:.3f})")
         return 0
     finally:
         tool.stop()

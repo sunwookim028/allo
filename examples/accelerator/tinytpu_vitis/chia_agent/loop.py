@@ -12,9 +12,10 @@ agent's word or the agent's own tool output:
 A candidate is kept only if it passes both and strictly lowers the summed cosim
 cycles; otherwise the spec is rewound and the next iteration is told why.
 
-A spend cap is enforced before every model call: if the global spend since the
-run started (opencode's own DB, all workers) plus the largest single call seen
-so far would exceed the cap, the loop stops proposing.
+A spend cap is enforced before every model call: if this run's spend (opencode's
+own DB, over the sessions titled with the run's tag, every worker) plus the
+largest single call seen so far would exceed the cap, the loop stops proposing.
+Another track's spend on the same account is not this run's (`spend.py`).
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from chia.models.opencode import AdditionalModelProvider, RateLimitError
 import preflight
 from allo_tool import AlloSpecTool, EDITABLE
 from llm import IsaOpenCodeLLM
-from spend import spent_since
+from spend import run_spend
 
 AGENT_DIR = Path(__file__).resolve().parent
 DESIGN_DIR = AGENT_DIR.parent
@@ -95,7 +96,7 @@ SYSTEM_MESSAGE = (
 )
 
 
-def make_llm(tool: AlloSpecTool) -> IsaOpenCodeLLM:
+def make_llm(tool: AlloSpecTool, title: str) -> IsaOpenCodeLLM:
     provider, _, model_id = MODEL.partition("/")
     if TEST_BASE_URL:
         additional = [AdditionalModelProvider(
@@ -113,6 +114,9 @@ def make_llm(tool: AlloSpecTool) -> IsaOpenCodeLLM:
         # decides what happens next.
         retries=1,
         additional_providers=additional,
+        # Every session this worker opens carries the run's tag, which is how
+        # its spend is found -- including a call that timed out.
+        extra_cli_args=["--title", title],
         # opencode's own file and shell tools are denied: the MCP tools are the
         # agent's only capability, so it has no path to a frozen file.
         config={"*": "deny", f"{tool.name}_*": "allow"},
@@ -142,22 +146,34 @@ class BudgetExhausted(Exception):
 
 
 class Budget:
-    """Global spend cap across every worker, read from opencode's DB."""
+    """This run's spend cap, read from opencode's DB: the sessions titled with
+    the run's tag (every worker's) and the ids this loop saw returned."""
 
-    def __init__(self, cap_usd: float, t0_ms: int):
-        self.cap, self.t0 = cap_usd, t0_ms
+    def __init__(self, cap_usd: float, t0_ms: int, run_tag: str, worker: str):
+        self.cap, self.t0, self.run_tag = cap_usd, t0_ms, run_tag
+        self.title = f"{run_tag} [{worker}]"
         self.largest_call = DEFAULT_CALL_USD
+        self.sessions: set[str] = set()
+
+    def note_session(self, session_id):
+        if session_id:
+            self.sessions.add(str(session_id))
 
     def spent(self) -> float:
-        return spent_since(self.t0)["usd"]
+        return run_spend(self.run_tag + " ", self.t0, self.sessions)["usd"]
+
+    def mine(self) -> dict:
+        """This worker's sessions and what each has cost so far."""
+        return run_spend(self.title, self.t0, self.sessions)["sessions"]
 
     def check(self, what: str):
-        spent = self.spent()
-        if spent + self.largest_call > self.cap:
+        run = run_spend(self.run_tag + " ", self.t0, self.sessions)
+        if run["usd"] + self.largest_call > self.cap:
             raise BudgetExhausted(
-                f"not starting {what}: spent ${spent:.2f} + next call "
+                f"not starting {what}: this run has spent ${run['usd']:.2f} over "
+                f"{len(run['sessions'])} session(s) + next call "
                 f"~${self.largest_call:.2f} would pass the ${self.cap:.2f} cap")
-        return spent
+        return run["usd"]
 
     def observe(self, usd: float):
         self.largest_call = max(self.largest_call, usd)
@@ -165,7 +181,8 @@ class Budget:
 
 def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
     for attempt in range(RATE_LIMIT_RETRIES + 1):
-        before = budget.check(what)
+        budget.check(what)
+        before = budget.mine()
         started = time.time()
         try:
             response = get(
@@ -178,19 +195,19 @@ def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
             print(f"  rate limited; retrying in {delay:.0f}s", flush=True)
             time.sleep(delay)
             continue
+        # Money comes from opencode's DB, never from `usage`: a call that timed
+        # out returns no session id and reports $0, and was billed.
+        sid = getattr(response, "session_id", None)
+        budget.note_session(sid)
+        new = {s: c for s, c in budget.mine().items() if s not in before}
+        usd = round(sum(new.values()), 4)
+        budget.observe(usd)
         usage = dict(getattr(response, "usage", None) or {})
-        # Project from the GLOBAL spend over this call, not from `usage`: a call
-        # that timed out reports no usage at all but was billed. The delta also
-        # includes other workers' spend in the window -- conservative, which
-        # is the right direction for a cap.
-        delta = budget.spent() - before
-        budget.observe(max(usage.get("cost_usd", 0.0), delta))
         calls.append({"what": what, "seconds": round(time.time() - started, 1),
-                      "session_id": getattr(response, "session_id", None),
-                      "global_usd_during_call": round(delta, 4),
+                      "session_id": sid, "sessions": sorted(new), "usd": usd,
                       "completed": bool(getattr(response, "success", True)),
-                      **usage})
-        print(f"  [{what}] ${usage.get('cost_usd', 0):.2f}, "
+                      "num_turns": usage.get("num_turns")})
+        print(f"  [{what}] ${usd:.2f} over {len(new)} session(s), "
               f"{usage.get('num_turns', '?')} turns, {time.time() - started:.0f}s; "
               f"run total ${budget.spent():.2f}", flush=True)
         return response
@@ -266,7 +283,7 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
 
         best, best_snapshot = baseline, baseline_snapshot
         history: list[str] = []
-        llm = make_llm(tool)
+        llm = make_llm(tool, budget.title)
 
         for iteration in range(1, iterations + 1):
             print("=" * 72)
@@ -318,7 +335,7 @@ it relies on anything the tests happen not to exercise.
                 _record(log_path, {"iteration": iteration, "kind": "candidate",
                                    "diff": "", "verdict": None, "accepted": False,
                                    "reason": "no diff", "agent_summary": summary,
-                                   "llm_usd": round(sum(c.get("cost_usd", 0) for c
+                                   "llm_usd": round(sum(c["usd"] for c
                                                         in calls[n_calls:]), 4),
                                    "seconds": round(time.time() - started, 1),
                                    "llm_calls": calls[n_calls:]})
@@ -347,7 +364,7 @@ it relies on anything the tests happen not to exercise.
 
             elapsed = time.time() - started
             diff = tool.diff_against(best_snapshot)
-            usd = round(sum(c.get("cost_usd", 0) for c in calls[n_calls:]), 4)
+            usd = round(sum(c["usd"] for c in calls[n_calls:]), 4)
             entry = {"iteration": iteration, "kind": "candidate", "diff": diff,
                      "verdict": verdict, "seconds": round(elapsed, 1),
                      "agent_summary": summary, "llm_usd": usd,
@@ -382,7 +399,7 @@ it relies on anything the tests happen not to exercise.
         print(f"  baseline : {summarize(baseline)}")
         print(f"  best     : {summarize(best)}")
         print(f"  llm spend (this worker): "
-              f"${sum(c.get('cost_usd', 0) for c in calls):.2f} over {len(calls)} calls")
+              f"${sum(c['usd'] for c in calls):.2f} over {len(calls)} calls")
         best_diff = tool.diff_against(baseline_snapshot)
         (log_dir / "best.diff").write_text(best_diff, encoding="utf-8")
         (log_dir / "calls.json").write_text(json.dumps(calls, indent=1))
@@ -407,6 +424,10 @@ def main() -> None:
     # No default: a run without an explicit cap does not start (preflight.py).
     parser.add_argument("--budget-usd", type=float,
                         default=os.environ.get("CHIA_BUDGET_USD"))
+    parser.add_argument("--run-tag", default=os.environ.get("CHIA_RUN_TAG"),
+                        help="title prefix of every opencode session this run "
+                             "opens; its per-run cap sums those sessions "
+                             "(default: chia-run <log-dir name>@<t0>)")
     parser.add_argument("--t0-ms", type=int,
                         default=int(os.environ.get("CHIA_RUN_T0_MS", "0")) or None)
     args = parser.parse_args()
@@ -417,7 +438,8 @@ def main() -> None:
     args.budget_usd = float(args.budget_usd)
     spec = args.spec_dir or args.log_dir / "spec"
     work = args.work_dir or REPO_ROOT / ".chia_scratch" / args.log_dir.name / "eval"
-    budget = Budget(args.budget_usd, t0)
+    tag = args.run_tag or f"chia-run {args.log_dir.name}@{t0}"
+    budget = Budget(args.budget_usd, t0, tag, args.tool_name)
     raise SystemExit(run(args.task, args.iterations, args.max_debug_attempts,
                          args.log_dir.resolve(), spec.resolve(), work.resolve(),
                          args.tool_name, budget))
