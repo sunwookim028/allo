@@ -171,6 +171,60 @@ used to be prose are now enforced at composition time:
   are ``dma_ld``'s, ``C`` is ``dma_st``'s, and a second unit naming one is a
   composition error rather than a Vitis error later.
 
+What the split made worse: the instruction layout
+=================================================
+
+One honest cost, and it is the only place where this decomposition is worse
+than the monolith. An instruction is taken apart in three places -- the
+encoder, the assembler's decoder and the sequencer's bit slices -- and in one
+file those shifts sat within a screen of each other. In three files they can
+drift, and **nothing here would catch it**: ``Unit.check`` answers *which
+names a unit may decode*, not *what the bits mean*, and the byte-identical
+MLIR check proves the region is unchanged, not that two hand-written decoders
+agree. A shift off by one in the assembler and not in the sequencer passes
+every gate on this page.
+
+Two of the three sites now read one definition. ``ip/isa.py`` names the layout
+-- ``OP_LO``/``OP_HI``, ``F0_LO``..``F3_HI``, ``NR_LO``/``NR_HI``,
+``AGU_TERM_BITS``, ``AGU_TARGET_BITS``, ``AGU_LEVEL_BITS`` and the masks
+derived from them -- ``enc``/``enc_agu`` build from it, and the assembler
+decodes through ``opcode_of``, ``rows_of``, ``fields_of`` and ``agu_term``
+rather than through ``& 0x3F``, ``>> 54`` and ``19 * term``. The re-derived
+encoder was checked against the literal one over 6000 random instructions and
+address words: zero differences.
+
+.. _tinytpu-library-symbolic-slice:
+
+The third site cannot, and that is a front-end limitation
+---------------------------------------------------------
+
+``sequencer`` still spells its slices ``control_word[0:6]``,
+``control_word[54:62]``. Writing them as ``control_word[OP_LO:OP_HI]``
+parses, builds and gives the right answers, but Allo cannot infer the width of
+a slice whose bounds are names:
+
+.. code-block:: text
+
+   allo/ir/infer.py:582: UserWarning: Cannot infer the bitwidth of the slice,
+   use UInt(32) as default
+
+and the extract widens from ``i6`` to ``i32``. Measured 2026-09-22: the
+normalized MLIR goes from identical to **796 diff lines** -- every field
+extract in the sequencer becomes a 32-bit one, which is a different circuit,
+not a different spelling. So the bit layout of an instruction can be named
+once for software and must be written twice for hardware, until the front end
+can fold a constant into a slice bound.
+
+This is what the ``isa-spec`` track fixes properly: it generates the layout
+from a single ``isa_spec.json`` and checks the encoder, ``expand``, the header
+and the *emitted HLS slices* against it, which is the guarantee naming alone
+cannot give -- one definition stops the sites drifting, it does not prove any
+of them matches an ISA written down independently. Deliberately not
+hand-rolled here. On the CHIA axis that generator belongs in
+``FROZEN_DESIGN``: it judges a candidate rather than being one, and a
+candidate editing ``ip/isa.py`` is then checked against the ISA, which the
+loop has no way to do today.
+
 Where the boundaries are, and why
 =================================
 

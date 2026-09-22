@@ -39,6 +39,39 @@ MAXROWS = 127                  # `nr` is 8 bits, top bit spare
 AGU_TERMS = 3                  # address terms per instruction
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
 
+# ---- THE LAYOUT, ONCE ----
+# Every site that takes an instruction apart reads these: `enc`/`enc_agu`
+# below, `Assembler.trace`'s decoder, and `sequencer`'s bit slices, which name
+# them because a `@df.kernel` resolves a slice bound from the architecture's
+# namespace like any other name. Before the design was split, the shifts
+# appeared once because there was one file; naming them is how they still
+# appear once now that there are three.
+#
+# `isa-spec` generates this layout from `isa_spec.json` and checks the encoder,
+# `expand`, the header and the emitted HLS slices against it. That check is the
+# guarantee these names do not provide: one definition stops the three sites
+# DRIFTING, it does not prove any of them matches an ISA written down
+# independently.
+OP_LO, OP_HI = 0, 6
+F0_LO, F0_HI = 6, 18
+F1_LO, F1_HI = 18, 30
+F2_LO, F2_HI = 30, 42
+F3_LO, F3_HI = 42, 54
+NR_LO, NR_HI = 54, 62
+FIELD_LO = (F0_LO, F1_LO, F2_LO, F3_LO)
+
+#: One AGU term: target, then level, then stride, packed back to back.
+AGU_TERM_BITS = 19
+AGU_TARGET_BITS = 4
+AGU_LEVEL_BITS = 3
+
+OP_MASK = (1 << (OP_HI - OP_LO)) - 1
+FIELD_MASK = (1 << (F0_HI - F0_LO)) - 1
+NR_MASK = (1 << (NR_HI - NR_LO)) - 1
+AGU_TARGET_MASK = (1 << AGU_TARGET_BITS) - 1
+AGU_LEVEL_MASK = (1 << AGU_LEVEL_BITS) - 1
+AGU_STRIDE_MASK = (1 << (AGU_TERM_BITS - AGU_TARGET_BITS - AGU_LEVEL_BITS)) - 1
+
 # The names a unit may decode, spelled out rather than swept out of the module:
 # `isa=()` on a unit is the claim that it decodes nothing, `Unit.check`
 # enforces it against the body, and a claim is only as good as the list it is
@@ -53,6 +86,11 @@ ISA_NAMESPACE = {
     "AGU_F2": AGU_F2, "AGU_F3": AGU_F3,
     "LOOP_DEPTH": LOOP_DEPTH, "IWORDS": IWORDS, "NHDR": NHDR,
     "MAXROWS": MAXROWS,
+    "OP_LO": OP_LO, "OP_HI": OP_HI, "F0_LO": F0_LO, "F0_HI": F0_HI,
+    "F1_LO": F1_LO, "F1_HI": F1_HI, "F2_LO": F2_LO, "F2_HI": F2_HI,
+    "F3_LO": F3_LO, "F3_HI": F3_HI, "NR_LO": NR_LO, "NR_HI": NR_HI,
+    "AGU_TERM_BITS": AGU_TERM_BITS, "AGU_TARGET_BITS": AGU_TARGET_BITS,
+    "AGU_LEVEL_BITS": AGU_LEVEL_BITS,
 }
 
 
@@ -65,26 +103,26 @@ def enc_agu(*terms):
     being fixed one-per-field, because a single field often needs two.
     """
     assert len(terms) <= AGU_TERMS, f"at most {AGU_TERMS} address terms"
-    w = 0
-    for i, (target, level, stride) in enumerate(terms):
+    word = 0
+    for index, (target, level, stride) in enumerate(terms):
         assert 0 <= target <= 4 and 0 <= level < LOOP_DEPTH
         assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"
-        base = 19 * i
-        w |= (target << base) | (level << (base + 4)) | (stride << (base + 7))
-    return w
+        base = AGU_TERM_BITS * index
+        word |= ((target << base)
+                 | (level << (base + AGU_TARGET_BITS))
+                 | (stride << (base + AGU_TARGET_BITS + AGU_LEVEL_BITS)))
+    return word
 
 
 def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
     """Assemble one instruction word."""
-    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 8)):
-        assert 0 <= v < (1 << (w - 1)), (
-            f"field {v} does not fit in {w - 1} usable bits "
-            f"(bit {w - 1} is the sign bit after extraction)")
-    return (
-        (op & 0x3F)
-        | (f0 << 6)
-        | (f1 << 18)
-        | (f2 << 30)
-        | (f3 << 42)
-        | (nr << 54)
-    )
+    widths = ((f0, F0_HI - F0_LO), (f1, F1_HI - F1_LO), (f2, F2_HI - F2_LO),
+              (f3, F3_HI - F3_LO), (nr, NR_HI - NR_LO))
+    for value, width in widths:
+        assert 0 <= value < (1 << (width - 1)), (
+            f"field {value} does not fit in {width - 1} usable bits "
+            f"(bit {width - 1} is the sign bit after extraction)")
+    word = (op & OP_MASK) << OP_LO
+    for value, lo in zip((f0, f1, f2, f3), FIELD_LO):
+        word |= value << lo
+    return word | (nr << NR_LO)

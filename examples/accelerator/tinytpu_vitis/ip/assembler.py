@@ -14,9 +14,34 @@ Both are rejected here. See ``docs/source/designs/tinytpu_isa.rst``.
 
 from collections import namedtuple
 
-from examples.accelerator.tinytpu_vitis.ip.isa import (AGU_TERMS, LOOP_DEPTH, OPCODE_NAMES, OP_DMA_LD, OP_DMA_ST,
-                  OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
-                  OP_VLD, OP_VRELU, NHDR, DMA_SRC_B, DMA_TO_VR)
+from examples.accelerator.tinytpu_vitis.ip.isa import (
+    AGU_LEVEL_MASK, AGU_STRIDE_MASK, AGU_TARGET_BITS, AGU_TARGET_MASK,
+    AGU_TERMS, AGU_TERM_BITS, AGU_LEVEL_BITS, DMA_SRC_B, DMA_TO_VR, FIELD_LO,
+    FIELD_MASK, LOOP_DEPTH, NHDR, NR_LO, NR_MASK, OPCODE_NAMES, OP_DMA_LD,
+    OP_DMA_ST, OP_ENDLOOP, OP_LOOP, OP_MASK, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
+    OP_VLD, OP_VRELU)
+
+
+def opcode_of(word):
+    return word & OP_MASK
+
+
+def rows_of(word):
+    return (word >> NR_LO) & NR_MASK
+
+
+def fields_of(word):
+    """The four address fields, unresolved."""
+    return [(word >> lo) & FIELD_MASK for lo in FIELD_LO]
+
+
+def agu_term(word, index):
+    """One `(target, level, stride)` address term."""
+    base = AGU_TERM_BITS * index
+    return ((word >> base) & AGU_TARGET_MASK,
+            (word >> (base + AGU_TARGET_BITS)) & AGU_LEVEL_MASK,
+            (word >> (base + AGU_TARGET_BITS + AGU_LEVEL_BITS))
+            & AGU_STRIDE_MASK)
 
 # The minimum read-after-write distance, in `accu` iterations, that makes the
 # `inter false` dependence claim on `ar` true. Measured in RTL cosim with
@@ -68,10 +93,10 @@ class Assembler:
             if guard > 1 << 22:
                 raise AssertionError("program does not terminate")
             control_word, agu_word = prog[pc]
-            op = control_word & 0x3F
+            op = opcode_of(control_word)
             if op == OP_LOOP:
                 live_iv[len(stack)] = 0
-                stack.append([pc + 1, 0, (control_word >> 54) & 0xFF])
+                stack.append([pc + 1, 0, rows_of(control_word)])
                 pc += 1
             elif op == OP_ENDLOOP:
                 body, iteration, trip = frame = stack[-1]
@@ -83,17 +108,13 @@ class Assembler:
                     stack.pop()
                     pc += 1
             else:
-                fields = [(control_word >> sh) & 0xFFF
-                          for sh in (6, 18, 30, 42)]
+                fields = fields_of(control_word)
                 for term in range(AGU_TERMS):
-                    base = 19 * term
-                    target = (agu_word >> base) & 0xF
-                    level = (agu_word >> (base + 4)) & 0x7
-                    stride = (agu_word >> (base + 7)) & 0xFFF
+                    target, level, stride = agu_term(agu_word, term)
                     if target != 0:
                         fields[target - 1] += live_iv[level] * stride
                 yield TracedIssue(pc, tuple(live_iv[:len(stack)]), op,
-                                  (control_word >> 54) & 0xFF, *fields)
+                                  rows_of(control_word), *fields)
                 pc += 1
 
     # pylint: disable=too-many-branches, too-many-statements, too-many-locals
@@ -107,7 +128,7 @@ class Assembler:
             raise ProgramError("empty program")
         depth = 0
         for pc, (control_word, agu_word) in enumerate(prog):
-            op = control_word & 0x3F
+            op = opcode_of(control_word)
             name = OPCODE_NAMES.get(op)
             where = f"instruction {pc} ({name or f'opcode {op}'})"
             if name is None or op == OP_DMA_ST:
@@ -115,7 +136,7 @@ class Assembler:
             if op == OP_LOOP:
                 if depth >= LOOP_DEPTH:
                     raise ProgramError(f"{where}: nesting exceeds LOOP_DEPTH={LOOP_DEPTH}")
-                if (control_word >> 54) & 0xFF < 1:
+                if rows_of(control_word) < 1:
                     raise ProgramError(f"{where}: trip count 0 still runs the body once")
                 depth += 1
             elif op == OP_ENDLOOP:
@@ -123,8 +144,7 @@ class Assembler:
                     raise ProgramError(f"{where}: endloop with no open loop")
                 depth -= 1
             for term in range(AGU_TERMS):
-                target = (agu_word >> (19 * term)) & 0xF
-                level = (agu_word >> (19 * term + 4)) & 0x7
+                target, level, _stride = agu_term(agu_word, term)
                 if target == 0:
                     continue
                 if (op in (OP_LOOP, OP_ENDLOOP, OP_NOP) or target > 4

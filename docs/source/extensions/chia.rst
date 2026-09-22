@@ -155,6 +155,27 @@ emits, not an instruction's semantics.
    encourage: with no argument it lists the writable files, with a path it
    returns one.
 
+   **Should ``EDITABLE`` be a directory instead of a list?** Recommendation
+   after building both sides: **no** -- a list, but a list of *paths*.
+
+   * The editable/frozen line does not follow a directory boundary.
+     ``ip/compose.py`` and ``ip/params.py`` live inside ``ip/`` and must be
+     frozen, so a directory rule needs an exception list, and an exception
+     list is a list.
+   * A directory rule says "whatever is in here is the design", which makes a
+     candidate able to ADD a module: ``evaluate.compose`` copies the spec
+     directory into the evaluation tree, so a new file under ``ip/units/``
+     plus one line of wiring would be imported by the gates having never been
+     named by anything a person reviewed. A list refuses an unknown path by
+     construction, and adding a unit stays a reviewed act in ``design.py``.
+   * What the directory was wanted for -- an agent editing one unit rather
+     than one enormous file -- comes from the GRANULARITY of the list and from
+     the tool surface, not from the rule's form. ``read_spec()`` lists the
+     writable paths with their line counts and marks which are units,
+     ``read_spec(path=...)`` returns one, and the prompt says to prefer
+     editing a single unit. That is the better-scoped experiment, and it is
+     available now.
+
    **This is prepared, not merged.** It lands with ``design-modular``.
 
 .. warning::
@@ -269,7 +290,7 @@ Mechanical enforcement, not instructions:
 Every accepted diff is still read by a person.
 
 Running two tracks on one host: ``ray stop`` is global
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **``ray stop`` matches Ray processes by name across the entire host**, so it
 kills raylets belonging to every worktree rather than only the one it is run
