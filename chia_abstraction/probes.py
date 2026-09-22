@@ -114,9 +114,12 @@ PROBES = {
 }
 #: The measured RTL, recorded so a candidate run need not re-synthesise.
 #: write statements per instance / instances, for the probe's buffer.
+import probe_meta  # noqa: E402  -- dependency-free; the tool surface uses it
 GROUND_TRUTH = {
-    "ports_dual": {"writes_per_instance": 2, "instances": 1},
-    "ports_banked": {"writes_per_instance": 1, "instances": 2},
+    name: {"writes_per_instance": i["measured_rtl"]
+           ["write_statements_per_instance"],
+           "instances": i["measured_rtl"]["instances"]}
+    for name, i in probe_meta.PROBES.items()
 }
 
 

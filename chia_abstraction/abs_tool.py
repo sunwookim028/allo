@@ -371,7 +371,11 @@ class AlloCompilerTool(ChiaTool):
         patch_file = self.work_dir / f"candidate-{'g' if gate_only else 's'}.diff"
         patch_file.parent.mkdir(parents=True, exist_ok=True)
         patch_file.write_text(d)
-        cmd = [sys.executable, str(Path(self.agent_dir) / "evaluate_abs.py"),
+        # ALLO_PYTHON, not sys.executable: this method runs in the CHIA
+        # environment (py3.10, no numpy, no allo) and `evaluate_abs.py` cannot
+        # even import there. With sys.executable EVERY candidate failed at
+        # stage `evaluator` and the agent got no harness feedback at all.
+        cmd = [self.allo_python, str(Path(self.agent_dir) / "evaluate_abs.py"),
                "--disposition", self.disposition, "--workload", self.workload,
                "--slot", str(self._slot), "--out", str(run_dir),
                "--tier", tier]
@@ -411,18 +415,11 @@ class AlloCompilerTool(ChiaTool):
         and the harness applies it and records accepted / refused / crashed.
         Where a site has a measured right answer it is shown.
         """
-        import probes
-        out = {}
-        for name, (_, fn, sched, buffer, expected) in probes.PROBES.items():
-            import inspect as _i
-            out[name] = {
-                "design": _i.getsource(fn),
-                "frozen_schedule": _i.getsource(sched),
-                "buffer_in_question": buffer,
-                "measured_rtl": probes.GROUND_TRUTH.get(name),
-                "right_answer_for_a_1_write_port_declaration": expected,
-            }
-        return json.dumps(out, indent=1)
+        # probe_meta imports NOTHING: `probes` needs numpy and allo, which
+        # this environment does not have, and importing it here made both
+        # probe tools raise.
+        import probe_meta
+        return json.dumps(probe_meta.describe(), indent=1)
 
     def declare_probe(self, probe: str, call: str) -> str:
         """Declare the ONE call of your new method to apply at probe site `probe`.
@@ -433,9 +430,10 @@ class AlloCompilerTool(ChiaTool):
         code; anything else is refused when the harness runs it. Declaring
         again for the same site replaces the earlier call.
         """
-        import probes
-        if probe not in probes.PROBES:
-            return f"Rejected: unknown probe; one of {sorted(probes.PROBES)}."
+        import probe_meta
+        if probe not in probe_meta.PROBES:
+            return (f"Rejected: unknown probe; one of "
+                    f"{sorted(probe_meta.PROBES)}.")
         f = self.work_dir / "probe_calls.json"
         f.parent.mkdir(parents=True, exist_ok=True)
         calls = json.loads(f.read_text()) if f.exists() else {}

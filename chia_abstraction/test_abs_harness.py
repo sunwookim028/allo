@@ -711,12 +711,69 @@ def phase_probe_controls(R, work):
            r["outcome"] == "invalid-call")
 
 
+# -- phase l: the tool surface must work in the AGENT's environment ----------
+#: Phase k proved the probe rung works from the `allo` environment. It did not
+#: prove the agent can REACH it: the MCP tool actor runs in the CHIA
+#: environment (py3.10, no numpy, no allo), where `import probes` raised and
+#: both probe tools were dead, and where `abs_tool` launched the evaluator with
+#: `sys.executable` so EVERY candidate failed at stage `evaluator` with no
+#: feedback. Two pilots ran that way before it was noticed.
+#:
+#: The lesson is the harness's own no-caller lesson: a capability proved from
+#: the experimenter's environment is not proved until it is exercised through
+#: the path the agent uses. So this phase runs in the CHIA environment.
+CHIA_PY = os.environ.get(
+    "CHIA_ENV_PYTHON", "/home/sk3463/miniconda3/envs/chia_env/bin/python")
+
+
+def _in_chia(code: str):
+    return subprocess.run([CHIA_PY, "-c", code], cwd=HERE, capture_output=True,
+                          text=True, timeout=300)
+
+
+def phase_agent_env(R, work):
+    ok_py = Path(CHIA_PY).exists()
+    R.case("l the agent's environment exists", "chia_env python present",
+           CHIA_PY if ok_py else "MISSING", ok_py)
+    if not ok_py:
+        return
+    r = _in_chia("import probe_meta, json;"
+                 "d=probe_meta.describe();"
+                 "assert set(d)=={'ports_dual','ports_banked'}, d;"
+                 "print(json.dumps(d)[:60])")
+    R.case("l list_probes' payload builds in the agent's environment",
+           "probe_meta imports with no numpy/allo and describes both probes",
+           (r.stdout.strip()[:60] if r.returncode == 0
+            else f"FAILED: {r.stderr.strip()[-160:]}"), r.returncode == 0)
+    r = _in_chia("import sys; sys.path.insert(0,'.'); import abs_tool;"
+                 "print('abs_tool ok')")
+    R.case("l the tool module itself imports in the agent's environment",
+           "abs_tool imports", (r.stdout.strip() if r.returncode == 0
+                                else f"FAILED: {r.stderr.strip()[-160:]}"),
+           r.returncode == 0)
+    # The evaluator must be launched with the ALLO interpreter, never the
+    # tool's own: it cannot import in the agent's environment at all.
+    src = (HERE / "abs_tool.py").read_text()
+    uses_allo = 'cmd = [self.allo_python, str(Path(self.agent_dir) / "evaluate_abs.py")' in src
+    R.case("l the evaluator is launched with the ALLO interpreter",
+           "abs_tool passes self.allo_python, not sys.executable",
+           "self.allo_python" if uses_allo else "sys.executable -- BROKEN",
+           uses_allo)
+    r = _in_chia("import sys; sys.path.insert(0,'.'); import evaluate_abs")
+    R.case("l and the evaluator indeed cannot run in the agent's environment",
+           "importing evaluate_abs under chia_env fails (hence the above)",
+           ("fails as expected: " + r.stderr.strip()[-80:]) if r.returncode
+           else "it imports -- the previous case is then untested",
+           r.returncode != 0)
+
+
 PHASES = {"d": phase_frozen, "f": phase_primitive, "h": phase_objective,
           "i": phase_using, "a": phase_noop, "b": phase_known_good,
           "c": phase_broken, "e": phase_cpp_fails, "g": phase_parallel,
-          "j": phase_leakcheck, "k": phase_probe_controls}
-FREE = "d,f,h,i,j,k"
-ALL = "d,f,h,i,j,k,a,e,c,b,g"
+          "j": phase_leakcheck, "k": phase_probe_controls,
+          "l": phase_agent_env}
+FREE = "d,f,h,i,j,k,l"
+ALL = "d,f,h,i,j,k,l,a,e,c,b,g"
 
 
 def main() -> int:
@@ -744,7 +801,7 @@ def main() -> int:
         try:
             if p == "h":
                 fn(R)
-            elif p in ("d", "f", "i", "g", "j", "k"):
+            elif p in ("d", "f", "i", "g", "j", "k", "l"):
                 fn(R, work)
             else:
                 fn(R, work, a.slot)
