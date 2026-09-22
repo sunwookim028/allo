@@ -107,13 +107,16 @@ FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
 #: commit, and it has to move in the SAME change as any edit to those files.
 #:
 #: History: 476a70d8 was the gap-attribution stack (172 / 262 / 418 / 484 /
-#: 686, and AR_RAW_DIST in check_program). acb080bd moves it for the five-shape
-#: deduplication only -- bench_isa.py, stress_isa.py and cosim.py now import
-#: the list from shapes.py instead of each spelling it out. The list, its
-#: order and every cycle count are unchanged; `git diff 476a70d8 acb080bd --
-#: examples/accelerator/tinytpu_vitis/{cosim,bench_isa,stress_isa}.py` is the
-#: whole of it.
-MAIN_BASE = "acb080bd"
+#: 686, and AR_RAW_DIST in check_program). acb080bd moved it for the five-shape
+#: deduplication only. 39ba9aaa is the bump this branch owes: main changed
+#: bench_isa.py, stress_isa.py and cosim.py after acb080bd -- `prog=` on
+#: cosim's testbench, and the benchmark work's additions to the two gates --
+#: WITHOUT moving MAIN_BASE with them, so on origin/main today `compose()`
+#: refuses every candidate at stage `setup` with
+#: "cosim.py @ <ref> differs from main @ acb080bd", including the unmodified
+#: control. Measured 2026-09-22. The design's own row moved with it, to
+#: 171 / 261 / 417 / 483 / 685.
+MAIN_BASE = "39ba9aaa"
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
     "shapes.py")]
