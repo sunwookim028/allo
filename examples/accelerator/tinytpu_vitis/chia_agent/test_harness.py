@@ -103,7 +103,7 @@ def genuine_control(**changes) -> dict:
     """A control record as `accept.py` measures one for the design at HEAD;
     `changes` makes a forgery out of it."""
     return {**control.record(
-        cycles=dict(BASELINE_ALL), blobs=control.blobs("HEAD"), ref="HEAD",
+        cycles=dict(BASELINE_ALL), design=control.blobs("HEAD"), ref="HEAD",
         estimated_ns=2.431, seconds=284.0, vouched=True, pristine_tree=True,
         source="measured in this run from git at HEAD, before the candidate "
                "diff was applied"), **changes}

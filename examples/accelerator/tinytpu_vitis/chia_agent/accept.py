@@ -195,7 +195,7 @@ def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
                         f"{out / 'control-cosim.log'}")
     return control.record(
         cycles={s: v["cycles"] for s, v in passed["rows"].items()},
-        blobs=design, ref=ref, estimated_ns=passed["estimated_ns"],
+        design=design, ref=ref, estimated_ns=passed["estimated_ns"],
         seconds=passed["seconds"], vouched=True, pristine_tree=True,
         source=f"measured in this run from git at {ref[:8]}, before the "
                f"candidate diff was applied")
@@ -362,7 +362,7 @@ def main():
         if ctl is None:
             ctl = control.record(
                 cycles={s: v["cycles"] for s, v in result["cosim"].items()},
-                blobs=result["design"], ref=ref, seconds=candidate["seconds"],
+                design=result["design"], ref=ref, seconds=candidate["seconds"],
                 estimated_ns=candidate["estimated_ns"], vouched=ok3,
                 pristine_tree=not result["checkout_status"],
                 source="no diff was applied: this run's own measurement is "

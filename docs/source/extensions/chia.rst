@@ -231,8 +231,10 @@ Mechanical enforcement, not instructions:
     ``--control <control-run>/accept.json`` reuses one control for the rest of
     a run's candidates; a record for another design, not vouched, not measured
     on a pristine checkout, short of a shape or missing the clock is refused
-    (``claim: no-control``), never silently used. Cost: one five-shape cosim,
-    ~4.7 min, once per run. The search's own baseline (``loop.py``, iteration
+    (``claim: no-control``), never silently used. A cosim that flakes at one
+    shape lands in the same place -- ``no-control``, before the candidate is
+    measured at all, and the run is repeated rather than compared against
+    something else. Cost: one five-shape cosim, ~4.5 min, once per run. The search's own baseline (``loop.py``, iteration
     0) was already a self-measurement; it now records the design's blobs and
     cross-checks itself too.
 
