@@ -224,3 +224,26 @@ per-run one. The split between the two tracks is recorded in
 `../examples/accelerator/tinytpu_vitis/chia_agent/allocation.json`; the
 pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
+
+## Running two tracks on one host
+
+Measured tonight, all three the hard way:
+
+1. **Never `ray stop`.** It matches Ray processes by name across the whole
+   host, so it kills every track's raylet, not just the one it is run from.
+   It cost the co-design track a paid run. This harness's teardown is
+   `ray.shutdown()`, which disconnects this driver only; there is no `ray stop`
+   anywhere in it.
+2. **Name your own cluster.** `ray.init(address="auto")` reads the host's
+   newest GCS address file and will attach to another track's cluster. Start a
+   head on a distinct port and pass `CHIA_RAY_ADDRESS`.
+3. **Name your own tool ports.** CHIA's tool server actor reads
+   `CHIA_TOOL_BASE_PORT` from the **worker** environment and defaults to 8000,
+   which another track already held. It never bound, and an LLM call with no
+   tools still returns — the agent spent two iterations making no edit. The
+   loop now sets the port range in `runtime_env` and **probes its own tool
+   surface before any model call**, refusing to search if it does not answer.
+
+Also worker-environment, not driver-environment: `PYTHONPATH` (so the modules
+reused from `chia_agent/` are importable when unpickled) and `PATH` (so
+`opencode` is found). All four go in `runtime_env["env_vars"]`.
