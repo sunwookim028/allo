@@ -102,6 +102,13 @@ class AlloCompilerTool(ChiaTool):
                          "LLVM_BUILD_DIR": llvm_build_dir}
         self._lock = threading.Lock()
         self._slot = int(os.environ.get("CHIA_ABS_SLOT", "0"))
+        # Pilots do NOT get the limitations register or the design history:
+        # the first night's gap inventory came from the register, which
+        # catalogues tooling defects, and aimed the agent at tooling.
+        self.pilot = os.environ.get("CHIA_ABS_PILOT", "")
+        if self.pilot:
+            for k in ("limitations.rst", "tinytpu_history.rst", "tinytpu_isa.rst"):
+                REFERENCE.pop(k, None)
         for name, fn in (
                 ("read_source", self.read_source),
                 ("read_reference", self.read_reference),
@@ -112,7 +119,9 @@ class AlloCompilerTool(ChiaTool):
                 ("check_policy", self.check_policy),
                 ("build_allo", self.build_allo),
                 ("run_gates", self.run_gates),
-                ("score", self.score)):
+                ("score", self.score),
+                ("list_probes", self.list_probes),
+                ("declare_probe", self.declare_probe)):
             self.mcp.add_tool(fn, name=f"{self.name}_{name}")
 
     def __getstate__(self):
@@ -369,9 +378,10 @@ class AlloCompilerTool(ChiaTool):
         if d.strip():
             cmd += ["--patch", str(patch_file)]
         if gate_only:
-            # The cheap gates only: stop before PPA by asking the evaluator
-            # for a workload whose scored shapes are the cheapest one.
             cmd += ["--gate-only"]
+        probe_file = self.work_dir / "probe_calls.json"
+        if probe_file.exists():
+            cmd += ["--probe-calls", str(probe_file)]
         env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
         env.update(self.eval_env)
         with self._lock:                  # one Vitis project per tool
@@ -392,6 +402,46 @@ class AlloCompilerTool(ChiaTool):
         if not v.get("ok"):
             v["detail"] = out[-6000:]
         return v
+
+    def list_probes(self) -> str:
+        """The harness-owned probe sites your new primitive can be called at.
+
+        Each is a FROZEN design with a FROZEN schedule. You cannot edit either;
+        you declare ONE call of your new method per site with declare_probe,
+        and the harness applies it and records accepted / refused / crashed.
+        Where a site has a measured right answer it is shown.
+        """
+        import probes
+        out = {}
+        for name, (_, fn, sched, buffer, expected) in probes.PROBES.items():
+            import inspect as _i
+            out[name] = {
+                "design": _i.getsource(fn),
+                "frozen_schedule": _i.getsource(sched),
+                "buffer_in_question": buffer,
+                "measured_rtl": probes.GROUND_TRUTH.get(name),
+                "right_answer_for_a_1_write_port_declaration": expected,
+            }
+        return json.dumps(out, indent=1)
+
+    def declare_probe(self, probe: str, call: str) -> str:
+        """Declare the ONE call of your new method to apply at probe site `probe`.
+
+        `call` must be exactly `s.<method>(<literals>)`, where <method> is a
+        Schedule method YOUR PATCH ADDS and every argument is a literal (str,
+        int, float, bool, None, tuple/list of those). It is a declaration, not
+        code; anything else is refused when the harness runs it. Declaring
+        again for the same site replaces the earlier call.
+        """
+        import probes
+        if probe not in probes.PROBES:
+            return f"Rejected: unknown probe; one of {sorted(probes.PROBES)}."
+        f = self.work_dir / "probe_calls.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        calls = json.loads(f.read_text()) if f.exists() else {}
+        calls[probe] = call
+        f.write_text(json.dumps(calls, indent=1))
+        return f"Declared for {probe}: {call}. Now declared: {json.dumps(calls)}"
 
     async def build_allo(self) -> str:
         """Rebuild the C++ bindings in YOUR tree and import Allo. ~30 s warm.

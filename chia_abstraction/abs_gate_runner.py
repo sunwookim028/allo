@@ -156,6 +156,12 @@ def main():
             rc, report = suite_runner.run(args)
             print("SUITE " + json.dumps(report, sort_keys=True), flush=True)
             ok, why = rc == 0, f"suite runner returned {rc}"
+        elif check == "probe":
+            sys.path.insert(0, HERE)
+            import probes
+            rc, report = probes.run(args)
+            print("PROBE " + json.dumps(report, sort_keys=True), flush=True)
+            ok, why = rc == 0, f"probe runner returned {rc}"
         elif check == "design_case":
             sys.path.insert(0, HERE)
             import design_cases
@@ -174,7 +180,7 @@ def main():
             ok, why = _run_script(SCRIPTS[check], args)
         else:
             return _fail(check or "?", f"unknown check; one of "
-                                       f"{sorted(set(SCRIPTS) | set(MODULES) | {'build_import', 'pytest', 'design_case'})}")
+                                       f"{sorted(set(SCRIPTS) | set(MODULES) | {'build_import', 'pytest', 'design_case', 'probe'})}")
     except BaseException as e:                      # noqa: BLE001 -- on purpose
         traceback.print_exc()
         sys.stdout.flush()

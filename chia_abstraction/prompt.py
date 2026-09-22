@@ -459,3 +459,215 @@ about C++. Then, in your final message, in this order:
 5. Whether it relies on anything the gates happen not to exercise, and whether
    what it expresses is a promise rather than a fact.
 """
+
+
+# =============================================================================
+# THE PILOTS. Same frame as MAINTAINING -- the IR, the pattern, the five places,
+# what may be edited, the feedback -- with the GAP INVENTORY CUT OUT.
+#
+# Why: the owner's judgement on the first night was that this track found
+# APPARATUS abstractions, not ARCHITECTURAL ones, and the cause was
+# diagnosable -- its gap inventory was the limitations register, which
+# catalogues front-end and tooling defects, so the agent was aimed at tooling.
+# Everything between "FIRST, DIAGNOSE THE REFUSAL" and "THE FEEDBACK YOU GET"
+# in MAINTAINING is that inventory plus worked examples that NAME causes; none
+# of it reaches a pilot. The four kinds of refusal survive, as method, without
+# a single worked example.
+# =============================================================================
+
+_FRAME_HEAD, _rest = MAINTAINING.split(
+    "FIRST, DIAGNOSE THE REFUSAL. THIS IS GRADED SEPARATELY FROM THE REPAIR.", 1)
+_FEEDBACK = "THE FEEDBACK YOU GET" + _rest.split("THE FEEDBACK YOU GET", 1)[1]
+_FEEDBACK = _FEEDBACK.replace(
+    "  gate:resources every resource within budget on every case",
+    "  gate:probe    THE CALL SITE YOU CANNOT WRITE. Tests are frozen to you,\n"
+    "                so a new primitive has no callers -- and on this project a\n"
+    "                new primitive once passed every other rung and then\n"
+    "                aborted the compiler the first time anything called it.\n"
+    "                So you DECLARE one call of your new method per probe site\n"
+    "                ({tool}_list_probes, then {tool}_declare_probe): exactly\n"
+    "                `s.<your_new_method>(<literals>)`. The harness applies it\n"
+    "                to a FROZEN design it owns, at a site it owns, and records\n"
+    "                accepted / refused / crashed. A crash rejects you. Where a\n"
+    "                site has a measured right answer, you are graded on it.\n"
+    "  gate:resources every resource within budget on every case")
+
+_METHOD = """
+DIAGNOSE BEFORE YOU BUILD. THIS IS GRADED SEPARATELY FROM THE REPAIR.
+
+A refusal is one of four kinds, and they need different answers:
+  (1) CANNOT EXPRESS    the language has no way to say what the machine means
+  (2) CANNOT REFUSE     the language accepts it and produces something wrong
+  (3) NOT A LANGUAGE PROBLEM   the constraint is in the target toolchain, the
+                        instruction encoding, or a design's own contract
+  (4) ALREADY EXPRESSIBLE  it can be said today and nobody said it
+State which kind, with the numbers that show it, before proposing anything.
+This project's own engineers misclassified a refusal twice in one night.
+
+ARCHITECTURAL, NOT TOOLING. The abstraction you add must describe the
+MACHINE -- a property of its datapath, memories, address generation,
+instruction word, or timing -- not a property of Allo's front end, error
+messages, build, or test infrastructure. If what you find is a tooling defect,
+you may say so, but it will be graded `tooling`, not as a result for this task.
+
+STATE YOUR UNCHECKED PREMISE. If your abstraction is a claim the compiler
+cannot verify -- if a false declaration would produce wrong hardware while
+every software simulation stays exact -- say so in its docstring, and say what
+would have to hold for it to be sound.
+"""
+
+PILOT_A_SEED = """
+PILOT A -- YOUR STARTING INFORMATION IS MEASUREMENTS AND NOTHING ELSE.
+
+You are not told what the gap is. Your task is to FIND one: name ONE
+architectural or microarchitectural property of the TinyTPU-isa machine that
+Allo has no way to express, justify the choice from the numbers below, then
+implement an abstraction for it with its legality rule.
+
+THE MACHINE'S PARAMETERS (all in `microarch_isa.py`, readable with
+read_reference): a T=4 weight-stationary int8/int32 array, MAXDIM=16, a
+sequencer with a PC, a 4-deep hardware loop stack and a 3-term address
+generator (AGU_TERMS=3), 9 opcodes, a 7-bit row-count field `nr` (max 127),
+an accumulator array `ar`, and AR_RAW_DIST=4.
+
+MEASUREMENT 1 -- a census of loop nests. At 16x16x16, a mapper enumerated
+1,226 candidate loop nests for GEMM on this machine and refused all but 5.
+Refusals by FIRST cause, with the mapper's own reason codes:
+    acc-split     897
+    acc-position  253
+    ar-distance    55
+    agu-terms      13
+    loop-depth      3
+A first-cause count hides overlap: 930 of the refused nests ALSO violate the
+ar-distance contract. Of the 5 nests the encoder and a reference model call
+encodable, 3 are confirmed on RTL; the other 2 pass the reference model, the
+program validator, a cycle model, the dataflow simulator and Vitis csim, and
+their cosim never completes.
+
+MEASUREMENT 2 -- widening the address generator. Raising AGU_TERMS 3 -> 4
+raised encodable nests 3 -> 7 -> 8 across two changes, moved the binding
+refusal twice, and never changed the nest the mapper chose: cycles did not
+move, area did. At AGU_TERMS=3 the limit on the accumulate field is never
+reached, because the instruction budget refuses the instruction first.
+
+MEASUREMENT 3 -- widening the operand load. Loading 4 operand rows per
+iteration into the operand buffer `rbA` instead of 1:
+
+                              cycles 48^3 / 64^3   rbA write ports   FF      LUT     BRAM
+    shipped                   10289 / 22123        1                 17488   26554   52
+    widened, as emitted       9569 / 21163         2                 24001   31396   116
+    widened, rbA banked       9569 / 21163         1                 25026   33799   100
+
+In the "as emitted" row Vitis names rbA's module `..._1R1W` while its RTL has
+two always-blocks that WRITE the array. Synopsys Design Compiler refuses that
+RTL (ELAB-366, multiple drivers on all 32 bits); the banked row synthesises.
+
+MEASUREMENT 4 -- a row-count overflow. At K=128 the operand-load instruction's
+row count exceeds the 7-bit `nr` field (max 127) on the shipped operand layout.
+A variant that splits the operand load removes K from that row count and fits.
+
+That is all you are given. Everything else you must read or measure.
+"""
+
+PILOT_B_SEED = """
+PILOT B -- YOUR TARGET PROPERTY IS NAMED; THE ABSTRACTION IS NOT.
+
+THE PROPERTY: how many WRITE PORTS a memory has, and whether the way a design
+accesses that memory needs more than it has.
+
+WHY IT MATTERS, MEASURED. Loading 4 operand rows per iteration into TinyTPU's
+operand buffer `rbA` instead of 1 cut cycles 10289 -> 9569 at 48^3 and
+22123 -> 21163 at 64^3. As emitted, Vitis names rbA's RAM module
+`..._RAM_AUTO_1R1W` -- while the RTL module contains two always-blocks that
+WRITE the array. That is a true dual-write-port RAM. An FPGA block RAM gives a
+second write port for free; standard cells have no dual-write primitive, and
+Synopsys Design Compiler REFUSES that RTL (ELAB-366, multiple drivers on all 32
+bits). Cyclically banking rbA so that every bank has exactly one writer keeps
+every cycle of the gain (9569 / 21163) and synthesises. The FPGA resource
+count stood in for the port count and could not state it.
+
+THE GROUND TRUTH YOU WILL BE GRADED AGAINST, in a 12-line reproduction the
+harness owns (`chia_abstraction/probes.py`, sites `ports_dual` and
+`ports_banked`, readable via list_probes):
+
+    kernel: buf[2*i] = ...; buf[2*i+1] = ...;   in a loop pipelined at II=1
+    ports_dual    as above.  csynth emits ONE RAM module for `buf`, named
+                  `..._RAM_AUTO_1R1W`, containing TWO write statements.
+    ports_banked  the same, with `buf` cyclically partitioned by 2.  csynth
+                  emits TWO instances of that module, each with ONE write.
+
+A correct abstraction, declaring `buf` to have ONE write port, must REFUSE
+`ports_dual` and ACCEPT `ports_banked` -- and the design it accepts is run
+through csim and must be bit-exact. A second always-block that only READS the
+array is a legal read port, not a write; do not count it.
+
+You are told WHERE to look and what is right. You are not told what to build:
+not its name, not its type, not whether it is a primitive, an attribute, an
+analysis or a pass.
+"""
+
+
+def pilot_brief(pilot: str, workload: str, tool: str = "allo") -> str:
+    """The system message for Pilot A or B: frame + method + seed + feedback."""
+    seed = {"A": PILOT_A_SEED, "B": PILOT_B_SEED}[pilot]
+    body = (_FRAME_HEAD + _METHOD + seed + "\n" + _FEEDBACK).replace(
+        "{tool}", tool)
+    return body.format(workload=workloads.brief(workloads.get(workload)),
+                       common=COMMON)
+
+
+#: What each pilot's prompt SEEDED, for the record. The whole distinction
+#: between the arms is this difference, and a reader will look for it.
+SEEDED = {
+    "A": ["the shared frame: IR, the five-place pattern, s.dependence as the "
+          "pattern and align_value as the counter-example, what may be edited",
+          "the four kinds of refusal, as method, with NO worked example",
+          "the architectural-not-tooling instruction",
+          "the state-your-unchecked-premise instruction",
+          "machine parameters: T, MAXDIM, PC, 4-deep loop stack, AGU_TERMS=3, "
+          "9 opcodes, 7-bit nr, ar, AR_RAW_DIST=4",
+          "M1 census by first cause (acc-split 897, acc-position 253, "
+          "ar-distance 55, agu-terms 13, loop-depth 3), the 930 overlap, "
+          "5 encodable / 3 RTL-confirmed",
+          "M2 AGU 3->4 raises encodable, chosen nest unchanged, budget masks "
+          "the accumulate limit",
+          "M3 the rbA widening table incl. 'names it _1R1W, two writing "
+          "always-blocks, DC refuses ELAB-366, banked synthesises'",
+          "M4 K=128 overflows the 7-bit nr on the shipped layout; split load fits",
+          "NOT seeded: any cause, any interpretation, the five-target list, "
+          "the limitations register, the probes' ground truth",
+          "POSSIBLE NUDGES, recorded rather than removed because removing "
+          "them would distort the frame: (a) the frame's pattern exemplar is "
+          "s.dependence, described as a claim that 'if false, produces wrong "
+          "RTL while every software simulation passes' -- adjacent to the "
+          "dependence-distance-as-contract target; (b) the design-case list "
+          "says systolic_1d does not synthesise because several kernel "
+          "instances read one top-level array (issue #27) -- adjacent to the "
+          "memory-port target, though it is about READ ownership"],
+    "B": ["everything in A's frame and method",
+          "the target PROPERTY: write-port count vs access pattern",
+          "the rbA measurement and the DC refusal",
+          "the ground truth: ports_dual (1 module, 2 writes) must be refused, "
+          "ports_banked (2 instances, 1 write each) accepted and bit-exact",
+          "the read-port caveat",
+          "NOT seeded: a primitive name, a type, whether it is a primitive, "
+          "attribute, analysis or pass; the IR's layout-map encoding of the "
+          "partition; the machine census M1/M2/M4"],
+}
+
+
+PILOT_CLOSING = """
+BEFORE YOU FINISH, if your change adds a Schedule method: call
+{tool}_list_probes, then {tool}_declare_probe once per site you want your
+method exercised at. A method with no declared call is never exercised, and
+cannot earn credit for what it expresses.
+
+In your final message, in this order:
+  1. THE DIAGNOSIS: which of the four kinds, and the numbers that show it.
+  2. THE PROPERTY: which property of the MACHINE your abstraction describes,
+     and why it is architectural rather than a property of the tooling.
+  3. THE ABSTRACTION: what you added, and which of the five places you touched.
+  4. ITS UNCHECKED PREMISE: what would have to hold for it to be sound, and
+     whether a false declaration would produce wrong hardware silently.
+  5. THE TEST YOU WOULD ADD: which file, which three cases.
+"""

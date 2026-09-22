@@ -540,6 +540,61 @@ def gate_limits(slot, env, work, out, tier, record=False):
             "items": cmp["now_items"]}
 
 
+# -- 5b. the probe rung: a new abstraction, called at a harness-owned site ----
+def added_schedule_methods(diff: str) -> list[str]:
+    """Public `Schedule` methods whose `def` line the patch adds."""
+    import re as _re
+    return sorted({m.group(1) for path, line in patch_policy.added_lines(diff)
+                   if path == "allo/customize.py"
+                   for m in [_re.match(r"\s*def\s+([A-Za-z]\w*)\s*\(", line)]
+                   if m})
+
+
+def gate_probe(slot, env, work, out, diff, probe_calls: Path | None):
+    """Exercise the candidate's NEW primitive at a call site it did not write.
+
+    Without this rung a new abstraction has no callers, so the objective cannot
+    reward it and the gates cannot catch it -- measured: last night's held-out
+    candidate passed every rung and aborted the compiler on its first call.
+
+    Two outcomes block: a probe call that CRASHES the compiler (an MLIR
+    assertion is a defect, not a legality rule), and an invalid declared call
+    when calls were declared at all. Whether the candidate separates the two
+    port ground truths is recorded as the grade, and feeds `expressive`.
+    """
+    added = added_schedule_methods(diff)
+    if not added:
+        return {"skipped": "the patch adds no Schedule method, so there is no "
+                           "new capability to call"}
+    calls = json.loads(probe_calls.read_text()) if probe_calls else {}
+    if not calls:
+        return {"added": added, "declared": False,
+                "note": "the patch adds a Schedule method and declares no "
+                        "probe call, so the new capability was never "
+                        "exercised. Recorded, not blocking; it cannot earn "
+                        "`expressive`."}
+    spec = work / "probe_calls.json"
+    spec.write_text(json.dumps({"added": added, "calls": calls}))
+    ok, rc, o, sec = vouched("probe", slot, slot, env, work, CASE_TIMEOUT,
+                             args=["--calls", str(spec),
+                                   "--work", str(work / "probe")],
+                             log=out / "probe.log")
+    rep = _payload(o, "PROBE")
+    if not ok or rep is None:
+        raise Reject("gate:probe", f"the probe rung did not run:\n{o[-4000:]}")
+    crashed = [r for r in rep["records"] if r.get("outcome") == "crashed"]
+    if crashed:
+        raise Reject("gate:probe", "the new primitive CRASHES the compiler "
+                     "when called at a harness-owned site: "
+                     + json.dumps(crashed, indent=1)[-3000:])
+    invalid = [r for r in rep["records"] if r.get("outcome") == "invalid-call"]
+    if invalid:
+        raise Reject("gate:probe", "a declared probe call is not a valid "
+                     "call of a method this patch added: "
+                     + json.dumps(invalid, indent=1)[-3000:])
+    return {"added": added, "declared": True, **rep, "seconds": sec}
+
+
 # -- 6. PPA -------------------------------------------------------------------
 def cosim_ppa(slot, env, work, out, shapes):
     """TinyTPU-isa RTL cosim cycles + csynth, cross-checked outside the process.
@@ -555,6 +610,22 @@ def cosim_ppa(slot, env, work, out, shapes):
     env = dict(env, TPU_SHAPES=",".join(shapes), TPU_PRJ=str(prj))
     ok, rc, o, sec = vouched("cosim", slot, work, env, work, COSIM_TIMEOUT,
                              log=out / "cosim.log")
+    retried = False
+    if not ok and re.search(r"cycles=None\s+no TB line", o):
+        # Measured 2026-09-22: 8 successful cosims, 8 identical cycle counts,
+        # 0 differing counts, 1 run that yielded NO number. The simulation is
+        # deterministic; the pipeline can fail to produce a number. So a
+        # no-number result is retried ONCE rather than believed -- and only
+        # that shape: a DIFFERENT number, or a mismatch, is never retried.
+        for f in list(prj.glob("*.log")):
+            try:
+                shutil.copy2(f, out / ("first_attempt_" + f.name))
+            except OSError:
+                pass
+        shutil.rmtree(prj, ignore_errors=True)
+        ok, rc, o, sec2 = vouched("cosim", slot, work, env, work,
+                                  COSIM_TIMEOUT, log=out / "cosim_retry.log")
+        sec, retried = sec + sec2, True
     # Preserve the evidence BEFORE any rejection: the work directory is wiped
     # by the next evaluation, and the first time a shape failed here
     # (4x4x4 `no TB line`, 2026-09-22) the logs were gone before they could be
@@ -599,7 +670,8 @@ def cosim_ppa(slot, env, work, out, shapes):
                                           f"simulated time says {sim:.0f}")
         cycles[s] = int(n)
     return {"cycles": cycles, "area": synth["area"],
-            "estimated_ns": synth["estimated_ns"], "seconds": sec}
+            "estimated_ns": synth["estimated_ns"], "seconds": sec,
+            "retried_after_no_number": retried}
 
 
 # -- 7. the verdict -----------------------------------------------------------
@@ -628,6 +700,9 @@ def main():
     ap.add_argument("--slot", type=int, default=0)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--tier", default="loop", choices=("loop", "accept"))
+    ap.add_argument("--probe-calls", type=Path, default=None,
+                    help="JSON {probe: 's.<new_method>(<literals>)'} declared "
+                         "by the candidate; applied at harness-owned sites")
     ap.add_argument("--gate-only", action="store_true",
                     help="stop after the correctness gates; no PPA, no "
                          "objective. ~5 min instead of ~10")
@@ -721,6 +796,9 @@ def main():
                  else design_cases.LOOP_CASES)
         stage("cases", lambda: gate_cases(slot, env, work, a.out, names, False))
         check("the design cases")
+        stage("probe", lambda: gate_probe(slot, env, work, a.out, diff,
+                                          a.probe_calls))
+        check("the probe rung")
         stage("limits", lambda: gate_limits(slot, env, work, a.out,
                                             a.tier, a.record_baseline))
         check("tests/limits")
@@ -749,6 +827,12 @@ def main():
             n for n, rep in (syn or {}).items()
             if not design_cases.CSYN_OK.get(n, True)
             and (rep.get("csyn") or {}).get("latency_worst") is not None)
+        pg = ((result["stages"].get("probe") or {}).get("grade") or {})
+        if pg.get("ports"):
+            # A previously inexpressible design property -- a memory's write
+            # port count, checked against its access pattern -- is now
+            # expressible, and the design it accepts is CONFIRMED bit-exact.
+            newly = sorted(set(newly) | {"ports:write-port-declaration"})
         result["newly_expressible"] = newly
         for name, rep in (syn or {}).items():
             c = rep.get("csyn") or {}

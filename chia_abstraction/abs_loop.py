@@ -94,6 +94,7 @@ _STAGE_RUNG = {
     "gate:build": "policy", "gate:import": "policy",
     "gate:tests": "built",
     "gate:bench_isa": "cheap", "gate:stress": "cheap", "gate:limits": "cheap",
+    "gate:probe": "cheap",
     "gate:resources": "correct",
     "ppa:cosim": "correct", "ppa:csynth": "correct", "ppa:timing": "correct",
     "setup": "proposed", "harness": "proposed", "git": "proposed",
@@ -206,7 +207,7 @@ def vertex_provider(provider: str, model_id: str) -> AdditionalModelProvider:
         options={"project": PROJECT, "location": LOCATION})
 
 
-def make_llm(tool, disposition, workload):
+def make_llm(tool, disposition, workload, pilot=None):
     provider, _, model_id = MODEL.partition("/")
     if TEST_BASE_URL:
         additional = [AdditionalModelProvider(
@@ -216,9 +217,10 @@ def make_llm(tool, disposition, workload):
         additional = [vertex_provider(provider, model_id)]
     return IsaOpenCodeLLM(
         model=MODEL,
-        system_message=brief.system_message(disposition).format(
-            workload=workloads.brief(workloads.get(workload)),
-            common=brief.COMMON),
+        system_message=(brief.pilot_brief(pilot, workload, tool.name) if pilot
+                        else brief.system_message(disposition).format(
+                            workload=workloads.brief(workloads.get(workload)),
+                            common=brief.COMMON)),
         timeout_seconds=2400,
         retries=1,
         additional_providers=additional,
@@ -370,6 +372,8 @@ def run(args, budget: Budget) -> int:
             ray.init(resources={"opencode_creds": 1}, runtime_env=runtime_env)
 
     os.environ["CHIA_ABS_SLOT"] = str(args.slot)
+    if args.pilot:
+        os.environ["CHIA_ABS_PILOT"] = args.pilot
     tool = AlloCompilerTool(
         args.tool_name, str(tree), str(log_dir / "work"), str(HERE), str(REPO),
         args.disposition, args.workload, ref, ALLO_PYTHON, LLVM_BUILD_DIR)
@@ -419,16 +423,26 @@ def run(args, budget: Budget) -> int:
 
         best_diff, best_obj = "", None
         history: list[str] = []
-        llm = make_llm(tool, args.disposition, args.workload)
+        llm = make_llm(tool, args.disposition, args.workload, args.pilot)
 
         for it in range(1, args.iterations + 1):
             print("=" * 72)
             print(f"Iteration {it}/{args.iterations} [{args.disposition}]")
             print("=" * 72, flush=True)
             tool.apply(best_diff)
+            # Probe declarations belong to ONE candidate; a stale one from a
+            # rewound iteration must not be scored against the next.
+            (log_dir / "work" / "probe_calls.json").unlink(missing_ok=True)
             started, n_calls = time.time(), len(calls)
             text = brief.task(args.disposition, args.workload, args.angle,
                               baseline["cases"], history)
+            if args.pilot:
+                # The per-iteration prompt carries the PILOT brief, not the
+                # first night's maintaining brief with its gap inventory.
+                tail = text.split("YOUR ANGLE for this search:", 1)[1]
+                text = (brief.pilot_brief(args.pilot, args.workload, tool.name)
+                        + "\n\nYOUR ANGLE for this search:" + tail
+                        + brief.PILOT_CLOSING.replace("{tool}", tool.name))
             if args.heldout:
                 # The held-out experiment: the agent is given the SYMPTOM and
                 # nothing else. `heldout.py` has already removed the answer,
@@ -537,7 +551,8 @@ gates pass. The harness re-measures your final tree independently either way.
         summary = {
             "disposition": args.disposition, "workload": args.workload,
             "angle": args.angle, "model": MODEL, "ref": ref,
-            "heldout": args.heldout,
+            "heldout": args.heldout, "pilot": args.pilot,
+            "seeded": brief.SEEDED.get(args.pilot) if args.pilot else None,
             "iterations": len(iters), "rungs_reached": rates,
             "rates": {r: round(rates[r] / n, 3) for r in RUNGS},
             "llm_usd": round(sum(c.get("cost_usd", 0) for c in calls), 4),
@@ -581,6 +596,10 @@ def main() -> None:
     ap.add_argument("--max-debug-attempts", type=int, default=1)
     ap.add_argument("--log-dir", type=Path, required=True)
     ap.add_argument("--slot", type=int, default=0)
+    ap.add_argument("--pilot", default=None, choices=("A", "B"),
+                    help="A: measurements only, find the gap. B: the memory "
+                         "write-port property named, with its ground truth. "
+                         "Replaces the first night's gap inventory.")
     ap.add_argument("--heldout", default=None, choices=("dependence",),
                     help="the rediscovery experiment: append the measured "
                          "SYMPTOM to the task. Requires CHIA_FROZEN_REF to be "

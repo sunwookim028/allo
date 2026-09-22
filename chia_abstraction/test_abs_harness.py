@@ -612,12 +612,111 @@ def phase_leakcheck(R, work):
            planted == ["planted.py:6: s.dependence(\"a\", \"b\")"])
 
 
+# -- phase k: the probe rung's pass condition is reachable, its fails fire ----
+#: A rung whose pass condition cannot be met, or whose fail condition never
+#: fires, reports the same thing every time and proves nothing -- the
+#: failing-open family again. So before any agent is graded against the port
+#: probes, three fixtures are graded against them, in-process, at $0:
+#:
+#:   ref_ports      a CRUDE reference that reads the IR's stores and the cyclic
+#:                  layout map. Must REFUSE dual and ACCEPT + CONFIRM banked.
+#:                  It exists only to show the pass condition is reachable. It
+#:                  lives here, in a file the agent's tools do not serve, and
+#:                  it is deliberately crude: it is a control, not the answer.
+#:   always_accept  must fail the grade (it accepts the dual-writer).
+#:   always_refuse  must fail the grade (it refuses the banked design).
+#: plus two invalid declarations that must be rejected before anything runs.
+def _fixture_methods():
+    import re as _re
+    from collections import Counter
+    from allo.customize import Schedule
+
+    def ref_ports(self, buffer, write=1):
+        """CONTROL FIXTURE, not an answer: a deliberately crude port check."""
+        from allo.customize import AlloValueError as _E
+        if not isinstance(write, int) or write < 1:
+            raise _E(f"ref_ports: write {write!r} must be an int >= 1")
+        txt = str(self.module)
+        alloc = next((l for l in txt.splitlines()
+                      if f'name = "{buffer}"' in l and "alloc" in l), "")
+        F = 1
+        if "#map" in alloc:
+            m = _re.search(r"affine_map<\(d0\) -> \(d0 mod (\d+)", txt)
+            F = int(m.group(1)) if m else 1
+        per = Counter()
+        for idx in _re.findall(r"affine\.store [^\n]*?\[([^\]]*)\] \{to = \""
+                               + _re.escape(buffer) + r"\"\}", txt):
+            mm = _re.match(r"\s*%\w+ \* (\d+)(?: \+ (\d+))?\s*$", idx)
+            if mm and int(mm.group(1)) % F == 0:
+                per[int(mm.group(2) or 0) % F] += 1
+            else:
+                per["?"] += 1
+        need = max(per.values()) if per else 0
+        if need > write:
+            raise _E(f"ref_ports: {buffer} needs {need} write ports per bank, "
+                     f"declared {write}")
+
+    def always_accept(self, buffer, write=1):
+        """CONTROL FIXTURE: never refuses."""
+
+    def always_refuse(self, buffer, write=1):
+        """CONTROL FIXTURE: always refuses."""
+        from allo.customize import AlloValueError as _E
+        raise _E("always_refuse")
+
+    for f in (ref_ports, always_accept, always_refuse):
+        setattr(Schedule, f.__name__, f)
+    return ("ref_ports", "always_accept", "always_refuse")
+
+
+def phase_probe_controls(R, work):
+    sys.path.insert(0, str(HERE))
+    import probes
+    names = _fixture_methods()
+    allowed = set(names)
+    w = work / "probe_controls"
+    w.mkdir(parents=True, exist_ok=True)
+
+    def grade_of(meth):
+        recs = [probes.run_probe(p, f's.{meth}("buf", write=1)', allowed, w)
+                for p in ("ports_dual", "ports_banked")]
+        return probes.grade(recs), recs
+
+    g, recs = grade_of("ref_ports")
+    R.case("k the pass condition is REACHABLE: a crude reference passes",
+           "dual refused, banked accepted and csim bit-exact -> ports=True",
+           f"dual={g['dual']} banked={g['banked']} "
+           f"confirmed={g['banked_confirmed']} ports={g['ports']}",
+           g["ports"] is True, {"records": recs})
+    g, _ = grade_of("always_accept")
+    R.case("k a check that never refuses FAILS the grade",
+           "dual accepted -> ports=False",
+           f"dual={g['dual']} ports={g['ports']}",
+           g["ports"] is False and g["dual"] == "accepted")
+    g, _ = grade_of("always_refuse")
+    R.case("k a check that always refuses FAILS the grade",
+           "banked refused -> ports=False",
+           f"banked={g['banked']} ports={g['ports']}",
+           g["ports"] is False and g["banked"] == "refused")
+    r = probes.run_probe("ports_dual", 's.pipeline("i")', allowed, w)
+    R.case("k an existing primitive cannot satisfy the probe",
+           "invalid-call: not a method this patch added",
+           f"{r['outcome']}: {r.get('why', '')[:70]}",
+           r["outcome"] == "invalid-call")
+    r = probes.run_probe("ports_dual",
+                         's.ref_ports(__import__("os").getcwd())', allowed, w)
+    R.case("k a declared call cannot smuggle code",
+           "invalid-call: arguments must be literals",
+           f"{r['outcome']}: {r.get('why', '')[:70]}",
+           r["outcome"] == "invalid-call")
+
+
 PHASES = {"d": phase_frozen, "f": phase_primitive, "h": phase_objective,
           "i": phase_using, "a": phase_noop, "b": phase_known_good,
           "c": phase_broken, "e": phase_cpp_fails, "g": phase_parallel,
-          "j": phase_leakcheck}
-FREE = "d,f,h,i,j"
-ALL = "d,f,h,i,j,a,e,c,b,g"
+          "j": phase_leakcheck, "k": phase_probe_controls}
+FREE = "d,f,h,i,j,k"
+ALL = "d,f,h,i,j,k,a,e,c,b,g"
 
 
 def main() -> int:
@@ -645,7 +744,7 @@ def main() -> int:
         try:
             if p == "h":
                 fn(R)
-            elif p in ("d", "f", "i", "g", "j"):
+            elif p in ("d", "f", "i", "g", "j", "k"):
                 fn(R, work)
             else:
                 fn(R, work, a.slot)

@@ -461,9 +461,19 @@ def graft(out: Path, base: str = PREPARED_BASE) -> dict:
                  "examples/accelerator/tinytpu_vitis/chia_agent",
                  "tests/limits"):
         sh(["git", "checkout", head, "--", path], cwd=wt, check=False)
-    # Redact only what the graft brought in.
+    # Redact what the graft brought in AND the base commit's own docs. The
+    # first graft left `docs/` at the base, which was right for the evaluator
+    # and wrong for the docs: the base's limitations register named the answer
+    # at line 41, inside the lines the agent read. (The failing-open leak
+    # detector is what hid that; see scan_leaks.)
     grafted = [l for l in sh(["git", "diff", "--name-only", base_ref],
                              cwd=wt).splitlines() if l.strip()]
+    grafted += [l for l in sh(["git", "ls-files", "docs"], cwd=wt).splitlines()
+                if l.strip() and l not in grafted]
+    # The base's design file carries the pragma verbatim in a docstring. A
+    # docstring changes no behaviour, and microarch_isa.py is not in the
+    # main-pinned evaluator set (cosim/bench/stress/isa_ref/kpn_model are).
+    grafted.append(DESIGN)
     redacted = []
     for rel in grafted:
         f = wt / rel
