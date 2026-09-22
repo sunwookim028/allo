@@ -1767,11 +1767,17 @@ config patches for both matched points are committed at
 
 .. note::
 
-   **The published 171/261/417/483/685 are a MAXDIM=16 measurement**, and the
-   shipped default is now 64, so ``reproduce.sh`` pins ``TPU_MAXDIM=16``
-   explicitly --- it exists to reproduce those numbers and would otherwise
-   measure 218/357/563/677/879 and report a difference that is the stride
-   change, not a regression.
+   **171/261/417/483/685 were a MAXDIM=16 measurement**, taken when ``MAXDIM``
+   was the DRAM row stride of every operand and the same shape therefore cost
+   more on a bigger build --- the MAXDIM=64 sweep of that design measured
+   218/357/563/677/879, and ``reproduce.sh`` pinned ``TPU_MAXDIM=16`` so that
+   the difference would not read as a regression.
+
+   **Neither is the current row.** The stride is runtime data now
+   (:ref:`tinytpu-margins`), so a shape costs the same on any build and
+   nothing is pinned: the default configuration measures
+   **178/262/416/478/696**, within eleven cycles of the MAXDIM=16 row and
+   better than it at two shapes.
 
    **That row itself moved by one cycle when this work landed**, uniformly at
    all five shapes: 172/262/418/484/686 became 171/261/417/483/685. See
