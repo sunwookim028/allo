@@ -1052,6 +1052,19 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 T=8 vs Gemmini DIM=8, both at MAXDIM=64
 ---------------------------------------
 
+.. warning::
+
+   **The T=8 cycle column carries an unresolved exposure and is provisional
+   until it is re-measured.** It was taken *before* the parametric
+   ``DMA_WORDS`` refactor landed, which is the same exposure that moved the
+   published MAXDIM=16 row by one cycle (:ref:`benchmarks-one-cycle`). There
+   the cause was the memory sizing, which does **not** change at
+   T=8/MAXDIM=64 --- only ``rbA``/``rbB`` grew by one word, which is what took
+   BRAM 58 -> 62 --- so the expectation is no change. **That is a prediction,
+   not a measurement**, and the re-run is in flight. The number most exposed
+   is the 16x16x8 win, since it is the only shape where this design beats
+   Gemmini on a supportable margin.
+
 The second matched point, and **it does not agree with the first**, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
 ``gemmini/allo_bare_steady.c`` at ``DIM=8``, Gemmini as **median of five
