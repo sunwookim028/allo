@@ -91,6 +91,19 @@ class NestError(Exception):
     """A nest the hardware cannot run, named at the point it was written."""
 
 
+class Unencodable(NestError):
+    """A legal loop nest this ISA cannot express, with the reason named first.
+
+    Raised by `gemm_from_nest` below, which is the *encoder* half of the
+    co-design loop: a frozen mapper enumerates nests and asks this module
+    whether each one can be said in TinyTPU-isa. Every refusal here is a
+    statement about the hardware or its encoding, so the reason string leads
+    with a short code (`acc-peel:`, `intrinsic:`, `emitter:`, ...) that the
+    mapper counts. Widening what the machine can encode is what makes more
+    nests available to the mapper; see docs/source/extensions/act.rst.
+    """
+
+
 class Iv:
     """An induction variable, and the only handle on an AGU level.
 
@@ -311,6 +324,167 @@ def gemm_program(M, K, N, relu=False):
         if relu:
             k.vrelu(AR_C, AR_C, rows=M)
         k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
+    return k.emit()
+
+
+# ------------------------------------------------ a nest in, a program out ---
+#: The ranks of a GEMM, in the order the intrinsic's fields are named. A nest
+#: the mapper offers is a sequence of loops over these.
+RANKS = ("M", "K", "N")
+
+
+def split_body(nest):
+    """The trailing *intrinsic* loops of `nest`, and the rest.
+
+    The innermost level is the tile one instruction performs by itself, so it
+    is a property of the ARRAY, not of the mapping: one `mm` drives `rows`
+    activation rows against a TxT weight block. The tail must therefore be one
+    loop per rank at the innermost level with K = N = T and M free (`rows` is a
+    static field, so the mapper may pick it, up to MAXROWS).
+
+    Returns `(emitted_loops, rows)`. Widening the intrinsic -- a wider array, a
+    multi-block `mm` -- is a hardware change that shows up here.
+    """
+    if not nest:
+        raise Unencodable("intrinsic: empty nest")
+    inner = nest[-1].level
+    cut = len(nest)
+    while cut and nest[cut - 1].level == inner:
+        cut -= 1
+    tail = {l.rank: l.factor for l in nest[cut:]}
+    if sorted(tail) != sorted(RANKS):
+        raise Unencodable(
+            f"intrinsic: the innermost level carries {sorted(tail)}, but one "
+            f"`mm` performs all three of {list(RANKS)}")
+    if tail["K"] != T or tail["N"] != T:
+        raise Unencodable(
+            f"intrinsic: one `mm` performs a {T}x{T} weight block, the nest "
+            f"asks for {tail['K']}x{tail['N']}")
+    if not 1 <= tail["M"] <= MAXROWS:
+        raise Unencodable(f"intrinsic: rows={tail['M']} exceeds MAXROWS={MAXROWS}")
+    return tuple(nest[:cut]), tail["M"]
+
+
+def gemm_from_nest(nest, M, K, N, relu=False):
+    """Emit a TinyTPU-isa GEMM for `nest`, or say why this ISA cannot say it.
+
+    This is the *encoder* the co-design loop drives. A loop nest -- anything
+    whose elements have `.rank`, `.factor`, `.level` and `.spatial`, which is
+    ACT's `mapping.Loop` interface (docs/source/extensions/act.rst) -- decides
+    the order of the emitted loops and how each rank is split across them. What
+    it does not decide is the machine's staging: B into the scratchpad one
+    block per n-tile, A into the operand vregs one block per k-tile, one
+    accumulator region drained per output tile.
+
+    `gemm_program` above is the nest `canonical()` describes, hand-written; this
+    function re-emits that program word for word and generalises it.
+
+    Every `raise Unencodable` below is a hardware or encoding limit, and the
+    mapper counts them by code. Today they are:
+
+      `acc-peel`   `acc` is a STATIC instruction field with no predicate on an
+                   induction variable, so the k=0 tile must be a peelable
+                   prefix -- which pins K innermost and unsplit and kills every
+                   permutation that moves it. This is the binding constraint:
+                   1,150 of 1,226 nests at 16x16x16.
+      `emitter`    a limit of this function, not of the machine: it re-stages A
+                   per m-tile and does not know how to interleave that with an
+                   n loop.
+      `intrinsic`  the array's own tile (see `split_body`).
+
+    Two more come from below this function: `AGU_TERMS` (one instruction word's
+    address-term budget, raised by `Program._ins`) and the accumulator RAW
+    distance (raised by `microarch_isa.check_program`). The 3-term AGU does not
+    merely forbid nests, it CHOOSES the reuse strategy: an m-tiled nest is
+    encodable only if A is re-staged per m-tile, because keeping it resident
+    across m needs a fourth term on the accumulating `mm`.
+    """
+    if not (M <= MAXDIM and K <= MAXDIM and N <= MAXDIM):
+        raise Unencodable(f"shape: {M}x{K}x{N} exceeds MAXDIM={MAXDIM}")
+    emitted, Mt = split_body(nest)
+
+    ks = [i for i, l in enumerate(emitted) if l.rank == "K"]
+    if len(ks) > 1:
+        raise Unencodable(
+            "acc-peel: K is split across two emitted loops, so the k=0 tile is "
+            "not a peelable prefix -- `acc` is a static field and cannot be "
+            "predicated on an induction variable")
+    if ks and ks[0] != len(emitted) - 1:
+        raise Unencodable(
+            f"acc-peel: the emitted order is "
+            f"{'>'.join(l.rank for l in emitted)}, but the k=0 tile must be a "
+            f"peelable prefix, which needs K innermost")
+    ms = [l for l in emitted if l.rank == "M"]
+    if ms and [l.rank for l in emitted[:len(ms)]] != ["M"] * len(ms):
+        raise Unencodable(
+            "emitter: m loops must be outermost -- this one re-stages A per "
+            "m-tile and does not know how to interleave that with an n loop. "
+            "A limit of this file, not of the machine")
+
+    Kt = emitted[ks[0]].factor if ks else 1
+    order = ">".join(f"{l.rank}{l.factor}" for l in emitted) or "-"
+    k = Program(f"gemm{'.relu' if relu else ''} {M}x{K}x{N} [{order}]")
+    rest = emitted[len(ms):len(emitted) - len(ks)]          # the n loops
+
+    def steps(ivs, rank, unit):
+        """An iv's stride, in units of the thing it indexes: n-tiles for N,
+        rows for M. Innermost-first mixed radix -- these are the AGU strides."""
+        out, step = [], unit
+        for r, iv, factor in reversed(ivs):
+            if r == rank:
+                out.append((iv, step))
+                step *= factor
+        return out
+
+    def ref(base, terms, scale=1):
+        r = Ref(base)
+        for iv, s in terms:
+            r = r.at(iv, s * scale)
+        return r
+
+    def stage_a(m_terms):
+        """A: one k-block per k-tile, into the operand vregs."""
+        with k.loop(K // T, "kA") as kb:
+            k.dma_ld(src=0, dram_row=ref(0, m_terms), col_block=Ref().at(kb, 1),
+                     vr=Ref(A_VR).at(kb, MAXDIM), rows=Mt)
+
+    def stage_b():
+        with k.loop(N // T, "nB") as nb:
+            k.dma_ld(src=1, dram_row=0, col_block=Ref().at(nb, 1),
+                     spad=Ref(B_SP).at(nb, MAXDIM), rows=K)
+
+    def body(ivs):
+        m_terms = steps(ivs, "M", Mt)
+        n_terms = steps(ivs, "N", 1)
+        # The peeled k=0 tile overwrites the accumulator; the rest accumulate.
+        k.mm(A_VR, AR_C, ref(B_SP, n_terms, MAXDIM), rows=Mt, acc=False)
+        if Kt > 1:
+            with k.loop(Kt - 1, "k") as kb:
+                k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
+                     ref(B_SP + T, n_terms, MAXDIM).at(kb, T),
+                     rows=Mt, acc=True)
+        if relu:
+            k.vrelu(AR_C, AR_C, rows=Mt)
+        k.mvout(AR_C, dram_row=ref(0, m_terms), col_block=ref(0, n_terms),
+                rows=Mt)
+
+    def walk(loops, ivs):
+        if not loops:
+            body(ivs)
+            return
+        lv = loops[0]
+        with k.loop(lv.factor, f"{lv.rank.lower()}{len(ivs)}") as iv:
+            nxt = ivs + [(lv.rank, iv, lv.factor)]
+            if lv.rank == "M" and len(nxt) == len(ms):
+                stage_a(steps(nxt, "M", Mt))     # innermost m loop reached
+            walk(loops[1:], nxt)
+
+    if ms:
+        stage_b()                                # B is m-independent: hoist it
+    else:
+        stage_a([])                              # the shipped prologue order
+        stage_b()
+    walk(list(ms) + list(rest), [])
     return k.emit()
 
 
