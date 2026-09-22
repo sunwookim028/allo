@@ -170,6 +170,22 @@ every software simulation stayed exact -- your docstring must say so.
 """
 
 
+def symptom() -> str:
+    """The symptom to hand the agent.
+
+    Main's prepared `holdout/symptom.md` if it is there, because it was written
+    and reviewed for this purpose and it RECORDS its own deliberate near-leak
+    (the word "dependence", which is the vendor's own term and what the
+    scheduling report says) instead of removing it. The copy in this module is
+    the fallback and is used by the redaction path.
+    """
+    p = REPO / PREPARED_SYMPTOM
+    if p.is_file():
+        return ("# The symptom, from " + PREPARED_SYMPTOM + "\n\n"
+                + p.read_text(encoding="utf-8"))
+    return SYMPTOM
+
+
 def sh(args, cwd=REPO, check=True, text=True):
     p = subprocess.run(args, cwd=cwd, capture_output=True, text=text)
     if check and p.returncode:

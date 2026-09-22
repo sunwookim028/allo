@@ -302,7 +302,7 @@ def run(args, budget: Budget) -> int:
                 # nothing else. `heldout.py` has already removed the answer,
                 # its tests and every mention of it from the ref the agent
                 # reads, so this is the whole of its starting information.
-                text += "\n" + heldout.SYMPTOM
+                text += "\n" + heldout.symptom()
             text += f"""
 Your tools are prefixed `{tool.name}_`. Read first
 (`{tool.name}_read_source`, `{tool.name}_read_reference`), edit with
