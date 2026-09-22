@@ -50,6 +50,9 @@ def main(argv=None):
     ap.add_argument("workload", nargs="?", default="gemm.relu")
     ap.add_argument("shape", nargs="?", default="16x16x16")
     ap.add_argument("--top", type=int, default=2)
+    ap.add_argument("--only", default=None,
+                    help="measure just the mapping with this label, wherever "
+                         "the search ranked it")
     ap.add_argument("--baseline", action="store_true",
                     help="also measure isa_dsl.gemm_program, the hand-written "
                          "generator's program for the same shape")
@@ -59,7 +62,12 @@ def main(argv=None):
     workload = workloads.get(args.workload)
     extents = extents_of(workload, args.shape)
     _, result = compile_one(args.workload, extents, machine)
-    chosen = result.ranked(args.top)
+    chosen = ([c for c in result.candidates if c.label == args.only]
+              if args.only else result.ranked(args.top))
+    if args.only and not chosen:
+        raise SystemExit(
+            f"no encodable mapping labelled {args.only!r}; the search found "
+            f"{[c.label for c in result.candidates]}")
     shape = tuple(extents[r] for r in workload.ranks)
     print(f"{args.workload} {args.shape}: cosim the top {len(chosen)} of "
           f"{len(result.candidates)} encodable mappings")

@@ -48,6 +48,51 @@ explicitly (see :doc:`/developer/pitfalls`).
    # unblock it and the region hung SILENTLY. See docs/source/developer/limitations.rst, item 11.
    export OMP_NUM_THREADS=8
 
+Which bindings a worktree loads
+-------------------------------
+
+``allo/_mlir`` is a **tracked symlink** to ``../mlir/build/tools/allo/_mlir``,
+so it resolves only inside a checkout whose own ``mlir/`` has been built. In a
+fresh worktree it dangles -- and importing ``allo`` still works, because the
+editable install maps the name ``allo`` to one checkout and its finder answers
+the submodule from there. Measured 2026-09-22 in an unbuilt worktree:
+
+.. code-block:: text
+
+   allo        <this worktree>/allo/__init__.py
+   allo._mlir  /home/sk3463/allo-bench/mlir/include/allo/Bindings/allo/__init__.py
+   extension   /home/sk3463/allo-bench/mlir/build/tools/allo/_mlir/_mlir_libs/_allo.cpython-312-x86_64-linux-gnu.so
+
+So the python half comes from the worktree under test and the **compiled half
+from a different checkout**, silently: nothing looks stale, because cmake
+preserves mtimes, and the symptom surfaces later as an unexplained ABI or
+behaviour mismatch. A local symlink takes precedence when it resolves, so the
+fix is to make it resolve.
+
+**Setting up a fresh worktree.** Either build that worktree's own bindings --
+
+.. code-block:: bash
+
+   ninja -C mlir/build -j"$(nproc)"        # or: examples/accelerator/tinytpu_vitis/reproduce.sh
+
+-- which is what ``reproduce.sh`` does before it runs anything, and it then
+checks that ``allo`` resolves inside the checkout and exits nonzero if it does
+not. Note that check is on ``allo`` itself, not on the extension, which is the
+half that leaks; closing that is what the test below is for. Or, for a
+read-only session that only needs to *run* something and accepts
+another checkout's build, point the symlink at a build **of the same commit**
+and say so in whatever you report:
+
+.. code-block:: bash
+
+   ln -sfn /path/to/other/mlir/build/tools/allo/_mlir allo/_mlir   # borrowed, not built
+
+``tests/act/test_bindings.py`` asserts this rather than leaving it to be
+noticed: it fails naming both paths when the extension comes from another
+checkout, and skips when no bindings are reachable at all. The ``act/`` core
+imports numpy only, so ``pytest tests/act`` still exercises the workload,
+mapspace and scheduler layers in a worktree with no build.
+
 Golden test for dataflow simulator
 ----------------------------------
 

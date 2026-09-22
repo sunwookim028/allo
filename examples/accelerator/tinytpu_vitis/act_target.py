@@ -38,7 +38,8 @@ EPILOGUE = {
 # wrong answer or hang, and only a hand-written check says no -- the class of
 # gap that needs a checker rather than a wider word.
 CAUSE_KIND = {
-    "acc-peel": "express", "AGU_TERMS": "express", "LOOP_DEPTH": "express",
+    "acc-split": "express", "acc-position": "express",
+    "AGU_TERMS": "express", "LOOP_DEPTH": "express",
     "capacity": "express", "intrinsic": "express", "coverage": "express",
     "spatial": "express", "shape": "express", "shape-class": "express",
     "trip-count": "express", "resources": "express", "nest": "express",
@@ -178,18 +179,33 @@ class TinyTpu(Target):
                 "intrinsic", f"rows={rows} exceeds MAXROWS={MAXROWS}")
         return rows
 
+    def refusals(self, workload, extents, nest):
+        """Every structural cause this nest violates, without raising.
+
+        The two `acc` branches are counted separately on purpose: splitting the
+        reduce rank and moving it off the innermost slot are different asks of
+        the hardware, and lumping them makes one tree's census incomparable
+        with another's.
+        """
+        roles = roles_of(workload)
+        emitted, intrinsic = peel_intrinsic(nest)
+        rows = intrinsic.get(roles.row, 1)
+        at = [i for i, l in enumerate(emitted) if l.rank == roles.reduce]
+        return tuple(cause for cause, _ in
+                     self._structural(nest, roles, rows, emitted, at))
+
     def _structural(self, nest, roles, rows, emitted, reduce_at):
         out = []
         if len(reduce_at) > 1:
             out.append((
-                "acc-peel",
+                "acc-split",
                 f"{order(nest)} splits {roles.reduce} across "
                 f"{len(reduce_at)} emitted loops, so the first partial sum is "
                 f"not a peelable prefix, and `acc` is an instruction field "
                 f"with no predicate on an induction variable"))
         elif reduce_at and reduce_at[0] != len(emitted) - 1:
             out.append((
-                "acc-peel",
+                "acc-position",
                 f"{order(nest)} does not put {roles.reduce} innermost among "
                 f"the emitted loops, which peeling the first partial sum "
                 f"requires"))

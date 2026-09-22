@@ -15,8 +15,11 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
-from act import target, workloads  # noqa: E402
+from act import mapspace, target, workloads  # noqa: E402
 from act.search import Problem, search  # noqa: E402
+from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
+    CALIBRATION, fit, orders_checked,
+)
 from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
     CAUSE_KIND,
 )
@@ -52,7 +55,8 @@ def show(result, machine, top, verify):
     if not result.best:
         raise SystemExit("every nest was refused")
     print(f"\n  {'mapping':16s} {'rows':>4s} {'static':>6s} {'words':>5s} "
-          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s}  check")
+          f"{'emits':>5s} {'makespan':>8s} {'bottleneck':>12s} {'staging':>9s}"
+          f"  isa_ref")
     for candidate in result.ranked(top):
         counts = machine.report(candidate.program)
         plan = candidate.priced.schedule
@@ -64,12 +68,74 @@ def show(result, machine, top, verify):
               f"{intrinsic_rows(candidate.nest):>4d} "
               f"{counts['static']:>6d} {counts['words']:>5d} "
               f"{counts['dynamic']:>5d} {plan.makespan:>8d} "
-              f"{unit + ' ' + str(load):>12s}  {verdict}")
+              f"{unit + ' ' + str(load):>12s} {staging(candidate.nest):>9s}"
+              f"  {verdict}")
+    if any(staging(c.nest) == "in-nest" for c in result.ranked(top)):
+        print("  in-nest staging is ENCODABLE but not confirmed on the RTL: "
+              "two such mappings\n  passed isa_ref, the KPN model, the "
+              "simulator and csim, and did not finish cosim.\n  See "
+              "docs/source/extensions/act.rst, \"three tiers of evidence\".")
     return result.best
+
+
+def census(machine, workload, extents, slots=2):
+    """Each structural predicate asked of every nest, independently.
+
+    This is the count a phrase like "930 nests also violate the RAW distance"
+    refers to: the predicate on its own, not what is left after relieving
+    another one. The first-cause table `show` prints is the other quantity, and
+    the two differ by however much the causes overlap.
+    """
+    tally, total = {}, 0
+    for nest in mapspace.nests(extents,
+                               machine.intrinsics(workload, extents), slots):
+        total += 1
+        for cause in machine.refusals(workload, extents, nest):
+            tally[cause] = tally.get(cause, 0) + 1
+    print(f"{workload.name}: {total} nests, each structural predicate asked "
+          f"independently")
+    for cause, count in sorted(tally.items(), key=lambda kv: -kv[1]):
+        print(f"  {count:6d}  {CAUSE_KIND.get(cause, '?'):8s} {cause}")
+    print("  (a nest can appear in several rows; AGU_TERMS and LOOP_DEPTH are "
+          "not here\n   because only emitting the program discovers them)")
+    return 0
+
+
+def verdict(result):
+    """What the pick is worth, given how far the model has been validated."""
+    intercept, slope, worst = fit()
+    scale = (f"cosim ~ {intercept:.0f} + {slope:.2f} x makespan over "
+             f"{len(CALIBRATION)} measured points, worst residual "
+             f"{worst:.0f} cycles")
+    pairs = orders_checked()
+    order = "; ".join(
+        f"{shape}: model {model:.2f}x -> cosim {real:.2f}x, "
+        f"{'same order' if agreed else 'WRONG ORDER'}"
+        for shape, model, real, agreed in pairs)
+    if len(result.candidates) < 2:
+        return f"one encodable mapping, nothing to rank. {scale}."
+    first, second = result.candidates[0].cost[0], result.candidates[1].cost[0]
+    margin = second / first if first else 1.0
+    return (f"margin over the runner-up {margin:.2f}x. That margin sizes "
+            f"nothing: {scale}, but the model's ORDER is validated on "
+            f"{len(pairs)} same-shape pair -- {order} -- so it overstated the "
+            f"gap by an order of magnitude while getting the order right. "
+            f"Treat the pick as a ranking hypothesis and measure it with "
+            f"act_cosim.py.")
 
 
 def intrinsic_rows(nest):
     return max(l.factor for l in nest if l.level == "intrinsic")
+
+
+def staging(nest):
+    """Whether the operand transfers hoist out of the emitted nest.
+
+    Not a claim about why: it is the structural property the mappings that fail
+    to finish cosim share, and the one the confirmed mappings do not have.
+    """
+    emitted = [l for l in nest if l.level != "intrinsic"]
+    return "in-nest" if any(l.rank == "M" for l in emitted) else "prologue"
 
 
 def gate(machine):
@@ -102,6 +168,9 @@ def main(argv=None):
     ap.add_argument("--no-verify", action="store_true")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--gate", action="store_true")
+    ap.add_argument("--census", action="store_true",
+                    help="every structural predicate asked of every nest, "
+                         "independently of the others")
     args = ap.parse_args(argv)
     machine = target.get(args.target)
     if args.list:
@@ -111,10 +180,14 @@ def main(argv=None):
     if args.gate:
         return gate(machine)
     workload = workloads.get(args.workload)
+    if args.census:
+        return census(machine, workload, extents_of(workload, args.shape),
+                      args.slots)
     _, result = compile_one(args.workload, extents_of(workload, args.shape),
                             machine, args.slots)
     best = show(result, machine, args.top, not args.no_verify)
     print(f"\n  chosen: {best.label}  cost {best.cost}")
+    print("  " + verdict(result))
     return 0
 
 

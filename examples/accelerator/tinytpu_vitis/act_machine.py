@@ -131,3 +131,48 @@ def steps_of(prog):
         else:
             out.append(MACHINE.step(index, next(data)))
     return tuple(out)
+
+
+# Model makespan against RTL cosim, measured 2026-09-22 on this host with
+# `cosim.py` (TPU_TB=default, one synthesis per sweep) and `act_cosim.py`. Each
+# row is `isa_dsl.gemm_program`, which is also the search's choice at every
+# shape but 4x4x4. The cosim column is the only measurement here.
+CALIBRATION = (
+    ("gemm 4x4x4", 50, 172),
+    ("gemm 8x8x8", 115, 262),
+    ("gemm 12x12x12", 227, 418),
+    ("gemm 16x16x8", 261, 484),
+    ("gemm 16x16x16", 453, 686),
+    ("gemm.relu 16x16x16", 517, 750),
+)
+
+# Two mappings of ONE shape, which is the only kind of pair a ranking rests on.
+# The model put them 1.25x apart and the machine 1.02x apart, same order.
+RANKING_EVIDENCE = (
+    ("gemm 4x4x4", ("hand-written", 50, 172), ("searched", 40, 169)),
+)
+
+
+def fit(points=CALIBRATION):
+    """Least squares `cycles = intercept + slope * model`, and the worst
+    residual. A two-parameter fit over the measured points, not a derivation."""
+    n = len(points)
+    xs = [model for _, model, _ in points]
+    ys = [cycles for _, _, cycles in points]
+    mx, my = sum(xs) / n, sum(ys) / n
+    spread = sum((x - mx) ** 2 for x in xs)
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / spread
+    intercept = my - slope * mx
+    worst = max(abs(y - (intercept + slope * x)) for x, y in zip(xs, ys))
+    return intercept, slope, worst
+
+
+def orders_checked(evidence=RANKING_EVIDENCE):
+    """Per same-shape pair: the model's margin, the machine's, and whether the
+    model got the order right."""
+    out = []
+    for shape, left, right in evidence:
+        cheap, dear = sorted((left, right), key=lambda row: row[1])
+        out.append((shape, dear[1] / cheap[1], dear[2] / cheap[2],
+                    cheap[2] <= dear[2]))
+    return out
