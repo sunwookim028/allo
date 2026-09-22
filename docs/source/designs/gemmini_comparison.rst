@@ -1146,6 +1146,34 @@ A cross-check fell out of the same work: a ``gemmini_params.h`` reconstructed
 independently from stock ``HEAD`` plus the committed patch is **byte-identical**
 to the header captured from the live tree.
 
+The measurement noise floor, which constrains every claim on this page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The same reproduction exposed something that had been visible in the recorded
+numbers all along and never priced: **the trial-to-trial spread reaches 20
+cycles at a shape whose total is 161** — identical hardware, identical binary,
+consecutive runs. That is up to **12 % noise at the small shapes**, and it comes
+from each measured window's sensitivity to the preceding call's cache and
+scratchpad state.
+
+Two consequences, both binding:
+
+- **No single-trial number at 4x4x4 or 8x8x8.** Report a median and the spread.
+  A 1.07-1.24x deficit measured at those shapes is, at the small end, partly
+  inside the noise. It does not erase the result — the sign is consistent across
+  all five shapes, and that consistency is the evidence — but any claim of a
+  difference *smaller* than the spread is unsupportable.
+- **A design A/B needs repeats at every point.** If a candidate's win is 42-59
+  cycles and the per-point noise is 20, a single measurement per point can
+  manufacture a crossover that is not there or conceal one that is. This applies
+  directly to the latency sensitivity grid above: without repeats it cannot
+  answer the question it was built for.
+
+This is the cycle-domain analogue of the synthesis noise floor recorded in
+:doc:`/designs/minitpu` — two builds of an identical netlist differing by 1,407
+LUT and 0.046 ns. Both say the same thing: **state the noise before stating the
+difference.**
+
 Do not mix the two benchmarks' columns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
