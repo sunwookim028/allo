@@ -360,6 +360,52 @@ rule needs the layout map (the IR already carries the cyclic partition as
 `(d0) -> (d0 mod 2, d0 floordiv 2)`) composed with each store's affine index,
 and the loop's initiation interval -- both present in the IR, neither used.
 
+### The class-level finding: a resource predicate is the wrong SHAPE for this claim
+
+Audited within the hour against a second machine, which names the hole.
+
+**A resource predicate is the wrong shape for this class of claim. Counting
+occupants against capacity discards WHICH element is touched in WHICH cycle,
+and both failure directions are recoveries of that discarded information -- a
+false accept where two writes collide in one cycle that the count cannot see,
+and a false refuse where writes are sequential in time that the count cannot
+see either. The sound form is a CALENDAR: the index map composed with the
+initiation interval. The IR already carries both.**
+
+MiniTPU's assembler does the same job and does not have the bug, and the reason
+is structural rather than careful: **its `write_port` is a set of cycles, not a
+count.** `first_free_write` advances a bundle until none of its writeback
+cycles meets one already booked -- composing the schedule *in time*, from the
+declared per-op writeback span, rather than comparing a number of stores to
+ports x banks. Against the two directions measured here: *accepted although
+both writes land on the same port* cannot happen, because two writebacks in one
+cycle are two members of the same set and collide by construction; *refused
+although the writes are sequential* cannot happen, because sequential
+writebacks occupy different cycles and never meet. Their engineer's conjecture
+is the sentence to build on: **the affine index composed with the initiation
+interval IS a calendar, written differently** -- which is exactly the two
+things this IR already carries and `s.memory_ports` did not consult.
+
+**Two honesty constraints on that comparison.**
+
+1. **Their safety is partly structural luck, and they said so first.** Their
+   register file has one write port and no banking, so there is no layout to
+   compose. They avoided the bug by not having the structure that makes it
+   possible. Stated this way the finding is PREDICTIVE: the bug appears when
+   banking arrives.
+2. **The calendar has its own exposure, one level down**, which they identified
+   unprompted: it is only as right as the declared writeback span it books, so
+   a wrong span yields a schedule internally consistent and wrong about the
+   machine. It is held from both ends by a two-sided latency probe -- one that
+   scans DOWNWARD, so it fails when the RTL is FASTER than declared, not only
+   slower. That is the declaration-versus-enforcement line this pilot hit,
+   arriving from a fourth direction, and the section is stronger for saying
+   that the sound form is not unconditionally sound either.
+
+Nothing above changes the grading. Pilot B's verdict stands, and the false
+accept through `Partition.Block` factor 2 remains the sharpest single
+measurement in the track -- it is now also EXPLAINED, which it was not before.
+
 ### Against the pre-registration
 
 Predicted for B: separates the ground truths and is confirmed, **30%**;
