@@ -17,7 +17,8 @@ from act.search import Problem, price, search  # noqa: E402
 pytest.importorskip("allo._mlir", reason="the target needs the bindings")
 
 from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
-    ENCODING, SEQUENCER_II, is_control, steps_of,
+    CALIBRATION, ENCODING, SEQUENCER_II, fit, is_control,
+    orders_checked, steps_of,
 )
 from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
     CAUSE_KIND, TINYTPU, roles_of,
@@ -71,7 +72,8 @@ def test_refusals_carry_a_cause_and_not_a_message_to_match_on():
     assert result.considered == sum(
         result.census.counts.values()) + len(result.candidates)
     assert set(result.census.counts) <= {
-        "acc-peel", "ar-distance", "AGU_TERMS", "LOOP_DEPTH", "intrinsic",
+        "acc-split", "acc-position", "ar-distance", "AGU_TERMS",
+        "LOOP_DEPTH", "intrinsic",
         "capacity", "machine", "resources", "nest", "trip-count", "coverage",
         "spatial", "shape"}
 
@@ -88,14 +90,16 @@ def test_the_encoding_budget_is_the_one_the_refusals_cite():
     assert ENCODING["has_predicated_fields"] is False
     workload = workloads.get("gemm.relu")
     result = search(Problem(workload, {"M": 16, "K": 16, "N": 16}), TINYTPU)
-    assert "acc-peel" in result.census.counts
+    assert "acc-split" in result.census.counts
     assert "AGU_TERMS" in result.census.counts
 
 
 def test_the_acc_field_is_what_refuses_most_of_the_mapspace():
     workload = workloads.get("gemm.relu")
     result = search(Problem(workload, {"M": 16, "K": 16, "N": 16}), TINYTPU)
-    assert result.census.counts["acc-peel"] > result.considered // 2
+    peel = (result.census.counts["acc-split"]
+            + result.census.counts["acc-position"])
+    assert peel > result.considered // 2
 
 
 def test_a_split_reduction_is_refused_by_the_peel_and_not_by_accident():
@@ -105,7 +109,7 @@ def test_a_split_reduction_is_refused_by_the_peel_and_not_by_accident():
             Loop("N", 4, INTRINSIC))
     with pytest.raises(Refused) as caught:
         TINYTPU.lower(workload, {"M": 16, "K": 16, "N": 16}, nest)
-    assert caught.value.cause == "acc-peel"
+    assert caught.value.cause == "acc-split"
 
 
 def test_a_spatial_loop_is_refused_because_there_is_one_array():
@@ -183,3 +187,39 @@ def test_the_sequencer_is_charged_for_the_loop_stack():
     plan = TINYTPU.steps(program)
     charged = sum(dict(step.loads).get("sequencer", 0) for step in plan)
     assert charged == len(plan) * SEQUENCER_II
+
+
+MEASURED = {
+    "gemm 4x4x4": ((4, 4, 4), False),
+    "gemm 8x8x8": ((8, 8, 8), False),
+    "gemm 12x12x12": ((12, 12, 12), False),
+    "gemm 16x16x8": ((16, 16, 8), False),
+    "gemm 16x16x16": ((16, 16, 16), False),
+    "gemm.relu 16x16x16": ((16, 16, 16), True),
+}
+
+
+def test_the_stored_calibration_still_matches_what_the_model_says():
+    for label, model, _ in CALIBRATION:
+        shape, relu = MEASURED[label]
+        today = price(TINYTPU, gemm_program(*shape, relu=relu)).cost[0]
+        assert today == model, (
+            f"{label}: the model now says {today}, the stored calibration was "
+            f"measured against {model}. Re-measure with act_cosim.py before "
+            f"any ranking is reported from it.")
+
+
+def test_the_model_tracks_the_measured_points():
+    intercept, slope, worst = fit()
+    assert 1.0 <= slope <= 1.5, f"slope {slope}"
+    assert worst <= 40, f"worst residual {worst} cycles over {len(CALIBRATION)}"
+
+
+def test_the_one_validated_pair_got_the_order_right():
+    pairs = orders_checked()
+    assert pairs, "no same-shape pair has been measured"
+    for shape, model_margin, real_margin, agreed in pairs:
+        assert agreed, f"{shape}: the model ordered the pair wrongly"
+        assert model_margin > real_margin, (
+            f"{shape}: the model understated the gap, which the reported "
+            f"caveat does not cover")

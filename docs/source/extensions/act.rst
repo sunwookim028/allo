@@ -395,11 +395,14 @@ Measured in this worktree, ``gemm.relu`` at 16x16x16, 1,226 nests in 1.3 s:
    * - first
      - also
      - cause
-   * - 1,150
-     - 1,150
-     - ``acc-peel`` -- ``acc`` is an instruction field with no predicate on an
-       induction variable, so the first partial sum must be a peelable prefix,
-       which pins the reduce rank innermost and unsplit
+   * - 897
+     - 897
+     - ``acc-split`` -- the reduce rank is split across two emitted loops, so
+       the first partial sum is not a contiguous prefix at all
+   * - 253
+     - 253
+     - ``acc-position`` -- the reduce rank is not innermost among the emitted
+       loops, so peeling its first iteration would duplicate the whole body
    * - 55
      - 930
      - ``ar-distance`` -- rows below ``AR_RAW_DIST=4`` make the accumulating
@@ -441,11 +444,91 @@ relaxes to accept the encoding. An explicit accumulator-zeroing opcode is the
 alternative, and costs a pass over ``ar`` plus ``AR_RAW_DIST`` slack before the
 first ``mm``.
 
-The two columns are the point of the multi-cause census. Attribute each nest to
-the first check that fires and ``acc`` accounts for 1,150 of 1,226; ask how many
-nests each constraint refuses *independently* and ``AR_RAW_DIST`` refuses 930 of
-them as well. A single-cause census makes the second number invisible and the
-first look like the only constraint that matters.
+Two constraints on where such a fix belongs, both found on the co-design track
+and both corroborated here:
+
+**A term on ``f2`` spends one of the three.** The probe above fits in
+``AGU_TERMS=3`` only because it has a single column tile and so needs no term
+for one: its terms are ``f2``, ``f0`` and ``f3``, already the whole budget. Add a
+column loop and the accumulating ``mm`` wants a fourth and is refused. So
+widening ``AGU_TERMS`` to 4 -- which on its own raises the encodable count while
+changing no cycles, and therefore looks like area for nothing -- is better read
+as the **prerequisite** for any AGU-resolved ``acc`` fix to work beyond one
+column tile. The two changes are complements, and neither alone shows anything.
+
+**The reference model does not need unfreezing, if the fix is resolved in the
+AGU.** ``isa_ref.run`` consumes ``expand(prog)``, which is the AGU-*resolved*
+field stream, so a clamp applied during resolution hands the unit
+``f2 in {0, 1}`` and leaves the instruction's architectural meaning untouched.
+Resolve it instead inside a unit's decode and ``f2=2`` acquires a new meaning,
+which ``isa_ref`` rightly rejects. That is a real constraint on the design space,
+not a detail of the harness.
+
+The two ``acc`` rows are counted separately on purpose. Splitting the reduce
+rank and moving it off the innermost slot are different asks of the hardware --
+one needs a per-iteration predicate, the other needs a whole body duplicated --
+and lumping them as one ``acc-peel`` bucket of 1,150 is what made this census
+incomparable with an independently built one. Together they are still 1,150.
+
+Two census definitions, and which number is which
+-------------------------------------------------
+
+The two columns above are different quantities, and the difference has already
+caused one figure to be relayed as if it were the other.
+
+**First cause** (column one) is what a sequential enumerator naturally reports:
+each nest attributed to the check that refused it first. Under this flow's check
+order that is 897 / 253 / 55 / 13 / 3, summing with the 5 encodable nests to
+1,226.
+
+**Independent** (column two) asks each predicate of *every* nest on its own,
+regardless of what else refuses it. That is where **930** comes from: 930 of the
+1,226 nests have an intrinsic row tile below ``AR_RAW_DIST=4``. It is re-derivable
+in one command, and it is the only sense in which that number is true:
+
+.. code-block:: bash
+
+   python act_compile.py gemm.relu 16x16x16 --census
+   #    930  refuse   ar-distance
+   #    897  express  acc-split
+   #    253  express  acc-position
+
+A **third** quantity exists and is the one a co-design track actually wants:
+*what is left once you relieve a constraint*. Remove the ``acc-position`` check
+and re-census, and the largest remaining obstacle is ``acc-split`` -- measured
+independently in another tree as **897**, which is exactly this flow's
+``acc-split`` count. Two independently built enumerators agreeing to the nest on
+that number is the strongest cross-check either of them has.
+
+Where the same two trees disagree is ``ar-distance`` as a *first* cause: 55 here
+against 8 there. That is not a contradiction either. The other tree's emitter
+refuses 274 nests for a restriction of its own (it re-stages the activations per
+row tile and cannot interleave that with a column loop), and it refuses them
+*before* reaching the RAW-distance check; this flow removed that restriction, so
+those nests survive to be judged on rows. The lesson worth keeping: a first-cause
+histogram is a property of the check order and of the emitter's limits, not of
+the hardware, and only the independent census and the relieve-and-re-census
+numbers are comparable across implementations.
+
+Reconciling the encodable count: 5 against 3
+--------------------------------------------
+
+This flow reports **5** encodable nests at 16x16x16 where the earlier
+``act_nest.py`` prototype and an independently built enumerator report **3**.
+The five are ``N4>K4``, ``M2>N4>K4``, ``M4>N4>K4``, ``N4>M2>K4`` and
+``N4>M4>K4``; the three are the first three. So the difference is exactly the two
+nests whose **column loop is outside the row loop**, and it is not a
+disagreement about the machine: ``act_nest.py`` refused them explicitly, in a
+message that called itself *"A limit of this file, not of the machine"*, because
+it staged the activations only outside the whole nest. This flow stages them
+immediately inside the innermost row loop wherever that loop sits, which costs
+redundant re-staging when a column loop encloses it -- correct, and ranked worse
+by the cost model, which is the right outcome for a mapper rather than a
+refusal.
+
+Both extra nests pass ``isa_ref.run``, and ``--gate`` verifies every encodable
+mapping of every registered workload at every shape, so the claim is checked
+rather than argued.
 
 **Five nests are encodable** (the prototype found three), and all five compute
 the spec, checked against ``isa_ref.run``. The shipped ``N4>K4`` mapping is one
@@ -558,16 +641,6 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - dynamic
      - model
      - **cosim**
-   * - ``gemm`` 16x16x16, shipped mapping (``cosim.py``)
-     - 13
-     - 28
-     - 453
-     - **686**
-   * - ``gemm.relu`` 16x16x16, shipped mapping
-     - 14
-     - 32
-     - 517
-     - **750**
    * - ``gemm`` 4x4x4, ``isa_dsl.gemm_program``
      - 10
      - 4
@@ -578,15 +651,76 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - 4
      - 40
      - **169**
+   * - ``gemm`` 8x8x8
+     - 13
+     - 10
+     - 115
+     - **262**
+   * - ``gemm`` 12x12x12
+     - 13
+     - 18
+     - 227
+     - **418**
+   * - ``gemm`` 16x16x8
+     - 13
+     - 16
+     - 261
+     - **484**
+   * - ``gemm`` 16x16x16
+     - 13
+     - 28
+     - 453
+     - **686**
+   * - ``gemm.relu`` 16x16x16
+     - 14
+     - 32
+     - 517
+     - **750**
 
-The first row reproduces the published 16x16x16 figure exactly, and it is worth
-recording what the second row settles: the published
-**172 / 262 / 418 / 484 / 686 are plain** ``gemm``, because ``cosim.py``'s
-``testbench(M, K, N)`` leaves ``relu`` at its default. ``gemm.relu`` at the same
-shape is 750, and 750 - 686 = **64**, which is exactly the four ``vrelu``
-instructions' 64 ``accu`` rows. The delta is accounted for to the cycle, which
-is the best evidence available that the units' work counts are the right model
-of this machine.
+The ``gemm`` rows reproduce the published **172 / 262 / 418 / 484 / 686**
+exactly, all five, so the harness is the one those figures came from. The
+``gemm.relu`` row settles what they are: **plain** ``gemm``, because
+``cosim.py``'s ``testbench(M, K, N)`` leaves ``relu`` at its default.
+``gemm.relu`` at 16x16x16 is 750, and 750 - 686 = **64**, exactly the four
+``vrelu`` instructions' 64 ``accu`` rows. The delta is accounted for to the
+cycle, which is the best evidence available that the units' work counts are the
+right model of this machine.
+
+The error bar a pick has to carry
+---------------------------------
+
+Over those six points the model fits ``cosim = 128 + 1.24 x makespan`` with a
+worst residual of **34 cycles** -- computed from the table by
+``act_machine.fit``, not typed in, and re-checked by a test that fails if the
+model drifts from the stored points. So the model's *absolute* level is
+predictable across shapes to a few percent once the intercept is allowed.
+
+That is the wrong statistic for ranking, and saying so matters. Ranking compares
+two mappings of **one** shape, where the intercept is common and only the
+difference matters, and there is exactly **one** such pair measured: at 4x4x4 the
+model put the two programs **1.25x** apart and the machine put them **1.02x**
+apart, same order. The model therefore overstated the gap by roughly an order of
+magnitude while getting the direction right.
+
+``act_compile.py`` prints this wherever it reports a pick, rather than leaving
+it on this page:
+
+.. code-block:: text
+
+   chosen: N4>K4  cost (517, 32)
+   margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 128 +
+   1.24 x makespan over 6 measured points, worst residual 34 cycles, but the
+   model's ORDER is validated on 1 same-shape pair -- gemm 4x4x4: model 1.25x
+   -> cosim 1.02x, same order -- so it overstated the gap by an order of
+   magnitude while getting the order right. Treat the pick as a ranking
+   hypothesis and measure it with act_cosim.py.
+
+Until more same-shape pairs are measured, **"the best mapping for this hardware"
+is not a claim this flow can make** -- "the mapping this cost model ranks first,
+whose order has been checked once" is. That distinction is the reason the
+sequencer correction mattered: charging ``LOOP``/``ENDLOOP`` moved a pair from
+509-vs-512 to 517-vs-642 and reversed it, so a term the model omits can flip an
+order, and only a measurement closes it.
 
 Where the search beats the hand-written generator
 -------------------------------------------------
