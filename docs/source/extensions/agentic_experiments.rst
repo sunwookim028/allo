@@ -126,7 +126,7 @@ real co-design claim: **neither change demonstrates anything alone**, and the
 first has to be made before the second's constraint can even be measured.
 
 A prediction stated in advance, confirmed to the cycle
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Worth recording separately, because it is the difference between a flow that is
 understood and one that merely works. Before measuring, the co-design track
