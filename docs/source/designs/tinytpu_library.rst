@@ -267,6 +267,17 @@ is where the parametrization lands:
      - The TinyTPU architecture: channels, memories, unit order, and
        ``TinyTPU``, which ties a parameter set to its region, its directives,
        its assembler and its reference programs.
+   * - ``ip/reduce.py``
+     - The **second** architecture, ``DotTree``: an adder-tree reduction
+       instead of the systolic chain, out of the same ``Unit``, ``Channel``,
+       ``Memory`` and ``Architecture``. :ref:`ip-gaps-compose` is what it
+       tests -- ``compose.py`` needed no change to admit a different reduction
+       topology, because the topology is the pair (which units, which
+       channels).
+   * - ``ip/placeholders.py``
+     - **Nothing here is implemented.** One declaration per unfilled row of
+       :ref:`ip-gaps-table`, each raising ``NotBuilt`` with what would make it
+       real.
 
 Instantiating it
 ================

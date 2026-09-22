@@ -78,6 +78,12 @@ class Unit:
     cannot go unstated -- ``isa=()`` on the array units is the claim that the
     PEs decode nothing, and it is enforced.
 
+    ``legality`` is the unit's own condition on the parameter set it is being
+    instantiated at, run at composition time. ``Unit.check`` answers *which
+    names a unit may use*; nothing answered *which values it works at*, so a
+    unit sized past what its arithmetic is exact for composed, built and gave
+    wrong answers -- see ``docs/source/designs/ip_gaps.rst``.
+
     ``instances`` is the emitted ``mapping=``, as expressions over the
     architecture's parameters (``("T", "T")`` for a T x T array). ``memories``
     names the region arguments the body's own parameters bind to, positionally.
@@ -91,6 +97,7 @@ class Unit:
     parameters: tuple[str, ...] = ()
     isa: tuple[str, ...] = ()
     directives: callable = None
+    legality: callable = None
 
     @property
     def name(self) -> str:
@@ -192,6 +199,8 @@ class Architecture:
                 assert name in self.parameters, (
                     f"{self.name}: unit {u.name} needs {name!r}, which this "
                     f"architecture does not define")
+            if u.legality is not None:
+                u.legality(self.parameters)
             for role, names, seen in (("writes", u.writes, writer),
                                       ("reads", u.reads, reader)):
                 for ch in names:
