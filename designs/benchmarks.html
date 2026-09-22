@@ -578,6 +578,111 @@ steady-state set would need to start where this one ends.</p></li>
 </ul>
 </section>
 </section>
+<section id="does-utilisation-move-with-m-yes-we-amortise">
+<span id="benchmarks-msweep"></span><h2>Does utilisation move with M? Yes — we amortise<a class="headerlink" href="#does-utilisation-move-with-m-yes-we-amortise" title="Link to this heading"><span>¶</span></a></h2>
+<p>An M-sweep at fixed K=N=64, everything else held, run at both array sizes.
+This answers a question <strong>neither</strong> project had measured, and it was asked
+because MiniTPU’s own M-sweep came out <strong>flat</strong>.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">M-sweep, K=N=64, one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> per T, every shape bit-exact</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 9.5%" />
+<col style="width: 11.9%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+<col style="width: 16.7%" />
+<col style="width: 19.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>M</p></th>
+<th class="head"><p>joint?</p></th>
+<th class="head"><p>T=4 cycles</p></th>
+<th class="head"><p><strong>% of 16</strong></p></th>
+<th class="head"><p>T=8 cycles</p></th>
+<th class="head"><p><strong>% of 64</strong></p></th>
+<th class="head"><p>MACs</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>16</p></td>
+<td><p>ours alone</p></td>
+<td><p>6 891</p></td>
+<td><p><strong>59.4%</strong></p></td>
+<td><p>2 539</p></td>
+<td><p><strong>40.3%</strong></p></td>
+<td><p>65 536</p></td>
+</tr>
+<tr class="row-odd"><td><p>32</p></td>
+<td><p><strong>joint</strong></p></td>
+<td><p>11 952</p></td>
+<td><p><strong>68.5%</strong></p></td>
+<td><p>4 048</p></td>
+<td><p><strong>50.6%</strong></p></td>
+<td><p>131 072</p></td>
+</tr>
+<tr class="row-even"><td><p>64</p></td>
+<td><p><strong>joint</strong></p></td>
+<td><p>22 123</p></td>
+<td><p><strong>74.1%</strong></p></td>
+<td><p>7 083</p></td>
+<td><p><strong>57.8%</strong></p></td>
+<td><p>262 144</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Utilisation rises monotonically with M at both array sizes.</strong> We amortise.</p>
+<p><strong>The mechanism, and it is the predicted one.</strong> The numbers are a straight
+line in M with a single fixed intercept:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>fixed term</p></th>
+<th class="head"><p>marginal, cycles per M row</p></th>
+<th class="head"><p>fixed as % at M=16</p></th>
+<th class="head"><p>at M=64</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T=4</p></td>
+<td><p><strong>1 782</strong></p></td>
+<td><p>317.8</p></td>
+<td><p>25.9%</p></td>
+<td><p>8.1%</p></td>
+</tr>
+<tr class="row-odd"><td><p>T=8</p></td>
+<td><p><strong>1 014</strong></p></td>
+<td><p>94.8</p></td>
+<td><p>39.9%</p></td>
+<td><p>14.3%</p></td>
+</tr>
+</tbody>
+</table>
+<p>Fitted on M=32 and M=64, the model predicts M=16 to within 24 cycles (T=4)
+and 8 cycles (T=8) — so the fixed term is paid <strong>once per call</strong>, not once
+per row block, which is exactly what “one program per call with M as an
+internal loop bound” predicts. Tripling M does not triple the fixed cost; it
+divides it.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>What this licenses, and what it does not.</strong> MiniTPU is flat at 33.6%
+across M=32, 64 and 128, with an identified cause: an emitter issuing one
+launch per 32 rows, each re-paying the whole fixed term. We are not flat.
+<strong>So flatness is not a property of how these machines re-enter a launch —
+it is specific to that emitter</strong>, and carrying the row-block loop inside
+the launch would make their structure ours.</p>
+<p>But the comparison is of an <strong>axis, not of shapes</strong>: our sweep is at
+K=N=64 and theirs at K=N=128, because 128 is past our ceiling
+(<a class="reference internal" href="#benchmarks-workload"><span class="std std-ref">The workload set: a GPT-2 projection (placeholder)</span></a>) and M=16 is below their 32-row floor. “Does
+utilisation move with M” is answerable on each machine independently and
+that is what makes the finding joint; the <em>numbers</em> are not comparable
+across the two columns. Only M ∈ {32, 64} exists on both machines at all,
+and even there the fixed K and N differ.</p>
+<p>For orientation and not as a comparison, Gemmini over its own M range goes
+80.7 -&gt; 86.1 -&gt; 95.1% at DIM=4 and 47.3 -&gt; 58.3 -&gt; 79.0% at DIM=16 — it
+amortises too, and harder than we do.</p>
+</div>
+</section>
 <section id="raising-the-build-what-a-bigger-maxdim-costs">
 <span id="benchmarks-raising-maxdim"></span><h2>Raising the build: what a bigger MAXDIM costs<a class="headerlink" href="#raising-the-build-what-a-bigger-maxdim-costs" title="Link to this heading"><span>¶</span></a></h2>
 <p>The design was built at MAXDIM=16 with a 512-row scratchpad, 256 operand
@@ -613,14 +718,14 @@ deliberately undersized build. MAXDIM itself defaults to <strong>64</strong>.</p
 <tbody>
 <tr class="row-even"><td><p>address field, 11 usable bits</p></td>
 <td><p><span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T \le 2047\)</span></p></td>
-<td><p>MAXDIM &lt;= 90</p></td>
+<td><p>MAXDIM &lt;= 88 (90 unrounded; MAXDIM is a multiple of T)</p></td>
 <td><p>MAXDIM=96: <code class="docutils literal notranslate"><span class="pre">check_program</span></code>, “AGU-resolved f3=2112 is outside the
 0..2047 range”</p></td>
 </tr>
 <tr class="row-odd"><td><p>header count, 15-bit slice</p></td>
 <td><p><span class="math notranslate nohighlight">\(\text{MAXDIM}^3/T^2 + \text{MAXDIM}^2/T \le 32767\)</span>
 (<code class="docutils literal notranslate"><span class="pre">accu</span></code>’s iteration count)</p></td>
-<td><p>MAXDIM &lt;= 76</p></td>
+<td><p>MAXDIM &lt;= 76 for a cubic shape</p></td>
 <td><p>MAXDIM=80: <code class="docutils literal notranslate"><span class="pre">assemble</span></code>, “header count 33600 does not fit 15 bits”</p></td>
 </tr>
 </tbody>
@@ -802,6 +907,21 @@ isa_dsl.py                    generated == hand-written, word for word
 kpn_model.py                  KPN OK
 pytest tests/act/             98 passed, 4 skipped
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The first ASIC number, and it describes the current design.</strong> DC on
+FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
+(T=4, MAXDIM=16) comes out at <strong>1,136,598</strong> standard-cell area, timing MET
+at +0.21 ns with zero violating and zero hold paths. That <strong>replaces</strong>
+1,271,692 from an earlier export of a superseded netlist — <strong>-10.6%</strong> —
+and the reason is the same memory-sizing change that took BRAM 42 -&gt; 40 and
+one cycle off the fixed term (<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). The design got
+smaller <em>and</em> slightly faster, and area and cycles now describe the same
+design, which they did not before.</p>
+<p>Read it only against our own variants synthesised identically. A 45 nm
+cell area has no relationship to a BRAM count, and with memories as
+registers it says as much about the memory treatment as about the datapath.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> is the one that matters most here, because <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> and
 <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> both cite it as the evidence that they catch a broken design,
@@ -1535,8 +1655,8 @@ columns share a clock.</p>
 187.5 MHz), which is <strong>88 cycles at 2.431 ns</strong> — that is where the 88 comes
 from, and it is carried as a time rather than as their cycle count so their
 clock is not imported with it.</p>
-<table class="docutils align-default" id="id3">
-<caption><span class="caption-text">48x48x48 and 64x64x64, one csynth per grid point</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">48x48x48 and 64x64x64, one csynth per grid point</span><a class="headerlink" href="#id4" title="Link to this table"><span>¶</span></a></caption>
 <colgroup>
 <col style="width: 12.4%" />
 <col style="width: 11.2%" />
@@ -1663,7 +1783,8 @@ the question it was built for, and all it answers.</p>
 <td><p>31 396</p></td>
 <td><p><strong>116</strong></p></td>
 <td><p>14</p></td>
-<td><p>2.431 ns</p></td>
+<td><p>2.431 ns (dual-ported form; see the warning below — the shipped
+variant of this experiment is banked)</p></td>
 </tr>
 <tr class="row-even"><td><p>delta</p></td>
 <td><p>+6 513 (+37%)</p></td>
@@ -1678,6 +1799,84 @@ the question it was built for, and all it answers.</p>
 lengthen the critical path</strong>, so the comparison is a pure cycles-for-area
 trade and the two columns can be compared in cycles without converting. The
 BRAM more than doubles, which is the real price.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The +123% BRAM and an ASIC elaboration failure are the same fact seen
+from two substrates, and that changes what the decision is.</strong></p>
+<p>The widened variant does not synthesise to standard cells. DC rejects it in
+two minutes — <code class="docutils literal notranslate"><span class="pre">ELAB-366:</span> <span class="pre">Net</span> <span class="pre">'ram[0][31]'</span> <span class="pre">...</span> <span class="pre">driven</span> <span class="pre">by</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">one</span>
+<span class="pre">source</span></code>, across all 32 bits — because Vitis satisfies the widened loop’s
+<code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> writes per iteration by emitting <code class="docutils literal notranslate"><span class="pre">rbA</span></code> as a <strong>true
+dual-write-port RAM</strong>: two <code class="docutils literal notranslate"><span class="pre">always</span> <span class="pre">&#64;(posedge</span> <span class="pre">clk)</span></code> blocks driving one
+array, while still naming the module <code class="docutils literal notranslate"><span class="pre">_1R1W</span></code>. Every RAM in all four
+exported variants was checked and <strong>it is the only two-write-port memory
+anywhere; it exists only in the widened build.</strong></p>
+<p>An FPGA block RAM has two independent write ports, so filling both per
+cycle is free. <strong>Standard cells have no such primitive</strong>, and with memories
+mapped to registers two unconditioned writers of one array is a genuine
+multi-driver. DC is right to refuse it, and the synthesis side is right to
+report it as not synthesisable rather than bodging a flip-flop dual port:
+that would be a number describing hardware nobody would build.</p>
+<p>So landing the widening is <strong>not</strong> “spend BRAM to buy cycles”. It is
+“<strong>commit to a dual-write-port memory</strong>”, which is a different commitment
+with different consequences for anyone carrying this design to another
+substrate. The BRAM number alone does not say that, which is why it is
+written here beside it.</p>
+<p><strong>Measured, and the widening survives without the primitive.</strong> The buffers
+are now <strong>cyclically banked by</strong> <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code>, so write <code class="docutils literal notranslate"><span class="pre">w</span></code> always lands
+in bank <code class="docutils literal notranslate"><span class="pre">w</span></code> and every bank has exactly one writer — the same widening
+expressed in a way both substrates can build. The result is the strongest
+of the three possible outcomes:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>build</p></th>
+<th class="head"><p>48^3</p></th>
+<th class="head"><p>64^3</p></th>
+<th class="head"><p>rbA write ports</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>BRAM</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>shipped (<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>)</p></td>
+<td><p>10 289</p></td>
+<td><p>22 123</p></td>
+<td><p>1</p></td>
+<td><p>17 488</p></td>
+<td><p>26 554</p></td>
+<td><p>52</p></td>
+</tr>
+<tr class="row-odd"><td><p>widened, dual-ported</p></td>
+<td><p>9 569</p></td>
+<td><p>21 163</p></td>
+<td><p><strong>2 (DC rejects)</strong></p></td>
+<td><p>24 001</p></td>
+<td><p>31 396</p></td>
+<td><p>116</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>widened, banked</strong></p></td>
+<td><p><strong>9 569</strong></p></td>
+<td><p><strong>21 163</strong></p></td>
+<td><p><strong>1</strong></p></td>
+<td><p>25 026</p></td>
+<td><p>33 799</p></td>
+<td><p><strong>100</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Identical cycles, to the cycle.</strong> Banking keeps the entire -720 / -960,
+so <strong>the gain was the widening and not the second write port</strong> — the
+optimisation is real and it is portable. Audited across every RAM module in
+the build: all seven have one write port, where the rejected export’s
+<code class="docutils literal notranslate"><span class="pre">rbA</span></code> had two. The <code class="docutils literal notranslate"><span class="pre">ELAB-366</span></code> cause is removed rather than worked
+around.</p>
+<p>It also costs <em>less</em> block RAM than the dual-ported form (+92% over the
+shipped control rather than +123%), trading that for +43% FF and +27% LUT.
+So the decision is back on the table on its merits, and what it now reads
+as is: <strong>-720 / -960 cycles for +43% FF, +27% LUT, +92% BRAM, at an
+unchanged clock, on a design that synthesises to standard cells.</strong></p>
+</div>
 <p>(The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
 parametric burst buffers carry <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> words of rounding headroom in
 <strong>both</strong> variants, so the two differ only in the loop and not in the memory
@@ -1996,13 +2195,74 @@ are written down rather than estimated in conversation.</p>
 <p>i.e. <strong>M=128, K=768, N=768</strong>. (The fused QKV projection is the same M and K
 with N=2304, three times the work; the MLP is 768-&gt;3072-&gt;768. The output
 projection is chosen because it is the smallest square one.)</p>
-<p><strong>What our build would need to run it.</strong> Not a bigger MAXDIM: 768 is past both
-encoding ceilings by orders of magnitude (<span class="math notranslate nohighlight">\(768^2/4 = 147\,456\)</span> operand
-rows against 2047), and M=128 is already past <code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code> = 127. The real
-blocker is that the region’s operands are declared <code class="docutils literal notranslate"><span class="pre">int8[MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM]</span></code>
-and addressed <code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">col</span></code>, so the machine cannot <em>address</em> a
-128x768 matrix at all, whatever its on-chip capacity. Three changes, in
-dependency order:</p>
+<p><strong>Which dimension binds first, and at what value.</strong> “We cannot run
+128x768x768” is true and useless; what a reader needs is the binding dimension
+and its number, because that is what says which field to widen. Derived from
+the encoding rules, not estimated:</p>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-text">Ceilings, largest legal value (MAXDIM must be a multiple of T)</span><a class="headerlink" href="#id5" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 22.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>limit</p></th>
+<th class="head"><p>what it bounds</p></th>
+<th class="head"><p>T=4</p></th>
+<th class="head"><p>T=8</p></th>
+<th class="head"><p>T=16</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address field, 11 usable bits
+(<span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T \le 2047\)</span>)</p></td>
+<td><p><strong>MAXDIM</strong>, hence M, K and N together</p></td>
+<td><p><strong>88</strong></p></td>
+<td><p><strong>120</strong></p></td>
+<td><p><strong>176</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code>, 7 usable bits (<code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code>)</p></td>
+<td><p>any single instruction’s row count, so M and K</p></td>
+<td><p>127</p></td>
+<td><p>127</p></td>
+<td><p>127</p></td>
+</tr>
+<tr class="row-even"><td><p>header count, 15 usable bits</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> iterations,
+<span class="math notranslate nohighlight">\((N/T)(K/T)M + (N/T)M\)</span></p></td>
+<td><p>shape-dependent</p></td>
+<td><p>shape-dependent</p></td>
+<td><p>shape-dependent</p></td>
+</tr>
+</tbody>
+</table>
+<p>So <strong>the address field binds first, through MAXDIM, at 88 (T=4) and 120
+(T=8)</strong> — and note that <code class="docutils literal notranslate"><span class="pre">nr</span></code>’s 127 is <em>not</em> a function of T, so it becomes
+the wall as soon as the array is wide enough to push MAXDIM past it.</p>
+<p>Against the shapes another team proposed, this is precise rather than
+approximate:</p>
+<ul class="simple">
+<li><p><strong>32 x 512 x 128</strong> (their recommended single shape). K=512 needs
+MAXDIM &gt;= 512: we are short <strong>5.8x</strong> at T=4 and <strong>4.3x</strong> at T=8 on the
+address field, <strong>4.0x</strong> on <code class="docutils literal notranslate"><span class="pre">nr</span></code>, and 4.0x / 1.0x on the header count.</p></li>
+<li><p><strong>K-sweep at M=32, N=128.</strong> Raising MAXDIM to match K, the first failure is
+at <strong>K=92</strong> (T=4) and <strong>K=128</strong> (T=8), in both cases the address field;
+last good K is 88 and 120.</p></li>
+<li><p><strong>Tall sweep at K=N=128.</strong> Blocked for <em>every</em> M, because N=128 alone
+exceeds the MAXDIM ceiling — at T=8 by <strong>eight</strong> (120 against 128). And
+M=128 additionally exceeds <code class="docutils literal notranslate"><span class="pre">nr</span></code> by <strong>one</strong> (127 against 128).</p></li>
+</ul>
+<p>Those last two are worth stating as margins rather than as failures: at T=8 we
+miss their tall sweep by 8 in one dimension and by 1 in another.</p>
+<p><strong>What our build would need to run the GPT-2 shape.</strong> Not simply a bigger
+MAXDIM — 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
+is that the region’s operands are declared <code class="docutils literal notranslate"><span class="pre">int8[MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM]</span></code> and
+addressed <code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">col</span></code>, so the machine cannot <em>address</em> a 128x768
+matrix at all, whatever its on-chip capacity. Three changes, in dependency
+order:</p>
 <ol class="arabic simple">
 <li><p><strong>A runtime base and row stride on</strong> <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> <strong>and</strong> <code class="docutils literal notranslate"><span class="pre">mvout</span></code>, so a
 MAXDIM=64 on-chip tile is a <em>window</em> into a larger DRAM matrix rather than
@@ -2272,6 +2532,7 @@ the five-trial measurement shows the precaution was one shape too strong.</p>
 <li><a class="reference internal" href="#tinytpu-isa-t-8-maxdim-64">TinyTPU-isa, T=8, MAXDIM=64</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#does-utilisation-move-with-m-yes-we-amortise">Does utilisation move with M? Yes — we amortise</a></li>
 <li><a class="reference internal" href="#raising-the-build-what-a-bigger-maxdim-costs">Raising the build: what a bigger MAXDIM costs</a><ul>
 <li><a class="reference internal" href="#two-independent-ceilings-both-in-the-encoding">Two independent ceilings, both in the encoding</a></li>
 <li><a class="reference internal" href="#the-instruction-memory-does-not-need-to-grow">The instruction memory does <strong>not</strong> need to grow</a></li>

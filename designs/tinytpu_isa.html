@@ -1478,37 +1478,44 @@ time, on 2026-09-22, on a different host from the one every other figure here
 comes from.</p>
 <p><strong>FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
 flatten effort 3, memories as flip-flops</strong> (<code class="docutils literal notranslate"><span class="pre">sram_mode='none'</span></code>), Synopsys DC
-<code class="docutils literal notranslate"><span class="pre">W-2024.09</span></code>, via mflowgen 0.8.0 at commit <code class="docutils literal notranslate"><span class="pre">aee0e5d6</span></code>. 47 minutes of wall
-time.</p>
+<code class="docutils literal notranslate"><span class="pre">W-2024.09</span></code>, via mflowgen 0.8.0 at commit <code class="docutils literal notranslate"><span class="pre">aee0e5d6</span></code>. 37 minutes of wall
+time, synthesising the current shipped design (<code class="docutils literal notranslate"><span class="pre">rtl_handoff/</span></code>,
+<code class="docutils literal notranslate"><span class="pre">T4_MAXDIM16_shipped_baseline</span></code>).</p>
 <table class="docutils align-default">
 <tbody>
 <tr class="row-odd"><td><p>Total cell area</p></td>
-<td><p><strong>1,271,692</strong> FreePDK45 area units</p></td>
+<td><p><strong>1,136,598</strong> FreePDK45 area units</p></td>
 </tr>
 <tr class="row-even"><td><p>non-combinational</p></td>
-<td><p>1,016,187 — <strong>79.9 %</strong></p></td>
+<td><p>906,098 — <strong>79.7 %</strong></p></td>
 </tr>
 <tr class="row-odd"><td><p>combinational</p></td>
-<td><p>255,505, of which 26,741 buffer/inverter</p></td>
+<td><p>230,501</p></td>
 </tr>
 <tr class="row-even"><td><p>macro / black box</p></td>
 <td><p>0</p></td>
 </tr>
-<tr class="row-odd"><td><p>Sequential cells</p></td>
-<td><p>224,987 (2,302 hierarchical cells)</p></td>
+<tr class="row-odd"><td><p>Cells</p></td>
+<td><p>389,399 (200,561 sequential, 1,662
+hierarchical)</p></td>
 </tr>
 <tr class="row-even"><td><p>Timing</p></td>
-<td><p><strong>MET</strong>, worst slack <strong>+0.18 ns</strong>, critical path
-3.11 ns of 3.33, 62 logic levels, zero violating
+<td><p><strong>MET</strong>, worst slack <strong>+0.21 ns</strong>, critical path
+3.08 ns of 3.33, 62 logic levels, zero violating
 and zero hold violations</p></td>
 </tr>
 <tr class="row-odd"><td><p>Power</p></td>
-<td><p>57.1 mW total, 22 mW leakage — <strong>indicative
-only</strong>, default toggle rates with no activity
-data; <code class="docutils literal notranslate"><span class="pre">gmem0_m_axi</span></code> alone accounts for 45 %</p></td>
+<td><p>not re-reported for this run; power from DC
+here is <strong>indicative only</strong> in any case, at
+default toggle rates with no activity data</p></td>
 </tr>
 </tbody>
 </table>
+<p>This replaces a first run of <strong>1,271,692</strong> that synthesised an export of the
+design <em>before</em> its memories were made derived from <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>; that netlist no
+longer exists. The current design is <strong>10.6 % smaller</strong> and one cycle faster,
+from the same change that took FPGA block RAM from 42 to 40 — so area and cycles
+now describe the same design.</p>
 <p><strong>Four fifths of the cell area is flip-flops</strong>, which is the predicted result
 rather than a surprising one: the scratchpad, the vector registers and the
 accumulator are block RAM on the FPGA and become registers when the flow is told
