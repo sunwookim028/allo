@@ -447,20 +447,39 @@ autoscheduler's own constraints with no target parameter.
 **The gap.** Allo's whole mapping vocabulary is ``split`` and ``reorder``.
 There is no way to give one iteration of a loop a different body from the
 rest -- no ``peel``, no index-set split, no ``tensorize``, nothing. So a
-reduction on a machine whose accumulate bit is a static instruction field can
-only be expressed by writing two loop nests by hand, and once they are two
-nests no primitive can tile or reorder them together.
+reduction whose first tile must behave differently from the rest can only be
+expressed by writing two loop nests by hand, and once they are two nests no
+primitive can tile or reorder them together.
 
 **The evidence.** Measured on a two-level loop-nest mapspace for TinyTPU-isa
 (branch ``act-investigation``,
 ``examples/accelerator/tinytpu_vitis/act_nest.py``; reproduced here):
-**1,226 nests enumerated, 3 encodable, and 1,150 of them refused by one static
-instruction field, ``acc``.** The accumulate bit cannot be predicated on an
-induction variable, so the ``k = 0`` tile has to be a peelable prefix, which
-pins the reduction innermost and unsplit and kills every permutation that moves
-it. The next constraint down, the 3-term address generator, refuses 17. The
-4-deep loop stack refuses none. One missing primitive costs 94% of that
-mapspace.
+**1,226 nests enumerated, 3 encodable, and 1,150 of them refused at one
+instruction field, ``acc``.** The ``k = 0`` tile has to be a peelable prefix,
+which pins the reduction innermost and unsplit and kills every permutation that
+moves it. The next constraint down, the 3-term address generator, refuses 17.
+The 4-deep loop stack refuses none.
+
+**Two corrections to that evidence, both found after this page was first
+written, and both worth reading before relying on the headline.** First, the
+mechanism: ``acc`` is *not* a static field that cannot be driven from an
+induction variable. It is ``mm``'s ``f2``, ``f2`` is a legal AGU target, and
+driving it from the reduce loop assembles for exactly two k-tiles before
+rejecting at Kt≥3 — the obstacle is **additive monotonicity in the address
+term**. The need for ``s.peel`` is unaffected, since a peelable prefix is still
+the only way to express the first tile differently; what changes is that the
+hardware fix is cheaper than "make the field dynamic" implies. Second, the
+count: a first-cause census hides overlap, and **930 of those 1,150 nests also
+violate the accumulator RAW-distance contract**, so the primitive does not
+recover 94 % of the mapspace on its own. Sorted by the distinction this page
+argues for, it is **1,166 express against 55 refuse**.
+
+A third fact, which is the one that should temper any promise made for this
+primitive: widening the address generator from 3 terms to 4 raises the
+encodable count and **does not change the chosen nest**, so the emitted program
+is identical, the cycles do not move, and the area rises. Enlarging a legal set
+is not the same as improving a design, and this mapspace has already
+demonstrated the difference.
 
 **Legality rule.** ``s.peel(axis, count)`` is legal if and only if ``axis``
 names a loop with constant bounds whose trip count exceeds ``count``. Peeling
