@@ -1,0 +1,55 @@
+{
+  "name": "mlp_tiny_l1",
+  "stresses": "mlp_tiny layer 2 of 2: nn.Linear(16, 16, bias=False) on a batch of 4 with no epilogue",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 4,
+    "k": 16,
+    "n": 16
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null,
+  "source": {
+    "model": "mlp_tiny",
+    "module": "fc2",
+    "index": 1
+  }
+}

@@ -1937,6 +1937,38 @@ it for a hazard whose predicate is still open. Nobody should read "depth is
 the cure" as "depth is free at any depth": the FPGA ladder is sub-linear only
 because of SRL16, and the ASIC cost is linear.
 
+.. admonition:: 2026-09-22: a channel depth flips it, and the program is a
+   shipped mapping
+
+   A fifth instance, from the PyTorch workload suite
+   (:doc:`/designs/workload_suite`), narrows the search. The program is
+   ``isa_dsl.gemm_program(4, 16, 16, relu=True)`` -- the **shipped** GEMM
+   mapping, the same one ``reproduce.sh`` cosims at other shapes, and the one
+   the ACT search independently picks for that shape. At the shipped
+   ``TPU_MAXDIM=64``:
+
+   * ``TPU_QD=8`` (the default): **no completion**. One progress line, none
+     after it, and ``xsimk`` held a core at 99 % for over twelve minutes
+     against a program the same build runs in 584 cycles.
+   * ``TPU_QD=16``, the only knob changed: **584 cycles, 0 of 4096 bytes
+     wrong**. Its second layer, and all four layers of a four-layer MLP, the
+     same.
+
+   Two things follow. First, **the fault is sensitive to channel depth**,
+   which the earlier bisection never varied -- so whatever blocks is a
+   handshake and not a value, and ``QD`` is the first knob found that moves
+   the boundary rather than the program. Second, **a hand-written shipped
+   mapping is in the failing class**, so this is not a property of generated
+   or unusual programs; the published counts avoid it only because they are
+   measured at ``TPU_MAXDIM=16``, where the burst is four times shorter.
+
+   ``kpn_model`` is not fooled for lack of trying: it reports minimum channel
+   depth 1 for this program, so the protocol model says ``QD=8`` is ample.
+   That is the same weakness the priority note below describes -- the cheap
+   checks descend from ``assemble()``'s own header -- now with a knob attached
+   to it. **Try ``TPU_QD=16`` before treating a hang as a verdict on the
+   program.**
+
 - **Priority: High as a warning, Medium as an action.** The warning is that on
   this design the cheap checks do not substitute for cosim, and two of them
   (``kpn_model`` and the header the simulator consumes) are derived from

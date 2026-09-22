@@ -1,0 +1,55 @@
+{
+  "name": "mlp_deep_l3",
+  "stresses": "mlp_deep layer 4 of 4: nn.Linear(12, 8, bias=False) on a batch of 4 with no epilogue",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 4,
+    "k": 12,
+    "n": 8
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null,
+  "source": {
+    "model": "mlp_deep",
+    "module": "fc4",
+    "index": 3
+  }
+}
