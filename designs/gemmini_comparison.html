@@ -1075,7 +1075,7 @@ consecutive runs. That is up to <strong>12 % noise at the small shapes</strong>,
 from each measured window’s sensitivity to the preceding call’s cache and
 scratchpad state.</p>
 <p>Two consequences, both binding:</p>
-<ul class="simple">
+<ul>
 <li><p><strong>No single-trial number at 4x4x4 or 8x8x8.</strong> Report a median and the spread.
 A 1.07-1.24x deficit measured at those shapes is, at the small end, partly
 inside the noise. It does not erase the result — the sign is consistent across
@@ -1090,7 +1090,21 @@ reproduced every one of its numbers to the cycle. So repeats are needed on
 the Gemmini side and are not needed on ours, and a design A/B measured only
 by our cosim — the latency sensitivity grid above, for instance — does not
 need them either. A <em>cross-machine comparison</em> is still limited by the
-noisier side of it.</p></li>
+noisier side of it.</p>
+<p><strong>That claim was incomplete, and the correction is measured.</strong> A controlled
+count of nine runs of one configuration gives <strong>8 successful co-simulations,
+8 identical cycle counts, 0 differing counts — and 1 run that yielded no
+number at all</strong> (<code class="docutils literal notranslate"><span class="pre">cycles=None,</span> <span class="pre">no</span> <span class="pre">TB</span> <span class="pre">line</span></code> at one shape while another
+returned its usual figure in the same run). So the statement has two halves
+and only the first was being made: <strong>the simulation is deterministic; the
+pipeline can fail to produce a number.</strong> A nondeterministic simulation gives
+a <em>different</em> number; a flaky pipeline gives <em>no</em> number.</p>
+<p>The operational consequence is the part that changes behaviour: <strong>a single
+rejection by a cycle gate is not evidence and must be retried rather than
+believed.</strong> Repeats are still not needed to establish a <em>value</em> on our side —
+that is what the 8-and-0 count says — but a <em>failure</em> on our side is not a
+measurement until it has been seen twice.</p>
+</li>
 </ul>
 <p>This is the cycle-domain analogue of the synthesis noise floor recorded in
 <a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> — two builds of an identical netlist differing by 1,407

@@ -871,6 +871,21 @@ Two consequences, both binding:
   need them either. A *cross-machine comparison* is still limited by the
   noisier side of it.
 
+  **That claim was incomplete, and the correction is measured.** A controlled
+  count of nine runs of one configuration gives **8 successful co-simulations,
+  8 identical cycle counts, 0 differing counts — and 1 run that yielded no
+  number at all** (``cycles=None, no TB line`` at one shape while another
+  returned its usual figure in the same run). So the statement has two halves
+  and only the first was being made: **the simulation is deterministic; the
+  pipeline can fail to produce a number.** A nondeterministic simulation gives
+  a *different* number; a flaky pipeline gives *no* number.
+
+  The operational consequence is the part that changes behaviour: **a single
+  rejection by a cycle gate is not evidence and must be retried rather than
+  believed.** Repeats are still not needed to establish a *value* on our side —
+  that is what the 8-and-0 count says — but a *failure* on our side is not a
+  measurement until it has been seen twice.
+
 This is the cycle-domain analogue of the synthesis noise floor recorded in
 :doc:`/designs/minitpu` — two builds of an identical netlist differing by 1,407
 LUT and 0.046 ns. Both say the same thing: **state the noise before stating the
