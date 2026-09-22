@@ -22,39 +22,133 @@
 CHIA Agentic Co-Design
 ####################################
 
-An LLM-agent search over an accelerator's **instruction set and
-microarchitecture at once**: workers propose edits to a TPU-style design, a
-harness gates and scores each proposal with a real synthesis or simulation tool
--- not an estimate -- and the best survives. The agents are driven by the
-`CHIA <https://github.com/ucb-bar/chia>`_ framework (``ucb-bar/chia``, pinned
-at ``16c35e9``) through the ``opencode`` CLI.
+An LLM-agent loop that co-designs a TPU's **instruction set and
+microarchitecture together**, where a proposal counts only if a real tool --
+RTL co-simulation and synthesis -- measures it. Agents are driven by
+`CHIA <https://github.com/ucb-bar/chia>`_ (``ucb-bar/chia`` at ``16c35e9``)
+through the ``opencode`` CLI.
 
-Two efforts share this idea, on two different designs and two different
-branches. Read the claims of each against its own section:
+The principle
+-------------
 
-- :ref:`chia-isa-loop` -- the current loop, on ``main`` in
-  ``examples/accelerator/tinytpu_vitis/chia_agent/``, searching the
-  :doc:`/designs/tinytpu_isa` design and scored by **RTL cosim**. Its first
-  paid run found one verified improvement (-160 cycles over five shapes, at
-  2.3x the block RAM; not landed).
-- :ref:`chia-codesign` -- the original effort, on branch ``chia-codesign``,
-  searching an older fp32 TinyTPU and scored by Vitis C-synthesis. Its
-  headline results replay deterministically; its claims about the *search*
-  itself are n=1.
+An agent can make an informed co-design decision only after it has measured how
+a software function performs -- in **timing and power** -- across **an array of
+hardware architectures**. Measured against that, today's loop has the first
+half of each:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 38 40
+
+   * -
+     - have
+     - missing
+   * - **timing**
+     - RTL cosim cycles, bit-exact, deterministic
+     - --
+   * - **power**
+     - DC estimate, default toggle rates, *indicative only*
+     - activity-based power (switching from cosim into synthesis)
+   * - **architectures**
+     - one design family (TinyTPU-isa, T=4/T=8), two substrates (FPGA,
+       45 nm), two references (Gemmini, MiniTPU)
+     - the parametrized IP library that would supply a real array
+
+Why the array matters is already measured: a DMA widening that is free on an
+FPGA emits a dual-write-port memory that standard cells cannot build, and only
+the second substrate said so.
+
+Takeaways
+---------
+
+- **It works end to end on real tools.** Every accepted number is RTL cosim
+  cycles plus csynth area and clock, bit-exact against a frozen reference
+  model. About **$85** spent on the CHIA2026 account so far; the harness is
+  also exercised with no model at all.
+- **It finds real design changes, not yet novel ones.** Best so far: a DMA
+  burst widening worth 55-61 % of the steady-state gap to Gemmini (not
+  landed; its banked form synthesises with no cycle loss).
+- **Two things are not yet shown:** a *rate* of discovery (every search is
+  n=1 per arm) and an agent-authored **architectural** abstraction (zero so
+  far -- the abstraction track produced apparatus findings instead).
+- **The recurring hazard is instruments that fail open.** Four in one night
+  reported success after failing. A negative result counts only if the
+  instrument can be shown to have run.
+
+Contributions
+-------------
+
+- **A judge agents cannot fool.** Nine mechanical guards -- most added after an
+  agent found the hole each closes -- mean a win is accepted only when real
+  RTL measures it, which is why a worker's false win claim re-scored as
+  exactly baseline.
+- **A pre-registered search result.** The unguided ``open`` arm, told only to
+  choose its own target from the numbers, independently reached the same
+  address-generator widening that directed analysis had found, with the
+  refusal bottleneck migrating and cycles flat exactly as predicted in
+  advance.
+- **Why agent-built compiler extensions are hard to evaluate.** A new
+  primitive has no callers, so an agent's abstraction scored neutral *and*
+  passed 291 tests while aborting the compiler on first use -- any gate ladder
+  that exercises a compiler only through existing designs cannot see a new
+  capability in either direction.
+
+How the loop is built
+---------------------
+
+.. code-block:: text
+
+     workload spec + measured baseline
+                   |
+                   v
+     +------------ swarm.py / loop.py, orchestrated on Ray ------------+
+     |  worker "open"            worker "acc-follows-k"          ...    |
+     |  opencode + Gemini        opencode + Gemini                      |
+     +--------------------------------+---------------------------------+
+                                      |  MCP tools only -- loopback, one
+                                      |  port per worker; opencode's own
+                                      |  file and shell tools are denied
+                                      v
+          read_spec    replace_text    apply_spec_patch    evaluate
+                                      |
+        EDITABLE  the design           |   FROZEN  reference model, gates,
+                                      |           evaluator, acceptance
+                                      v  candidate diff
+     +------ evaluate.py: a fresh tree from git for every candidate ----+
+     |  policy  -->  sandbox  -->  gates  -->  csynth  -->  RTL cosim   |
+     |  static       bwrap         bench, stress, param                  |
+     +--------------------------------+---------------------------------+
+                                      |  nonce-vouched verdict:
+                                      |  cycles + area + clock
+                                      v
+           accept.py: against a control measured in the same run
+                      win  |  not-better  |  rejected
+                                      |
+                                      v
+           evidence/     spend read from opencode's database,
+                         capped per run and in total
+
+Two dispositions share this shape. **Using** edits the design with Allo's
+abstractions as they stand (``chia_agent/``, on ``main``). **Maintaining**
+edits Allo itself -- the compiler -- and adds a rung that exercises a new
+primitive through a harness-authored call site (``chia_abstraction/``, on
+branch ``chia-abstraction``).
 
 .. note::
 
-   **Attribution.** The agent search (``chia_agent/``, ``chia_runs/``, the
-   claim scripts) is Sunwoo Kim's. Most of the ``chia-codesign`` branch is
-   **not**: it imports Kai Shao's CIRCT RTL generator, ACT / DSA compiler flow
-   and ``allov2`` core re-architecture from https://github.com/kkkaishao/allo
-   (503 of the 539 commits ``chia-codesign`` carries that ``main`` does not;
-   see that branch's ``ATTRIBUTION.md`` and :doc:`/extensions/act`). The
-   ``chia-isa`` loop carries over only ``chia_agent/`` -- none of the old
-   TinyTPU and none of Kai Shao's code. ``ATTRIBUTION.md`` also records an open
-   item: nothing in the ``chia-codesign`` tree records the terms under which
-   Kai's code was imported, which it states should be settled before that work
-   is published, submitted or landed on ``main``.
+   **Attribution.** The agent search is Sunwoo Kim's. Most of the retired
+   ``chia-codesign`` branch is **not**: it imports Kai Shao's CIRCT RTL
+   generator, ACT compiler flow and ``allov2`` core from
+   https://github.com/kkkaishao/allo (503 of its 539 commits not on ``main``;
+   see that branch's ``ATTRIBUTION.md`` and :doc:`/extensions/act`). The loop on
+   ``main`` carries none of Kai Shao's code. The terms under which it was
+   imported are unrecorded, which ``ATTRIBUTION.md`` says must be settled before
+   that work is published or landed.
+
+The rest of this page is the comprehensive record: where the code lives, the
+evaluator and every guard with the exploit that bought it, how to run it, each
+paid run, and the planned experiments. Superseded figures and withdrawn claims
+are at the foot of the page.
 
 
 Where the Code Lives
@@ -364,27 +458,47 @@ A capped smoke run on the earlier design is recorded in
 `Earlier measurements and corrections`_.
 
 
-Summary: Demonstrated vs. Not
------------------------------
+What Is and Is Not Demonstrated
+-------------------------------
+
+The evidence behind the takeaways at the top of this page, one line per claim.
 
 **Demonstrated**
 
-- On ``chia-codesign``: C1-C8 -- the deterministic claims, re-derivable by the
-  listed commands, including replay of the two agent-found variants (4.07x and
-  1.98x) to their recorded cycle counts with exact numerics.
-- For TinyTPU-isa (``chia_agent/`` on ``main``): the loop runs end to end on
-  the model. Run 1 found one improvement that survives independent acceptance
-  (-160 cycles over five shapes, bit-exact, stress and RTL stress clean, at
-  2.3x the block RAM), and the harness re-scored a worker's false claim as
-  exactly baseline. The whole harness is exercised without an LLM (57 cases).
+- **The loop runs end to end on real tools** (``chia_agent/`` on ``main``).
+  Every accepted figure is RTL cosim cycles plus csynth area and clock,
+  bit-exact against a frozen reference model.
+- **It catches a false claim.** Run 1 (2026-09-19): a worker reported an
+  improvement that re-scored as exactly baseline.
+- **It finds a real change.** Run 1: a DMA burst widening, -160 cycles over five
+  shapes, bit-exact, stress and RTL-stress clean, at 2.3x block RAM. Not
+  landed; the dual-ported form does not synthesise to standard cells and the
+  banked form does, with identical cycles (:doc:`/designs/benchmarks`).
+- **A pre-registered prediction held.** Run 2 (2026-09-22, two arms): both arms
+  passed every gate and raised the encodable count -- 3 to 8 for the directed
+  arm, 3 to 7 for the unguided ``open`` arm -- while the chosen nest, and
+  therefore the cycles, did not move and area rose. The ``open`` arm's first
+  attempt made 16 nests encodable that computed the **wrong answer**, and the
+  reference-model sweep caught all 16.
+- **The retired ``chia-codesign`` claims C1-C8** replay deterministically,
+  including the two agent-found variants (4.07x and 1.98x) at exact numerics.
 
 **Not demonstrated**
 
-- That the TinyTPU-isa search finds improvements at any useful *rate*: one
-  paid run, one win, n=1.
-- The *rate* at which a search finds a good design (S1), the ~100x yield spread
-  across hypotheses (S2), and accept rates / trajectories (S3): all n=1 or
-  unanalysed, and the search is not seeded.
+- **A rate of discovery.** Every search is n=1 per arm. A rate does not need a
+  seed -- it is a property of the sampling process -- so replication (E1 below)
+  is the next paid run.
+- **An agent-authored architectural abstraction.** None yet. The abstraction
+  track's one candidate was an implementation of an existing primitive, it
+  leaked its answer through the documentation, and it aborts the compiler on
+  first use (:doc:`/extensions/agentic_experiments`).
+- **Novelty.** The burst widening is a sensible engineering change, not a
+  discovery.
+
+**Known defects, being repaired.** Run 2 was stopped after 2 of 5 iterations by
+a per-run cap that summed the whole account rather than its own sessions. The
+$0 guard suite, 57 cases at landing, does not currently pass (one stale
+assertion, one crash in the loop phase).
 
 The Planned Experiments
 -----------------------
