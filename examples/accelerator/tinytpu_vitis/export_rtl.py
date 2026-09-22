@@ -111,6 +111,38 @@ class ExportError(Exception):
     """An export that would have shipped something unsynthesisable."""
 
 
+#: **The operand scratchpad and the accumulator** -- the two arrays a real
+#: implementation would build out of SRAM macros. Dropping these modules from a
+#: file list leaves their instantiations as empty black boxes, so DC reports the
+#: design's LOGIC area with the memory treatment taken out of it. That figure is
+#: the only one that survives `sram_mode='none'`, and it is the one the Gemmini
+#: comparison leads with.
+#:
+#: **The criterion is semantic, not syntactic, and it is the same criterion on
+#: both sides**: drop the scratchpad and the accumulator, keep everything else.
+#: `export_gemmini_rtl.py` drops `mem_ext`/`mem_0_ext` (with their `split_*`
+#: halves), which ARE Gemmini's scratchpad and accumulator and nothing else.
+#: Here that is `spad` -- one module, instantiated twice, for the scratchpad and
+#: the vector registers -- and `ar`. Everything else stays on BOTH sides: our
+#: `rbA` DMA read buffers stay because Gemmini's DMA buffering lives in
+#: `BeatMerger`/`XactTracker` as plain registers and stays; our sequencer's
+#: `ib`/`iv_now`/`lp_start`/`lp_trip` stay because Gemmini's control-path RAMs
+#: (`ram_2x147` and friends) stay.
+#:
+#: The regex is per-toolchain because the NAMES are per-toolchain -- Vitis
+#: writes `<unit>_<array>_RAM_AUTO_1R1W`, firtool writes `mem_ext` -- but what
+#: it selects is the same two arrays. A structural rule (any module declaring
+#: an array-of-reg) was rejected: it would also take Gemmini's depth-2 queue
+#: RAMs, which are flops in any implementation, and no depth threshold
+#: separates those from our depth-4 `lp_trip`.
+MEM_ARRAY = re.compile(r"_(spad|ar)_RAM_")
+
+#: Bits each dropped module holds, for the record that makes the two sides
+#: checkable against each other rather than merely parallel.
+_MEM_GEOM = (re.compile(r"parameter\s+AddressRange\s*=\s*(\d+)"),
+             re.compile(r"parameter\s+DataWidth\s*=\s*(\d+)"))
+
+
 #: The layout, stated once because it was briefly in doubt: **flat**. Every
 #: variant directory holds `sv2v_manifest.f`, `MANIFEST.json`, `README.md` and
 #: the `.v` files side by side, with NO `rtl/` subdirectory, and the manifest
@@ -122,6 +154,127 @@ class ExportError(Exception):
 #: deployed and what the synthesis sessions are running against; moving it
 #: while runs are queued would buy nothing.
 RTL_SUBDIR = ""
+
+
+def instance_counts(files, top=None):
+    """How many times each module is instantiated in the whole `top` hierarchy.
+
+    A module's own file says nothing about how many of it there are, and the
+    scratchpad module is instantiated twice -- once as `spad`, once as the
+    vector registers -- so a per-module sum would halve the storage it holds.
+    """
+    top = top or TOP
+    defines = {}
+    for name, text in files.items():
+        for m in _MODULE.findall(text):
+            defines[m] = name
+    counts, queue, seen = {top: 1}, [top], {top}
+    while queue:
+        mod = queue.pop(0)
+        text = files[defines[mod]]
+        defined = set(_MODULE.findall(text))
+        here = {}
+        for m in _INST.finditer(text):
+            used = m.group(1)
+            if used in _KW or used in defined or used not in defines:
+                continue
+            head = text[m.start():m.start() + len(m.group(0))].split()
+            if not head or head[0] != used:   # `for (...` / `if (...` backtracks
+                continue
+            here[used] = here.get(used, 0) + 1
+        for child, n in here.items():
+            counts[child] = counts.get(child, 0) + counts[mod] * n
+            if child not in seen:
+                seen.add(child)
+                queue.append(child)
+    return counts
+
+
+def memory_files(files):
+    """The files holding the scratchpad and accumulator arrays. See MEM_ARRAY."""
+    return sorted(n for n in files if MEM_ARRAY.search(n))
+
+
+def memory_bits(files, dropped):
+    """`{filename: bits}` for the dropped arrays, instances included."""
+    counts = instance_counts(files)
+    out = {}
+    for n in dropped:
+        mods = _MODULE.findall(files[n])
+        depth = _MEM_GEOM[0].search(files[n])
+        width = _MEM_GEOM[1].search(files[n])
+        if mods and depth and width:
+            out[n] = (int(depth.group(1)) * int(width.group(1))
+                      * counts.get(mods[0], 0))
+    return out
+
+
+def write_manifest(dest, name, order, skip=(), bits=None):
+    drop = set(skip)
+    with open(os.path.join(dest, name), "w") as fh:
+        fh.write(f"# TinyTPU-isa RTL for sv2v. Top module: {TOP}\n"
+                 f"# Paths are relative to THIS FILE's directory, which also\n"
+                 f"# holds the .v files -- the layout is flat, no rtl/ subdir.\n"
+                 f"# Dependency order, leaves first, {TOP} last.\n"
+                 f"# Order is advisory for Verilog-2001: no file uses\n"
+                 f"# `include or a macro defined elsewhere, so any order\n"
+                 f"# compiles. GENERATED by export_rtl.py from the module\n"
+                 f"# instantiation graph of these files -- do not edit.\n")
+        if drop:
+            total = sum((bits or {}).values())
+            fh.write(f"# LOGIC-ONLY LIST. The scratchpad and the accumulator\n"
+                     f"# are OMITTED, so their instantiations elaborate as\n"
+                     f"# empty black boxes and DC reports this design's logic\n"
+                     f"# area with the memory treatment taken out of it. The\n"
+                     f"# same criterion drops mem_ext/mem_0_ext on Gemmini's\n"
+                     f"# side -- the scratchpad and the accumulator, nothing\n"
+                     f"# else, on both. DMA buffers and control-path RAMs stay\n"
+                     f"# on both sides. Omitted here ({total:,} bits):\n")
+            for n in sorted(drop):
+                fh.write(f"#   {n}  ({(bits or {}).get(n, 0):,} bits)\n")
+            fh.write(f"# NOTE: the memory PORT logic goes with them, on both\n"
+                     f"# sides equally -- the ports become dangling nets, so a\n"
+                     f"# logic-only area excludes the interface as well as the\n"
+                     f"# array. Compare logic-only against logic-only only.\n")
+        fh.write("# '#' comments and a leading '!' excludes a file.\n")
+        for n in order:
+            if n in drop:
+                continue
+            fh.write(f"{RTL_SUBDIR}/{n}\n" if RTL_SUBDIR else f"{n}\n")
+
+
+def regenerate_manifests(dest):
+    """Rewrite both file lists for an ALREADY-exported directory.
+
+    The logic-only list arrived after these directories shipped, and re-running
+    `csynth` to get it would re-emit RTL that is byte-identical at best and
+    subtly different at worst. This regenerates both lists from the `.v` files
+    already in `dest`, by the same code path the export uses, so the two lists
+    are consistent with each other and with Gemmini's pair.
+    """
+    files = {n: open(os.path.join(dest, n), errors="replace").read()
+             for n in sorted(os.listdir(dest)) if n.endswith((".v", ".sv"))}
+    if not files:
+        raise ExportError(f"{dest} holds no .v files")
+    if not any(re.search(r"^\s*module\s+%s\s*[(#;]" % re.escape(TOP), t, re.M)
+               for t in files.values()):
+        raise ExportError(f"no file in {dest} defines `module {TOP}`")
+    order = compile_order(files)
+    dropped = memory_files(files)
+    if not dropped:
+        raise ExportError(
+            f"{dest} has no module matching {MEM_ARRAY.pattern!r}: a logic-only "
+            f"list that drops nothing is not a logic-only list, it is a copy "
+            f"of the full one, and it would land beside Gemmini's as though "
+            f"the two had been cut the same way.")
+    bits = memory_bits(files, dropped)
+    write_manifest(dest, "sv2v_manifest.f", order)
+    write_manifest(dest, "sv2v_manifest_nomem.f", order, skip=dropped, bits=bits)
+    print(f"{os.path.basename(dest)}: {len(order)} files, "
+          f"{len(order) - len(dropped)} logic-only, dropping "
+          f"{sum(bits.values()):,} bits -> " +
+          ", ".join(f"{n} ({b:,})" for n, b in sorted(bits.items())))
+    return dropped, bits
 
 
 def write_design(src_verilog, dest, meta=None, resources=None):
@@ -173,19 +326,15 @@ def write_design(src_verilog, dest, meta=None, resources=None):
             f"unfinished csynth. The DC area would land beside a blank where "
             f"the other variants have Vitis figures.")
 
-    with open(os.path.join(dest, "sv2v_manifest.f"), "w") as fh:
-        fh.write(f"# TinyTPU-isa RTL for sv2v. Top module: {TOP}\n"
-                 f"# Paths are relative to THIS FILE's directory, which also\n"
-                 f"# holds the .v files -- the layout is flat, no rtl/ subdir.\n"
-                 f"# Dependency order, leaves first, {TOP} last.\n"
-                 f"# Order is advisory for Verilog-2001: no file uses\n"
-                 f"# `include or a macro defined elsewhere, so any order\n"
-                 f"# compiles. GENERATED by export_rtl.py from the module\n"
-                 f"# instantiation graph of these files -- do not edit.\n"
-                 f"# '#' comments and a leading '!' excludes a file.\n")
-        for n in order:
-            fh.write(f"{RTL_SUBDIR}/{n}\n" if RTL_SUBDIR else f"{n}\n")
+    write_manifest(dest, "sv2v_manifest.f", order)
+    dropped = memory_files(files)
+    write_manifest(dest, "sv2v_manifest_nomem.f", order,
+                   skip=dropped, bits=memory_bits(files, dropped))
     meta = dict(meta or {})
+    meta["manifests"] = {"full": "sv2v_manifest.f",
+                         "logic_only": "sv2v_manifest_nomem.f"}
+    meta["memory_array_files"] = sorted(dropped)
+    meta["memory_bits"] = sum(memory_bits(files, dropped).values())
     meta["top"] = TOP
     meta["top_defined_in"] = definers[0]
     meta["files"] = len(order)
@@ -302,6 +451,17 @@ def build_and_export(name, env_extra, dest, shapes):
 
 
 if __name__ == "__main__":
+    if "--manifests" in sys.argv:
+        targets = [a for a in sys.argv[1:] if not a.startswith("-")]
+        if not targets:
+            targets = sorted(d for d in os.listdir(DEST)
+                             if os.path.isdir(os.path.join(DEST, d)))
+        for t in targets:
+            regenerate_manifests(t if os.path.isabs(t)
+                                 else os.path.join(DEST, t))
+        sys.exit(0)
     print(f"exporting into {DEST}")
     print("Run `latency_grid.py --keep-verilog <dir>` to export the "
           "burst-widened variant from a build it makes anyway.")
+    print("Run `export_rtl.py --manifests [dir ...]` to rewrite both file "
+          "lists for directories that already shipped.")
