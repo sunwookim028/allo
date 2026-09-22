@@ -8,6 +8,7 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
+# At TPU_MAXDIM=16 (pinned below), which is where these were measured.
 EXPECTED="4x4x4=172 8x8x8=262 12x12x12=418 16x16x8=484 16x16x16=686"
 
 usage() {
@@ -76,6 +77,15 @@ export PYTHONPATH=$ROOT
 # A knob left in the caller's shell (TPU_SHAPES, TPU_AXI_LATENCY, TPU_TB, ...)
 # would change what is measured. The published numbers are the defaults.
 for v in $(env | grep -o '^TPU_[A-Z_]*' || true); do unset "$v"; done
+# ...with ONE knob set deliberately. The published five are a **MAXDIM=16**
+# measurement, and the shipped default moved to MAXDIM=64 so that shapes which
+# reach steady state can run at all (docs/source/designs/benchmarks.rst).
+# MAXDIM is the DRAM row stride of every operand, so the same shape costs more
+# on a bigger build -- 4x4x4 is 218 cycles at MAXDIM=64 against 172 at 16 --
+# and this script reproduces the published numbers, which means pinning the
+# configuration they were taken on. The MAXDIM=64 sweep is
+# `TPU_SET=all cosim.py`, and its numbers are on the benchmarks page.
+export TPU_MAXDIM=16
 
 PY=$(command -v python)
 LOGS=$HERE/.scratch          # gitignored

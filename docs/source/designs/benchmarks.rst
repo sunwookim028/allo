@@ -1707,6 +1707,16 @@ immediately afterwards. Check the boot banner says the DIM you expect. The
 config patches for both matched points are committed at
 ``examples/accelerator/tinytpu_vitis/gemmini/``.
 
+.. note::
+
+   **The published 172/262/418/484/686 are a MAXDIM=16 measurement**, and the
+   shipped default is now 64, so ``reproduce.sh`` pins ``TPU_MAXDIM=16``
+   explicitly --- it exists to reproduce those numbers and would otherwise
+   measure 218/357/563/677/879 and report a difference that is the stride
+   change, not a regression. Both sets are on this page and neither
+   supersedes the other: the MAXDIM=16 five are the latency benchmark's
+   provenance, the MAXDIM=64 sweep is the matched comparison.
+
 .. seealso::
 
    :doc:`tinytpu_isa` for the design, :doc:`gemmini_comparison` for the
