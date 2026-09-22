@@ -276,8 +276,9 @@ the differences table, and every harness finding stand unchanged.
 **Before any rediscovery claim is made, the experiment must be re-run** with
 the docs redacted at the held-out ref and the fixed detector.
 
-**Four-way outcome, as an implementation result: `same-abstraction`, verified
-to build and to be correct, and INERT** — see the gate result below.
+**Four-way outcome, as an implementation result: NEAR MISS.** It passes every
+rung of the ladder and it **aborts the compiler the first time anything calls
+it.** See "G3" below. The four-way grade is *not* `same-abstraction`.
 
 What it produced:
 
@@ -346,6 +347,43 @@ all of `allo/customize.py`, the five `Emit*HLS.cpp` emitters,
 `microarch_isa.py`**, so it did not see the verbatim pragma in that file's
 comment; what it saw was the `limitations.rst:41` line naming the gap. That is
 why the surviving claim is *implementation*, and why it is not *nothing*.
+
+## G3: the decisive test, and it failed
+
+The gate cannot exercise a primitive that nothing calls, so `heldout.py`'s G3
+step applies the primitive **plus a harness-authored call site in the
+candidate's own spelling** — forced by its reversed signature to
+
+    s.dependence("ar", "accu_0:c", dep_type="inter", true_false="false")
+
+and measures. Result: **the compiler aborts.**
+
+    BuiltinAttributes.cpp:365: mlir::IntegerAttr::getInt():
+      Assertion `(getType().isIndex() || getType().isSignlessInteger())
+                 && "must be signless integer"' failed.
+    #10 VhlsModuleEmitter::emitLoopDirectives(Operation*)
+
+The cause is one line. The agent's Python builds the `distance` field as an
+**unsigned** integer:
+
+    i32 = IntegerType.get_unsigned(32)
+    "distance": IntegerAttr.get(i32, distance),
+
+and its own C++ then reads it with `IntegerAttr::getInt()`, which requires a
+**signless** integer. (The tree's version uses `IntegerType.get_signless(64)`.)
+The Python side and the emitter side disagree about the IR type, and nothing
+noticed, because **nothing called it**.
+
+**This is the strongest argument in the directory for the harness-authored
+call-site rung.** Without G3 the candidate looked correct: it built in 28.3 s,
+passed 291/291 tests with zero regressions, was bit-exact on three design
+cases, and left every resource at ratio 1.000. The defect is reachable only
+through a call site, and the agent cannot write one. So the objective could
+not REWARD it and the gates could not CATCH it, for the same reason.
+
+It also makes the five-place pattern's point concretely: a primitive and its
+emitter must agree, and the thing that proves they agree is the test — step 4,
+the one the agent was explicitly told it could not write.
 
 ## A limitation of THIS OBJECTIVE, not of the candidate
 
