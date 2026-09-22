@@ -255,14 +255,30 @@ expressible.
 
 .. note::
 
-   An independent census from the ACT rebuild reports 930 nests also violating
-   the RAW-distance contract, and an encodable count of 5 rather than 3. Neither
-   is reproduced here: this page's numbers are measured with **this** encoder by
-   ``histogram.py``, and by first cause the RAW distance accounts for 2 (and for
-   8 after the position check is dropped). The two censuses may be counting
-   different quantities -- every constraint evaluated independently, versus
-   re-censusing after relieving one -- and that is being reconciled. Until it
-   is, these are the numbers with a derivation attached.
+   **Reconciled with an independently built enumerator** (the ACT rebuild),
+   2026-09-22, and the disagreement was a definition rather than a bug in
+   either:
+
+   - its **930** counts nests that violate the RAW-distance predicate asked of
+     every nest *independently of every other constraint*. That is a different
+     quantity from anything a first-cause histogram reports, and both are
+     legitimate.
+   - splitting ``acc-peel`` into its two branches, its ``acc-split`` count is
+     **897 -- exactly the figure measured here**, by a separately written
+     enumerator over the same mapspace.
+   - its encodable count of **5** was withdrawn by its author as a *hardware*
+     claim: the two extra row-tiled nests pass the reference model, the
+     validator, the cycle model, the dataflow simulator and Vitis csim, and
+     then **cosim does not complete** -- stuck at
+     ``Inter-Transaction Progress 0/1`` for over half an hour, against about
+     two minutes for the shipped mapping. Encodable is not runnable, and a
+     hardware claim takes the smaller number. **3** stands.
+
+   The corollary is worth carrying, because it governs how any of these counts
+   may be compared: **a first-cause histogram is a property of check order and
+   of emitter limits, not of the hardware.** Only an independent census (each
+   constraint asked of every nest) and a relieve-and-re-census are comparable
+   across implementations.
 
 The interaction: two changes that are complements, not alternatives
 ===================================================================
