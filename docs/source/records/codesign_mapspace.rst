@@ -27,7 +27,8 @@ Co-design Record: The Mapspace Refusal Histogram, Per Machine
    **Dated measurement record.** TinyTPU-isa at ``codesign-loop``, T=4,
    MAXDIM=16; the frozen mapper ``chia_agent/mapspace.py``; dated **2026-09-22**.
    Re-derive with ``python chia_agent/histogram.py`` (``$0``, no model, no Vitis,
-   ~6 s for all five variants). Cosim figures are Vitis HLS 2023.2 + xsim,
+   ~6 s for all five variants); ``--second-cause`` and ``--interaction`` produce
+   the other two tables on this page. Cosim figures are Vitis HLS 2023.2 + xsim,
    xcu280-fsvh2892-2L-e, 3.33 ns target.
 
    **No number on this page is a cycle count except where it says cosim.** The
@@ -202,20 +203,167 @@ encoding.
 ``N4>K4 rows=16`` in every variant, including the widest. The mapper's pick is
 unchanged, so the RTL runs the same instruction stream, so **the cosim cycle
 count does not move** -- while the area of a 4-term AGU and a 6-frame loop stack
-does. On the two-term objective (:doc:`/extensions/codesign`) that is not even a
-trade; it is a cost with no benefit.
+does. Read on its own, that is a cost with no benefit.
 
-That is the honest reading, and it points at the one refusal none of these
-variants touches: ``acc-peel``, 1,150 of 1,226, unmoved in every row. ``acc`` is
-a static instruction field with no predicate on an induction variable, so the
-k=0 tile must be a peelable prefix, which pins K innermost and unsplit. Until
-that changes, widening the address path buys expressiveness the mapper has no
-use for.
+It is not, and the next section is why.
 
 **5. The 54 ``emitter`` refusals are ours, not the machine's.** They are
 ``gemm_from_nest`` declining to interleave its per-m-tile A staging with an n
 loop. They belong in the table because an honest histogram distinguishes "the
 hardware cannot say this" from "our generator has not learned to".
+
+**6. The first-cause histogram overstates the prize**, and it must not be read
+as "1,150 nests a fixed ``acc`` would free". The encoder raises at the first
+constraint a nest violates. Removing the ``acc-peel`` *position* check and
+re-censusing (``histogram.py --second-cause``; counting only, since the
+programs it admits overwrite the accumulator on every k-tile, which is test k3)
+gives:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 14 14 14 14
+
+   * - census at 16x16x16
+     - expressible
+     - ``acc-peel``
+     - ``emitter``
+     - ``agu-terms``
+     - ``ar-raw``
+   * - first cause, shipped
+     - 3
+     - 1150
+     - 54
+     - 17
+     - 2
+   * - position check dropped
+     - 12
+     - **897**
+     - **274**
+     - 35
+     - 8
+   * - dropped, and ``agu4``
+     - 17
+     - 897
+     - 274
+     - --
+     - 20
+
+So 897 of the 1,150 are refused by the *other* ``acc-peel`` branch -- K split
+across two emitted loops, where ``acc`` would have to follow two induction
+variables at once -- and 274 by the encoder's own m/n limitation. Only 12 become
+expressible.
+
+.. note::
+
+   An independent census from the ACT rebuild reports 930 nests also violating
+   the RAW-distance contract, and an encodable count of 5 rather than 3. Neither
+   is reproduced here: this page's numbers are measured with **this** encoder by
+   ``histogram.py``, and by first cause the RAW distance accounts for 2 (and for
+   8 after the position check is dropped). The two censuses may be counting
+   different quantities -- every constraint evaluated independently, versus
+   re-censusing after relieving one -- and that is being reconciled. Until it
+   is, these are the numbers with a derivation attached.
+
+The interaction: two changes that are complements, not alternatives
+===================================================================
+
+This is the headline, and it is the one result here that a one-knob-at-a-time
+search cannot reach.
+
+``acc`` is field ``f2``, and ``f2`` **is** an AGU target. So the no-peel form --
+``acc`` carried by one additive AGU term, no peeled k=0 tile -- is a thing the
+ISA can nearly say already. Its accumulating ``mm`` names A (``f0``, one term),
+``acc`` (``f2``, one term) and its weights at ``B_SP + nb*MAXDIM + kb*T``
+(``f3``, **two** terms): four in all, as soon as the program has an n loop at
+all.
+
+Measured, ``histogram.py --interaction``, for the no-peel ``mm`` at each
+(Kt, Nt):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 28 28 28
+
+   * -
+     - Nt=1
+     - Nt=2
+     - Nt=4
+   * - **AGU_TERMS=3**, Kt=2
+     - no: AGU budget
+     - no: AGU budget
+     - no: AGU budget
+   * - **AGU_TERMS=3**, Kt=3
+     - no: AGU budget
+     - no: AGU budget
+     - no: AGU budget
+   * - **AGU_TERMS=3**, Kt=4
+     - no: AGU budget
+     - no: AGU budget
+     - no: AGU budget
+   * - **AGU_TERMS=4**, Kt=2
+     - **expressible, exact**
+     - **expressible, exact**
+     - **expressible, exact**
+   * - **AGU_TERMS=4**, Kt=3
+     - no: f2 out of range
+     - no: f2 out of range
+     - no: f2 out of range
+   * - **AGU_TERMS=4**, Kt=4
+     - no: f2 out of range
+     - no: f2 out of range
+     - no: f2 out of range
+
+The two constraints are **in series, and the first masks the second**:
+
+- At ``AGU_TERMS=3`` every cell fails on the address-term budget. The
+  monotonicity limit is never reached, so on the shipped machine it **cannot be
+  observed at all** in any program with an n loop.
+- Widen the AGU and the budget clears -- and now monotonicity becomes the
+  binding constraint, visibly: Kt=2 works and is numerically exact against
+  ``isa_ref``, Kt>=3 dies because an additive term's third value is 2 and
+  ``check_program`` requires ``f2`` in {0, 1}.
+
+Hence: ``agu4`` alone unlocks nests and changes no pick, so on its own it looks
+like a cost with no benefit. A step mechanism for ``acc`` alone cannot even be
+exercised, because the budget refuses the instruction before ``f2``'s value is
+ever in question. **Neither alone shows anything; only together does either
+have anything to bite on.** That is what makes the pair a co-design result
+rather than a knob: a search that varies one parameter at a time sees nothing in
+either direction and concludes, wrongly, that the mapspace is not the
+constraint.
+
+What it does **not** say is that ``agu4`` plus an additive term is a fix. Kt=2
+is K <= 8, and the scored shape is 16x16x16 with Kt=4. A working mechanism needs
+the step as well -- saturation, or a predicate on ``iv_now[level] == 0`` -- and
+that is what the search is for.
+
+
+Where a fix has to go, and why
+==============================
+
+A rule, not a prohibition, and it falls out of one line:
+``isa_ref.run`` iterates ``expand(prog)``.
+
+``expand`` yields the AGU-**resolved** fields. So:
+
+- A step resolved **in the AGU** -- the sequencer's kernel, with ``expand`` kept
+  in lockstep -- delivers ``f2`` in {0, 1} to the unit. The instruction's
+  architectural meaning is unchanged and **the frozen reference model does not
+  need unfreezing**.
+- The same step resolved **in a unit's decode** makes ``f2 = 2`` mean
+  "accumulate". That *is* a change to what the instruction means, and
+  ``isa_ref`` -- which is frozen, and which ``stress_isa.py`` checks every
+  program against -- rightly rejects it.
+
+This converts "do not touch the reference model" from something a candidate can
+only trip over into something that tells it where to put its change.
+
+It is worth recording that the first agent run at this problem found the
+mechanism and put it in the forbidden place. Its one edit, unscored -- the run
+was stopped mid-iteration because its prompt carried the wrong diagnosis -- was
+``f2 = 1 if w0[30:42] != 0 else 0`` in a unit's decode: saturation, reached for
+unprompted, at the site the freeze boundary forbids.
+
 
 What the mapping search alone buys
 ==================================
@@ -276,8 +424,9 @@ A note on where this check belongs
 The 1,150 ``acc-peel`` refusals are **not** an Allo limitation. At the Allo
 level the predicate is ``scf.if`` on ``cmpi eq, index_cast(k), 0``, and Allo
 builds it; nothing refuses it and no primitive removes it. What refuses the nest
-is *our instruction encoding*, met by a compiler that had no way to check an
-encoding.
+is *our instruction encoding* -- an address-term budget, and an address term
+that grows additively where a step is wanted -- met by a compiler that had no
+way to check an encoding.
 
 An ``Encoding`` abstraction with ``s.encodable_on`` has since landed on ``main``,
 making a target's instruction-word budget a checkable schedule property

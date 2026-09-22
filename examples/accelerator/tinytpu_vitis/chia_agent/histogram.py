@@ -185,6 +185,79 @@ CAUSES = ("acc-peel", "emitter", "agu-terms", "loop-depth",
           "accumulator-raw-distance", "imem", "intrinsic", "coverage")
 
 
+#: The no-peel `mm`: `acc` carried by one additive AGU term on `f2`, inside an
+#: n loop. Its accumulating `mm` names A (f0, one term), acc (f2, one term) and
+#: its weights at `B_SP + nb*MAXDIM + kb*T` (f3, TWO terms) -- four in all as
+#: soon as the program has an n loop. Run under each variant to see which
+#: constraint refuses it and at which (Kt, Nt).
+INTERACTION_PROBE = r"""
+import json
+import numpy as np
+from examples.accelerator.tinytpu_vitis.isa_dsl import Program, Ref, NestError
+from examples.accelerator.tinytpu_vitis import isa_ref
+from examples.accelerator.tinytpu_vitis.microarch_isa import (
+    OP_MM, A_VR, AR_C, B_SP, MAXDIM, T, AGU_TERMS, assemble, ProgramError)
+
+
+def prog(Kt, Nt):
+    M, K, N = T, T * Kt, T * Nt
+    k = Program("no-peel")
+    with k.loop(Kt, "kA") as kb:
+        k.dma_ld(src=0, dram_row=0, col_block=Ref().at(kb, 1),
+                 vr=Ref(A_VR).at(kb, MAXDIM), rows=M)
+    with k.loop(Nt, "nB") as nb:
+        k.dma_ld(src=1, dram_row=0, col_block=Ref().at(nb, 1),
+                 spad=Ref(B_SP).at(nb, MAXDIM), rows=K)
+    with k.loop(Nt, "n") as nb:
+        with k.loop(Kt, "kk") as kb:
+            k._ins(OP_MM, Ref(A_VR).at(kb, MAXDIM), AR_C, Ref(0).at(kb, 1),
+                   Ref(B_SP).at(nb, MAXDIM).at(kb, T), nr=M)
+        k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
+    return k.emit(), M, K, N
+
+
+out = {"AGU_TERMS": AGU_TERMS, "cells": {}}
+for Kt in (2, 3, 4):
+    for Nt in (1, 2, 4):
+        key = "Kt=%d,Nt=%d" % (Kt, Nt)
+        try:
+            p, M, K, N = prog(Kt, Nt)
+            assemble(p)
+            rng = np.random.default_rng(11)
+            A = np.zeros((MAXDIM, MAXDIM), np.int8)
+            B = np.zeros((MAXDIM, MAXDIM), np.int8)
+            A[:M, :K] = rng.integers(-8, 9, (M, K))
+            B[:K, :N] = rng.integers(-8, 9, (K, N))
+            gold = np.clip(A[:M, :K].astype(np.int64)
+                           @ B[:K, :N].astype(np.int64), -128, 127).astype(np.int8)
+            got = isa_ref.run(p, A.reshape(-1), B.reshape(-1),
+                              np.zeros(MAXDIM * MAXDIM, np.int8))
+            exact = bool(np.array_equal(got.reshape(MAXDIM, MAXDIM)[:M, :N], gold))
+            out["cells"][key] = "expressible, " + ("exact" if exact else "WRONG")
+        except (ProgramError, NestError, AssertionError) as e:
+            t = str(e)
+            out["cells"][key] = ("no: AGU budget" if "address terms" in t
+                                 else "no: f2 out of range"
+                                 if "must be 0 (overwrite)" in t else "no: " + t[:40])
+print(json.dumps(out))
+"""
+
+
+def interaction(name: str) -> dict:
+    """Run `INTERACTION_PROBE` against one variant's composed tree."""
+    edits, _ = VARIANTS[name]
+    with tempfile.TemporaryDirectory(prefix="tinytpu-interaction-") as tmp:
+        tree = Path(tmp)
+        compose(tree, edits)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+        env.update(PYTHONPATH=f"{tree}:{REPO}", PYTHONDONTWRITEBYTECODE="1")
+        p = subprocess.run([ALLO_PYTHON, "-c", INTERACTION_PROBE], cwd=tmp,
+                           env=env, capture_output=True, text=True, timeout=900)
+        if p.returncode:
+            raise RuntimeError(f"{name}: {(p.stdout + p.stderr)[-2000:]}")
+        return json.loads(p.stdout.strip().splitlines()[-1])
+
+
 def rows(results, shape_tag):
     """One row per variant: the counts, then every cause in a fixed order."""
     out = []
@@ -249,6 +322,12 @@ def main():
     ap.add_argument("--variants", default=",".join(VARIANTS))
     ap.add_argument("--shapes", default="4x4x4,16x16x16")
     ap.add_argument("--format", choices=("text", "rst", "json"), default="text")
+    ap.add_argument("--interaction", action="store_true",
+                    help="probe the AGU-budget/monotonicity interaction "
+                         "directly: is the NO-PEEL `mm` (acc as one additive "
+                         "AGU term) expressible at each (Kt, Nt), under "
+                         "AGU_TERMS=3 and 4? Shows that the budget MASKS the "
+                         "monotonicity limit entirely")
     ap.add_argument("--second-cause", action="store_true",
                     help="also remove the encoder's acc-peel POSITION check and "
                          "re-census, to show what the first-cause histogram "
@@ -269,6 +348,21 @@ def main():
         if a.second_cause:
             results[name + " (no position check)"] = measure(
                 name, shapes, drop_position_check=True)
+    if a.interaction:
+        print("\nThe no-peel `mm` (acc as one additive AGU term), by variant.")
+        print("Two constraints in SERIES: at AGU_TERMS=3 the address-term")
+        print("budget refuses every cell, so the monotonicity limit is MASKED")
+        print("and cannot be observed at all. Widen the AGU and it becomes the")
+        print("binding one.")
+        for name in a.variants.split(","):
+            name = name.strip()
+            if name not in VARIANTS:
+                continue
+            d = interaction(name)
+            print(f"\n  {name} (AGU_TERMS={d['AGU_TERMS']}):")
+            for key in sorted(d["cells"]):
+                print(f"      {key:12s}  {d['cells'][key]}")
+        print()
     if a.format == "json":
         print(json.dumps(results, indent=1, sort_keys=True))
     elif a.format == "rst":
