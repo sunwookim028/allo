@@ -1256,11 +1256,102 @@ as if it were.
   the same hardware gives different counts, and the measured spread reaches
   **20 cycles at 16x16x8** against a ~520-cycle total.
 
+Gemmini DIM=4 at MAXDIM=64, per-shape spread (``allo_bare_steady.c``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 10 10 12 12 20 22
+
+   * - shape
+     - trials
+     - spread
+     - % of total
+     - deficit
+     - **deficit / spread**
+     - supportable?
+   * - 4x4x4
+     - 205, 215
+     - 10
+     - 4.9%
+     - 13
+     - 1.3x
+     - **no**
+   * - 8x8x8
+     - 322, 319
+     - 3
+     - 0.9%
+     - 38
+     - 12.7x
+     - yes
+   * - 12x12x12
+     - 458, 455
+     - 3
+     - 0.7%
+     - 108
+     - 36x
+     - yes
+   * - 16x16x8
+     - 542, 522
+     - **20**
+     - 3.8%
+     - 155
+     - 7.8x
+     - yes
+   * - 16x16x16
+     - 687, 685
+     - 2
+     - 0.3%
+     - 194
+     - 97x
+     - yes
+   * - 32x32x32
+     - 2 996, 2 995
+     - 1
+     - 0.03%
+     - 757
+     - 757x
+     - yes
+   * - 48x48x48
+     - 9 103, 9 102
+     - 1
+     - 0.01%
+     - 1 187
+     - 1 187x
+     - yes
+   * - 64x64x64
+     - 20 375, 20 377
+     - 2
+     - 0.01%
+     - 1 748
+     - **874x**
+     - yes
+   * - 64x32x64
+     - 11 245, 11 250
+     - 5
+     - 0.04%
+     - 1 662
+     - 332x
+     - yes
+   * - 32x64x32
+     - 5 479, 5 478
+     - 1
+     - 0.02%
+     - 1 346
+     - 1 346x
+     - yes
+
 Consequence, stated once and applied everywhere: **the uncertainty on a
 cross-machine difference is Gemmini's alone**, and a claimed difference
-smaller than it is unsupportable. At 4x4x4 and 8x8x8 that covers a large part
-of the deficit, so the result at the small shapes rests on the **consistent
-sign across every shape**, not on the magnitude at any one of them.
+smaller than it is unsupportable.
+
+**Every steady-state conclusion on this page clears that bar by two to three
+orders of magnitude.** The 1 748-cycle deficit at 64x64x64 is 874x the
+2-cycle spread there; the -960-cycle burst saving is 480x it. **The one number
+that does not clear it is 4x4x4**, where a 13-cycle deficit sits inside a
+10-cycle spread --- so *the 1.06x at 4x4x4 is not a supportable claim of a
+difference* and is reported only as part of a sign that is consistent across
+all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
+155-cycle deficit, so it survives.
 
 .. note::
 
