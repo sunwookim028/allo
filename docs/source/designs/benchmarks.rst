@@ -1418,12 +1418,47 @@ dependency order:
    two terms (``B_SP + nb*MAXDIM + kb*T``), and an outer k-tile would want a
    third on the same field.
 
-**What it would cost if it ran.** At the measured 74.1% of peak,
-:math:`75.5\text{M} / (16 \times 0.741) = 6.4` million cycles at T=4, or
-15.5 ms at the 411 MHz csynth estimate. At T=8 (peak 64) the same fraction
-would give ~1.6 million cycles. Both are projections from the 64x64x64 point,
-not measurements, and they assume the windowed DMA costs nothing --- which is
-exactly the assumption the entry exists to stop us making.
+**What it would cost if it ran.** Projected from each build's *own* measured
+fraction of peak at 64x64x64, which is the largest shape either can run:
+
+.. list-table::
+   :header-rows: 1
+
+   * - build
+     - peak MAC/cyc
+     - measured % of peak at 64^3
+     - projected cycles
+     - at 411 MHz
+   * - T=4, MAXDIM=64
+     - 16
+     - 74.1%
+     - 6.37 M
+     - 15.5 ms
+   * - T=8, MAXDIM=64
+     - 64
+     - 57.8%
+     - 2.04 M
+     - 5.0 ms
+
+Both are **projections from one point**, and they assume the windowed DMA that
+does not exist yet would cost nothing --- which is exactly the assumption this
+entry exists to stop us making. The T=8 figure is the weaker of the two, since
+57.8% is a ramp point rather than a steady-state one.
+
+.. important::
+
+   **The asymmetry this entry exposes is the largest one on the page, and it
+   is not in our favour: Gemmini can run this workload today and we cannot.**
+   ``tiled_matmul_auto`` takes arbitrary M, K, N with runtime strides and
+   splits them across as many ``loop_ws`` calls as its scratchpad needs --- at
+   128x768x768 its own tiling search would use multiple calls, and that is
+   ordinary operation for it, not an extension. Our machine cannot address the
+   matrix.
+
+   That is a real capability gap and no cycle count offsets it. It is also the
+   reason this set is a placeholder rather than a measurement: a benchmark set
+   that only contains shapes we can run is a set chosen to flatter us, and
+   writing the gap down is the alternative to quietly omitting it.
 
 
 .. _benchmarks-reproduce:
