@@ -179,3 +179,51 @@ used — see below), DC **W-2024.09**, ADK `freepdk-45nm` **view-standard**.
   `git checkout` in `~/allo-asic` (the original `adk.tcl` is a symlink to
   `../pkgs/base/adk.tcl`) and delete the leftover `adk-base.tcl`. `view-standard`
   is unaffected, being unpacked fresh in the build directory.
+
+## Logic-only runs: why the memory stubs exist
+
+Omitting a memory module from the file list does **not** black-box it. DC cannot
+resolve the reference and the flow treats that as fatal:
+
+```
+Warning: Unable to resolve reference 'mem_ext' in 'mem'.  (LINK-5)
+Error: failed to link design Gemmini
+```
+
+`tools/make_stubs.py` copies each omitted module's header verbatim from its own
+source — ports only, comments stripped, no body — and writes `<name>_stub.v`,
+which is appended to the logic-only file list. It refuses if a header cannot be
+found rather than inventing one.
+
+With stubs the memory ports terminate in a zero-area black box instead of
+dangling, so a logic-only figure excludes the array **and the array's own
+interface**, while the logic that drives the memories — address generation,
+enables, write masks — is retained and counted. The same rule must be applied
+on both sides of any logic-only comparison, or the two numbers are not
+measuring the same boundary.
+
+## Where the burst widening's area actually goes
+
+`report_area -hierarchy` on the pair, per top-level instance:
+
+| instance | MAXDIM=64 shipped | banked widened | change |
+| --- | --- | --- | --- |
+| `gmem1_m_axi_U` | 56,605 | 744,092 | **13.1x** |
+| `gmem2_m_axi_U` | 56,580 | 745,280 | **13.2x** |
+| `gmem0_m_axi_U` | 703,513 | 703,151 | — |
+| `dma_ld_0_1_U0` | 376,260 | 388,577 | +3.3% |
+| `spm_0_U0` | 188,053 | 188,299 | — |
+| `vru_0_U0` | 188,017 | 188,046 | — |
+| `accu_0_U0` | 103,857 | 103,837 | — |
+
+**99.1% of the +1,388,710 delta is the two AXI adapters** `gmem1` and `gmem2`
+growing 13x. The scratchpad, the vector registers and the accumulator do not
+move at all, and `dma_ld`'s own buffers account for 0.9%.
+
+So "+74.4% for the widening" is **not** the operand memories getting bigger. It
+is the cost of widening two 32-bit master ports to the same width as `gmem0`:
+the adapters' outstanding-transaction buffering scales with the data width, and
+on the FPGA that buffering is block RAM. The design question this raises is
+narrower and more tractable than "is the widening worth it": whether both
+operand ports need widening, or whether one wide port and a shared buffer would
+buy the same cycles.
