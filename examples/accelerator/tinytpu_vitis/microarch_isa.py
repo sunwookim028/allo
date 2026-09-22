@@ -254,9 +254,19 @@ why the mirror was not defended on cycles when it was removed.)
 **AND THE MIRROR WAS NOT PAYING FOR ITSELF.** Its burst read whole DRAM rows,
 so it cost `MAXDIM/T` words per row the program named whatever the shape was:
 at MAXDIM=64 a 16x16x16 GEMM names 128 rows and the mirror moved 512 words to
-serve them. Reading the T bytes the instruction actually asks for is the
-strided pattern, and Vitis reports exactly what it reported in 2026 --
-`Multiple burst reads of length T` -- but there are far fewer of them.
+serve them.
+
+**The strided read is no longer II=4, and that is a toolchain change, not a
+code one.** The measurement at the top of this note was taken before
+`align_value(64)` and `m_axi_max_widen_bitwidth 512` were in the build. With
+them, gmem1/gmem2 are 32 bits wide -- exactly one packed word at T=4 -- so a
+row read is ONE beat rather than four, Vitis emits no `[HLS 214-115]` burst
+note for the operand ports at all, and `dma_ld`'s flat row loop closes at
+`Final II = 1, Depth = 17`: the AXI request latency is pipelined away rather
+than paid per row. The verdict "strided costs 4x" was true of the build it was
+measured on and is no longer true of this one, which is worth saying plainly
+because the mirror was built to avoid it.
+
 Measured, one build each, MAXDIM=64, this host, `-m_axi_latency` default:
 
 | shape | mirror + BRAM | per-row `m_axi` |

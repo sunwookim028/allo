@@ -624,6 +624,12 @@ data**:
   with ``wpr`` from that header, so a program names a tile of a matrix of any
   size. The on-chip mirror is gone with them: it bounded the problem by BRAM,
   and it read whole DRAM rows when a tiled GEMM names one column block of each.
+* the per-row read is not the four-beat transaction the mirror was built to
+  avoid. With ``align_value(64)`` and ``m_axi_max_widen_bitwidth 512`` the
+  operand ports are 32 bits -- one packed word at T=4 -- so Vitis emits no
+  ``[HLS 214-115]`` burst note for them and ``dma_ld``'s row loop closes at
+  ``Final II = 1, Depth = 17``, the request latency pipelined away rather than
+  paid per row;
 * ``isa_ref.run`` takes the same geometry and **nothing else about it changed**,
   which is the freeze boundary working as intended: a stride resolved in the
   address generator leaves every instruction's meaning alone, where the same
