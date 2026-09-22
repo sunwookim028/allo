@@ -92,17 +92,48 @@ static void tiles(size_t dI,size_t dJ,size_t dK,const char*nm){
   gemmini_fence(); uint64_t _b=read_cycles(); _b-_a; })
 
 // One shape: "MxKxN" is gemm(I=M, K=K, J=N), so tiles(dI=M,dJ=N,dK=K) and
-// BARE(M/DIM, N/DIM, K/DIM). Two trials, as allo_bare5.c does, because the
-// 4x4x4 point was the one that moved (161 vs 144).
+// BARE(M/DIM, N/DIM, K/DIM).
+//
+// REPEATS, AND WHY THEY ARE NOT OPTIONAL ON THIS SIDE. Gemmini is a whole
+// SoC -- a Rocket core, an L1 cache, and a scratchpad still holding the
+// previous call's state -- so the same binary on the same hardware does NOT
+// give the same cycle count twice. Measured here: the spread reaches **20
+// cycles at 16x16x8**, whose total is ~520, i.e. 4%, and up to 12% of the
+// total at the smallest shapes. So a single trial cannot support a claimed
+// difference smaller than that, and the published five were 2-3 trials.
+//
+// The other side of the comparison needs no repeats and gets none: Vitis
+// cosim is a deterministic simulation of a fixed design on fixed inputs, and
+// two independent csynth+cosim runs of the shipped build in separate
+// processes returned 10289 and 22123 both times, to the cycle. **The
+// uncertainty on a cross-machine difference is therefore entirely
+// Gemmini's.**
+//
+// The BARE trials are grouped per shape and the BAREF pass runs afterwards,
+// so the ex_accumulate variant cannot contaminate the sequence the headline
+// numbers are measured in -- each measurement is sensitive to the immediately
+// preceding call's cache and scratchpad state, which is also why this file
+// reads 2-14 cycles below `allo_bare5.c` at the same shapes. **Name the file
+// beside every figure; the two are not interchangeable.**
+#ifndef TRIALS
+#define TRIALS 5
+#endif
+#ifndef TRIALSF
+#define TRIALSF 2
+#endif
 #define SHAPE(M,K,N) do { \
-  fill(M,K,A); fill(K,N,B); \
-  printf("BARE %dx%dx%d %llu\n", M,K,N, (unsigned long long)BARE((M)/DIM,(N)/DIM,(K)/DIM)); \
-  fill(M,K,A); fill(K,N,B); \
-  printf("BARE %dx%dx%d %llu\n", M,K,N, (unsigned long long)BARE((M)/DIM,(N)/DIM,(K)/DIM)); \
-  fill(M,K,A); fill(K,N,B); \
-  printf("BAREF %dx%dx%d %llu\n", M,K,N, (unsigned long long)BAREF((M)/DIM,(N)/DIM,(K)/DIM)); \
-  fill(M,K,A); fill(K,N,B); \
-  printf("BAREF %dx%dx%d %llu\n", M,K,N, (unsigned long long)BAREF((M)/DIM,(N)/DIM,(K)/DIM)); \
+  for (int _t = 0; _t < TRIALS; _t++) { \
+    fill(M,K,A); fill(K,N,B); \
+    printf("BARE %dx%dx%d %llu\n", M,K,N, \
+           (unsigned long long)BARE((M)/DIM,(N)/DIM,(K)/DIM)); \
+  } \
+} while (0)
+#define SHAPEF(M,K,N) do { \
+  for (int _t = 0; _t < TRIALSF; _t++) { \
+    fill(M,K,A); fill(K,N,B); \
+    printf("BAREF %dx%dx%d %llu\n", M,K,N, \
+           (unsigned long long)BAREF((M)/DIM,(N)/DIM,(K)/DIM)); \
+  } \
 } while (0)
 
 int main(){
@@ -143,6 +174,19 @@ int main(){
   SHAPE(32,32,32); SHAPE(48,48,48); SHAPE(64,64,64);
   SHAPE(64,32,64);           // M=64, K=32, N=64
   SHAPE(32,64,32);           // M=32, K=64, N=32
+#endif
+  // The ex_accumulate control, as a SEPARATE pass so it does not sit between
+  // two headline measurements of the same shape.
+#if DIM <= 4
+  SHAPEF(4,4,4); SHAPEF(12,12,12);
+#endif
+#if DIM <= 8
+  SHAPEF(8,8,8); SHAPEF(16,16,8);
+#endif
+  SHAPEF(16,16,16);
+#if MAXDIM >= 64
+  SHAPEF(32,32,32); SHAPEF(48,48,48); SHAPEF(64,64,64);
+  SHAPEF(64,32,64); SHAPEF(32,64,32);
 #endif
   printf("DONE\n"); return 0;
 }

@@ -807,6 +807,138 @@ not about steady-state efficiency**, and at steady state the deficit shrinks
 to about 9% without disappearing.
 
 
+T=8 vs Gemmini DIM=8, both at MAXDIM=64
+---------------------------------------
+
+The second matched point, and **it does not agree with the first**, which is
+the whole reason for having two. Peak is 64 MAC/cycle on both sides.
+``gemmini/allo_bare_steady.c`` at ``DIM=8``, which drops 4x4x4 and 12x12x12
+because they are not multiples of 8 --- the same ``runnable()`` rule our own
+side applies on T, so **both machines drop the same shapes**.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 13 8 12 12 11 11 15
+
+   * - shape
+     - set
+     - ours
+     - Gemmini
+     - ours % peak
+     - Gemmini % peak
+     - **ours / Gemmini**
+   * - 8x8x8
+     - latency
+     - 285
+     - 312
+     - 2.8%
+     - 2.6%
+     - **1.09x FASTER**
+   * - 16x16x8
+     - latency
+     - 424
+     - 496
+     - 7.5%
+     - 6.5%
+     - **1.17x FASTER**
+   * - 16x16x16
+     - both
+     - 493
+     - 530
+     - 13.0%
+     - 12.1%
+     - **1.08x FASTER**
+   * - 32x32x32
+     - steady
+     - 1 484
+     - 1 267
+     - 34.5%
+     - 40.4%
+     - 1.17x slower
+   * - 48x48x48
+     - steady
+     - 3 537
+     - 3 001
+     - 48.9%
+     - 57.6%
+     - 1.18x slower
+   * - 64x64x64
+     - steady
+     - 7 083
+     - 5 986
+     - 57.8%
+     - 68.4%
+     - 1.18x slower
+   * - 64x32x64
+     - steady
+     - 4 523
+     - 3 831
+     - 45.3%
+     - 53.5%
+     - 1.18x slower
+
+**We beat Gemmini at three shapes.** They are all in the latency set, and the
+reason is exactly the reason the latency set exists: at T=8, 16x16x16 is four
+tile-matmuls, so the machine with the shorter pipeline wins and we have the
+shorter pipeline. It is a real win and it is a win at the thing the latency
+set measures.
+
+At steady state the deficit is a **flat 1.17-1.18x** and does not converge,
+where at T=4 it converged to 1.086x. Two matched points, two different
+behaviours:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - latency shapes
+     - 32^3
+     - 48^3
+     - 64^3
+   * - T=4 / DIM=4
+     - 1.06-1.30x slower
+     - 1.25x
+     - 1.13x
+     - **1.086x**
+   * - T=8 / DIM=8
+     - **1.08-1.17x faster**
+     - 1.17x
+     - 1.18x
+     - **1.18x**
+
+**This is what a single matched point could not have told us**, and it is the
+answer to "is the deficit a property of the design or of one configuration":
+it is a property of *where the shape sits relative to the array*. At T=4,
+64x64x64 is a steady-state shape (74.1% of peak) and we close to within 9%. At
+T=8 the same shape is still in the ramp (57.8%) and we sit 18% behind, because
+Gemmini's much deeper buffering fills an 8x8 array better than our 4 KiB
+operand file does at this problem size. A T=8 steady-state set would have to
+start around 128 on a side --- which is past the encoding ceiling, and is
+therefore the concrete argument for widening the fields.
+
+.. warning::
+
+   **The uncertainty on every difference above is Gemmini's, not ours.**
+   Gemmini is a whole SoC --- Rocket, an L1 cache, a scratchpad still holding
+   the previous call's state --- so the same binary on the same hardware does
+   not give the same count twice: the measured trial-to-trial spread reaches
+   **20 cycles at 16x16x8**, and up to 12% of the total at the smallest
+   shapes. Our side is a deterministic simulation of a fixed design on fixed
+   inputs and reproduces to the cycle across independent runs.
+
+   So **a claimed difference smaller than Gemmini's spread is unsupportable**,
+   which at 4x4x4 and 8x8x8 covers much of the gap. What carries the result at
+   the small shapes is the **consistent sign across every shape**, not the
+   magnitude at any one of them. Median and spread per shape are in
+   :ref:`benchmarks-spread`.
+
+   The two Gemmini benchmark files are also **not interchangeable**:
+   ``allo_bare_steady.c`` reads 2-14 cycles below ``allo_bare5.c`` at the same
+   shapes on the same hardware, because each measurement is sensitive to the
+   preceding call's cache and scratchpad state and the two files have
+   different call sequences. Every figure on this page names its file.
+
+
 .. _benchmarks-latency-grid:
 
 Does the ranking survive the memory-latency range?
@@ -857,50 +989,92 @@ clock is not imported with it.
 
 .. list-table:: 48x48x48 and 64x64x64, one csynth per grid point
    :header-rows: 1
-   :widths: 12 12 14 14 14 12 12
+   :widths: 11 10 12 12 10 12 12 10
 
    * - ``m_axi_latency``
      - = ns @ 2.431
      - shipped 48^3
      - widened 48^3
+     - **delta**
      - shipped 64^3
      - widened 64^3
-     - widened wins?
+     - **delta**
    * - 0
      - 0
      - 10 289
-     - **9 569**
+     - 9 569
+     - **-720**
      - 22 123
-     - **21 163**
-     - yes, -7.0% / -4.3%
+     - 21 163
+     - **-960**
    * - 16
      - 39
-     - *pending*
-     - *pending*
-     - *pending*
-     - *pending*
-     -
+     - 9 823
+     - 9 103
+     - **-720**
+     - 21 175
+     - 20 215
+     - **-960**
    * - 64
      - 156
-     - *pending*
-     - *pending*
-     - *pending*
-     - *pending*
-     -
+     - 10 430
+     - 9 710
+     - **-720**
+     - 22 666
+     - 21 706
+     - **-960**
    * - 88
      - 214
-     - *pending*
-     - *pending*
-     - *pending*
-     - *pending*
-     -
+     - 10 838
+     - 10 118
+     - **-720**
+     - 23 554
+     - 22 594
+     - **-960**
    * - 100
      - 243
-     - *pending*
-     - *pending*
-     - *pending*
-     - *pending*
-     -
+     - 11 042
+     - 10 322
+     - **-720**
+     - 23 998
+     - 23 038
+     - **-960**
+
+**Outcome 1, and more strongly than the question anticipated: the ranking does
+not merely hold across the whole 0 to 243 ns range --- the advantage is
+EXACTLY constant.** -720 cycles at 48x48x48 and -960 at 64x64x64 at **all
+five** latency points, not approximately: the last two points were *predicted*
+from the first three and came back to the cycle. **There is no inversion anywhere in the range, and no
+sensitivity at all.** So the knob did not choose this design decision, and
+what is left is purely the BRAM cost.
+
+The invariance is not luck, and it has a mechanism, which is worth having
+because an unexplained constant would be more suspicious than a varying one.
+The widening removes loop *iterations* from the burst: at 48x48x48 the two
+operands span 48 x WPR = 768 packed words each, so 1 536 iterations at
+``DMA_WORDS=1`` become 96 at 16, a saving of 1 440; at 64x64x64, 2 048 become
+128, a saving of 1 920. **The measured saving is exactly half of each**
+(720 and 960), i.e. the A and B bursts overlap each other so precisely one of
+the two is ever on the critical path. That is a fixed structural saving in the
+burst prologue, which is why no amount of modelled latency moves it --- the
+latency shifts *when* the prologue runs, not how many iterations it has.
+
+.. warning::
+
+   **The knob is NON-MONOTONIC, and that is the grid's other finding.**
+   Latency 16 is *faster* than latency 0 --- 9 823 against 10 289 at
+   48x48x48, and 21 175 against 22 123 at 64x64x64 --- for **both** variants.
+   Cycles then rise monotonically from 16 through 100.
+
+   A real memory system cannot get faster by being slower, so this is direct
+   evidence that ``config_interface -m_axi_latency`` is a **scheduling
+   directive, not a latency model**: telling Vitis to expect 16 cycles makes
+   it schedule the burst more aggressively, and cosim's actual memory still
+   answers immediately, so the design gets faster. It follows that **no row of
+   this grid may be read as "what happens with a memory of that latency"**.
+   What the grid legitimately shows is that the *ranking* of the two variants
+   is invariant to the directive across its whole useful range --- which is
+   the question it was built for, and all it answers.
 
 What the widening costs, at every latency (it does not vary with the knob):
 
@@ -944,6 +1118,48 @@ they address --- which is what makes the cycle columns comparable. The price
 is 4 BRAM on the shipped path against the pre-parametric build, at **zero
 cycles**: 10 289 and 22 123 are the same numbers the pre-refactor build
 produced.)
+
+
+.. _benchmarks-spread:
+
+Median and spread: which side carries the uncertainty
+=====================================================
+
+**Only one side has any.** This is not symmetric and it should not be reported
+as if it were.
+
+* **Ours is deterministic.** Vitis cosim is a simulation of a fixed design on
+  fixed inputs. Two independent runs of the shipped T=4 MAXDIM=64 build --- in
+  separate processes, from separate ``csynth_design`` invocations, in separate
+  project directories --- returned **10 289 and 22 123 both times**, to the
+  cycle. Each new configuration is checked the same way once (not sampled):
+  the point of the check is that a non-deterministic cosim would invalidate
+  every comparison drawn from it, and that is worth finding now rather than in
+  a disagreement with someone else's table later. **If a pair ever disagrees
+  the right response is to stop and report it, not to average or re-run.**
+* **Gemmini's is not.** It is a full SoC: a Rocket core, a 32 KiB L1 D-cache,
+  and a scratchpad still holding the previous call's state. The same binary on
+  the same hardware gives different counts, and the measured spread reaches
+  **20 cycles at 16x16x8** against a ~520-cycle total.
+
+Consequence, stated once and applied everywhere: **the uncertainty on a
+cross-machine difference is Gemmini's alone**, and a claimed difference
+smaller than it is unsupportable. At 4x4x4 and 8x8x8 that covers a large part
+of the deficit, so the result at the small shapes rests on the **consistent
+sign across every shape**, not on the magnitude at any one of them.
+
+.. note::
+
+   And the trap on the other side, which matters more for how all of this
+   should be read: **a number can be perfectly deterministic and still wrong
+   about the hardware.** Our cosim contains no memory system at all and
+   ``TPU_AXI_LATENCY`` is a value we pick; MiniTPU's simulator contains a
+   *fitted* one, and the 92-cycle version of that fit ranked GEMM templates
+   backwards against the board --- a 45% simulated improvement that measured
+   3.6% on silicon. Reproducibility is a property of the measurement.
+   Agreement with hardware is a separate claim needing separate evidence.
+   **We have the first and not the second**, on either side of this
+   comparison.
 
 
 .. _benchmarks-diagnosis:
