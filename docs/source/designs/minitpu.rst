@@ -115,8 +115,8 @@ check still passes, and ``clk_summary`` misreports it.
 ``tools/dma_fence_report.py`` hardcodes ``CLOCK_HZ = 187.5e6``. Any cycles→seconds
 or GFLOP/s comparison must use 187.5 MHz; 200 MHz overstates it by 6.7 %.
 
-The design's README once stated **7.255 W**, which was stale for the
-``0xB182E69D`` build. Fixed after we reported it; it then read 8.255 W.
+A stale README power figure we reported, and the value it was corrected to,
+are in `Earlier measurements and corrections`_.
 
 2. The QoR noise floor — the most reusable finding here
 -------------------------------------------------------
@@ -142,14 +142,60 @@ magnitude is the load-bearing part.
 3. Architecture
 ---------------
 
+The shape of the machine, read out of ``~/core/minitpu/src/`` at the same HEAD
+as the *(verified)* rows below. Parameter names are the RTL's; the values are
+the shipped configuration (``NUM_LANES = 16``, ``DATA_WIDTH = 16``,
+``NUM_VREGS = 32``):
+
+.. code-block:: text
+
+   host (AXI-Lite) -> command unit -> IRAM loader -> IRAM
+                                                       |
+                                                       v
+   +--------------------------------------------------------------+
+   | sequencer   fetch; STACK_DEPTH = 4 loop stack; LB_CAP = 24   |
+   |             bundle loop buffer; stalls only on DELAY,        |
+   |             matrix-busy and halt-drain -- no interlocks      |
+   +--+--------------+--------------+-------------+--------+------+
+      | V            | M            | MEM         | S      | C
+      v              v              v
+   +----------+  +------------+  +-----------+
+   | VPU      |  | MXU        |  | vld / vst |
+   | ALU, SFU |  | DIM x DIM  |  | vmemld /  |
+   | xlu      |  |  = 16 x 16 |  | vmemst    |
+   +-----+----+  | BF16 PEs,  |  +-----+-----+
+         |       | MXU_ACC_W  |        |
+         |       |  = 24 bit  |        |
+         |       +-----+------+        |
+         |             | per-lane      |
+         |             | output FIFO   |
+         |             v               |
+         |      +---------------+      |
+         +----->| VREG file     |<-----+
+                | 3R1W, 32 regs |
+                | ONE write     |  <-- the measured bottleneck,
+                | port          |      not the array
+                +-------+-------+
+                        |
+                        v
+                +---------------------+       +-----------+
+                | VMEM, one flat word |       | DMA,      |
+                | array; compute port |<----->| 2 async   |<--> DRAM
+                | and DMA port, whole |       | channels  |
+                | words only          |       +-----------+
+                +---------------------+
+
+One VMEM word is one VREG: ``NUM_SUBLANES * NUM_LANES * DATA_WIDTH`` = 128 B,
+which the DMA names as ``NUM_SUBLANES`` = 4 beats of 32 B. That is the only
+role ``NUM_SUBLANES`` plays in addressing -- see the VMEM correction below.
+
 +---------------+----------------------------------------------------------------------------------+
 |               |                                                                                  |
 +===============+==================================================================================+
 | Array         | 16×16 weight-stationary BF16 PEs; ``psum_in`` zero only at row 0, so it          |
 |               | accumulates sixteen **terms** deep in hardware — deeper is a BF16 ``vadd`` in    |
 |               | the VPU. **Not an exactness guarantee**: per MiniTPU's owner, only the first     |
-|               | term is exact (via a zero bypass) and every later add rounds. An earlier         |
-|               | revision of this page said "exactly 16 deep", which read as exactness.           |
+|               | term is exact (via a zero bypass) and every later add rounds.                    |
 |               | Their arithmetic semantics are documented by them at                             |
 |               | ``core/minitpu/docs/ARITHMETIC.md``, which is the source of record.              |
 +---------------+----------------------------------------------------------------------------------+
@@ -184,6 +230,36 @@ magnitude is the load-bearing part.
 |               | against RTL localparams                                                          |
 +---------------+----------------------------------------------------------------------------------+
 
+.. note::
+
+   **One row above no longer matches the tree.** "MXU output FIFO 32/lane" is
+   the 2026-09-18 reading, and §7 records both source trees agreeing on 32.
+   ``vpu_pkg.sv`` now defaults ``MXU_OUTPUT_FIFO_DEPTH`` to **64**
+   (``MINITPU_MXU_OUTPUT_FIFO_DEPTH``), and the parameter is the thing that
+   must match ``docs/isa_latency.json`` or the board overflows it silently.
+   Stated rather than restated, because this is another team's design and
+   their tree is the record: the depth to quote is whatever
+   ``MINITPU_MXU_OUTPUT_FIFO_DEPTH`` is at the commit being discussed.
+
+The bundle's fixed bit layout, from ``sequencer_pkg.sv``'s
+``encoded_bundle_t``, which is declared MSB first so that the struct *is* the
+layout (cells not to scale; ``BUNDLE_WIDTH = 128``, of which 113 bits carry a
+slot):
+
+.. code-block:: text
+
+   +-------+-------+-------+-------+-------+-------+-------+-------+
+   |   V   |   M   |  MEM  |   S   |   C   |  IMM  | DELAY | rsrvd |
+   |127:108|107:100| 99:66 | 65:53 | 52:46 | 45:22 | 21:15 | 14:0  |
+   +-------+-------+-------+-------+-------+-------+-------+-------+
+   bits:  20      8      34      13       7      24       7      15
+
+``IMM_W = 24`` is the one shared constant -- S's immediate, ``loop.begin``'s
+payload, or a descriptor's displacement -- and **exactly one slot may claim it
+per bundle**; ``encode_bundle`` fails the build if two do, because the losers
+would silently read the winner's constant. ``DELAY_W = 7`` holds issue 0..127
+cycles, sized so one field covers the MXU's 82-cycle result latency.
+
 Why BF16: accumulator width was chosen first from the LUT/DSP budget, and an
 8-bit-exponent format is what fits it — "there is no FP32 state anywhere in this
 design… fp32's extra 8 bits could only ever hold zeros there"
@@ -191,8 +267,8 @@ design… fp32's extra 8 bits could only ever hold zeros there"
 argument, and the assembler carries it" (README) — paid for with two silicon bugs
 nothing caught at runtime.
 
-VMEM — **CORRECTION to the source document**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+VMEM is one flat array, not four banks per lane
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The rescued scaling report describes VMEM as **4 banks per lane**
 (``bank = row mod NUM_SUBLANES``, conflict cost ``gcd(stride,4)``, an assembly-time
@@ -216,11 +292,8 @@ re-measured over 20 points with **maximum residual 0**:
 
    cycles = 46 + 281·n + 64.5·B + 111·n·B
 
-The fit this page previously carried, exact over 20 simulated points before the
-``vmatpop`` occupancy correction (``72c8b78``), was
-``46 + 194·n + 64.5·B + 303·n·B``. Kept as the earlier reading, not as current.
-The fixed term and the ``B`` coefficient did not move; the ``n`` and ``n·B``
-terms did.
+The fit this page carried before the ``vmatpop`` occupancy correction
+(``72c8b78``) is kept in `Earlier measurements and corrections`_.
 
 The **matrix step is 52 cycles**, and the bottleneck is the **write port of the
 3R1W vector-register file** — port C is shared by store and matrix — **not the
@@ -246,20 +319,21 @@ drains, or a second weight bank); splitting the matrix controller alone was
 measured and gains nothing.
 
 **Board-validated** means exactly three bring-up kernels: ``halt`` 4 cy,
-``vreg`` 12 cy, ``scalar`` 8 cy. Nothing else on this page is a board cycle
-count, and an earlier revision of this section said otherwise.
+``vreg`` 12 cy, ``scalar`` 8 cy. **Nothing else on this page is a board cycle
+count.**
 
-The workload figures below are **Verilator** counts, not board figures, and
-this page had them stale as well. Per MiniTPU's owner, after its commit
-``72c8b78`` corrected ``vmatpop`` occupancy from 7 to 4, 16×16 GEMM is **168**
-cy (was published here as 283) and 16×16 GEMM→GELU is **155** cy (was 253). The
+The workload figures below are **Verilator** counts, not board figures. Per
+MiniTPU's owner, after its commit ``72c8b78`` corrected ``vmatpop`` occupancy
+from 7 to 4, 16×16 GEMM is **168** cy and 16×16 GEMM→GELU is **155** cy. The
 remaining Verilator targets are unchanged on record: 32×64 BF16 add 119 cy,
 32×64 multiply-add 155 cy, 32×32 DMA-streamed multiply-add 929 cy, 768-element
 LayerNorm 941 core cy / 218 bundles.
 
 Accuracy: GPT-2 124M block 0.68 % vs fp32, Qwen2.5-0.5B decoder layer 3.81 %.
-``B = 1..16`` is bit-identical row-wise only — an earlier claim omitted the
-qualifier and was wrong for attention.
+``B = 1..16`` is bit-identical **row-wise only**.
+
+What this page said about all three before it was corrected is in
+`Earlier measurements and corrections`_.
 
 5. What this says about our own cost model
 ------------------------------------------
@@ -316,8 +390,11 @@ Not reproduced here; what survives of it is §5.
 The concession that became the win
 ----------------------------------
 
-The most instructive thing to come out of comparing two designs, and it is a
-method finding rather than an architectural one.
+The rule first, because it is the part that transfers: **an overhead you
+exclude from a window is an overhead you cannot see, so put the excluded
+quantity beside someone else's** -- the comparison is what makes an absurd
+value look absurd. What follows is the episode that established it, and it is
+a method finding rather than an architectural one.
 
 While establishing that a fair comparison must **count every machine's host or
 none of them** (:doc:`/designs/gemmini_comparison`), MiniTPU's owner volunteered
@@ -365,7 +442,9 @@ baseline for every performance claim.
 
 Measured, by cosim, at the five benchmark shapes: **216 / 408 / 809 / 933 /
 1521** cycles with zero mismatches, against the shipped design's 172 / 262 /
-418 / 484 / 686 — **1.26x to 2.22x the cycles**. At ``T=8`` the variant measures
+418 / 484 / 686 as it then stood (that row is 171 / 261 / 417 / 483 / 685
+since 2026-09-22, which does not move the ratio) — **1.26x to 2.22x the
+cycles**. At ``T=8`` the variant measures
 302 / 474 / 699, also exact. Functional gates pass throughout: bench ``ALL
 EXACT``, stress 487/487, 34 crafted bad programs rejected against 390 generated
 programs accepted, and 42 mutants caught (41 by the functional gates, one only
@@ -432,3 +511,39 @@ previous section), and its scaling stages rest on the banked VMEM and on
 
 Neither source tree travels (``~/core/npu`` is now empty), so nothing in it can
 be re-derived from source on another host.
+
+Earlier measurements and corrections
+------------------------------------
+
+What this page said before, kept so the corrections are checkable. None of it
+is current.
+
+The README's stale power figure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The design's README once stated **7.255 W**, which was stale for the
+``0xB182E69D`` build. Fixed after we reported it; it then read 8.255 W. The
+report itself is §6.
+
+The cycle-model fit before the ``vmatpop`` correction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The fit this page previously carried, exact over 20 simulated points before
+the ``vmatpop`` occupancy correction (``72c8b78``), was
+``46 + 194·n + 64.5·B + 303·n·B``. Kept as the earlier reading, not as
+current. The fixed term and the ``B`` coefficient did not move; the ``n`` and
+``n·B`` terms did.
+
+Readings of another team's design that this page got wrong
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* An earlier revision said the array accumulates **"exactly 16 deep"**, which
+  read as an exactness guarantee. It is not one: only the first term is exact,
+  via a zero bypass, and every later add rounds.
+* An earlier revision of §4 implied that figures other than the three bring-up
+  kernels were board cycle counts. They are not.
+* The Verilator workload figures were stale here as well: 16×16 GEMM was
+  published on this page as **283** cy and 16×16 GEMM→GELU as **253**, against
+  the corrected 168 and 155.
+* An earlier claim that ``B = 1..16`` is bit-identical **omitted the row-wise
+  qualifier, and was wrong for attention**.
