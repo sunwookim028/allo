@@ -965,112 +965,114 @@ T=8 vs Gemmini DIM=8, both at MAXDIM=64
 
 The second matched point, and **it does not agree with the first**, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
-``gemmini/allo_bare_steady.c`` at ``DIM=8``, which drops 4x4x4 and 12x12x12
-because they are not multiples of 8 --- the same ``runnable()`` rule our own
-side applies on T, so **both machines drop the same shapes**.
+``gemmini/allo_bare_steady.c`` at ``DIM=8``, Gemmini as **median of five
+trials**, which drops 4x4x4 and 12x12x12 because they are not multiples of 8
+--- the same ``runnable()`` rule our own side applies on T, so **both machines
+drop the same shapes**.
 
 .. list-table::
    :header-rows: 1
-   :widths: 13 8 12 12 11 11 15
+   :widths: 12 8 9 13 10 10 12 16
 
    * - shape
      - set
      - ours
-     - Gemmini
+     - Gemmini (median)
      - ours % peak
-     - Gemmini % peak
-     - **ours / Gemmini**
+     - Gem % peak
+     - **ours / Gem**
+     - clears spread?
    * - 8x8x8
      - latency
      - 285
-     - 312
+     - 305 +/- 17
      - 2.8%
      - 2.6%
-     - **1.09x FASTER**
+     - 0.93x (ours faster)
+     - no (1.2x)
    * - 16x16x8
      - latency
      - 424
-     - 496
+     - 500 +/- 16
      - 7.5%
-     - 6.5%
-     - **1.17x FASTER**
+     - 6.4%
+     - **0.85x (ours faster)**
+     - **yes (4.8x)**
    * - 16x16x16
      - both
      - 493
-     - 530
+     - 535 +/- 45
      - 13.0%
-     - 12.1%
-     - **1.08x FASTER**
+     - 12.0%
+     - 0.92x (ours faster)
+     - no (0.9x)
    * - 32x32x32
      - steady
      - 1 484
-     - 1 267
+     - 1 280 +/- 18
      - 34.5%
-     - 40.4%
-     - 1.17x slower
+     - 40.0%
+     - 1.16x
+     - yes (11x)
    * - 48x48x48
      - steady
      - 3 537
-     - 3 001
+     - 3 028 +/- 35
      - 48.9%
-     - 57.6%
-     - 1.18x slower
+     - 57.1%
+     - 1.17x
+     - yes (15x)
    * - 64x64x64
      - steady
      - 7 083
-     - 5 986
+     - 6 033 +/- 35
      - 57.8%
-     - 68.4%
-     - 1.18x slower
+     - 67.9%
+     - **1.17x**
+     - yes (30x)
    * - 64x32x64
      - steady
      - 4 523
-     - 3 831
+     - 3 897 +/- 35
      - 45.3%
-     - 53.5%
-     - 1.18x slower
+     - 52.6%
+     - 1.16x
+     - yes (18x)
+   * - 32x64x32
+     - steady
+     - 2 508
+     - 1 866 +/- 36
+     - 40.8%
+     - 54.8%
+     - 1.34x
+     - yes (18x)
 
-.. warning::
+**We beat Gemmini at one shape, supportably: 16x16x8, by 1.18x, clearing the
+spread 4.8x.** At 8x8x8 and 16x16x16 the sign is also ours but the margins
+(20 and 42 cycles) do not clear their spreads (17 and 45), so those two are
+**level, not wins** --- and the earlier best-of-two reading of them as wins is
+withdrawn. That is the first supportable win this design has over Gemmini at
+any shape.
 
-   **Two of those three "wins" do not clear the measurement noise, and the
-   claim must be read accordingly.** The Gemmini column above is best-of-two;
-   the five-trial spread measured at DIM=4 is **17-44 cycles, roughly
-   constant in absolute terms**, and there is no reason DIM=8 would be
-   quieter. Against a 36-44 cycle spread:
+At steady state the deficit is a **flat 1.16-1.17x** with no convergence,
+except 32x64x32 at 1.34x --- the one shape where a shallow K (32, four k-tiles
+at T=8) leaves the weight chain least amortised.
 
-   .. list-table::
-      :header-rows: 1
+.. note::
 
-      * - shape
-        - our margin
-        - vs ~40-cycle spread
-        - supportable?
-      * - 8x8x8
-        - 27 cycles
-        - 0.7x
-        - **no**
-      * - 16x16x8
-        - 72 cycles
-        - 1.8x
-        - marginal
-      * - 16x16x16
-        - 37 cycles
-        - 0.9x
-        - **no**
+   **Settled at five trials.** The DIM=8 column above is the median of five,
+   with the full min-max spread; the per-shape spread is 16-45 cycles, the
+   same roughly-constant band measured at DIM=4. An earlier revision of this
+   page read three shapes as wins from best-of-two and then downgraded all
+   three to "level" as a precaution; the five-trial measurement shows the
+   precaution was one shape too strong. **One win is supportable, two are
+   level.**
 
-   So the honest statement is: **at T=8 we are level with Gemmini on the
-   latency shapes** --- the sign is in our favour at all three, which is
-   itself the evidence, but not one of the individual margins is large enough
-   to claim a specific speedup. That is still a qualitative change from T=4,
-   where we are behind at every shape and behind by margins that *do* clear
-   the noise from 12x12x12 up.
-
-   The five-trial DIM=8 measurement that would settle it is the one piece of
-   this page not yet complete.
-
-The reason we are level there rather than behind is the reason the latency set
+The reason we are ahead there rather than behind is the reason the latency set
 exists: at T=8, 16x16x16 is only four tile-matmuls, so the machine with the
-shorter pipeline is not penalised, and ours is shorter.
+shorter pipeline is not penalised, and ours is shorter. 16x16x8 is the
+clearest case because it is the shallowest of the three (two n-tiles), which
+is why it is the one whose margin clears the noise.
 
 At steady state the deficit is a **flat 1.17-1.18x** and does not converge,
 where at T=4 it converged to 1.086x. Two matched points, two different
@@ -1090,10 +1092,10 @@ behaviours:
      - 1.13x
      - **1.086x**
    * - T=8 / DIM=8
-     - **level** (sign ours, margins inside noise)
+     - **0.85x at 16x16x8** (a win); level at the other two
+     - 1.16x
      - 1.17x
-     - 1.18x
-     - **1.18x**
+     - **1.17x**
 
 **This is what a single matched point could not have told us**, and it is the
 answer to "is the deficit a property of the design or of one configuration":
@@ -1110,16 +1112,18 @@ therefore the concrete argument for widening the fields.
    **The uncertainty on every difference above is Gemmini's, not ours.**
    Gemmini is a whole SoC --- Rocket, an L1 cache, a scratchpad still holding
    the previous call's state --- so the same binary on the same hardware does
-   not give the same count twice: the measured trial-to-trial spread reaches
-   **20 cycles at 16x16x8**, and up to 12% of the total at the smallest
-   shapes. Our side is a deterministic simulation of a fixed design on fixed
-   inputs and reproduces to the cycle across independent runs.
+   not give the same count twice: over five trials the spread is **16-45
+   cycles**, roughly constant in absolute terms, which is up to 12% of the
+   total at the smallest shapes and under 0.2% at 64x64x64. Our side is a
+   deterministic simulation of a fixed design on fixed inputs and reproduces
+   to the cycle across independent runs.
 
-   So **a claimed difference smaller than Gemmini's spread is unsupportable**,
-   which at 4x4x4 and 8x8x8 covers much of the gap. What carries the result at
-   the small shapes is the **consistent sign across every shape**, not the
-   magnitude at any one of them. Median and spread per shape are in
-   :ref:`benchmarks-spread`.
+   So **a claimed difference smaller than Gemmini's spread is unsupportable.**
+   At T=4 that rules out 4x4x4 and 8x8x8; at T=8 it rules out 8x8x8 and
+   16x16x16. In each case the **sign** is still informative --- it is the same
+   across all ten shapes at T=4, and the same across all three latency shapes
+   at T=8 --- but the magnitude at an individual sub-spread shape is not.
+   Median and spread per shape are in :ref:`benchmarks-spread`.
 
    The two Gemmini benchmark files are also **not interchangeable**:
    ``allo_bare_steady.c`` reads 2-14 cycles below ``allo_bare5.c`` at the same
