@@ -57,20 +57,40 @@ def shape2d(extent):
     return rows, extent[-1]
 
 
+def needs_maxdim(sp):
+    """The smallest `MAXDIM` whose buffers hold every region this spec names."""
+    reach = 0
+    for t in sp["inputs"] + [sp["output"]] + sp.get("constants", []):
+        rows, cols = (shape2d(_extent(sp["name"], sp["dims"], t["subscript"]))
+                      if "subscript" in t else (t["rows"], t["cols"]))
+        row, col = t["origin"]
+        reach = max(reach, row + rows, col + cols)
+    return reach
+
+
+def fits_build(sp):
+    """None if this build can hold the spec, else the reason it cannot.
+
+    A spec outlives one build: the corpus keeps the steady-state shapes
+    `bench_isa.LATENCY`/`STEADY` name even where `MAXDIM` is too small to run
+    them, and the judge skips those rather than calling them malformed."""
+    need = needs_maxdim(sp)
+    if need > MAXDIM:
+        return f"needs MAXDIM >= {need}; this build has TPU_MAXDIM={MAXDIM}"
+    return None
+
+
 def _check_region(sp, where, buf, origin, extent):
     if buf not in BUFFERS:
         raise SpecError(f"{sp}: {where} names buffer {buf!r}, not one of {BUFFERS}")
     row, col = origin
+    if row < 0 or col < 0:
+        raise SpecError(f"{sp}: {where} starts at {origin}")
     if col % T:
         raise SpecError(
             f"{sp}: {where} starts at column {col}, which is not a multiple of "
             f"T={T}. Every DRAM access the ISA has is a packed word of T lanes "
             f"at a column-block boundary, so a tensor cannot start between them.")
-    rows, cols = shape2d(extent)
-    if row + rows > MAXDIM or col + cols > MAXDIM:
-        raise SpecError(
-            f"{sp}: {where} occupies rows {row}..{row + rows - 1} and columns "
-            f"{col}..{col + cols - 1} of a {MAXDIM}x{MAXDIM} buffer")
 
 
 def validate(sp):
@@ -250,14 +270,18 @@ def compare(sp, got, want):
 
 def summary(sp):
     dims = ", ".join(f"{c}={n}" for c, n in sp["dims"].items())
-    return (f"{sp['name']:28s} {sp['einsum']:14s} {dims:24s} "
+    return (f"{sp['name']:28s} {sp['einsum']:14s} {dims:26s} "
             f"pad={sp['operand_pad']:9s} "
             f"win={sp['output'].get('write_window', 'exact')}")
 
 
 if __name__ == "__main__":
     cs = corpus()
-    print(f"{len(cs)} specs in {CORPUS}, MAXDIM={MAXDIM} T={T} WPR={WPR}")
+    runnable = [sp for sp in cs if fits_build(sp) is None]
+    print(f"{len(cs)} specs in {CORPUS}; {len(runnable)} fit this build "
+          f"(MAXDIM={MAXDIM} T={T} WPR={WPR})")
     for sp in cs:
         print("  " + summary(sp))
         print(f"      {sp['stresses']}")
+        if fits_build(sp):
+            print(f"      SKIPPED on this build: {fits_build(sp)}")

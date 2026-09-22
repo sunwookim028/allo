@@ -26,8 +26,17 @@ GATE_MARGIN = 1.10
 
 
 def chosen(args):
-    return (spec_mod.corpus() if args.spec == "all"
-            else [spec_mod.by_name(args.spec)])
+    """The specs to judge: everything this build can hold, unless named."""
+    if args.spec != "all":
+        return [spec_mod.by_name(args.spec)]
+    keep = []
+    for sp in spec_mod.corpus():
+        why = spec_mod.fits_build(sp)
+        if why is None:
+            keep.append(sp)
+        else:
+            print(f"  {sp['name']:28s} SKIPPED  {why}")
+    return keep
 
 
 def build_program(make, sp):

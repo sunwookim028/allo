@@ -138,6 +138,8 @@ def main():
             fails.append(f"{name}: rule {r.rule.name} has no remedy")
         hit[r.rule.name] = hit.get(r.rule.name, 0) + 1
     for sp in spec_mod.corpus():
+        if spec_mod.fits_build(sp) is not None:
+            continue
         try:
             prog = baseline.program(sp)
         except baseline.Unsupported:
