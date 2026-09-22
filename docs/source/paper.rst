@@ -234,6 +234,48 @@ spatial array at 11.3%. A third instance: a dual-write-port buffer is free on
 FPGA block RAM and is **rejected outright** by the standard-cell flow, while a
 banked rewrite preserves every cycle.
 
+**6.2a What can be compared before the comparison design is synthesised.** Our
+own runs are complete and the comparison design's are not, but two comparisons
+are available now from its *published* figures, and they differ sharply in what
+they support.
+
+*Structural, and node-independent.* Gemmini's published breakdown (Intel 22 nm,
+16×16 int8, 256 KB scratchpad, 64 KB accumulator) gives memory **67.1%** of
+accelerator area and the spatial array **11.3%**. Our baseline (FreePDK45,
+4×4, flip-flop memories) gives the instruction-fetch adapter **60.0%** and
+non-combinational cells **79.7%** of total area. These are fractions of each
+design's own total, so no node or capacity scaling is involved, and they agree
+on the conclusion that matters:
+
+   On both designs the arithmetic is a small minority of the silicon. The
+   majority is state and supply — SRAM capacity in one case, instruction
+   supply and register-resident state in the other — and the two designs reach
+   that condition by entirely different routes.
+
+That is the substrate-disagreement result of §6.2 restated from an independent
+source: the component a designer optimises is not the component that sets the
+area.
+
+*Absolute, and only as a sanity check.* Gemmini's accelerator-only total is
+**858K µm²** at 22 nm (1,029K less the 171K host-CPU line their table reports
+separately). Ours is **1,137K µm²** at 45 nm, or **455K** excluding
+instruction supply. A crude standard-cell node scaling of 45 nm to 22 nm is
+roughly 3–4×, which places our comparable figure an order of magnitude below
+theirs — as it should be, for a 16-PE machine with 2.5 KiB of local memory
+against a 256-PE machine with 320 KB. We report this only as confirmation that
+nothing is wildly wrong. It is **not** an area-efficiency claim: the
+configurations differ by 16× in PE count and 128× in memory capacity, the
+memories are flip-flops on our side and SRAM macros on theirs, their figure
+includes place-and-route and ours does not, and the node factor is the
+dominant uncertainty.
+
+*What is still missing, and why it is the useful one.* A per-PE comparison of
+the arithmetic array alone would be free of the memory-technology difference
+entirely, since the array is pure logic on both sides — Gemmini's published
+figure is **453 µm² per PE** at 22 nm. Our per-instance array area is not in
+the committed reports, so this comparison is one hierarchical area report away
+and is the first thing to extract when the queued runs execute.
+
 **6.3 The workload class changes the answer by four to eight times.** On GEMM
 shapes the same optimisation is worth **4.3–7.0%** of runtime; on multi-layer
 models, **25–34%**. A model does not make the problem larger, it makes it
