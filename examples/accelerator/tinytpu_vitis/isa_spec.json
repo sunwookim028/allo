@@ -1,0 +1,1513 @@
+{
+  "_comment": [
+    "THE TinyTPU-isa INSTRUCTION SET. This file is the source of truth: every",
+    "opcode number, every field position and width, the instruction memory",
+    "header, the AGU term encoding, the loop-stack semantics, the memory map,",
+    "the two program contracts, the build parameters and their legal ranges,",
+    "and the numerics. Edit here, then run:",
+    "",
+    "    python gen_isa.py --write     regenerate every derived artefact",
+    "    python gen_isa.py --check     fail if any artefact is stale, or if",
+    "                                  either consumer disagrees with this file",
+    "    python gen_isa.py --conform   ... and check the EMITTED HLS's bit",
+    "                                  slices against the field table",
+    "",
+    "Derived artefacts (generated, checked in, verified byte-identical):",
+    "  isa_encoding.py                          this file as Python: the",
+    "    constants, the encoder, the decoder with the operand names below, the",
+    "    control-flow/AGU resolver, the header builder and the numerics.",
+    "  docs/source/designs/tinytpu_isa.rst      the ISA tables, between the",
+    "    GENERATED markers; the prose around them is hand-written.",
+    "",
+    "The two consumers are held to this file from OPPOSITE ends, which is the",
+    "point of having it:",
+    "  * the DESIGN (microarch_isa.py) keeps its constants and its bit slices",
+    "    written out -- it is the file the CHIA agent edits and the file Vitis",
+    "    synthesises, and it may not import a generated module -- and",
+    "    `gen_isa.py --check` holds every one of them to the table below by",
+    "    value, by slice, and by behaviour.",
+    "  * the REFERENCE MODEL (isa_ref.py) is built ON isa_encoding.py: it",
+    "    names operands by the `name` given here and never sees a bit",
+    "    position, an opcode number or a numeric width the design chose. It",
+    "    used to import them from the design, which made it a restatement of",
+    "    the design rather than an oracle for it.",
+    "",
+    "A parameter's DEFAULT is recorded here as well as its legal range,",
+    "because the generated module has to build the SAME machine the design",
+    "builds: `gen_isa.py --check` re-imports both under several environments",
+    "and compares every parameter and derived constant. When a default moves",
+    "in the design -- the pending MAXDIM rebuild sizes the memories from",
+    "MAXDIM * MAXDIM / T -- re-derive it here rather than restating it: a",
+    "literal goes in `default`, one computed from other parameters goes in",
+    "`default_expression`.",
+    "",
+    "JSON, not YAML: the generator and the conformance check must run wherever",
+    "`allo` runs, and `json` is in the standard library while PyYAML is not in",
+    "this repository's requirements. Prose lives in `_comment` and `note`",
+    "keys, as MiniTPU's docs/isa_latency.json does."
+  ],
+  "name": "TinyTPU-isa",
+  "design": "examples/accelerator/tinytpu_vitis/microarch_isa.py",
+  "docs": "docs/source/designs/tinytpu_isa.rst",
+  "consumers": [
+    {
+      "path": "examples/accelerator/tinytpu_vitis/isa_encoding.py",
+      "held": "generated",
+      "note": "The spec as Python. Regenerated and diffed byte for byte by gen_isa.py --check."
+    },
+    {
+      "path": "docs/source/designs/tinytpu_isa.rst",
+      "held": "generated",
+      "note": "The ISA tables, between the GENERATED markers. The prose around them is hand-written."
+    },
+    {
+      "path": "examples/accelerator/tinytpu_vitis/microarch_isa.py",
+      "held": "checked",
+      "note": "The design. Keeps its constants and bit slices written out -- it is what Vitis synthesises, and chia_agent/spec_policy.py admits no import but isa_dsl -- and is held to this file by value, by slice, by behaviour and by parameter range."
+    },
+    {
+      "path": "examples/accelerator/tinytpu_vitis/isa_dsl.py",
+      "held": "checked",
+      "note": "The program generator, through the encoder it shares with the design."
+    },
+    {
+      "path": "examples/accelerator/tinytpu_vitis/isa_ref.py",
+      "held": "built on the generated module",
+      "note": "The reference model. Names operands by the `name` given below and never sees a bit position, an opcode number or a numeric width the design chose."
+    },
+    {
+      "_comment": [
+        "IF THE `design-modular` DECOMPOSITION MERGES FIRST, re-point these",
+        "rather than rewriting them. `microarch_isa.py` becomes a ~100-line",
+        "re-export facade, and the facts this file is checked against move:",
+        "  ip/isa.py        opcodes, field layout, DMA flags, AGU targets,",
+        "                   AGU_TERMS, LOOP_DEPTH, IWORDS, NHDR, MAXROWS,",
+        "                   enc, enc_agu                       -- EDITABLE",
+        "  ip/assembler.py  AR_RAW_DIST, expand/trace/check/assemble and the",
+        "                   imem header                        -- EDITABLE",
+        "  ip/params.py     T, MAXDIM, the derived memories, VW/AW/WPR,",
+        "                   OPERAND_ROWS, TEST_WINDOW, BUS_BYTES -- FROZEN",
+        "",
+        "The check gets MORE to do there, not less. That branch writes the",
+        "encoding out in three places -- the encoder in ip/isa.py, a",
+        "hand-written decoder twice over in Assembler.trace and",
+        "Assembler.check (`& 0x3F`, shifts 6/18/30/42/54, `19 * term`, `+4`,",
+        "`+7`), and the hardware slices in ip/units/sequencer.py -- and",
+        "nothing there checks any of them against the others. The",
+        "encoder-vs-spec, expand-vs-spec and emitted-slice checks here cover",
+        "exactly that.",
+        "",
+        "It also does not solve what this file exists for: isa_ref.py is",
+        "unchanged on that branch and still imports OP_*, DMA_*, `expand` and",
+        "its own wraparound from the design, so the oracle is still a",
+        "restatement. Decomposition moves the facts; it does not make the",
+        "reference model independent of them.",
+        "",
+        "Placement on that branch's frozen/editable axis: isa_spec.json,",
+        "gen_isa.py and the generated isa_encoding.py belong in FROZEN_DESIGN",
+        "/ the evaluator's FROZEN list. They judge a candidate; they are not",
+        "one. Nothing a candidate may write needs to import them, which is",
+        "what keeps spec_policy's ban on `open` and `exec` untouched."
+      ]
+    },
+    {
+      "path": "allo/encoding.py",
+      "held": "checked",
+      "note": "`TINYTPU_ISA`: the compiler-side descriptor of what one instruction word can carry. It imports nothing from examples/, so its address_terms and loop_depth budgets are checked against `agu.terms` and `loop_stack.depth` rather than generated."
+    }
+  ],
+  "encoding_rule": {
+    "_comment": [
+      "EVERY FIELD CARRIES ONE MORE BIT THAN ITS VALUE RANGE NEEDS. An N-bit",
+      "field safely carries 0 .. 2^(N-1) - 1, so the top bit is always spare.",
+      "A bit slice used to be extracted into a SIGNED ap_int<N> in the emitted",
+      "HLS, so a field whose top bit was set read back negative and a loop",
+      "bounded by it ran zero times: `nr = 64` for a 64-row `vld` silently",
+      "loaded nothing. The emitter is fixed (fork 3de74846, upstream #612,",
+      "merged dc6b8fa6) and the rule is KEPT as a conservative encoding",
+      "convention. The narrative, and why only cosim caught it, is in the",
+      "docs page under 'The spare-bit rule, and the signed bit-slice bug'."
+    ],
+    "usable_max": "2 ** (width - 1) - 1",
+    "asserted_by": [
+      "microarch_isa.enc",
+      "microarch_isa.enc_agu",
+      "isa_encoding.encode"
+    ]
+  },
+  "instruction_word": {
+    "_comment": [
+      "One instruction is two 64-bit words. Word 0 is the opcode and five",
+      "fields; word 1 is the AGU terms. The fields are deliberately wider",
+      "than any legal value so that the encoding is not the limit on problem",
+      "size -- except `nr`, whose width IS load-bearing: a synthesis tool",
+      "bounds a runtime-bounded loop by the range of its index, so a 12-bit",
+      "row count made Vitis assume 4095 rows per instruction and report a",
+      "top-level latency of 91407 cycles. Narrowing the field narrows the",
+      "bound."
+    ],
+    "words_per_instruction": 2,
+    "software_constant": "IWORDS",
+    "word_bits": 64,
+    "word0": {
+      "fields": [
+        {
+          "name": "op",
+          "lo": 0,
+          "width": 6,
+          "signed": false,
+          "role": "opcode",
+          "note": "6 bits for 9 opcodes; the spare-bit rule caps it at 31."
+        },
+        {
+          "name": "f0",
+          "lo": 6,
+          "width": 12,
+          "signed": false,
+          "role": "operand field, AGU target 1",
+          "note": "12 bits for a 2047 maximum, comfortably above SPAD_ROWS and NVR."
+        },
+        {
+          "name": "f1",
+          "lo": 18,
+          "width": 12,
+          "signed": false,
+          "role": "operand field, AGU target 2"
+        },
+        {
+          "name": "f2",
+          "lo": 30,
+          "width": 12,
+          "signed": false,
+          "role": "operand field, AGU target 3"
+        },
+        {
+          "name": "f3",
+          "lo": 42,
+          "width": 12,
+          "signed": false,
+          "role": "operand field, AGU target 4"
+        },
+        {
+          "name": "nr",
+          "lo": 54,
+          "width": 8,
+          "signed": false,
+          "role": "row count, or loop trip count",
+          "software_constant": "MAXROWS",
+          "note": "Never an AGU target, so it is the same for every dynamic issue of a static instruction. 8 bits for MAXROWS = 127."
+        }
+      ],
+      "spare_bits": [
+        62,
+        63
+      ]
+    },
+    "word1": {
+      "note": "The AGU terms; see the `agu` section. Zero when an instruction needs no address generation."
+    }
+  },
+  "agu": {
+    "_comment": [
+      "Up to three address terms per instruction, each `(target, level,",
+      "stride)`, resolving to `field[target] += iv[level] * stride` in the",
+      "sequencer before the word is dispatched. Terms NAME their target",
+      "rather than being fixed one-per-field, because one field often needs",
+      "two: the weight `mm` inside the k loop is at `B_SP + nb*MAXDIM +",
+      "kb*T`, two terms on f3, which a one-term-per-field encoding cannot",
+      "say. Without the AGU a loop body would reissue identical addresses",
+      "and simply redo the same work."
+    ],
+    "terms": 3,
+    "software_constant": "AGU_TERMS",
+    "term_bits": 19,
+    "subfields": [
+      {
+        "name": "target",
+        "lo": 0,
+        "width": 4,
+        "signed": false,
+        "note": "4 bits for 0..4 under the spare-bit rule."
+      },
+      {
+        "name": "level",
+        "lo": 4,
+        "width": 3,
+        "signed": false,
+        "note": "3 bits for 0..LOOP_DEPTH-1."
+      },
+      {
+        "name": "stride",
+        "lo": 7,
+        "width": 12,
+        "signed": false,
+        "note": "12 bits for 0..2047."
+      }
+    ],
+    "targets": [
+      {
+        "name": "unused",
+        "value": 0,
+        "field": null
+      },
+      {
+        "name": "f0",
+        "value": 1,
+        "field": "f0",
+        "software_constant": "AGU_F0"
+      },
+      {
+        "name": "f1",
+        "value": 2,
+        "field": "f1",
+        "software_constant": "AGU_F1"
+      },
+      {
+        "name": "f2",
+        "value": 3,
+        "field": "f2",
+        "software_constant": "AGU_F2"
+      },
+      {
+        "name": "f3",
+        "value": 4,
+        "field": "f3",
+        "software_constant": "AGU_F3"
+      }
+    ],
+    "semantics": "field[target] += iv[level] * stride, for each term with target != 0, in term order",
+    "rules": [
+      "A term may only name a loop level that is OPEN at that instruction; the sequencer would otherwise resolve it against a stale iv_now[level].",
+      "loop, endloop and nop carry no AGU terms.",
+      "The sequencer writes the resolved sum back into the 12-bit field, so a term can push a field past what the encoder would have accepted on its own; `check_program` is the only place that sees the resolved value."
+    ]
+  },
+  "loop_stack": {
+    "_comment": [
+      "loop/endloop bound a body and the PC branches backward, so the STATIC",
+      "program is O(nesting) while the DYNAMIC instruction stream is",
+      "O(tiles). A LIFO of {body_start, iv, trip} frames, LOOP_DEPTH levels",
+      "deep, modelled on MiniTPU's sequencer_loop_ctrl."
+    ],
+    "depth": 4,
+    "software_constant": "LOOP_DEPTH",
+    "frame": [
+      "body_start",
+      "iv",
+      "trip"
+    ],
+    "semantics": [
+      "loop: push {pc+1, 0, nr}, set iv_now[level] = 0, pc += 1. The body is the instruction stream up to the matching endloop.",
+      "endloop: iv += 1; if iv < trip then iv_now[level] = iv and pc = body_start, else pop and pc += 1.",
+      "The nesting depth at which a loop opens IS the AGU level it exports."
+    ],
+    "rules": [
+      "The back edge is tested AFTER the body, so a trip count of 0 still runs the body ONCE. Trip counts below 1 are refused, not silently corrected.",
+      "Loops must be balanced and nested no deeper than LOOP_DEPTH."
+    ]
+  },
+  "opcodes": [
+    {
+      "name": "nop",
+      "value": 0,
+      "software_constant": "OP_NOP",
+      "rows": "none",
+      "units": [],
+      "operands": []
+    },
+    {
+      "name": "dma_ld",
+      "value": 1,
+      "software_constant": "OP_DMA_LD",
+      "rows": "nr DRAM rows",
+      "units": [
+        "dma_ld",
+        "spm (dst = spad) or vru (dst = vr)"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "mode",
+          "meaning": "source matrix | destination memory",
+          "bitflags": [
+            {
+              "name": "src_b",
+              "mask": 1,
+              "software_constant": "DMA_SRC_B",
+              "meaning": "0 = source A, 1 = source B"
+            },
+            {
+              "name": "to_vr",
+              "mask": 2,
+              "software_constant": "DMA_TO_VR",
+              "meaning": "0 = destination spad, 2 = destination vr"
+            }
+          ],
+          "legal_values": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "note": "0: A -> spad, 1: B -> spad, 2: A -> vr, 3: B -> vr. The shipped GEMM uses 2 for activations and 1 for weights."
+        },
+        {
+          "field": "f1",
+          "name": "dram_row0",
+          "meaning": "first DRAM row of the source matrix"
+        },
+        {
+          "field": "f2",
+          "name": "col_block",
+          "meaning": "packed-word column block within the row, 0 .. WPR-1"
+        },
+        {
+          "field": "f3",
+          "name": "dst_row0",
+          "meaning": "first destination row, in spad or vr by the mode bit"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "A or B",
+          "base": "dram_row0",
+          "rows": "nr"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "spad or vr",
+          "base": "dst_row0",
+          "rows": "nr"
+        }
+      ]
+    },
+    {
+      "name": "dma_st",
+      "value": 2,
+      "software_constant": "OP_DMA_ST",
+      "retired": true,
+      "rows": "none",
+      "units": [],
+      "operands": [],
+      "note": "Retired: results leave via mvout. `check_program` refuses it, so the number stays reserved rather than reusable."
+    },
+    {
+      "name": "vld",
+      "value": 3,
+      "software_constant": "OP_VLD",
+      "rows": "nr packed words",
+      "units": [
+        "spm",
+        "vru"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "vr0",
+          "meaning": "first destination vreg row"
+        },
+        {
+          "field": "f1",
+          "name": "spad0",
+          "meaning": "first source scratchpad row"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "spad",
+          "base": "spad0",
+          "rows": "nr"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "vr",
+          "base": "vr0",
+          "rows": "nr"
+        }
+      ],
+      "note": "A pure copy. It MAY copy an unwritten spad row, but the copy is then unwritten too."
+    },
+    {
+      "name": "mm",
+      "value": 4,
+      "software_constant": "OP_MM",
+      "rows": "nr activation rows (wavefront rows through the array)",
+      "units": [
+        "spm",
+        "vru",
+        "accu"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "vr_a",
+          "meaning": "first activation row in vr"
+        },
+        {
+          "field": "f1",
+          "name": "ar0",
+          "meaning": "first accumulator row"
+        },
+        {
+          "field": "f2",
+          "name": "acc",
+          "meaning": "0 = overwrite ar, 1 = accumulate into ar",
+          "legal_values": [
+            0,
+            1
+          ]
+        },
+        {
+          "field": "f3",
+          "name": "spad_w",
+          "meaning": "first of T weight rows in spad"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "vr",
+          "base": "vr_a",
+          "rows": "nr",
+          "as": "activations"
+        },
+        {
+          "memory": "spad",
+          "base": "spad_w",
+          "rows": "T",
+          "as": "weights"
+        },
+        {
+          "memory": "ar",
+          "base": "ar0",
+          "rows": "nr",
+          "as": "accumulate base",
+          "only_if": "acc == 1"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "ar",
+          "base": "ar0",
+          "rows": "nr"
+        }
+      ],
+      "note": "PE(i, j) holds lane j of weight row i and taps lane i of the activation word, so output column j is sum_i act[i] * W[i][j]."
+    },
+    {
+      "name": "vadd",
+      "value": 5,
+      "software_constant": "OP_VADD",
+      "rows": "nr accumulator rows",
+      "units": [
+        "accu"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar_d",
+          "meaning": "first destination accumulator row"
+        },
+        {
+          "field": "f1",
+          "name": "ar_s1",
+          "meaning": "first row of the left source"
+        },
+        {
+          "field": "f2",
+          "name": "ar_s2",
+          "meaning": "first row of the right source"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "ar",
+          "base": "ar_s1",
+          "rows": "nr",
+          "as": "a source"
+        },
+        {
+          "memory": "ar",
+          "base": "ar_s2",
+          "rows": "nr",
+          "as": "a source"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "ar",
+          "base": "ar_d",
+          "rows": "nr"
+        }
+      ]
+    },
+    {
+      "name": "vrelu",
+      "value": 6,
+      "software_constant": "OP_VRELU",
+      "rows": "nr accumulator rows",
+      "units": [
+        "accu"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar_d",
+          "meaning": "first destination accumulator row"
+        },
+        {
+          "field": "f1",
+          "name": "ar_s",
+          "meaning": "first source accumulator row"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "ar",
+          "base": "ar_s",
+          "rows": "nr",
+          "as": "a source"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "ar",
+          "base": "ar_d",
+          "rows": "nr"
+        }
+      ]
+    },
+    {
+      "name": "mvout",
+      "value": 7,
+      "software_constant": "OP_MVOUT",
+      "rows": "nr accumulator rows",
+      "units": [
+        "accu",
+        "dma_st"
+      ],
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar0",
+          "meaning": "first accumulator row to retire"
+        },
+        {
+          "field": "f1",
+          "name": "dram_row0",
+          "meaning": "first DRAM row of C"
+        },
+        {
+          "field": "f2",
+          "name": "col_block",
+          "meaning": "packed-word column block of C, 0 .. WPR-1"
+        }
+      ],
+      "reads": [
+        {
+          "memory": "ar",
+          "base": "ar0",
+          "rows": "nr",
+          "as": "the value to retire"
+        }
+      ],
+      "writes": [
+        {
+          "memory": "C",
+          "base": "dram_row0",
+          "rows": "nr"
+        }
+      ],
+      "note": "The only way a result leaves the accelerator. Values pass through the output conversion in the numerics section."
+    },
+    {
+      "name": "loop",
+      "value": 8,
+      "software_constant": "OP_LOOP",
+      "rows": "nr is the trip count, minimum 1",
+      "units": [
+        "sequencer"
+      ],
+      "operands": []
+    },
+    {
+      "name": "endloop",
+      "value": 9,
+      "software_constant": "OP_ENDLOOP",
+      "rows": "none",
+      "units": [
+        "sequencer"
+      ],
+      "operands": []
+    }
+  ],
+  "dispatch": {
+    "_comment": [
+      "The sequencer sends each unit only the instructions it executes, in",
+      "DATAFLOW order: if it blocks on a full queue, every unit upstream of",
+      "the blocked one already holds its instruction and can keep producing",
+      "what the blocked unit waits for. Dispatching downstream-first",
+      "deadlocks. Two units get a REWRITTEN copy so their flat row loops can",
+      "read their own work count straight out of `nr` -- a row count that",
+      "depends on the decoded opcode is a carried dependence and closes a",
+      "flat loop at Final II = 2."
+    ],
+    "rewrites": [
+      {
+        "opcode": "mm",
+        "unit": "spm",
+        "set": {
+          "nr": "T + 1",
+          "f1": "the instruction's own nr"
+        },
+        "note": "One header word plus T weight rows down wcol; f1 carries the array's row count into the header word."
+      },
+      {
+        "opcode": "vadd",
+        "unit": "accu",
+        "set": {
+          "nr": "2 * nr"
+        },
+        "note": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
+      }
+    ]
+  },
+  "imem": {
+    "_comment": [
+      "imem[0:NHDR] is a header of per-unit WORK counts; instructions follow,",
+      "two words each. imem[0] is static and bounds the sequencer's fetch;",
+      "every other count is DYNAMIC, computed by resolving the program's",
+      "control flow at assembly time. They are work counts, not instruction",
+      "counts, because every unit runs one flat loop over the rows (or words,",
+      "or iterations) it will actually process. A unit promised the wrong",
+      "number here does not produce a wrong answer, it HANGS -- the one place",
+      "where the assembler and the microarchitecture are coupled."
+    ],
+    "header_words": 8,
+    "software_constant": "NHDR",
+    "count_slice_width": 16,
+    "count_usable_max": 32767,
+    "entries": [
+      {
+        "index": 0,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "n_instr",
+        "consumer": "sequencer",
+        "terms": [
+          {
+            "kind": "static_instructions"
+          }
+        ],
+        "note": "Bounds the fetch loop: the sequencer stops when pc >= n_instr."
+      },
+      {
+        "index": 1,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "dma_ld_rows",
+        "consumer": "dma_ld",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "dma_ld"
+            ]
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "spm_rows",
+        "consumer": "spm",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "dma_ld"
+            ],
+            "where": "dst_spad"
+          },
+          {
+            "kind": "rows",
+            "ops": [
+              "vld"
+            ]
+          },
+          {
+            "kind": "instructions",
+            "ops": [
+              "mm"
+            ],
+            "scale": "T + 1"
+          }
+        ],
+        "note": "A dma_ld counts for spm or for vru by its destination bit, never both."
+      },
+      {
+        "index": 3,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "vru_words",
+        "consumer": "vru",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "dma_ld"
+            ],
+            "where": "dst_vr"
+          },
+          {
+            "kind": "rows",
+            "ops": [
+              "vld"
+            ]
+          },
+          {
+            "kind": "rows",
+            "ops": [
+              "mm"
+            ]
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "mm_count",
+        "consumer": "the array, via spm's header word",
+        "terms": [
+          {
+            "kind": "instructions",
+            "ops": [
+              "mm"
+            ]
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "slice": [
+          16,
+          32
+        ],
+        "name": "mm_rows",
+        "consumer": "the array, via spm's header word",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "mm"
+            ]
+          }
+        ],
+        "note": "Each PE's own flat trip count: every wavefront row of every mm."
+      },
+      {
+        "index": 5,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "accu_iterations",
+        "consumer": "accu",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "mm",
+              "vrelu",
+              "mvout"
+            ]
+          },
+          {
+            "kind": "rows",
+            "ops": [
+              "vadd"
+            ],
+            "scale": "2"
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "dma_st_rows",
+        "consumer": "dma_st",
+        "terms": [
+          {
+            "kind": "rows",
+            "ops": [
+              "mvout"
+            ]
+          }
+        ]
+      },
+      {
+        "index": 7,
+        "slice": [
+          0,
+          16
+        ],
+        "name": "a_span",
+        "consumer": "dma_ld",
+        "terms": [
+          {
+            "kind": "row_span",
+            "ops": [
+              "dma_ld"
+            ],
+            "where": "src_a",
+            "operand": "dram_row0"
+          }
+        ],
+        "note": "The DRAM row span dma_ld must burst for A: the highest row any of its dma_lds names once the AGU is resolved."
+      },
+      {
+        "index": 7,
+        "slice": [
+          16,
+          32
+        ],
+        "name": "b_span",
+        "consumer": "dma_ld",
+        "terms": [
+          {
+            "kind": "row_span",
+            "ops": [
+              "dma_ld"
+            ],
+            "where": "src_b",
+            "operand": "dram_row0"
+          }
+        ]
+      }
+    ],
+    "size": {
+      "software_constant": "IMEM_SIZE",
+      "value": "NHDR + IWORDS * max_static_instructions",
+      "constraints": [
+        "IMEM_SIZE % 8 == 0 -- the program prefetch moves 8 words per iteration.",
+        "NHDR + IWORDS * len(prog) <= IMEM_SIZE for every program that runs."
+      ],
+      "note": "The prefetch is IMEM_SIZE words long whatever the program, so every unused slot is startup time. Sized to the longest program shipped, not to a round number."
+    }
+  },
+  "memories": [
+    {
+      "name": "spad",
+      "owner": "spm",
+      "depth_parameter": "SPAD_ROWS",
+      "row_width_bits": "T * 8",
+      "row_width_constant": "VW",
+      "row_contents": "T int8 lanes, one packed word",
+      "written_by": [
+        "dma_ld (dst = spad)"
+      ],
+      "read_by": [
+        "vld",
+        "mm (weights)"
+      ],
+      "cleared_by_hardware": false,
+      "note": "Pure SIMD access: an address names a whole packed word and there is no way to address a lane, which is what lets a single-ported memory feed T lanes per cycle."
+    },
+    {
+      "name": "vr",
+      "owner": "vru",
+      "depth_parameter": "NVR",
+      "row_width_bits": "T * 8",
+      "row_width_constant": "VW",
+      "row_contents": "T int8 lanes, one packed word",
+      "written_by": [
+        "dma_ld (dst = vr)",
+        "vld"
+      ],
+      "read_by": [
+        "mm (activations)"
+      ],
+      "cleared_by_hardware": false
+    },
+    {
+      "name": "ar",
+      "owner": "accu",
+      "depth_parameter": "NAR",
+      "row_width_bits": "T * 32",
+      "row_width_constant": "AW",
+      "row_contents": "T accumulator lanes",
+      "written_by": [
+        "mm",
+        "vadd",
+        "vrelu"
+      ],
+      "read_by": [
+        "mm (acc = 1)",
+        "vadd",
+        "vrelu",
+        "mvout"
+      ],
+      "cleared_by_hardware": false
+    },
+    {
+      "name": "imem",
+      "owner": "sequencer",
+      "depth_parameter": "IMEM_SIZE",
+      "row_width_bits": 64,
+      "row_contents": "header words, then two words per instruction",
+      "written_by": [
+        "the host, through m_axi"
+      ],
+      "read_by": [
+        "sequencer"
+      ],
+      "cleared_by_hardware": false,
+      "note": "Prefetched on-chip in full by one burst before anything runs, so it cannot be read early."
+    },
+    {
+      "name": "A",
+      "owner": "dma_ld",
+      "depth_parameter": "MAXDIM * MAXDIM",
+      "row_width_bits": 8,
+      "row_contents": "int8, flat, addressed row * MAXDIM + col",
+      "written_by": [
+        "the host"
+      ],
+      "read_by": [
+        "dma_ld"
+      ],
+      "cleared_by_hardware": false
+    },
+    {
+      "name": "B",
+      "owner": "dma_ld",
+      "depth_parameter": "MAXDIM * MAXDIM",
+      "row_width_bits": 8,
+      "row_contents": "int8, flat, addressed row * MAXDIM + col",
+      "written_by": [
+        "the host"
+      ],
+      "read_by": [
+        "dma_ld"
+      ],
+      "cleared_by_hardware": false
+    },
+    {
+      "name": "C",
+      "owner": "dma_st",
+      "depth_parameter": "MAXDIM * MAXDIM",
+      "row_width_bits": 8,
+      "row_contents": "int8, flat, addressed row * MAXDIM + col",
+      "written_by": [
+        "dma_st (mvout)"
+      ],
+      "read_by": [
+        "the host"
+      ],
+      "cleared_by_hardware": false,
+      "note": "Rows and column blocks no mvout names are left exactly as the host passed them, which is how a sentinel check falls out of comparing the whole of C."
+    }
+  ],
+  "contracts": {
+    "write_before_read": {
+      "_comment": [
+        "spad, vr and ar are NOT cleared by the hardware -- their zero",
+        "initialisers were removed to delete a 514-cycle memset -- so at",
+        "ap_start each holds whatever the previous invocation, or power-up,",
+        "left there. The guarantee moved from the hardware to the program."
+      ],
+      "rules": [
+        "Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu.",
+        "Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there -- directly, or into spad and then through a vld.",
+        "vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error.",
+        "nr >= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op.",
+        "Every resolved field must be within 0 .. 2047, the range the encoding rule admits."
+      ],
+      "enforced_by": "microarch_isa.check_program, which microarch_isa.assemble calls, so a violating program cannot be assembled",
+      "not_enforced_by_hardware": "Reading an accumulator row early is a wrong answer, not a crash.",
+      "note": "dma_ld's burst buffers and the sequencer's program buffer are unzeroed too, but cannot be read early and so carry no obligation: the program buffer is filled by one unconditional IMEM_SIZE-word burst, and the A and B spans in the header are computed from the same resolved trace that names the rows dma_ld reads."
+    },
+    "accumulator_raw_distance": {
+      "_comment": [
+        "accu runs at II=1 because schedule() tells Vitis there is no carried",
+        "dependence through ar. THAT CLAIM IS NOT TRUE OF THE HARDWARE ON ITS",
+        "OWN: in the synthesized loop the ar load issues in pipeline state 5",
+        "and the store lands in state 7. The assembler makes it true by",
+        "refusing programs that read a row too soon. The measured window, the",
+        "cosim evidence and what the claim bought in flip-flops are in the",
+        "docs page under 'The accumulator's dependence claim'."
+      ],
+      "software_constant": "AR_RAW_DIST",
+      "value": 4,
+      "unit": "accu iterations",
+      "iteration_cost": {
+        "mm": "1 per row",
+        "vrelu": "1 per row",
+        "mvout": "1 per row",
+        "vadd": "2 per row: first source on the even iteration, second source and the write on the odd one"
+      },
+      "rule": "A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on.",
+      "constraints": [
+        "AR_RAW_DIST <= T, so no GEMM is constrained by it -- the smallest GEMM has T rows."
+      ],
+      "enforced_by": "microarch_isa.check_program",
+      "exercised_at_its_edge_by": "isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build"
+    }
+  },
+  "parameters": [
+    {
+      "name": "T",
+      "env": "TPU_T",
+      "default": 4,
+      "min": 4,
+      "max": null,
+      "role": "SIMD width, and the array dimension: the array is T*T processing elements",
+      "constraints": [
+        "T >= 4, so a packed operand word has room for the two 16-bit counts vru sends down wcol.",
+        "MAXDIM % T == 0, so a DRAM row is a whole number of packed words.",
+        "AR_RAW_DIST <= T."
+      ],
+      "note": "The one parameter that changes the SHAPE of the generated region: T*T kernel instances and T, T*T stream arrays."
+    },
+    {
+      "name": "MAXDIM",
+      "env": "TPU_MAXDIM",
+      "default": 64,
+      "min": 4,
+      "max": null,
+      "role": "largest M, K, N supported by one build",
+      "constraints": [
+        "MAXDIM % T == 0",
+        "the addressing ceiling: (MAXDIM // T) * MAXDIM <= 2048",
+        "the cubic-header ceiling: MAXDIM**3/T**2 + MAXDIM**2/T <= 32767"
+      ],
+      "note": "Both ceilings are the encoding, not the datapath, and `isa_encoding.maxdim_ceiling` computes each rather than restating it; see maxdim_ceilings for which question each answers. The design ships at 64, inside both."
+    },
+    {
+      "name": "SPAD_ROWS",
+      "env": "TPU_SPAD",
+      "default": null,
+      "min": 1,
+      "max": 2048,
+      "role": "scratchpad depth in packed words",
+      "constraints": [
+        "SPAD_ROWS <= 2047, the range a 12-bit field admits under the encoding rule"
+      ],
+      "default_expression": "max(TEST_WINDOW, OPERAND_ROWS)",
+      "note": "Derived, not typed in. The shipped GEMM lays B out at B_SP + nb*MAXDIM + k, so the highest row it names is OPERAND_ROWS; the TEST_WINDOW floor is there because the fuzz programs address a fixed 64-row window independently of MAXDIM."
+    },
+    {
+      "name": "NVR",
+      "env": "TPU_NVR",
+      "default": null,
+      "min": 1,
+      "max": 2048,
+      "role": "operand vector registers",
+      "constraints": [
+        "NVR <= 2047"
+      ],
+      "default_expression": "max(TEST_WINDOW, OPERAND_ROWS)",
+      "note": "Derived from the same layout: A sits at A_VR + kb*MAXDIM + m. Three independent literals here were silently too small above MAXDIM=16 -- the build assembled and gave wrong answers."
+    },
+    {
+      "name": "NAR",
+      "env": "TPU_NAR",
+      "default": null,
+      "min": 1,
+      "max": 2048,
+      "role": "accumulator vector registers",
+      "constraints": [
+        "NAR <= 2047"
+      ],
+      "default_expression": "max(128, TEST_WINDOW, 2 * MAXDIM + 8)",
+      "note": "AR_C is MAXDIM rows and AR_P another MAXDIM from MAXDIM+1, so a GEMM plus a vector program needs 2*MAXDIM+2; the 128 floor keeps the fixed-address test programs legal at small MAXDIM."
+    },
+    {
+      "name": "IMEM_SIZE",
+      "env": "TPU_IMEM",
+      "default": null,
+      "min": 8,
+      "max": null,
+      "role": "instruction memory depth in 64-bit words",
+      "default_expression": "NHDR + IWORDS * 24",
+      "constraints": [
+        "IMEM_SIZE % 8 == 0",
+        "IMEM_SIZE >= NHDR + IWORDS"
+      ]
+    },
+    {
+      "name": "QD",
+      "env": "TPU_QD",
+      "default": 8,
+      "min": 2,
+      "max": null,
+      "role": "stream depth on every point-to-point channel",
+      "constraints": [],
+      "note": "Not an ISA fact; listed because it is a TPU_* build parameter and a build must report it."
+    },
+    {
+      "name": "DMA_WORDS",
+      "env": "TPU_DMA_WORDS",
+      "default": null,
+      "default_expression": "min(WPR, max(1, BUS_BYTES // (VW // 8))) if os.environ.get(\"TPU_DMA_WIDEN\") == \"1\" else 1",
+      "min": 1,
+      "max": null,
+      "role": "packed words the operand burst moves per loop iteration",
+      "constraints": [],
+      "note": "Not an ISA fact; listed because it is a TPU_* build parameter, a build must report it, and TPU_DMA_WIDEN selects it indirectly."
+    }
+  ],
+  "derived_properties": [
+    {
+      "_comment": [
+        "Facts that FOLLOW from the sections above rather than being stated",
+        "in them, and that `gen_isa.py --check` recomputes from the spec and",
+        "then confirms against the design. They are here because all three",
+        "were documented wrongly in this project until 2026-09-21, and nothing",
+        "checked them: a property nothing computes is a sentence, not a spec."
+      ]
+    },
+    {
+      "id": "every_operand_field_is_an_agu_target",
+      "statement": "Every operand field is a legal AGU target, including one with a restricted value set such as mm's `acc`. Nothing in the encoding or in the sequencer distinguishes them: the sequencer adds iv[level] * stride to whichever field the term names and writes the sum back, and it does not know which fields have restricted values.",
+      "derived_from": [
+        "agu.targets",
+        "agu.semantics"
+      ],
+      "corrects": "Three documents in this project described `acc` as a static field that cannot be predicated on an induction variable. That is false. The real obstacle is the next property.",
+      "witness": "acc_agu_target",
+      "expect": {
+        "accepted": true,
+        "resolved_acc": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": "agu_terms_are_additively_monotone",
+      "statement": "An AGU term contributes base + iv * stride with no predication, no saturation and no wrap, so the values a field takes over a loop of trip t are the arithmetic progression base, base + stride, ..., base + (t-1) * stride, and nothing bends it back inside a bound. A field with a restricted value set is therefore drivable from a loop for exactly as long as that progression stays inside the set -- `isa_encoding.agu_legal_trip` computes how long from `legal_values` alone.",
+      "derived_from": [
+        "agu.semantics",
+        "opcodes[mm].operands[acc].legal_values"
+      ],
+      "witness": "acc_agu_monotone",
+      "expect": {
+        "frontier_from_spec": "isa_encoding.agu_legal_trip(OP_MM, 'acc', base=0, stride=1)",
+        "design_accepts_up_to": "frontier",
+        "design_rejects_from": "frontier + 1",
+        "rejection_names_field": "f2"
+      },
+      "note": "At base 0 stride 1 the frontier is 2: an accumulate field driven by the reduce loop assembles for exactly two k-tiles and is rejected at the third."
+    },
+    {
+      "id": "a_term_on_acc_costs_one_of_the_budget",
+      "statement": "A term on `acc` costs one of the AGU_TERMS terms an instruction carries. The accumulating mm of the shipped tiled GEMM already spends all of them -- activations walk the reduce loop, weights walk both the column loop and the reduce loop -- so driving `acc` from the reduce loop needs one more than the instruction word has, and the budget refuses the instruction before the monotonicity frontier above is ever reached. Widening the address generator and relieving `acc` are therefore COMPLEMENTS, not alternatives: at AGU_TERMS = 3 the second constraint is unreachable for any program with a column loop.",
+      "derived_from": [
+        "agu.terms",
+        "opcodes[mm].operands"
+      ],
+      "witness": "acc_term_budget",
+      "expect": {
+        "terms_used_by_shipped_acc_mm": "agu.terms",
+        "terms_with_acc": "agu.terms + 1",
+        "refused_by_budget": true
+      },
+      "note": "`terms_used_by_shipped_acc_mm` is read out of the shipped program's own AGU word, not restated here."
+    },
+    {
+      "id": "the_maxdim_ceilings_are_the_encoding's",
+      "statement": "What bounds MAXDIM is the ENCODING, not the datapath, and both bounds follow from numbers already in this file. They answer different questions -- one asks what the operand layout can ADDRESS, the other what a CUBIC GEMM's header count can promise -- so neither is a correction of the other, and the binding one depends on the program. `isa_encoding.maxdim_ceiling` computes each over multiples of T, and the design refuses a cubic GEMM at exactly the value the cubic-header ceiling gives.",
+      "derived_from": [
+        "maxdim_ceilings",
+        "encoding_rule.usable_max",
+        "imem.count_slice_width",
+        "imem.entries[accu_iterations]"
+      ],
+      "witness": "maxdim_ceilings",
+      "expect": {
+        "agree_at_every_probe": true,
+        "ceilings_are_multiples_of_T": true,
+        "addressing_refused_at_import": true,
+        "cubic_header_refused_in_assemble": true,
+        "addressing_imports_at_ceiling": true,
+        "cubic_header_accepts_at_ceiling": true
+      },
+      "note": "The numbers are computed, not typed: at T=4 the addressing ceiling is 88 and the cubic-header ceiling is 76, so the cubic one binds; at T=8 they are 128 and 120, so the cubic one binds there too. An earlier revision of this file said 90 for the first, copied from the design's comment, which solved the inequality over the reals instead of over multiples of T."
+    },
+    {
+      "id": "program_limits_predict_what_assembles",
+      "statement": "The limits in `program_limits` decide exactly which GEMM shapes this build can run, and `isa_encoding.gemm_limits` computes which limit refuses a shape and by how much. For the shipped layout, a shape assembles if and only if every limit but the `split_operand_load` alternative fits.",
+      "derived_from": [
+        "program_limits.limits",
+        "derived_constants[MAXROWS]",
+        "imem.count_usable_max"
+      ],
+      "witness": "program_limits",
+      "expect": {
+        "agrees_on_every_shape": true
+      },
+      "note": "The `split_operand_load` row is the one that makes the answer actionable rather than final: at T=8 MAXDIM=128 the shipped layout is over by 1 on `max(M, K)` for 32x128x128 and 64x128x128, but splitting the B load removes K from the row count and both assemble and compute A@B exactly -- measured on the design, not argued. 128x128x128 is over by 1 even then, and its accu header count is over by 2049, so it needs both a wider nr and a wider header slice.",
+      "not_proved": "At both shipped configurations the `nr` limit bites before the header-count limit for every shape the shipped layout can emit, so widening `header_counts.accu` here changes no prediction and this property does not catch it. The header bound has its teeth in `the_maxdim_ceilings_are_the_encoding's` instead, which probes MAXDIM=88 at T=4 where the cubic GEMM is refused by the header alone. It is the same shape of masking as the AGU budget hiding the monotonicity frontier: a second constraint that is never reached because a first one refuses first. Worth knowing before anyone widens `nr` and expects the shapes to follow."
+    }
+  ],
+  "assertions": [
+    {
+      "expr": "T >= 4",
+      "why": "a packed operand word must hold the two 16-bit counts vru sends down wcol"
+    },
+    {
+      "expr": "MAXDIM % T == 0",
+      "why": "a DRAM row must be a whole number of packed words"
+    },
+    {
+      "expr": "OPERAND_ROWS <= 2048",
+      "why": "an address field carries 11 usable bits, and the layout numbers its rows 0 .. OPERAND_ROWS-1, so the highest address must be <= 2047"
+    },
+    {
+      "expr": "AR_RAW_DIST <= T",
+      "why": "a T-row GEMM must satisfy the accumulator distance contract"
+    },
+    {
+      "expr": "IMEM_SIZE % 8 == 0",
+      "why": "the program prefetch moves 8 words per iteration"
+    },
+    {
+      "expr": "IMEM_SIZE >= NHDR + IWORDS",
+      "why": "imem must hold the header and at least one instruction"
+    },
+    {
+      "expr": "SPAD_ROWS <= 2048 and NVR <= 2048 and NAR <= 2048",
+      "why": "a 12-bit address field carries 0..2047 under the encoding rule, and a memory of depth D is addressed 0..D-1, so D <= 2048 -- the same count-versus-address distinction as the addressing ceiling"
+    },
+    {
+      "expr": "SPAD_ROWS >= OPERAND_ROWS and NVR >= OPERAND_ROWS",
+      "why": "an operand memory smaller than the layout addresses assembles and gives wrong answers"
+    },
+    {
+      "expr": "NAR >= 2 * MAXDIM + 2",
+      "why": "AR_C is MAXDIM rows and AR_P another MAXDIM from MAXDIM+1"
+    },
+    {
+      "expr": "DMA_WORDS >= 1",
+      "why": "the operand burst moves at least one packed word per iteration"
+    }
+  ],
+  "derived_constants": [
+    {
+      "name": "VW",
+      "value": "T * 8",
+      "role": "packed operand word: T operand lanes"
+    },
+    {
+      "name": "AW",
+      "value": "T * 32",
+      "role": "packed accumulator word: T accumulator lanes"
+    },
+    {
+      "name": "WPR",
+      "value": "MAXDIM // T",
+      "role": "packed words per DRAM row; the legal range of col_block"
+    },
+    {
+      "name": "OPERAND_ROWS",
+      "value": "(MAXDIM // T) * MAXDIM",
+      "role": "the highest operand row the shipped GEMM's layout names; what the operand memories are sized from"
+    },
+    {
+      "name": "TEST_WINDOW",
+      "value": 64,
+      "role": "the fixed row window the stress harness's fuzz programs address, independently of MAXDIM; a floor under the operand memories"
+    },
+    {
+      "name": "BUS_BYTES",
+      "value": 64,
+      "role": "the m_axi beat the build aligns to (align_value 64)"
+    },
+    {
+      "name": "MAXROWS",
+      "value": 127,
+      "role": "the largest nr the 8-bit field admits under the encoding rule"
+    }
+  ],
+  "numerics": {
+    "_comment": [
+      "One entry per arithmetic configuration the design can be built in, and",
+      "`active` names the one this revision ships. A new configuration (bf16",
+      "operands with a 24-bit float accumulator, say) is ADDED as a sibling",
+      "with the same keys -- operand, accumulator, multiply, accumulate,",
+      "output -- and nothing above has to move. Every claim here is about",
+      "VALUES, not about widths: `exact` means the result is the exact",
+      "mathematical one, and where it is not, `rounding` and `overflow` say",
+      "what happens instead. That distinction is the reason this section",
+      "exists: with int8 operands every statement below is `exact` and any",
+      "model agrees with any other, which hides whether the model and the",
+      "design agree for the right reason.",
+      "",
+      "Order of accumulation is stated because it stops being irrelevant the",
+      "moment the accumulator rounds: the array sums strictly sequentially",
+      "down a PE column, in ascending contraction index, never as a tree."
+    ],
+    "active": "int8",
+    "configurations": {
+      "int8": {
+        "operand": {
+          "kind": "integer",
+          "signed": true,
+          "bits": 8,
+          "min": -128,
+          "max": 127,
+          "numpy_dtype": "int8",
+          "where": "A, B, C at the region boundary; spad and vr lanes"
+        },
+        "accumulator": {
+          "kind": "integer",
+          "signed": true,
+          "bits": 32,
+          "min": -2147483648,
+          "max": 2147483647,
+          "numpy_dtype": "int32",
+          "where": "ar lanes, and the partial sum travelling south through the array"
+        },
+        "multiply": {
+          "inputs": [
+            "operand",
+            "operand"
+          ],
+          "intermediate_bits": 16,
+          "exact": true,
+          "rounding": "none",
+          "note": "int8 x int8 is bounded by 128*128 = 16384, so a 16-bit product is exact and the multiplier stays narrow."
+        },
+        "accumulate": {
+          "format": "accumulator",
+          "operation": "integer addition",
+          "exact": false,
+          "rounding": "none",
+          "overflow": "wraparound, two's complement, at 32 bits",
+          "order": "strictly sequential in ascending contraction index, south down the PE column, then the mm's acc term",
+          "note": "Exact for every value that fits; a sum that does not fit wraps rather than saturating. With int8 operands and T <= 127 a single mm cannot overflow, but an accumulating chain of mms can, and so can a vadd."
+        },
+        "output": {
+          "from": "accumulator",
+          "to": "operand",
+          "conversion": "saturate",
+          "rounding": "none",
+          "saturate": {
+            "lo": -128,
+            "hi": 127
+          },
+          "where": "mvout, in accu, before the word leaves for dma_st",
+          "note": "Gemmini's mvout under ACC_SCALE_IDENTITY with shift 0, which is what its allo_cmp.c passes."
+        },
+        "elementwise": {
+          "vadd": {
+            "operation": "integer addition",
+            "format": "accumulator",
+            "exact": false,
+            "overflow": "wraparound, two's complement, at 32 bits"
+          },
+          "vrelu": {
+            "operation": "max(x, 0)",
+            "format": "accumulator",
+            "exact": true
+          }
+        }
+      }
+    }
+  },
+  "maxdim_ceilings": {
+    "_comment": [
+      "TWO ceilings bound MAXDIM, they answer DIFFERENT questions, and neither",
+      "is architectural -- both are the ENCODING. `isa_encoding.maxdim_ceiling`",
+      "computes each one rather than restating it, because the search must run",
+      "over MULTIPLES OF T (`MAXDIM % T == 0` is an assertion above). Solving",
+      "either inequality over the reals gives a number no build can use: that",
+      "is how `MAXDIM <= 90` came to be written into microarch_isa.py, into",
+      "docs/source/designs/benchmarks.rst and into an earlier revision of this",
+      "file, when the answer at T=4 is 88. The formula was also written",
+      "`MAXDIM**2 / T`, which is not what the layout computes -- it is",
+      "`(MAXDIM // T) * MAXDIM`, and the two differ exactly when MAXDIM is not",
+      "a multiple of T, which is the case the wrong answer rested on.",
+      "The off-by-one is worth the sentence: an earlier revision here wrote `OPERAND_ROWS <= 2047`, confusing a COUNT with the highest ADDRESS. It gave the right answer at T=4 by luck and the wrong one at T=8, and the conformance check found it by disagreeing with the design.",
+      "The same off-by-one appeared TWICE: once in the addressing ceiling and once in the memory-depth bound, both writing 2047 where a DEPTH (or a row count) is bounded by 2048 because its highest ADDRESS is 2047. Both gave the right answer at T=4 and the wrong one at T=8 MAXDIM=128, which is exactly the configuration a cross-team comparison turned on. Count versus highest address is the distinction to check first whenever a bound here is a power of two minus one.",
+      "Only the ADDRESSING ceiling is a build invariant; the cubic-header one is not, and asserting it at import would refuse a build that is fine for every shape but the largest cube. `check_parameters` therefore asserts the first and not the second, and the second lives here and in program_limits.header_counts, where it is checked per program by `assemble`."
+    ],
+    "ceilings": [
+      {
+        "name": "addressing",
+        "predicate": "(m // t) * m <= 2048",
+        "question": "How large a MAXDIM can the shipped GEMM's operand layout ADDRESS? A property of the layout and the address field, independent of the shape being run.",
+        "from": "an address field carries 11 usable bits (encoding_rule), so the highest operand ADDRESS must be <= 2047. The layout names OPERAND_ROWS rows, numbered 0 .. OPERAND_ROWS-1, so the bound is OPERAND_ROWS <= 2048 -- the design's import-time assert says the same thing. Writing it as OPERAND_ROWS <= 2047 is off by one and understates the ceiling at T=8 (120 instead of 128).",
+        "fails_as": "check_program: \"AGU-resolved f3=... is outside the 0..2047 range\", or the import-time assert on OPERAND_ROWS"
+      },
+      {
+        "name": "cubic_header",
+        "predicate": "m ** 3 // t ** 2 + m ** 2 // t <= 32767",
+        "question": "How large a MAXDIM can a CUBIC GEMM's header count promise accu? A property of the WORKLOAD as well as the encoding -- a non-cubic shape gives a different count, so this ceiling moves with the program.",
+        "from": "a header count is read back through a 15-bit slice (imem.count_slice_width), and accu's iteration count for an MxMxM GEMM is M**3/T**2 + M**2/T",
+        "fails_as": "assemble: \"header count ... does not fit 15 bits\""
+      }
+    ],
+    "note": "The binding ceiling for a build is the smaller of the two, and which one binds depends on the program. The design ships at MAXDIM=64, inside both."
+  },
+  "program_limits": {
+    "_comment": [
+      "Limits on what a PROGRAM may ask for, as opposed to what a BUILD may be",
+      "configured to. They are not interchangeable, and conflating them is an",
+      "error this file made: `MAXDIM <= MAXROWS` was asserted at build level,",
+      "which would refuse a MAXDIM=128 build outright. The design asserts no",
+      "such thing -- it imports fine at MAXDIM=128 and simply cannot run the",
+      "shapes whose row counts overflow `nr`.",
+      "Each limit carries a `need` and an `allowed` expression over (M, K, N, T) and this build's constants, so `isa_encoding.gemm_limits(M, K, N)` computes which limit refuses a shape and BY HOW MUCH. The margin is the point: `short by one in nr` is a design target, `cannot express` is not."
+    ],
+    "limits": [
+      {
+        "name": "build_extent",
+        "need": "max(M, K, N)",
+        "allowed": "MAXDIM",
+        "rule": "No dimension may exceed the build's MAXDIM.",
+        "enforced_by": "the program generators' own assert"
+      },
+      {
+        "name": "rows_per_instruction.shipped_layout",
+        "need": "max(M, K)",
+        "allowed": "MAXROWS",
+        "rule": "The shipped tiled-GEMM layout issues one dma_ld of K rows per B column block and one mm of M rows per tile, so both M and K travel in `nr`.",
+        "enforced_by": "isa_dsl.gemm_program's assert, and `enc` on the word itself",
+        "note": "A property of THIS LAYOUT, not of the ISA."
+      },
+      {
+        "name": "rows_per_instruction.split_operand_load",
+        "need": "M",
+        "allowed": "MAXROWS",
+        "rule": "Splitting the B load into several dma_lds removes K from the row count; only M still travels in `nr`. The instruction set permits this -- the shipped generator simply does not emit it.",
+        "enforced_by": "`enc` on the word itself",
+        "note": "Measured: at T=8 MAXDIM=128 this makes 32x128x128 and 64x128x128 assemble and compute A@B exactly, where the shipped layout refuses both."
+      },
+      {
+        "name": "header_counts.accu",
+        "need": "(K // T) * M * (N // T) + M * (N // T)",
+        "allowed": "32767",
+        "rule": "accu's per-unit work count is read back through a 15-bit slice. It is the largest header count, and it depends on the SHAPE, not only on MAXDIM.",
+        "enforced_by": "microarch_isa.assemble"
+      }
+    ]
+  }
+}

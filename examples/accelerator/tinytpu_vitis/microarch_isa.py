@@ -156,7 +156,7 @@ the flat loop closes at `Final II = 3` (II=2 with `ar` in registers, II=1 with a
 write-behind rotation at 13.7x the flip-flops, reverted). It is flat now because
 `schedule()` asserts the absence of that dependence with `s.dependence` -- a
 claim the assembler makes true by enforcing a minimum read-after-write
-distance on `ar` (THE ACCUMULATOR DISTANCE CONTRACT, below).
+distance on `ar` (the accumulator distance contract, `isa_spec.json`).
 
 **The PEs are flat too, and their weights are double-buffered.** A PE used to
 run one loop per `mm` with a serial prologue -- read the header, latch a weight,
@@ -263,11 +263,12 @@ II=1.
 
 ## Data type
 
-int8 lanes, int32 accumulation, `mvout` clipping to int8 -- Gemmini's default
-config (`inputType = SInt(8.W)`, `accType = SInt(32.W)`) and its `mvout`
-behaviour under `ACC_SCALE_IDENTITY` with shift 0, which is what `allo_cmp.c`
-passes. Packing is what makes the SIMD scratchpad work, and packing needs
-integers, so unlike `microarch_ws.py` (at `e2451b81`) there is no fp32 switch here.
+The widths, the exactness of each arithmetic stage and the output conversion
+are `isa_spec.json` "numerics"; the configuration shipped matches Gemmini's
+default (`inputType = SInt(8.W)`, `accType = SInt(32.W)`) and its `mvout`
+under `ACC_SCALE_IDENTITY` with shift 0. Packing is what makes the SIMD
+scratchpad work and packing needs integers, so unlike `microarch_ws.py` (at
+`e2451b81`) there is no fp32 switch here.
 """
 
 import os
@@ -278,134 +279,49 @@ from allo.customize import Partition
 import allo.dataflow as df
 
 # ---------------------------------------------------------------- the ISA ----
-# One 64-bit instruction word: a 6-bit opcode and five fields. The fields are
-# deliberately wide enough that the encoding is not the limit on problem size.
-#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
+# THE SPECIFICATION IS `isa_spec.json`, not this file. Every opcode number,
+# field position and width, the header layout, the AGU term encoding, the loop
+# semantics, the memory map, the two program contracts, the parameter ranges
+# and the numerics live there; `gen_isa.py --check` holds every constant and
+# every bit slice below to it, by value, by slice and by behaviour, and
+# `--conform` holds the EMITTED HLS's slices to it too. The narratives -- why
+# the fields carry a spare bit, why `nr` is 8 bits, what the accumulator's
+# dependence claim cost -- are on docs/source/designs/tinytpu_isa.rst.
 #
-# **Every field carries one more bit than its value range needs, because a
-# bit-slice USED TO BE extracted into a *signed* `ap_int<N>` in the emitted HLS:**
-#
-#     ap_int<7> v268;  v268 = w02(60, 54);   // nr
-#     int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
-#
-# so a field whose top bit was set read back negative, and a loop bounded by it
-# ran zero times. This cost a real bug: `nr = 64` for a 64-row `vld` silently
-# loaded nothing, and the design produced zeros. The Allo dataflow simulator
-# treated the slice as unsigned and passed, so **only cosim/csim caught it** --
-# a genuine simulator/RTL divergence, and the reason `cosim.py` is worth having
-# in the loop rather than at the end.
-#
-# Fixed since: slices are emitted unsigned (fork 3de74846, upstream #612, merged
-# in dc6b8fa6; limitations register item 12). The spare bit is kept as a
-# conservative encoding rule, and `enc()` still asserts it.
-#
-# The rule this imposed: an N-bit field safely carries 0 .. 2^(N-1) - 1. `nr`
-# is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
-# a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
-#
-# `nr` is the row count for *every* instruction that has one, and it is only 8
-# bits wide, 7 of them usable (<= MAXROWS = 127) under the spare-bit rule above.
-# That width is load-bearing, not cosmetic: a
-# synthesis tool bounds a runtime-bounded loop by the *range of the index*, so
-# when the row count came out of a 12-bit field Vitis assumed up to 4095 rows
-# per instruction and reported `Trip = 1023 / 2049` with a top-level latency of
-# 91407 cycles -- a worst-case bound from the encoding, not a property of the
-# design. Narrowing the field narrows the bound. Gemmini does the same thing:
-# its mvin/mvout carry an explicit, bounded row count.
+# The constants stay written out here rather than imported: this is the file
+# Vitis synthesises and the file the CHIA agent edits, and
+# chia_agent/spec_policy.py admits no import but `isa_dsl`. MiniTPU's
+# board_package/asm.py keeps its copies for the same reason and is checked the
+# same way.
 OP_NOP = 0
-OP_DMA_LD = 1     # f0=src|dst f1=dram_row0 f2=col_block f3=spad0|vr0   nr=rows
-OP_DMA_ST = 2     # (retired: results leave via OP_MVOUT)
-OP_VLD = 3        # f0=vr0  f1=spad0                            nr=rows
-OP_MM = 4         # f0=vr_a f1=ar0 f2=acc f3=spad_w     nr=rows
-OP_VADD = 5       # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
-OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
-OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
-OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
-OP_ENDLOOP = 9    # close the innermost loop
+OP_DMA_LD = 1
+OP_DMA_ST = 2     # retired; the number stays reserved
+OP_VLD = 3
+OP_MM = 4
+OP_VADD = 5
+OP_VRELU = 6
+OP_MVOUT = 7
+OP_LOOP = 8
+OP_ENDLOOP = 9
 
-# `dma_ld`'s f0: bit 0 is the SOURCE matrix, bit 1 the DESTINATION memory.
-#   0: A -> spad    1: B -> spad    2: A -> vr    3: B -> vr
-# f3 is then a scratchpad row or a vreg. The shipped GEMM uses 2 (activations
-# straight into the vregs) and 1 (weights into the scratchpad, where `mm`
-# names them).
-DMA_SRC_B = 1
-DMA_TO_VR = 2
-
-# ---- THE WRITE-BEFORE-READ CONTRACT (`mm` acc, `vadd`, `vrelu`, `mvout`) ----
-# `spad`, `vr` and `ar` are NOT cleared by the hardware. Their `= 0`
-# initialisers were removed to delete a 514-cycle memset, so at `ap_start`
-# each holds whatever the previous invocation (or power-up) left there. The
-# guarantee moved from the hardware to the program:
-#
-#   * `mm` with f2=1 (accumulate), `vadd` (both sources), `vrelu` (source) and
-#     `mvout` read `ar` rows, and every such row must have been written earlier
-#     in the SAME program -- by an overwriting `mm` (f2=0), a `vadd` or a
-#     `vrelu`. `ar` is the accumulator; reading it early is a wrong answer,
-#     not a crash.
-#   * `mm` reads `nr` activation rows of `vr` at f0 and T weight rows of
-#     `spad` at f3; those rows must hold data a `dma_ld` put there (directly,
-#     or into `spad` and then through a `vld`).
-#   * `vld` is a pure copy and MAY copy an unwritten `spad` row, but the copy
-#     is then unwritten too, and consuming it in an `mm` is an error.
-#
-# ---- THE ACCUMULATOR DISTANCE CONTRACT ----
-# `accu` runs at II=1 because `schedule()` tells Vitis there is no carried
-# dependence through `ar` (`s.dependence`, limitations register item 21). That
-# is true only if no row is read too soon after it was written: counting
-# `accu` iterations -- one per `mm`/`vrelu`/`mvout` row, two per `vadd` row
-# (first source on the even one; second source and the write on the odd
-# one) -- a read of an `ar` row must come at least AR_RAW_DIST iterations
-# after the write it depends on. Every GEMM satisfies it with room to spare
-# (an accumulating `mm`, a `vrelu` or an `mvout` reads row r exactly `M >= T`
-# iterations after the previous instruction wrote it), and `check_program`
-# rejects any program that does not, exactly as it rejects an unwritten read.
-# Why 4. In the synthesized loop (II=1, depth 6) the `ar` load issues in
-# pipeline state 5 and the store lands in state 7, so a read 1 or 2
-# iterations after the write returns the OLD row. Measured in RTL cosim with
-# `isa_dsl.ar_distance_program(d)`: d=1 -> 4 cells wrong, d=2 -> 20 wrong,
-# d=3, 4, 5 -> 0. The contract is the first safe distance plus one of margin,
-# and it equals T, the row count of the smallest GEMM, so no GEMM is
-# affected. `TPU_TB=stress` cosim runs `ar_distance_program(AR_RAW_DIST)` on
-# every build; a re-synthesis that widened the window fails there.
-#
-# `rbA`/`rbB` (dma_ld's burst buffers) and `ib` (the sequencer's program
-# buffer) are also unzeroed but cannot be read early: `ib` is filled by an
-# unconditional IMEM_SIZE-word burst, and the A/B spans are computed by
-# `assemble()` from the same resolved trace that names the rows `dma_ld` reads.
-#
-# `check_program()` below enforces all of this statically, and `assemble()`
-# calls it, so a program that violates the contract cannot be assembled.
-
+DMA_SRC_B = 1                  # dma_ld f0 bit 0: the source matrix
+DMA_TO_VR = 2                  # dma_ld f0 bit 1: the destination memory
 
 LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's loop stack
 IWORDS = 2                     # an instruction is two 64-bit words
-
 
 AGU_TERMS = 3                  # address terms per instruction
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
 
 
 def enc_agu(*terms):
-    """The second instruction word: up to `AGU_TERMS` address terms.
-
-    Each term is `(target, level, stride)` and resolves to
-    `field[target] += iv[level] * stride`, so an address can be relative to any
-    enclosing loop's induction variable. Terms name their target rather than
-    being fixed one-per-field, because a single field often needs two: the
-    weight `vld` inside the k loop is offset by both the n tile and the k tile,
-    `B_SP + nb*MAXDIM + kb*T`, and a one-term-per-field encoding cannot say it.
-
-    Without this a loop body would reissue identical addresses every iteration
-    and simply redo the same work, which is why MiniTPU exports its induction
-    variables to `sequencer_agu_resolve` instead of keeping them in the stack.
-
-    Field widths carry a spare bit each: a slice used to extract to a signed
-    `ap_int<N>` (see the encoding note above; fixed since, the rule is kept), so target is 4 bits for 0..4,
-    level 3 bits for 0..3, stride 12 bits for 0..2047."""
+    """The second instruction word: up to `AGU_TERMS` `(target, level, stride)`
+    address terms, encoded as `isa_spec.json` "agu" defines them."""
     assert len(terms) <= AGU_TERMS, f"at most {AGU_TERMS} address terms"
     w = 0
     for i, (target, level, stride) in enumerate(terms):
         assert 0 <= target <= 4 and 0 <= level < LOOP_DEPTH
+        # The spare-bit rule: an N-bit field carries 0 .. 2^(N-1) - 1.
         assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"
         base = 19 * i
         w |= (target << base) | (level << (base + 4)) | (stride << (base + 7))
@@ -413,14 +329,14 @@ def enc_agu(*terms):
 
 
 def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
-    """Assemble one instruction word. The compiler backend that lowers a TOSA
-    matmul into these lives only on `chia-codesign`, so programs are written
-    against this encoder -- by hand in `gemm_program_handwritten()` below, or
-    through the loop-nest generator in `isa_dsl.py`, which derives the AGU
-    levels from nesting instead of having them typed."""
-    # `< (1 << (w - 1))`, not `< (1 << w)`: the top bit is the sign bit once the
-    # field is extracted, see the encoding note above.
+    """Assemble one instruction word, as `isa_spec.json` "instruction_word"
+    defines it. The compiler backend that lowers a TOSA matmul into these lives
+    only on `chia-codesign`, so programs are written against this encoder -- by
+    hand in `gemm_program_handwritten()` below, or through the loop-nest
+    generator in `isa_dsl.py`, which derives the AGU levels from nesting
+    instead of having them typed."""
     for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 8)):
+        # `< (1 << (w - 1))`: the spare-bit rule, the top bit is never used.
         assert 0 <= v < (1 << (w - 1)), (
             f"field {v} does not fit in {w - 1} usable bits "
             f"(bit {w - 1} is the sign bit after extraction)")
@@ -437,27 +353,17 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
 # ---------------------------------------------------------------------------
 # THE HARDWARE. Every constant below is fixed at build time and is *independent
 # of the workload*: one RTL build runs every shape, with M, K and N arriving as
-# instruction fields rather than as Python constants.
-#
-# This is the property the comparison needs. Gemmini's numbers come from one
-# elaboration -- `allo_cmp.c` declares `elem_t A[MAXDIM][MAXDIM]` and passes
-# MAXDIM as the stride for every shape it runs -- so a per-workload
-# specialization on our side would not be measuring the same kind of object.
-# Earlier revisions of this file did exactly that: M/K/N, the instruction count,
-# and every unit's loop bound were compile-time constants, so 4x4x4 and
-# 16x16x16 were *different accelerators*. They are now the same one.
+# instruction fields rather than as Python constants. Their meanings, defaults,
+# legal ranges and cross-constraints are `isa_spec.json` "parameters", and
+# `gen_isa.py --check` holds each one to that table and to the environment
+# variable it must still be read from. Why one build has to serve every shape
+# for the Gemmini comparison to mean anything is on
+# docs/source/designs/gemmini_comparison.rst.
 # ---------------------------------------------------------------------------
 T = int(os.environ.get("TPU_T", 4))   # SIMD width == array dimension
-# T >= 4 so that a packed word has room for the two 16-bit counts `vru` sends
-# down `wcol` to the array (`mm` count, wavefront rows).
 assert T >= 4, "a packed operand word must be at least 32 bits"
-# T is the one parameter that changes the *shape* of the generated region:
-# the array is T*T kernel instances and the chains are T and T*T stream
-# arrays, so T=16 is 262 instances and ~800 streams. That was unrunnable
-# until the simulator's OpenMP team was sized to the section count
-# (docs/source/developer/limitations.rst, item 11); before that fix it hung with no output.
-VW = T * 8                     # packed operand word: T int8 lanes
-AW = T * 32                    # packed accumulator word: T int32 lanes
+VW = T * 8                     # packed operand word: T operand lanes
+AW = T * 32                    # packed accumulator word: T accumulator lanes
 
 MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))     # largest M, K, N supported
 # A, B and C are **flat** at the region boundary, addressed `row * MAXDIM + col`.
@@ -513,17 +419,33 @@ NAR = int(os.environ.get(
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 
 # ---- WHAT BOUNDS MAXDIM, AND AT WHAT VALUE ----
-# Two independent limits, both in the ENCODING rather than in the datapath, and
-# both measured by raising MAXDIM until they fired (`docs/source/designs/benchmarks.rst`):
+# Two limits, both in the ENCODING rather than in the datapath, and they answer
+# DIFFERENT questions, so neither is a correction of the other. The values are
+# computed by `isa_encoding.maxdim_ceiling`, not typed -- the search has to run
+# over multiples of T, and solving either inequality over the reals gives a
+# number no build can use. That is how `MAXDIM <= 90` came to be written here,
+# in `docs/source/designs/benchmarks.rst` and in the spec: the answer at T=4 is
+# 88, and the formula is `(MAXDIM // T) * MAXDIM`, not `MAXDIM*MAXDIM/T`, which
+# differ exactly when MAXDIM is not a multiple of T.
 #
-#   * an address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so
-#     an operand row must be <= 2047:  MAXDIM*MAXDIM/T <= 2047, i.e. MAXDIM <= 90
-#     at T=4. MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
-#     outside the 0..2047 range".
-#   * a header count is read back through a 15-bit slice, and the largest is
-#     `accu`'s iteration count, MAXDIM^3/T^2 + MAXDIM^2/T for a cubic GEMM, so
-#     MAXDIM <= 76 at T=4. MAXDIM=80 fails in `assemble` with
-#     "header count 33600 does not fit 15 bits".
+#   * ADDRESSING -- what the operand LAYOUT can address, whatever shape runs.
+#     An address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so
+#     the highest operand ADDRESS must be <= 2047. The layout numbers its rows
+#     0 .. OPERAND_ROWS-1, so the bound is `OPERAND_ROWS <= 2048`, which is
+#     what the assert below says: MAXDIM <= 88 at T=4, 128 at T=8. Writing it
+#     as `<= 2047` confuses a count with the highest address; it happens to
+#     give the right answer at T=4 and the wrong one at T=8.
+#   * CUBIC HEADER -- what a CUBIC GEMM's header count can promise `accu`. It
+#     is `MAXDIM^3/T^2 + MAXDIM^2/T`, read back through a 15-bit slice, so
+#     MAXDIM <= 76 at T=4, 120 at T=8. It moves with the WORKLOAD: a non-cubic
+#     shape gives a different count. Past it the module imports and `assemble`
+#     refuses: MAXDIM=80 fails with "header count 33600 does not fit 15 bits".
+#
+# The cubic-header ceiling binds at both T=4 and T=8, but which one binds is a
+# property of the program, not a constant. `gen_isa.py --check` confirms each
+# against the design by the STAGE it fires at -- past the addressing ceiling
+# the module will not import; between the two it imports and `assemble`
+# refuses -- so neither can take credit for the other's failure.
 #
 # MAXDIM=64 is the largest round value inside both, and is what the design
 # ships at. Neither limit is architectural: widening the fields or the header
@@ -538,20 +460,8 @@ assert OPERAND_ROWS <= (1 << 11), (
 MAXROWS = 127                                      # `nr` is 8 bits, top bit spare
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 
-# Instruction slots. Sized to the longest program shipped, not to a round
-# number: the sequencer's prefetch is `IMEM_SIZE` words long whatever the
-# program, so every unused slot is startup time -- the same arithmetic as under
-# `wrap_io=True`, which copied the declared length for the same reason.
-# With control flow the program is O(nesting), not O(tiles): the looped GEMM is
-# at most 14 instructions (with relu) at every shape, where the unrolled one
-# reaches 32 at 16x16x16. So imem is sized to the longest program shipped (the
-# stress harness's random programs, up to `_MAX_STATIC`) rather than to the
-# largest problem.
-#
-# This is not cosmetic. Measured when the prefetch moved one word per cycle:
-# moving to a 2-word instruction format cost exactly +68 cycles at all five
-# shapes, the 68 extra words it added -- the loop logic itself cost nothing.
-# The prefetch now moves 8 words per cycle, so the 56 words cost 7 cycles.
+# The prefetch is IMEM_SIZE words long whatever the program, so every unused
+# slot is startup time -- hence the longest program shipped, not a round number.
 _MAX_STATIC = 24               # longest program shipped, plus headroom
 IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
@@ -574,7 +484,7 @@ A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)
 B_SP = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
 AR_C = 0                       # the accumulator, up to MAXDIM words
 AR_P = MAXDIM + 1              # scratch region for vector-unit programs
-AR_RAW_DIST = 4                # see THE ACCUMULATOR DISTANCE CONTRACT
+AR_RAW_DIST = 4                # isa_spec.json accumulator_raw_distance
 assert AR_RAW_DIST <= T, "a T-row GEMM must satisfy the accumulator contract"
 assert IMEM_SIZE % 8 == 0, "the program prefetch moves 8 words per iteration"
 
@@ -1423,14 +1333,14 @@ def check_program(prog):
 
     What it checks, per dynamic issue:
 
-      * **write-before-read** on `spad`, `vr` and `ar` -- the contract at the
-        opcode table. Written-ness is tracked per row and propagated through
+      * **write-before-read** on `spad`, `vr` and `ar` -- the contract in
+        `isa_spec.json`. Written-ness is tracked per row and propagated through
         `vld` (a copy of an unwritten row is unwritten); it is an error only
         where a value is *consumed*: `mm` reading `vr` and `spad`, and
         `mm`-acc / `vadd` / `vrelu` / `mvout` reading `ar`.
-      * **the accumulator distance contract**: every `ar` read comes at least
-        `AR_RAW_DIST` `accu` iterations after the write it depends on, which
-        is what makes `schedule()`'s dependence claim on `ar` true.
+      * **the accumulator distance contract** (`isa_spec.json`): every `ar`
+        read comes at least `AR_RAW_DIST` `accu` iterations after the write it
+        depends on, which is what makes `schedule()`'s dependence claim true.
       * **bounds** on every memory and on `C`/`A`/`B`: an out-of-range row is
         silent corruption in RTL, not an exception.
       * **`nr >= 1`** on every data op. `dma_ld`, `spm`, `vru` and `dma_st` run
@@ -1438,8 +1348,8 @@ def check_program(prog):
         whenever the row counter runs out, so a zero-row instruction is
         fetched as if it had one row -- it desynchronises the unit, it is not
         a no-op.
-      * resolved fields below 2^11, the range `enc` admits (the encoding
-        note at the top). The sequencer writes the resolved sum back into the
+      * resolved fields below 2^11, the range `enc` admits (the spec's
+        encoding rule). The sequencer writes the resolved sum back into the
         12-bit field, so an AGU term can push a field past what `enc` would
         have accepted; this is the only place that can see it.
       * structure: balanced loops, depth <= LOOP_DEPTH, trip >= 1 (the
@@ -1502,7 +1412,7 @@ def check_program(prog):
                 raise ProgramError(
                     f"{where}: reads {mem} row(s) {bad} as {what} before any "
                     f"instruction wrote them. {mem} is not cleared by the "
-                    f"hardware; see the write-before-read contract.")
+                    f"hardware; see isa_spec.json, write_before_read.")
 
         if op == OP_NOP:
             continue
@@ -1521,8 +1431,8 @@ def check_program(prog):
                     f"{where}: reads ar row {row} as {what} "
                     f"{at - ar_wrote[row]} accu iteration(s) after it was "
                     f"written; the accumulator's dependence claim needs "
-                    f">= AR_RAW_DIST={AR_RAW_DIST} (see THE ACCUMULATOR "
-                    f"DISTANCE CONTRACT)")
+                    f">= AR_RAW_DIST={AR_RAW_DIST} (isa_spec.json, "
+                    f"accumulator_raw_distance)")
 
         def ar_write(row, at):
             written["ar"][row] = True
@@ -1575,26 +1485,9 @@ def check_program(prog):
 
 
 def assemble(prog, check=True):
-    """Two words per instruction, behind a header of dynamic per-unit counts.
-
-        imem[0] static instruction count   imem[4] mm count | mm rows << 16
-        imem[1] dma_ld  rows               imem[5] accu   iterations
-        imem[2] spm     rows               imem[6] dma_st rows
-        imem[3] vru     rows               imem[7] A rows | B rows << 16
-
-    imem[0] bounds the sequencer's fetch; every other count is dynamic, from
-    `expand`. They must match the sequencer's dispatch rules exactly.
-
-    **These are work counts, not instruction counts.** Each unit runs one flat
-    loop over the rows (or words, or iterations) it will actually process, so
-    what it is promised has to be the sum of `nr` over the instructions it is
-    sent, with the two per-unit adjustments the flattened bodies make:
-
-      * `spm` charges an `mm` `T + 1` iterations -- the header and the T
-        weight rows it pushes down `wcol` -- whatever the `mm`'s own `nr`;
-      * `accu` charges a `vadd` two iterations per row;
-      * a `dma_ld` goes to `spm` or to `vru` by its destination bit, never
-        both.
+    """Two words per instruction, behind the header `isa_spec.json` "imem"
+    lays out. Every count but the static one is dynamic, from `expand`, and
+    they must match the sequencer's dispatch rules exactly.
 
     A unit promised the wrong number here does not produce a wrong answer, it
     hangs -- which is worth stating, because it is the one place where the
@@ -1683,8 +1576,8 @@ def schedule(s):
         dependent=False,
         because=(
             f"check_program() rejects any program that reads an ar row within "
-            f"AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing it (THE "
-            f"ACCUMULATOR DISTANCE CONTRACT); assemble() enforces it, the "
+            f"AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing it "
+            f"(isa_spec.json, accumulator_raw_distance); assemble() enforces it, the "
             f"hardware does not, and only TPU_TB=stress cosim can see a breach"
         ),
     )

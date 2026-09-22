@@ -43,6 +43,9 @@ Stages, in order:
      into `mlir/build`; a fresh checkout has none, and the editable install in
      the `allo` env points at whichever tree ran `pip install -e`), and makes
      `import allo` resolve to this checkout;
+  1b. gen_isa.py --check -- the ISA spec's conformance check: every generated
+     artefact byte-identical to isa_spec.json, and the design and the
+     reference model held to it; must print ISA OK;
   2. bench_isa.py -- the published functional sweep, must print ALL EXACT;
   3. stress_isa.py -- the correctness gate, must print STRESS OK;
   3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK;
@@ -59,7 +62,8 @@ in RTL alone and needs a cosim of its own. With --no-cosim, stage 3b runs
 `mutate.py --no-rtl`: the functional levels only, ~5 min, and the RTL-only
 mutant is reported as not run rather than as caught.
 
-Also not run by any option: `cosim.py TPU_TB=stress`, and
+Also not run by any option: `cosim.py TPU_TB=stress`, `gen_isa.py --conform`
+(stage 1b plus the emitted HLS's own bit slices, which needs an HLS build), and
 `chia_agent/param_check.py`.
 
 Needs: the `allo` conda env, LLVM at $LLVM_BUILD_DIR (default in this script),
@@ -131,6 +135,8 @@ case "$where" in
 esac
 
 cd "$HERE"
+echo "== gen_isa.py --check (the ISA spec and both its consumers)"
+out=$("$PY" gen_isa.py --check | tail -1); echo "$out"; grep -q "ISA OK" <<<"$out"
 echo "== bench_isa.py (published functional setup)"
 out=$("$PY" bench_isa.py | tail -1); echo "$out"; grep -q "ALL EXACT" <<<"$out"
 echo "== stress_isa.py (correctness gate)"

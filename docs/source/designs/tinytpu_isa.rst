@@ -289,84 +289,623 @@ see `Earlier measurements and corrections`_.
 Data type
 ~~~~~~~~~
 
-int8 lanes, int32 accumulation, clipping to int8 on the way out -- Gemmini's
-default config (``inputType = SInt(8.W)``, ``accType = SInt(32.W)``) and its
-``mvout`` behaviour under ``ACC_SCALE_IDENTITY`` with shift 0, which is what
-``allo_cmp.c`` passes. Packing is what makes the SIMD scratchpad work, and
-packing needs integers, so unlike ``microarch_ws.py`` (at ``e2451b81``) there is
-no fp32 switch.
+Packing is what makes the SIMD scratchpad work, and packing needs integers, so
+unlike ``microarch_ws.py`` (at ``e2451b81``) there is no fp32 switch. The
+widths, the exactness of each stage and the output conversion are the
+:ref:`tinytpu-isa-spec` numerics table; the configuration shipped is Gemmini's
+default (``inputType = SInt(8.W)``, ``accType = SInt(32.W)``) with its
+``mvout`` behaviour under ``ACC_SCALE_IDENTITY`` and shift 0, which is what
+``allo_cmp.c`` passes.
 
+
+.. _tinytpu-isa-spec:
 
 The ISA
 -------
 
-Instruction format
-~~~~~~~~~~~~~~~~~~
+**Every fact in this section is generated from**
+``examples/accelerator/tinytpu_vitis/isa_spec.json``, which is the source of
+truth for the instruction encoding, the opcodes, the instruction-memory header,
+the memory map, the two program contracts, the build parameters and the
+numerics. ``gen_isa.py --write`` regenerates the tables below and
+``isa_encoding.py``; ``gen_isa.py --check`` fails if either is stale or if the
+design or the reference model has drifted from the spec. The prose outside the
+generated region is hand-written rationale.
 
-An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
-6-bit opcode and five fields; the second carries up to three address-generation
-(AGU) terms.
+.. BEGIN GENERATED: examples/accelerator/tinytpu_vitis/gen_isa.py
+
+.. Generated from examples/accelerator/tinytpu_vitis/isa_spec.json.
+   Edit the spec and run ``python gen_isa.py --write``; ``--check``
+   fails if this region is stale.
+
+Bit layout
+^^^^^^^^^^
+
+Most significant on the left. ``enc()`` builds word 0 and ``enc_agu()`` word 1; both are generated from the field table below, so neither picture can go stale.
 
 .. code-block:: text
 
-   word 0, one cell per bit, most significant on the left (``enc()``):
+   word 0:
+   +------------+------------+------------+------------+------------+------------+------------+
+   |            |     nr     |     f3     |     f2     |     f1     |     f0     |     op     |
+   |   63:62    |   61:54    |   53:42    |   41:30    |   29:18    |    17:6    |    5:0     |
+   +------------+------------+------------+------------+------------+------------+------------+
 
-   +--+--------+------------+------------+------------+------------+------+
-   |  |   nr   |     f3     |     f2     |     f1     |     f0     |  op  |
-   |  | 61:54  |   53:42    |   41:30    |   29:18    |   17:6     | 5:0  |
-   +--+--------+------------+------------+------------+------------+------+
-     ^ 63:62 unused
+   word 1: up to AGU_TERMS = 3 address terms of 19 bits:
+   +------------+------------+------------+------------+
+   |            |   term 2   |   term 1   |   term 0   |
+   |   63:57    |   56:38    |   37:19    |    18:0    |
+   +------------+------------+------------+------------+
 
-   word 1, up to AGU_TERMS = 3 address terms of 19 bits (``enc_agu()``):
+   one term:    stride [18:7]   level [6:4]   target [3:0]
+   resolves to: field[target] += iv[level] * stride, for each term with target != 0, in term order
 
-   +-------+-------------------+-------------------+-------------------+
-   |       |      term 2       |      term 1       |      term 0       |
-   | 63:57 |       56:38       |       37:19       |       18:0        |
-   +-------+-------------------+-------------------+-------------------+
-      ^ unused
+Bits 62, 63 of word 0 and bits 63:57 of word 1 are unused.
 
-   one term:   stride [18:7]   level [6:4]   target [3:0]
-   resolves to:   field[target] += iv[level] * stride
+.. list-table:: Who reads this spec, and how each one is held to it
+   :header-rows: 1
 
-.. list-table:: Opcodes (``microarch_isa.py``)
+   * - file
+     - held
+     - note
+   * - ``examples/accelerator/tinytpu_vitis/isa_encoding.py``
+     - generated
+     - The spec as Python. Regenerated and diffed byte for byte by gen_isa.py --check.
+   * - ``docs/source/designs/tinytpu_isa.rst``
+     - generated
+     - The ISA tables, between the GENERATED markers. The prose around them is hand-written.
+   * - ``examples/accelerator/tinytpu_vitis/microarch_isa.py``
+     - checked
+     - The design. Keeps its constants and bit slices written out -- it is what Vitis synthesises, and chia_agent/spec_policy.py admits no import but isa_dsl -- and is held to this file by value, by slice, by behaviour and by parameter range.
+   * - ``examples/accelerator/tinytpu_vitis/isa_dsl.py``
+     - checked
+     - The program generator, through the encoder it shares with the design.
+   * - ``examples/accelerator/tinytpu_vitis/isa_ref.py``
+     - built on the generated module
+     - The reference model. Names operands by the ``name`` given below and never sees a bit position, an opcode number or a numeric width the design chose.
+   * - ``allo/encoding.py``
+     - checked
+     - ``TINYTPU_ISA``: the compiler-side descriptor of what one instruction word can carry. It imports nothing from examples/, so its address_terms and loop_depth budgets are checked against ``agu.terms`` and ``loop_stack.depth`` rather than generated.
+
+Instruction word
+^^^^^^^^^^^^^^^^
+
+An instruction is **2 64-bit words** (``IWORDS``). Word 0 carries the opcode and five fields; word 1 carries up to 3 address-generation terms.
+
+.. list-table:: Instruction word 0
+   :header-rows: 1
+
+   * - field
+     - bits
+     - width
+     - usable range
+     - role
+   * - ``op``
+     - ``[0:6]``
+     - 6
+     - 0 .. 31
+     - opcode
+   * - ``f0``
+     - ``[6:18]``
+     - 12
+     - 0 .. 2047
+     - operand field, AGU target 1
+   * - ``f1``
+     - ``[18:30]``
+     - 12
+     - 0 .. 2047
+     - operand field, AGU target 2
+   * - ``f2``
+     - ``[30:42]``
+     - 12
+     - 0 .. 2047
+     - operand field, AGU target 3
+   * - ``f3``
+     - ``[42:54]``
+     - 12
+     - 0 .. 2047
+     - operand field, AGU target 4
+   * - ``nr``
+     - ``[54:62]``
+     - 8
+     - 0 .. 127
+     - row count, or loop trip count
+
+Every field carries one more bit than its value range needs: an N-bit field safely holds ``0 .. 2^(N-1) - 1``, the spare-bit rule below.
+
+.. list-table:: Instruction word 1: one AGU term (19 bits, 3 of them)
+   :header-rows: 1
+
+   * - subfield
+     - bits
+     - width
+     - usable range
+     - meaning
+   * - ``target``
+     - ``[0:4]``
+     - 4
+     - 0 .. 7
+     - 4 bits for 0..4 under the spare-bit rule.
+   * - ``level``
+     - ``[4:7]``
+     - 3
+     - 0 .. 3
+     - 3 bits for 0..LOOP_DEPTH-1.
+   * - ``stride``
+     - ``[7:19]``
+     - 12
+     - 0 .. 2047
+     - 12 bits for 0..2047.
+
+A term resolves to ``field[target] += iv[level] * stride, for each term with target != 0, in term order``. Targets: 0 = unused, 1 = ``f0``, 2 = ``f1``, 3 = ``f2``, 4 = ``f3``.
+
+Opcodes
+^^^^^^^
+
+.. list-table:: Opcodes
+   :header-rows: 1
+
+   * - constant
+     - value
+     - name
+     - operand fields
+     - ``nr``
+     - units
+   * - ``OP_NOP``
+     - 0
+     - nop
+     -
+     - none
+     - --
+   * - ``OP_DMA_LD``
+     - 1
+     - dma_ld
+     - | ``f0`` = mode: source matrix | destination memory
+       | ``f1`` = dram_row0: first DRAM row of the source matrix
+       | ``f2`` = col_block: packed-word column block within the row, 0 .. WPR-1
+       | ``f3`` = dst_row0: first destination row, in spad or vr by the mode bit
+     - nr DRAM rows
+     - ``dma_ld``, spm (dst = spad) or vru (dst = vr)
+   * - ``OP_DMA_ST``
+     - 2
+     - dma_st
+     - Retired: results leave via mvout. ``check_program`` refuses it, so the number stays reserved rather than reusable.
+     - none
+     - --
+   * - ``OP_VLD``
+     - 3
+     - vld
+     - | ``f0`` = vr0: first destination vreg row
+       | ``f1`` = spad0: first source scratchpad row
+     - nr packed words
+     - ``spm``, ``vru``
+   * - ``OP_MM``
+     - 4
+     - mm
+     - | ``f0`` = vr_a: first activation row in vr
+       | ``f1`` = ar0: first accumulator row
+       | ``f2`` = acc: 0 = overwrite ar, 1 = accumulate into ar
+       | ``f3`` = spad_w: first of T weight rows in spad
+     - nr activation rows (wavefront rows through the array)
+     - ``spm``, ``vru``, ``accu``
+   * - ``OP_VADD``
+     - 5
+     - vadd
+     - | ``f0`` = ar_d: first destination accumulator row
+       | ``f1`` = ar_s1: first row of the left source
+       | ``f2`` = ar_s2: first row of the right source
+     - nr accumulator rows
+     - ``accu``
+   * - ``OP_VRELU``
+     - 6
+     - vrelu
+     - | ``f0`` = ar_d: first destination accumulator row
+       | ``f1`` = ar_s: first source accumulator row
+     - nr accumulator rows
+     - ``accu``
+   * - ``OP_MVOUT``
+     - 7
+     - mvout
+     - | ``f0`` = ar0: first accumulator row to retire
+       | ``f1`` = dram_row0: first DRAM row of C
+       | ``f2`` = col_block: packed-word column block of C, 0 .. WPR-1
+     - nr accumulator rows
+     - ``accu``, ``dma_st``
+   * - ``OP_LOOP``
+     - 8
+     - loop
+     -
+     - nr is the trip count, minimum 1
+     - ``sequencer``
+   * - ``OP_ENDLOOP``
+     - 9
+     - endloop
+     -
+     - none
+     - ``sequencer``
+
+Derived properties
+^^^^^^^^^^^^^^^^^^
+
+Facts that **follow** from the tables above rather than being written in them. ``gen_isa.py --check`` recomputes each one from the spec and then confirms the design behaves that way, so they are checked rather than asserted -- every one of them was documented wrongly here until 2026-09-21, which is the argument for computing them.
+
+``every_operand_field_is_an_agu_target``
+   Every operand field is a legal AGU target, including one with a restricted value set such as mm's ``acc``. Nothing in the encoding or in the sequencer distinguishes them: the sequencer adds iv[level] * stride to whichever field the term names and writes the sum back, and it does not know which fields have restricted values.
+
+   Derived from: ``agu.targets``, ``agu.semantics``.
+
+   **Corrects:** Three documents in this project described ``acc`` as a static field that cannot be predicated on an induction variable. That is false. The real obstacle is the next property.
+
+``agu_terms_are_additively_monotone``
+   An AGU term contributes base + iv * stride with no predication, no saturation and no wrap, so the values a field takes over a loop of trip t are the arithmetic progression base, base + stride, ..., base + (t-1) * stride, and nothing bends it back inside a bound. A field with a restricted value set is therefore drivable from a loop for exactly as long as that progression stays inside the set -- ``isa_encoding.agu_legal_trip`` computes how long from ``legal_values`` alone.
+
+   Derived from: ``agu.semantics``, ``opcodes[mm].operands[acc].legal_values``.
+
+   At base 0 stride 1 the frontier is 2: an accumulate field driven by the reduce loop assembles for exactly two k-tiles and is rejected at the third.
+
+``a_term_on_acc_costs_one_of_the_budget``
+   A term on ``acc`` costs one of the AGU_TERMS terms an instruction carries. The accumulating mm of the shipped tiled GEMM already spends all of them -- activations walk the reduce loop, weights walk both the column loop and the reduce loop -- so driving ``acc`` from the reduce loop needs one more than the instruction word has, and the budget refuses the instruction before the monotonicity frontier above is ever reached. Widening the address generator and relieving ``acc`` are therefore COMPLEMENTS, not alternatives: at AGU_TERMS = 3 the second constraint is unreachable for any program with a column loop.
+
+   Derived from: ``agu.terms``, ``opcodes[mm].operands``.
+
+   ``terms_used_by_shipped_acc_mm`` is read out of the shipped program's own AGU word, not restated here.
+
+``the_maxdim_ceilings_are_the_encoding's``
+   What bounds MAXDIM is the ENCODING, not the datapath, and both bounds follow from numbers already in this file. They answer different questions -- one asks what the operand layout can ADDRESS, the other what a CUBIC GEMM's header count can promise -- so neither is a correction of the other, and the binding one depends on the program. ``isa_encoding.maxdim_ceiling`` computes each over multiples of T, and the design refuses a cubic GEMM at exactly the value the cubic-header ceiling gives.
+
+   Derived from: ``maxdim_ceilings``, ``encoding_rule.usable_max``, ``imem.count_slice_width``, ``imem.entries[accu_iterations]``.
+
+   The numbers are computed, not typed: at T=4 the addressing ceiling is 88 and the cubic-header ceiling is 76, so the cubic one binds; at T=8 they are 128 and 120, so the cubic one binds there too. An earlier revision of this file said 90 for the first, copied from the design's comment, which solved the inequality over the reals instead of over multiples of T.
+
+``program_limits_predict_what_assembles``
+   The limits in ``program_limits`` decide exactly which GEMM shapes this build can run, and ``isa_encoding.gemm_limits`` computes which limit refuses a shape and by how much. For the shipped layout, a shape assembles if and only if every limit but the ``split_operand_load`` alternative fits.
+
+   Derived from: ``program_limits.limits``, ``derived_constants[MAXROWS]``, ``imem.count_usable_max``.
+
+   The ``split_operand_load`` row is the one that makes the answer actionable rather than final: at T=8 MAXDIM=128 the shipped layout is over by 1 on ``max(M, K)`` for 32x128x128 and 64x128x128, but splitting the B load removes K from the row count and both assemble and compute A@B exactly -- measured on the design, not argued. 128x128x128 is over by 1 even then, and its accu header count is over by 2049, so it needs both a wider nr and a wider header slice.
+
+Per-unit rewrites
+^^^^^^^^^^^^^^^^^
+
+The sequencer hands two units a rewritten copy of the word, so each unit's flat row loop reads its own work count out of ``nr``:
+
+.. list-table::
    :header-rows: 1
 
    * - opcode
-     - value
-     - fields
-   * - ``OP_NOP``
-     - 0
-     -
-   * - ``OP_DMA_LD``
-     - 1
-     - ``f0`` = src | dst << 1 (src: 0 = A, 1 = B; dst: 0 = ``spad``, 1 = ``vr``),
-       ``f1`` = dram_row0, ``f2`` = col_block, ``f3`` = spad0 or vr0,
-       ``nr`` = rows
-   * - ``OP_DMA_ST``
-     - 2
-     - retired: results leave via ``OP_MVOUT``
-   * - ``OP_VLD``
-     - 3
-     - ``f0`` = vr0, ``f1`` = spad0, ``nr`` = rows
-   * - ``OP_MM``
+     - unit
+     - rewritten to
+     - why
+   * - ``mm``
+     - ``spm``
+     - ``nr`` = T + 1, ``f1`` = the instruction's own nr
+     - One header word plus T weight rows down wcol; f1 carries the array's row count into the header word.
+   * - ``vadd``
+     - ``accu``
+     - ``nr`` = 2 * nr
+     - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
+
+Instruction memory header
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``imem[0:NHDR]`` (``NHDR = 8``) is a header of per-unit **work** counts; instructions follow, two words each. Each count is read back through a 16-bit slice, so it stops at 32767.
+
+.. list-table:: Header words
+   :header-rows: 1
+
+   * - word
+     - bits
+     - name
+     - count
+     - consumer
+   * - ``imem[0]``
+     - ``[0:16]``
+     - ``n_instr``
+     - static instruction count
+     - ``sequencer``
+   * - ``imem[1]``
+     - ``[0:16]``
+     - ``dma_ld_rows``
+     - rows of ``dma_ld``
+     - ``dma_ld``
+   * - ``imem[2]``
+     - ``[0:16]``
+     - ``spm_rows``
+     - | the sum of:
+       |   rows of ``dma_ld`` with destination ``spad``
+       |   rows of ``vld``
+       |   issues of ``mm``, times T + 1
+     - ``spm``
+   * - ``imem[3]``
+     - ``[0:16]``
+     - ``vru_words``
+     - | the sum of:
+       |   rows of ``dma_ld`` with destination ``vr``
+       |   rows of ``vld``
+       |   rows of ``mm``
+     - ``vru``
+   * - ``imem[4]``
+     - ``[0:16]``
+     - ``mm_count``
+     - issues of ``mm``
+     - the array, via spm's header word
+   * - ``imem[4]``
+     - ``[16:32]``
+     - ``mm_rows``
+     - rows of ``mm``
+     - the array, via spm's header word
+   * - ``imem[5]``
+     - ``[0:16]``
+     - ``accu_iterations``
+     - | the sum of:
+       |   rows of ``mm``, ``vrelu``, ``mvout``
+       |   rows of ``vadd``, times 2
+     - ``accu``
+   * - ``imem[6]``
+     - ``[0:16]``
+     - ``dma_st_rows``
+     - rows of ``mvout``
+     - ``dma_st``
+   * - ``imem[7]``
+     - ``[0:16]``
+     - ``a_span``
+     - max(first row + rows) over ``dma_ld`` with source ``A``
+     - ``dma_ld``
+   * - ``imem[7]``
+     - ``[16:32]``
+     - ``b_span``
+     - max(first row + rows) over ``dma_ld`` with source ``B``
+     - ``dma_ld``
+
+Memory map
+^^^^^^^^^^
+
+.. list-table:: Memories
+   :header-rows: 1
+
+   * - memory
+     - owner
+     - depth
+     - row width
+     - written by
+     - read by
+     - cleared at start
+   * - ``spad``
+     - ``spm``
+     - ``SPAD_ROWS``
+     - ``T * 8`` bits
+     - dma_ld (dst = spad)
+     - vld, mm (weights)
+     - **no**
+   * - ``vr``
+     - ``vru``
+     - ``NVR``
+     - ``T * 8`` bits
+     - dma_ld (dst = vr), vld
+     - mm (activations)
+     - **no**
+   * - ``ar``
+     - ``accu``
+     - ``NAR``
+     - ``T * 32`` bits
+     - mm, vadd, vrelu
+     - mm (acc = 1), vadd, vrelu, mvout
+     - **no**
+   * - ``imem``
+     - ``sequencer``
+     - ``IMEM_SIZE``
+     - ``64`` bits
+     - the host, through m_axi
+     - sequencer
+     - **no**
+   * - ``A``
+     - ``dma_ld``
+     - ``MAXDIM * MAXDIM``
+     - ``8`` bits
+     - the host
+     - dma_ld
+     - **no**
+   * - ``B``
+     - ``dma_ld``
+     - ``MAXDIM * MAXDIM``
+     - ``8`` bits
+     - the host
+     - dma_ld
+     - **no**
+   * - ``C``
+     - ``dma_st``
+     - ``MAXDIM * MAXDIM``
+     - ``8`` bits
+     - dma_st (mvout)
+     - the host
+     - **no**
+
+No on-chip memory is cleared by the hardware, so every read of one is the program's obligation; see the contracts below.
+
+Contracts
+^^^^^^^^^
+
+**Write before read.**
+
+* Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu.
+* Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there -- directly, or into spad and then through a vld.
+* vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error.
+* nr >= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op.
+* Every resolved field must be within 0 .. 2047, the range the encoding rule admits.
+
+Enforced by microarch_isa.check_program, which microarch_isa.assemble calls, so a violating program cannot be assembled.
+
+**The accumulator read-after-write distance.** A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on. ``AR_RAW_DIST = 4`` accu iterations; cost per opcode: ``mm`` 1 per row, ``vrelu`` 1 per row, ``mvout`` 1 per row, ``vadd`` 2 per row: first source on the even iteration, second source and the write on the odd one. Enforced by microarch_isa.check_program. Exercised at its edge by isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build.
+
+Parameters
+^^^^^^^^^^
+
+.. list-table:: Build parameters
+   :header-rows: 1
+
+   * - constant
+     - environment variable
+     - default
+     - legal range
+     - role
+   * - ``T``
+     - ``TPU_T``
      - 4
-     - ``f0`` = vr_a (activations), ``f1`` = ar0, ``f2`` = acc, ``f3`` =
-       spad_w (T weight rows), ``nr`` = rows
-   * - ``OP_VADD``
-     - 5
-     - ``f0`` = ar_d, ``f1`` = ar_s1, ``f2`` = ar_s2, ``nr`` = rows
-   * - ``OP_VRELU``
-     - 6
-     - ``f0`` = ar_d, ``f1`` = ar_s, ``nr`` = rows
-   * - ``OP_MVOUT``
-     - 7
-     - ``f0`` = ar0, ``f1`` = dram_row0, ``f2`` = col_block, ``nr`` = rows (acc -> DRAM)
-   * - ``OP_LOOP``
+     - 4 .. unbounded
+     - SIMD width, and the array dimension: the array is T*T processing elements
+   * - ``MAXDIM``
+     - ``TPU_MAXDIM``
+     - 64
+     - 4 .. unbounded
+     - largest M, K, N supported by one build
+   * - ``SPAD_ROWS``
+     - ``TPU_SPAD``
+     - ``max(TEST_WINDOW, OPERAND_ROWS)``
+     - 1 .. 2048
+     - scratchpad depth in packed words
+   * - ``NVR``
+     - ``TPU_NVR``
+     - ``max(TEST_WINDOW, OPERAND_ROWS)``
+     - 1 .. 2048
+     - operand vector registers
+   * - ``NAR``
+     - ``TPU_NAR``
+     - ``max(128, TEST_WINDOW, 2 * MAXDIM + 8)``
+     - 1 .. 2048
+     - accumulator vector registers
+   * - ``IMEM_SIZE``
+     - ``TPU_IMEM``
+     - ``NHDR + IWORDS * 24``
+     - 8 .. unbounded
+     - instruction memory depth in 64-bit words
+   * - ``QD``
+     - ``TPU_QD``
      - 8
-     - open a loop, body is the next instruction; ``nr`` = trip count
-   * - ``OP_ENDLOOP``
-     - 9
-     - close the innermost loop
+     - 2 .. unbounded
+     - stream depth on every point-to-point channel
+   * - ``DMA_WORDS``
+     - ``TPU_DMA_WORDS``
+     - ``min(WPR, max(1, BUS_BYTES // (VW // 8))) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1``
+     - 1 .. unbounded
+     - packed words the operand burst moves per loop iteration
+
+.. list-table:: Derived constants
+   :header-rows: 1
+
+   * - constant
+     - value
+     - role
+   * - ``VW``
+     - ``T * 8``
+     - packed operand word: T operand lanes
+   * - ``AW``
+     - ``T * 32``
+     - packed accumulator word: T accumulator lanes
+   * - ``WPR``
+     - ``MAXDIM // T``
+     - packed words per DRAM row; the legal range of col_block
+   * - ``OPERAND_ROWS``
+     - ``(MAXDIM // T) * MAXDIM``
+     - the highest operand row the shipped GEMM's layout names; what the operand memories are sized from
+   * - ``TEST_WINDOW``
+     - ``64``
+     - the fixed row window the stress harness's fuzz programs address, independently of MAXDIM; a floor under the operand memories
+   * - ``BUS_BYTES``
+     - ``64``
+     - the m_axi beat the build aligns to (align_value 64)
+   * - ``MAXROWS``
+     - ``127``
+     - the largest nr the 8-bit field admits under the encoding rule
+
+Cross-parameter constraints, asserted by ``isa_encoding.check_parameters()``:
+
+* ``T >= 4`` -- a packed operand word must hold the two 16-bit counts vru sends down wcol
+* ``MAXDIM % T == 0`` -- a DRAM row must be a whole number of packed words
+* ``OPERAND_ROWS <= 2048`` -- an address field carries 11 usable bits, and the layout numbers its rows 0 .. OPERAND_ROWS-1, so the highest address must be <= 2047
+* ``AR_RAW_DIST <= T`` -- a T-row GEMM must satisfy the accumulator distance contract
+* ``IMEM_SIZE % 8 == 0`` -- the program prefetch moves 8 words per iteration
+* ``IMEM_SIZE >= NHDR + IWORDS`` -- imem must hold the header and at least one instruction
+* ``SPAD_ROWS <= 2048 and NVR <= 2048 and NAR <= 2048`` -- a 12-bit address field carries 0..2047 under the encoding rule, and a memory of depth D is addressed 0..D-1, so D <= 2048 -- the same count-versus-address distinction as the addressing ceiling
+* ``SPAD_ROWS >= OPERAND_ROWS and NVR >= OPERAND_ROWS`` -- an operand memory smaller than the layout addresses assembles and gives wrong answers
+* ``NAR >= 2 * MAXDIM + 2`` -- AR_C is MAXDIM rows and AR_P another MAXDIM from MAXDIM+1
+* ``DMA_WORDS >= 1`` -- the operand burst moves at least one packed word per iteration
+
+What bounds ``MAXDIM``
+^^^^^^^^^^^^^^^^^^^^^^
+
+Two ceilings, both in the **encoding** rather than the datapath. They answer different questions, so neither is a correction of the other, and which one binds depends on the program and on ``T``. The values below are **computed** by ``isa_encoding.maxdim_ceiling``, over multiples of ``T``: solving either inequality over the reals gives a number no build can use.
+
+.. list-table:: ``MAXDIM`` ceilings
+   :header-rows: 1
+
+   * - ceiling
+     - at T=4
+     - at T=8
+     - predicate
+     - the question it answers
+     - how the design refuses past it
+   * - ``addressing``
+     - 88
+     - 128
+     - ``(MAXDIM // T) * MAXDIM <= 2048``
+     - How large a MAXDIM can the shipped GEMM's operand layout ADDRESS? A property of the layout and the address field, independent of the shape being run.
+     - check_program: "AGU-resolved f3=... is outside the 0..2047 range", or the import-time assert on OPERAND_ROWS
+   * - ``cubic_header``
+     - 76
+     - 120
+     - ``MAXDIM ** 3 // T ** 2 + MAXDIM ** 2 // T <= 32767``
+     - How large a MAXDIM can a CUBIC GEMM's header count promise accu? A property of the WORKLOAD as well as the encoding -- a non-cubic shape gives a different count, so this ceiling moves with the program.
+     - assemble: "header count ... does not fit 15 bits"
+
+The binding ceiling for a build is the smaller of the two, and which one binds depends on the program. The design ships at MAXDIM=64, inside both.
+
+Numerics
+^^^^^^^^
+
+Active configuration: **int8**. A configuration states what happens to *values*, not only how wide they are, so that a format whose arithmetic is inexact can be added without restructuring anything above.
+
+.. list-table:: ``int8``
+   :header-rows: 1
+
+   * - stage
+     - operation
+     - range, or exactness and what replaces it
+     - where / note
+   * - operand
+     - integer, signed, 8 bits
+     - -128 .. 127
+     - A, B, C at the region boundary; spad and vr lanes
+   * - accumulator
+     - integer, signed, 32 bits
+     - -2147483648 .. 2147483647
+     - ar lanes, and the partial sum travelling south through the array
+   * - multiply
+     - operand x operand -> 16 bits
+     - exact
+     - int8 x int8 is bounded by 128*128 = 16384, so a 16-bit product is exact and the multiplier stays narrow.
+   * - accumulate
+     - integer addition
+     - rounding: none; overflow: wraparound, two's complement, at 32 bits
+     - order: strictly sequential in ascending contraction index, south down the PE column, then the mm's acc term
+   * - output
+     - accumulator -> operand, saturate
+     - to -128 .. 127, rounding none
+     - mvout, in accu, before the word leaves for dma_st
+   * - ``vadd``
+     - integer addition
+     - overflow: wraparound, two's complement, at 32 bits
+     - in the accumulator format
+   * - ``vrelu``
+     - max(x, 0)
+     - exact
+     - in the accumulator format
+
+.. END GENERATED
+
+
+
+Rationale
+~~~~~~~~~
 
 **Control flow.** ``LOOP``/``ENDLOOP`` drive a ``LOOP_DEPTH = 4`` hardware loop
 stack, as MiniTPU's (:doc:`minitpu`). The sequencer's loop is do-while, so a
@@ -414,27 +953,13 @@ see :ref:`tinytpu-isa-csynth-bound`.
 Header and program memory
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``imem[0:NHDR]`` (``NHDR = 8``) is a header of **dynamic per-unit work counts**;
-instructions follow, two words each (``assemble()``):
-
-.. code-block:: text
-
-   imem[0] static instruction count   imem[4] mm count | mm rows << 16
-   imem[1] dma_ld  rows               imem[5] accu   iterations
-   imem[2] spm     rows               imem[6] dma_st rows
-   imem[3] vru     rows               imem[7] A rows | B rows << 16
-
-``imem[0]`` bounds the sequencer's fetch; every other count is dynamic, from
-``expand()``, which runs the program's control flow at assembly time and
-resolves the AGU exactly as the sequencer does. With a hardware loop the static
-and dynamic counts differ, and **a unit promised more work than it receives
-does not produce a wrong answer, it hangs** -- the one place where the
-assembler and the microarchitecture are coupled. These are *work* counts, not
-instruction counts, because every unit runs one flat loop over its rows:
-``spm`` charges an ``mm`` ``T + 1`` rows for the header and weight words it
-pushes, ``accu`` charges a ``vadd`` two iterations per row, and a ``dma_ld``
-counts for ``spm`` or ``vru`` by its destination. ``imem[7]`` is the DRAM row
-span ``dma_ld`` bursts for each operand matrix.
+The header words are tabulated above. ``imem[0]`` bounds the sequencer's fetch;
+every other count is dynamic, from ``expand()``, which runs the program's
+control flow at assembly time and resolves the AGU exactly as the sequencer
+does. With a hardware loop the static and dynamic counts differ, and **a unit
+promised more work than it receives does not produce a wrong answer, it
+hangs** -- the one place where the assembler and the microarchitecture are
+coupled.
 
 ``IMEM_SIZE`` is ``NHDR + IWORDS * 24`` (the longest program shipped, plus
 headroom). The program is pulled on-chip by one burst of ``IMEM_SIZE`` words
@@ -550,112 +1075,11 @@ Every constant is fixed at build time and **independent of the workload**: one
 RTL build runs every shape, with M, K and N arriving as instruction fields. This
 is the property the Gemmini comparison needs -- Gemmini's numbers come from one
 elaboration, and ``allo_cmp.c`` passes ``MAXDIM`` as the stride for every shape.
-
-.. list-table::
-   :header-rows: 1
-
-   * - constant
-     - default
-     - environment variable
-     - meaning
-   * - ``T``
-     - 4
-     - ``TPU_T``
-     - SIMD width == array dimension; ``T >= 4``
-   * - ``MAXDIM``
-     - 64
-     - ``TPU_MAXDIM``
-     - largest M, K, N supported; A/B/C are flat ``int8[MAXDIM*MAXDIM]``
-   * - ``SPAD_ROWS``
-     - ``max(TEST_WINDOW, OPERAND_ROWS)`` = 1024
-     - ``TPU_SPAD``
-     - scratchpad rows, each one packed ``UInt(T*8)`` word
-   * - ``NVR``
-     - ``max(TEST_WINDOW, OPERAND_ROWS)`` = 1024
-     - ``TPU_NVR``
-     - operand vector registers, one packed word each
-   * - ``NAR``
-     - ``max(128, TEST_WINDOW, 2*MAXDIM+8)`` = 136
-     - ``TPU_NAR``
-     - accumulator vector registers, ``UInt(T*32)`` each
-   * - ``QD``
-     - 8
-     - ``TPU_QD``
-     - stream depth
-   * - ``IMEM_SIZE``
-     - ``NHDR + IWORDS*24`` = 56
-     - ``TPU_IMEM``
-     - instruction memory words
-   * - ``DMA_WORDS``
-     - 1
-     - ``TPU_DMA_WIDEN``, ``TPU_DMA_WORDS``
-     - packed words per operand-burst iteration; widening is opt-in and
-       parametric, not landed (:doc:`benchmarks`)
-
-**The memories are derived from** ``MAXDIM``, **not typed in.**
-``OPERAND_ROWS = (MAXDIM/T) * MAXDIM`` is the highest operand row the shipped
-GEMM layout names, and ``TEST_WINDOW = 64`` is the fixed window the stress
-harness's random programs address, so each memory is the larger of the two.
-They were three independent literals (512 / 256 / 128) until ``main``'s
-benchmark work: those happened to be large enough at ``MAXDIM=16`` and
-silently were not at 64, where the GEMM names 1024 operand rows against a
-256-entry vreg file -- a build that assembled and gave wrong answers.
-
-Where everything lives, with the shipped values at ``T=4``, ``MAXDIM=64``.
-Each on-chip memory has exactly one owner, and that is what the single
-reader / single writer rule above buys:
-
-.. code-block:: text
-
-      imem              A , B                          C
-        |                  |                           ^
-        | one burst,       | one burst per matrix,     | int8, clipped
-        | 8 words/cycle    | T lanes packed per word   | by dma_st
-        v                  v                           |
-   +--------------+  +----------------------+          |
-   | ib           |  | rbA, rbB             |          |
-   | UInt(64)     |  | UInt(T*8)            |          |
-   | [IMEM_SIZE]  |  | [MAXDIM*WPR          |          |
-   |  = 56 words, |  |  + DMA_WORDS]        |          |
-   |  cyclic x 8  |  |  = 1025 words each   |          |
-   | owner:       |  | owner: dma_ld        |          |
-   |   sequencer  |  +---+--------------+---+          |
-   +--------------+      |              |              |
-                  dma2sp |              | dma2vr       |
-                         v              v              |
-               +-----------------+ +-----------------+ |
-               | spad            | | vr              | |
-               | UInt(T*8)       | | UInt(T*8)       | |
-               | [SPAD_ROWS]     | | [NVR]           | |
-               |  = 1024 rows,   | |  = 1024 rows,   | |
-               |    4 KiB        | |    4 KiB        | |
-               | owner: spm      | | owner: vru      | |
-               +--------+--------+ +--------+--------+ |
-                weights |                   | activ-   |
-                        v                   v  ations  |
-                     +------------------------+        |
-                     | T x T array, no state  |        |
-                     +-----------+------------+        |
-                                 | packed psums        |
-                                 v                     |
-                        +---------------------+        |
-                        | ar  UInt(T*32)[NAR] |--------+
-                        |  = 136 rows, 2176 B |
-                        | owner: accu         |
-                        +---------------------+
-
-``WPR = MAXDIM / T`` is the packed words in one DRAM row (16 at the shipped
-values). ``spad`` and ``vr`` hold 4 KiB each, the whole of an operand matrix;
-``ar`` is the only output memory, and results never re-enter the scratchpad.
-
-**Two independent ceilings bound** ``MAXDIM``, **and both are in the
-encoding rather than the datapath**: an address field carries 11 usable bits,
-so ``MAXDIM*MAXDIM/T <= 2047`` gives ``MAXDIM <= 90`` at ``T=4``; a header
-count is read back through a 15-bit slice, and ``accu``'s iteration count
-``MAXDIM^3/T^2 + MAXDIM^2/T`` gives ``MAXDIM <= 76``. 64 is the largest round
-value inside both, and is what the design ships at. Neither limit is
-architectural; both were measured by raising ``MAXDIM`` until they fired
-(:doc:`benchmarks`).
+The parameters, their defaults, their legal ranges, their cross-constraints and
+what bounds ``MAXDIM`` are tabulated in :ref:`tinytpu-isa-spec`, generated from
+``isa_spec.json``.
+The parameters, their defaults, their legal ranges and their cross-constraints
+are tabulated in :ref:`tinytpu-isa-spec`.
 
 ``T`` is the one parameter that changes the *shape* of the generated region: the
 array is ``T*T`` kernel instances, so ``T=16`` is 262 instances and ~800 streams.
@@ -788,6 +1212,151 @@ dataflow design and are documented in :doc:`/backends/vitis`.
 
 .. _tinytpu-isa-verify:
 
+.. _tinytpu-isa-conformance:
+
+The spec, and holding both consumers to it
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``isa_ref.py`` was derived from ``microarch_isa.py``'s own comments and
+imported its opcode numbers, its field layout and its address resolution. It
+therefore agreed with the design about everything, *because it shared the
+design's assumptions* -- a restatement, not an oracle. That is invisible while
+the arithmetic is int8 and exact at every stage, and becomes a correctness
+hazard as soon as it is not.
+
+So the ISA facts live in one file, ``isa_spec.json``, and the two consumers are
+held to it from opposite ends. This is MiniTPU's arrangement
+(:doc:`minitpu`), which has already caught real errors there.
+
+**Generated from the spec** (checked in, and ``gen_isa.py --check``
+regenerates each one and fails on any byte of difference, so drift is caught
+rather than discovered):
+
+* ``isa_encoding.py`` -- the constants, the encoder, a decoder that returns
+  operands under the spec's *names*, the control-flow and AGU resolver, the
+  header builder and the numerics.
+* the tables in :ref:`tinytpu-isa-spec`, between the ``GENERATED`` markers.
+
+**Checked against the spec, not generated.** ``microarch_isa.py`` keeps its
+constants and bit slices written out: it is the file Vitis synthesises and the
+file a CHIA candidate edits, and ``chia_agent/spec_policy.py`` admits no import
+but ``isa_dsl``. MiniTPU's ``board_package/asm.py`` keeps its copies for the
+same reason. ``gen_isa.py --check`` holds it to the spec four ways -- every
+named constant by value; every bit slice it takes of a 64-bit instruction word
+against the field table; ``enc``/``enc_agu``, ``expand`` and ``assemble``'s
+header against the spec's own implementations over 73 programs; and every
+parameter in range, still read from its environment variable.
+``gen_isa.py --conform`` adds the one check that does not read Python at all:
+it builds the design down the HLS path and holds **the bit ranges the emitted
+C++ actually takes** to the same table.
+
+``allo.encoding.TINYTPU_ISA`` is checked the same way. It is the compiler-side
+descriptor of what one instruction word can carry
+(:doc:`/developer/extending_allo`) and it imports nothing from ``examples/``,
+so its ``address_terms`` and ``loop_depth`` are a third written-out copy of
+``AGU_TERMS`` and ``LOOP_DEPTH`` -- held to ``agu.terms`` and
+``loop_stack.depth`` by value.
+
+**Same machine, not merely same rules.** A parameter's *default* is part of
+the spec, because the reference model has to build the machine the design
+built. ``gen_isa.py --check`` re-imports both modules in a fresh interpreter
+under four environments -- the bare defaults, ``TPU_MAXDIM`` at 8 and 32, and
+every memory overridden at once -- and compares all 16 parameters and derived
+constants. A default that moves in the design and not in the spec is named
+there, in the one configuration no test varies: the defaults.
+
+**Derived properties.** Four facts *follow* from the encoding rather than
+being written in it, and three of them were stated wrongly in this project's
+own documents until 2026-09-21. They are recomputed from the spec and
+confirmed against the design on every run -- see the generated list in
+:ref:`tinytpu-isa-spec`.
+
+The load-bearing one: ``isa_encoding.agu_legal_trip`` derives, from
+``legal_values`` alone, how long a field with a restricted value set stays
+legal when a loop drives it, and the design is then asked where it actually
+stops. ``mm``'s accumulate field driven by the reduce loop at stride 1 is
+legal for **two** k-tiles and rejected at the third -- because an address term
+is **additively monotone** (``base + iv * stride``, no predication, no
+saturation, no wrap), not because the field is static, which is what three
+documents here said. A second property prices it: the shipped accumulating
+``mm`` already spends all three address terms, so a term on ``acc`` needs a
+fourth and the budget refuses the instruction **before** the monotonicity
+frontier is ever reached. Widening the address generator and relieving ``acc``
+are therefore complements, not alternatives.
+
+The fourth derives what bounds ``MAXDIM``, which is the *encoding* and not the
+datapath. There are **two** ceilings and they answer different questions, so
+neither is a correction of the other:
+
+* the **addressing** ceiling asks what the operand *layout* can address,
+  whatever shape runs -- ``(MAXDIM // T) * MAXDIM <= 2048``, from the 11
+  usable bits of an address field. (2048, not 2047: the layout numbers its
+  rows ``0 .. OPERAND_ROWS-1``, so it is the highest *address* that must fit.)
+  At T=4 that is **88**; at T=8, **128**.
+* the **cubic-header** ceiling asks what a *cubic* GEMM's header count can
+  promise ``accu`` -- ``MAXDIM**3/T**2 + MAXDIM**2/T <= 32767``, from the
+  15-bit header slice. At T=4 that is **76**; at T=8, **120**. It moves with
+  the workload: a non-cubic shape gives a different count.
+
+The cubic one binds at both array sizes, but which binds is a property of the
+program rather than a constant.
+``isa_encoding.maxdim_ceiling`` **computes** each, over multiples of ``T``,
+because solving either inequality over the reals gives a number no build can
+use -- which is how ``MAXDIM <= 90`` came to be written in three documents
+when the answer is 88. The design is then probed at each ceiling and one step
+of ``T`` past it, and the two are told apart by the **stage** at which it
+refuses: past the addressing ceiling the module will not import at all; past
+the cubic-header ceiling it imports and ``assemble`` refuses the GEMM
+(``80 refuses in assemble``, ``92 refuses at import``). Without that, either
+ceiling could take credit for the other's failure.
+
+**Build limits and program limits are not interchangeable**, and conflating
+them cost this file three errors in one sitting. A build's ``MAXDIM`` is
+bounded by what the layout can *address*; what a *program* may ask for is
+bounded separately, by the rows an instruction's ``nr`` carries and by the
+header counts its shape produces. ``isa_encoding.gemm_limits(M, K, N)``
+computes which limit refuses a shape **and by how much**, because the margin
+is what makes a gap actionable: "over by one in ``nr``" names a design target,
+"cannot express" does not. A fifth derived property holds that prediction to
+the design over every GEMM shape the build admits.
+
+The distinction is load-bearing. At ``T=8``, ``MAXDIM=128``, the shipped
+tiled-GEMM layout is over by **one** on ``max(M, K)`` for ``32x128x128`` and
+``64x128x128`` -- it issues one ``dma_ld`` of ``K`` rows per B column block, so
+``K`` travels in ``nr``. That is a property of *that layout*, not of the
+instruction set: splitting the B load into two ``dma_ld``\ s of 64 rows removes
+``K`` from the row count, and both shapes then assemble and compute ``A @ B``
+bit-exactly on the design. ``128x128x128`` is over by one even then, and its
+``accu`` header count is over by 2049, so it needs both a wider ``nr`` and a
+wider header slice.
+
+**The checks have teeth**, and that was measured rather than hoped: fifteen
+single-point edits -- an opcode number, a field position, a field width, an
+AGU subfield position, a header term's scale, the loop depth,
+``AR_RAW_DIST``, the accumulator width, a clip bound, a parameter range, the
+AGU budget, ``mm``'s legal ``acc`` values, each of the two ``MAXDIM`` ceiling
+predicates, and a changed default in the design -- each produced a named
+failure identifying the disagreeing constant, slice,
+program or property. The last of those was not a simulation: when ``main``
+rebuilt the memories to be derived from ``MAXDIM`` and moved its default to
+64, ``gen_isa.py --check`` named all five parameters that had moved, in every
+probed configuration, instead of passing.
+
+**What this does not prove.** It is a conformance check, not a proof of
+correctness. It says the design and the reference model encode, decode,
+resolve and count the same way the spec says; it says nothing about whether a
+*unit* does the right thing with a field it decoded correctly -- that is
+``stress_isa.py``, ``mutate.py`` and cosim. It checks the emitted HLS's bit
+ranges, not its behaviour, and it does not read the Verilog. And the numerics
+section is checked only where it is mechanically checkable: the lane widths and
+the ``mvout`` saturation bounds. The reference model's *arithmetic* is held to
+the spec by construction -- it calls the generated ``acc()`` and
+``to_operand()`` -- not by an independent check.
+
+What the split does buy immediately: a mutant of ``microarch_isa.py`` can no
+longer move the reference model with it. Before, an opcode renumbered in the
+design was renumbered in its own oracle.
+
 Verifying a change
 ~~~~~~~~~~~~~~~~~~
 
@@ -819,6 +1388,15 @@ bugs -- at T=4 a PE's partial sum never leaves 9 bits, so narrowing the int32
 partial sum to int16 still prints ``ALL EXACT``. The correctness gates are
 below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
 ``mutate.py`` after any change to the harness.
+
+``gen_isa.py --check``
+   About 6 s. The ISA conformance check described in
+   :ref:`tinytpu-isa-conformance`: both generated artefacts regenerated and
+   diffed byte for byte, every consumer of ``isa_spec.json`` held to it, the
+   design and the generated module re-imported under four configurations and
+   compared, and the derived properties recomputed and confirmed.
+   ``--conform`` adds the emitted HLS's own bit ranges (one HLS build).
+   It prints ``ISA OK`` or names each disagreement.
 
 ``stress_isa.py`` (``ef112868``)
    About 10 s on the Allo simulator, 492 runs: full-range int8 operands with
