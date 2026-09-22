@@ -33,9 +33,7 @@ distribution. The design under test is :doc:`tinytpu_isa`.
    both sides over the same window — the accelerator plus its dispatch, with
    near-zero memory latency on both — TinyTPU-isa is **1.07-1.24x slower than
    Gemmini**. That measurement stands and it is what the body of this page
-   analyses. Until ``e24e433b`` it was **1.55-1.8x** slower (252 / 383 / 591 /
-   667 / 919 cycles); the step is the gap attribution's measured design stack
-   (:ref:`gemmini-gap-attribution`).
+   analyses.
 
    Over **ten** shapes at ``MAXDIM=64``, with Gemmini reported as a median of
    five trials, the deficit **converges**: 1.27x at 16x16x16, 1.26x at 32³,
@@ -48,13 +46,9 @@ distribution. The design under test is :doc:`tinytpu_isa`.
    with the burst-widening candidate, which is not landed and costs +123 %
    block RAM.
 
-   The earlier claim, "faster at all five shapes", compared our
-   accelerator-only count with Gemmini's ``tiled_matmul_auto``, and about 395
-   cycles of that call is Rocket driver software. **That claim is withdrawn**,
-   as is the "3.2x fixed-cost win" that went with it. Ratios in the history
-   sections (the I/O-trade and T=16 tables, and the marginal-cost fits) are
-   against those end-to-end Gemmini numbers; they are kept, on this page and on
-   :doc:`tinytpu_history`, as a record of our own progress, not as comparisons.
+   An earlier version of this page claimed the design was faster than Gemmini
+   at all five shapes; that claim, and the "3.2x fixed-cost win" that went with
+   it, are withdrawn — see `Earlier measurements and corrections`_.
 
 
 The like-for-like comparison
@@ -119,10 +113,9 @@ rather than assuming it.
 
 The decomposition closes, which is the reason to trust this. ``allo_cmp.c``'s
 total minus this window, per shape, **all from trial 1**: **413, 395, 393,
-393, 393**. (An earlier revision published 413 / 396 / 395 / 394 / 395, which
-mixed trials; the conclusion is unchanged.) A flat ~393 cycles of Rocket
-software across a 16x range of work is exactly what a per-call driver overhead
-looks like, and it confirms the 72% figure (below) independently.
+393, 393**. [#mixedtrials]_ A flat ~393 cycles of Rocket software across a 16x
+range of work is exactly what a per-call driver overhead looks like, and it
+confirms the 72% figure (below) independently.
 
 Three caveats, none of which flatter us:
 
@@ -138,296 +131,9 @@ Three caveats, none of which flatter us:
   before ``e24e433b``) on a dynamic-instruction axis, and pairing them would
   repeat the error the audit found.
 
-History of our column, since earlier revisions quoted each in turn: 1004 / 1108
-/ 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 / 1139 / 1457 after
-it, which is where the table sat for most of a day at 1.18x to 1.48x *behind*
-(end-to-end Gemmini); 676 / 827 / 1062 / 1125 / 1423 with a flat accumulator
-that was **reverted**, costing 13.7x the flip-flops in that unit for 2.3% and
-priced as :ref:`limitation-21`; 252 / 383 / 591 / 667 / 919 after the memset
-and widening pass, the shipped baseline until ``e24e433b``. The step to the
-current numbers is the gap attribution's design stack
-(:ref:`gemmini-gap-attribution`). All of these are on :doc:`tinytpu_history`.
-
-
-.. _gemmini-gap-attribution:
-
-Where the deficit came from, and what was landed
-------------------------------------------------
-
-.. important::
-
-   **Provenance.** The attribution below was measured on **variants** of the
-   design as it was shipped until ``e24e433b`` (``7a24c21e``: 252 / 383 / 591
-   / 667 / 919), cosimulated at two shapes (4x4x4 and 16x16x16), on branch
-   ``impact-limits`` (``f98c0dac``, ``55405e00``). The branch's scripts, raw
-   results and timelines are now on ``main`` under
-   `examples/accelerator/tinytpu_vitis/impact/
-   <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact>`__
-   and the branch is deleted.
-
-   **Its best stack is now the shipped design.** ``e24e433b`` landed
-   ``v_design_dep_imem8`` -- every design row of the table below, plus the
-   ``accu`` row through a real schedule primitive (``s.dependence``,
-   ``bbea2af0``) rather than a ``kernel.cpp`` patch -- and measured it at all
-   five shapes: **172 / 262 / 418 / 484 / 686**, bit-exact. At the two shapes
-   the variants were measured on, the landed build reproduces them exactly
-   (172 and 686); the other three shapes were first measured on the landed
-   build. What landed is listed on :ref:`tinytpu-isa-landing`.
-
-Of the **326-cycle deficit at 16x16x16** (919 against Gemmini's 593), **Allo
-forced 35-95 cycles, all of it** :ref:`limitation-21` (no dependence pragma, so
-``accu`` stayed at II=2); **Vitis forced nothing measurable**; the rest, about
-80%, was **our design**. Both parts are now removed: the design rows by
-rebuilding the units, the Allo row by adding the primitive. The stack took
-**919 -> 686** at 16x16x16 and **252 -> 172** at 4x4x4, against Gemmini's 593
-and 144-161.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 17 17 26 10
-
-   * - cause (pre-landing design)
-     - 16x16x16
-     - 4x4x4
-     - provenance
-     - forced by
-   * - program prefetch, one 64-bit word per iteration
-     - 52
-     - 52
-     - measured (``v_imem8``); **landed**
-     - design
-   * - B through the vector registers, plus the serial per-``mm`` weight
-       prologue
-     - 22 alone, 82 once ``accu`` is II=1
-     - ~10
-     - measured; **landed**
-     - design
-   * - A through ``spad`` -> ``vld`` -> ``vr``
-     - 64
-     - ~13
-     - measured; **landed**
-     - design
-   * - ``accu`` at II=2 (:ref:`limitation-21`)
-     - 35 alone, 95 after the design fixes
-     - 5
-     - measured; **landed**, via ``s.dependence``
-     - Allo (**fixed**)
-   * - region start
-     - ~0
-     -
-     -
-     -
-   * - residual
-     - 93
-     - 11-28
-     - timeline **estimate**: operand staging ~84, serial DMA before the first
-       weight, drain ~142 -- **none of it built**
-     - design
-
-The rows interact: the bottleneck moves from ``vru`` to the PE prologue to
-``accu``. Taking the design rows first gives 919 to 833 (86) and then 95
-forced; taking forced first gives 35 and then 146 design. The Allo row is
-therefore quoted as a range, 35-95 (65 averaged over both orders).
-
-**What remains.** The landed design is still **93 cycles** behind Gemmini at
-16x16x16 (686 against 593) and **11-28** at 4x4x4 (172 against 144-161), and
-between 42 and 93 cycles at the three shapes the branch did not measure (262
-against 220, 418 against 347, 484 against 391). The branch estimated where the
-16x16x16 residual sits from the stack's per-process timelines
-(``impact/results/``): operand staging (~84 cycles), the serial DMA ahead of
-the first weight, and the drain (~142). That split is an **estimate**, and no
-change against it has been built or measured.
-
-**The dependence claim needed a contract the branch never tested.** The
-injected pragma is only true for programs that never read an accumulator row
-within two ``accu`` iterations of writing it; the branch cosimulated GEMM
-programs only, which never do. Landing it added the contract to the assembler
-and a test at its edge (:ref:`tinytpu-isa-dependence`).
-
-Variants
-~~~~~~~~
-
-Every variant is the pre-landing ``microarch_isa.py`` (``7a24c21e``, the
-``base`` row) plus asserted textual patches (``make_variants.py``), so its diff
-is exactly the change being priced. A
-variant counts only if the Allo simulator is ``ALL EXACT`` (``bench_variant.py``:
-gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
-mismatches. Measured by cosim (xsim, ``-m_axi_latency 0``), all bit-exact:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 44 9 9 9 9
-
-   * - variant
-     - what changes
-     - 4x4x4
-     - 16x16x16
-     - accu FF
-     - top FF
-   * - base
-     - the design shipped until ``e24e433b``
-     - 252
-     - 919
-     - 1,250
-     - 14,888
-   * - ``v_accu1``
-     - accu II=1, write-behind rotation (``ca978b97``)
-     - 248
-     - 885
-     - 17,438
-     - 31,076
-   * - ``v_accudep``
-     - accu flat in BRAM + injected ``#pragma HLS dependence variable=ar inter
-       false``
-     - 247
-     - 884
-     - 1,744
-     - 15,382
-   * - ``v_wdirect``
-     - ``mm`` reads its weights from ``spad`` via ``spm``, and the weight ``vld``
-       is dropped
-     - 247
-     - 914
-     -
-     -
-   * - ``v_wdb``
-     - ``v_wdirect`` + per-PE weight loader and depth-4 FIFO (double buffer),
-       flat PE
-     - 242
-     - 897
-     - 1,250
-     - 16,453
-   * - ``v_wdb_accu1``
-     - ``v_wdb`` + rotation
-     - 238
-     - 803
-     -
-     -
-   * - ``v_wdb_accudep``
-     - ``v_wdb`` + pragma
-     - 237
-     - 802
-     -
-     -
-   * - ``v_design``
-     - ``v_wdb`` + A DMA'd straight into ``vr``, so the A ``vld`` is dropped
-     - 229
-     - 833
-     -
-     -
-   * - **v_design_dep**
-     - ``v_design`` + pragma
-     - **224**
-     - **738**
-     - 1,744
-     - 17,780
-   * - ``v_imem8``
-     - program prefetch 8 words/iteration into cyclic-partitioned ``ib``
-     - 200
-     - 867
-     -
-     -
-   * - **v_design_dep_imem8**
-     - ``v_design_dep`` + imem8 -- **shipped since** ``e24e433b``
-     - **172**
-     - **686**
-     -
-     -
-   * - ``v_order``
-     - program-only reorder: A ``vld`` before the B ``dma_ld``\ s
-     - 252
-     - 919
-     -
-     -
-   * - ``v_dmadirect``
-     - ``dma_ld`` without staging (strided rows, 32-bit beats)
-     - 258
-     - 926
-     -
-     -
-   * - ``v_best``
-     - wdb + rotation + order + dmadirect
-     - 249
-     - 800
-     -
-     -
-   * - ``v_memset``
-     - ``spad`` declared ``= 0`` again
-     - 661
-     - 1280
-     -
-     -
-   * - ``v_memset6``
-     - all six arrays ``= 0`` again
-     - 661
-     - 1280
-     -
-     -
-
-Gemmini (accelerator + dispatch, same window): 161/144 at 4x4x4, 593 at
-16x16x16.
-
-The pragma form of the ``accu`` fix (``v_accudep``) reaches the same cycles as
-the reverted rotation at **1,744 FF in** ``accu`` **against 17,438**. On the
-branch it was injected by patching the emitted ``kernel.cpp`` between
-``s.build(mode="csyn")`` and running Vitis (``cosim_variant.py``'s
-``patch_kernel`` hook); the shipped design emits it through ``s.dependence``,
-and the landed build's ``accu`` is 1,744 FF, as the variant's was.
-
-``v_memset`` restores the ``= 0`` initialiser on ``spad`` and costs **+409**
-cycles at 4x4x4 and **+361** at 16x16x16: Allo lowers an array initialiser to a
-runtime zero-fill loop (:ref:`limitation-g`).
-
-**A design trap found on the way.** A flat loop whose row count depends on the
-decoded opcode closes at ``Final II = 2`` on the row counter (a carried
-dependence). Precomputing the count upstream, in the sequencer, and carrying it
-in the instruction word fixed it in both ``spm`` (``v_wdirect``) and ``accu``;
-the landed sequencer does the same.
-
-The pre-landing design's per-process timeline at 16x16x16
-(``impact/results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
-(``s_axilite`` programming, inside the cosim window), 47-120 program prefetch,
-120-204 operand bursts, 204-334 128 DMA rows through ``spm``, 334-799 ``vru``
-running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
-(array, ``accu``, ``dma_st``).
-
-The same work settled that the one-owner-per-array rule the design works under
-is Allo's, not Vitis's, and that it cost this design **0 cycles**: every
-restructure above was Allo-legal, and the landed design is too. See
-:ref:`limitation-shared-memory` and the note on :doc:`tinytpu_isa` ("One owner
-per memory").
-
-.. _gemmini-attribution-reproduce:
-
-Reproducing the attribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-From ``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
-
-.. code-block:: bash
-
-   source env.sh                    # conda allo, LLVM_BUILD_DIR, OMP, TMPDIR
-   python make_variants.py          # writes v_base.py and v_*.py from 7a24c21e
-   python pyrun.py bench_variant.py v_design_dep                     # simulator
-   TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py v_design_dep runs/v_design_dep
-   ./profile.sh runs/v_design_dep   # per-process timeline of the last shape
-
-``make_variants.py`` reads its baseline from git at ``7a24c21e`` -- the design
-the table calls ``base`` -- not the shipped file, so the variants keep
-measuring what the table says; it gives them the baseline's own hand-written
-program, since ``isa_dsl`` now targets the landed ISA. ``cosim_variant.py
-base`` builds the *shipped* design; the pre-landing one is ``v_base``.
-``pyrun.py`` strips the conda env's editable finder, so ``allo`` resolves to
-this checkout. ``cosim_variant.py`` reuses ``../cosim.py`` (``align_value`` 64,
-widen 512, ``-B/usr/bin``, ``m_axi`` depths) and adds only a
-``patch_kernel(prj)`` hook for variants that edit the emitted C++.
-``profile.sh`` re-runs cosim with ``-enable_dataflow_profiling``, then re-runs
-the xsim snapshot so the monitor's CSVs survive (cosim deletes them).
-``analyze_df.py`` and ``rle_df.py`` turn them into per-process
-run/starve/block counts and run-length traces. Raw outputs, timelines and the
-Vitis shared-array probe summaries are under ``results/`` and
-``probe_shared/``; ``ar_distance_probe.py`` is the RTL probe behind the
-accumulator distance contract.
+Earlier values of our column, the measured attribution of the deficit that
+produced the step to these numbers, and what remains of that deficit, are at
+the foot of this page — see `Earlier measurements and corrections`_.
 
 
 Making the baseline matched
@@ -468,11 +174,9 @@ Both numbers are **measured on RTL**: ours by Vitis ``cosim`` (xsim), Gemmini's 
 One hardware build, workload swept as data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**This is the correction that matters most.** Earlier revisions compared
-per-workload builds against Gemmini's single elaboration: ``M``, ``K``, ``N``, the
-instruction count and every unit's loop bound were compile-time constants, so
-4x4x4 and 16x16x16 were *different accelerators*. That is not a comparison an
-instruction-programmable claim can rest on.
+Earlier revisions of this page compared per-workload builds against Gemmini's
+single elaboration; that is recorded in `Earlier measurements and
+corrections`_.
 
 The design is now built **once** -- ``T=4``, ``MAXDIM=16``, fixed scratchpad,
 vregs and imem -- and the shape arrives as data:
@@ -490,77 +194,11 @@ Verified: **11 programs on one build, all bit-exact** -- ``gemm`` and
 needed its own accelerator.
 
 
-The withdrawn comparison, and why it was wrong
-----------------------------------------------
-
-.. warning::
-
-   **WITHDRAWN 2026-09-18: "faster than Gemmini at all five shapes", and the
-   3.2x fixed-cost win.** Both stood in ``COMPARISON.md`` and both are wrong --
-   not imprecise, wrong -- because the two columns measure different things.
-   They are struck here rather than footnoted.
-
-.. list-table::
-   :header-rows: 1
-
-   * - shape
-     - ours (accelerator only)
-     - Gemmini ``tiled_matmul_auto``
-     - our util
-   * - 4x4x4
-     - **252**
-     - 574
-     - 1.6%
-   * - 8x8x8
-     - **383**
-     - 615
-     - 8.4%
-   * - 12x12x12
-     - **591**
-     - 740
-     - 18.3%
-   * - 16x16x8
-     - **667**
-     - 784
-     - 19.2%
-   * - 16x16x16
-     - **919**
-     - 986
-     - 27.9%
-
-**Do not read a ratio off this table.** The right column is an accelerator plus
-a RISC-V software driver; the left is an accelerator alone. At 4x4x4, **72% of
-Gemmini's 574 cycles is Rocket driver code**.
-
-**What was said, and why it was wrong.** The narrowing gap -- 2.28x at 4x4x4 down
-to 1.07x at 16x16x16 -- was read as the signature of winning on fixed cost and
-losing on marginal cost, and fixed 151 was quoted against Gemmini's 483 as a
-3.2x cheaper start. The pattern was real; the explanation was not. Gemmini's
-fixed term is mostly its software driver, which our number has no counterpart
-for, so the gap narrows with size because the driver amortises -- not because
-our machine starts cheaper.
-
-The marginal comparison, 17.28 cycles per dynamic instruction against 10.81, is
-**also not like-for-like** and is left standing only as our own figure. The two
-fits are against different x-axes (ours dynamic instructions, Gemmini's shapes),
-and the accelerator-only share of the 483 intercept is **unknown** -- estimated
-140-170, not measured. It is left unknown here rather than given a number nobody
-can defend.
-
-**The result that made these numbers possible is a correction, not an
-optimisation.** ``COMPARISON.md`` previously said the fixed cost was "essentially
-closed" at 563 vs 483. It was not closed, it was *hidden*: ``spm`` opened with a
-514-cycle zero-fill of ``spad`` and ``dma_ld``'s operand burst ran ~512 cycles
-beside it, two serial prefixes of nearly equal length masking each other. That
-is why fixing either alone measured as worthless, and why "merging the A and B
-bursts changed cycles by exactly zero" was a true measurement supporting a false
-conclusion. Details: :ref:`tinytpu-history-prefixes`.
-
-
 What each number's window contains
 ----------------------------------
 
-The audit that withdrew the claims above. Both sides re-measured on the
+The audit that withdrew the claims recorded at the foot of this page
+(`Earlier measurements and corrections`_). Both sides re-measured on the
 elaborated chipyard tree, not argued from documentation.
 
 **The memory models match, so this is not the problem.** Gemmini's harness is
@@ -807,11 +445,9 @@ A ceiling and an overhead are different objects. Ours is an overhead: a fixed
 charge the sweep is paying off. Theirs is a ceiling: no amount of amortisation
 reaches past it without changing the emitter.
 
-**A correction worth recording:** an earlier analysis put Gemmini's marginal
-efficiency at "essentially 100% of peak" from the two-point difference
-``986 - 574 = 412`` cycles. That is wrong: 412 cycles for the 4032 additional
-MACs is 9.79 MAC/cycle, i.e. **61.2%**. The overhead-vs-ceiling distinction
-survives the correction, but at 1.7x rather than 2.7x.
+An earlier analysis of this page read Gemmini's marginal efficiency off a
+two-point difference and put it at "essentially 100% of peak"; that reading was
+corrected — see `Earlier measurements and corrections`_.
 
 
 .. _gemmini-reproduce:
@@ -989,10 +625,11 @@ generally:
   Their rule, now ours: read the identity of what you are measuring **after**
   provisioning, not only before.
 
-This is the same failure mode as the withdrawn claim recorded above: a number
-that is true of the measurement but not of the thing being measured. Two of
-those have now been caught by comparing notes across designs rather than by
-inspection, which is an argument for continuing to do so.
+This is the same failure mode as the withdrawn claim recorded at the foot of
+this page (`Earlier measurements and corrections`_): a number that is true of
+the measurement but not of the thing being measured. Two of those have now been
+caught by comparing notes across designs rather than by inspection, which is an
+argument for continuing to do so.
 
 Gemmini at a matched array size is being built independently by both sides as of
 2026-09-22 — deliberately twice, because neither side's Gemmini figure has ever
@@ -1062,7 +699,8 @@ directive to the HLS tool, not a memory latency model.** So **no row of that
 sweep may be read as "what this design does against a memory of that
 latency"**, and the sweep is not evidence about real memory systems. It bounds
 how much this *directive* can move a conclusion, which is a narrower and much
-less interesting claim than the one made below before the grid was run.
+less interesting claim than the one this page made before the grid was run,
+which is kept at the foot (`Earlier measurements and corrections`_).
 
 What survives is the discipline rather than the instrument: report the range
 over which a conclusion holds, and do not let a knob you cannot interpret decide
@@ -1070,15 +708,6 @@ a design. What does *not* survive is the idea that our sweep is a better
 epistemic position than a fitted memory model — it is not a memory model at all,
 and a fitted one at least attempts the right quantity. Our position is that we
 have no memory model and should say so.
-
-The paragraph below was written before the grid was run and is kept because the
-reasoning is still right about fitted knobs, and wrong about ours: One argument for that comes from the
-other side of the comparison, against their own interest: a *fitted* knob
-invites belief — 92 cycles was carried for months, looked authoritative, and
-inverted a ranking — whereas a latency of zero is so obviously not a claim about
-silicon that nobody is tempted to quote it as one. Having no memory model is not
-therefore better than having a fitted one; what is better than either is
-reporting the range over which a conclusion holds.
 
 One caveat on transplanting the number at all: theirs is a ZCU104's memory
 system seen through a descriptor-based DMA with two channels and 32-byte beats,
@@ -1110,7 +739,8 @@ The four axes pull in different directions and are settled differently:
   memory, and equalising them means rebuilding one side's SoC.
 - **Dispatch path — match it by *window*, not by configuration.** No knob
   addresses it; only the window does, which is exactly what fixed the withdrawn
-  claim recorded above.
+  claim recorded at the foot of this page (`Earlier measurements and
+  corrections`_).
 
 So the config delta that survives review is **three fields, two of which are
 the array size** — ``meshRows`` and ``meshColumns`` — with the third being
@@ -1320,6 +950,428 @@ Their steady-state figure, which they are re-running before standing behind it
 86.4 % of peak against their 53.8 %, i.e. 1.61x more efficient per processing
 element. Ours reaches **74.1 % of peak at 64x64x64** and is still climbing.
 
+The capability gap, which is worse for us than the cycle deficit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
+search. We cannot address a matrix that size at all: our operands are a single
+``int8[MAXDIM*MAXDIM]`` region, so the shape has to fit the addressable space
+rather than being tiled into it. Unblocking it needs a runtime base and stride
+on the DMA load and store paths, a fifth loop level, and possibly a fourth
+address term.
+
+This matters more than the 1.09x. A 9 % cycle deficit at a shape both machines
+can run is a tuning result; being unable to express the shapes a real workload
+uses is a capability result, and no amount of cycle-level work closes it.
+
+
+Earlier measurements and corrections
+------------------------------------
+
+What the figures above used to be, and the claims this page has made and then
+withdrawn. Nothing in this section describes the current state.
+
+History of our column
+~~~~~~~~~~~~~~~~~~~~~
+
+Until ``e24e433b`` the like-for-like result was **1.55-1.8x** slower (252 / 383
+/ 591 / 667 / 919 cycles).
+
+History of our column, since earlier revisions quoted each in turn: 1004 / 1108
+/ 1294 / 1344 / 1586 before the burst DMA; 680 / 831 / 1066 / 1139 / 1457 after
+it, which is where the table sat for most of a day at 1.18x to 1.48x *behind*
+(end-to-end Gemmini); 676 / 827 / 1062 / 1125 / 1423 with a flat accumulator
+that was **reverted**, costing 13.7x the flip-flops in that unit for 2.3% and
+priced as :ref:`limitation-21`; 252 / 383 / 591 / 667 / 919 after the memset
+and widening pass, the shipped baseline until ``e24e433b``. The step to the
+current numbers is the gap attribution's design stack
+(:ref:`gemmini-gap-attribution`). All of these are on :doc:`tinytpu_history`.
+
+.. _gemmini-gap-attribution:
+
+Where the deficit came from, and what was landed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. important::
+
+   **Provenance.** The attribution below was measured on **variants** of the
+   design as it was shipped until ``e24e433b`` (``7a24c21e``: 252 / 383 / 591
+   / 667 / 919), cosimulated at two shapes (4x4x4 and 16x16x16), on branch
+   ``impact-limits`` (``f98c0dac``, ``55405e00``). The branch's scripts, raw
+   results and timelines are now on ``main`` under
+   `examples/accelerator/tinytpu_vitis/impact/
+   <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact>`__
+   and the branch is deleted.
+
+   **Its best stack is now the shipped design.** ``e24e433b`` landed
+   ``v_design_dep_imem8`` -- every design row of the table below, plus the
+   ``accu`` row through a real schedule primitive (``s.dependence``,
+   ``bbea2af0``) rather than a ``kernel.cpp`` patch -- and measured it at all
+   five shapes: **172 / 262 / 418 / 484 / 686**, bit-exact. At the two shapes
+   the variants were measured on, the landed build reproduces them exactly
+   (172 and 686); the other three shapes were first measured on the landed
+   build. What landed is listed on :ref:`tinytpu-isa-landing`.
+
+Of the **326-cycle deficit at 16x16x16** (919 against Gemmini's 593), **Allo
+forced 35-95 cycles, all of it** :ref:`limitation-21` (no dependence pragma, so
+``accu`` stayed at II=2); **Vitis forced nothing measurable**; the rest, about
+80%, was **our design**. Both parts are now removed: the design rows by
+rebuilding the units, the Allo row by adding the primitive. The stack took
+**919 -> 686** at 16x16x16 and **252 -> 172** at 4x4x4, against Gemmini's 593
+and 144-161.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 17 17 26 10
+
+   * - cause (pre-landing design)
+     - 16x16x16
+     - 4x4x4
+     - provenance
+     - forced by
+   * - program prefetch, one 64-bit word per iteration
+     - 52
+     - 52
+     - measured (``v_imem8``); **landed**
+     - design
+   * - B through the vector registers, plus the serial per-``mm`` weight
+       prologue
+     - 22 alone, 82 once ``accu`` is II=1
+     - ~10
+     - measured; **landed**
+     - design
+   * - A through ``spad`` -> ``vld`` -> ``vr``
+     - 64
+     - ~13
+     - measured; **landed**
+     - design
+   * - ``accu`` at II=2 (:ref:`limitation-21`)
+     - 35 alone, 95 after the design fixes
+     - 5
+     - measured; **landed**, via ``s.dependence``
+     - Allo (**fixed**)
+   * - region start
+     - ~0
+     -
+     -
+     -
+   * - residual
+     - 93
+     - 11-28
+     - timeline **estimate**: operand staging ~84, serial DMA before the first
+       weight, drain ~142 -- **none of it built**
+     - design
+
+The rows interact: the bottleneck moves from ``vru`` to the PE prologue to
+``accu``. Taking the design rows first gives 919 to 833 (86) and then 95
+forced; taking forced first gives 35 and then 146 design. The Allo row is
+therefore quoted as a range, 35-95 (65 averaged over both orders).
+
+**What remains.** The landed design is still **93 cycles** behind Gemmini at
+16x16x16 (686 against 593) and **11-28** at 4x4x4 (172 against 144-161), and
+between 42 and 93 cycles at the three shapes the branch did not measure (262
+against 220, 418 against 347, 484 against 391). The branch estimated where the
+16x16x16 residual sits from the stack's per-process timelines
+(``impact/results/``): operand staging (~84 cycles), the serial DMA ahead of
+the first weight, and the drain (~142). That split is an **estimate**, and no
+change against it has been built or measured.
+
+**The dependence claim needed a contract the branch never tested.** The
+injected pragma is only true for programs that never read an accumulator row
+within two ``accu`` iterations of writing it; the branch cosimulated GEMM
+programs only, which never do. Landing it added the contract to the assembler
+and a test at its edge (:ref:`tinytpu-isa-dependence`).
+
+Variants
+^^^^^^^^
+
+Every variant is the pre-landing ``microarch_isa.py`` (``7a24c21e``, the
+``base`` row) plus asserted textual patches (``make_variants.py``), so its diff
+is exactly the change being priced. A
+variant counts only if the Allo simulator is ``ALL EXACT`` (``bench_variant.py``:
+gemm and gemm.relu at five shapes, plus the vadd program) and cosim reports 0
+mismatches. Measured by cosim (xsim, ``-m_axi_latency 0``), all bit-exact:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 44 9 9 9 9
+
+   * - variant
+     - what changes
+     - 4x4x4
+     - 16x16x16
+     - accu FF
+     - top FF
+   * - base
+     - the design shipped until ``e24e433b``
+     - 252
+     - 919
+     - 1,250
+     - 14,888
+   * - ``v_accu1``
+     - accu II=1, write-behind rotation (``ca978b97``)
+     - 248
+     - 885
+     - 17,438
+     - 31,076
+   * - ``v_accudep``
+     - accu flat in BRAM + injected ``#pragma HLS dependence variable=ar inter
+       false``
+     - 247
+     - 884
+     - 1,744
+     - 15,382
+   * - ``v_wdirect``
+     - ``mm`` reads its weights from ``spad`` via ``spm``, and the weight ``vld``
+       is dropped
+     - 247
+     - 914
+     -
+     -
+   * - ``v_wdb``
+     - ``v_wdirect`` + per-PE weight loader and depth-4 FIFO (double buffer),
+       flat PE
+     - 242
+     - 897
+     - 1,250
+     - 16,453
+   * - ``v_wdb_accu1``
+     - ``v_wdb`` + rotation
+     - 238
+     - 803
+     -
+     -
+   * - ``v_wdb_accudep``
+     - ``v_wdb`` + pragma
+     - 237
+     - 802
+     -
+     -
+   * - ``v_design``
+     - ``v_wdb`` + A DMA'd straight into ``vr``, so the A ``vld`` is dropped
+     - 229
+     - 833
+     -
+     -
+   * - **v_design_dep**
+     - ``v_design`` + pragma
+     - **224**
+     - **738**
+     - 1,744
+     - 17,780
+   * - ``v_imem8``
+     - program prefetch 8 words/iteration into cyclic-partitioned ``ib``
+     - 200
+     - 867
+     -
+     -
+   * - **v_design_dep_imem8**
+     - ``v_design_dep`` + imem8 -- **shipped since** ``e24e433b``
+     - **172**
+     - **686**
+     -
+     -
+   * - ``v_order``
+     - program-only reorder: A ``vld`` before the B ``dma_ld``\ s
+     - 252
+     - 919
+     -
+     -
+   * - ``v_dmadirect``
+     - ``dma_ld`` without staging (strided rows, 32-bit beats)
+     - 258
+     - 926
+     -
+     -
+   * - ``v_best``
+     - wdb + rotation + order + dmadirect
+     - 249
+     - 800
+     -
+     -
+   * - ``v_memset``
+     - ``spad`` declared ``= 0`` again
+     - 661
+     - 1280
+     -
+     -
+   * - ``v_memset6``
+     - all six arrays ``= 0`` again
+     - 661
+     - 1280
+     -
+     -
+
+Gemmini (accelerator + dispatch, same window): 161/144 at 4x4x4, 593 at
+16x16x16.
+
+The pragma form of the ``accu`` fix (``v_accudep``) reaches the same cycles as
+the reverted rotation at **1,744 FF in** ``accu`` **against 17,438**. On the
+branch it was injected by patching the emitted ``kernel.cpp`` between
+``s.build(mode="csyn")`` and running Vitis (``cosim_variant.py``'s
+``patch_kernel`` hook); the shipped design emits it through ``s.dependence``,
+and the landed build's ``accu`` is 1,744 FF, as the variant's was.
+
+``v_memset`` restores the ``= 0`` initialiser on ``spad`` and costs **+409**
+cycles at 4x4x4 and **+361** at 16x16x16: Allo lowers an array initialiser to a
+runtime zero-fill loop (:ref:`limitation-g`).
+
+**A design trap found on the way.** A flat loop whose row count depends on the
+decoded opcode closes at ``Final II = 2`` on the row counter (a carried
+dependence). Precomputing the count upstream, in the sequencer, and carrying it
+in the instruction word fixed it in both ``spm`` (``v_wdirect``) and ``accu``;
+the landed sequencer does the same.
+
+The pre-landing design's per-process timeline at 16x16x16
+(``impact/results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
+(``s_axilite`` programming, inside the cosim window), 47-120 program prefetch,
+120-204 operand bursts, 204-334 128 DMA rows through ``spm``, 334-799 ``vru``
+running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
+(array, ``accu``, ``dma_st``).
+
+The same work settled that the one-owner-per-array rule the design works under
+is Allo's, not Vitis's, and that it cost this design **0 cycles**: every
+restructure above was Allo-legal, and the landed design is too. See
+:ref:`limitation-shared-memory` and the note on :doc:`tinytpu_isa` ("One owner
+per memory").
+
+.. _gemmini-attribution-reproduce:
+
+Reproducing the attribution
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+From ``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
+
+.. code-block:: bash
+
+   source env.sh                    # conda allo, LLVM_BUILD_DIR, OMP, TMPDIR
+   python make_variants.py          # writes v_base.py and v_*.py from 7a24c21e
+   python pyrun.py bench_variant.py v_design_dep                     # simulator
+   TPU_SHAPES=4x4x4,16x16x16 python pyrun.py cosim_variant.py v_design_dep runs/v_design_dep
+   ./profile.sh runs/v_design_dep   # per-process timeline of the last shape
+
+``make_variants.py`` reads its baseline from git at ``7a24c21e`` -- the design
+the table calls ``base`` -- not the shipped file, so the variants keep
+measuring what the table says; it gives them the baseline's own hand-written
+program, since ``isa_dsl`` now targets the landed ISA. ``cosim_variant.py
+base`` builds the *shipped* design; the pre-landing one is ``v_base``.
+``pyrun.py`` strips the conda env's editable finder, so ``allo`` resolves to
+this checkout. ``cosim_variant.py`` reuses ``../cosim.py`` (``align_value`` 64,
+widen 512, ``-B/usr/bin``, ``m_axi`` depths) and adds only a
+``patch_kernel(prj)`` hook for variants that edit the emitted C++.
+``profile.sh`` re-runs cosim with ``-enable_dataflow_profiling``, then re-runs
+the xsim snapshot so the monitor's CSVs survive (cosim deletes them).
+``analyze_df.py`` and ``rle_df.py`` turn them into per-process
+run/starve/block counts and run-length traces. Raw outputs, timelines and the
+Vitis shared-array probe summaries are under ``results/`` and
+``probe_shared/``; ``ar_distance_probe.py`` is the RTL probe behind the
+accumulator distance contract.
+
+Per-workload builds
+~~~~~~~~~~~~~~~~~~~
+
+**This is the correction that matters most.** Earlier revisions compared
+per-workload builds against Gemmini's single elaboration: ``M``, ``K``, ``N``, the
+instruction count and every unit's loop bound were compile-time constants, so
+4x4x4 and 16x16x16 were *different accelerators*. That is not a comparison an
+instruction-programmable claim can rest on. What replaced it is `One hardware
+build, workload swept as data`_.
+
+The withdrawn comparison, and why it was wrong
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. warning::
+
+   **WITHDRAWN 2026-09-18: "faster than Gemmini at all five shapes", and the
+   3.2x fixed-cost win.** Both stood in ``COMPARISON.md`` and both are wrong --
+   not imprecise, wrong -- because the two columns measure different things.
+   They are struck here rather than footnoted.
+
+The earlier claim, "faster at all five shapes", compared our
+accelerator-only count with Gemmini's ``tiled_matmul_auto``, and about 395
+cycles of that call is Rocket driver software. **That claim is withdrawn**,
+as is the "3.2x fixed-cost win" that went with it. Ratios in the history
+sections (the I/O-trade and T=16 tables, and the marginal-cost fits) are
+against those end-to-end Gemmini numbers; they are kept, on this page and on
+:doc:`tinytpu_history`, as a record of our own progress, not as comparisons.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - ours (accelerator only)
+     - Gemmini ``tiled_matmul_auto``
+     - our util
+   * - 4x4x4
+     - **252**
+     - 574
+     - 1.6%
+   * - 8x8x8
+     - **383**
+     - 615
+     - 8.4%
+   * - 12x12x12
+     - **591**
+     - 740
+     - 18.3%
+   * - 16x16x8
+     - **667**
+     - 784
+     - 19.2%
+   * - 16x16x16
+     - **919**
+     - 986
+     - 27.9%
+
+**Do not read a ratio off this table.** The right column is an accelerator plus
+a RISC-V software driver; the left is an accelerator alone. At 4x4x4, **72% of
+Gemmini's 574 cycles is Rocket driver code**.
+
+**What was said, and why it was wrong.** The narrowing gap -- 2.28x at 4x4x4 down
+to 1.07x at 16x16x16 -- was read as the signature of winning on fixed cost and
+losing on marginal cost, and fixed 151 was quoted against Gemmini's 483 as a
+3.2x cheaper start. The pattern was real; the explanation was not. Gemmini's
+fixed term is mostly its software driver, which our number has no counterpart
+for, so the gap narrows with size because the driver amortises -- not because
+our machine starts cheaper.
+
+The marginal comparison, 17.28 cycles per dynamic instruction against 10.81, is
+**also not like-for-like** and is left standing only as our own figure. The two
+fits are against different x-axes (ours dynamic instructions, Gemmini's shapes),
+and the accelerator-only share of the 483 intercept is **unknown** -- estimated
+140-170, not measured. It is left unknown here rather than given a number nobody
+can defend.
+
+**The result that made these numbers possible is a correction, not an
+optimisation.** ``COMPARISON.md`` previously said the fixed cost was "essentially
+closed" at 563 vs 483. It was not closed, it was *hidden*: ``spm`` opened with a
+514-cycle zero-fill of ``spad`` and ``dma_ld``'s operand burst ran ~512 cycles
+beside it, two serial prefixes of nearly equal length masking each other. That
+is why fixing either alone measured as worthless, and why "merging the A and B
+bursts changed cycles by exactly zero" was a true measurement supporting a false
+conclusion. Details: :ref:`tinytpu-history-prefixes`.
+
+Gemmini's marginal efficiency, once read as 100% of peak
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**A correction worth recording:** an earlier analysis put Gemmini's marginal
+efficiency at "essentially 100% of peak" from the two-point difference
+``986 - 574 = 412`` cycles. That is wrong: 412 cycles for the 4032 additional
+MACs is 9.79 MAC/cycle, i.e. **61.2%**. The overhead-vs-ceiling distinction
+survives the correction, but at 1.7x rather than 2.7x.
+
+The latency knob, as read before the grid was run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This was written before the grid was run and is kept because the reasoning is
+still right about fitted knobs, and wrong about ours: One argument for that
+comes from the other side of the comparison, against their own interest: a
+*fitted* knob invites belief — 92 cycles was carried for months, looked
+authoritative, and inverted a ranking — whereas a latency of zero is so
+obviously not a claim about silicon that nobody is tempted to quote it as one.
+Having no memory model is not therefore better than having a fitted one; what
+is better than either is reporting the range over which a conclusion holds.
+
 A shared hypothesis died in the process
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1337,16 +1389,7 @@ second issue path on our side has to stand on our own measurement rather than
 on the parallel. Recorded because a hypothesis that both sides liked and that
 one side has now falsified is worth more than one nobody tested.
 
-The capability gap, which is worse for us than the cycle deficit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Footnotes
 
-Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
-search. We cannot address a matrix that size at all: our operands are a single
-``int8[MAXDIM*MAXDIM]`` region, so the shape has to fit the addressable space
-rather than being tiled into it. Unblocking it needs a runtime base and stride
-on the DMA load and store paths, a fifth loop level, and possibly a fourth
-address term.
-
-This matters more than the 1.09x. A 9 % cycle deficit at a shape both machines
-can run is a tuning result; being unable to express the shapes a real workload
-uses is a capability result, and no amount of cycle-level work closes it.
+.. [#mixedtrials] An earlier revision published 413 / 396 / 395 / 394 / 395,
+   which mixed trials; the conclusion is unchanged.

@@ -22,10 +22,14 @@
 TinyTPU-isa: Design History
 ###########################
 
-This page records how :doc:`tinytpu_isa` reached its current numbers: the
-predecessor designs it replaced, each optimisation pass with its measured
-effect (including the ones that were reverted or measured slower), and the
-readings of those numbers that were later corrected.
+This page is the archive. It records the superseded measurements and the route
+by which the current design was reached: the predecessor designs it replaced,
+each optimisation pass with its measured effect (including the ones that were
+reverted or measured slower), and the readings of those numbers that were
+later corrected. **Nothing on this page is the current state.** The current
+design and ISA are on :doc:`tinytpu_isa`, the current cycle counts on
+:doc:`benchmarks`, and the matched like-for-like comparison against Gemmini on
+:doc:`gemmini_comparison`.
 
 .. important::
 
@@ -702,7 +706,8 @@ M_AXI table, unchanged by any of this: all four ports 8/64-bit, Max Read and
 Write Burst Length 16, Num Read and Write Outstanding 16. A 56- or 256-beat
 burst is issued as requests of 16, at II=1 each.
 
-Cosim, one build, all five shapes bit-exact:
+Cosim, one build, all five shapes bit-exact; the *after* column is the
+burst-DMA build, superseded by the memset/widening pass below:
 
 .. list-table::
    :header-rows: 1
@@ -869,7 +874,7 @@ loop to II=2 under a dual-port BRAM, came free from the same partition.
 
    * - shape
      - dyn. instrs
-     - nested (**shipped**)
+     - nested (**shipped** at the burst-DMA build)
      - rotated (reverted)
      -
    * - 4x4x4
@@ -955,7 +960,7 @@ Cosim:
    :header-rows: 1
 
    * - shape
-     - baseline
+     - baseline (the burst-DMA build)
      - flat PE, II=2
      - flat PE, II=1
    * - 4x4x4
@@ -1052,6 +1057,9 @@ build's ``csynth.log``: one port at 512, two at 32, zero 214-307.
 Measured, one build, bit-exact at every shape
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The *after* column is the build shipped from ``b4be2b10`` until ``e24e433b``,
+superseded by the landing below (:ref:`tinytpu-history-landing`).
+
 .. list-table::
    :header-rows: 1
 
@@ -1133,7 +1141,7 @@ patch. The changes are listed on :ref:`tinytpu-isa-landing`.
 
    * - shape
      - 919 build
-     - landed
+     - landed (**current**, :doc:`benchmarks`)
      - branch's measurement of the stack
    * - 4x4x4
      - 252

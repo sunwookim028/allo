@@ -29,7 +29,9 @@ wants the result rather than the apparatus. The apparatus is in
 
 Every number here is one that exists in git with a command that re-derives it.
 Where a claim was made and later withdrawn, the withdrawal is recorded rather
-than the claim quietly removed — that history is part of the result.
+than the claim quietly removed — that history is part of the result. The
+withdrawals that no longer bear on a current reading are collected in
+`Earlier measurements and corrections`_.
 
 The question
 ============
@@ -321,13 +323,6 @@ with the simulator process still at 99 % CPU after **32 minutes**, against about
 two minutes for the shipped mapping. No deadlock is *reported*, so it is not
 called one.
 
-A correction to how this was first described, including here: the
-``Inter-Transaction Progress 0/1`` line is **not a signature of the failure.**
-It is Vitis's first periodic report and it appears in *every* log, passing runs
-included — a completing run prints ``0/1``, then ``1/1``, then finishes. The
-observation is that **the second line never comes.** The number that was being
-quoted as diagnostic locates nothing.
-
 Two consequences, and the second is the uncomfortable one. **An encodable count
 is not a runnable count**: five nests are encodable by the encoder and the
 reference model, three are confirmed on RTL, and the smaller number is the one
@@ -336,42 +331,14 @@ the assembler's own header**, so neither can see an error in the header formula
 itself — agreement among them is weaker evidence than it looks, because they
 share a premise.
 
-**The obvious explanation was tested and refuted.** The suspicion was that the
-trigger is a transfer *inside* the emitted nest rather than hoisted into a
-prologue, and a coverage fact made it look stronger still — of the 23 programs
-the named gates run, **none issues a memory load after a compute**, while the
-random-program generator produces one in **314 of 400 seeds**. So the pattern is
-exercised constantly in the simulator and had never reached a co-simulation
-testbench.
-
-Four minimal programs, each verified against the reference model and by csim,
-then co-simulated under a hard bound: a prologue-only case, a load after a
-compute, a load in a loop before a compute, and a load sharing a loop body with
-a compute. **All four completed.**
-
-A second track then killed the hypothesis from the opposite direction, which is
-the stronger refutation: **both** non-completing programs stage *every* transfer
-in a prologue, and **both** mappings that issue a load *inside* the output nest
-**complete** (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
-staging-based warning would have passed both failures and flagged two programs
-that run — it is exactly the wrong guard, and it had been shipped once before
-being reverted.
-
 The failure is also **not monotone in size**: halving any of the three tile
 counts makes it complete, and *doubling* the row count also makes it complete.
 The minimal reproduction is 16 instructions — plain int8 GEMM tiling, fully
 unrolled, no epilogue — filed with a test that runs its cheap half in seconds
 without Vitis. No positive characterisation is offered and the diagnosis is left
-open.
-
-Two things worth copying from how that was handled. A `covered / UNCOVERED`
-column had **already been added** to the flow on the strength of the suspicion,
-and it separated the candidates perfectly; it was **reverted** once the
-predicate was refuted, on the grounds that shipping a refuted predicate as a
-warning would mislead the very search it exists to guide. And the coverage gap
-survives as a finding in its own right even though it was not the cause: **a
-pattern can be exercised thousands of times in a simulator and never once on
-RTL**, and nothing in the gate list makes that visible.
+open. The staging hypothesis raised and refuted along the way, and a withdrawn
+reading of the ``Inter-Transaction Progress`` line, are in
+`Earlier measurements and corrections`_.
 
 The general lesson is about verification chains rather than about this design:
 **a stack of cheap checks that all pass is not a substitute for the expensive
@@ -398,3 +365,53 @@ The honest summary of the cost side is that **money has not been the binding
 constraint; a trustworthy judge has.** Most of the effort so far went into
 making a verdict mean something, and every hour of it was repaid the first time
 a worker claimed a win it did not have.
+
+Earlier measurements and corrections
+====================================
+
+A withdrawn reading and a refuted hypothesis from the investigation reported
+under `Methodology the experiments forced on us`_, kept because the withdrawal
+is part of the record.
+
+The ``Inter-Transaction Progress`` line, withdrawn as a signature
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A correction to how this was first described, including here: the
+``Inter-Transaction Progress 0/1`` line is **not a signature of the failure.**
+It is Vitis's first periodic report and it appears in *every* log, passing runs
+included — a completing run prints ``0/1``, then ``1/1``, then finishes. The
+observation is that **the second line never comes.** The number that was being
+quoted as diagnostic locates nothing.
+
+The staging hypothesis, tested and refuted
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**The obvious explanation was tested and refuted.** The suspicion was that the
+trigger is a transfer *inside* the emitted nest rather than hoisted into a
+prologue, and a coverage fact made it look stronger still — of the 23 programs
+the named gates run, **none issues a memory load after a compute**, while the
+random-program generator produces one in **314 of 400 seeds**. So the pattern is
+exercised constantly in the simulator and had never reached a co-simulation
+testbench.
+
+Four minimal programs, each verified against the reference model and by csim,
+then co-simulated under a hard bound: a prologue-only case, a load after a
+compute, a load in a loop before a compute, and a load sharing a loop body with
+a compute. **All four completed.**
+
+A second track then killed the hypothesis from the opposite direction, which is
+the stronger refutation: **both** non-completing programs stage *every* transfer
+in a prologue, and **both** mappings that issue a load *inside* the output nest
+**complete** (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
+staging-based warning would have passed both failures and flagged two programs
+that run — it is exactly the wrong guard, and it had been shipped once before
+being reverted.
+
+Two things worth copying from how that was handled. A `covered / UNCOVERED`
+column had **already been added** to the flow on the strength of the suspicion,
+and it separated the candidates perfectly; it was **reverted** once the
+predicate was refuted, on the grounds that shipping a refuted predicate as a
+warning would mislead the very search it exists to guide. And the coverage gap
+survives as a finding in its own right even though it was not the cause: **a
+pattern can be exercised thousands of times in a simulator and never once on
+RTL**, and nothing in the gate list makes that visible.
