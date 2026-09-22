@@ -6,8 +6,8 @@ textual patches, so the diff between a variant and the baseline is exactly the
 change being priced and nothing else. The baseline is pinned to the file the
 gap attribution was measured against (`BASE_COMMIT`, 252 / 919 cycles), read
 from git, not the shipped file: the stack `v_design_dep_imem8` measured here is
-what `main` has shipped since, with the dependence pragma now emitted by
-`s.dependence` rather than patched into `kernel.cpp` (`patch_kernel` below is
+what `main` has shipped since, with the <<REDACTED>> now emitted by
+`<<REDACTED>>` rather than patched into `kernel.cpp` (`patch_kernel` below is
 how it was measured, kept as the record).
 
     python make_variants.py            # writes v_base.py and v_*.py here
@@ -427,12 +427,12 @@ def patch_wdb(s):
     return s
 
 
-# ------------------------------------- accu flat, ar in BRAM, + dependence pragma
+# ------------------------------------- accu flat, ar in BRAM, + <<REDACTED>>
 ACCUFLAT = '''    @df.kernel(mapping=[1])
     def accu():
         # Flat row loop, NO rotation, `ar` left in BRAM. The carried store->load
         # on `ar` is what held this at Final II = 3; `patch_kernel` below injects
-        # `#pragma HLS dependence variable=ar inter false` into the emitted C++
+        # `<<REDACTED>>
         # -- the one line item 21 says Allo cannot emit. vadd takes TWO
         # iterations per row (x on the even one, y + write on the odd one) so
         # no iteration needs more than one read and one write of `ar`.
@@ -520,11 +520,11 @@ ACCUFLAT = '''    @df.kernel(mapping=[1])
 PATCH_KERNEL = '''
 
 DEP_PRAGMA = os.environ.get("TPU_DEP_PRAGMA",
-                            "#pragma HLS dependence variable=ar inter false")
+                            "<<REDACTED>>
 
 
 def patch_kernel(prj):
-    """Inject the dependence pragma into the emitted C++ -- the text-patch
+    """Inject the <<REDACTED>> into the emitted C++ -- the text-patch
     escape hatch cosim.py already uses for m_axi depths. Inserted as the
     first line of the first loop in accu_0 (the flat row loop)."""
     import re as _re
@@ -749,13 +749,13 @@ VARIANTS = {
                [patch_wdb, patch_accu1, patch_dmadirect, patch_order]),
     "v_memset": ("item (f): spad declared `= 0` again (Allo emits a memset)", [patch_memset_spad]),
     "v_memset6": ("item (f): all six arrays `= 0` again", [patch_memset6]),
-    "v_wdb_accudep": ("v_wdb + accu II=1 via the injected dependence pragma", [patch_wdb, patch_accuflat]),
+    "v_wdb_accudep": ("v_wdb + accu II=1 via the injected <<REDACTED>>", [patch_wdb, patch_accuflat]),
     "v_design": ("every Allo-legal design change: wdb + A straight into vr", [patch_wdb, patch_adirect]),
-    "v_design_dep": ("v_design + accu II=1 via the injected dependence pragma",
+    "v_design_dep": ("v_design + accu II=1 via the injected <<REDACTED>>",
                      [patch_wdb, patch_adirect, patch_accuflat]),
     "v_imem8": ("imem prefetch 8 words/iteration (design)", [patch_imem8]),
     "v_design_dep_imem8": ("v_design_dep + imem8", [patch_wdb, patch_adirect, patch_accuflat, patch_imem8]),
-    "v_accudep": ("accu flat, ar in BRAM, + injected dependence pragma", [patch_accuflat]),
+    "v_accudep": ("accu flat, ar in BRAM, + injected <<REDACTED>>", [patch_accuflat]),
 }
 
 if __name__ == "__main__":

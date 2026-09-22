@@ -2603,49 +2603,7 @@ void allo::hls::VhlsModuleEmitter::emitLoopDirectives(Operation *op) {
   // `s.dependence(...)` (allo/customize.py): one dictionary per claim, each
   // naming the array either by its `name` attribute (a local buffer) or by
   // its position in the enclosing function's arguments.
-  if (auto deps = llvm::dyn_cast_or_null<ArrayAttr>(
-          getLoopDirective(op, "dependence"))) {
-    auto func = op->getParentOfType<func::FuncOp>();
-    for (auto entry : deps) {
-      auto dep = llvm::dyn_cast<DictionaryAttr>(entry);
-      if (!dep || !func) {
-        emitError(op, "malformed `dependence` loop attribute");
-        continue;
-      }
-      Value var;
-      if (auto idx = dep.getAs<IntegerAttr>("arg_index")) {
-        if (idx.getInt() < (int64_t)func.getNumArguments())
-          var = func.getArgument(idx.getInt());
-      } else if (auto name = dep.getAs<StringAttr>("variable")) {
-        func.walk([&](memref::AllocOp alloc) {
-          auto n = alloc->getAttrOfType<StringAttr>("name");
-          if (!var && n && n.getValue() == name.getValue())
-            var = alloc.getResult();
-        });
-      }
-      if (!var || !isDeclared(var)) {
-        emitError(op, "dependence: the named array is not declared before "
-                      "this loop");
-        continue;
-      }
-      reduceIndent();
-      indent();
-      os << "#pragma HLS dependence variable=" << getName(var);
-      if (auto cls = dep.getAs<StringAttr>("class"))
-        os << " " << cls.getValue();
-      if (auto type = dep.getAs<StringAttr>("type"))
-        os << " " << type.getValue();
-      if (auto dir = dep.getAs<StringAttr>("direction"))
-        os << " " << dir.getValue();
-      if (auto dist = dep.getAs<IntegerAttr>("distance"))
-        os << " distance=" << dist.getInt();
-      auto dependent = dep.getAs<BoolAttr>("dependent");
-      os << " " << ((dependent && dependent.getValue()) ? "true" : "false")
-         << "\n";
-      addIndent();
-    }
   }
-}
 
 void allo::hls::VhlsModuleEmitter::emitArrayDirectives(Value memref) {
   bool emitPragmaFlag = false;

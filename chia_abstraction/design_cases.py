@@ -138,7 +138,7 @@ def _systolic_1d_inputs():
 
 def _systolic_1d_schedule(s):
     # The compute PE's accumulation loop: the same shape of claim
-    # `s.dependence` is about on TinyTPU-isa's accumulator.
+    # `<<REDACTED>>` is about on TinyTPU-isa's accumulator.
     s.pipeline("gemm_1_1:m")
     return s
 

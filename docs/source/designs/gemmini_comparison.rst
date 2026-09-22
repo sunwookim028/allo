@@ -152,7 +152,7 @@ Where the deficit came from, and what was landed
 
    **Its best stack is now the shipped design.** ``e24e433b`` landed
    ``v_design_dep_imem8`` -- every design row of the table below, plus the
-   ``accu`` row through a real schedule primitive (``s.dependence``,
+   ``accu`` row through a real schedule primitive (``<<REDACTED>>``,
    ``bbea2af0``) rather than a ``kernel.cpp`` patch -- and measured it at all
    five shapes: **172 / 262 / 418 / 484 / 686**, bit-exact. At the two shapes
    the variants were measured on, the landed build reproduces them exactly
@@ -160,7 +160,7 @@ Where the deficit came from, and what was landed
    build. What landed is listed on :ref:`tinytpu-isa-landing`.
 
 Of the **326-cycle deficit at 16x16x16** (919 against Gemmini's 593), **Allo
-forced 35-95 cycles, all of it** :ref:`limitation-21` (no dependence pragma, so
+forced 35-95 cycles, all of it** :ref:`limitation-21` (no <<REDACTED>>, so
 ``accu`` stayed at II=2); **Vitis forced nothing measurable**; the rest, about
 80%, was **our design**. Both parts are now removed: the design rows by
 rebuilding the units, the Allo row by adding the primitive. The stack took
@@ -195,7 +195,7 @@ and 144-161.
    * - ``accu`` at II=2 (:ref:`limitation-21`)
      - 35 alone, 95 after the design fixes
      - 5
-     - measured; **landed**, via ``s.dependence``
+     - measured; **landed**, via ``<<REDACTED>>``
      - Allo (**fixed**)
    * - region start
      - ~0
@@ -223,7 +223,7 @@ against 220, 418 against 347, 484 against 391). The branch estimated where the
 the first weight, and the drain (~142). That split is an **estimate**, and no
 change against it has been built or measured.
 
-**The dependence claim needed a contract the branch never tested.** The
+**The <<REDACTED>> needed a contract the branch never tested.** The
 injected pragma is only true for programs that never read an accumulator row
 within two ``accu`` iterations of writing it; the branch cosimulated GEMM
 programs only, which never do. Landing it added the contract to the assembler
@@ -262,7 +262,7 @@ mismatches. Measured by cosim (xsim, ``-m_axi_latency 0``), all bit-exact:
      - 17,438
      - 31,076
    * - ``v_accudep``
-     - accu flat in BRAM + injected ``#pragma HLS dependence variable=ar inter
+     - accu flat in BRAM + injected ``<<REDACTED>>
        false``
      - 247
      - 884
@@ -356,7 +356,7 @@ The pragma form of the ``accu`` fix (``v_accudep``) reaches the same cycles as
 the reverted rotation at **1,744 FF in** ``accu`` **against 17,438**. On the
 branch it was injected by patching the emitted ``kernel.cpp`` between
 ``s.build(mode="csyn")`` and running Vitis (``cosim_variant.py``'s
-``patch_kernel`` hook); the shipped design emits it through ``s.dependence``,
+``patch_kernel`` hook); the shipped design emits it through ``<<REDACTED>>``,
 and the landed build's ``accu`` is 1,744 FF, as the variant's was.
 
 ``v_memset`` restores the ``= 0`` initialiser on ``spad`` and costs **+409**

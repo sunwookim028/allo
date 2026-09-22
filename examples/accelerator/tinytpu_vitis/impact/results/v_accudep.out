@@ -1,6 +1,6 @@
 variant=v_accudep module=/home/sk3463/allo-impact/examples/accelerator/tinytpu_vitis/impact/v_accudep.py run=/home/sk3463/allo-impact/examples/accelerator/tinytpu_vitis/impact/runs/v_accudep
 TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 2 shapes as data
-  patched accu_0: #pragma HLS dependence variable=ar inter false
+  patched accu_0: <<REDACTED>>
   synthesizing once ...
    4x 4x 4  cycles=247   TB 4x4x4 mismatches = 0 / 16
   16x16x16  cycles=884   TB 16x16x16 mismatches = 0 / 256

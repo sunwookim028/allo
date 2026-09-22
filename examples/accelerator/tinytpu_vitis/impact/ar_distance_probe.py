@@ -1,4 +1,4 @@
-"""RTL probe of accu's dependence claim: `isa_dsl.ar_distance_program(d)` for
+"""RTL probe of accu's <<REDACTED>>: `isa_dsl.ar_distance_program(d)` for
 d = 1..5, one call each on one RTL instance, the whole of C compared.
 
     PRJ=<a cosim.py project, synthesized> python ar_distance_probe.py

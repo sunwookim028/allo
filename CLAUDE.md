@@ -81,8 +81,8 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 `mutate.py` after any change to the harness. `assemble()` rejects programs that
 read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
 hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
-iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
-(`#pragma HLS dependence ... inter false`) that is only true under that
+iterations of writing it: `accu`'s II=1 rests on an `<<REDACTED>>` claim
+(`<<REDACTED>>
 contract, and no simulator can see a violation -- only the `TPU_TB=stress`
 cosim, which runs `ar_distance_program` at the edge.
 Details: `docs/source/designs/tinytpu_isa.rst` ("Verifying a change").

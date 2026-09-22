@@ -154,7 +154,7 @@ not have: its row index is a carried register, so Vitis cannot prove that
 iteration n's store and iteration n+1's load of `ar` touch different rows, and
 the flat loop closes at `Final II = 3` (II=2 with `ar` in registers, II=1 with a
 write-behind rotation at 13.7x the flip-flops, reverted). It is flat now because
-`schedule()` asserts the absence of that dependence with `s.dependence` -- a
+`schedule()` asserts the absence of that dependence with `<<REDACTED>>` -- a
 claim the assembler makes true by enforcing a minimum read-after-write
 distance on `ar` (THE ACCUMULATOR DISTANCE CONTRACT, below).
 
@@ -345,7 +345,7 @@ DMA_TO_VR = 2
 #
 # ---- THE ACCUMULATOR DISTANCE CONTRACT ----
 # `accu` runs at II=1 because `schedule()` tells Vitis there is no carried
-# dependence through `ar` (`s.dependence`, limitations register item 21). That
+# dependence through `ar` (`<<REDACTED>>`, limitations register item 21). That
 # is true only if no row is read too soon after it was written: counting
 # `accu` iterations -- one per `mm`/`vrelu`/`mvout` row, two per `vadd` row
 # (first source on the even one; second source and the write on the odd
@@ -993,7 +993,7 @@ def tinytpu_isa(
         clips to int8 on the way out (Gemmini's `mvout` under
         ACC_SCALE_IDENTITY with shift 0).
 
-        **One flat row loop at II=1, `ar` in BRAM, and a dependence claim.**
+        **One flat row loop at II=1, `ar` in BRAM, and a <<REDACTED>>.**
         Every arm is muxed down to ONE `ar` read and ONE `ar` write per
         iteration; `vadd`, which needs two reads, takes two iterations per row
         (first source on the even one, second source and the write on the odd
@@ -1007,8 +1007,8 @@ def tinytpu_isa(
             (II = 1, distance = 1) between 'store' on array 'ar'
             and 'load' ('rv') on array 'ar'
 
-        `schedule()` answers it with `s.dependence("accu_0:x", "ar", ...)`,
-        which emits `#pragma HLS dependence variable=ar inter false` in this
+        `schedule()` answers it with `<<REDACTED>>
+        which emits `<<REDACTED>>
         loop (limitations register item 21). **The claim is made true by the
         assembler, not by the hardware:** `check_program` rejects any program
         in which an `ar` row is read fewer than `AR_RAW_DIST` accu iterations
@@ -1334,7 +1334,7 @@ def check_program(prog):
         `mm`-acc / `vadd` / `vrelu` / `mvout` reading `ar`.
       * **the accumulator distance contract**: every `ar` read comes at least
         `AR_RAW_DIST` `accu` iterations after the write it depends on, which
-        is what makes `schedule()`'s dependence claim on `ar` true.
+        is what makes `schedule()`'s <<REDACTED>> on `ar` true.
       * **bounds** on every memory and on `C`/`A`/`B`: an out-of-range row is
         silent corruption in RTL, not an exception.
       * **`nr >= 1`** on every data op. `dma_ld`, `spm`, `vru` and `dma_st` run
@@ -1424,7 +1424,7 @@ def check_program(prog):
                 raise ProgramError(
                     f"{where}: reads ar row {row} as {what} "
                     f"{at - ar_wrote[row]} accu iteration(s) after it was "
-                    f"written; the accumulator's dependence claim needs "
+                    f"written; the accumulator's <<REDACTED>> needs "
                     f">= AR_RAW_DIST={AR_RAW_DIST} (see THE ACCUMULATOR "
                     f"DISTANCE CONTRACT)")
 
@@ -1565,7 +1565,7 @@ def schedule(s):
       * `ib` is cyclically partitioned by 8, so the sequencer's program
         prefetch writes 8 words per cycle (see `sequencer`).
       * **`accu`'s row loop carries no dependence through `ar`** -- the claim
-        `s.dependence` emits as `#pragma HLS dependence variable=ar inter
+        `<<REDACTED>>` emits as `<<REDACTED>>
         false`. It is what holds the flat loop at II=1 (Vitis alone closes it
         at 3), and it is true because `check_program` enforces THE
         ACCUMULATOR DISTANCE CONTRACT on every program `assemble()` accepts.
@@ -1575,5 +1575,4 @@ def schedule(s):
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
-    s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
     return s

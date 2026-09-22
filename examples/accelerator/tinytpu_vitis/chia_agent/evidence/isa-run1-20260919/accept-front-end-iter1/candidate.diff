@@ -157,7 +157,7 @@
 -iteration n's store and iteration n+1's load of `ar` touch different rows, and
 -the flat loop closes at `Final II = 3` (II=2 with `ar` in registers, II=1 with a
 -write-behind rotation at 13.7x the flip-flops, reverted). It is flat now because
--`schedule()` asserts the absence of that dependence with `s.dependence` -- a
+-`schedule()` asserts the absence of that dependence with `<<REDACTED>>` -- a
 -claim the assembler makes true by enforcing a minimum read-after-write
 -distance on `ar` (THE ACCUMULATOR DISTANCE CONTRACT, below).
 -

@@ -68,7 +68,7 @@ BASELINES = {
         {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
          "16x16x16": 919},
     # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
-    # II=1 via s.dependence). Main's published numbers; re-measured by a no-diff
+    # II=1 via <<REDACTED>>). Main's published numbers; re-measured by a no-diff
     # control through this script, evidence/accept-control-476a70d8/.
     ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
      "8f2e9aa9f518ef320cab163adc95e05737c777be"):

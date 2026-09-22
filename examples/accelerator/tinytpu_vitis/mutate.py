@@ -27,8 +27,8 @@ loader really runs the file it was given.
 
 **RTL-only mutants** (`RTL_ONLY`) break something no simulator models, so they
 pass `bench_isa` and `stress_isa` by construction and only cosim can catch
-them. `ar_claim_false` is the one there is: it makes the dependence claim
-`schedule()` emits on `accu`'s `ar` (`#pragma HLS dependence ... inter false`)
+them. `ar_claim_false` is the one there is: it makes the <<REDACTED>>
+`schedule()` emits on `accu`'s `ar` (`<<REDACTED>>
 untrue for programs the assembler accepts, and the `TPU_TB=stress` testbench's
 `ar_distance_program` case is what fails. Their cosim runs at 4x4x4 unless
 `TPU_SHAPES` says otherwise. With `--no-rtl` they are reported as not run, not
@@ -132,7 +132,7 @@ MUTANTS = [
      "te: int32 = rv[32 * e4", "if te > 127:", "if te > 128:"),
     ("clip_lo_off_by_one", "mvout clip lower bound -129, not -128",
      "te: int32 = rv[32 * e4", "if te < -128:", "if te < -129:"),
-    # --- the assembler, and the dependence claim it makes true ---
+    # --- the assembler, and the <<REDACTED>> it makes true ---
     ("assembler_span_short", "assemble() bursts one DRAM row too few",
      "def span(src):", "e[3] + e[1] for e in ev", "e[3] + e[1] - 1 for e in ev"),
     ("ar_contract_unenforced", "check_program stops enforcing the accumulator "

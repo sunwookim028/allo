@@ -581,7 +581,7 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
    * - ``impact/``
      - the gap attribution's variants (generated from the pre-landing
        baseline), their raw results and timelines, the Vitis shared-array
-       probe, and the RTL probe of the accumulator's dependence claim
+       probe, and the RTL probe of the accumulator's <<REDACTED>>
        (:ref:`gemmini-attribution-reproduce`)
 
 .. code-block:: bash
@@ -775,7 +775,7 @@ Two design facts the hardening found:
 
 .. _tinytpu-isa-dependence:
 
-The accumulator's dependence claim
+The accumulator's <<REDACTED>>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``accu`` is one flat row loop at II=1 because ``schedule()`` tells Vitis that
@@ -783,10 +783,10 @@ its accumulator carries no dependence across iterations:
 
 .. code-block:: python
 
-   s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
-   # -> #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
+   <<REDACTED>>
+   # -> <<REDACTED>>
 
-``s.dependence`` is the schedule primitive added for :ref:`limitation-21`
+``<<REDACTED>>`` is the schedule primitive added for :ref:`limitation-21`
 (``bbea2af0``). Without the claim the flat loop closes at ``Final II = 3``:
 the row index is a carried register, so Vitis cannot prove that iteration n's
 store and iteration n+1's load of ``ar`` touch different rows.
@@ -835,7 +835,7 @@ that widened the window fails there.
 
 That test has teeth. ``mutate.py``'s ``ar_claim_false`` sets ``AR_RAW_DIST =
 1``: the pragma is then false for programs the assembler accepts. It passes
-``bench_isa`` and ``stress_isa`` -- no simulator models a dependence pragma --
+``bench_isa`` and ``stress_isa`` -- no simulator models a <<REDACTED>> --
 and the stress cosim catches it (``ar_distance(1)``: 4 cells wrong).
 ``ar_contract_unenforced`` (the check disabled) is caught by ``stress_isa``'s
 validator controls.
@@ -936,7 +936,7 @@ patched:
 * **A straight into the vregs.** ``dma_ld``'s ``f0`` gained a destination bit;
   the shipped GEMM sends A to the vregs, so the A ``spad -> vld -> vr`` trip is
   gone (``v_design``). ``vld`` stays in the ISA.
-* ``accu`` **flat at II=1**, held there by the ``s.dependence`` claim and the
+* ``accu`` **flat at II=1**, held there by the ``<<REDACTED>>`` claim and the
   distance contract that makes it true (:ref:`tinytpu-isa-dependence`), not by
   patching ``kernel.cpp`` (``v_accudep``).
 * **Per-unit work counts precomputed in the sequencer**: a flat loop whose row
@@ -1068,7 +1068,7 @@ with the same margin.
 
 The speedup costs **+2,593 FF and +6,617 LUT**, about 0.1% and 0.5% of the
 xcu280, and no BRAM or DSP. The largest item is the 16 weight loaders (1,250
-FF, 4,472 LUT); ``accu``'s dependence claim costs 494 FF over the nested loop
+FF, 4,472 LUT); ``accu``'s <<REDACTED>> costs 494 FF over the nested loop
 it replaced -- against **16,188** for the write-behind rotation that reached
 the same II (:ref:`limitation-21`).
 

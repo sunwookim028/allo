@@ -159,7 +159,7 @@ reason to change backend. Six flagged items (2026-09-18):
        under* ``stream type=unsync``; *on the SystemC fork each client gets an* ``AlloMemPins``
        *replica. See* :ref:`limitation-shared-memory`. *Measured impact on TinyTPU-isa: 0
        cycles.)*
-   * - :ref:`limitation-21`: no ``#pragma HLS dependence``, so a false dependence cannot be
+   * - :ref:`limitation-21`: no ``<<REDACTED>>
        asserted away
      - **(A)** -- Vitis has the pragma; Allo emits only ``m_axi``/``s_axilite``/``bind_storage``/
        ``array_partition`` (``s_axilite`` was later found not to be emitted on the Vitis path at

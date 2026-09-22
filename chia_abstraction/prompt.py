@@ -79,8 +79,8 @@ edited or added, not deleted wholesale.
 
 THE ABSTRACTIONS YOU HAVE. `s.pipeline(axis, initiation_interval=, rewind=,
 style=)`, `s.unroll(axis, factor=)`, `s.partition(MockBuffer(kernel, buf),
-partition_type=, factor=, dim=)`, `s.dependence(axis, target, dep_type=,
-direction=, distance=, dependent=)`, `s.reorder`, `s.split`, `s.buffer_at`,
+partition_type=, factor=, dim=)`, `<<REDACTED>>
+direction=, distance=, <<REDACTED>> `s.reorder`, `s.split`, `s.buffer_at`,
 `s.to`, `s.unfold`, and the `configs=` keys of the Vitis backend
 (`align_value`, `hbm_mapping`, `sub_funcs`). Reach them on a dataflow region
 through `allo.dataflow.customize`, naming a kernel instance as
@@ -164,10 +164,10 @@ and emits the pragma. `allo::getLoopDirective(op, "name")`
 THE PATTERN A PRIMITIVE FOLLOWS. Two extensions exist in this tree. One follows
 the pattern; one does not, and the difference is the point.
 
-  `s.dependence` (`allo/customize.py:833-943`) is the pattern: a
+  `<<REDACTED>>` (`allo/customize.py:833-943`) is the pattern: a
   `@wrapped_apply` method on `Schedule`; five explicit `AlloValueError` raises
   validating every argument against a closed set BEFORE any IR is touched; a
-  `dependence` `ArrayAttr` of `DictAttr` appended to (not overwriting) the
+  `<<REDACTED>>` `ArrayAttr` of `DictAttr` appended to (not overwriting) the
   loop's attributes; one branch in `EmitVivadoHLS.cpp:emitLoopDirectives`
   (2603-2647) that `emitError`s when the attribute is malformed or names an
   array that is not declared before the loop; three tests in
@@ -179,7 +179,7 @@ the pattern; one does not, and the difference is the point.
   a `configs` key read in one place, NO validation of any kind, no IR carrier
   at all (a regex rewrite of already-emitted text), and NO TEST anywhere.
 
-  `s.pipeline(style=)` repeats `s.dependence`'s shape in 44 lines across three
+  `s.pipeline(style=)` repeats `<<REDACTED>>`'s shape in 44 lines across three
   files with one test.
 
 SO: a primitive is ONE change touching FIVE places.
@@ -205,7 +205,7 @@ SO: a primitive is ONE change touching FIVE places.
      that is incomplete, and it is the first thing a reviewer will ask for.
   5. THE DOCS. The docstring, stating the pragma or IR it produces, the closed
      set of each argument, and WHAT IS A PROMISE RATHER THAN A FACT.
-     `s.dependence` and `align_value` are both claims that, if false, produce
+     `<<REDACTED>>` and `align_value` are both claims that, if false, produce
      wrong RTL while every software simulation passes. If your abstraction is
      a claim, say so in the docstring.
 
@@ -262,7 +262,7 @@ something else you can defend.
       fixed the RTL deadlock a cyclic region hits under Vitis's default stall
       pipeline -- but Allo emits a `while` as `while (true) {{ if (!c) break; }}`
       and cannot attach ANY loop directive to it, so a free-running unit
-      written that way gets no `style`, no `dependence` and no `II`. Loop
+      written that way gets no `style`, no `<<REDACTED>>` and no `II`. Loop
       directive attachment should not depend on loop syntax.
   #26 (item 23) THERE IS NOWHERE IN THE EMITTER TO HANG AN INTERFACE
       ATTRIBUTE. The `m_axi` pragma is produced by a REGEX REWRITE of

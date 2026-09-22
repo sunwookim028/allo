@@ -33,7 +33,7 @@ TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
     case whose results sit exactly on the clip and ReLU boundaries, a mid
     range, `isa_dsl.vector_program`, and `isa_dsl.ar_distance_program` at
     the accumulator's distance contract (a case only RTL can fail: every
-    simulator ignores the dependence pragma) -- each with `C` prefilled with random
+    simulator ignores the <<REDACTED>>) -- each with `C` prefilled with random
     bytes and the WHOLE of `C` compared against `isa_ref`/numpy, so the
     region must be exact and everything outside it untouched. The calls share
     one RTL instance, so each sees the `spad`/`vr`/`ar` the previous left.
@@ -169,7 +169,7 @@ def stress_testbench(M, K, N):
     prog = vector_program(8)
     cases.append(("vector_program(8) full", prog, A, B, C0,
                   isa_ref.run(prog, A, B, C0)))
-    # The accumulator's dependence claim, at the edge of the contract that
+    # The accumulator's <<REDACTED>>, at the edge of the contract that
     # makes it true: every `ar` read exactly AR_RAW_DIST iterations after its
     # write. Only the RTL can fail this; every simulator ignores the pragma.
     A, B = operands("full", 951)

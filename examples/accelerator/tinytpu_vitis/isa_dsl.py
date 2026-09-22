@@ -359,7 +359,7 @@ def ar_distance_program(dist):
     and after every kind of write, including `vadd`'s (two iterations a row).
 
     With `dist = AR_RAW_DIST` it is the tightest program `check_program`
-    accepts, and it is what shows the RTL honours the dependence claim
+    accepts, and it is what shows the RTL honours the <<REDACTED>>
     `schedule()` makes: a pipeline whose read-to-write window reached `dist`
     reads a stale row here, where no GEMM ever would. `check_program` must
     reject `dist - 1`.

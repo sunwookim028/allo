@@ -49,7 +49,7 @@ checked at construction, a primitive landing with its legality rules:
    raise `AlloValueError` at least once. A primitive whose arguments are not
    checked against a closed set is refused here, before anything is built --
    `align_value` is in the tree as the counter-example (no validation, no test)
-   and `s.dependence` as the pattern (five raises, three tests).
+   and `<<REDACTED>>` as the pattern (five raises, three tests).
 
 Rule 4 is blocking. A separate, NON-blocking hint is emitted when the patch
 teaches one emitter to read a new loop attribute and leaves the others silently

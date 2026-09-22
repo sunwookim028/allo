@@ -831,7 +831,7 @@ landed.
 **Not in the design.** It was built (``ca978b97``), it was bit-exact, it was 2.3%
 faster, and it was reverted for area (``644d8cdc``, 2026-09-18): the rotation
 costs ``accu`` 13.7x its flip-flops (1,270 -> 17,450), the trade gets worse as T
-grows, and one line of ``#pragma HLS dependence`` would have bought the same II
+grows, and one line of ``<<REDACTED>>
 for nothing. The measurement is kept because it is what prices
 :ref:`limitation-21` -- the number that says what the missing pragma is worth in
 silicon. ``microarch_isa.py`` is back at the nested form, identical to the
@@ -847,7 +847,7 @@ The obstacle was one dependence: read ``ar[f1 + r]``, add, write it back, with
    between 'store' on array 'ar' and 'load' ('rv') on array 'ar'
 
 ``Final II = 3``; completely partitioned into registers it is ``Final II = 2``,
-no further. Vitis will take ``#pragma HLS dependence variable=ar inter false``
+no further. Vitis will take ``<<REDACTED>>
 for exactly the first of those, and **Allo has no primitive that emits one**. So
 the proof had to be made unnecessary instead of waived: ``accu`` kept the last
 two computed rows in registers, wrote ``ar`` two iterations late, and answered a
@@ -1122,10 +1122,10 @@ Landing the gap attribution: 919 -> 686
 
 The gap attribution (:ref:`gemmini-gap-attribution`) priced the deficit to
 Gemmini on variants of the 919 build and found about 80% of it in our own
-design and 35-95 cycles forced by Allo's missing dependence pragma
+design and 35-95 cycles forced by Allo's missing <<REDACTED>>
 (:ref:`limitation-21`). ``e24e433b`` (2026-09-19) made its best bit-exact
 stack, ``v_design_dep_imem8``, the design, after ``bbea2af0`` added the
-``s.dependence`` primitive so the pragma no longer needed a ``kernel.cpp``
+``<<REDACTED>>`` primitive so the pragma no longer needed a ``kernel.cpp``
 patch. The changes are listed on :ref:`tinytpu-isa-landing`.
 
 .. list-table::

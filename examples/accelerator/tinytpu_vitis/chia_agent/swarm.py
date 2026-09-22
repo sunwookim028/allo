@@ -89,7 +89,7 @@ stress testbench.
 
 Already landed (do not re-propose): program prefetch 8 words a cycle, weights
 by scratchpad address with per-PE double-buffered weight loaders (wld), A no
-longer through spad->vld->vr, accu at II=1 via s.dependence (valid only
+longer through spad->vld->vr, accu at II=1 via <<REDACTED>> (valid only
 because check_program enforces AR_RAW_DIST=4 between an accumulator write and
 a read of it -- a closer read is an RTL-only failure the simulator does not
 show), sequencer-precomputed row counts.

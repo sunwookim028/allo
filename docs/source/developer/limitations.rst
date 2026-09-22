@@ -38,7 +38,7 @@ Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.
 
 Related feature-gap tracking lives as fork issues and is not restated here:
-combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
+combinational wires (fork issue #9), HLS <<REDACTED>> (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
 streams as top-level inputs (fork issue #12), and the nested sub-region Stream
 compile-time-constant shape constraint (fork issue #4; item :ref:`H <limitation-h>`). The
@@ -385,10 +385,10 @@ Fixed or closed
      - **fork-only -- upstreaming candidate**
      - `item20_emitter_name_collision.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py>`__
    * - :ref:`21 <limitation-21>`
-     - FIXED by ``bbea2af0`` (``s.dependence``); TinyTPU-isa uses it since
+     - FIXED by ``bbea2af0`` (``<<REDACTED>>``); TinyTPU-isa uses it since
        ``e24e433b``
      - frontend, emitter
-     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
+     - No schedule primitive and no emitter path for ``<<REDACTED>>
      - **fork-only -- upstreaming candidate**
      - ``tests/test_vhls.py::test_dependence_pragma*``
 
@@ -458,7 +458,7 @@ Priority annotations below were folded in from the former root ``STATE.md``
 fork-vs-upstream feature map is the pinned fork issue
 https://github.com/sunwookim028/allo/issues/13). Related feature-gap tracking
 lives as fork issues and is
-not restated here: combinational wires (fork issue #9), HLS dependence pragma
+not restated here: combinational wires (fork issue #9), HLS <<REDACTED>>
 (fork issue #10), shared mutable memory across kernels (fork issue #11; relates
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
 nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
@@ -1165,18 +1165,18 @@ compile:
 
 .. _limitation-21:
 
-21. No ``#pragma HLS dependence`` primitive, so a false dependence cannot be asserted away
+21. No ``<<REDACTED>>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. admonition:: Status (2026-09-19)
 
    **FIXED by** ``bbea2af0`` (fork-only; upstreaming candidate): a schedule
-   primitive, ``s.dependence(axis, target, dep_type="inter"|"intra",
-   direction=None|"RAW"|"WAR"|"WAW", distance=None, dependent=False,
+   primitive, ``<<REDACTED>>
+   direction=None|"RAW"|"WAR"|"WAW", distance=None, <<REDACTED>>
    dep_class=None|"array"|"pointer")``, next to ``s.partition`` in
-   ``allo/customize.py``. It stores the claim as a ``dependence`` attribute on
+   ``allo/customize.py``. It stores the claim as a ``<<REDACTED>>`` attribute on
    the loop and ``emitLoopDirectives`` in ``EmitVivadoHLS.cpp`` emits
-   ``#pragma HLS dependence variable=<array> ...`` inside that loop (affine and
+   ``<<REDACTED>>
    ``scf`` loops alike). The array is a local buffer or an argument of the
    loop's function. It is reachable on a dataflow region through
    ``allo.dataflow.customize`` by the kernel instance's name, as ``s.partition``
@@ -1190,7 +1190,7 @@ compile:
 
    The text below is the item as it stood before the fix.
 
-Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
+Vitis takes ``<<REDACTED>>
 where the scheduler cannot prove two accesses are independent but the author
 can. **Allo emits no dependence pragmas and has no primitive for one** -- the
 only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
@@ -1211,7 +1211,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   with T while the 2.3% does not. The shipped design is back to the nested form
   at II=2.
 - **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
-  ``#pragma HLS dependence variable=ar inter false`` into the emitted
+  ``<<REDACTED>>
   ``kernel.cpp`` (``v_accudep``, now under ``examples/accelerator/tinytpu_vitis/impact/``)
   measures **35 cycles** at 16x16x16 on the then-shipped design (919 -> 884; 5
   at 4x4x4), and **95** once the design fixes are in (``v_design_dep``). The
@@ -1219,7 +1219,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   reverted rotation. Before the fix the only way to get it was patching
   ``kernel.cpp`` between ``s.build(mode="csyn")`` and running Vitis.
   Attribution: :ref:`gemmini-gap-attribution`.
-- **A dependence claim is a contract, and the primitive does not check it.**
+- **A <<REDACTED>> is a contract, and the primitive does not check it.**
   Landing the claim on TinyTPU-isa showed that ``inter false`` on ``ar`` is
   true only for programs that never read an accumulator row within two
   iterations of writing it: the synthesized loop loads in state 5 and stores in
@@ -1229,7 +1229,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II
-  problems and Allo cannot reach it. A ``s.dependence(...)`` primitive alongside
+  problems and Allo cannot reach it. A ``<<REDACTED>>
   the existing ``s.partition(...)`` is the natural shape.
 
 .. _limitation-22:
@@ -1406,7 +1406,7 @@ Not emitted by **any** emitter -- zero hits, not "hard to reach":
 - ``#pragma HLS latency`` (the only ``latency`` hits in ``allo/`` are report
   *parsing*, ``allo/backend/report.py``, ``catapult.py:286``).
 - ``#pragma HLS protocol``.
-- ``#pragma HLS dependence`` -- see :ref:`item 21 <limitation-21>`, where the cost of its absence is
+- ``<<REDACTED>>
   measured; not restated here.
 - ``#pragma HLS resource`` survives only as dead comment
   (``EmitVivadoHLS.cpp:2756``).

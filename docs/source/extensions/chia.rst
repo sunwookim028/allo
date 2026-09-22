@@ -150,7 +150,7 @@ The evaluator
   ``git worktree`` with its own ``mlir/`` build it runs ``bench_isa``,
   ``stress_isa``, ``param_check``, cosim at all five shapes, and the
   ``TPU_TB=stress`` RTL testbench (several calls on one RTL instance, whole
-  ``C`` compared -- what sees an RTL-only failure such as a dependence pragma
+  ``C`` compared -- what sees an RTL-only failure such as a <<REDACTED>>
   that is false at a short read-after-write distance). ``claim`` is ``win``
   only against the recorded baseline, itself measured by a no-diff run
   (``evidence/accept-control-476a70d8/``: 172 / 262 / 418 / 484 / 686, RTL
