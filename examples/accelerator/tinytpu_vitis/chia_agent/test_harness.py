@@ -175,6 +175,17 @@ IMPORT_ATTACKS = {
 }
 
 
+def _evaluate_module():
+    """The evaluator, imported by path: `test_harness` runs in `chia_env` and
+    must read the same `PARAM_CONFIGS` the gate does rather than a copy."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "evaluate_for_harness", AGENT_DIR / "evaluate.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def head(name: str) -> str:
     return subprocess.run(["git", "show", f"HEAD:{PKG}/{name}"], cwd=REPO,
                           capture_output=True, text=True, check=True).stdout
@@ -570,12 +581,19 @@ class Suite:
               f"{(v.get('detail') or '')[:80]!r}",
               r.startswith("Replaced") and not v.get("ok")
               and v.get("stage") == "gate:param")
-        # The unmodified design passes it, at both configurations.
+        # The unmodified design passes it, at every configuration the gate
+        # names. Counted from `PARAM_CONFIGS` rather than written down: the
+        # list was two entries when this was written and is three now, and a
+        # hard-coded 2 made the case fail while all three printed PARAM OK.
         self.reset("tpta")
         v = await A.verdict("run_functional_check")
         param = (v.get("gate") or {}).get("param", {})
-        check("g.unmodified passes gate:param", "ok, PARAM OK at MAXDIM 8 and 12",
-              param, v.get("ok") and len(param) == 2)
+        want = len(_evaluate_module().PARAM_CONFIGS)
+        check("g.unmodified passes gate:param",
+              f"ok, PARAM OK at all {want} parametricity configurations",
+              param,
+              bool(v.get("ok")) and len(param) == want
+              and all(str(line).startswith("PARAM OK") for line in param.values()))
         self.reset("tpta")
 
     # d ------------------------------------------------------------------
