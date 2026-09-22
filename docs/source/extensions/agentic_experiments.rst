@@ -75,6 +75,23 @@ covering forged verdicts, frozen-file tampering, sandbox escape attempts,
 deadlock, and a correct-but-slower diff. An agentic result whose harness is
 only ever exercised by the agent is not evidence.
 
+.. admonition:: Status of that suite, 2026-09-22
+
+   It does **not** currently pass at 57. Two cases fail. One is a **stale
+   assertion**: the parametricity phase expects the two configurations that
+   existed before a third, varying ``T``, was added — all three print
+   ``PARAM OK``, so the code is right and the test's expectation is behind it.
+   The other is an unresolved crash in the loop phase, where a fake-model run
+   produced no ``variants.jsonl`` and the test reported the missing artefact
+   rather than whatever failed upstream of it. Neither is caused by the freeze
+   reference, which was checked by proving every frozen file byte-identical
+   across the two refs.
+
+   Recorded rather than quietly re-run to green, because a guard suite that
+   nobody notices has stopped passing is worse than no guard suite. The "57"
+   is what it was at landing and is not a current measurement.
+
+
 What the agents actually tried to get away with
 ===============================================
 
