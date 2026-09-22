@@ -24,7 +24,7 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Allo Limitations Register" href="limitations.html" />
+    <link rel="next" title="Stream Ports: a Unit with an Interface" href="stream_ports.html" />
     <link rel="prev" title="MLIR Translation Guide" href="../gallery/developer_02_mlir.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
@@ -190,6 +190,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -269,10 +270,11 @@ once: see <a class="reference internal" href="#extending-allo-encoding"><span cl
 </tr>
 <tr class="row-odd"><td><p>You copied a unit instead of instantiating it; or the same design exists
 several times, differing only in topology.</p></td>
-<td><p>Allo has no <strong>unit with an interface</strong>. Composition is by lexical
-capture, so a unit cannot be named, imported or wired.</p></td>
+<td><p>Allo had no <strong>unit with an interface</strong>. Composition was by lexical
+capture, so a unit could not be named, imported or wired.</p></td>
 <td><p>A <strong>type</strong> (a stream that can be a port) plus <strong>frontend</strong> support for
-calls that pass it. Open: <a class="reference internal" href="#extending-allo-ports"><span class="std std-ref">1. A stream that can be a port, so a unit can have an interface</span></a>.</p></td>
+calls that pass it. Done: <a class="reference internal" href="#extending-allo-ports"><span class="std std-ref">1. A stream that can be a port, so a unit can have an interface – done</span></a>, and
+<a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a> for the rules.</p></td>
 </tr>
 <tr class="row-even"><td><p>You wanted one iteration of a loop to do something different from the
 rest, and wrote two loop nests by hand.</p></td>
@@ -636,9 +638,30 @@ parametrized, modular units that compose into different architectural choices
 – with any one accelerator being something the library <em>instantiates</em>.
 An extension that removes a wart from the design we already have ranks below
 one that lets a second design share a representation with it.</p>
-<section id="a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface">
-<span id="extending-allo-ports"></span><h3>1. A stream that can be a port, so a unit can have an interface<a class="headerlink" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>The gap.</strong> A <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> cannot name its stream ports. Streams are
+<section id="a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done">
+<span id="extending-allo-ports"></span><h3>1. A stream that can be a port, so a unit can have an interface – <strong>done</strong><a class="headerlink" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done" title="Link to this heading"><span>¶</span></a></h3>
+<p>Landed as <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> plus <code class="docutils literal notranslate"><span class="pre">allo/netlist.py</span></code>; <a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a> is the
+page, and the record below is what was predicted, kept because one half of the
+prediction was wrong in an instructive way.</p>
+<p><strong>What it cost, against the estimate.</strong> No IR change, no C++, no rebuild: about
+420 lines of Python in two new modules (<code class="docutils literal notranslate"><span class="pre">allo/netlist.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">allo/ir/units.py</span></code>), one method on <code class="docutils literal notranslate"><span class="pre">Stream</span></code>, and five single-line hooks in
+<code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code> / <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>. The whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code>
+suite was the regression net, as predicted, and caught nothing – because the
+change is an addition: a region that instantiates no unit is not touched at
+all, and there is a test that says so.</p>
+<p><strong>The correction worth reading.</strong> Blocker 2 below – six <code class="docutils literal notranslate"><span class="pre">.clone()</span></code> sites in
+<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> – was never touched. It is only a blocker if a port has
+to <em>become</em> a block argument in the frontend. It does not:
+<code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code> already turns a kernel’s construct ops into block
+arguments, and it keys them by the op’s <code class="docutils literal notranslate"><span class="pre">name</span></code> attribute, so a port is a
+construct op carrying the <strong>channel’s</strong> name bound to the <strong>unit’s</strong> parameter
+name. Binding those two names is the whole of the mechanism. Blocker 1,
+<code class="docutils literal notranslate"><span class="pre">Stream.__class_getitem__</span></code>, was real and is fixed. The lesson is the one at
+the top of this page, applied to a diagnosis rather than a design: the IR
+being right meant even less had to change than the analysis that found it
+believed.</p>
+<p><strong>The gap, as it was.</strong> A <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> cannot name its stream ports. Streams are
 declared as annotations in a <code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> body and reached from kernel bodies
 by lexical name, so a unit’s interface is not a property of the unit – it is
 derived, by whole-region analysis (<code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code>), from the
@@ -695,7 +718,14 @@ fix is to resolve the stream as a value.</p>
 </ol>
 <p><strong>Legality rules that must ship with it.</strong> These are the point of the
 extension: constraints that are whole-program analyses today become local
-checks on a signature or on one wiring edge.</p>
+checks on a signature or on one wiring edge. All five shipped, with one
+correction that only the real design could have found: <strong>a stream array is a
+chain</strong>, read at <code class="docutils literal notranslate"><span class="pre">ch[i]</span></code> and written at <code class="docutils literal notranslate"><span class="pre">ch[i</span> <span class="pre">+</span> <span class="pre">1]</span></code> with a runtime index,
+so for an array port neither <em>direction is single-valued</em> nor <em>single
+producer, single consumer</em> is decidable. Both rules are therefore scoped to
+scalar ports, and the array case is declared rather than checked – the same
+split <code class="docutils literal notranslate"><span class="pre">design-modular</span></code>’s architecture check had already arrived at
+independently. The drafted rules, as drafted:</p>
 <ul class="simple">
 <li><p><em>Direction is single-valued.</em> Within a unit, each stream port is used only
 for <code class="docutils literal notranslate"><span class="pre">get</span></code>/<code class="docutils literal notranslate"><span class="pre">empty</span></code> (in) or only for <code class="docutils literal notranslate"><span class="pre">put</span></code>/<code class="docutils literal notranslate"><span class="pre">full</span></code> (out). Mixed use is
@@ -723,12 +753,18 @@ to record what they are relying on, the way
 extension that overstates its own guarantee is the failure mode that
 primitive paid for before its rule landed.</p></li>
 </ul>
-<p><strong>Risk.</strong> Moderate, and lower than it looks: the destination IR is already
-emitted and already exercised by the whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code> suite, so this is
-a frontend path to an existing IR shape rather than a new IR. The two
-blockers above are located to the line. The risk is concentrated in
+<p><strong>Risk, as estimated.</strong> Moderate, and lower than it looks: the destination IR
+is already emitted and already exercised by the whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code> suite,
+so this is a frontend path to an existing IR shape rather than a new IR. The
+two blockers above are located to the line. The risk is concentrated in
 <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> and <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code>, which the golden tests cover
 densely – run them at every step.</p>
+<p><strong>Risk, as it turned out.</strong> Lower still. <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> took one
+import and two lines. The one defect the work exposed was pre-existing and
+unrelated to ports: <code class="docutils literal notranslate"><span class="pre">get_global_vars</span></code> read a region’s namespace off the
+<code class="docutils literal notranslate"><span class="pre">functools.wraps</span></code> wrapper, i.e. <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py</span></code>’s module dict, and
+every region in the tree resolved its stream declarations correctly only
+because the <em>caller</em> happened to import the same names. See <a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a>.</p>
 </section>
 <section id="encoding-and-s-encodable-on">
 <h3>2. <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> and <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code><a class="headerlink" href="#encoding-and-s-encodable-on" title="Link to this heading"><span>¶</span></a></h3>
@@ -894,7 +930,7 @@ things, and every number on it was measured in this tree.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#the-open-gaps-ranked">The open gaps, ranked</a><ul>
-<li><a class="reference internal" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface">1. A stream that can be a port, so a unit can have an interface</a></li>
+<li><a class="reference internal" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done">1. A stream that can be a port, so a unit can have an interface – <strong>done</strong></a></li>
 <li><a class="reference internal" href="#encoding-and-s-encodable-on">2. <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> and <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code></a></li>
 <li><a class="reference internal" href="#s-peel-axis-count-1-index-set-splitting">3. <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count=1)</span></code> – index-set splitting</a></li>
 <li><a class="reference internal" href="#s-tensorize-band-intrinsic-not-ready">4. <code class="docutils literal notranslate"><span class="pre">s.tensorize(band,</span> <span class="pre">intrinsic)</span></code> – NOT READY</a></li>
@@ -923,7 +959,7 @@ things, and every number on it was measured in this tree.</p>
 
             <div class="right">
                 
-                    <a href="limitations.html"><span>Allo Limitations Register</span><span class="icon">&gt;</span></a>
+                    <a href="stream_ports.html"><span>Stream Ports: a Unit with an Interface</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>
