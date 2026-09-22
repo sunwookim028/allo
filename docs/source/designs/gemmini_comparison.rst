@@ -1059,7 +1059,7 @@ parameter on our side and **a single matched point cannot separate "our design
 is slower" from "our design is slower at this one size."**
 
 The capacity asymmetry is cycle-neutral, and this is the finding
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The obvious objection to this comparison is memory capacity: our design has a
 4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
@@ -1094,7 +1094,7 @@ also the choice that avoids hand-rolling a multi-tile nest and then arguing
 about whether our tiling was fair.
 
 Open: ``ex_accumulate`` in the window benchmark
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``gemmini/allo_bare5.c`` passes ``ex_accumulate`` as a literal ``true``, where
 the real driver computes ``!no_bias || D == NULL``, which is **false** for the

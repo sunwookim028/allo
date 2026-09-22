@@ -18,9 +18,9 @@
     specific language governing permissions and limitations
     under the License.
 
-#################################################
+##################################################
 Agentic Experiments: What We Ran and What It Shows
-#################################################
+##################################################
 
 A short account of the LLM-agent experiments in this fork, for a reader who
 wants the result rather than the apparatus. The apparatus is in
