@@ -1751,13 +1751,191 @@ GEMM itself, which sends ``accu`` 20 instructions at 16x16x16 and 272 at
 64x64x64 at ``QD=8`` and completes. So depth is the cure without yet being the
 characterisation, and a program cannot be screened by counting.
 
-**The price of the cure**, csynth on xcu280 at the 3.33 ns target, T=4,
-MAXDIM=64, ``DMA_WORDS=1``: QD 8 -> 16 costs **+1,624 FF (+9.3 %) and +652
-LUT (+2.5 %)** with **BRAM, DSP and the estimated 2.431 ns period unchanged**.
-The LUT delta is inside this flow's ~1.5k noise floor; the FF delta is not.
-Four cycles on the programs above. That is cheap enough that ``QD`` is the
-first thing to raise when a program hangs, and cheap enough that raising the
-shipped default is a live option rather than a redesign.
+.. _limitation-24-price:
+
+What ``QD=16`` costs the shipped design
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Raising the depth is a change to the **shipped** design, which the reproduce
+gate pins at five numbers, so it is measured in the same paired form: one
+tree, ``TPU_MAXDIM=16``, everything else unset, ``QD=8`` and then ``QD=16``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - ``QD=8`` (published)
+     - ``QD=16``
+     - delta
+   * - 4x4x4
+     - 171
+     - 175
+     - +4
+   * - 8x8x8
+     - 261
+     - 265
+     - +4
+   * - 12x12x12
+     - 417
+     - 421
+     - +4
+   * - 16x16x8
+     - 483
+     - **482**
+     - **-1**
+   * - 16x16x16
+     - 685
+     - **674**
+     - **-11**
+
+**The row moves and it is not uniform**, which is the interesting part: the
+three smallest shapes pay the pipeline skew of deeper FIFOs (+4 each, the same
++4 the item-24 family paid), and the two largest **get faster**, because a
+deeper queue lets the sequencer run further ahead of the units it dispatches
+to. The QD=8 column reproduces the published ``171 / 261 / 417 / 483 / 685``
+exactly, which is the control.
+
+Correctness at ``QD=16`` is unchanged: ``stress_isa.py`` prints **STRESS OK:
+492/492**, and the RTL gate (``TPU_TB=stress``) is 0 wrong over six calls at
+both 4x4x4 and 16x16x16 -- including ``ar_distance(4)``, so the accumulator's
+dependence contract still holds at the deeper queues.
+
+The price, on the FPGA
+^^^^^^^^^^^^^^^^^^^^^^
+
+csynth on xcu280 at the 3.33 ns target, shipped config (T=4, MAXDIM=16):
+
+.. list-table::
+   :header-rows: 1
+
+   * - ``QD``
+     - BRAM
+     - DSP
+     - FF
+     - LUT
+     - estimated period
+   * - 8
+     - 40
+     - 14
+     - 17,075
+     - 26,558
+     - 2.431 ns
+   * - **16**
+     - **40**
+     - 14
+     - **18,699** (+9.5 %)
+     - **27,210** (+2.5 %)
+     - **2.431 ns**
+   * - 32
+     - 40
+     - 14
+     - 19,779 (+15.8 %)
+     - 28,420 (+7.0 %)
+     - 2.431 ns
+
+At T=4/MAXDIM=64 the same step costs +1,624 FF (+9.3 %) and +652 LUT, also
+with BRAM and the period unchanged.
+
+**Where the queues live, because "BRAM unchanged" is not a property of the
+knob.** Every one of the 106 FIFOs maps to **shift registers** at QD=8, 16 and
+32 alike -- measured, not assumed (``RTMG 210-285`` in the csynth log) -- and
+BRAM stays at 40 throughout. The widths are what decide when that stops: the
+control queues are 64 bits, the operand and array chains 32, the activation
+forwards 8, and the accumulator return path ``cw`` is 128, the widest. At
+depth 32 that widest queue is still only 4,096 bits, which is why nothing has
+migrated yet. **This says depth is cheap up to 32 at these widths; it does not
+say depth is cheap.** A wider design, or depth 64, has to re-measure --
+MiniTPU's equivalent is block RAM they are already at 47 % of, where a 4 KiB
+register file costs 96 of 312 tiles because the *width* forces four tiles
+whatever the depth.
+
+The price, on standard cells -- which is a different object
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**The FPGA figure must not stand in for the ASIC one by silence**, because the
+mechanism that makes depth cheap on the FPGA does not exist in 45 nm. Vitis
+emits every one of these FIFOs as
+
+.. code-block:: verilog
+
+   reg [DATA_WIDTH-1:0] SRL_SIG [0:DEPTH-1];   // MEM_STYLE = "shiftReg"
+
+an unconditional shift of a ``DEPTH x DATA_WIDTH`` register array. Vivado
+infers ``SRL16`` primitives from that, and **an SRL16 holds sixteen bits per
+LUT whether the FIFO is eight deep or sixteen** -- which is exactly why the
+FPGA bill for 8 -> 16 is only +652 LUT and why the +1,624 FF is pointer and
+output-register overhead rather than storage. Standard cells have no such
+primitive: the array is flip-flops, and the cost is linear in depth.
+
+Counted from the instance list of the very RTL the ASIC flow reads (the two
+csynth runs above, ``wq`` excluded because it is declared at a fixed depth 4
+and does not scale with ``QD``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - queue width x instances
+     - bits at ``QD=8``
+     - bits at ``QD=16``
+   * - 128 x 4 (``cw``)
+     - 4,096
+     - 8,192
+   * - 64 x 5 (control)
+     - 2,560
+     - 5,120
+   * - 32 x 36 (operands, chains)
+     - 9,216
+     - 18,432
+   * - 8 x 12 (``a_fwd``)
+     - 768
+     - 1,536
+   * - **total**
+     - **16,640**
+     - **33,280**
+
+So ``QD=16`` adds **16,640 flip-flops** on standard cells. Against the shipped
+MAXDIM=16 baseline's DC run -- 200,561 sequential cells, 1,136,598 total cell
+area, 906,098 of it non-combinational -- that is **+8.3 % sequential cells**
+and, at that run's 4.52 area units per sequential cell, **about +6.6 % of
+total cell area**.
+
+**A full DC run was not available here**: the flow is mflowgen on ``zhang-21``
+with ``/scratch``, the module system and a DC licence, none of which exist on
+this host, and a run is 37-72 minutes there. The figures above are therefore a
+**count from the RTL plus the measured area-per-sequential-cell of the same
+design in the same flow**, not a synthesis result, and they should be replaced
+by one when that host is free. What is not an estimate is the mechanism: the
+FIFO is a register array in the Verilog, and there is no SRL in 45 nm.
+
+That the two substrates land at a similar percentage (+9.5 % FPGA FF, +8.3 %
+ASIC sequential cells) is a **coincidence of this depth, not agreement**: the
+FPGA number is control overhead with the storage free in SRLs, the ASIC number
+is the storage itself. At QD=32 the ASIC cost doubles again (+33,280 flops,
+linear) where the FPGA adds only a further 1,080 FF.
+
+The recommendation
+^^^^^^^^^^^^^^^^^^
+
+**Raise the default to ``QD=16``.** A design that does not complete on legal
+programs is worse than one four cycles slower, and every reason to hesitate
+was checked rather than assumed:
+
+- the five-shape row moves by +4 / +4 / +4 / -1 / -11, and **no margin against
+  Gemmini flips**: at these shapes the design is behind Gemmini at QD=8 and
+  still behind by the same few per cent at QD=16, and at the matched MAXDIM=64
+  points the two largest shapes move the *right* way;
+- correctness is unchanged (492/492, and the RTL stress gate including the
+  dependence-contract case);
+- the clock does not move: 2.431 ns estimated at QD 8, 16 and 32 alike;
+- the cost is +9.5 % FF and +2.5 % LUT on FPGA with no BRAM, and about +8.3 %
+  sequential cells on standard cells -- **which must be quoted beside the
+  cycles**, because the ASIC area comparison against Gemmini is being
+  assembled and a sequential-cell change of that size lands directly on it.
+
+The one honest caveat is that this **buys termination with area**, and it buys
+it for a hazard whose predicate is still open. Nobody should read "depth is
+the cure" as "depth is free at any depth": the FPGA ladder is sub-linear only
+because of SRL16, and the ASIC cost is linear.
 
 - **Priority: High as a warning, Medium as an action.** The warning is that on
   this design the cheap checks do not substitute for cosim, and two of them

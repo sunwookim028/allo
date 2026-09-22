@@ -32,12 +32,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 
 #: THE NAMED PARITY BASELINES. Kept beside the shipped design, not replacing
 #: it (docs/source/designs/gemmini_comparison.rst, "The parity baseline").
-#: `TPU_PROGRAM` stays `shipped`: the `interleaved` order is measured and it
-#: helps only the latency shapes, where these configurations are already
-#: faster than Gemmini, and it deadlocks in RTL at Kt >= QD (see the page).
+#:
+#: Three changes from the shipped design, each with one mechanism: the banked
+#: burst widening, the `interleaved` program order, and QD=32. The depth is
+#: load-bearing twice over -- it is what makes the `interleaved` order legal
+#: (it deadlocks at `Kt >= QD`, limitations item 24), and at T=4/MAXDIM=64 the
+#: largest expressible `Kt` is MAXDIM/T = 16, so QD=32 clears every shape this
+#: build can express rather than the ones that happened to be measured.
 PARITY_CONFIGS = {
     "parity-t4": dict(TPU_T="4", TPU_MAXDIM="64", TPU_DMA_WIDEN="1",
-                      TPU_PROGRAM="shipped"),
+                      TPU_QD="32", TPU_PROGRAM="interleaved"),
+    # T=8 is NOT yet measured in this configuration; its published column is
+    # the widening alone at QD=8. See the page.
     "parity-t8": dict(TPU_T="8", TPU_MAXDIM="64", TPU_DMA_WIDEN="1",
                       TPU_PROGRAM="shipped"),
 }
