@@ -2660,15 +2660,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     put_op = allo_d.StreamTryPutOp(
                         IntegerType.get_signless(1),
                         stream.result,
@@ -2691,15 +2698,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     get_op = allo_d.StreamTryGetOp(
                         node.func.value.dtype.build(),
                         IntegerType.get_signless(1),
@@ -2722,15 +2736,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     empty_op = allo_d.StreamEmptyOp(
                         IntegerType.get_signless(1),
                         stream.result,
@@ -2750,15 +2771,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     full_op = allo_d.StreamFullOp(
                         IntegerType.get_signless(1),
                         stream.result,
