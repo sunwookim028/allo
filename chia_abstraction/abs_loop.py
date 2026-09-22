@@ -81,8 +81,12 @@ RATE_LIMIT_RETRIES = 6
 RATE_LIMIT_BACKOFF = 45.0
 
 #: The rungs, in order. An iteration's `reached` is the highest one it got to.
-RUNGS = ("proposed", "policy", "built", "cheap", "correct", "resourced",
-         "improved")
+#: `none` is the rung below `proposed`: the agent returned and left no diff at
+#: all. It is a real and distinct outcome -- the first pilot launch scored it
+#: twice, because the tool server had not bound and the agent had no way to
+#: edit anything -- and leaving it out of this tuple crashed the summary.
+RUNGS = ("none", "proposed", "policy", "built", "cheap", "correct",
+         "resourced", "improved")
 #: Which harness stage failing means which rung was NOT reached.
 _STAGE_RUNG = {
     "policy": "proposed", "assemble": "proposed", "tamper": "proposed",
@@ -254,8 +258,19 @@ def run(args, budget: Budget) -> int:
     # REUSES from it -- `llm`, `preflight`, `spend` -- are pickled into the
     # remote call and must be importable there. Packaging the repo root instead
     # would ship 725 MB of node_modules past Ray's 512 MB limit.
+    # CHIA_TOOL_BASE_PORT is read from the WORKER environment by CHIA's tool
+    # server actor, so it has to go in runtime_env, not the driver's env. The
+    # default is 8000, which the design track's tool servers already hold on
+    # this host: the first pilot launch bound nothing, the agent was handed NO
+    # TOOLS, and it spent two iterations making no edit. That is the same
+    # failure the design loop's smoke run hit, from a different cause.
     runtime_env = {"working_dir": str(HERE),
-                   "env_vars": {"PYTHONPATH": str(DESIGN_AGENT)}}
+                   "env_vars": {
+                       "PYTHONPATH": str(DESIGN_AGENT),
+                       "CHIA_TOOL_BASE_PORT": os.environ.get(
+                           "CHIA_TOOL_BASE_PORT", "8400"),
+                       "CHIA_TOOL_MAX_PORT": os.environ.get(
+                           "CHIA_TOOL_MAX_PORT", "8499")}}
     # CHIA_RAY_ADDRESS pins this loop to ITS OWN head. `address="auto"` reads
     # the host's newest GCS address file, and this host runs several tracks at
     # once: "auto" found two clusters, connected to another track's, and then
@@ -307,6 +322,18 @@ def run(args, budget: Budget) -> int:
         record(log, {"iteration": 0, "kind": "baseline", "ref": ref,
                      "disposition": args.disposition,
                      "workload": args.workload, "baseline": baseline})
+        # The tool surface must actually be up before any model call. A tool
+        # server that failed to bind still yields a working LLM call -- with
+        # no tools -- and the agent then spends an iteration doing nothing.
+        # Measured: that is exactly what happened on the first launch.
+        probe = tool.check_policy()
+        print(f"  tool server: {tool.tool_info.hostname}:{tool.tool_info.port}"
+              f" -- check_policy says {probe!r}", flush=True)
+        if "No changes" not in probe:
+            print(f"Refusing to search: the tool surface is not answering "
+                  f"({probe[:300]!r}).")
+            return 2
+
         best_diff, best_obj = "", None
         history: list[str] = []
         llm = make_llm(tool, args.disposition, args.workload)
@@ -420,7 +447,7 @@ gates pass. The harness re-measures your final tree independently either way.
 
         tool.apply(best_diff)
         rates = {r: sum(1 for e in iters
-                        if RUNGS.index(e.get("reached", "proposed"))
+                        if RUNGS.index(e.get("reached") or "none")
                         >= RUNGS.index(r))
                  for r in RUNGS}
         n = max(len(iters), 1)
