@@ -123,6 +123,10 @@ def cmd_correct(args):
             for line in fails:
                 print(f"      {line}")
     print("  CORRECT OK" if not bad else f"  {bad} NOT AS EXPECTED")
+    print("  tier reached: legal, correct. NOT confirmed -- the dataflow "
+          "simulator and csim can both agree with `isa_ref` on a program whose "
+          "RTL never completes; see docs/source/developer/limitations.rst "
+          "item 24.")
     return 0 if not bad else 1
 
 

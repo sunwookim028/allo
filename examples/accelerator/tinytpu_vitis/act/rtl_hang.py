@@ -83,6 +83,21 @@ def family():
     ]
 
 
+def contrast():
+    """Programs that are not in the bisection but bound it: the shipped
+    mappings whose RTL does complete, including one with a `vrelu` in a
+    hardware loop and two that stage a transfer inside the output nest."""
+    from examples.accelerator.tinytpu_vitis.act import variants
+    return [(name, spec_mod.by_name(spec), make(spec_mod.by_name(spec)))
+            for name, spec, make in (
+                ("gemm_relu_16x16x16 shipped", "gemm_relu_16x16x16",
+                 baseline.program),
+                ("gemm_8x8x8 weights in-nest", "gemm_8x8x8",
+                 variants.weights_reloaded_per_output),
+                ("gemm_16x16x16 weights in-nest", "gemm_16x16x16",
+                 variants.weights_reloaded_per_output))]
+
+
 def host_spec():
     """A spec whose declared output is the whole of `C`, so the judge's
     testbench compares every byte and the family may write anywhere in it."""
@@ -115,20 +130,22 @@ def main(argv):
     if mode == "cosim" or "--sim" in argv:
         from examples.accelerator.tinytpu_vitis.act import correctness
         mod = correctness.build_module()
-    rows = [(name, prog, cheap_checks(prog, mod)) for name, prog in family()]
-    for name, prog, line in rows:
-        print(f"  {name:24s} {len(prog):3d} instrs; {cycles.report(prog)}")
-        print(f"  {'':24s} {line}")
+    jobs = [(name, host_spec(), prog) for name, prog in family()]
+    if "--contrast" in argv:
+        jobs += contrast()
+    rows = [(name, sp, prog, cheap_checks(prog, mod)) for name, sp, prog in jobs]
+    for name, _, prog, line in rows:
+        print(f"  {name:28s} {len(prog):3d} instrs; {cycles.report(prog)}")
+        print(f"  {'':28s} {line}")
     if mode != "cosim":
         return 0
     from examples.accelerator.tinytpu_vitis.act import measure
     prj = measure.PRJ
     print(f"  synthesizing once into {prj} ...", flush=True)
     measure.synthesize(prj)
-    sp = host_spec()
-    for name, prog, _ in rows:
+    for name, sp, prog, _ in rows:
         n, line = measure.measure(sp, prog, prj, tag=name.replace(" ", "_"))
-        print(f"  {name:24s} cosim={n}   {line}", flush=True)
+        print(f"  {name:28s} cosim={n}   {line}", flush=True)
     return 0
 
 

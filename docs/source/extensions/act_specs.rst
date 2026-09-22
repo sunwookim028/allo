@@ -659,7 +659,22 @@ so this page does not call it one.
 The full characterisation, the bisection, and the two hypotheses it rules out
 are :ref:`item 24 <limitation-24>` of the limitations register, with the repro
 in ``tests/limits/item24_cosim_hang.py`` and the family in
-``act/rtl_hang.py``. The part that belongs here is what it does to the judge.
+``act/rtl_hang.py``. Two things from it are worth carrying here, because they
+are about how a compiler should be judged rather than about this design:
+
+- **The minimal case is sixteen instructions, fully unrolled, with no
+  ``vrelu`` and no epilogue** -- plain int8 GEMM tiling. Nothing exotic has to
+  be generated to reach it.
+- **The hypothesis that an in-nest transfer is the trigger is measurably
+  false.** :doc:`act` leaves open whether "a transfer inside the emitted nest
+  rather than hoisted into a prologue" is what the failing mappings share. It
+  is not: both non-completing programs here stage every transfer in a
+  prologue, and both ``weights_reloaded`` mappings, which issue a ``dma_ld``
+  between ``mvout``\ s inside the output nest, complete (256 cycles at 8x8x8
+  and 638 at 16x16x16, 0 of 256 bytes wrong). A staging column would pass both
+  failures and flag two mappings that run, so it is not the guard to use.
+
+The part that belongs here is what it does to the judge.
 
 Three tiers, and an estimate is not one of them
 -----------------------------------------------
