@@ -182,6 +182,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul class="current">
@@ -228,7 +229,10 @@ on-device transpose to an L2 TPU running FlashAttention
 (<code class="docutils literal notranslate"><span class="pre">levels/L2/tpu.py</span></code>);</p></li>
 <li><p>the second pass (items 11-23), from building the instruction-programmable
 TinyTPU-isa (<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>) on <code class="docutils literal notranslate"><span class="pre">main</span></code> and taking it through
-the Vitis dataflow path to RTL co-simulation.</p></li>
+the Vitis dataflow path to RTL co-simulation;</p></li>
+<li><p>the third pass (item <a class="reference internal" href="#limitation-24"><span class="std std-ref">24</span></a>), from compiling <em>for</em> that
+design rather than building it – generated programs that every cheap check
+accepts and the RTL does not run.</p></li>
 </ul>
 <p>Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.</p>
@@ -1727,6 +1731,172 @@ pending re-verification.</p>
 </div>
 </section>
 </section>
+<section id="five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes">
+<span id="limitation-24"></span><h3>24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes<a class="headerlink" href="#five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes" title="Link to this heading"><span>¶</span></a></h3>
+<div class="admonition-status-2026-09-22 admonition">
+<p class="admonition-title">Status (2026-09-22)</p>
+<p>REPRODUCES. Cheap half: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code>
+(seconds, no Vitis). RTL half: <code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file
+(one csynth, ten cosims, tens of minutes). Family and bisection:
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act/rtl_hang.py</span></code>; log:
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log</span></code>.</p>
+</div>
+<p>A legal, bit-exact TinyTPU-isa program of <strong>sixteen instructions</strong> passes every
+check the fork has short of RTL and then does not finish in <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 42.0%" />
+<col style="width: 58.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>check</p></th>
+<th class="head"><p>result on the minimal program</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.check_program</span></code> / <code class="docutils literal notranslate"><span class="pre">assemble</span></code></p></td>
+<td><p>accepts</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">kpn_model.run</span></code> (bounded FIFOs, deadlock reporting)</p></td>
+<td><p>no deadlock, minimum channel depth 1</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> (the ISA as numpy)</p></td>
+<td><p>correct</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">df.build(target=&quot;simulator&quot;)</span></code></p></td>
+<td><p>completes, bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, 0 of 256 bytes wrong</p></td>
+</tr>
+<tr class="row-even"><td><p>Vitis <strong>csim</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mismatches</span> <span class="pre">=</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">256</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Vitis <strong>cosim</strong> (xsim, RTL)</p></td>
+<td><p><strong>does not complete</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>This is the second independent occurrence. The first is on
+<a class="reference internal" href="../extensions/act.html"><span class="doc">ACT, and Why We Cite It</span></a>, where two row-tiled ACT mappings behaved the same way
+and the flow withdrew its “5 encodable” claim in favour of “3 confirmed on
+RTL”; that instance was found by a different tree, from a different generator,
+on the same design.</p>
+<section id="what-does-not-complete-is-exactly">
+<h4>What “does not complete” is, exactly<a class="headerlink" href="#what-does-not-complete-is-exactly" title="Link to this heading"><span>¶</span></a></h4>
+<p>A completing run of this design prints two progress lines and a <code class="docutils literal notranslate"><span class="pre">$finish</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>// RTL Simulation : 0 / 1 [n/a] @ "109000"
+// RTL Simulation : 1 / 1 [n/a] @ "777000"
+$finish called at time : 796590 ps
+</pre></div>
+</div>
+<p>for a 198-cycle program. A non-completing run prints the <strong>first</strong> line and
+never the second. <code class="docutils literal notranslate"><span class="pre">109000</span></code> is <strong>picoseconds</strong> and is simply where Vitis makes
+its first periodic report, so it is the same number in every log, passing or
+hanging – <strong>it is not where the design stops, and nothing measured here
+locates the stall.</strong> Vitis’ own deadlock detector reports nothing, so this item
+does not call it a deadlock. What is measured is: no second progress line, no
+report, and no completion against a neighbour that finishes in under a second
+of simulated time.</p>
+</section>
+<section id="the-minimal-program">
+<h4>The minimal program<a class="headerlink" href="#the-minimal-program" title="Link to this heading"><span>¶</span></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">act.rtl_hang.tiled(n_out=2,</span> <span class="pre">n_block=2,</span> <span class="pre">n_reduce=2,</span> <span class="pre">rows=4)</span></code>: two output
+column blocks x two row blocks, each a two-deep accumulation of four rows
+followed by an <code class="docutils literal notranslate"><span class="pre">mvout</span></code>. Fully unrolled – no <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> at all –
+four <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> and twelve compute instructions, plain int8 GEMM tiling with no
+<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> and no epilogue.</p>
+</section>
+<section id="the-bisection-and-what-it-rules-out">
+<h4>The bisection, and what it rules out<a class="headerlink" href="#the-bisection-and-what-it-rules-out" title="Link to this heading"><span>¶</span></a></h4>
+<p>Ten programs, one csynth, one cosim each, <code class="docutils literal notranslate"><span class="pre">ACT_COSIM_TIMEOUT=200</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 20.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>program</p></th>
+<th class="head"><p>cosim</p></th>
+<th class="head"><p>knob changed</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p>the minimal case</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n1</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>223</p></td>
+<td><p>one output block</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b1</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>223</p></td>
+<td><p>one row block</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n1</span> <span class="pre">b1</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>198</p></td>
+<td><p>both</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k1</span> <span class="pre">r4</span></code></p></td>
+<td><p>230</p></td>
+<td><p>no accumulate step</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r8</span></code></p></td>
+<td><p>356</p></td>
+<td><p>eight rows instead of four</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r16</span> <span class="pre">relu</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p>the other program the judge found</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n1</span> <span class="pre">r16</span> <span class="pre">relu</span></code></p></td>
+<td><p>291</p></td>
+<td><p>one output block</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r16</span> <span class="pre">norelu</span></code></p></td>
+<td><p>459</p></td>
+<td><p>the <code class="docutils literal notranslate"><span class="pre">vrelu</span></code> deleted</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r4</span> <span class="pre">relu</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p>four rows instead of sixteen</p></td>
+</tr>
+</tbody>
+</table>
+<p>Four hypotheses die here, and they are the useful part of the item:</p>
+<ul class="simple">
+<li><p><strong>Not the hardware loop.</strong> The looped and fully unrolled forms of the
+<code class="docutils literal notranslate"><span class="pre">pointwise</span></code> program behave identically, and the whole <code class="docutils literal notranslate"><span class="pre">tiled</span></code> family is
+unrolled.</p></li>
+<li><p><strong>Not ``vrelu``.</strong> The entire <code class="docutils literal notranslate"><span class="pre">tiled</span></code> family has no <code class="docutils literal notranslate"><span class="pre">vrelu</span></code> and the
+minimal case is in it. Conversely <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 has a <code class="docutils literal notranslate"><span class="pre">vrelu</span></code>
+in a loop and completes in 750 cycles.</p></li>
+<li><p><strong>Not “a transfer inside the emitted nest rather than hoisted into a
+prologue”</strong> – the hypothesis left open on <a class="reference internal" href="../extensions/act.html"><span class="doc">ACT, and Why We Cite It</span></a>. Measured
+the other way round, twice each: <strong>both</strong> non-completing programs have every
+transfer in a prologue, and <strong>both</strong> <code class="docutils literal notranslate"><span class="pre">weights_reloaded</span></code> mappings, which
+issue a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> between <code class="docutils literal notranslate"><span class="pre">mvout</span></code>s inside the output nest, complete
+(256 cycles at 8x8x8, 638 at 16x16x16, 0 of 256 wrong). In-nest staging is
+neither necessary nor sufficient, so a staging column does not separate the
+two classes.</p></li>
+<li><p><strong>Not monotone in size.</strong> Halving any one of the three tile counts makes it
+complete, and so does <em>doubling</em> the row count. It is neither “too big” nor
+“too small”, which rules out simple capacity and fill explanations.</p></li>
+</ul>
+<p>No positive characterisation is offered: the four surviving programs that fail
+share three or more <code class="docutils literal notranslate"><span class="pre">accu</span></code> instructions per output tile and four or more
+output tiles, but <code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r8</span></code> has both and completes, so that is a
+correlation and not a condition. <strong>The diagnosis is open.</strong></p>
+<ul class="simple">
+<li><p><strong>Priority: High as a warning, Medium as an action.</strong> The warning is that on
+this design the cheap checks do not substitute for cosim, and two of them
+(<code class="docutils literal notranslate"><span class="pre">kpn_model</span></code> and the header the simulator consumes) are derived from
+<code class="docutils literal notranslate"><span class="pre">assemble()</span></code>’s own header, so their agreement is weaker evidence than it
+looks. The action is to find the blocked process, which needs
+<code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-trace_level</span> <span class="pre">all</span></code> on the sixteen-instruction case and a look
+at the stream handshakes – affordable now that the repro is that small.</p></li>
+</ul>
+</section>
+</section>
 </section>
 <section id="surfaced-by-the-2026-09-19-re-verification-and-impact-analysis">
 <h2>Surfaced by the 2026-09-19 re-verification and impact analysis<a class="headerlink" href="#surfaced-by-the-2026-09-19-re-verification-and-impact-analysis" title="Link to this heading"><span>¶</span></a></h2>
@@ -1955,6 +2125,12 @@ sub-region – about five lines, not yet prototyped.</p>
 </li>
 <li><a class="reference internal" href="#m-axi-port-widening-is-not-reachable-from-user-code-align-value-is-necessary-and-not-sufficient-a-negative-result">23. <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> port widening is not reachable from user code – <code class="docutils literal notranslate"><span class="pre">align_value</span></code> is necessary and <strong>not</strong> sufficient (a NEGATIVE result)</a><ul>
 <li><a class="reference internal" href="#pragma-inventory-grep-over-mlir-lib-mlir-include-allo-2026-09-18">Pragma inventory (grep over <code class="docutils literal notranslate"><span class="pre">mlir/lib</span></code>, <code class="docutils literal notranslate"><span class="pre">mlir/include</span></code>, <code class="docutils literal notranslate"><span class="pre">allo/</span></code>, 2026-09-18)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes">24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes</a><ul>
+<li><a class="reference internal" href="#what-does-not-complete-is-exactly">What “does not complete” is, exactly</a></li>
+<li><a class="reference internal" href="#the-minimal-program">The minimal program</a></li>
+<li><a class="reference internal" href="#the-bisection-and-what-it-rules-out">The bisection, and what it rules out</a></li>
 </ul>
 </li>
 </ul>

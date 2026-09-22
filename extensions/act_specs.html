@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ACT Workload Specs and the Judge &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Developer Setup" href="../developer/index.html" />
+    <link rel="prev" title="ACT, and Why We Cite It" href="act.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">ACT Workload Specs and the Judge</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="act-workload-specs-and-the-judge">
+<h1>ACT Workload Specs and the Judge<a class="headerlink" href="#act-workload-specs-and-the-judge" title="Link to this heading"><span>¶</span></a></h1>
+<p>The two things a compiler needs that <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a> does not supply: a corpus of
+workload-level specs to compile, and a way to decide whether what came out is
+right, legal and fast. Both live in
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act/</span></code> and both are about the
+<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> accelerator; neither contains any part of ACT.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This page is the <strong>input and the judge</strong> side of the interface. ACT’s own
+core, mapper and scheduler are Kai Shao’s work and are audited from the
+outside on <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>; nothing here modifies or republishes them.</p>
+</div>
+<section id="what-a-spec-says-and-what-it-deliberately-does-not">
+<h2>What a spec says, and what it deliberately does not<a class="headerlink" href="#what-a-spec-says-and-what-it-deliberately-does-not" title="Link to this heading"><span>¶</span></a></h2>
+<p>A spec is a JSON file in <code class="docutils literal notranslate"><span class="pre">act/corpus/</span></code>. It states the computation and the
+calling convention, and nothing about how to perform it: no tiling, no loop
+order, no residency, no schedule, no instruction.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gemm_16x16x8"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"stresses"</span><span class="p">:</span><span class="w"> </span><span class="s2">"the measured set's only non-cubic shape: half the output columns of gemm_16x16x16 over the same reduction, so output and reduction cost separate"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"einsum"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mk,kn-&gt;mn"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"dims"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"m"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="nt">"k"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="nt">"n"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"inputs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"X"</span><span class="p">,</span><span class="w"> </span><span class="nt">"subscript"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mk"</span><span class="p">,</span><span class="w"> </span><span class="nt">"dtype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int8"</span><span class="p">,</span><span class="w"> </span><span class="nt">"buffer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="p">,</span><span class="w"> </span><span class="nt">"origin"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">]},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"W"</span><span class="p">,</span><span class="w"> </span><span class="nt">"subscript"</span><span class="p">:</span><span class="w"> </span><span class="s2">"kn"</span><span class="p">,</span><span class="w"> </span><span class="nt">"dtype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int8"</span><span class="p">,</span><span class="w"> </span><span class="nt">"buffer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"B"</span><span class="p">,</span><span class="w"> </span><span class="nt">"origin"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">]}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"constants"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Y"</span><span class="p">,</span><span class="w"> </span><span class="nt">"subscript"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mn"</span><span class="p">,</span><span class="w"> </span><span class="nt">"dtype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int8"</span><span class="p">,</span><span class="w"> </span><span class="nt">"buffer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"C"</span><span class="p">,</span>
+<span class="w">             </span><span class="nt">"origin"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="nt">"write_window"</span><span class="p">:</span><span class="w"> </span><span class="s2">"exact"</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"accumulator"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int32"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"epilogue"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"saturate"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"operand_pad"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arbitrary"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"known_gap"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>JSON, one file per spec, pretty-printed one key to a line: machine-readable
+without a dependency, and a new case is a new file rather than a diff inside
+an existing one.</p>
+<p><code class="docutils literal notranslate"><span class="pre">einsum</span></code> is the human-readable statement and <code class="docutils literal notranslate"><span class="pre">subscript</span></code> is the
+machine-readable one. <code class="docutils literal notranslate"><span class="pre">spec.validate</span></code> refuses a spec where they disagree,
+which is the same discipline <code class="docutils literal notranslate"><span class="pre">isa_dsl.assert_matches_handwritten</span></code> applies to
+the generated GEMM: state it twice, check that the two agree, and the
+statement stops being able to drift.</p>
+<section id="three-fields-exist-because-this-isa-forces-the-question-into-the-open">
+<h3>Three fields exist because this ISA forces the question into the open<a class="headerlink" href="#three-fields-exist-because-this-isa-forces-the-question-into-the-open" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>``operand_pad``</strong> – what the bytes <em>around</em> a declared operand hold.
+<code class="docutils literal notranslate"><span class="pre">arbitrary</span></code> means the judge fills them with nonzero garbage; <code class="docutils literal notranslate"><span class="pre">zero</span></code> means
+the host promises zeros. It matters because <code class="docutils literal notranslate"><span class="pre">mm</span></code> consumes a whole <code class="docutils literal notranslate"><span class="pre">T</span></code>-lane
+packed word: a reduction of <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">6</span></code> on a <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">4</span></code> array has to cover
+<code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">0..7</span></code>, and whether that is exact depends entirely on what rows 6 and 7
+of the weight operand hold. Two corpus specs differ in nothing but this field,
+and one of them is satisfiable while the other is not.</p>
+<p><strong>``write_window``</strong> – how much of <code class="docutils literal notranslate"><span class="pre">C</span></code> a program may write. <code class="docutils literal notranslate"><span class="pre">exact</span></code> means
+the declared output region and not one byte more; <code class="docutils literal notranslate"><span class="pre">column_block</span></code> extends the
+permission to the end of the enclosing <code class="docutils literal notranslate"><span class="pre">T</span></code>-lane column block, because
+<code class="docutils literal notranslate"><span class="pre">mvout</span></code> retires whole packed words and an output of <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">=</span> <span class="pre">6</span></code> cannot avoid
+touching columns 6 and 7. This is stated per spec rather than assumed,
+so “the program clobbered <code class="docutils literal notranslate"><span class="pre">C</span></code>” and “the machine writes <code class="docutils literal notranslate"><span class="pre">T</span></code> lanes at a
+time” are different verdicts.</p>
+<p><strong>``constants``</strong> – compile-time-known matrices the host places in DRAM. The
+design has no path that writes DRAM other than <code class="docutils literal notranslate"><span class="pre">mvout</span></code> and no opcode that
+zeroes an on-chip row, so a program cannot manufacture an identity or a
+vector of ones; a pointwise or reduction workload therefore needs one placed
+for it. Keeping constants out of <code class="docutils literal notranslate"><span class="pre">inputs</span></code> keeps <code class="docutils literal notranslate"><span class="pre">einsum</span></code> an honest
+statement of the mathematics while the convention that makes it runnable stays
+visible in the same file.</p>
+<p>Two more fields carry the rest. <strong>``stresses``</strong> is one line saying what this
+case tests that the others do not – <code class="docutils literal notranslate"><span class="pre">validate</span></code> rejects a spec without it,
+because a corpus of unexplained shapes teaches a compiler nothing.
+<strong>``known_gap``</strong> is one line saying why no program on the <em>current</em> build can
+satisfy the spec, and the judge reports such a spec’s failure as <code class="docutils literal notranslate"><span class="pre">KNOWN</span> <span class="pre">GAP</span></code>
+rather than <code class="docutils literal notranslate"><span class="pre">WRONG</span></code>, so the suite stays green while the gap stays visible.</p>
+</section>
+<section id="two-layers-one-convention">
+<h3>Two layers, one convention<a class="headerlink" href="#two-layers-one-convention" title="Link to this heading"><span>¶</span></a></h3>
+<p>There are now two machine-readable specs in this tree and they are at
+different layers, deliberately sharing a foundation rather than inventing two:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 20.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>file</p></th>
+<th class="head"><p>layer</p></th>
+<th class="head"><p>says</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code></p></td>
+<td><p>the machine</p></td>
+<td><p>opcodes, field positions and widths, the imem header, the AGU term
+encoding, the loop-stack semantics, the memory map, the build
+parameters and the numerics</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">act/corpus/*.json</span></code></p></td>
+<td><p>the workload</p></td>
+<td><p>what must be computed, at what shapes and precisions, where the bytes
+are, and what the pad and the write window are allowed to be</p></td>
+</tr>
+</tbody>
+</table>
+<p>Both are JSON rather than YAML for the same reason: the validator has to run
+wherever <code class="docutils literal notranslate"><span class="pre">allo</span></code> runs, and <code class="docutils literal notranslate"><span class="pre">json</span></code> is in the standard library while PyYAML is
+not in this repository’s requirements. Both state the load-bearing facts twice
+and check that the two statements agree – <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> holds the
+design to the ISA table, <code class="docutils literal notranslate"><span class="pre">spec.validate</span></code> holds <code class="docutils literal notranslate"><span class="pre">einsum</span></code> to the
+<code class="docutils literal notranslate"><span class="pre">subscript</span></code> fields – which is the discipline
+<code class="docutils literal notranslate"><span class="pre">isa_dsl.assert_matches_handwritten</span></code> already applies to the generated GEMM.
+A spec here never restates an ISA fact: opcode numbers, field widths and
+<code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> reach the judge by import, never by transcription.</p>
+</section>
+<section id="layout">
+<h3>Layout<a class="headerlink" href="#layout" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every tensor lies row-major in a <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">x</span> <span class="pre">MAXDIM</span></code> int8 DRAM image
+(<code class="docutils literal notranslate"><span class="pre">A</span></code>, <code class="docutils literal notranslate"><span class="pre">B</span></code> or <code class="docutils literal notranslate"><span class="pre">C</span></code>): all but the last subscript index rows, the last
+indexes columns, and a vector is a column. Origins must start on a column-block
+boundary, since every DRAM access the ISA has is a <code class="docutils literal notranslate"><span class="pre">T</span></code>-lane packed word.
+That rule is what lets <code class="docutils literal notranslate"><span class="pre">bmk,bkn-&gt;bmn</span></code> be placed without a new field.</p>
+</section>
+</section>
+<section id="the-corpus">
+<h2>The corpus<a class="headerlink" href="#the-corpus" title="Link to this heading"><span>¶</span></a></h2>
+<p>Twenty-two specs, in three groups.</p>
+<p>The first six are the shapes this fork measures – <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">LATENCY</span></code> set and the 172 / 262 / 418 / 484 / 686 cosim points on
+<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>. The last five are the <code class="docutils literal notranslate"><span class="pre">STEADY</span></code> set that
+<code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> gains on the <code class="docutils literal notranslate"><span class="pre">benchmark-set</span></code> branch, whose accounting is in
+<code class="docutils literal notranslate"><span class="pre">docs/source/designs/benchmarks.rst</span></code> there – cubic 32, 48 and 64 plus
+64x32x64 and
+32x64x32, big enough that MACs per cycle characterises the machine rather than
+its pipeline fill. Both sets are taken rather than reinvented, so there is one
+benchmark set in this tree and not two. The steady shapes do not fit
+<code class="docutils literal notranslate"><span class="pre">main</span></code>’s <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">=</span> <span class="pre">16</span></code> build and are reported <code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code> with the reason
+until <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM</span></code> is raised; a workload spec is a property of the workload,
+not of one elaboration.</p>
+<p>The eleven in the middle exist because a corpus of square GEMMs would teach a
+mapper nothing.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 16.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>spec</p></th>
+<th class="head"><p>einsum</p></th>
+<th class="head"><p>what it stresses</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_4x4x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>one tile in every dimension: the fixed cost of issuing a program with
+nothing to amortise it over</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_8x8x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>the smallest shape with a real loop nest in all three ranks</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_12x12x12</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>an odd tile count, so a mapper assuming power-of-two trips breaks</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>the measured set’s only non-cubic shape</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>the largest shape the operand buffers hold; highest utilisation</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_relu_16x16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>a fused epilogue: the ReLU is on the int32 accumulator, before the
+narrowing</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_m_16x16x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>reuse in M: one weight tile serves 16 activation rows</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_n_4x4x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>reuse in N: activations resident, weights streaming</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_k_4x16x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>reuse in K: four k-tiles into one accumulator region, which puts every
+accumulate read at exactly <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code> – the legality edge</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_rows_6x8x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">=</span> <span class="pre">6</span></code> against <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">4</span></code>; rows are the one dimension the ISA leaves
+free, so padding M is legal but writes two rows it must not</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_narrow_2x8x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">=</span> <span class="pre">2</span></code> is below <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code>, so the obvious program is rejected
+for <em>legality</em>, not arithmetic: pad the <code class="docutils literal notranslate"><span class="pre">mm</span></code> to 4 rows, retire 2</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_cols_8x8x6</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">=</span> <span class="pre">6</span></code> against a <code class="docutils literal notranslate"><span class="pre">T</span></code>-lane <code class="docutils literal notranslate"><span class="pre">mvout</span></code>; needs
+<code class="docutils literal notranslate"><span class="pre">write_window:</span> <span class="pre">column_block</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reduce_8x6x8_zeropad</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">K</span> <span class="pre">=</span> <span class="pre">6</span></code> with a zero pad: rounding the reduction up is exact and costs
+one extra k-tile</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reduce_8x6x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>the same with an arbitrary pad. <strong>Known gap</strong>: no opcode zeroes a row,
+so rounding K up sums garbage and nothing else is expressible</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bmk,bkn-&gt;bmn</span></code></p></td>
+<td><p>a batch dimension in both inputs and the output, which a GEMM mapper
+has no rank for; the only corpus case whose natural program fills all
+<code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span> <span class="pre">=</span> <span class="pre">3</span></code> address terms at once</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mn-&gt;mn</span></code></p></td>
+<td><p>no contraction dimension at all: the array is the only path into the
+accumulator, so a pointwise workload goes through <code class="docutils literal notranslate"><span class="pre">mm</span></code> against a
+host-placed identity</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">row_reduce_16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk-&gt;m</span></code></p></td>
+<td><p>a contraction whose output is a vector, written as one column of a
+word the machine can only write whole</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_steady_32x32x32</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>eight times the headline shape’s MACs, so the fixed pipeline term stops
+dominating</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_steady_48x48x48</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>a tile count that is not a power of two in any rank</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_steady_64x64x64</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>the largest shape the widened build holds</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_steady_64x32x64</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>half the reduction at the same output size, which separates the
+wavefront-row term from the tile-count term</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_steady_32x64x32</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mk,kn-&gt;mn</span></code></p></td>
+<td><p>M and K swapped against the above: same MACs, opposite aspect</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">specs</span></code> prints this list with each <code class="docutils literal notranslate"><span class="pre">stresses</span></code> line.</p>
+<p>Adding a spec is adding a JSON file. <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/spec.py</span></code> validates the
+whole corpus; <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/baseline.py</span></code> says whether the reference submission
+can map it.</p>
+</section>
+<section id="the-judge">
+<h2>The judge<a class="headerlink" href="#the-judge" title="Link to this heading"><span>¶</span></a></h2>
+<p>A submission is a program: either <code class="docutils literal notranslate"><span class="pre">module:function</span></code> taking a spec and
+returning the <code class="docutils literal notranslate"><span class="pre">(instruction</span> <span class="pre">word,</span> <span class="pre">AGU</span> <span class="pre">word)</span></code> list <code class="docutils literal notranslate"><span class="pre">assemble</span></code> takes, or a
+<code class="docutils literal notranslate"><span class="pre">.json</span></code> file of those word pairs, which is what an agent that emits text
+rather than Python should produce (<code class="docutils literal notranslate"><span class="pre">act/submission.py</span></code>). The default
+submission is <code class="docutils literal notranslate"><span class="pre">act/baseline.py</span></code>, one hand-chosen mapping per spec, which
+maps all seventeen.</p>
+<section id="is-it-legal">
+<h3>Is it legal?<a class="headerlink" href="#is-it-legal" title="Link to this heading"><span>¶</span></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>legal
+python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>legal<span class="w"> </span>--spec<span class="w"> </span>gemm_narrow_2x8x4<span class="w"> </span>--program<span class="w"> </span>mymod:make
+</pre></div>
+</div>
+<p>Four layers, reported in the order a program fails them:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 86.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>layer</p></th>
+<th class="head"><p>what it is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.check_program</span></code>: write-before-read on <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code>
+/ <code class="docutils literal notranslate"><span class="pre">ar</span></code>, the <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code> accumulator distance contract,
+bounds, <code class="docutils literal notranslate"><span class="pre">nr</span> <span class="pre">&gt;=</span> <span class="pre">1</span></code>, resolved field range, loop structure and AGU
+levels</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encoding</span></code></p></td>
+<td><p>the assertions <code class="docutils literal notranslate"><span class="pre">assemble</span></code> makes: imem capacity, the 15-bit header
+counts, the array counts, the DRAM burst span</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">protocol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">kpn_model.run</span></code>: the units’ promised work counts against what the
+sequencer dispatches. A valid program cannot reach this layer, which is
+the point – it is a regression detector for the assembler and the
+microarchitecture, not a program-error check</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">spec</span></code></p></td>
+<td><p>every <code class="docutils literal notranslate"><span class="pre">mvout</span></code>’s footprint in the dynamic stream against the spec’s
+write window, and the spec’s output region against that footprint.
+Static, so “you padded M into C” is caught before anything runs</p></td>
+</tr>
+</tbody>
+</table>
+<section id="the-rejection-message-is-part-of-the-deliverable">
+<h4>The rejection message is part of the deliverable<a class="headerlink" href="#the-rejection-message-is-part-of-the-deliverable" title="Link to this heading"><span>¶</span></a></h4>
+<p>A generating agent acts on the message and on nothing else, so every
+rejection carries a rule name, what happened, the rule that was broken, what
+to change instead, and a disassembly of the offending instruction with its two
+neighbours:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>REJECTED [isa / mem.write_before_read]
+  what happened: instruction 7 (mm, loop ivs [1]): reads spad row(s) [4, 5, 6, 7]
+    as weights before any instruction wrote them. spad is not cleared by the
+    hardware; see the write-before-read contract.
+  the rule:      spad, vr and ar are not cleared between programs, so a row that
+    this program never wrote holds whatever the last one left
+  what to change: load the rows with `dma_ld` (or `vld`) before the instruction
+    that consumes them. If these rows are a pad you wanted to be zero, note that
+    no opcode zeroes a row: `dma_ld` is the only writer of spad and vr and it can
+    only copy DRAM the host filled, so a zero pad has to be part of the spec's
+    calling convention.
+  in context:
+      5  endloop  nr=  0 f=[0, 0, 0, 0]
+      6  loop     nr=  2 f=[0, 0, 0, 0]
+      7  mm       nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4 f3+=iv0*4   &lt;-- here
+      8  mvout    nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4
+      9  endloop  nr=  0 f=[0, 0, 0, 0]
+</pre></div>
+</div>
+<p>That message is the one this fork’s own reference submission earned while it
+was being written, and it names the fix.</p>
+<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> prints the 23-rule table and runs its self-test.
+The ISA fixtures are <code class="docutils literal notranslate"><span class="pre">stress_isa._bad_programs</span></code> – one crafted violation per
+contract, reused rather than rewritten – plus ten built in
+<code class="docutils literal notranslate"><span class="pre">act/rules_test.py</span></code> for rules no shipped program breaks. <strong>Measured in this
+session: 29 crafted violations reach 21 of the 23 rules, every one of them
+with a remedy, and none falls through to the remedy-less fallback.</strong> The two
+unreached rules are <code class="docutils literal notranslate"><span class="pre">dma.span</span></code> (<code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s operand-range check
+always fires first) and <code class="docutils literal notranslate"><span class="pre">kpn.protocol</span></code>. The same command also asserts that
+no baseline submission is rejected.</p>
+</section>
+</section>
+<section id="is-it-correct">
+<h3>Is it correct?<a class="headerlink" href="#is-it-correct" title="Link to this heading"><span>¶</span></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>correct
+python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>correct<span class="w"> </span>--spec<span class="w"> </span>relu_16x16<span class="w"> </span>--no-simulator
+</pre></div>
+</div>
+<p>Bit-exact, against two named anchors, and the verdict says which one moved:</p>
+<ol class="arabic simple">
+<li><p><strong>the program against the spec</strong> – <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> (the ISA as numpy,
+already verified and not rewritten here) against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code> (the einsum
+in int64, then the epilogue, then the narrowing). Every byte of the output
+region must match and nothing outside the write window may move. A failure
+here is the mapping.</p></li>
+<li><p><strong>the design against the ISA</strong> – the module <code class="docutils literal notranslate"><span class="pre">df.build</span></code> produces against
+<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, on all <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code> bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> with no window
+and no tolerance. A failure here is the hardware or the simulator, and the
+message says so.</p></li>
+</ol>
+<p>Four operand distributions per spec (<code class="docutils literal notranslate"><span class="pre">small</span></code>, <code class="docutils literal notranslate"><span class="pre">mid</span></code>, <code class="docutils literal notranslate"><span class="pre">full</span></code>, <code class="docutils literal notranslate"><span class="pre">corner</span></code>,
+taken from <code class="docutils literal notranslate"><span class="pre">stress_isa.operands</span></code>), <code class="docutils literal notranslate"><span class="pre">C</span></code> always prefilled with random bytes
+so a clobber cannot hide behind a zero, and each case run twice on one build
+so state a previous call left in <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code> / <code class="docutils literal notranslate"><span class="pre">ar</span></code> shows up. This is
+<code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>’s discipline applied per spec rather than per shape.</p>
+<p>Measured in this session on the reference submission: <strong>16 of the 17 specs
+bit-exact against both anchors; the seventeenth is
+``gemm_reduce_8x6x8``, reported as its declared known gap</strong> (64 of 64 result
+bytes wrong, 0 clobbered – the arbitrary reduction pad, exactly as the spec
+predicts).</p>
+</section>
+<section id="is-it-fast">
+<h3>Is it fast?<a class="headerlink" href="#is-it-fast" title="Link to this heading"><span>¶</span></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>fast
+python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>fast<span class="w"> </span>--spec<span class="w"> </span>gemm_16x16x16<span class="w"> </span>--cosim
+</pre></div>
+</div>
+<p>The cheap gate costs microseconds and involves no tool. Every unit in this
+design is one flat loop over the work count the header promises it
+(<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, the row-flattening note), and the units run
+concurrently, so the steady state is the busiest unit’s count and everything
+else is fixed cost:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 173.2 + 1.621 * max(dma_ld, spm, vru, accu, dma_st)
+</pre></div>
+</div>
+<p>Both counts come straight off the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes, so the gate
+needs no new model of the machine – it reads the number the assembler already
+had to compute. The two constants are least squares over the five published
+cosim points, which are Vitis measurements this fork attributes to
+<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code> at <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. The gate passes a
+submission whose estimate is within 10% of the reference submission’s, and
+<code class="docutils literal notranslate"><span class="pre">--cosim</span></code> measures only what passes.</p>
+<p>The real measurement is <code class="docutils literal notranslate"><span class="pre">act/measure.py</span></code>: one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code>, then one
+<code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per submission on that same RTL, with a testbench that
+prefills <code class="docutils literal notranslate"><span class="pre">C</span></code> and compares every byte against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, so a cosim
+mismatch is an RTL fault and not a program fault. The Vitis path, the
+<code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code> link flag that Vitis 2023.2’s binutils needs against this
+system’s glibc, the <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths cosim requires and Allo does not emit,
+and the <code class="docutils literal notranslate"><span class="pre">alignas(64)</span></code> that the <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> promise obliges the
+testbench to keep are all imported from <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> rather than restated.
+Point <code class="docutils literal notranslate"><span class="pre">TPU_PRJ</span></code> somewhere with room and delete the project afterwards; disk
+on this host is tight.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> runs under a deadline (<code class="docutils literal notranslate"><span class="pre">ACT_COSIM_TIMEOUT</span></code>, default 600 s),
+and on expiry the whole process group – <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> and the <code class="docutils literal notranslate"><span class="pre">xsim</span></code> it
+spawned – is killed and the verdict reads <code class="docutils literal notranslate"><span class="pre">RTL</span> <span class="pre">DID</span> <span class="pre">NOT</span> <span class="pre">COMPLETE</span></code>, with what
+csim said and the last inter-transaction progress line. A submission whose RTL
+never finishes is a verdict about the submission; it must not be a hung judge.
+That case is not hypothetical: see <a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>.</p>
+</section>
+</section>
+<section id="is-kpn-model-py-good-enough-to-be-the-cheap-gate">
+<span id="act-specs-kpn-verdict"></span><h2>Is <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> good enough to be the cheap gate?<a class="headerlink" href="#is-kpn-model-py-good-enough-to-be-the-cheap-gate" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>No, and it does not claim to be.</strong> As shipped it reports no cycle number at
+all: it is a deadlock and protocol model with bounded FIFOs, it answers
+“minimum channel depth” and “which process is blocked on which channel”, and
+its own docstring says data values are not modelled. Run over every shipped
+program it prints <code class="docutils literal notranslate"><span class="pre">minimum</span> <span class="pre">depth</span> <span class="pre">1</span></code> and <code class="docutils literal notranslate"><span class="pre">KPN</span> <span class="pre">OK</span></code> and no cycles
+(reproduced in this session).</p>
+<p>It can be <em>made</em> to produce a cycle number, and <code class="docutils literal notranslate"><span class="pre">cycles.kpn_rounds</span></code> does it
+without touching the model: <code class="docutils literal notranslate"><span class="pre">kpn_model.build</span></code> hands back the process
+network, and stepping it barrier-synchronously – one channel action per
+process per round – counts the cycles a KPN with II=1 links and no memory
+latency would take. That number is worse than free and worse than the header
+counts. Single-feature least squares over the five published points, all
+measured in this session:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>predictor</p></th>
+<th class="head"><p>cost to compute</p></th>
+<th class="head"><p>max |error| in sample, 5 points</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kpn_rounds</span></code> (barrier-synchronous KPN)</p></td>
+<td><p>0.6-16 ms</p></td>
+<td><p><strong>12.6%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>dynamic instruction count</p></td>
+<td><p>0.1-0.3 ms</p></td>
+<td><p>12.9%</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> header count</p></td>
+<td><p>0.1-0.3 ms</p></td>
+<td><p>13.1%</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> header count</p></td>
+<td><p>0.1-0.3 ms</p></td>
+<td><p>8.0%</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> header count</p></td>
+<td><p>0.1-0.3 ms</p></td>
+<td><p>8.7%</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max</span></code> over the five unit counts</p></td>
+<td><p>0.1-0.3 ms</p></td>
+<td><p><strong>9.2%</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>(Timed in this session: 116-314 us for <code class="docutils literal notranslate"><span class="pre">cycles.estimate</span></code>, 0.6-15.5 ms for
+<code class="docutils literal notranslate"><span class="pre">cycles.kpn_rounds</span></code>, on the same programs.)</p>
+<p>So the KPN round count is <em>less</em> accurate than a single number the assembler
+already computes, and fifty times more expensive: at <code class="docutils literal notranslate"><span class="pre">gemm_16x16x16</span></code> it
+predicts 1484 rounds against 686 measured cycles, and the 1484 is dominated by
+the 4x4 array’s 32 weight-loader and PE processes each taking a round to pass a
+token along a chain that the RTL walks in one cycle. A barrier-synchronous
+scheduler charges a round per <em>process</em> per hop; the hardware charges a cycle
+per <em>link</em>. Fixing that means modelling the array’s chains as pipelines rather
+than as processes, which is a different model, not a calibration of this one.</p>
+<p>It is not a complete deadlock oracle either. On <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code> it reports
+<code class="docutils literal notranslate"><span class="pre">minimum</span> <span class="pre">channel</span> <span class="pre">depth</span> <span class="pre">1</span></code> and no deadlock, and the RTL does not complete
+(<a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>). It models the channel <em>counts</em> – who is promised
+how much work – and not the latencies and pipeline depths a real hang can
+come from, so it catches assembler/microarchitecture mismatches and nothing
+else. That is still worth having, and it is worth knowing its edge.</p>
+<p><code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>’s real value is the layer it already occupies in the judge: it
+is the <code class="docutils literal notranslate"><span class="pre">protocol</span></code> check in <code class="docutils literal notranslate"><span class="pre">judge.py</span> <span class="pre">legal</span></code>, where a promised-work
+mismatch is named with the blocked process instead of hanging the simulator.
+It should stay there and stay out of the cycle gate.</p>
+</section>
+<section id="what-the-cheap-gate-is-worth">
+<span id="act-specs-gate-measured"></span><h2>What the cheap gate is worth<a class="headerlink" href="#what-the-cheap-gate-is-worth" title="Link to this heading"><span>¶</span></a></h2>
+<p>Measured with <code class="docutils literal notranslate"><span class="pre">act/calibrate.py</span></code>, which runs one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> and then
+one <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per program on that same RTL. Everything in this section
+was measured in this session (<code class="docutils literal notranslate"><span class="pre">logs/cosim_act_corpus_sweep.log</span></code> and
+<code class="docutils literal notranslate"><span class="pre">logs/cosim_act_relu_hang.log</span></code>); <code class="docutils literal notranslate"><span class="pre">PUBLISHED_CYCLES</span></code> in <code class="docutils literal notranslate"><span class="pre">cycles.py</span></code> is the
+only attributed number on the page.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>specs
+<span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>variants
+</pre></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 32.5%" />
+<col style="width: 12.5%" />
+<col style="width: 10.0%" />
+<col style="width: 12.5%" />
+<col style="width: 11.2%" />
+<col style="width: 11.2%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>spec</p></th>
+<th class="head"><p>critical</p></th>
+<th class="head"><p>work</p></th>
+<th class="head"><p>estimate</p></th>
+<th class="head"><p>cosim</p></th>
+<th class="head"><p>error</p></th>
+<th class="head"><p>in fit</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_4x4x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
+<td><p>9</p></td>
+<td><p>188</p></td>
+<td><p><strong>172</strong></p></td>
+<td><p>+9.2%</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_8x8x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>48</p></td>
+<td><p>251</p></td>
+<td><p><strong>262</strong></p></td>
+<td><p>-4.2%</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_12x12x12</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>144</p></td>
+<td><p>407</p></td>
+<td><p><strong>418</strong></p></td>
+<td><p>-2.7%</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>192</p></td>
+<td><p>484</p></td>
+<td><p><strong>484</strong></p></td>
+<td><p>+0.1%</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>320</p></td>
+<td><p>692</p></td>
+<td><p><strong>686</strong></p></td>
+<td><p>+0.9%</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_relu_16x16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
+<td><p>384</p></td>
+<td><p>796</p></td>
+<td><p>750</p></td>
+<td><p>+6.1%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_m_16x16x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>128</p></td>
+<td><p>381</p></td>
+<td><p>383</p></td>
+<td><p>-0.6%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_n_4x4x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
+<td><p>36</p></td>
+<td><p>232</p></td>
+<td><p>269</p></td>
+<td><p>-13.9%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_k_4x16x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
+<td><p>36</p></td>
+<td><p>232</p></td>
+<td><p>256</p></td>
+<td><p>-9.5%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
+<td><p>18</p></td>
+<td><p>202</p></td>
+<td><p>209</p></td>
+<td><p>-3.2%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">row_reduce_16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>128</p></td>
+<td><p>381</p></td>
+<td><p>371</p></td>
+<td><p>+2.6%</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
+<td><p>192</p></td>
+<td><p>484</p></td>
+<td><p><em>never</em></p></td>
+<td><p>–</p></td>
+<td><p>no</p></td>
+</tr>
+</tbody>
+</table>
+<p>Two things fall out of the left column before the model is even discussed.
+<strong>The five published cycle counts reproduce exactly</strong> – 172 / 262 / 418 /
+484 / 686 – through a testbench that compares all 256 bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> against
+<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> rather than only the <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">x</span> <span class="pre">N</span></code> region, which is a stricter
+check than the one the published numbers come from. And two of the corpus’s
+three non-GEMM einsums run on real RTL: <code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code>
+(<code class="docutils literal notranslate"><span class="pre">bmk,bkn-&gt;bmn</span></code>) at 209 cycles and <code class="docutils literal notranslate"><span class="pre">row_reduce_16x16</span></code> (<code class="docutils literal notranslate"><span class="pre">mk-&gt;m</span></code>) at 371,
+both with 0 of 256 bytes wrong. The third, <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code> (<code class="docutils literal notranslate"><span class="pre">mn-&gt;mn</span></code>), is
+<a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">the one that does not</span></a>.</p>
+<p>On the model: <strong>in sample, max error 9.2% over the five points it is fitted
+to; out of sample, max error 13.9% and mean absolute error 6.0% over the six
+held-out specs that produced a cycle number.</strong> The two worst cases are both
+ones where <code class="docutils literal notranslate"><span class="pre">spm</span></code> is
+the critical unit at a small work count, where what the design is actually
+doing is filling the array’s weight and activation chains – a term the model
+does not have, because <code class="docutils literal notranslate"><span class="pre">max</span></code> over the unit counts cannot see a pipeline it
+does not model.</p>
+<p>A 6% mean is good enough to sort candidates that differ by more than that and
+useless for candidates that differ by less. The gate is set at 10% of the
+reference submission’s estimate for that reason: it is a filter on the
+obviously-worse, not a ranking.</p>
+<section id="what-the-expensive-judge-found-that-nothing-cheaper-did">
+<span id="act-specs-rtl-hang"></span><h3>What the expensive judge found that nothing cheaper did<a class="headerlink" href="#what-the-expensive-judge-found-that-nothing-cheaper-did" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Two of the programs the judge was given pass every cheap check and then do
+not complete in RTL</strong>: <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code>’s submission, and the <code class="docutils literal notranslate"><span class="pre">row_blocked</span></code>
+variant of <code class="docutils literal notranslate"><span class="pre">gemm_8x8x8</span></code>. For both, <code class="docutils literal notranslate"><span class="pre">check_program</span></code> accepts, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>
+reports minimum channel depth 1 and no deadlock, the Allo simulator is
+bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, and Vitis csim reports 0 of 256 bytes wrong –
+and then <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> never finishes the transaction.</p>
+<p>What that looks like, and what it does not: a completing run of the same
+design prints two progress lines and a <code class="docutils literal notranslate"><span class="pre">$finish</span></code> –
+<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;109000&quot;</span></code>, then <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;777000&quot;</span></code>, then
+<code class="docutils literal notranslate"><span class="pre">$finish</span> <span class="pre">called</span> <span class="pre">at</span> <span class="pre">time</span> <span class="pre">:</span> <span class="pre">796590</span> <span class="pre">ps</span></code> for a 198-cycle program. A hanging run
+prints the <strong>first</strong> line and never the second. <code class="docutils literal notranslate"><span class="pre">109000</span></code> is picoseconds and
+is simply where Vitis makes its first periodic report, so it is the same
+number in every log, passing or hanging; it is not where the design stops, and
+nothing here locates the stall. No deadlock is reported by Vitis’ own detector,
+so this page does not call it one.</p>
+<p>The full characterisation, the bisection, and the two hypotheses it rules out
+are <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a> of the limitations register, with the repro
+in <code class="docutils literal notranslate"><span class="pre">tests/limits/item24_cosim_hang.py</span></code> and the family in
+<code class="docutils literal notranslate"><span class="pre">act/rtl_hang.py</span></code>. Two things from it are worth carrying here, because they
+are about how a compiler should be judged rather than about this design:</p>
+<ul class="simple">
+<li><p><strong>The minimal case is sixteen instructions, fully unrolled, with no
+``vrelu`` and no epilogue</strong> – plain int8 GEMM tiling. Nothing exotic has to
+be generated to reach it.</p></li>
+<li><p><strong>The hypothesis that an in-nest transfer is the trigger is measurably
+false.</strong> <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a> leaves open whether “a transfer inside the emitted nest
+rather than hoisted into a prologue” is what the failing mappings share. It
+is not: both non-completing programs here stage every transfer in a
+prologue, and both <code class="docutils literal notranslate"><span class="pre">weights_reloaded</span></code> mappings, which issue a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>
+between <code class="docutils literal notranslate"><span class="pre">mvout</span></code>s inside the output nest, complete (256 cycles at 8x8x8
+and 638 at 16x16x16, 0 of 256 bytes wrong). A staging column would pass both
+failures and flag two mappings that run, so it is not the guard to use.</p></li>
+</ul>
+<p>The part that belongs here is what it does to the judge.</p>
+</section>
+<section id="three-tiers-and-an-estimate-is-not-one-of-them">
+<h3>Three tiers, and an estimate is not one of them<a class="headerlink" href="#three-tiers-and-an-estimate-is-not-one-of-them" title="Link to this heading"><span>¶</span></a></h3>
+<p>The consequence for this judge is that <strong>“is it fast” has a tier above it:
+does it run on RTL at all</strong>, and the cheap gate cannot see that tier. So a
+result now says which tier it reached:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.0%" />
+<col style="width: 84.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>tier</p></th>
+<th class="head"><p>what has been shown</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">legal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_program</span></code>, the <code class="docutils literal notranslate"><span class="pre">assemble</span></code> limits, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>, and the
+spec’s write window accept the program</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">correct</span></code></p></td>
+<td><p>it computes the spec, bit-exact, on the Allo simulator against
+<code class="docutils literal notranslate"><span class="pre">isa_ref</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">confirmed</span></code></p></td>
+<td><p>Vitis cosim ran it to completion and produced a cycle count</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">judge.py</span> <span class="pre">fast</span></code> without <code class="docutils literal notranslate"><span class="pre">--cosim</span></code> prints in as many words that nothing it
+listed is confirmed; with <code class="docutils literal notranslate"><span class="pre">--cosim</span></code> it carries a <code class="docutils literal notranslate"><span class="pre">tier</span></code> column and exits
+nonzero naming anything the RTL did not finish – <strong>rankable, not pickable</strong>.
+<code class="docutils literal notranslate"><span class="pre">calibrate.py</span></code> marks the same thing. This is the convention <code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code>
+adopted on <code class="docutils literal notranslate"><span class="pre">main</span></code> (<em>encodable</em> versus <em>confirmed</em>), followed rather than
+reinvented.</p>
+<p>A cycle <em>estimate</em> is deliberately not on that ladder. Both hanging programs
+have estimates – 484 and 264 cycles – and a gate that ranked on them would
+have preferred one of them to a program that runs.</p>
+<p>This is the reason the judge has an expensive tier at all, and it is a
+concrete instance of what <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> calls cosim’s role as a
+deadlock oracle. It is not a defect in the spec or in the submission: both
+pass every contract the machine states.</p>
+</section>
+</section>
+<section id="how-to-work-on-this">
+<h2>How to work on this<a class="headerlink" href="#how-to-work-on-this" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/spec.py</span></code> – validate the whole corpus and print it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/baseline.py</span></code> – the reference submission’s static and dynamic
+instruction counts per spec.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> – the rule table and its self-test. Run it
+after any change to <code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s messages; it is what keeps a
+rejection from degrading into a bare exception.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">legal</span></code> then <code class="docutils literal notranslate"><span class="pre">correct</span></code> then <code class="docutils literal notranslate"><span class="pre">fast</span></code> – the three
+verdicts, cheap to expensive.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/cycles.py</span></code> – the per-unit work table, the estimate and the
+KPN round count for every spec, side by side.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/variants.py</span> <span class="pre">gemm_16x16x16</span></code> – several legal mappings of one
+spec with their estimates, which is the fixture the rank test uses.</p></li>
+</ul>
+<p>Environment is the fork’s usual one (<code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code>): the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env,
+<code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> exported by hand, <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code>. Only <code class="docutils literal notranslate"><span class="pre">correct</span></code>
+and <code class="docutils literal notranslate"><span class="pre">fast</span> <span class="pre">--cosim</span></code> need a build; <code class="docutils literal notranslate"><span class="pre">legal</span></code>, <code class="docutils literal notranslate"><span class="pre">specs</span></code> and <code class="docutils literal notranslate"><span class="pre">rules</span></code> are pure
+Python over the corpus.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">ACT Workload Specs and the Judge</a><ul>
+<li><a class="reference internal" href="#what-a-spec-says-and-what-it-deliberately-does-not">What a spec says, and what it deliberately does not</a><ul>
+<li><a class="reference internal" href="#three-fields-exist-because-this-isa-forces-the-question-into-the-open">Three fields exist because this ISA forces the question into the open</a></li>
+<li><a class="reference internal" href="#two-layers-one-convention">Two layers, one convention</a></li>
+<li><a class="reference internal" href="#layout">Layout</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-corpus">The corpus</a></li>
+<li><a class="reference internal" href="#the-judge">The judge</a><ul>
+<li><a class="reference internal" href="#is-it-legal">Is it legal?</a><ul>
+<li><a class="reference internal" href="#the-rejection-message-is-part-of-the-deliverable">The rejection message is part of the deliverable</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#is-it-correct">Is it correct?</a></li>
+<li><a class="reference internal" href="#is-it-fast">Is it fast?</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#is-kpn-model-py-good-enough-to-be-the-cheap-gate">Is <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> good enough to be the cheap gate?</a></li>
+<li><a class="reference internal" href="#what-the-cheap-gate-is-worth">What the cheap gate is worth</a><ul>
+<li><a class="reference internal" href="#what-the-expensive-judge-found-that-nothing-cheaper-did">What the expensive judge found that nothing cheaper did</a></li>
+<li><a class="reference internal" href="#three-tiers-and-an-estimate-is-not-one-of-them">Three tiers, and an estimate is not one of them</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#how-to-work-on-this">How to work on this</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="act.html">
+                    <span class="icon">&lt;</span><span>ACT, and Why We Cite It</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="../developer/index.html"><span>Developer Setup</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

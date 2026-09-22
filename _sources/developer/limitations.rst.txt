@@ -32,7 +32,10 @@ passes:
   (``levels/L2/tpu.py``);
 * the second pass (items 11-23), from building the instruction-programmable
   TinyTPU-isa (:doc:`/designs/tinytpu_isa`) on ``main`` and taking it through
-  the Vitis dataflow path to RTL co-simulation.
+  the Vitis dataflow path to RTL co-simulation;
+* the third pass (item :ref:`24 <limitation-24>`), from compiling *for* that
+  design rather than building it -- generated programs that every cheap check
+  accepts and the RTL does not run.
 
 Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.
@@ -1512,6 +1515,152 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    bit width 512. See :doc:`/designs/gemmini_comparison` and
    :doc:`/backends/vitis`. The status of this item is left as last recorded
    pending re-verification.
+
+.. _limitation-24:
+
+24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (2026-09-22)
+
+   REPRODUCES. Cheap half: ``python tests/limits/item24_cosim_hang.py``
+   (seconds, no Vitis). RTL half: ``ALLO_LIMITS_COSIM=1`` on the same file
+   (one csynth, ten cosims, tens of minutes). Family and bisection:
+   ``examples/accelerator/tinytpu_vitis/act/rtl_hang.py``; log:
+   ``examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log``.
+
+A legal, bit-exact TinyTPU-isa program of **sixteen instructions** passes every
+check the fork has short of RTL and then does not finish in ``cosim_design``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - check
+     - result on the minimal program
+   * - ``microarch_isa.check_program`` / ``assemble``
+     - accepts
+   * - ``kpn_model.run`` (bounded FIFOs, deadlock reporting)
+     - no deadlock, minimum channel depth 1
+   * - ``isa_ref.run`` (the ISA as numpy)
+     - correct
+   * - ``df.build(target="simulator")``
+     - completes, bit-exact against ``isa_ref``, 0 of 256 bytes wrong
+   * - Vitis **csim**
+     - ``mismatches = 0 / 256``
+   * - Vitis **cosim** (xsim, RTL)
+     - **does not complete**
+
+This is the second independent occurrence. The first is on
+:doc:`/extensions/act`, where two row-tiled ACT mappings behaved the same way
+and the flow withdrew its "5 encodable" claim in favour of "3 confirmed on
+RTL"; that instance was found by a different tree, from a different generator,
+on the same design.
+
+What "does not complete" is, exactly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A completing run of this design prints two progress lines and a ``$finish``:
+
+.. code-block:: text
+
+   // RTL Simulation : 0 / 1 [n/a] @ "109000"
+   // RTL Simulation : 1 / 1 [n/a] @ "777000"
+   $finish called at time : 796590 ps
+
+for a 198-cycle program. A non-completing run prints the **first** line and
+never the second. ``109000`` is **picoseconds** and is simply where Vitis makes
+its first periodic report, so it is the same number in every log, passing or
+hanging -- **it is not where the design stops, and nothing measured here
+locates the stall.** Vitis' own deadlock detector reports nothing, so this item
+does not call it a deadlock. What is measured is: no second progress line, no
+report, and no completion against a neighbour that finishes in under a second
+of simulated time.
+
+The minimal program
+^^^^^^^^^^^^^^^^^^^
+
+``act.rtl_hang.tiled(n_out=2, n_block=2, n_reduce=2, rows=4)``: two output
+column blocks x two row blocks, each a two-deep accumulation of four rows
+followed by an ``mvout``. Fully unrolled -- no ``LOOP``/``ENDLOOP`` at all --
+four ``dma_ld`` and twelve compute instructions, plain int8 GEMM tiling with no
+``vrelu`` and no epilogue.
+
+The bisection, and what it rules out
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Ten programs, one csynth, one cosim each, ``ACT_COSIM_TIMEOUT=200``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - program
+     - cosim
+     - knob changed
+   * - ``tiled n2 b2 k2 r4``
+     - **no completion**
+     - the minimal case
+   * - ``tiled n1 b2 k2 r4``
+     - 223
+     - one output block
+   * - ``tiled n2 b1 k2 r4``
+     - 223
+     - one row block
+   * - ``tiled n1 b1 k2 r4``
+     - 198
+     - both
+   * - ``tiled n2 b2 k1 r4``
+     - 230
+     - no accumulate step
+   * - ``tiled n2 b2 k2 r8``
+     - 356
+     - eight rows instead of four
+   * - ``pointwise n4 r16 relu``
+     - **no completion**
+     - the other program the judge found
+   * - ``pointwise n1 r16 relu``
+     - 291
+     - one output block
+   * - ``pointwise n4 r16 norelu``
+     - 459
+     - the ``vrelu`` deleted
+   * - ``pointwise n4 r4 relu``
+     - **no completion**
+     - four rows instead of sixteen
+
+Four hypotheses die here, and they are the useful part of the item:
+
+- **Not the hardware loop.** The looped and fully unrolled forms of the
+  ``pointwise`` program behave identically, and the whole ``tiled`` family is
+  unrolled.
+- **Not ``vrelu``.** The entire ``tiled`` family has no ``vrelu`` and the
+  minimal case is in it. Conversely ``gemm.relu`` at 16x16x16 has a ``vrelu``
+  in a loop and completes in 750 cycles.
+- **Not "a transfer inside the emitted nest rather than hoisted into a
+  prologue"** -- the hypothesis left open on :doc:`/extensions/act`. Measured
+  the other way round, twice each: **both** non-completing programs have every
+  transfer in a prologue, and **both** ``weights_reloaded`` mappings, which
+  issue a ``dma_ld`` between ``mvout``\ s inside the output nest, complete
+  (256 cycles at 8x8x8, 638 at 16x16x16, 0 of 256 wrong). In-nest staging is
+  neither necessary nor sufficient, so a staging column does not separate the
+  two classes.
+- **Not monotone in size.** Halving any one of the three tile counts makes it
+  complete, and so does *doubling* the row count. It is neither "too big" nor
+  "too small", which rules out simple capacity and fill explanations.
+
+No positive characterisation is offered: the four surviving programs that fail
+share three or more ``accu`` instructions per output tile and four or more
+output tiles, but ``tiled n2 b2 k2 r8`` has both and completes, so that is a
+correlation and not a condition. **The diagnosis is open.**
+
+- **Priority: High as a warning, Medium as an action.** The warning is that on
+  this design the cheap checks do not substitute for cosim, and two of them
+  (``kpn_model`` and the header the simulator consumes) are derived from
+  ``assemble()``'s own header, so their agreement is weaker evidence than it
+  looks. The action is to find the blocked process, which needs
+  ``cosim_design -trace_level all`` on the sixteen-instruction case and a look
+  at the stream handshakes -- affordable now that the repro is that small.
 
 
 Surfaced by the 2026-09-19 re-verification and impact analysis
