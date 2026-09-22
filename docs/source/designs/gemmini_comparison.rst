@@ -825,6 +825,300 @@ banner. And the committed ``roccTests_Makefile.patch`` adds only ``allo_cmp`` to
 the ``tests`` list, **not** ``allo_bare5``, so ``build.sh`` will not build the
 window benchmark; it needs its explicit make target.
 
+Area: the axis this page was missing
+------------------------------------
+
+Until 2026-09-22 this project published standard-cell area for its own design
+at three configurations — 1,136,598 at ``T=4, MAXDIM=16``, 1,865,314 at ``T=4,
+MAXDIM=64``, 2,481,926 at ``T=8, MAXDIM=64`` — and **none for Gemmini**, while
+comparing cycles against Gemmini at a matched array size. A cycle comparison
+with an area column on only one side is not a comparison; it is an
+advertisement. This section is the correction, and the RTL that makes it
+possible is in ``examples/accelerator/tinytpu_vitis/gemmini_rtl/``.
+
+The comparable unit is ``Gemmini``, not the SoC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Chipyard elaborates a whole system-on-chip: a Rocket core, an L1 instruction
+and data cache, an inclusive L2, the system and memory buses, the debug module,
+a bootrom and a DRAM model. Our design has none of it — no host, no cache, no
+core; its program is in DRAM and it starts on ``ap_start``. Synthesising the
+chipyard top would compare a CPU with a matrix unit.
+
+The unit that answers the same question on both sides is Gemmini's own
+accelerator module, ``Gemmini`` (``Controller.scala:45``), whose ports are the
+RoCC command and response interface, one TileLink master for its DMA, and a
+page-table-walker port. Everything the accelerator is made of is inside it:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 40 38
+
+   * - subsystem
+     - Gemmini modules
+     - ours
+   * - spatial array
+     - ``Mesh``, ``Tile``, ``PE``, ``MacUnit``, ``MeshWithDelays``,
+       ``TransposePreloadUnroller``
+     - ``pe``, ``accu``
+   * - scratchpad
+     - ``Scratchpad``, ``ScratchpadBank``, ``mem``/``mem_ext``
+     - ``spad`` and the vector registers
+   * - accumulator
+     - ``AccumulatorMem``, ``TwoPortSyncMem``, ``AccumulatorScale``,
+       ``AccPipe``, ``ScalePipe``
+     - ``ar``
+   * - control
+     - ``ExecuteController``, ``LoadController``, ``StoreController``,
+       ``ReservationStation``, ``LoopMatmul*``
+     - ``sequencer``
+   * - memory interface
+     - ``StreamReader``, ``StreamWriter``, ``BeatMerger``, ``XactTracker``,
+       ``DMACommandTracker``, ``TLBuffer``, ``TLXbar``
+     - ``dma_ld``, ``dma_st``
+
+The boundary is not asserted, it is **computed**: the export takes the
+transitive closure of the module instantiation graph from ``Gemmini`` over the
+elaborated RTL, which gives 138 modules at DIM=4 and 136 at DIM=8 with **no
+undefined module left over**. Anything outside that closure — Rocket and its
+tile, the L1s, the L2's banks and directory, the SoC buses and peripherals, the
+DRAM model and the test harness — is cut, and the closure is checkable by
+anyone who disagrees with a particular cut.
+
+Three things stay in although a GEMM never touches them, and all three make
+Gemmini look **bigger**, which is the direction that does not flatter us:
+the conv pipeline (``LoopConv*``, ``Im2Col``, ``PixelRepeater``,
+``ZeroWriter``), the output-stationary datapath that ``dataflow = BOTH``
+carries, and — the one worth naming in any quote, because it is a real block —
+**an fp32 scaling pipeline**. ``defaultConfig``'s ``mvin_scale_args`` are
+``Float``, so Gemmini's default int8 accelerator instantiates 8 recoded-float
+multiply-adds at DIM=4 and 12 at DIM=8. We have none. Removing any of the three
+would be tuning the opponent, so none is removed; naming them is the honest
+alternative.
+
+**One cut is genuinely ambiguous and is reported both ways.** ``FrontendTLB``
+— Gemmini's private four-entry TLB, with ``DecoupledTLB``, ``DTLB_2``,
+``PMAChecker`` and ``PMPChecker_s6`` — is *inside* the ``Gemmini`` module,
+because Gemmini's DMA issues virtual addresses. Ours takes physical addresses
+over AXI and has no translation at all. Cutting it would mean editing Gemmini's
+RTL, so it is left in and its area is reported separately from DC's
+``report_area -hierarchy``; both the with-TLB and the without-TLB figures
+belong in any quote.
+
+The memory treatment is the whole problem, and the choice made
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Our three published areas are synthesised with ``sram_mode='none'``: the
+scratchpad, vector registers and accumulator become flip-flops, which is why
+~80 % of the cell area is non-combinational. Gemmini's scratchpad is 256 KiB
+and its accumulator 64 KiB. Flip-flopping 320 KiB is **2,621,440 registers**,
+against 200,561 sequential cells in our *entire* ``T=4`` design. The resulting
+number would be a measurement of the memory treatment, not of either design,
+and it would be roughly thirteen times our whole area before a single gate of
+Gemmini's datapath was counted.
+
+Four ways out, and why the fourth is not enough on its own:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - option
+     - what it costs
+   * - flip-flop both, caveat the number
+     - the caveat cannot be read. A 13x ratio that is entirely an artefact of
+       capacity is not improved by a sentence underneath it; readers quote
+       numbers, not footnotes.
+   * - SRAM macros on both sides
+     - the honest ASIC implementation, and **it invalidates our three
+       published figures**, which would all have to be re-run. It also needs
+       macros for every geometry on both sides. Right answer eventually; not
+       an answer today.
+   * - match Gemmini's capacity to ours
+     - changes Gemmini's hardware. Legitimate only if the change is provably
+       cycle-neutral — which, at the published shapes, it is (below).
+   * - report logic area excluding memories
+     - the only figure invariant to all of this, but it deletes the axis the
+       comparison most needs: a design that buys cycles with memory looks free.
+
+**The choice is the third and the fourth together**, and it has to be both:
+the fourth is the headline because it is the only figure invariant to the
+memory treatment, and the third exists so that the full-memory figure beside it
+is not absurd. Gemmini is elaborated at an 8 KiB scratchpad and a 4 KiB
+accumulator — 98,304 bits, 12 KiB total — and each configuration ships two file
+lists from one export, one including the memory arrays and one omitting them so
+``mem``/``mem_0`` elaborate as empty black boxes.
+
+Why 4 KiB of accumulator: it is the smallest capacity inside the envelope the
+cycle-neutrality sweep already covers. 2 KiB is legal under Gemmini's
+``require`` clauses at both array sizes, but a 16x16 int32 tile is 1 KiB and the
+binding limit is the accumulator's *half* capacity, so 2 KiB sits exactly on the
+edge where the tiling search has never been run.
+
+Why 8 KiB of scratchpad needs a correction to this page's own arithmetic.
+Measured out of the shipped RTL — every ``*_RAM_*`` module's depth times its
+width times its hierarchical instance count — our operand and accumulator
+storage is:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - our variant
+     - scratchpad + vregs
+     - accumulator
+     - vs Gemmini's 12 KiB
+   * - ``T4_MAXDIM16_shipped_baseline`` (1,136,598)
+     - 0.5 KiB
+     - 2.0 KiB
+     - Gemmini has **4.8x**
+   * - ``T4_MAXDIM64_shipped`` (1,865,314)
+     - 8.0 KiB
+     - 2.1 KiB
+     - Gemmini has 1.19x
+   * - ``T8_MAXDIM64`` (2,481,926)
+     - 8.0 KiB
+     - 4.25 KiB
+     - **matched to 2 %**
+
+**The "4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator"
+this page quotes elsewhere describes** ``MAXDIM=64``, **not the** ``MAXDIM=16``
+**baseline whose area is published.** At ``MAXDIM=16`` both arrays are 64 rows
+of 32 bits — 256 bytes apiece — because the memories are derived from
+``MAXDIM``. So 8 KiB of Gemmini scratchpad is a near-exact match against
+``T8_MAXDIM64`` and against ``T4_MAXDIM64_shipped``, and it hands Gemmini
+**4.8x our storage** against the MAXDIM=16 baseline the DIM=4 cycle numbers
+belong to. The total including the DMA read buffers and the sequencer's small
+RAMs is 3.50 KiB, 18.62 KiB and 20.75 KiB respectively.
+
+**That asymmetry is why the logic-only figure is the headline and the
+full-memory figure is the secondary**, rather than the other way round. At the
+DIM=8 pair the two agree; at the DIM=4 pair only the logic-only figure is
+defensible without a paragraph of arithmetic attached.
+
+**The capacity change is legitimate only because it is cycle-neutral, and that
+was measured before this section existed.** ``tiled_matmul_auto``'s own tiling
+search issues exactly one ``loop_ws`` at every published shape from 256/64 KB
+down to 4/4 KB, so not one of 161 / 220 / 347 / 391 / 593 moves — see `The
+capacity asymmetry is cycle-neutral, and this is the finding`_. It stops being
+neutral at 32x32x32, so **this section does not extend to the ten-shape sweep
+at MAXDIM=64 without being re-measured**, and an area quote at 64x64x64 would
+need its own capacity argument.
+
+What the choice gives up, stated plainly: the 256 KiB scratchpad is a **real
+capability** that this comparison deliberately removes. The area answers *what
+does the same amount of local memory cost in each design*. It does not answer
+*what does the shipped Gemmini cost*, and it must never be quoted against a
+published Gemmini area, which will have been taken with SRAM macros at full
+capacity and is not the same measurement at all. The logic-only figure is the
+safer of the two to carry, being invariant to both the memory treatment and the
+capacity choice — but only if our side omits its ``*_RAM_*`` modules in exactly
+the same way, which is a second run on our side and not a free comparison.
+
+Results
+~~~~~~~
+
+Pending: the RTL and the settings are handed to the zhang-21 synthesis session,
+and no DC run has completed at the time of writing. The table below is the
+shape the answer has to take, and every row needs all four columns before any
+ratio is quoted.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 16 16 16 18
+
+   * - design
+     - memory
+     - total cell area
+     - logic only
+     - less the TLB
+   * - TinyTPU-isa ``T=4, MAXDIM=16``
+     - 3.50 KiB
+     - 1,136,598
+     - not yet run
+     - n/a (no TLB)
+   * - TinyTPU-isa ``T=4, MAXDIM=64``
+     - 18.62 KiB
+     - 1,865,314
+     - not yet run
+     - n/a
+   * - Gemmini DIM=4, 8/4 KiB
+     - 12.0 KiB
+     - not yet run
+     - not yet run
+     - not yet run
+   * - TinyTPU-isa ``T=8, MAXDIM=64``
+     - 20.75 KiB
+     - 2,481,926
+     - not yet run
+     - n/a
+   * - Gemmini DIM=8, 8/4 KiB
+     - 12.0 KiB
+     - not yet run
+     - not yet run
+     - not yet run
+
+Both of our ``T=4`` rows are there because neither is a clean opponent on its
+own: ``MAXDIM=16`` is the build the DIM=4 cycle numbers were measured on, and
+``MAXDIM=64`` is the build whose memory capacity matches. A reader wanting one
+number should take the **logic-only** column, where the difference between them
+is our own ``+64.1 %`` operand-space step and not a property of Gemmini.
+
+The DIM=8 pair is matched on memory to 2 % but **not on operand space**: our
+``T=8`` build is at ``MAXDIM=64``, a fourfold operand space against the
+``MAXDIM=16`` baseline, and that difference is worth +64.1 % of our own cell
+area on its own. Quoting DIM=8 against DIM=4 across designs without naming both
+changes is the same error this project has already withdrawn once.
+
+The handoff
+~~~~~~~~~~~
+
+``gemmini_rtl/DIM4_int8_capmatched/`` and ``gemmini_rtl/DIM8_int8_capmatched/``,
+written by ``export_gemmini_rtl.py``, in the shape ``rtl_handoff/`` already
+uses: flat RTL, ``sv2v_manifest.f`` in dependency order, ``MANIFEST.json``
+naming the top module and carrying the configuration, and a README stating the
+elaborating commit and every cut. The exporter refuses an export whose named
+top module is undefined and one whose resource record is empty — the two guards
+``export_rtl.write_design`` makes, which caught a ``T8_MAXDIM64`` export that
+shipped 223 self-consistent files with no top module in them — plus a third for
+this comparison: an export carrying more than 32 KiB of memory array, which is
+what a stock-capacity elaboration looks like.
+
+Two differences from the Vitis handoff, both measured here:
+
+* **sv2v IS needed**, unlike for Vitis output. "Chisel emits Verilog" is not
+  true of firtool 1.75.0: ``CounterFile``, ``LoopMatmulStC`` and ``RRArbiter``
+  use packed multidimensional arrays (``wire [7:0][6:0]``) and assignment
+  patterns (``'{3'h5, 3'h0, …}``) **outside any** ``ifdef``. Verilator rejects
+  every file list under ``--language 1364-2001`` with 6-7 syntax errors and
+  accepts them all as SystemVerilog, so the files are named ``.sv`` and the
+  flow needs ``normalize_rtl: True`` or ``analyze -format sverilog``.
+* **``SYNTHESIS`` must be defined at read time**, or ``plusarg_reader`` arrives
+  as ``$value$plusargs`` inside an ``initial`` block and 173 ``logic``
+  declarations come back with it.
+
+The top-module check that forced ``normalize_rtl: False`` on our own RTL is
+*not* a problem here: ``module Gemmini(`` carries a trailing comment, not an
+attribute, so the collector's ``^\s*module\s+<top>`` pattern matches.
+
+All four file lists — two configurations, full and logic-only — pass
+``verilator --lint-only -DSYNTHESIS --top-module Gemmini`` with no error, which
+is the cheapest available evidence that the closure is complete before DC sees
+it.
+
+One hazard, again
+~~~~~~~~~~~~~~~~~
+
+Elaborating these two configurations rewrote ``gemmini_params.h`` twice, as
+every elaboration does. The header was restored to the committed ``DIM=4``
+snapshot afterwards and verified by checksum. The exporter does not trust that
+header at all: it reads ``DIM`` back out of the scratchpad's own geometry in
+``.top.mems.conf`` — a bank is ``DIM`` int8 elements wide, an accumulator row is
+``DIM`` int32 — and refuses an export whose RTL does not match the
+configuration it claims. The C benchmark build still depends on the header, so
+the snapshot-and-restore step is still required for anyone re-running cycles.
+
+
 Reproduced, once, independently
 -------------------------------
 

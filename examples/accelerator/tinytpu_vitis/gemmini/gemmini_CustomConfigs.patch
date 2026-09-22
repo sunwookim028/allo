@@ -1,8 +1,8 @@
 diff --git a/src/main/scala/gemmini/CustomConfigs.scala b/src/main/scala/gemmini/CustomConfigs.scala
-index 011d7ce..bede0ed 100644
+index 011d7ce..9f038ee 100644
 --- a/src/main/scala/gemmini/CustomConfigs.scala
 +++ b/src/main/scala/gemmini/CustomConfigs.scala
-@@ -49,6 +49,41 @@ object GemminiCustomConfigs {
+@@ -49,6 +49,66 @@ object GemminiCustomConfigs {
      acc_capacity = CapacityInKilobytes(128),
    )
  
@@ -39,6 +39,31 @@ index 011d7ce..bede0ed 100644
 +    tileRows = 1,
 +    tileColumns = 1,
 +    has_training_convs = false,
++  )
++
++  // The two configs above at a local-memory capacity matched to TinyTPU-isa,
++  // for the AREA comparison only. Gemmini ships 256 KiB of scratchpad and
++  // 64 KiB of accumulator against our 4 KiB scratchpad + 4 KiB vector
++  // registers + 2.1 KiB accumulator, and both sides are synthesised with
++  // memories as flip-flops, so an unmatched capacity would make the area
++  // number a measurement of the memory treatment and nothing else.
++  //
++  // 8 KiB of scratchpad is exactly our int8 operand storage (4 KiB spad +
++  // 4 KiB vregs); 4 KiB of accumulator is the smallest capacity inside the
++  // envelope the cycle-neutrality sweep already covers, and leaves Gemmini
++  // 1.9 KiB more accumulator than we have, which is the direction that does
++  // not flatter us. Cycle-neutral up to 16x16x16: tiled_matmul_auto issues
++  // exactly one loop_ws at every published shape from 256/64 KB down to
++  // 4/4 KB (designs/gemmini_comparison.rst). Nothing else changes, so these
++  // differ from int8Dim{4,8}Config in two capacity fields and no other.
++  val int8Dim4AreaConfig = int8Dim4Config.copy(
++    sp_capacity = CapacityInKilobytes(8),
++    acc_capacity = CapacityInKilobytes(4),
++  )
++
++  val int8Dim8AreaConfig = int8Dim8Config.copy(
++    sp_capacity = CapacityInKilobytes(8),
++    acc_capacity = CapacityInKilobytes(4),
 +  )
 +
    // Specify which of your custom configs you want to build here

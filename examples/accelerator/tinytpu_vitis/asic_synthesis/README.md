@@ -96,6 +96,29 @@ Reports are under `reports/<variant>/`: the QoR and power reports verbatim, an
 area summary (full report is 716 KB, the reference report 4 MB; both stay in the
 build directory), and mflowgen's `synthesis-metrics.json`.
 
+## The Gemmini side of the same flow
+
+`../gemmini_rtl/` holds Gemmini's accelerator — the `Gemmini` module and its
+local memories, with Rocket, the caches, the buses and the DRAM model cut —
+elaborated at DIM=4 and DIM=8, int8/int32, at a memory capacity matched to ours
+so that `sram_mode='none'` means the same thing on both sides. It is for **these
+identical settings**: DC W-2024.09, FreePDK45 `view-standard`, 3.33 ns,
+topographical, flatten effort 3.
+
+Four runs, not two: each directory carries `sv2v_manifest.f` (with memories)
+and `sv2v_manifest_nomem.f` (memory arrays black-boxed). The logic-only figure
+is the headline, because Gemmini's memories and ours are different sizes; our
+own designs need the matching run, omitting their seven `*_RAM_*` modules, for
+the pair to mean anything.
+
+Two differences from the RTL above, both measured: this RTL **is**
+SystemVerilog (firtool emits packed multidimensional arrays outside any
+`ifdef`, so `normalize_rtl: True` or `analyze -format sverilog` is required,
+unlike for Vitis output), and `SYNTHESIS` must be defined at read time. The
+top-module check is not a problem — `module Gemmini(` carries a comment, not an
+attribute. See `../gemmini_rtl/README.md` and
+`docs/source/designs/gemmini_comparison.rst`, "Area".
+
 ## Reproducing
 
 The flow is mflowgen at `~/allo-asic` on zhang-21; `construct-commercial.py`

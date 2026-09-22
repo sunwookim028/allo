@@ -49,7 +49,7 @@ _KW = {"module", "endmodule", "input", "output", "inout", "reg", "wire",
        "default", "endcase", "wait", "repeat", "forever", "disable"}
 
 
-def compile_order(files):
+def compile_order(files, top=None):
     """Leaves first: a topological sort of the module instantiation graph.
 
     `files` maps a filename to its text. A file is emitted only after every
@@ -57,7 +57,11 @@ def compile_order(files):
     have) degrades to alphabetical for the files involved rather than
     raising -- an unusable manifest is worse than a slightly wrong order,
     and `sv2v` will say so.
+
+    `top` names the module to emit last; `export_gemmini_rtl.py` passes
+    `Gemmini`, which is why it is a parameter rather than the module constant.
     """
+    top = top or TOP
     defines, uses = {}, {}
     for name, text in files.items():
         mods = set(_MODULE.findall(text))
@@ -82,7 +86,7 @@ def compile_order(files):
         order.append(name)
 
     # The top last, so start from everything else and finish at the top.
-    top_file = defines.get(TOP)
+    top_file = defines.get(top)
     for name in sorted(files):
         if name != top_file:
             visit(name)
