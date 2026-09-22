@@ -1,0 +1,910 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+..  Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+..    http://www.apache.org/licenses/LICENSE-2.0
+
+..  Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+#################
+The Benchmark Set
+#################
+
+Three sets, answering three different questions. They are never blended into
+one verdict, because the questions are not the same question.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 30 56
+
+   * - set
+     - what it measures
+     - what it cannot say
+   * - **latency**
+     - time to first result: 4x4x4 .. 16x16x16, where the fixed pipeline term
+       dominates
+     - nothing about throughput. The same shape is not the same work on two
+       different array sizes.
+   * - **steady state**
+     - MACs/cycle as a fraction of the array's own peak: 16, 32, 48, 64 cubed
+       plus two non-cubic shapes
+     - nothing about latency, and nothing about a real layer's memory traffic
+   * - **workload**
+     - one GPT-2 projection, stated exactly
+     - nothing yet: it is a **placeholder**. No build runs it (below).
+
+.. important::
+
+   **Which question a number answers, per the framing agreed with MiniTPU's
+   owner.**
+
+   * **TinyTPU-isa vs Gemmini is well posed**: matched 4x4 array, matched
+     int8/int32, matched near-zero memory latency, matched measurement window.
+     It is measured on both sets below.
+   * **MiniTPU vs either is NOT well posed at these shapes**: a 16x16 BF16
+     array has 16x the MAC/cycle peak and a different window, so a cycle
+     ratio against it is a statement about array size. It becomes well posed
+     only through fraction-of-peak, or through an equal-array-size build.
+     Every MiniTPU figure carried elsewhere in these docs is **current as of
+     2026-09-22** and may move; its board clock is 187.5 MHz while its
+     bitstream closes timing at 200 MHz, so a cycles-to-seconds conversion
+     uses 187.5 and a timing-closure claim uses 200.
+
+   A single blended verdict across the three machines is the one thing not to
+   produce, because it will be quoted without its caveat.
+
+
+.. _benchmarks-why-latency-is-not-throughput:
+
+Why the latency set is not a throughput comparison
+==================================================
+
+The five shapes top out at 16x16x16. On a 4x4 array that is
+:math:`(16/4) \times (16/4) = 16` weight loads and 16x16 = 256 wavefront rows;
+on a 16x16 array it is **one** weight load and one pass. The per-machine work
+accounting, for 16x16x16:
+
+.. list-table::
+   :header-rows: 1
+
+   * - machine
+     - array
+     - tile-matmuls
+     - wavefront rows
+     - peak MAC/cycle
+     - ideal cycles
+   * - TinyTPU-isa, T=4
+     - 4x4
+     - 16
+     - 256
+     - 16
+     - 256
+   * - TinyTPU-isa, T=8
+     - 8x8
+     - 4
+     - 32
+     - 64
+     - 64
+   * - Gemmini, DIM=4
+     - 4x4
+     - 16
+     - 256
+     - 16
+     - 256
+   * - MiniTPU, 16x16
+     - 16x16
+     - 1
+     - 16
+     - 256
+     - 16
+
+"Ideal cycles" is :math:`(N/T)(K/T)M`, one wavefront row per cycle at T*T
+MACs. A machine with a 16x deeper array needs 16x fewer cycles for the *same
+shape* before any design difference is involved, so the shortest pipeline wins
+this set by construction. That is why these five are labelled a **latency**
+benchmark and why the steady-state set exists.
+
+
+.. _benchmarks-steady:
+
+The steady-state set
+====================
+
+Cubic 16, 32, 48, 64 plus **64x32x64** and **32x64x32**. The two non-cubic
+shapes are not decoration: the cost model is
+:math:`\text{fixed} + (N/T)(K/T) \cdot M`, so a shape that holds M and N and
+halves K separates the wavefront-row term from the tile-count term, and
+swapping M and K distinguishes the two.
+
+64 is the largest cubic shape the build runs, and what bounds it is the
+**instruction encoding**, not the datapath --- see
+:ref:`benchmarks-raising-maxdim`.
+
+TinyTPU-isa, T=4, MAXDIM=64
+---------------------------
+
+Vitis ``cosim`` (xsim), ``ap_start`` to ``ap_done``, one ``csynth`` and one RTL
+build for the whole sweep, shapes swept as instruction data. Every shape
+**bit-exact** (``mismatches = 0``). Peak is :math:`T^2 = 16` MAC/cycle.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 10 12 12 12 14 12
+
+   * - shape
+     - set
+     - MACs
+     - cycles
+     - MAC/cycle
+     - **% of peak**
+     - ideal cycles
+   * - 4x4x4
+     - latency
+     - 64
+     - 218
+     - 0.29
+     - 1.8%
+     - 4
+   * - 8x8x8
+     - latency
+     - 512
+     - 357
+     - 1.43
+     - 9.0%
+     - 32
+   * - 12x12x12
+     - latency
+     - 1 728
+     - 563
+     - 3.07
+     - 19.2%
+     - 108
+   * - 16x16x8
+     - latency
+     - 2 048
+     - 677
+     - 3.02
+     - 18.9%
+     - 128
+   * - 16x16x16
+     - both
+     - 4 096
+     - 879
+     - 4.66
+     - 29.1%
+     - 256
+   * - 32x32x32
+     - steady
+     - 32 768
+     - 3 752
+     - 8.73
+     - 54.6%
+     - 2 048
+   * - 48x48x48
+     - steady
+     - 110 592
+     - 10 289
+     - 10.75
+     - 67.2%
+     - 6 912
+   * - 64x64x64
+     - steady
+     - 262 144
+     - 22 123
+     - 11.85
+     - **74.1%**
+     - 16 384
+   * - 64x32x64
+     - steady
+     - 131 072
+     - 12 907
+     - 10.16
+     - 63.5%
+     - 8 192
+   * - 32x64x32
+     - steady
+     - 65 536
+     - 6 824
+     - 9.60
+     - 60.0%
+     - 4 096
+
+**This is the number that characterises the design, and it had never been
+measured.** Utilisation rises monotonically with problem size and reaches
+**74.1% of the array's peak at 64x64x64**, still climbing. The latency set
+sits at 1.8-29% of peak, which is the quantitative statement of why it is not
+a throughput benchmark.
+
+TinyTPU-isa, T=8, MAXDIM=64
+---------------------------
+
+The same RTL flow at the second array size. Peak is :math:`T^2 = 64`
+MAC/cycle, so **the fractions are against a four-times-larger peak and the
+raw cycles are not comparable with the T=4 column** --- which is exactly why
+the fraction is the column to read.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 12 12 14 16 14 16
+
+   * - shape
+     - MACs
+     - cycles
+     - MAC/cycle
+     - **% of peak (64)**
+     - ideal cycles
+     - T=4 cycles / T=8
+   * - 8x8x8
+     - 512
+     - 285
+     - 1.80
+     - 2.8%
+     - 8
+     - 1.25x
+   * - 16x16x8
+     - 2 048
+     - 424
+     - 4.83
+     - 7.5%
+     - 32
+     - 1.60x
+   * - 16x16x16
+     - 4 096
+     - 493
+     - 8.31
+     - 13.0%
+     - 64
+     - 1.78x
+   * - 32x32x32
+     - 32 768
+     - 1 484
+     - 22.08
+     - 34.5%
+     - 512
+     - 2.53x
+   * - 48x48x48
+     - 110 592
+     - 3 537
+     - 31.27
+     - 48.9%
+     - 1 728
+     - 2.91x
+   * - 64x64x64
+     - 262 144
+     - 7 083
+     - 37.01
+     - **57.8%**
+     - 4 096
+     - **3.12x**
+   * - 64x32x64
+     - 131 072
+     - 4 523
+     - 28.98
+     - 45.3%
+     - 2 048
+     - 2.85x
+
+Two things to read off this, and they pull in opposite directions:
+
+* **The array scales**: quadrupling the array gives 3.12x at 64x64x64, i.e.
+  78% scaling efficiency, and the ratio is still rising with problem size.
+  The design's T parameter works.
+* **A bigger array needs a bigger problem.** T=8 reaches only 57.8% of *its*
+  peak at 64x64x64 where T=4 reaches 74.1% of *its* peak, because 64x64x64 is
+  a smaller problem relative to an 8x8 array. So 64 is a steady-state shape
+  for T=4 and is still in the ramp for T=8 --- which is the same observation
+  that makes the five small shapes a latency benchmark, one level up. A T=8
+  steady-state set would need to start where this one ends.
+
+
+.. _benchmarks-raising-maxdim:
+
+Raising the build: what a bigger MAXDIM costs
+=============================================
+
+The design was built at MAXDIM=16 with a 512-row scratchpad, 256 operand
+vector registers and 128 accumulator registers. Those were three typed-in
+literals that happened to be big enough for MAXDIM=16, and **only** for
+MAXDIM=16: the shipped GEMM lays A out at ``A_VR + kb*MAXDIM + m``, so the
+highest operand row it names is
+
+.. math::
+
+   (\text{MAXDIM}/T - 1)\,\text{MAXDIM} + \text{MAXDIM}
+   \;=\; \text{MAXDIM}^2 / T
+
+which at MAXDIM=64 is 1024 rows against a 256-entry file. Raising MAXDIM alone
+produced a build that assembled and gave wrong answers. The sizes are now
+**that expression** (``microarch_isa.OPERAND_ROWS``), with the ``TPU_SPAD`` /
+``TPU_NVR`` / ``TPU_NAR`` environment overrides kept only for probing a
+deliberately undersized build. MAXDIM itself defaults to **64**.
+
+Two independent ceilings, both in the encoding
+----------------------------------------------
+
+Found by raising MAXDIM until each fired:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 30 20 24
+
+   * - limit
+     - condition
+     - ceiling at T=4
+     - how it fails
+   * - address field, 11 usable bits
+     - :math:`\text{MAXDIM}^2/T \le 2047`
+     - MAXDIM <= 90
+     - MAXDIM=96: ``check_program``, "AGU-resolved f3=2112 is outside the
+       0..2047 range"
+   * - header count, 15-bit slice
+     - :math:`\text{MAXDIM}^3/T^2 + \text{MAXDIM}^2/T \le 32767`
+       (``accu``'s iteration count)
+     - MAXDIM <= 76
+     - MAXDIM=80: ``assemble``, "header count 33600 does not fit 15 bits"
+
+**MAXDIM=64 is the largest round value inside both**, and it is asserted at
+import so an out-of-range configuration fails immediately rather than
+silently. Neither ceiling is architectural --- widening the fields or the
+header slices moves them --- but the field widths are load-bearing for a
+different reason: a synthesis tool bounds a runtime-bounded loop by the *range
+of the index*, which is why ``nr`` is 8 bits (see ``microarch_isa``'s encoding
+note). Widening means re-measuring every loop bound Vitis derives.
+
+At T=8 the same two expressions give MAXDIM <= 120, verified: the ceiling is a
+property of :math:`\text{MAXDIM}^2/T`, so a wider array buys a longer edge.
+
+The instruction memory does **not** need to grow
+------------------------------------------------
+
+``IMEM_SIZE`` stays at **56 words** at every shape up to 64x64x64, because
+``isa_dsl``'s loop-nest generator already emits the tiled GEMM as
+:math:`O(\text{nesting})` rather than :math:`O(\text{tiles})`:
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - looped (shipped)
+     - unrolled reference
+     - dynamic instructions
+   * - 16x16x16
+     - 14 static / 36 words
+     - 32 static / 72 words
+     - 32
+   * - 32x32x32
+     - 14 static / 36 words
+     - 96 static / 200 words
+     - 96
+   * - 64x64x64
+     - 14 static / 36 words
+     - 320 static / 648 words
+     - 320
+
+So the answer to "must imem grow, or must the program loop harder" is: the
+program already loops, ``isa_dsl`` already handles it, and imem is untouched.
+The unrolled form outgrows imem from 16x16x16 on, which is the point of having
+control flow; ``bench_isa.py`` runs it where it fits and covers the rest with a
+static equivalence check that the two forms issue the identical dynamic
+instruction stream.
+
+MAXDIM -> resources
+-------------------
+
+One ``csynth_design`` per configuration, ``xcu280-fsvh2892-2L-e``, 3.33 ns
+target (``csynth_sweep.py``; reports kept under
+``examples/accelerator/tinytpu_vitis/csynth_reports/``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 10 10 10 10 10 10 10 12
+
+   * - T
+     - MAXDIM
+     - spad
+     - nvr
+     - FF
+     - LUT
+     - BRAM
+     - DSP
+     - est. clock
+   * - 4
+     - 16
+     - 64
+     - 64
+     - 17 074
+     - 26 493
+     - 40
+     - 14
+     - 2.431 ns (411 MHz)
+   * - 4
+     - 32
+     - 256
+     - 256
+     - 17 455
+     - 26 529
+     - 44
+     - 14
+     - 2.431 ns (411 MHz)
+   * - 4
+     - 48
+     - 576
+     - 576
+     - 17 467
+     - 26 651
+     - 48
+     - 14
+     - 2.431 ns (411 MHz)
+   * - 4
+     - 64
+     - 1 024
+     - 1 024
+     - 17 487
+     - 26 552
+     - 48
+     - 14
+     - 2.431 ns (411 MHz)
+
+**Raising MAXDIM from 16 to 64 costs +413 FF (+2.4%), +59 LUT (+0.2%) and
++8 BRAM (+20%), and does not move the estimated clock.** That is the whole
+price of being able to run a shape that reaches steady state, and it is the
+reason the shipped default moved to 64 rather than staying at 16 with an
+override. Note the MAXDIM=16 row is itself *cheaper* than the design as
+previously shipped, because the derived sizes replace the literal
+512/256 scratchpad and vreg files with the 64/64 that MAXDIM=16 actually
+needs.
+
+Verification per configuration
+------------------------------
+
+Every configuration below is exact on all four gates: ``bench_isa.py``
+(``ALL EXACT``), ``stress_isa.py`` (``STRESS OK``, which includes the program
+validator's controls --- crafted illegal programs rejected, every generated
+one accepted), and RTL cosim bit-exact at every shape reported.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 12 14 20 26 18
+
+   * - T
+     - MAXDIM
+     - peak MAC/cyc
+     - ``bench_isa``
+     - ``stress_isa``
+     - cosim
+   * - 4
+     - 16
+     - 16
+     - ALL EXACT (5 shapes)
+     - STRESS OK 492/492, 64 shapes, 18 bad programs rejected
+     - published 172/262/418/484/686
+   * - 4
+     - 64
+     - 16
+     - ALL EXACT (11 shapes)
+     - STRESS OK 640/640, 96 shapes, 18 bad programs rejected
+     - bit-exact, 10 shapes (table above)
+   * - 8
+     - 32
+     - 64
+     - ALL EXACT
+     - STRESS OK 486/486, 64 shapes
+     - not run (64 is the reported T=8 build)
+   * - 8
+     - 64
+     - 64
+     - ALL EXACT (8 shapes)
+     - STRESS OK 630/630, 96 shapes
+     - bit-exact, 8 shapes (T=8 table)
+
+``stress_isa``'s exhaustive shape set is :math:`(\text{MAXDIM}/T)^3`, which is
+64 shapes at MAXDIM=16 but **4096** at MAXDIM=64. Above ``TPU_STRESS_SHAPES``
+(default 96) it becomes a seeded stratified sample that always keeps the
+scored shapes and every extreme; ``TPU_STRESS_SHAPES=0`` restores the
+exhaustive set.
+
+Two harness limitations were found and fixed rather than worked around, both
+of them hard-coded constants masquerading as design limits:
+
+* ``isa_dsl.vector_program`` addressed accumulator and scratchpad rows by the
+  literals 40 / 80 / 100, which fit only because the memories were themselves
+  literals. Its regions are now derived from ``SPAD_ROWS`` / ``NVR`` / ``NAR``
+  --- they only ever had to be distinct, non-zero and in range --- and it now
+  states its three real requirements as asserts: ``M >= T`` (its third ``mm``
+  reads T weight rows out of an M-row region), ``MAXDIM // T >= 4`` (it names
+  column block 3), and room for its DRAM rows. **This, not the design, is what
+  "T=4 only" was.**
+* ``bench_isa``'s shape list was unfiltered, so at T=8 it asked for 4x4x4.
+  Both sets now pass through ``runnable()``.
+
+
+.. _benchmarks-matched:
+
+Matched against Gemmini
+=======================
+
+What is matched, and what is not
+-------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 38 42
+
+   * - axis
+     - matched?
+     - how
+   * - array size
+     - **yes, at two sizes**
+     - T=4 vs ``Int8Dim4GemminiRocketConfig``; T=8 vs
+       ``Int8Dim8GemminiRocketConfig``
+   * - data type
+     - **yes**
+     - int8 x int8 -> int32 on both, Gemmini's own default type
+   * - operand distribution
+     - **yes**
+     - [-4, 4], the distribution ``allo_cmp.c`` fills
+   * - DRAM row stride
+     - **yes**, and this is new
+     - both sides run at MAXDIM=64 (below)
+   * - measurement window
+     - **yes, by construction**
+     - see the window table
+   * - memory latency
+     - both idealised, not identical
+     - ours ``-m_axi_latency 0``; Gemmini's Rocket SoC with
+       ``additionalLatency=0``
+   * - on-chip capacity
+     - **no** --- disclosed, not corrected
+     - Gemmini 256 KiB scratchpad + 64 KiB accumulator against our 4 + 4 +
+       2.1 KiB. At every shape in either set **both machines hold the entire
+       working set on chip** (64x64 int8 is 4 KiB), and Gemmini's tiling
+       search returns one ``loop_ws`` at every capacity from 256 KiB down to
+       4 KiB for 4x4x4 .. 16x16x16. So it is an area and power asymmetry, not
+       a cycle one, at these shapes. It would become a cycle asymmetry above
+       32x32x32 if Gemmini's memory were shrunk to ours, where the driver
+       would split 64x64x64 into 32 calls.
+   * - dispatch software
+     - **no** --- excluded from both
+     - Gemmini's window excludes its ~395-cycle Rocket driver; ours has no
+       host driver at all
+
+Gemmini's config delta from its own published ``defaultConfig`` is **two
+fields, and both of them are the array size** (plus
+``has_training_convs = false``, conv hardware neither benchmark touches and
+which does not appear in the generated header). Everything else ---
+``spad_read_delay`` = 4, ``tile_latency`` = 0, ``mesh_output_delay`` = 1,
+``dataflow`` = ``BOTH``, both capacities --- is left at Gemmini's default and
+is named here as **unexercised**, because tuning any of them is tuning the
+opponent. ``dataflow = BOTH`` means Gemmini carries an output-stationary
+datapath neither benchmark uses, which favours us if it favours anyone.
+
+Why both sides run at MAXDIM=64
+-------------------------------
+
+MAXDIM is the DRAM row stride of every operand **on both machines**:
+``allo_bare5.c`` passes it as the ``loop_ws`` stride and TinyTPU-isa's
+``dma_ld`` addresses ``A[row * MAXDIM + col]``. So the same logical shape costs
+differently on a build with a bigger MAXDIM, and a comparison is matched only
+if the two sides use the same one. Both columns below are MAXDIM=64. The
+effect is real and it is larger for us: at 16x16x16, Gemmini goes 593 -> 685
+(+15.5%) and we go 686 -> 879 (+28%) --- diagnosed in
+:ref:`benchmarks-diagnosis`.
+
+The exact program each machine runs
+-----------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 42 42
+
+   * -
+     - TinyTPU-isa
+     - Gemmini
+   * - program
+     - ``isa_dsl.gemm_program(M, K, N)``: a 13-instruction looped GEMM in the
+       accelerator's own ISA, assembled into ``imem`` in DRAM. One RTL build
+       runs every shape; the shape is instruction data.
+     - 5 ``config`` RoCC instructions, then **one** hardware ``gemmini_loop_ws``
+       covering the whole shape, then ``fence``
+       (``gemmini/allo_bare_steady.c``). One elaboration runs every shape.
+   * - window opens
+     - ``ap_start``
+     - ``rdcycle``, after the CPU has refilled A and B
+   * - window closes
+     - ``ap_done``
+     - ``rdcycle``, after ``gemmini_fence()`` retires
+   * - inside
+     - the whole program: the imem burst, both operand bursts, every
+       ``dma_ld`` / ``mm`` / ``mvout``, the write-back of C
+     - the 5 configs, the ``loop_ws`` expansion into mvin/preload/compute/mvout,
+       the fence, and L1 coherence for the operands the CPU just dirtied
+   * - outside
+     - nothing --- there is no host driver
+     - ``tiled_matmul_auto``'s tile search, padding arithmetic, argument
+       marshalling: the **~395 cycles** of Rocket software, measured flat
+       across a 16x range of work
+   * - tiles per call
+     - ``(N/T)(K/T)`` ``mm`` instructions from one program
+     - **one** ``loop_ws``, proven at runtime by replicating the driver's own
+       tiling search and printing ``loop_ws_calls=1`` for every shape
+
+The asymmetries, stated once
+----------------------------
+
+#. **Our window has no host driver**; Gemmini's excludes its ~395-cycle one.
+   The doc-level consequence is that Gemmini's column is a **lower bound** on
+   its dispatch cost, since the real driver computes the ``loop_ws`` operands
+   at runtime and that cost sits in the excluded 395. Conservative against us.
+#. **Both harnesses have near-zero memory latency.** Neither number is a
+   statement about a real memory system.
+#. **Gemmini's on-chip memory is 64x ours** and, at these shapes, provably
+   cycle-neutral (above).
+#. ``ex_accumulate``: ``allo_bare5.c`` hardcoded ``true`` where the driver
+   computes ``false`` for a no-bias single-tile matmul. Both were measured at
+   every shape (``BARE`` / ``BAREF`` in ``allo_bare_steady.c``). The
+   difference is **within trial-to-trial noise** --- at 64x64x64, 20375/20377
+   against 20384/20350 --- so the published numbers stand. Recorded because it
+   sat inside all five of them and had not been checked.
+
+T=4 vs Gemmini DIM=4, both at MAXDIM=64
+---------------------------------------
+
+Ours: Vitis cosim, bit-exact at every shape. Gemmini: Verilator, two trials
+per shape, best of two, every shape one ``loop_ws``. Peak is 16 MAC/cycle on
+both.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 13 8 12 12 11 11 15
+
+   * - shape
+     - set
+     - ours
+     - Gemmini
+     - ours % peak
+     - Gemmini % peak
+     - **ours / Gemmini**
+   * - 4x4x4
+     - latency
+     - 218
+     - 205
+     - 1.8%
+     - 2.0%
+     - 1.06x slower
+   * - 8x8x8
+     - latency
+     - 357
+     - 319
+     - 9.0%
+     - 10.0%
+     - 1.12x slower
+   * - 12x12x12
+     - latency
+     - 563
+     - 455
+     - 19.2%
+     - 23.7%
+     - 1.24x slower
+   * - 16x16x8
+     - latency
+     - 677
+     - 522
+     - 18.9%
+     - 24.5%
+     - 1.30x slower
+   * - 16x16x16
+     - both
+     - 879
+     - 685
+     - 29.1%
+     - 37.4%
+     - 1.28x slower
+   * - 32x32x32
+     - steady
+     - 3 752
+     - 2 995
+     - 54.6%
+     - 68.4%
+     - 1.25x slower
+   * - 48x48x48
+     - steady
+     - 10 289
+     - 9 102
+     - 67.2%
+     - 75.9%
+     - 1.13x slower
+   * - 64x64x64
+     - steady
+     - 22 123
+     - 20 375
+     - 74.1%
+     - 80.4%
+     - **1.086x slower**
+   * - 64x32x64
+     - steady
+     - 12 907
+     - 11 245
+     - 63.5%
+     - 72.8%
+     - 1.15x slower
+   * - 32x64x32
+     - steady
+     - 6 824
+     - 5 478
+     - 60.0%
+     - 74.8%
+     - 1.25x slower
+
+**Answer: we do not beat Gemmini, at any shape in either set. But the deficit
+converges rather than persisting.** On the cubic sweep it goes 1.28x (16) ->
+1.25x (32) -> 1.13x (48) -> **1.086x (64)**, and in fraction-of-peak terms the
+gap closes from 8.3 points at 16x16x16 to 6.3 at 64x64x64. It does not invert.
+
+That answers the honest open question directly: the 1.07-1.24x measured at the
+five small shapes was **a statement about pipeline depth and issue overhead,
+not about steady-state efficiency**, and at steady state the deficit shrinks
+to about 9% without disappearing.
+
+
+.. _benchmarks-diagnosis:
+
+Where the remaining cycles go
+=============================
+
+Three terms, in order of size at 64x64x64.
+
+**1. The operand burst reads whole DRAM rows (the MAXDIM-stride term).**
+``dma_ld``'s burst loop runs ``na * WPR`` words, where ``WPR = MAXDIM / T`` is
+the packed words in one DRAM row --- so it reads the **full MAXDIM-wide row**
+whichever columns the program names. At MAXDIM=64 a 4x4x4 GEMM bursts
+4 x 16 = 64 words to use 4, a 16x waste, and this is the whole of the
+16x16x16 regression from 686 (MAXDIM=16) to 879 (MAXDIM=64): 193 cycles, against
+Gemmini's 92 for the same stride change. At 64x64x64 the waste is zero,
+because the full row *is* what the program needs --- which is why the deficit
+converges. Fixing it means giving ``dma_ld`` a column extent so the burst
+covers the named blocks only; it is the single largest item and it is worth
+more at small shapes than large ones.
+
+**2. The residual steady-state gap, ~5 700 cycles at 64x64x64** (22 123 against
+an ideal 16 384; Gemmini is at 20 375 against the same ideal, so ~4 000 of it
+is not ours specifically). Per the timeline attribution in
+``impact/results/`` and ``chia_agent/evidence/``, the three components are
+operand staging ahead of the first MAC, the serial DMA before the first
+weight, and the drain. None has been built. The method is
+``impact/profile.sh``: re-run cosim with ``-enable_dataflow_profiling``, re-run
+the xsim snapshot so the monitor's CSVs survive, then ``impact/analyze_df.py``
+for per-process timelines. At 64x64x64 this is the measurement to make next,
+because every previous timeline was taken at 16x16x16, where term 1 dominates
+and term 2 is invisible.
+
+**3. Issue overhead, ~20 cycles per dynamic instruction** (fixed 557,
+marginal 20.1, measured at MAXDIM=16). At 64x64x64 the program issues 320
+dynamic instructions, so this is ~6 400 cycles of the 22 123 --- and it is the
+term the loop nest already minimises: the *static* program is 14 instructions
+at every shape, so nothing here is program size. It is the per-instruction
+dispatch through the sequencer.
+
+What would have to change, in order of measured value: give ``dma_ld`` a
+column extent (term 1, largest, and it is what makes the small shapes look
+worst); then profile at 64x64x64 rather than 16x16x16 before touching term 2,
+because the existing attribution was measured where term 1 dominated. A
+parametric burst-widening candidate already exists and is verified
+(``chia_agent/evidence/isa-run1-20260919/param_burst.diff``: 172/262/376/425/627
+at MAXDIM=16, BRAM 42 -> 98) --- it widens the burst per iteration rather than
+narrowing what it reads, so it addresses the same cycles from the other side
+and at a real BRAM cost.
+
+
+.. _benchmarks-workload:
+
+The workload set: a GPT-2 projection (placeholder)
+==================================================
+
+**Nothing here is measured.** The entry exists so that the shape and its cost
+are written down rather than estimated in conversation.
+
+**The shape.** GPT-2 small has :math:`d_\text{model} = 768`. The attention
+**output projection** at sequence length 128 is
+
+.. math::
+
+   [128, 768] \times [768, 768] \;\longrightarrow\; [128, 768],
+   \qquad 75\,497\,472 \text{ MACs}
+
+i.e. **M=128, K=768, N=768**. (The fused QKV projection is the same M and K
+with N=2304, three times the work; the MLP is 768->3072->768. The output
+projection is chosen because it is the smallest square one.)
+
+**What our build would need to run it.** Not a bigger MAXDIM: 768 is past both
+encoding ceilings by orders of magnitude (:math:`768^2/4 = 147\,456` operand
+rows against 2047), and M=128 is already past ``MAXROWS`` = 127. The real
+blocker is that the region's operands are declared ``int8[MAXDIM * MAXDIM]``
+and addressed ``row * MAXDIM + col``, so the machine cannot *address* a
+128x768 matrix at all, whatever its on-chip capacity. Three changes, in
+dependency order:
+
+#. **A runtime base and row stride on** ``dma_ld`` **and** ``mvout``, so a
+   MAXDIM=64 on-chip tile is a *window* into a larger DRAM matrix rather than
+   the whole of it. Today both are MAXDIM-relative. This is the change that
+   actually unblocks the entry.
+#. **A deeper loop stack.** The GEMM already uses 2 levels; an outer tile nest
+   over DRAM tiles (m, n, k) needs 3 more, so ``LOOP_DEPTH`` must grow from 4
+   to at least 5 --- or the outer tiling must be issued by a host as repeated
+   region invocations, which would put a driver inside our measurement window
+   for the first time and change what the window means.
+#. ``AGU_TERMS`` **may need to grow from 3**: a weight address already spends
+   two terms (``B_SP + nb*MAXDIM + kb*T``), and an outer k-tile would want a
+   third on the same field.
+
+**What it would cost if it ran.** At the measured 74.1% of peak,
+:math:`75.5\text{M} / (16 \times 0.741) = 6.4` million cycles at T=4, or
+15.5 ms at the 411 MHz csynth estimate. At T=8 (peak 64) the same fraction
+would give ~1.6 million cycles. Both are projections from the 64x64x64 point,
+not measurements, and they assume the windowed DMA costs nothing --- which is
+exactly the assumption the entry exists to stop us making.
+
+
+.. _benchmarks-reproduce:
+
+Reproducing
+===========
+
+.. code-block:: bash
+
+   source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
+   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   export PYTHONPATH=$PWD
+   cd examples/accelerator/tinytpu_vitis
+
+   # functional, seconds -- the gates every configuration must pass
+   TPU_SET=all python bench_isa.py                 # ALL EXACT
+   python stress_isa.py                            # STRESS OK
+   TPU_T=8 TPU_MAXDIM=64 python stress_isa.py      # the second array size
+
+   # resources: one csynth per configuration, project deleted, report kept
+   python csynth_sweep.py 4:16 4:32 4:48 4:64
+   python csynth_sweep.py --reparse                # re-read, no Vitis
+
+   # cycles: one csynth, one cosim per shape, on one RTL build
+   TPU_MAXDIM=64 TPU_PRJ=$PWD/cosim_T4_64.prj \
+     TPU_SHAPES=4x4x4,8x8x8,12x12x12,16x16x8,16x16x16,32x32x32,48x48x48,64x64x64,64x32x64,32x64x32 \
+     python cosim.py
+
+Gemmini, in a **separate shell** (``env.sh`` replaces the ``allo`` conda env):
+
+.. code-block:: bash
+
+   R=/home/sk3463/chipyard/generators/gemmini/software/gemmini-rocc-tests
+   cp examples/accelerator/tinytpu_vitis/gemmini/allo_bare_steady.c $R/bareMetalC/
+   cd /home/sk3463/chipyard && source env.sh
+   make -C $R/build/bareMetalC -f $R/bareMetalC/Makefile \
+        abs_top_srcdir=$R XLEN=64 src_dir=$R/bareMetalC allo_bare_steady-baremetal
+   cd sims/verilator
+   ./simulator-chipyard.harness-Int8Dim4GemminiRocketConfig +permissive +permissive-off \
+     $R/build/bareMetalC/allo_bare_steady-baremetal
+
+A shape change is C-only. A **config** change (DIM, dtype, capacity) needs
+``make CONFIG=<X> -j16`` in ``sims/verilator``, and that **rewrites**
+``gemmini-rocc-tests/include/gemmini_params.h`` in place as a side effect of
+elaboration, so the DIM=4 header must be snapshotted first and the C rebuilt
+immediately afterwards. Check the boot banner says the DIM you expect. The
+config patches for both matched points are committed at
+``examples/accelerator/tinytpu_vitis/gemmini/``.
+
+.. seealso::
+
+   :doc:`tinytpu_isa` for the design, :doc:`gemmini_comparison` for the
+   latency-set comparison at MAXDIM=16 and the gap attribution,
+   :doc:`minitpu` for MiniTPU.
