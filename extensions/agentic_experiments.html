@@ -24,7 +24,7 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="ACT Compiler-Backend Flow" href="act.html" />
+    <link rel="next" title="ACT, and Why We Cite It" href="act.html" />
     <link rel="prev" title="CHIA Agentic Co-Design" href="chia.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
@@ -180,7 +180,7 @@
 <li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="act.html">ACT Compiler-Backend Flow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -320,6 +320,25 @@ of driver overhead in the opponent’s window, and a “fixed cost essentially
 closed” that was hiding a 514-cycle memset. Two of those were <em>true
 measurements supporting false conclusions</em>, which is the failure mode to design
 against — it survives inspection in a way a wrong number does not.</p>
+<p><strong>Cross-design review caught what inspection did not.</strong> Two of the claims above
+were corrected not by re-reading them but by exchanging them with a session
+working on a <em>different</em> machine, and in both cases <strong>the receiving side caught
+the overgeneralisation rather than the author</strong>. Once it was a driver-overhead
+figure being used as though the opponent’s whole window were accelerator time;
+once it was a measurement noise floor, real on a full SoC, being generalised to
+a deterministic co-simulation where it does not apply. Neither survived one
+round of being told to someone who had to act on it.</p>
+<p>This is cheap and it is not the same as testing. A test checks that a number is
+what it was last time; a reader with their own measurements to reconcile checks
+whether the number <em>means</em> what it is being used to mean. That is the failure
+mode this project keeps hitting, and it is the one tests do not catch.</p>
+<p>The sharper form of it, owed to the engineer on the other side of those
+exchanges: in each case <strong>the author had more evidence and the receiver had more
+distance.</strong> We knew our own noise floor better than they did and generalised it
+anyway; they knew a claim of theirs was second-hand and relayed it anyway.
+Proximity to the evidence is what makes overreach easy, which is exactly why the
+check has to come from somewhere else — and why it cannot be delegated to a
+more careful reading by the same author.</p>
 <p><strong>Report resources and clock beside cycles, always.</strong> A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist
@@ -382,7 +401,7 @@ a worker claimed a win it did not have.</p>
 
             <div class="right">
                 
-                    <a href="act.html"><span>ACT Compiler-Backend Flow</span><span class="icon">&gt;</span></a>
+                    <a href="act.html"><span>ACT, and Why We Cite It</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

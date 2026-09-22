@@ -180,7 +180,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -1238,6 +1238,14 @@ simulator settings it is good for. MiniTPU’s ranking inverted somewhere betwee
 40 and 92 cycles at 187.5 MHz — 213 to 490 ns — and it was the nanosecond
 figure that let them say their board sits nearer the low end rather than merely
 that one knob value beat another.</p>
+<p>So <strong>the sweep is the primary form and any single latency value is a
+convenience</strong>, not the other way round. One argument for that comes from the
+other side of the comparison, against their own interest: a <em>fitted</em> knob
+invites belief — 92 cycles was carried for months, looked authoritative, and
+inverted a ranking — whereas a latency of zero is so obviously not a claim about
+silicon that nobody is tempted to quote it as one. Having no memory model is not
+therefore better than having a fitted one; what is better than either is
+reporting the range over which a conclusion holds.</p>
 <p>One caveat on transplanting the number at all: theirs is a ZCU104’s memory
 system seen through a descriptor-based DMA with two channels and 32-byte beats,
 on an AXI port that is not on the memory controller’s clock. Our AXI slave is a
@@ -1425,6 +1433,21 @@ noisier side of it.</p></li>
 <a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> — two builds of an identical netlist differing by 1,407
 LUT and 0.046 ns. Both say the same thing: <strong>state the noise before stating the
 difference</strong>, and say which measurement the noise belongs to.</p>
+<p><strong>Verify determinism once per configuration rather than assuming it.</strong> One extra
+run per configuration — not per data point — and confirm the counts are
+identical. The reason is not sampling: it is that a simulator figure which turns
+out <em>not</em> to be deterministic would undermine every comparison drawn from it,
+and that is much better discovered in a two-run check than in a disagreement
+with someone else’s table hours later. Our cosim has effectively passed this
+already, through the alignment variant’s independent re-measurement reproducing
+every number to the cycle, but a new configuration has not.</p>
+<p>And the trap on the far side of determinism, which is the more dangerous one: <strong>a
+simulator number can be perfectly reproducible and still wrong about hardware.</strong>
+Ours contains no memory system at all, and MiniTPU’s contains a fitted one — the
+92-cycle failure recorded above is exactly this, a confident, repeatable
+simulator that ranked designs backwards against the board. Reproducibility is a
+property of the measurement; agreement with hardware is a separate claim needing
+separate evidence.</p>
 </section>
 <section id="do-not-mix-the-two-benchmarks-columns">
 <h3>Do not mix the two benchmarks’ columns<a class="headerlink" href="#do-not-mix-the-two-benchmarks-columns" title="Link to this heading"><span>¶</span></a></h3>
