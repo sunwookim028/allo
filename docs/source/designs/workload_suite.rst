@@ -212,6 +212,58 @@ Three checks, and a layer that fails any of them is reported, never rounded.
    machinery, below, each compared against ``isa_ref`` over all 4096 bytes of
    ``C`` rather than over the result region alone.
 
+.. _workload-suite-claims:
+
+What is verified, and what is only executed
+--------------------------------------------
+
+These are different claims and the suite keeps them apart, on the ladder
+``act/judge.py`` already defines --- ``legal``, then ``correct``, then
+``confirmed``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - model
+     - correct (bit-exact vs ``isa_ref`` and vs PyTorch)
+     - confirmed (RTL ran it)
+     - its cycle figure is
+   * - ``mlp_tiny``
+     - yes, 2/2 layers
+     - **yes**, 2/2 layers
+     - **measured**
+   * - ``mlp_deep``
+     - yes, 4/4 layers
+     - **yes**, 4/4 layers
+     - **measured**
+   * - ``mlp_small``
+     - yes, 2/2 layers
+     - **yes**, 2/2 layers
+     - **measured**
+   * - ``mlp_wide``
+     - yes, 2/2 layers
+     - **no** --- RTL does not complete
+     - *estimated only*
+
+So three of four models carry a measured number and one carries a modelled
+one, and the page never adds them together. ``mlp_wide`` is **correct and not
+confirmed**: its programs agree with ``isa_ref`` and with PyTorch in software,
+and Vitis csim reports ``0 / 4096`` mismatches, but no RTL run of it has ever
+produced a cycle count (:ref:`why <workload-suite-widening>`).
+
+Two provenance facts that belong with the claims rather than under them:
+
+* **The bit-exactness claims need no bindings.** ``isa_ref`` is numpy and the
+  ``act/`` core imports numpy only, so "correct" is established by code that
+  is entirely this checkout's.
+* **The compiled half is borrowed.** This worktree has no ``mlir/build``, so
+  ``allo._mlir`` resolves to ``/home/sk3463/allo-bench`` at ``ff7beaf1`` ---
+  ``tests/act/test_bindings.py`` fails here and names both paths, which is
+  what it is for. ``git diff ff7beaf1 HEAD -- mlir/`` is **empty**, so the
+  emitter that produced the HLS for every cosim below is the same source as
+  this branch's. That is the "borrowed, same commit" case ``dev/toolchains.rst``
+  describes, said out loud as it asks.
+
 The numbers
 ===========
 
@@ -674,3 +726,78 @@ Running it
 ``workloads/workload.prj``, removed when the run ends) and measures every named
 model's layers on that one build, so a sum over layers is a sum over one
 machine. Put the project inside your worktree: ``/home`` is chronically full.
+
+**``torch`` is not a dependency of this repository** and is not in
+``requirements.txt`` --- upstream keeps it optional, and
+``tests/pytorch/test_linear.py`` guards its import. The suite needs it, and
+the ``allo`` environment on this host did not have it until 2026-09-22:
+
+.. code-block:: bash
+
+    pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+
+``pytest tests/act/test_workload_suite.py`` skips rather than fails when
+``torch`` is *absent*, so a machine without it still runs the rest of
+``tests/act``. It does **not** skip when ``torch`` is installed but broken:
+``pytest.importorskip`` re-raises anything that is not a
+``ModuleNotFoundError``, which is the behaviour you want and is worth knowing
+before you read a red collection error as "the suite is wrong".
+
+.. _workload-suite-loop:
+
+A co-design change, read end to end through the suite
+=====================================================
+
+This is the whole point, so here is the loop once, concretely, with the change
+that was actually put through it.
+
+**The change.** Widen the ``dma_ld`` operand burst from one packed word per
+loop iteration to a whole 64-byte beat. It is already parametric, so the
+change is an environment variable rather than a patch, and it costs +123 %
+BRAM. **The question a co-design loop has to answer is whether that BRAM buys
+anything on software anyone would run.**
+
+**Step 1 --- what does the workload look like to the machine?**
+
+.. code-block:: bash
+
+    python workloads/run.py --emit
+
+Ten layers, all mappable, each one a spec in ``workloads/specs/``. Six of the
+ten are four-row GEMMs: the suite is mostly *small* work, which a shape table
+chosen by hand would not have told you.
+
+**Step 2 --- cheap screen: which layers could the change even touch?**
+
+.. code-block:: bash
+
+    python workloads/run.py --burst
+
+Every layer, because every layer's weight burst is four to sixteen times its
+activation burst. Seconds, no tools. If this had come back zeros the loop would
+stop here.
+
+**Step 3 --- measure the two machines on the workload.**
+
+.. code-block:: bash
+
+    TPU_QD=16 python workloads/run.py --cosim mlp_tiny mlp_deep mlp_small
+    TPU_QD=16 TPU_DMA_WIDEN=1 python workloads/run.py --cosim mlp_tiny mlp_deep mlp_small
+
+One ``csynth`` per build, every layer bit-exact against ``isa_ref`` on both.
+2 117 cycles becomes 1 534 on ``mlp_deep``; 2 781 becomes 1 821 on
+``mlp_small``.
+
+**Step 4 --- the number the decision turns on.** **25 to 34 per cent of a
+model's runtime**, where the GEMM table said 4.3 to 7.0 per cent. That is the
+output of the loop: not "the widening is 720 cycles at 48\ :sup:`3`", which is
+true and does not decide anything, but "the widening removes a quarter to a
+third of the time our software spends", which does.
+
+**What the loop also returned, unasked.** Three things the GEMM table could
+not have produced, and each of them is a correction to an instrument rather
+than to the design: the static estimate is calibrated for a machine we do not
+ship; the burst law is exact at eight rows and 40 % optimistic at four; and
+the shipped channel depth does not run the shipped mapping at 4x16x16. A
+workload is a better test of the instruments than a shape is, because it
+exercises them where they were never fitted.
