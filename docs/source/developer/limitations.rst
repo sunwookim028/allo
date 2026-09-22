@@ -1523,9 +1523,12 @@ strengthened, since the interface pragma set is one line narrower than claimed.
 
 .. admonition:: Status (2026-09-22)
 
-   REPRODUCES. Cheap half: ``python tests/limits/item24_cosim_hang.py``
-   (seconds, no Vitis). RTL half: ``ALLO_LIMITS_COSIM=1`` on the same file
-   (one csynth, ten cosims, tens of minutes). Family and bisection:
+   REPRODUCES at the shipped ``QD=8``, and **DIAGNOSED as a channel-depth
+   threshold**: the same ten programs, same tree, same toolchain, all complete
+   at ``TPU_QD=16`` (:ref:`limitation-24-qd`). Cheap half:
+   ``python tests/limits/item24_cosim_hang.py`` (seconds, no Vitis). RTL half:
+   ``ALLO_LIMITS_COSIM=1`` on the same file (one csynth, ten cosims, tens of
+   minutes). Family and bisection:
    ``examples/accelerator/tinytpu_vitis/act/rtl_hang.py``; log:
    ``examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log``.
 
@@ -1658,15 +1661,118 @@ Four hypotheses die here, and they are the useful part of the item:
 No positive characterisation is offered: the four surviving programs that fail
 share three or more ``accu`` instructions per output tile and four or more
 output tiles, but ``tiled n2 b2 k2 r8`` has both and completes, so that is a
-correlation and not a condition. **The diagnosis is open.**
+correlation and not a condition. **The diagnosis was open**, until the
+channel-depth measurement below.
+
+.. _limitation-24-qd:
+
+The diagnosis: it is a channel-depth threshold, and ``TPU_QD=16`` clears it
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The whole family run twice in one tree on one day, ``ACT_COSIM_TIMEOUT=300``,
+the only difference being the stream depth every channel is declared at:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 38 16 16 30
+
+   * - program
+     - ``QD=8``
+     - ``QD=16``
+     -
+   * - ``tiled n2 b2 k2 r4``
+     - **no completion**
+     - **359**
+     - the minimal case
+   * - ``tiled n1 b2 k2 r4``
+     - 320
+     - 324
+     -
+   * - ``tiled n2 b1 k2 r4``
+     - 320
+     - 324
+     -
+   * - ``tiled n1 b1 k2 r4``
+     - 295
+     - 299
+     -
+   * - ``tiled n2 b2 k1 r4``
+     - 327
+     - 331
+     -
+   * - ``tiled n2 b2 k2 r8``
+     - 549
+     - 553
+     -
+   * - ``pointwise n4 r16 relu``
+     - **no completion**
+     - **681**
+     - the other case the judge found
+   * - ``pointwise n1 r16 relu``
+     - 484
+     - 488
+     -
+   * - ``pointwise n4 r16 norelu``
+     - 652
+     - 656
+     -
+   * - ``pointwise n4 r4 relu``
+     - **no completion**
+     - **280**
+     -
+
+**All ten complete at QD=16, bit-exact**, and the three that do not complete at
+QD=8 are exactly the three this item was filed for. The control is in the same
+run: every program that completed at QD=8 still completes, four cycles slower,
+which is the deeper FIFOs' pipeline skew and is the sanity check that the two
+columns are the same design.
+
+This also explains "not monotone in size", which was the observation nobody
+could place: a threshold is not monotone. Halving a tile count or doubling the
+row count moves the program off the threshold from either side.
+
+**A second, independent instance, found from the other end.** Two reordered
+GEMM programs (``isa_dsl.gemm_program_interleaved`` and ``_b_per_tile``, which
+issue an operand ``dma_ld`` between two ``mm``\ s instead of hoisting every
+load into a prologue) hang in cosim **exactly when** ``Kt >= QD`` -- at T=4
+32x32x32 and above, and at T=8 64x64x64 and 32x64x32, but not at T=4 16x16x16
+(``Kt=4``), T=8 48x48x48 (``Kt=6``) or T=8 64x32x64 (``Kt=4``). 30 million
+simulated cycles, no second progress line, Vitis' deadlock detector silent --
+the same signature. ``TPU_QD=16`` completes the identical program bit-exact
+(32x32x32: 3,355 cycles). Two generators, two shapes of program, one knob.
+
+**What is fixed and what is still open.** Fixed: the fault is a bounded-channel
+hazard between the sequencer's in-order dispatch across five queues and the
+units' in-order consumption, and the depth those queues are declared at is the
+threshold. Open: the *predicate*. ``Kt >= QD`` holds for the reordered GEMMs
+and says nothing about this item's family, and the obvious counting rule --
+"more than ``QD`` instructions sent to one unit" -- is refuted by the shipped
+GEMM itself, which sends ``accu`` 20 instructions at 16x16x16 and 272 at
+64x64x64 at ``QD=8`` and completes. So depth is the cure without yet being the
+characterisation, and a program cannot be screened by counting.
+
+**The price of the cure**, csynth on xcu280 at the 3.33 ns target, T=4,
+MAXDIM=64, ``DMA_WORDS=1``: QD 8 -> 16 costs **+1,624 FF (+9.3 %) and +652
+LUT (+2.5 %)** with **BRAM, DSP and the estimated 2.431 ns period unchanged**.
+The LUT delta is inside this flow's ~1.5k noise floor; the FF delta is not.
+Four cycles on the programs above. That is cheap enough that ``QD`` is the
+first thing to raise when a program hangs, and cheap enough that raising the
+shipped default is a live option rather than a redesign.
 
 - **Priority: High as a warning, Medium as an action.** The warning is that on
   this design the cheap checks do not substitute for cosim, and two of them
   (``kpn_model`` and the header the simulator consumes) are derived from
   ``assemble()``'s own header, so their agreement is weaker evidence than it
-  looks. The action is to find the blocked process, which needs
-  ``cosim_design -trace_level all`` on the sixteen-instruction case and a look
-  at the stream handshakes -- affordable now that the repro is that small.
+  looks. **``kpn_model`` is the specific gap**: it runs the channel protocol
+  at depth ``QD`` and reports these programs deadlock-free, so it is missing
+  the sequencer's ability to block part-way through the several queues one
+  instruction is dispatched to. Making the model block mid-instruction is now
+  a well-posed change with ten programs to check it against, and it is the
+  action that would let a program be screened before Vitis.
+- The remaining action on the design side is the predicate, not the cure:
+  ``cosim_design -trace_level all`` on the sixteen-instruction case at
+  ``QD=8`` would name the blocked process and the full channel, which is what
+  turns "raise ``QD``" into a rule the assembler could enforce.
 - **Run the RTL half in its own process group.** Killing ``vitis_hls`` does not
   kill ``xsim``: one orphaned ``xsimk`` from a non-completing case here was
   still holding a full core **32 minutes** after its parent died, and several

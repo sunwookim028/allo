@@ -1343,6 +1343,16 @@ reports no deadlock, so it is missing the sequencer's mid-instruction blocking
 across its five output queues. Anyone adding a program order should cosim it
 at a shape with ``Kt >= QD`` before believing any of the three.
 
+**This diagnosed a filed limitation.** :ref:`limitation-24` -- row-tiled
+mappings that pass five checks and then never complete in cosim, un-diagnosed
+after two independent investigations -- has the same signature, and it is the
+same cause: run its whole ten-program family at ``TPU_QD=16`` and **all ten
+complete, bit-exact**, where the three known cases do not complete at ``QD=8``
+in the same tree on the same day. It also explains that item's "not monotone
+in size" observation, which is what a threshold looks like from either side.
+The measurement, its price (+9.3 % FF, no BRAM and no clock change) and what
+is still open about the predicate are recorded there, not here.
+
 
 Earlier measurements and corrections
 ------------------------------------
