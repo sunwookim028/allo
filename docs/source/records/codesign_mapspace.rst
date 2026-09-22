@@ -18,9 +18,9 @@
     specific language governing permissions and limitations
     under the License.
 
-############################################################
+###############################################################
 Co-design Record: The Mapspace Refusal Histogram, Per Machine
-############################################################
+###############################################################
 
 .. note::
 
