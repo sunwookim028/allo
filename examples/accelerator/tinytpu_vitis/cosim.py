@@ -96,11 +96,11 @@ AXI_LATENCY = os.environ.get("TPU_AXI_LATENCY", "")
 RANDOM_STALL = os.environ.get("TPU_RANDOM_STALL", "") == "1"
 
 
-def vectors(M, K, N, relu=False, seed=0):
+def vectors(M, K, N, relu=False, seed=0, prog=None):
     rng = np.random.default_rng(seed)
     A = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
     B = rng.integers(-4, 5, (MAXDIM, MAXDIM)).astype(np.int8)
-    words = assemble(gemm_program(M, K, N, relu))
+    words = assemble(gemm_program(M, K, N, relu) if prog is None else prog)
     imem = np.zeros(IMEM_SIZE, np.uint64)
     imem[: len(words)] = np.array(words, np.uint64)
     gold = A[:M, :K].astype(np.int64) @ B[:K, :N].astype(np.int64)
@@ -118,8 +118,8 @@ def carr(name, vals, ctype):
            ", ".join(str(int(v)) for v in vals) + "};\n"
 
 
-def testbench(M, K, N, relu=False):
-    imem, A, B, gold, _ = vectors(M, K, N, relu)
+def testbench(M, K, N, relu=False, prog=None):
+    imem, A, B, gold, _ = vectors(M, K, N, relu, prog=prog)
     body = f"""
 int main() {{
   for (int i = 0; i < {MAXDIM * MAXDIM}; i++) C[i] = 0;
