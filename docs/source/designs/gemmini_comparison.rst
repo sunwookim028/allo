@@ -891,7 +891,7 @@ Applying and running
      ../../generators/gemmini/software/gemmini-rocc-tests/build/bareMetalC/allo_cmp-baremetal
 
 ``~/chipyard/env.sh`` activates Chipyard's own conda environment and so replaces
-the ``allo`` one; source it in a separate shell (:doc:`/developer/toolchains`).
+the ``allo`` one; source it in a separate shell (``dev/toolchains.rst``).
 Raw Gemmini output is in ``logs/gemmini_int8_dim4.log``.
 
 ``allo_cmp.c`` measures what a user gets: ``tiled_matmul_auto``, driver and all.
@@ -968,3 +968,45 @@ the same nominal configuration would be more informative than either number
 alone. Reproducing a build means recording the config object, array dimensions,
 datatypes, scratchpad and accumulator sizes, the chipyard and gemmini commits,
 the harness, and exactly what is inside the counter window.
+
+The memory-latency knob, and why the sweep outranks the value
+-------------------------------------------------------------
+
+Our cycle counts come from Vitis cosim, which has **no DRAM model**:
+``TPU_AXI_LATENCY`` is a value we choose, and the published figures are taken at
+0. Gemmini's side is idealised too — ``WithBlackBoxSimMem(additionalLatency=0)``
+gives roughly a 1-2 cycle AXI unless ``+dramsim`` is used — so neither column
+contains a memory system, and that is a disclosure rather than a defect. What
+would be a defect is choosing a latency that makes our design look good.
+
+MiniTPU's owner supplied their equivalent figure with the provenance that makes
+it usable: **about 40 cycles at 187.5 MHz — 213 ns — for a contiguous
+descriptor before its first beat lands, with up to 8 bursts in flight**
+(``tools/round_trip.py`` in their tree holds it with the derivation). Carry the
+**seconds**, not the cycles: 213 ns is about 88 cycles at our shipped design's
+estimated 2.431 ns period and about 64 at a 3.33 ns target, so converting
+through cycles imports their clock along with their memory system.
+
+It is a **fitted** value, not a measured DRAM latency — fitted so that a
+simulated schedule change matched a board A/B of the same commit — and its
+history is the reason this section exists. The value it replaced, 92 cycles,
+was also inferred, and at 92 their simulator **ranked GEMM templates backwards**
+against the board: a 45 % simulated cut in GEMM cycles was 3.6 % on hardware.
+At 0 it ranked them backwards as well. Two different wrong values, two
+different wrong rankings, and the simulator was internally consistent and
+confident in both cases; it was caught only by running the A/B on two boards.
+
+The conclusion to carry, which is theirs and which we are adopting: **the
+sensitivity sweep is worth more than any single value.** Ours runs 172 at 0
+cycles, 214 at 16, and 358 at 64. So the question a design decision has to
+answer is not "what is the right latency" but "does my ranking survive the
+range" — if a variant wins at 0 and loses at 88, the knob chose the design. If
+conclusions are stable from 0 to 100, the knob does not matter and can be
+disclosed and forgotten. If they invert somewhere in that range, **the inversion
+is the finding**.
+
+One caveat on transplanting the number at all: theirs is a ZCU104's memory
+system seen through a descriptor-based DMA with two channels and 32-byte beats,
+on an AXI port that is not on the memory controller's clock. Our AXI slave is a
+different design on different silicon. 213 ns is a far better starting point
+than zero and it is not a measurement of our machine.
