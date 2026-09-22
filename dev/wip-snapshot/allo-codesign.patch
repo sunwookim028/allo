@@ -1,0 +1,80 @@
+diff --git a/docs/source/records/codesign_mapspace.rst b/docs/source/records/codesign_mapspace.rst
+index 6ba25c14..5f5fbb98 100644
+--- a/docs/source/records/codesign_mapspace.rst
++++ b/docs/source/records/codesign_mapspace.rst
+@@ -517,11 +517,70 @@ a measurement from this page:
+   meaning and the frozen reference model untouched, while the same change
+   resolved in a unit's decode alters what a field value means and is rejected.
+ 
+-**What was deliberately not seeded:** any mechanism. Saturation is not named,
+-predicating on an induction variable is not named, and the workers are not told
+-where to put a fix -- only what each location costs them. The stopped pilot
+-shows that constraint is not redundant: it reached for a mechanism unprompted
+-and put it at the forbidden site.
++**What was deliberately not seeded:** any mechanism. Verified by inspecting the
++live prompts: the strings ``saturat`` and ``predicat`` appear in **neither**
++worker's system message nor either angle. The workers are not told where to put
++a fix, only what each location costs them. The stopped pilot shows that
++constraint is not redundant: it reached for a mechanism unprompted and put it at
++the forbidden site.
++
++.. warning::
++
++   **The two arms are not equally guided, and neither is unguided.** This was
++   audited against the prompts as actually sent, not from memory, and the
++   result is less flattering than the design intended.
++
++   .. list-table::
++      :header-rows: 1
++      :widths: 40 20 20 20
++
++      * - carried by
++        - shared system message
++        - ``acc-follows-k``
++        - ``open``
++      * - the corrected diagnosis (monotonicity, ``f2`` is an AGU target,
++          Kt=2, a term on ``f2`` costs one of three)
++        - **yes**
++        - yes
++        - via the shared message
++      * - the freeze rule (``isa_ref`` consumes ``expand``)
++        - **yes**
++        - yes
++        - via the shared message
++      * - the full (Kt, Nt) masking grid, ``AGU_TERMS=4``
++        - no
++        - **yes**
++        - pointer only
++      * - the second-cause census (897 / 274)
++        - no
++        - **yes**
++        - no
++      * - a mechanism (saturation, predication)
++        - no
++        - **no**
++        - **no**
++
++   Two consequences, both of which constrain what may be claimed:
++
++   1. ``acc-follows-k`` is handed the entire intellectual content of the
++      co-design finding before it thinks. If it returns a win, that passes a
++      *procedural* test for search -- no human inside an iteration -- while
++      being, substantively, **directed work with an automated typist.** It must
++      never be quoted as "the loop found this".
++   2. ``open`` is **not** the unguided control it was meant to be. Its angle
++      withholds the grid and the census, but the shared system message hands it
++      the corrected diagnosis anyway. It is *less directed*, not undirected.
++      **This run contains no unguided condition at all.**
++
++   So the strongest attributional claim either arm can support is **"the loop
++   found a mechanism, given the diagnosis"** -- not "the loop found the idea".
++   The diagnosis was ours, measured and written down before the run. A run that
++   tests whether a loop can reach the diagnosis itself would have to withhold it
++   from the system message, and is not this run.
++
++   The two arms are reported **separately, always**, and labelled *directed*
++   and *less directed*. Pooling them would let the directed arm's result borrow
++   the other's credibility.
+ 
+ 
+ Resources, for the pair
