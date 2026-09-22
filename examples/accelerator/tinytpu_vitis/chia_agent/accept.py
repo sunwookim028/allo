@@ -100,12 +100,12 @@ def sh(cmd, cwd, env=None, log=None, timeout=7200, stdin=None):
     return rc, out, round(time.time() - t, 1)
 
 
-def vouched(check, wt, cwd, env, log, writable, timeout=7200):
+def vouched(check, wt, cwd, env, log, writable, timeout=7200, args=()):
     """As evaluate.py: the check under gate_runner.py (from the checkout, i.e.
     from git at --ref), passed only on its nonce line. Returns (ok, rc, out, s)."""
     nonce = secrets.token_hex(16)
     rc, out, sec = sh(boxed([ALLO_PYTHON, str(wt / PKG / "chia_agent" / "gate_runner.py"),
-                             check], writable), cwd, env, None, timeout,
+                             check, *args], writable), cwd, env, None, timeout,
                       stdin=nonce + "\n")
     ok = rc == 0 and f"CHIA-GATE {check} OK {nonce}" in out.splitlines()
     out = out.replace(nonce, "<nonce>")
@@ -134,6 +134,12 @@ def main():
                     help="skip cosim.py's TPU_TB=stress correctness testbench")
     ap.add_argument("--baseline", type=Path,
                     help="a control run's accept.json (default: recorded BASELINES)")
+    ap.add_argument("--codesign", action="store_true",
+                    help="accept a CO-DESIGN candidate: also run the frozen "
+                         "mapspace gate (exhaustive enumeration, refusal "
+                         "histogram, every survivor proved against isa_ref) and "
+                         "cosim the nest the frozen mapper chose rather than the "
+                         "candidate's own gemm_program")
     a = ap.parse_args()
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -234,9 +240,28 @@ def main():
             result["param"][tag] = {"ok": good, "seconds": secp,
                                     "line": [l.strip() for l in op.splitlines()
                                              if "PARAM " in l][-1:]}
+        # The co-design loop's own gate: the whole mapspace enumerated against
+        # this candidate's hardware, the refusal histogram, the seam identity,
+        # and every survivor proved against isa_ref. All five shapes here, not
+        # the two the search scores.
+        map_ok = True
+        if a.codesign:
+            okm, rcm, om, secm = vouched(
+                "codesign", wt, wt, env, out / "codesign_gate.log", cos,
+                timeout=GATE_TIMEOUT,
+                args=("4x4x4,8x8x8,12x12x12,16x16x8,16x16x16",))
+            untouched("codesign")
+            map_ok = okm and bool(re.search(r"^  MAPSPACE OK$", om, re.M))
+            result["mapspace"] = {
+                "ok": map_ok, "seconds": secm,
+                "seam": [l.strip() for l in om.splitlines() if "SEAM OK" in l],
+                "lines": [l.strip() for l in om.splitlines()
+                          if l.startswith("MAPSPACE ")]}
         # cosim.py puts its project next to itself by default; keep it in the
-        # writable .cosim directory instead.
-        ok3, rc3, o3, sec3 = vouched("cosim", wt, cos,
+        # writable .cosim directory instead. In co-design mode the driver is
+        # codesign_cosim.py, which binds the mapper's chosen nest into it.
+        check = "codesign_cosim" if a.codesign else "cosim"
+        ok3, rc3, o3, sec3 = vouched(check, wt, cos,
                                      dict(env, TPU_PRJ=str(cos / "isa_sweep.prj")),
                                      out / "cosim.log", cos)
         untouched("cosim")
@@ -264,7 +289,7 @@ def main():
             cos2 = wt / ".cosim_stress"
             cos2.mkdir()
             ok4, rc4, o4, sec4 = vouched(
-                "cosim", wt, cos2,
+                check, wt, cos2,
                 dict(env, TPU_PRJ=str(cos2 / "isa_sweep.prj"), TPU_TB="stress"),
                 out / "cosim_stress.log", cos2)
             untouched("cosim stress")
@@ -282,7 +307,17 @@ def main():
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
                         and ok2 and ok3 and param_ok and len(result["cosim"]) == 5
                         and exact and result.get("estimated_ns", 99) <= 3.33
-                        and rtl_ok)
+                        and rtl_ok and map_ok)
+        # The measured pair, uncollapsed, as it should be quoted.
+        if xml.exists():
+            t = xml.read_text()
+            res = {k.lower(): int(m.group(1)) for k in
+                   ("BRAM_18K", "DSP", "FF", "LUT", "URAM")
+                   for m in [re.search(rf"<{k}>(\d+)", t)] if m}
+            result["objective"] = {
+                "cycles": {s: v["cycles"] for s, v in result["cosim"].items()},
+                "resources": dict(res, estimated_ns=result.get("estimated_ns")),
+                "note": "two terms, reported as a pair per shape; never summed"}
         if a.baseline:
             base = {s: v["cycles"] for s, v in
                     json.loads(a.baseline.read_text())["cosim"].items()}

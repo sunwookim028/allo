@@ -49,6 +49,13 @@ REFERENCE = {
     "isa_ref.py": "examples/accelerator/tinytpu_vitis/isa_ref.py",
     "evaluate.py": "examples/accelerator/tinytpu_vitis/chia_agent/evaluate.py",
     "param_check.py": "examples/accelerator/tinytpu_vitis/chia_agent/param_check.py",
+    # The co-design loop's frozen half. Readable on purpose: the agent should
+    # be able to see exactly what the mapper enumerates, what it refuses, and
+    # by what rule it picks -- it just cannot change any of it.
+    "mapspace.py": "examples/accelerator/tinytpu_vitis/chia_agent/mapspace.py",
+    "codesign_gate.py": "examples/accelerator/tinytpu_vitis/chia_agent/codesign_gate.py",
+    "codesign_cosim.py": "examples/accelerator/tinytpu_vitis/chia_agent/codesign_cosim.py",
+    "act.rst": "docs/source/extensions/act.rst",
     "tinytpu_isa.rst": "docs/source/designs/tinytpu_isa.rst",
     "tinytpu_history.rst": "docs/source/designs/tinytpu_history.rst",
     "gemmini_comparison.rst": "docs/source/designs/gemmini_comparison.rst",
@@ -64,7 +71,12 @@ class AlloSpecTool(ChiaTool):
     """Let an agent co-edit TinyTPU-isa's hardware and program generator only."""
 
     def setup(self, spec_dir: str, work_dir: str, agent_dir: str, repo: str,
-              allo_python: str, llvm_build_dir: str) -> None:
+              allo_python: str, llvm_build_dir: str,
+              codesign: bool = False) -> None:
+        #: Co-design mode: the evaluator also enumerates the mapspace against
+        #: the candidate's hardware and cosims the nest the FROZEN mapper
+        #: chose, rather than the program the agent hand-wrote.
+        self.codesign = bool(codesign)
         self.spec_dir = Path(spec_dir).resolve()
         self.sources = {name: self.spec_dir / name for name in EDITABLE}
         self.work_dir = Path(work_dir).resolve()
@@ -88,6 +100,9 @@ class AlloSpecTool(ChiaTool):
         self.mcp.add_tool(
             self.run_functional_check, name=f"{self.name}_run_functional_check")
         self.mcp.add_tool(self.score_cycles, name=f"{self.name}_score_cycles")
+        if self.codesign:
+            self.mcp.add_tool(self.mapspace_report,
+                              name=f"{self.name}_mapspace_report")
 
     def __getstate__(self):
         # The tool is re-pickled on every prompt; a Lock cannot be.
@@ -131,6 +146,8 @@ class AlloSpecTool(ChiaTool):
         timed out must not be wiped by the harness's next one."""
         cmd = [sys.executable, self.evaluator, "--spec-dir", str(self.spec_dir),
                "--work", str(self.work_dir / work)]
+        if self.codesign:
+            cmd.append("--codesign")
         if gate_only:
             cmd.append("--gate-only")
         if shapes:
@@ -184,7 +201,12 @@ class AlloSpecTool(ChiaTool):
                        max_lines: int = 400) -> str:
         """Read a FROZEN file for context (you cannot edit these).
 
-        ``name`` is one of: cosim.py (the RTL cosim scorer and its testbench),
+        ``name`` is one of: mapspace.py (THE MAPPER -- its exhaustive
+        enumerator, the refusal histogram, and the rule by which it picks the
+        nest that gets cosimmed; read this first in co-design mode),
+        codesign_gate.py / codesign_cosim.py (how the mapper's choice reaches
+        the RTL), act.rst (why the mapper looks like this, and the measured
+        refusal counts on the shipped design), cosim.py (the RTL cosim scorer and its testbench),
         bench_isa.py (the published-setup functional check), stress_isa.py
         (the correctness gate: 492 runs at 476a70d8, full-range operands, 64 shapes, whole
         C compared, vector and random programs), isa_ref.py (what each
@@ -313,7 +335,31 @@ class AlloSpecTool(ChiaTool):
     async def score_cycles(self) -> str:
         """The objective, in ~2-4 min: gate, then Vitis HLS csynth + RTL C/RTL
         cosim at 4x4x4 and 16x16x16, each testbench bit-exact against numpy.
-        Score = sum of cosim cycles (lower is better). Also reports the csynth
-        clock estimate (must meet 3.33 ns) and area (recorded, not scored)."""
+
+        In co-design mode the program under the RTL is the best nest the FROZEN
+        mapper can encode on your hardware, chosen by exhaustive enumeration --
+        not the program you hand-wrote. The verdict reports a PAIR and never
+        collapses it: `cycles` per shape from the cosim, and `resources` (FF,
+        LUT, BRAM18K, DSP, URAM and the estimated clock, which must meet
+        3.33 ns) from the csynth of the same build. Buying cycles with block RAM
+        is a trade, not a win, and it is reported as one. `mapspace` records how
+        many nests your hardware made encodable and which constraint refused
+        the rest."""
         verdict = await asyncio.to_thread(self.evaluate)
         return json.dumps(verdict, indent=1)
+
+    async def mapspace_report(self) -> str:
+        """The co-design signal, in ~30 s and no Vitis: the gate plus the
+        exhaustive mapspace enumeration against your hardware.
+
+        Reports, per scored shape, how many of the enumerated loop nests this
+        hardware can ENCODE, which constraint refused each of the rest, and
+        which nest the frozen mapper would choose. Use it to see whether a
+        hardware change actually widened what the machine can say, before
+        paying for a cosim. It is a count of nests, not a cycle count: nothing
+        here is a performance number."""
+        verdict = await asyncio.to_thread(self.evaluate, True)
+        out = {k: verdict.get(k) for k in ("ok", "stage", "mapspace", "gate")}
+        if not verdict.get("ok"):
+            out["detail"] = verdict.get("detail", "")[-4000:]
+        return json.dumps(out, indent=1)

@@ -79,6 +79,77 @@ of the fixed cost is the design's?""",
     ),
 )
 
+#: CO-DESIGN angles (`--codesign`). Each names one of the four constraints that
+#: were MEASURED to collapse the mapspace at 16x16x16, and asks the worker what
+#: the design looks like on the other side of it. None of them says what to
+#: change: the refusal counts are facts, the response is the agent's.
+CODESIGN_STRATEGIES = (
+    (
+        "acc-predicate",
+        """The binding constraint, measured: 1,150 of the 1,226 enumerated
+nests are refused because `acc` is a STATIC instruction field. With no
+predicate on an induction variable, the k=0 tile has to be a peelable prefix,
+which pins K innermost and unsplit and kills every permutation that moves it.
+Every K-outer order, every split of K, and every nest that interleaves K with
+M or N is on the other side of that one field. What would it take for the
+accumulate/overwrite decision to come from the loop state rather than from the
+instruction word -- in the encoding, in the sequencer, and in the array -- and
+which of the 1,150 does that actually make worth running?""",
+    ),
+    (
+        "agu-width",
+        """AGU_TERMS=3 refuses only 17 nests, but measurement shows it does
+more than refuse: it CHOOSES the data-reuse strategy. An m-tiled nest is
+encodable only if A is re-staged into the operand vregs once per m-tile,
+because keeping A resident across m needs a fourth address term on the
+accumulating `mm`. So the m-tiled survivors pay a repeated A load that a
+4-term AGU would not. The AGU word is 64 bits and three terms currently use
+19 each (target 4, level 3, stride 12); a fourth term has to come out of that
+budget or out of the field widths. What does the mapspace look like with the
+fourth term, and does the reuse it unlocks pay for the decode area?""",
+    ),
+    (
+        "open",
+        """You are given the whole refusal histogram at 16x16x16 and no
+preferred answer: 1,150 `acc` as a static field, 54 the encoder's own m/n
+interleave limitation, 17 AGU_TERMS=3, 2 the accumulator RAW distance, 0
+LOOP_DEPTH. The shipped nest is already the best of the 3 survivors, so the
+mapping search alone yields nothing. Decide for yourself which of those is
+worth attacking -- including the possibility that the intrinsic tile itself
+(one `mm` performing rows x TxT) is the thing to widen, or that the right move
+is to spend imem rather than logic. Justify the choice from the histogram
+before you edit anything.""",
+    ),
+)
+
+CODESIGN_TASK = """Find a TinyTPU-isa DESIGN POINT that a better loop nest can
+use. You propose the hardware and the ISA; a frozen mapper enumerates the whole
+mapspace and cosims the best nest your hardware can encode. Neither the mapper
+nor its selection rule nor any test is reachable from your tools.
+
+The design you start from, measured (RTL cosim, bit-exact, all five shapes):
+4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686 cycles; the
+search scores 4x4x4 and 16x16x16. A matched 4x4 int8 Gemmini takes
+144-161/220/347/391/593 over the same window. Resources at that build, csynth:
+see the pair in the prompt. A winner is re-verified bit-exact at all five
+shapes, by stress_isa, and by the RTL stress testbench.
+
+At 16x16x16 your hardware can encode 3 of 1,226 nests. Raising that number is
+the point of the exercise, and the cycle count is the point of raising it; a
+change that unlocks nests without lowering cycles is a real and reportable
+outcome, not a failure, as long as you say which happened.
+
+Already landed on this design (do not re-propose): program prefetch 8 words a
+cycle, weights by scratchpad address with per-PE double-buffered weight loaders
+(wld), A no longer through spad->vld->vr, accu at II=1 via s.dependence (valid
+only because check_program enforces AR_RAW_DIST=4 between an accumulator write
+and a read of it -- a closer read is an RTL-only failure the simulator does not
+show), sequencer-precomputed row counts.
+
+Your starting angle:
+{angle}
+"""
+
 BASE_TASK = """Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.
 Current cosim cycles (all five shapes, bit-exact, main @ 476a70d8):
 4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686. A matched 4x4
@@ -99,19 +170,23 @@ Your starting angle:
 """
 
 
-def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms):
+def launch(worker, angle, run_dir: Path, iterations, soft_budget, t0_ms,
+           codesign=False):
     log_dir = run_dir / worker
     log_dir.mkdir(parents=True, exist_ok=True)
     work = REPO_ROOT / ".chia_scratch" / run_dir.name / worker
     env = os.environ | {"CHIA_RUN_T0_MS": str(t0_ms),
                         "CHIA_BUDGET_USD": str(soft_budget)}
     command = [sys.executable, "-u", str(AGENT_DIR / "loop.py"),
-               "--task", BASE_TASK.format(angle=angle),
+               "--task", (CODESIGN_TASK if codesign
+                          else BASE_TASK).format(angle=angle),
                "--iterations", str(iterations),
                "--log-dir", str(log_dir),
                "--spec-dir", str(log_dir / "spec"),
                "--work-dir", str(work),
                "--tool-name", f"tpu{worker.replace('-', '')}"]
+    if codesign:
+        command.append("--codesign")
     handle = (log_dir / "worker.log").open("w", encoding="utf-8")
     return subprocess.Popen(command, cwd=AGENT_DIR, env=env, stdout=handle,
                             stderr=subprocess.STDOUT, start_new_session=True)
@@ -189,10 +264,16 @@ def main() -> None:
     parser.add_argument("--run-dir", type=Path, default=REPO_ROOT / "chia_runs"
                         / f"isa-{time.strftime('%Y%m%d-%H%M%S')}")
     parser.add_argument("--stagger", type=float, default=60.0)
+    parser.add_argument("--codesign", action="store_true",
+                        help="the CO-DESIGN loop: the workers propose hardware, "
+                             "a frozen mapper enumerates the mapspace "
+                             "exhaustively, and the best nest each candidate can "
+                             "encode is what gets cosimmed")
     args = parser.parse_args()
     run_dir = args.run_dir.resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
-    strategies = list(STRATEGIES)[: args.workers]
+    strategies = list(CODESIGN_STRATEGIES if args.codesign
+                      else STRATEGIES)[: args.workers]
     started = time.time()
     t0_ms = int(started * 1000)
     # Before any worker: which account and project this run charges, and
@@ -205,7 +286,9 @@ def main() -> None:
         "model": os.environ.get("TINYTPU_OPENCODE_MODEL"),
         "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
                                capture_output=True, text=True).stdout.strip(),
-        "task_template": BASE_TASK, "strategies": dict(strategies)}, indent=1))
+        "codesign": args.codesign,
+        "task_template": CODESIGN_TASK if args.codesign else BASE_TASK,
+        "strategies": dict(strategies)}, indent=1))
 
     # Each loop checks "spent + its next call <= cap" on its own, so two loops
     # can pass that check at the same moment. Reserve one projected call per
@@ -219,7 +302,7 @@ def main() -> None:
                 time.sleep(args.stagger)
             print(f"launching worker '{worker}'", flush=True)
             procs.append((worker, launch(worker, angle, run_dir, args.iterations,
-                                         soft, t0_ms)))
+                                         soft, t0_ms, args.codesign)))
         while any(p.poll() is None for _, p in procs):
             spent = spent_since(t0_ms)["usd"]
             if spent >= args.budget_usd:
