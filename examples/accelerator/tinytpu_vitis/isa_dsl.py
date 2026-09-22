@@ -346,9 +346,11 @@ def gemm_tiled(M, K, N, Mt=None, relu=False):
     What it costs and what it buys. The A tile is re-read once per column
     block of C, because the accumulator holds ONE column block of the output
     band (Mt rows) and a k reduction cannot be interrupted -- so the machine's
-    2 KB of operand vregs, not its instruction set, is what decides the DRAM
-    traffic. What it buys is that nothing here grows with M, K or N: the static
-    program is the same 15 instructions at 16x16x16 and at 128x768x768, the
+    operand vregs -- 4 KB at the shipped T=4, MAXDIM=64 -- and not its
+    instruction set, are what decide the DRAM traffic.
+
+    What it buys is that nothing here grows with M, K or N: the static
+    program is the same 14 instructions at 16x16x16 and at 128x768x768, the
     deepest nest is 3 of the 4 hardware loop levels, and **no instruction needs
     more than 2 of the 3 address terms**. The fourth term and the fifth loop
     level that were expected to be needed for large shapes are needed for a

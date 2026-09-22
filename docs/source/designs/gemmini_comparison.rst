@@ -998,8 +998,9 @@ nest's worst instruction carries 2 of the 3 address terms and is 3 of the 4
 levels deep, at every shape. What they are needed for is the *better* mapping:
 one that keeps several output column blocks resident, so the A tile is not
 re-read once per column block of C. Our DRAM traffic on the big shape is
-``M*K*N/T``, and that is a consequence of 2 KB of operand vregs against
-Gemmini's 256 KB scratchpad -- a capacity gap, which is a different argument
+``M*K*N/T`` bytes, and that is a consequence of 4 KB of operand vregs and a
+2,176-byte accumulator (T=4, MAXDIM=64) against Gemmini's 256 KB scratchpad
+and 64 KB accumulator -- a capacity gap, which is a different argument
 from the addressing one and is the honest remaining half of this section.
 
 
