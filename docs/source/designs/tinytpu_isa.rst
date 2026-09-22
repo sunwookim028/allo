@@ -22,10 +22,13 @@
 TinyTPU-isa: A Programmable GEMM Accelerator
 ############################################
 
-TinyTPU-isa (``examples/accelerator/tinytpu_vitis/microarch_isa.py``) is an int8
+TinyTPU-isa (``examples/accelerator/tinytpu_vitis/``) is an int8
 instruction-programmable tiled-GEMM accelerator written in grid Allo
 (``@df.region`` / ``@df.kernel``) and taken through the Vitis HLS dataflow path to
-**RTL co-simulation**. It is the machine the project's requirements name: an ISA,
+**RTL co-simulation**. Each of its units is a module of its own under
+``ip/units/``, composed into a region by ``ip/compose.py``; that decomposition
+is :doc:`tinytpu_library`, and ``microarch_isa.py`` is the instantiation the
+numbers on this page were measured on. It is the machine the project's requirements name: an ISA,
 a vector unit, a SIMD scratchpad, vector registers streaming to the array's
 ports, and tiled GEMM as a *program* rather than as a fixed-function datapath.
 
@@ -160,8 +163,8 @@ The eight kinds of unit:
 
 **A vector unit that tiled GEMM needed.** As designed, ``mm`` computed the psums
 of *one* k-tile and wrote them to accumulator registers, and summing across
-k-tiles was an explicit ``vadd`` -- load-bearing, not decoration (the module
-docstring still states the requirement this way). This is Gemmini's split too:
+k-tiles was an explicit ``vadd`` -- load-bearing, not decoration. This is
+Gemmini's split too:
 the adds live in ``AccumulatorMem``'s write path, not in the mesh. In the
 shipped program ``mm`` carries an overwrite/accumulate field (``f2``) and the
 GEMM inner loop no longer uses ``vadd`` at all, so ``vadd_program`` exists to
@@ -683,9 +686,13 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
 .. list-table::
    :widths: 25 75
 
+   * - ``ip/``
+     - the unit library: one module per unit under ``ip/units/``, the
+       composition (``compose.py``), the parameter set, the ISA encoder, the
+       assembler, the reference programs (:doc:`tinytpu_library`)
    * - ``microarch_isa.py``
-     - the design, the encoder, ``assemble()``/``expand()``, the reference
-       programs, ``schedule()``
+     - the shipped instantiation: the parameter set from the environment, and
+       the names the harness imports
    * - ``isa_dsl.py``
      - the loop-nest generator (``gemm_program``)
    * - ``reproduce.sh``
@@ -817,7 +824,7 @@ default testbench are the **performance** setup: seed 0, operands in [-4, 4]
 like), ``C`` zeroed, and only the ``M x N`` region compared. They miss real
 bugs -- at T=4 a PE's partial sum never leaves 9 bits, so narrowing the int32
 partial sum to int16 still prints ``ALL EXACT``. The correctness gates are
-below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
+below. Run ``stress_isa.py`` after **any** change to the design, and
 ``mutate.py`` after any change to the harness.
 
 ``stress_isa.py`` (``ef112868``)
@@ -859,7 +866,7 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
      - **fails**: 247 of 486 runs (pre-landing); 241 of 492 on the landed design
 
 ``mutate.py`` (``c8089332``; re-anchored and extended in ``e24e433b``)
-   34 single-point mutants of ``microarch_isa.py`` (plus the unmodified
+   34 single-point mutants of the design (plus the unmodified
    ``none`` control through the same loader), each run through ``bench_isa``
    and ``stress_isa``, and through the ``TPU_TB=stress`` cosim for the one
    RTL-only mutant (and for any mutant on request). **All 34 are caught**

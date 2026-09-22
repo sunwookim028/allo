@@ -18,6 +18,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
+| TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
 | Dated measurement records | `docs/source/records/` |
 
@@ -67,7 +68,10 @@ does not build the fork's site; build locally.
 
 ## TinyTPU-isa (the one accelerator design on `main`)
 
-`examples/accelerator/tinytpu_vitis/`. From a clean checkout, one command
+`examples/accelerator/tinytpu_vitis/`. The hardware is the unit library under
+`ip/` (eight units in `ip/units/`, wired by `ip/tinytpu.py`, composed into one
+region by `ip/compose.py`); `microarch_isa.py` is only the shipped parameter
+set and the names the harness imports. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
 checks the published cycle counts (171/261/417/483/685; 252/383/591/667/919
 before `e24e433b`):
@@ -79,8 +83,9 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 `bench_isa.py` / `cosim.py` (default TB) are the **performance** setup
 (Gemmini's [-4, 4] operands) and miss real bugs; `stress_isa.py` and
 `TPU_TB=stress python cosim.py` are the **correctness** gates. Run
-`stress_isa.py` (~10 s) after any change to `microarch_isa.py`, and
-`mutate.py` after any change to the harness. `assemble()` rejects programs that
+`stress_isa.py` (~10 s) after any change to `microarch_isa.py` or anything
+under `ip/`, and `mutate.py` after any change to the harness or any move of
+anchored code (a mutant's anchor must occur exactly once across the design). `assemble()` rejects programs that
 read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
 hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
 iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
