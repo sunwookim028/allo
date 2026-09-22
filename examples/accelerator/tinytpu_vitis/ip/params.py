@@ -35,9 +35,11 @@ TEST_WINDOW = 64
 #: Widest beat the operand ports can move once `align_value(64)` is emitted.
 BUS_BYTES = 64
 
-#: An address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so an
-#: operand row must be <= 2047. At T=4 that is MAXDIM <= 90; MAXDIM=96 fails in
-#: `Assembler.check` with "AGU-resolved f3=2112 is outside the 0..2047 range".
+#: An address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so the
+#: highest operand address is 2047 and the layout may name 2048 rows. At T=4
+#: that is MAXDIM <= 88 (90.5 unrounded, and MAXDIM is a multiple of T), at T=8
+#: 128; MAXDIM=96 at T=4 fails in `Assembler.check` with "AGU-resolved f3=2112
+#: is outside the 0..2047 range". isa_spec.json computes both.
 ADDRESS_FIELD_MAX = (1 << 11)
 
 

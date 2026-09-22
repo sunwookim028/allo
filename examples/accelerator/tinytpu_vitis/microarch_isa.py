@@ -28,7 +28,8 @@ refuses), `tinytpu_history.rst` (how the numbers were reached),
 
 import os
 
-from examples.accelerator.tinytpu_vitis.ip.params import TpuParams
+from examples.accelerator.tinytpu_vitis.ip.params import (  # noqa: F401
+    BUS_BYTES, TEST_WINDOW, TpuParams)
 from examples.accelerator.tinytpu_vitis.ip.tinytpu import TinyTPU
 from examples.accelerator.tinytpu_vitis.ip.assembler import (  # noqa: F401
     AR_RAW_DIST, ProgramError)
