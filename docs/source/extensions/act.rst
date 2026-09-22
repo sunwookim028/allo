@@ -571,12 +571,21 @@ count. For ``gemm.relu`` at 16x16x16:
      - **750 cycles**
      - **did not complete**
 
-Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
-at ``Inter-Transaction Progress: 0 / 1`` with the simulator burning a full core,
-one of them for over half an hour, where the shipped mapping's whole run --
-synthesis, csim and cosim -- takes about two minutes. No deadlock is *reported*,
-so this page does not call it one; what is measured is that the transaction does
-not complete.
+Two row-tiled mappings were tried and behaved the same way: no completion, with
+the simulator holding a full core, one of them for over half an hour, where the
+shipped mapping's whole run -- synthesis, csim and cosim -- takes about two
+minutes. No deadlock is *reported*, so this page does not call it one; what is
+measured is that the run does not finish.
+
+.. warning::
+
+   An earlier version of this page said the failing runs "sit at
+   ``Inter-Transaction Progress: 0 / 1``" as though that were a signature. **It
+   is not.** ``109000`` is picoseconds and that line is simply Vitis's first
+   periodic report, printed in every log including passing ones, which then
+   print ``1 / 1`` and finish. The observation is only that the second line
+   never comes; nothing measured locates the stall. See
+   :ref:`item 24 <limitation-24>`, where the failure was reduced.
 
 The lesson is the one this design's own history already taught once, when the
 dataflow simulator passed a bug that only cosim caught: **four checkers agreeing
@@ -592,17 +601,31 @@ and *confirmed* -- the RTL ran it. ``act_compile.py`` reports the first, and its
 ``act_cosim.py``.
 
 One reassurance, and it is a test rather than a hope: at every shape and every
-registered workload the mapping the flow **picks** is in the prologue-staging,
-RTL-confirmed class -- ``tests/act/test_tinytpu.py`` asserts it. The unconfirmed
-mappings are ranked, reported and never chosen, and ``act_compile.py`` prints a
-``staging`` column plus a warning whenever any of them appear.
+registered workload the mapping the flow **picks** is the one whose program
+cosim has actually measured -- ``tests/act/test_tinytpu.py`` asserts it. The
+unconfirmed mappings are ranked, reported and never chosen.
 
 This is also the sharpest ``cannot refuse`` gap found in this work, and it is
-not in the ISA: some property of a program with a data transfer *inside* the
-emitted nest, rather than all of them hoisted into a prologue, is not being
-checked by anything that can be run in seconds. Finding it is the highest-value
-next step for this flow, because until it is found the mapspace beyond
-prologue-only staging cannot be trusted, and that is most of it.
+not in the ISA. It is filed as :ref:`item 24 <limitation-24>`, reduced there to
+a sixteen-instruction program by the workload-specs track, with a bisection.
+
+**The suspicion this page raised is dead, killed twice.** It was that the
+trigger is a data transfer *inside* the emitted nest rather than hoisted into a
+prologue -- the one feature the failing mappings shared and the shipped one
+lacked. From the small end, four programs built to have exactly that feature all
+complete (169 / 189 / 171 / 186 cycles,
+``tests/limits/item24_cosim_small_programs_complete.py``). From the failing end,
+**both** non-completing programs stage every transfer in a prologue, and both
+mappings that do stage inside the nest complete. In-nest staging is neither
+necessary nor sufficient, which is why this flow ships no staging column: a
+predicate that passes both failures and flags two programs that run is worse
+than none. The bisection also rules out ``vrelu``, the hardware loop, and
+monotonicity in size.
+
+What survives is the consequence, not the cause. The mapspace this flow
+enumerates cannot be trusted past the mappings cosim has actually run, which is
+the real cost of the item and the reason it outranks widening any hardware
+parameter.
 
 **Five nests are encodable** (the prototype found three) and all five compute
 the spec against ``isa_ref.run`` -- but only three are confirmed on the RTL; see

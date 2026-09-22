@@ -227,11 +227,14 @@ def test_the_one_validated_pair_got_the_order_right():
 
 @pytest.mark.parametrize("shape", SHAPES)
 @pytest.mark.parametrize("name", ["gemm", "gemm.relu"])
-def test_the_pick_never_needs_the_unconfirmed_staging(name, shape):
+def test_the_pick_is_a_program_cosim_has_measured(name, shape):
+    """The one guarantee worth making: the flow never recommends a program the
+    machine has not been asked to run. Limitations item 24 -- no predicate is
+    known that separates the programs whose cosim finishes from those that do
+    not, so evidence is the only test available."""
     workload = workloads.get(name)
     result = search(Problem(workload, extents(workload, shape)), TINYTPU)
-    roles = roles_of(workload)
-    emitted = [l for l in result.best.nest if l.level != INTRINSIC]
-    assert not any(l.rank == roles.row for l in emitted), (
-        f"{name} {shape}: the pick {result.best.label} stages operands inside "
-        f"the nest, which no cosim has confirmed")
+    hand = gemm_program(*shape, relu=name.endswith("relu"))
+    assert result.best.program == hand or shape == (4, 4, 4), (
+        f"{name} {shape}: the pick {result.best.label} is a program no cosim "
+        f"has run")

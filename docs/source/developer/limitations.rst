@@ -1644,7 +1644,13 @@ Four hypotheses die here, and they are the useful part of the item:
   issue a ``dma_ld`` between ``mvout``\ s inside the output nest, complete
   (256 cycles at 8x8x8, 638 at 16x16x16, 0 of 256 wrong). In-nest staging is
   neither necessary nor sufficient, so a staging column does not separate the
-  two classes.
+  two classes. The same hypothesis was killed independently from the small end:
+  ``tests/limits/item24_cosim_small_programs_complete.py`` cosims four
+  deliberately constructed programs at ``rows=4`` -- a prologue-only control, a
+  ``dma_ld`` after an ``mm``, a ``dma_ld`` inside a loop, and a ``dma_ld``
+  sharing a loop body with an ``mm`` and an ``mvout`` -- and **all four
+  complete**, at 169 / 189 / 171 / 186 cycles. Two trees, two directions, one
+  dead hypothesis.
 - **Not monotone in size.** Halving any one of the three tile counts makes it
   complete, and so does *doubling* the row count. It is neither "too big" nor
   "too small", which rules out simple capacity and fill explanations.
@@ -1661,6 +1667,12 @@ correlation and not a condition. **The diagnosis is open.**
   looks. The action is to find the blocked process, which needs
   ``cosim_design -trace_level all`` on the sixteen-instruction case and a look
   at the stream handshakes -- affordable now that the repro is that small.
+- **Run the RTL half in its own process group.** Killing ``vitis_hls`` does not
+  kill ``xsim``: one orphaned ``xsimk`` from a non-completing case here was
+  still holding a full core **32 minutes** after its parent died, and several
+  agents share this host. ``item24_cosim_small_programs_complete.py`` starts
+  each child with ``start_new_session=True`` and kills the group on timeout;
+  anything that cosims a program which may not finish should do the same.
 
 
 Surfaced by the 2026-09-19 re-verification and impact analysis
