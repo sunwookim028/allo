@@ -225,6 +225,44 @@ microarchitecture together</strong>, where a proposal counts only if a real tool
 RTL co-simulation and synthesis – measures it. Agents are driven by
 <a class="reference external" href="https://github.com/ucb-bar/chia">CHIA</a> (<code class="docutils literal notranslate"><span class="pre">ucb-bar/chia</span></code> at <code class="docutils literal notranslate"><span class="pre">16c35e9</span></code>)
 through the <code class="docutils literal notranslate"><span class="pre">opencode</span></code> CLI.</p>
+<section id="the-principle">
+<h2>The principle<a class="headerlink" href="#the-principle" title="Link to this heading"><span>¶</span></a></h2>
+<p>An agent can make an informed co-design decision only after it has measured how
+a software function performs – in <strong>timing and power</strong> – across <strong>an array of
+hardware architectures</strong>. Measured against that, today’s loop has the first
+half of each:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 38.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>have</p></th>
+<th class="head"><p>missing</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>timing</strong></p></td>
+<td><p>RTL cosim cycles, bit-exact, deterministic</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>power</strong></p></td>
+<td><p>DC estimate, default toggle rates, <em>indicative only</em></p></td>
+<td><p>activity-based power (switching from cosim into synthesis)</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>architectures</strong></p></td>
+<td><p>one design family (TinyTPU-isa, T=4/T=8), two substrates (FPGA,
+45 nm), two references (Gemmini, MiniTPU)</p></td>
+<td><p>the parametrized IP library that would supply a real array</p></td>
+</tr>
+</tbody>
+</table>
+<p>Why the array matters is already measured: a DMA widening that is free on an
+FPGA emits a dual-write-port memory that standard cells cannot build, and only
+the second substrate said so.</p>
+</section>
 <section id="takeaways">
 <h2>Takeaways<a class="headerlink" href="#takeaways" title="Link to this heading"><span>¶</span></a></h2>
 <ul class="simple">
@@ -1362,6 +1400,7 @@ rather than tribal.</p></li>
             <div class="page_toc">
                 <ul>
 <li><a class="reference internal" href="#">CHIA Agentic Co-Design</a><ul>
+<li><a class="reference internal" href="#the-principle">The principle</a></li>
 <li><a class="reference internal" href="#takeaways">Takeaways</a></li>
 <li><a class="reference internal" href="#contributions">Contributions</a></li>
 <li><a class="reference internal" href="#how-the-loop-is-built">How the loop is built</a></li>

@@ -28,6 +28,36 @@ RTL co-simulation and synthesis -- measures it. Agents are driven by
 `CHIA <https://github.com/ucb-bar/chia>`_ (``ucb-bar/chia`` at ``16c35e9``)
 through the ``opencode`` CLI.
 
+The principle
+-------------
+
+An agent can make an informed co-design decision only after it has measured how
+a software function performs -- in **timing and power** -- across **an array of
+hardware architectures**. Measured against that, today's loop has the first
+half of each:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 38 40
+
+   * -
+     - have
+     - missing
+   * - **timing**
+     - RTL cosim cycles, bit-exact, deterministic
+     - --
+   * - **power**
+     - DC estimate, default toggle rates, *indicative only*
+     - activity-based power (switching from cosim into synthesis)
+   * - **architectures**
+     - one design family (TinyTPU-isa, T=4/T=8), two substrates (FPGA,
+       45 nm), two references (Gemmini, MiniTPU)
+     - the parametrized IP library that would supply a real array
+
+Why the array matters is already measured: a DMA widening that is free on an
+FPGA emits a dual-write-port memory that standard cells cannot build, and only
+the second substrate said so.
+
 Takeaways
 ---------
 
