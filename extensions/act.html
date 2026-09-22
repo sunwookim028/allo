@@ -599,22 +599,26 @@ python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act_compile.py<
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>1,150</p></td>
-<td><p>1,150</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">acc-peel</span></code> – <code class="docutils literal notranslate"><span class="pre">acc</span></code> is an instruction field with no predicate on an
-induction variable, so the first partial sum must be a peelable prefix,
-which pins the reduce rank innermost and unsplit</p></td>
+<tr class="row-even"><td><p>897</p></td>
+<td><p>897</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc-split</span></code> – the reduce rank is split across two emitted loops, so
+the first partial sum is not a contiguous prefix at all</p></td>
 </tr>
-<tr class="row-odd"><td><p>55</p></td>
+<tr class="row-odd"><td><p>253</p></td>
+<td><p>253</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc-position</span></code> – the reduce rank is not innermost among the emitted
+loops, so peeling its first iteration would duplicate the whole body</p></td>
+</tr>
+<tr class="row-even"><td><p>55</p></td>
 <td><p>930</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> – rows below <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST=4</span></code> make the accumulating
 <code class="docutils literal notranslate"><span class="pre">mm</span></code> re-read its own row inside the pipeline window</p></td>
 </tr>
-<tr class="row-even"><td><p>13</p></td>
+<tr class="row-odd"><td><p>13</p></td>
 <td><p>13</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">AGU_TERMS=3</span></code>, one instruction word’s address-term budget</p></td>
 </tr>
-<tr class="row-odd"><td><p>3</p></td>
+<tr class="row-even"><td><p>3</p></td>
 <td><p>3</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH=4</span></code></p></td>
 </tr>
@@ -646,13 +650,158 @@ induction-variable-dependent, and <code class="docutils literal notranslate"><sp
 relaxes to accept the encoding. An explicit accumulator-zeroing opcode is the
 alternative, and costs a pass over <code class="docutils literal notranslate"><span class="pre">ar</span></code> plus <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> slack before the
 first <code class="docutils literal notranslate"><span class="pre">mm</span></code>.</p>
-<p>The two columns are the point of the multi-cause census. Attribute each nest to
-the first check that fires and <code class="docutils literal notranslate"><span class="pre">acc</span></code> accounts for 1,150 of 1,226; ask how many
-nests each constraint refuses <em>independently</em> and <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> refuses 930 of
-them as well. A single-cause census makes the second number invisible and the
-first look like the only constraint that matters.</p>
-<p><strong>Five nests are encodable</strong> (the prototype found three), and all five compute
-the spec, checked against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>. The shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> mapping is one
+<p>Two constraints on where such a fix belongs, both found on the co-design track
+and both corroborated here:</p>
+<p><strong>A term on ``f2`` spends one of the three.</strong> The probe above fits in
+<code class="docutils literal notranslate"><span class="pre">AGU_TERMS=3</span></code> only because it has a single column tile and so needs no term
+for one: its terms are <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">f0</span></code> and <code class="docutils literal notranslate"><span class="pre">f3</span></code>, already the whole budget. Add a
+column loop and the accumulating <code class="docutils literal notranslate"><span class="pre">mm</span></code> wants a fourth and is refused. So
+widening <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> to 4 – which on its own raises the encodable count while
+changing no cycles, and therefore looks like area for nothing – is better read
+as the <strong>prerequisite</strong> for any AGU-resolved <code class="docutils literal notranslate"><span class="pre">acc</span></code> fix to work beyond one
+column tile. The two changes are complements, and neither alone shows anything.</p>
+<p><strong>The reference model does not need unfreezing, if the fix is resolved in the
+AGU.</strong> <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> consumes <code class="docutils literal notranslate"><span class="pre">expand(prog)</span></code>, which is the AGU-<em>resolved</em>
+field stream, so a clamp applied during resolution hands the unit
+<code class="docutils literal notranslate"><span class="pre">f2</span> <span class="pre">in</span> <span class="pre">{0,</span> <span class="pre">1}</span></code> and leaves the instruction’s architectural meaning untouched.
+Resolve it instead inside a unit’s decode and <code class="docutils literal notranslate"><span class="pre">f2=2</span></code> acquires a new meaning,
+which <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> rightly rejects. That is a real constraint on the design space,
+not a detail of the harness.</p>
+<p>The two <code class="docutils literal notranslate"><span class="pre">acc</span></code> rows are counted separately on purpose. Splitting the reduce
+rank and moving it off the innermost slot are different asks of the hardware –
+one needs a per-iteration predicate, the other needs a whole body duplicated –
+and lumping them as one <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code> bucket of 1,150 is what made this census
+incomparable with an independently built one. Together they are still 1,150.</p>
+</section>
+<section id="two-census-definitions-and-which-number-is-which">
+<h3>Two census definitions, and which number is which<a class="headerlink" href="#two-census-definitions-and-which-number-is-which" title="Link to this heading"><span>¶</span></a></h3>
+<p>The two columns above are different quantities, and the difference has already
+caused one figure to be relayed as if it were the other.</p>
+<p><strong>First cause</strong> (column one) is what a sequential enumerator naturally reports:
+each nest attributed to the check that refused it first. Under this flow’s check
+order that is 897 / 253 / 55 / 13 / 3, summing with the 5 encodable nests to
+1,226.</p>
+<p><strong>Independent</strong> (column two) asks each predicate of <em>every</em> nest on its own,
+regardless of what else refuses it. That is where <strong>930</strong> comes from: 930 of the
+1,226 nests have an intrinsic row tile below <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST=4</span></code>. It is re-derivable
+in one command, and it is the only sense in which that number is true:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>act_compile.py<span class="w"> </span>gemm.relu<span class="w"> </span>16x16x16<span class="w"> </span>--census
+<span class="c1">#    930  refuse   ar-distance</span>
+<span class="c1">#    897  express  acc-split</span>
+<span class="c1">#    253  express  acc-position</span>
+</pre></div>
+</div>
+<p>A <strong>third</strong> quantity exists and is the one a co-design track actually wants:
+<em>what is left once you relieve a constraint</em>. Remove the <code class="docutils literal notranslate"><span class="pre">acc-position</span></code> check
+and re-census, and the largest remaining obstacle is <code class="docutils literal notranslate"><span class="pre">acc-split</span></code> – measured
+independently in another tree as <strong>897</strong>, which is exactly this flow’s
+<code class="docutils literal notranslate"><span class="pre">acc-split</span></code> count. Two independently built enumerators agreeing to the nest on
+that number is the strongest cross-check either of them has.</p>
+<p>Where the same two trees disagree is <code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> as a <em>first</em> cause: 55 here
+against 8 there. That is not a contradiction either. The other tree’s emitter
+refuses 274 nests for a restriction of its own (it re-stages the activations per
+row tile and cannot interleave that with a column loop), and it refuses them
+<em>before</em> reaching the RAW-distance check; this flow removed that restriction, so
+those nests survive to be judged on rows. The lesson worth keeping: a first-cause
+histogram is a property of the check order and of the emitter’s limits, not of
+the hardware, and only the independent census and the relieve-and-re-census
+numbers are comparable across implementations.</p>
+</section>
+<section id="reconciling-the-encodable-count-5-against-3">
+<h3>Reconciling the encodable count: 5 against 3<a class="headerlink" href="#reconciling-the-encodable-count-5-against-3" title="Link to this heading"><span>¶</span></a></h3>
+<p>This flow reports <strong>5</strong> encodable nests at 16x16x16 where the earlier
+<code class="docutils literal notranslate"><span class="pre">act_nest.py</span></code> prototype and an independently built enumerator report <strong>3</strong>.
+The five are <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">M2&gt;N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">M4&gt;N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">N4&gt;M2&gt;K4</span></code> and
+<code class="docutils literal notranslate"><span class="pre">N4&gt;M4&gt;K4</span></code>; the three are the first three. So the difference is exactly the two
+nests whose <strong>column loop is outside the row loop</strong>, and it is not a
+disagreement about the machine: <code class="docutils literal notranslate"><span class="pre">act_nest.py</span></code> refused them explicitly, in a
+message that called itself <em>“A limit of this file, not of the machine”</em>, because
+it staged the activations only outside the whole nest. This flow stages them
+immediately inside the innermost row loop wherever that loop sits, which costs
+redundant re-staging when a column loop encloses it – correct, and ranked worse
+by the cost model, which is the right outcome for a mapper rather than a
+refusal.</p>
+<p>Both extra nests pass <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, and <code class="docutils literal notranslate"><span class="pre">--gate</span></code> verifies every encodable
+mapping of every registered workload at every shape. <strong>But that is not enough
+to claim them, and the check that says so is below.</strong> Read with the next
+section, the reconciliation is: 5 encodable by the encoder and the reference
+model, <strong>3 confirmed on the RTL</strong>, and the other tree’s 3 is the better-grounded
+number for any claim about the hardware.</p>
+</section>
+<section id="encodable-has-three-tiers-of-evidence">
+<span id="act-encodable-tiers"></span><h3>“Encodable” has three tiers of evidence<a class="headerlink" href="#encodable-has-three-tiers-of-evidence" title="Link to this heading"><span>¶</span></a></h3>
+<p>Attempting to cosim the two extra nests turned up something worth more than the
+count. For <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 42.0%" />
+<col style="width: 29.0%" />
+<col style="width: 29.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>checker</p></th>
+<th class="head"><p>shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">N4&gt;M2&gt;K4</span></code> (row-tiled)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> (numpy, the ISA’s meaning)</p></td>
+<td><p>correct</p></td>
+<td><p>correct</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_program</span></code> / <code class="docutils literal notranslate"><span class="pre">assemble</span></code></p></td>
+<td><p>accepts</p></td>
+<td><p>accepts</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kpn_model.run</span></code> (channel protocol, bounded FIFOs)</p></td>
+<td><p>runs, minimum depth 1</p></td>
+<td><p>runs, minimum depth 1</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">df.build(target=&quot;simulator&quot;)</span></code></p></td>
+<td><p>completes, correct</p></td>
+<td><p>completes, correct</p></td>
+</tr>
+<tr class="row-even"><td><p>Vitis <strong>csim</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mismatches</span> <span class="pre">=</span> <span class="pre">0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mismatches</span> <span class="pre">=</span> <span class="pre">0</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Vitis <strong>cosim</strong> (RTL)</p></td>
+<td><p><strong>750 cycles</strong></p></td>
+<td><p><strong>did not complete</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
+at <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress:</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span></code> with the simulator burning a full core,
+one of them for over half an hour, where the shipped mapping’s whole run –
+synthesis, csim and cosim – takes about two minutes. No deadlock is <em>reported</em>,
+so this page does not call it one; what is measured is that the transaction does
+not complete.</p>
+<p>The lesson is the one this design’s own history already taught once, when the
+dataflow simulator passed a bug that only cosim caught: <strong>four checkers agreeing
+is not evidence about the RTL.</strong> Two of those four are derived from
+<code class="docutils literal notranslate"><span class="pre">assemble</span></code>’s header, so they cannot see an error in the header formula itself;
+<code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> is a model of the ISA, not of the machine; and csim compiles the
+units’ C without their handshakes. Only cosim exercises the streams.</p>
+<p>So a mapper on this machine can report two different things, and should say
+which: <em>encodable</em> – the encoder accepts it and the reference model agrees –
+and <em>confirmed</em> – the RTL ran it. <code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> reports the first, and its
+<code class="docutils literal notranslate"><span class="pre">check</span></code> column says so. Anything published as a property of the hardware needs
+<code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code>.</p>
+<p>One reassurance, and it is a test rather than a hope: at every shape and every
+registered workload the mapping the flow <strong>picks</strong> is in the prologue-staging,
+RTL-confirmed class – <code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> asserts it. The unconfirmed
+mappings are ranked, reported and never chosen, and <code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> prints a
+<code class="docutils literal notranslate"><span class="pre">staging</span></code> column plus a warning whenever any of them appear.</p>
+<p>This is also the sharpest <code class="docutils literal notranslate"><span class="pre">cannot</span> <span class="pre">refuse</span></code> gap found in this work, and it is
+not in the ISA: some property of a program with a data transfer <em>inside</em> the
+emitted nest, rather than all of them hoisted into a prologue, is not being
+checked by anything that can be run in seconds. Finding it is the highest-value
+next step for this flow, because until it is found the mapspace beyond
+prologue-only staging cannot be trusted, and that is most of it.</p>
+<p><strong>Five nests are encodable</strong> (the prototype found three) and all five compute
+the spec against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> – but only three are confirmed on the RTL; see
+<a class="reference internal" href="#act-encodable-tiers"><span class="std std-ref">“Encodable” has three tiers of evidence</span></a>. The shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> mapping is one
 of them, and <code class="docutils literal notranslate"><span class="pre">act_target</span></code> re-emits the shipped <code class="docutils literal notranslate"><span class="pre">gemm</span></code>/<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> program
 <strong>word for word</strong> at all five <code class="docutils literal notranslate"><span class="pre">bench_isa.SHAPES</span></code> – the regression anchor,
 committed as <code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code>.</p>
@@ -757,18 +906,6 @@ it does not measure.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x16, shipped mapping (<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>)</p></td>
-<td><p>13</p></td>
-<td><p>28</p></td>
-<td><p>453</p></td>
-<td><p><strong>686</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16, shipped mapping</p></td>
-<td><p>14</p></td>
-<td><p>32</p></td>
-<td><p>517</p></td>
-<td><p><strong>750</strong></p></td>
-</tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 4x4x4, <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code></p></td>
 <td><p>10</p></td>
 <td><p>4</p></td>
@@ -781,16 +918,77 @@ it does not measure.</p>
 <td><p>40</p></td>
 <td><p><strong>169</strong></p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 8x8x8</p></td>
+<td><p>13</p></td>
+<td><p>10</p></td>
+<td><p>115</p></td>
+<td><p><strong>262</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 12x12x12</p></td>
+<td><p>13</p></td>
+<td><p>18</p></td>
+<td><p>227</p></td>
+<td><p><strong>418</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x8</p></td>
+<td><p>13</p></td>
+<td><p>16</p></td>
+<td><p>261</p></td>
+<td><p><strong>484</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x16</p></td>
+<td><p>13</p></td>
+<td><p>28</p></td>
+<td><p>453</p></td>
+<td><p><strong>686</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16</p></td>
+<td><p>14</p></td>
+<td><p>32</p></td>
+<td><p>517</p></td>
+<td><p><strong>750</strong></p></td>
+</tr>
 </tbody>
 </table>
-<p>The first row reproduces the published 16x16x16 figure exactly, and it is worth
-recording what the second row settles: the published
-<strong>172 / 262 / 418 / 484 / 686 are plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s
-<code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default. <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at the same
-shape is 750, and 750 - 686 = <strong>64</strong>, which is exactly the four <code class="docutils literal notranslate"><span class="pre">vrelu</span></code>
-instructions’ 64 <code class="docutils literal notranslate"><span class="pre">accu</span></code> rows. The delta is accounted for to the cycle, which
-is the best evidence available that the units’ work counts are the right model
-of this machine.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce the published <strong>172 / 262 / 418 / 484 / 686</strong>
+exactly, all five, so the harness is the one those figures came from. The
+<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> row settles what they are: <strong>plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because
+<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default.
+<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 750, and 750 - 686 = <strong>64</strong>, exactly the four
+<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> instructions’ 64 <code class="docutils literal notranslate"><span class="pre">accu</span></code> rows. The delta is accounted for to the
+cycle, which is the best evidence available that the units’ work counts are the
+right model of this machine.</p>
+</section>
+<section id="the-error-bar-a-pick-has-to-carry">
+<h3>The error bar a pick has to carry<a class="headerlink" href="#the-error-bar-a-pick-has-to-carry" title="Link to this heading"><span>¶</span></a></h3>
+<p>Over those six points the model fits <code class="docutils literal notranslate"><span class="pre">cosim</span> <span class="pre">=</span> <span class="pre">128</span> <span class="pre">+</span> <span class="pre">1.24</span> <span class="pre">x</span> <span class="pre">makespan</span></code> with a
+worst residual of <strong>34 cycles</strong> – computed from the table by
+<code class="docutils literal notranslate"><span class="pre">act_machine.fit</span></code>, not typed in, and re-checked by a test that fails if the
+model drifts from the stored points. So the model’s <em>absolute</em> level is
+predictable across shapes to a few percent once the intercept is allowed.</p>
+<p>That is the wrong statistic for ranking, and saying so matters. Ranking compares
+two mappings of <strong>one</strong> shape, where the intercept is common and only the
+difference matters, and there is exactly <strong>one</strong> such pair measured: at 4x4x4 the
+model put the two programs <strong>1.25x</strong> apart and the machine put them <strong>1.02x</strong>
+apart, same order. The model therefore overstated the gap by roughly an order of
+magnitude while getting the direction right.</p>
+<p><code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> prints this wherever it reports a pick, rather than leaving
+it on this page:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>chosen: N4&gt;K4  cost (517, 32)
+margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 128 +
+1.24 x makespan over 6 measured points, worst residual 34 cycles, but the
+model's ORDER is validated on 1 same-shape pair -- gemm 4x4x4: model 1.25x
+-&gt; cosim 1.02x, same order -- so it overstated the gap by an order of
+magnitude while getting the order right. Treat the pick as a ranking
+hypothesis and measure it with act_cosim.py.
+</pre></div>
+</div>
+<p>Until more same-shape pairs are measured, <strong>“the best mapping for this hardware”
+is not a claim this flow can make</strong> – “the mapping this cost model ranks first,
+whose order has been checked once” is. That distinction is the reason the
+sequencer correction mattered: charging <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> moved a pair from
+509-vs-512 to 517-vs-642 and reversed it, so a term the model omits can flip an
+order, and only a measurement closes it.</p>
 </section>
 <section id="where-the-search-beats-the-hand-written-generator">
 <h3>Where the search beats the hand-written generator<a class="headerlink" href="#where-the-search-beats-the-hand-written-generator" title="Link to this heading"><span>¶</span></a></h3>
@@ -920,10 +1118,14 @@ a requirement, not a convenience.</p></li>
 <li><a class="reference internal" href="#the-tinytpu-isa-target">The TinyTPU-isa target</a></li>
 <li><a class="reference internal" href="#one-command">One command</a></li>
 <li><a class="reference internal" href="#what-acc-actually-is">What <code class="docutils literal notranslate"><span class="pre">acc</span></code> actually is</a></li>
+<li><a class="reference internal" href="#two-census-definitions-and-which-number-is-which">Two census definitions, and which number is which</a></li>
+<li><a class="reference internal" href="#reconciling-the-encodable-count-5-against-3">Reconciling the encodable count: 5 against 3</a></li>
+<li><a class="reference internal" href="#encodable-has-three-tiers-of-evidence">“Encodable” has three tiers of evidence</a></li>
 <li><a class="reference internal" href="#two-kinds-of-gap-cannot-express-cannot-refuse">Two kinds of gap: cannot express, cannot refuse</a></li>
 <li><a class="reference internal" href="#what-this-flow-should-emit-next">What this flow should emit next</a></li>
 <li><a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a></li>
 <li><a class="reference internal" href="#the-ranking-checked-against-cosim">The ranking, checked against cosim</a></li>
+<li><a class="reference internal" href="#the-error-bar-a-pick-has-to-carry">The error bar a pick has to carry</a></li>
 <li><a class="reference internal" href="#where-the-search-beats-the-hand-written-generator">Where the search beats the hand-written generator</a></li>
 </ul>
 </li>

@@ -239,6 +239,43 @@ explicitly (see <a class="reference internal" href="pitfalls.html"><span class="
 </pre></div>
 </div>
 </section>
+<section id="which-bindings-a-worktree-loads">
+<h2>Which bindings a worktree loads<a class="headerlink" href="#which-bindings-a-worktree-loads" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code> is a <strong>tracked symlink</strong> to <code class="docutils literal notranslate"><span class="pre">../mlir/build/tools/allo/_mlir</span></code>,
+so it resolves only inside a checkout whose own <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> has been built. In a
+fresh worktree it dangles – and importing <code class="docutils literal notranslate"><span class="pre">allo</span></code> still works, because the
+editable install maps the name <code class="docutils literal notranslate"><span class="pre">allo</span></code> to one checkout and its finder answers
+the submodule from there. Measured 2026-09-22 in an unbuilt worktree:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>allo        &lt;this worktree&gt;/allo/__init__.py
+allo._mlir  /home/sk3463/allo-bench/mlir/include/allo/Bindings/allo/__init__.py
+extension   /home/sk3463/allo-bench/mlir/build/tools/allo/_mlir/_mlir_libs/_allo.cpython-312-x86_64-linux-gnu.so
+</pre></div>
+</div>
+<p>So the python half comes from the worktree under test and the <strong>compiled half
+from a different checkout</strong>, silently: nothing looks stale, because cmake
+preserves mtimes, and the symptom surfaces later as an unexplained ABI or
+behaviour mismatch. A local symlink takes precedence when it resolves, so the
+fix is to make it resolve.</p>
+<p><strong>Setting up a fresh worktree.</strong> Either build that worktree’s own bindings –</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ninja<span class="w"> </span>-C<span class="w"> </span>mlir/build<span class="w"> </span>-j<span class="s2">"</span><span class="k">$(</span>nproc<span class="k">)</span><span class="s2">"</span><span class="w">        </span><span class="c1"># or: examples/accelerator/tinytpu_vitis/reproduce.sh</span>
+</pre></div>
+</div>
+<p>– which is what <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> does before it runs anything, and it then
+checks that <code class="docutils literal notranslate"><span class="pre">allo</span></code> resolves inside the checkout and exits nonzero if it does
+not. Note that check is on <code class="docutils literal notranslate"><span class="pre">allo</span></code> itself, not on the extension, which is the
+half that leaks; closing that is what the test below is for. Or, for a
+read-only session that only needs to <em>run</em> something and accepts
+another checkout’s build, point the symlink at a build <strong>of the same commit</strong>
+and say so in whatever you report:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ln<span class="w"> </span>-sfn<span class="w"> </span>/path/to/other/mlir/build/tools/allo/_mlir<span class="w"> </span>allo/_mlir<span class="w">   </span><span class="c1"># borrowed, not built</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tests/act/test_bindings.py</span></code> asserts this rather than leaving it to be
+noticed: it fails naming both paths when the extension comes from another
+checkout, and skips when no bindings are reachable at all. The <code class="docutils literal notranslate"><span class="pre">act/</span></code> core
+imports numpy only, so <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/act</span></code> still exercises the workload,
+mapspace and scheduler layers in a worktree with no build.</p>
+</section>
 <section id="golden-test-for-dataflow-simulator">
 <h2>Golden test for dataflow simulator<a class="headerlink" href="#golden-test-for-dataflow-simulator" title="Link to this heading"><span>¶</span></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># `conda run` does not source the activate scripts, so export the env first.</span>
@@ -442,6 +479,7 @@ faster than any rebuild.</p></li>
                 <ul>
 <li><a class="reference internal" href="#">Development Environment and Toolchains</a><ul>
 <li><a class="reference internal" href="#environment">Environment</a></li>
+<li><a class="reference internal" href="#which-bindings-a-worktree-loads">Which bindings a worktree loads</a></li>
 <li><a class="reference internal" href="#golden-test-for-dataflow-simulator">Golden test for dataflow simulator</a></li>
 <li><a class="reference internal" href="#toolchains-on-the-development-host">Toolchains on the development host</a><ul>
 <li><a class="reference internal" href="#vitis-binutils-vs-glibc-relr-dyn">Vitis binutils vs. glibc <code class="docutils literal notranslate"><span class="pre">.relr.dyn</span></code></a></li>
