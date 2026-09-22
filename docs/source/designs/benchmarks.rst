@@ -532,16 +532,34 @@ Verification per configuration
 Every configuration below is exact on all four gates: ``bench_isa.py``
 (``ALL EXACT``), ``stress_isa.py`` (``STRESS OK``, which includes the program
 validator's controls --- crafted illegal programs rejected, every generated
-one accepted), and RTL cosim bit-exact at every shape reported. Beyond those,
-re-run after this work landed:
+one accepted), and RTL cosim bit-exact at every shape reported.
 
-* ``chia_agent/param_check.py`` at all three ``PARAM_CONFIGS``:
-  **PARAM OK 69/69** at MAXDIM=8, **186/186** at MAXDIM=12, **408/408** at
-  T=8 MAXDIM=32.
-* ``tests/act/`` (which imports ``bench_isa.SHAPES``): **81 passed, 4
-  skipped**.
-* ``isa_dsl.py`` self-test (generated == hand-written, word for word) and
-  ``kpn_model.py`` (**KPN OK**).
+**Re-run in full after the rebase onto main**, which brought the ACT rebuild,
+the ``Encoding`` primitive and the ``shapes.py`` deduplication under this
+work. Verbatim:
+
+.. code-block:: text
+
+   bench_isa TPU_MAXDIM=16       ALL EXACT
+   bench_isa (default, 64)       ALL EXACT
+   bench_isa TPU_SET=all         ALL EXACT
+   stress_isa TPU_MAXDIM=16      STRESS OK: 492/492 runs exact ... GEMM at 64 shapes
+   stress_isa (default, 64)      STRESS OK: 640/640 runs exact ... GEMM at 96 shapes
+   stress_isa T=8 MAXDIM=64      STRESS OK: 630/630 runs exact ... GEMM at 96 shapes
+   param_check TPU_MAXDIM=8      PARAM OK: 69/69 runs exact  (3 seeds ungeneratable)
+   param_check TPU_MAXDIM=12     PARAM OK: 186/186 runs exact
+   param_check T=8 MAXDIM=32     PARAM OK: 408/408 runs exact
+   mutate.py --no-rtl            MUTATE OK: all 33 mutants run were caught
+                                 (1 RTL-only not run: ar_claim_false)
+   isa_dsl.py                    generated == hand-written, word for word
+   kpn_model.py                  KPN OK
+   pytest tests/act/             98 passed, 4 skipped
+
+``mutate.py`` is the one that matters most here, because ``bench_isa`` and
+``stress_isa`` both cite it as the evidence that they catch a broken design,
+and both were edited by this work: **all 33 mutants still caught.** The
+RTL-only mutant (``ar_claim_false``, a false ``#pragma HLS dependence``
+claim, which no simulator can see) needs a cosim of its own and was not run.
 
 .. list-table::
    :header-rows: 1
