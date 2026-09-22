@@ -4,7 +4,7 @@
    "file": "item01_region_stateful.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
+   "seconds": 2.5,
    "tail": "[item 1] FIXED: out_a after 2 calls = [0, 2, 4, 6] (expect [0, 2, 4, 6]), out_b = [2, 4, 6, 8]\n",
    "verdicts": {
     "1": "FIXED"
@@ -14,7 +14,7 @@
    "file": "item02_kernel_stateful.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 1.9,
+   "seconds": 2.4,
    "tail": "[item 2] FIXED: calls -> [3, 0], [6, 1], [6, 1] (expect [3,0],[6,1],[6,1])\n",
    "verdicts": {
     "2": "FIXED"
@@ -24,7 +24,7 @@
    "file": "item03_nested_call_streams.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 1.9,
+   "seconds": 2.6,
    "tail": "[item 3] FIXED: out = 21 (expect 21)\n",
    "verdicts": {
     "3": "FIXED"
@@ -34,8 +34,8 @@
    "file": "item04_math_exp.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
-   "tail": " res = method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/infer.py\", line 1316, in visit_Call\n    func = ctx.global_vars[obj_name]\n           ~~~~~~~~~~~~~~~^^^^^^^^^^\nKeyError: 'exp'\n\nError: 'exp'\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 41 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   38: @df.region()                                                           \u2502\n\u2502   39: def df_math(A: float32[4], B: float32[4]):                             \u2502\n\u2502   40:                                                                        \u2502\n\u2502   41:     @df.kernel(mapping=[1], args=[A, B])                               \u2502\n\u2502   42:     def k_0(a: float32[4], b: float32[4]):                             \u2502\n\u2502   43:         for i in range(4):                                             \u2502\n\u2502   44:             b[i] = math.exp(a[i])                                      \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'allo.exp (llvm)': 'ok', 'math.exp (llvm)': 'SystemExit', 'math.exp (df.kernel, frontend)': 'SystemExit'}\n[item 4] REPRODUCES: {'allo.exp (llvm)': 'ok', 'math.exp (llvm)': 'SystemExit', 'math.exp (df.kernel, frontend)': 'SystemExit'}\n",
+   "seconds": 3.0,
+   "tail": "ode)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/infer.py\", line 1316, in visit_Call\n    func = ctx.global_vars[obj_name]\n           ~~~~~~~~~~~~~~~^^^^^^^^^^\nKeyError: 'exp'\n\nError: 'exp'\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 41 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   38: @df.region()                                                           \u2502\n\u2502   39: def df_math(A: float32[4], B: float32[4]):                             \u2502\n\u2502   40:                                                                        \u2502\n\u2502   41:     @df.kernel(mapping=[1], args=[A, B])                               \u2502\n\u2502   42:     def k_0(a: float32[4], b: float32[4]):                             \u2502\n\u2502   43:         for i in range(4):                                             \u2502\n\u2502   44:             b[i] = math.exp(a[i])                                      \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'allo.exp (llvm)': 'ok', 'math.exp (llvm)': 'SystemExit', 'math.exp (df.kernel, frontend)': 'SystemExit'}\n[item 4] REPRODUCES: {'allo.exp (llvm)': 'ok', 'math.exp (llvm)': 'SystemExit', 'math.exp (df.kernel, frontend)': 'SystemExit'}\n",
    "verdicts": {
     "4": "REPRODUCES"
    }
@@ -44,8 +44,8 @@
    "file": "item05_region_param_shadowing.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.0,
-   "tail": " method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/infer.py\", line 689, in visit_AnnAssign\n    target_.dtype == target_dtype and target_.shape == target_shape\nAssertionError: Invalid assignment to d_addr, type mismatch.\n\nError: Invalid assignment to d_addr, type mismatch.\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 23 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   20: @df.region()                                                           \u2502\n\u2502   21: def top(cmd: int32[4], d_addr: int32[1], out: int32[1]):               \u2502\n\u2502   22:                                                                        \u2502\n\u2502   23:     @df.kernel(mapping=[1], args=[cmd, out])                           \u2502\n\u2502   24:     def driver_0(c: int32[4], o: int32[1]):                            \u2502\n\u2502   25:         d_addr: int32 = c[3]                                           \u2502\n\u2502   26:         o[0] = d_addr + 1                                              \u2502\n\u2502   27:                                                                        \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n[item 5] REPRODUCES: variant a (int32 local vs int32[1] param): SystemExit: 1\n",
+   "seconds": 2.5,
+   "tail": "         ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/infer.py\", line 689, in visit_AnnAssign\n    target_.dtype == target_dtype and target_.shape == target_shape\nAssertionError: Invalid assignment to d_addr, type mismatch.\n\nError: Invalid assignment to d_addr, type mismatch.\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 23 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   20: @df.region()                                                           \u2502\n\u2502   21: def top(cmd: int32[4], d_addr: int32[1], out: int32[1]):               \u2502\n\u2502   22:                                                                        \u2502\n\u2502   23:     @df.kernel(mapping=[1], args=[cmd, out])                           \u2502\n\u2502   24:     def driver_0(c: int32[4], o: int32[1]):                            \u2502\n\u2502   25:         d_addr: int32 = c[3]                                           \u2502\n\u2502   26:         o[0] = d_addr + 1                                              \u2502\n\u2502   27:                                                                        \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n[item 5] REPRODUCES: variant a (int32 local vs int32[1] param): SystemExit: 1\n",
    "verdicts": {
     "5": "REPRODUCES"
    }
@@ -54,8 +54,8 @@
    "file": "item06_elif_local_dominance.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.2,
-   "tail": "y\", line 285, in __call__\n    res = method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/infer.py\", line 174, in visit_Name\n    raise RuntimeError(f\"Unsupported Name `{node.id}`\")\nRuntimeError: Unsupported Name `eff`\n\nError: Unsupported Name `eff`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 63 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   60: @df.region()                                                           \u2502\n\u2502   61: def top(cmd: int32[4], out: int32[2]):                                 \u2502\n\u2502   62:                                                                        \u2502\n\u2502   63:     @df.kernel(mapping=[1], args=[cmd, out])                           \u2502\n\u2502   64:     def dec_0(c: int32[4], o: int32[2]):                               \u2502\n\u2502   65:         for t in range(4):                                             \u2502\n\u2502   66:             funct7: int32 = c[t]                                       \u2502\n\u2502   67:             if funct7 == 1:                                            \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'a': 'ok', 'b': 'ok', 'c': 'SystemExit: 1'}\n[item 6] FIXED: {'a': 'ok', 'b': 'ok', 'c': 'SystemExit: 1'}\n",
+   "seconds": 3.0,
+   "tail": "all__\n    res = method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/infer.py\", line 174, in visit_Name\n    raise RuntimeError(f\"Unsupported Name `{node.id}`\")\nRuntimeError: Unsupported Name `eff`\n\nError: Unsupported Name `eff`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 63 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   60: @df.region()                                                           \u2502\n\u2502   61: def top(cmd: int32[4], out: int32[2]):                                 \u2502\n\u2502   62:                                                                        \u2502\n\u2502   63:     @df.kernel(mapping=[1], args=[cmd, out])                           \u2502\n\u2502   64:     def dec_0(c: int32[4], o: int32[2]):                               \u2502\n\u2502   65:         for t in range(4):                                             \u2502\n\u2502   66:             funct7: int32 = c[t]                                       \u2502\n\u2502   67:             if funct7 == 1:                                            \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'a': 'ok', 'b': 'ok', 'c': 'SystemExit: 1'}\n[item 6] FIXED: {'a': 'ok', 'b': 'ok', 'c': 'SystemExit: 1'}\n",
    "verdicts": {
     "6": "FIXED"
    }
@@ -64,8 +64,8 @@
    "file": "item07_bitwise_and.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
-   "tail": "er.py\", line 332, in visit_general_binop\n    typing_rule = get_typing_rule(type(node.op), ctx.typing_rule_set)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/typing_rule.py\", line 25, in get_typing_rule\n    assert node in rule_registry, f\"Typing rule for {node} not found\"\n           ^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Typing rule for <class 'ast.BitAnd'> not found\n\nWarning: '2' not found in source lines, the location may be incorrect\nError: Typing rule for <class 'ast.BitAnd'> not found\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 67 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   67: def plain(x: int32) -> int32:                                          \u2502\n\u2502   68:     return (x & 2) >> 1                                                \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'int32 & | ^ << >>': 'ok', 'UInt(64) (w>>54)&0xFF': 'ok', 'vhls emits &': 'ok'}\ninfo: typing_rule_set='cpp-style' (AIE target): REJECTED (SystemExit)\n[item 7] CANNOT-REPRODUCE (supported in the default rule set since 12f898d7, 2023): {'int32 & | ^ << >>': 'ok', 'UInt(64) (w>>54)&0xFF': 'ok', 'vhls emits &': 'ok'}\n",
+   "seconds": 2.6,
+   "tail": " visit_general_binop\n    typing_rule = get_typing_rule(type(node.op), ctx.typing_rule_set)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/typing_rule.py\", line 25, in get_typing_rule\n    assert node in rule_registry, f\"Typing rule for {node} not found\"\n           ^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Typing rule for <class 'ast.BitAnd'> not found\n\nWarning: '2' not found in source lines, the location may be incorrect\nError: Typing rule for <class 'ast.BitAnd'> not found\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 67 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   67: def plain(x: int32) -> int32:                                          \u2502\n\u2502   68:     return (x & 2) >> 1                                                \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n{'int32 & | ^ << >>': 'ok', 'UInt(64) (w>>54)&0xFF': 'ok', 'vhls emits &': 'ok'}\ninfo: typing_rule_set='cpp-style' (AIE target): REJECTED (SystemExit)\n[item 7] CANNOT-REPRODUCE (supported in the default rule set since 12f898d7, 2023): {'int32 & | ^ << >>': 'ok', 'UInt(64) (w>>54)&0xFF': 'ok', 'vhls emits &': 'ok'}\n",
    "verdicts": {
     "7": "CANNOT-REPRODUCE"
    }
@@ -74,7 +74,7 @@
    "file": "item08_subregion_two_callsites.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.4,
+   "seconds": 3.3,
    "tail": "ze.<locals>.MLIRError: Failure while executing pass pipeline:\nerror: unknown: redefinition of symbol named 'feed_0__0_fixed'\n note: unknown: see current operation: \n  \"func.func\"() <{function_type = (memref<4xi32>, !allo.stream<i32, 4>) -> (), sym_name = \"feed_0__0_fixed\"}> ({\n  ^bb0(%arg0: memref<4xi32>, %arg1: !allo.stream<i32, 4>):\n    %0 = \"arith.constant\"() <{value = 2 : i64}> : () -> i64\n    \"affine.for\"() <{lowerBoundMap = affine_map<() -> (0)>, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = affine_map<() -> (4)>}> ({\n    ^bb0(%arg2: index):\n      %1 = \"affine.load\"(%arg0, %arg2) <{map = affine_map<(d0) -> (d0)>}> {from = \"la\"} : (memref<4xi32>, index) -> i32\n      %2 = \"arith.extsi\"(%1) : (i32) -> i64\n      %3 = \"arith.muli\"(%2, %0) <{overflowFlags = #arith.overflow<none>}> : (i64, i64) -> i64\n      \"allo.stream_put\"(%arg1, %3) <{indices = array<i64>}> : (!allo.stream<i32, 4>, i64) -> ()\n      \"affine.yield\"() : () -> ()\n    }) {loop_name = \"i\", op_name = \"S_i_0\"} : () -> ()\n    \"func.return\"() : () -> ()\n  }) {df.kernel, df.nested_kernel, itypes = \"s_\", otypes = \"\", stypes = \"_o\"} : () -> ()\n note: unknown: see existing symbol definition here\n",
    "verdicts": {
     "8": "REPRODUCES"
@@ -82,19 +82,17 @@
   },
   {
    "file": "item09_sim_cache_helpers.py",
-   "produced_a_verdict": true,
-   "rc": 0,
-   "seconds": 3.0,
-   "tail": "helper x+1 -> 1; helper edited to x+100 -> 100\n[item 9] NOT-A-LIMITATION: Allo keeps no simulator cache; the stale `.cache/llvm_sim/` was the allo-tpu harness's own\n",
-   "verdicts": {
-    "9": "NOT-A-LIMITATION"
-   }
+   "produced_a_verdict": false,
+   "rc": 1,
+   "seconds": 1.0,
+   "tail": "Traceback (most recent call last):\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/tests/limits/item09_sim_cache_helpers.py\", line 86, in <module>\n    main()\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/tests/limits/item09_sim_cache_helpers.py\", line 67, in main\n    os.makedirs(SCRATCH, exist_ok=True)\n  File \"<frozen os>\", line 225, in makedirs\nOSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-abs/.chia_scratch/slot0/tests/limits/_item09_scratch'\n",
+   "verdicts": {}
   },
   {
    "file": "item10_error_source_location.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 3.1,
+   "seconds": 4.0,
    "tail": "(a) diagnostic locations: ['\"-\":5:12']  (source line is 32)\n(b) three builds in one process: ok\n[item 10] REPRODUCES: (a) error names Python source: False; (b) rebuild in-process ok: True\n",
    "verdicts": {
     "10": "REPRODUCES"
@@ -104,7 +102,7 @@
    "file": "item11_omp_team_size.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.8,
+   "seconds": 2.9,
    "tail": "[item 11] FIXED: 18 processes at OMP_NUM_THREADS=2 finished\n",
    "verdicts": {
     "11": "FIXED"
@@ -114,8 +112,8 @@
    "file": "item14_wrapio_false_multidim.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.0,
-   "tail": "ized to 1D pointers (e.g., float *v) which cannot be passed to nested functions expecting multi-dimensional arrays (e.g., float v[M][N]). Solution: Use only 1D arrays as arguments to nested functions, or enable wrap_io=True.\nloc(\"-\":2:3): error: nested function cannot have multi-dimensional array arguments when wrap_io=False (flatten=True) and the top-level function has multi-dimensional arrays. Top-level multi-dimensional arrays are linearized to 1D pointers (e.g., float *v) which cannot be passed to nested functions expecting multi-dimensional arrays (e.g., float v[M][N]). Solution: Use only 1D arrays as arguments to nested functions, or enable wrap_io=True.\n  (a) 2-D region arg -> kernel: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-di\n  (b) 2-D local -> nested fn: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-di\n  (c) flat args (control): ok\n[item 14] REPRODUCES: (a) 2-D region arg -> kernel=RuntimeError: Failed to emit HLS code. C; (b) 2-D local -> nested fn=RuntimeError: Failed to emit HLS code. C; (c) flat args (control)=ok\n",
+   "seconds": 2.5,
+   "tail": "only 1D arrays as arguments to nested functions, or enable wrap_io=True.\nloc(\"-\":2:3): error: nested function cannot have multi-dimensional array arguments when wrap_io=False (flatten=True) and the top-level function has multi-dimensional arrays. Top-level multi-dimensional arrays are linearized to 1D pointers (e.g., float *v) which cannot be passed to nested functions expecting multi-dimensional arrays (e.g., float v[M][N]). Solution: Use only 1D arrays as arguments to nested functions, or enable wrap_io=True.\n  (a) 2-D region arg -> kernel: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-di\n  (b) 2-D local -> nested fn: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-di\n  (c) flat args (control): OSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-abs/.chia_scratch/slot0/tests/limits/_item14.prj'\n[item 14] REPRODUCES: (a) 2-D region arg -> kernel=RuntimeError: Failed to emit HLS code. C; (b) 2-D local -> nested fn=RuntimeError: Failed to emit HLS code. C; (c) flat args (control)=OSError: [Errno 30] Read-only file syste\n",
    "verdicts": {
     "14": "REPRODUCES"
    }
@@ -124,8 +122,8 @@
    "file": "item16_cosim_not_wired.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
-   "tail": "{'mode=cosim': 'AssertionError: Invalid mode', 'hw_emu run.tcl has cosim_design': True, 'host.cpp is an XRT/OpenCL host': True, 'm_axi pragmas carry depth=': False}\n[item 16] REPRODUCES: {'mode=cosim': 'AssertionError: Invalid mode', 'hw_emu run.tcl has cosim_design': True, 'host.cpp is an XRT/OpenCL host': True, 'm_axi pragmas carry depth=': False}\n",
+   "seconds": 2.5,
+   "tail": "{'mode=cosim': \"OSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-ab\", 'hw_emu': \"OSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-abs/.chia_scratch/slot\"}\n[item 16] REPRODUCES: {'mode=cosim': \"OSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-ab\", 'hw_emu': \"OSError: [Errno 30] Read-only file system: '/home/sk3463/allo-chia-abs/.chia_scratch/slot\"}\n",
    "verdicts": {
     "16": "REPRODUCES"
    }
@@ -134,7 +132,7 @@
    "file": "item17_frontend_constraints.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 6.0,
+   "seconds": 8.4,
    "tail": "  17a (constraint): SystemExit: 1\n  17b (constraint): ok\n  17c (constraint): SystemExit: 1\n  17d (capability): ok\n  17e (capability): ok\n[item 17] REPRODUCES: constraints still present: ['a', 'c']; capabilities d=ok e=ok\n",
    "verdicts": {
     "17": "REPRODUCES"
@@ -144,7 +142,7 @@
    "file": "item18_catapult_try_ops_blocking.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.0,
+   "seconds": 2.7,
    "tail": "{'vhls read_nb': True, 'catapult nb_read': False, 'catapult success hard-coded true': True, 'catapult full() hard-coded false': True, 'catapult warns': False}\n[item 18] REPRODUCES: {'vhls read_nb': True, 'catapult nb_read': False, 'catapult success hard-coded true': True, 'catapult full() hard-coded false': True, 'catapult warns': False}\n",
    "verdicts": {
     "18": "REPRODUCES"
@@ -154,7 +152,7 @@
    "file": "item19_tapa_try_ops_message.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.0,
+   "seconds": 2.4,
    "tail": "loc(\"-\":5:23): error: can't be correctly emitted.\n  message: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.\n[item 19] REPRODUCES: fails to emit; message names the op: False; mentions wrap_io: True\n",
    "verdicts": {
     "19": "REPRODUCES"
@@ -164,7 +162,7 @@
    "file": "item20_emitter_name_collision.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.5,
+   "seconds": 2.4,
    "tail": "{'loop var named v1': [], 'mover (3rd param a stream)': []}\n[item 20] FIXED: {'loop var named v1': [], 'mover (3rd param a stream)': []}\n",
    "verdicts": {
     "20": "FIXED"
@@ -174,8 +172,8 @@
    "file": "new_customize_sys_exit.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 1.7,
-   "tail": "e = visit_stmt(ctx, node.value)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/visitor.py\", line 285, in __call__\n    res = method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/infer.py\", line 174, in visit_Name\n    raise RuntimeError(f\"Unsupported Name `{node.id}`\")\nRuntimeError: Unsupported Name `undefined_name`\n\nWarning: 'undefined_name' not found in source lines, the location may be incorrect\nError: Unsupported Name `undefined_name`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 19 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   16: def bad(a: int32[4]) -> int32[4]:                                      \u2502\n\u2502   17:     b: int32[4]                                                        \u2502\n\u2502   18:     for i in range(4):                                                 \u2502\n\u2502   19:         b[i] = undefined_name[i]                                       \u2502\n\u2502   20:     return b                                                           \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nSystemExit(1) -- escapes `except Exception`\n[item new-sys-exit] REPRODUCES: SystemExit(1) -- escapes `except Exception`\n",
+   "seconds": 2.2,
+   "tail": "    ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/visitor.py\", line 285, in __call__\n    res = method(ctx, node)\n          ^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/infer.py\", line 174, in visit_Name\n    raise RuntimeError(f\"Unsupported Name `{node.id}`\")\nRuntimeError: Unsupported Name `undefined_name`\n\nWarning: 'undefined_name' not found in source lines, the location may be incorrect\nError: Unsupported Name `undefined_name`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 19 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   16: def bad(a: int32[4]) -> int32[4]:                                      \u2502\n\u2502   17:     b: int32[4]                                                        \u2502\n\u2502   18:     for i in range(4):                                                 \u2502\n\u2502   19:         b[i] = undefined_name[i]                                       \u2502\n\u2502   20:     return b                                                           \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nSystemExit(1) -- escapes `except Exception`\n[item new-sys-exit] REPRODUCES: SystemExit(1) -- escapes `except Exception`\n",
    "verdicts": {
     "new-sys-exit": "REPRODUCES"
    }
@@ -184,7 +182,7 @@
    "file": "new_sim_math_lowering.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
+   "seconds": 3.4,
    "tail": "loc(\"-\":5:12): error: cannot be converted to LLVM IR: missing `LLVMTranslationDialectInterface` registration for dialect for op: math.exp\n{'llvm backend': 'ok', 'simulator': 'RuntimeError: Failure while creating the ExecutionEngine.'}\n[item new-sim-math] REPRODUCES: {'llvm backend': 'ok', 'simulator': 'RuntimeError: Failure while creating the ExecutionEngine.'}\n",
    "verdicts": {
     "new-sim-math": "REPRODUCES"
@@ -194,7 +192,7 @@
    "file": "new_stream_get_no_cast.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.1,
+   "seconds": 2.5,
    "tail": "operandSegmentSizes = array<i32: 0, 0>}> {name = \"x\"} : () -> memref<i8>\n      \"affine.store\"(%1, %2) <{map = #map3}> {to = \"x\"} : (i32, memref<i8>) -> ()\n      %3 = \"affine.load\"(%2) <{map = #map3}> {from = \"x\"} : (memref<i8>) -> i8\n      \"affine.store\"(%3, %arg2, %arg4) <{map = #map}> {to = \"b\"} : (i8, memref<4xi8>, index) -> ()\n      \"affine.yield\"() : () -> ()\n    }) {loop_name = \"i\", op_name = \"S_i_0\"} : () -> ()\n    \"func.return\"() : () -> ()\n  }) {df.kernel, itypes = \"s_\", otypes = \"\", stypes = \"_i\"} : () -> ()\n  \"func.func\"() <{function_type = (memref<4xi32>, memref<4xi8>) -> (), sym_name = \"via_stream\"}> ({\n  ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi8>):\n    %0 = \"allo.stream_construct\"() {name = \"s\"} : () -> !allo.stream<i32, 2>\n    \"func.return\"() : () -> ()\n  }) {itypes = \"ss\", otypes = \"\"} : () -> ()\n}) : () -> ()\n\n{'int32 array -> int8': 'ok', 'int32 stream -> int8': \"MLIRError: error: unknown: 'affine.store' op value to store must have the same type as memref element\"}\n[item new-stream-get-cast] REPRODUCES: {'int32 array -> int8': 'ok', 'int32 stream -> int8': \"MLIRError: error: unknown: 'affine.store' op value to store must have the same type as memref element\"}\n",
    "verdicts": {
     "new-stream-get-cast": "REPRODUCES"
@@ -204,15 +202,17 @@
    "file": "new_subregion_foreign_globals.py",
    "produced_a_verdict": true,
    "rc": 0,
-   "seconds": 2.2,
-   "tail": "type_hint\n    base_type, base_shape, _ = TypeInferer.visit_type_hint(ctx, node.value)\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/allo/ir/infer.py\", line 113, in visit_type_hint\n    assert dtype is not None, f\"Unsupported type `{node.value.id}`\"\n           ^^^^^^^^^^^^^^^^^\nAssertionError: Unsupported type `Stream`\n\nError: Unsupported type `Stream`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 78 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   75: @df.region()                                                           \u2502\n\u2502   76: def top_a(A: int32[2], B: int32[2]):                                   \u2502\n\u2502   77:                                                                        \u2502\n\u2502   78:     @df.kernel(mapping=[1], args=[A, B])                               \u2502\n\u2502   79:     def drv_0(a: int32[2], b: int32[2]):                               \u2502\n\u2502   80:         inner(a, b)                                                    \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n[item new-subregion-globals] REPRODUCES: {'(a) caller lacks N_SUB/Stream': 'SystemExit: 1', '(b) caller imports N_SUB, Stream': 'ok'}\n",
+   "seconds": 2.9,
+   "tail": "ype, base_shape, _ = TypeInferer.visit_type_hint(ctx, node.value)\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/ir/infer.py\", line 113, in visit_type_hint\n    assert dtype is not None, f\"Unsupported type `{node.value.id}`\"\n           ^^^^^^^^^^^^^^^^^\nAssertionError: Unsupported type `Stream`\n\nError: Unsupported type `Stream`\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Traceback (most recent call last): Line: 78 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502   75: @df.region()                                                           \u2502\n\u2502   76: def top_a(A: int32[2], B: int32[2]):                                   \u2502\n\u2502   77:                                                                        \u2502\n\u2502   78:     @df.kernel(mapping=[1], args=[A, B])                               \u2502\n\u2502   79:     def drv_0(a: int32[2], b: int32[2]):                               \u2502\n\u2502   80:         inner(a, b)                                                    \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Source Code \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n[item new-subregion-globals] REPRODUCES: {'(a) caller lacks N_SUB/Stream': 'SystemExit: 1', '(b) caller imports N_SUB, Stream': 'ok'}\n",
    "verdicts": {
     "new-subregion-globals": "REPRODUCES"
    }
   }
  ],
- "seconds": 50.2,
- "silent": [],
+ "seconds": 61.7,
+ "silent": [
+  "item09_sim_cache_helpers.py"
+ ],
  "tier": "fast",
  "verdicts": {
   "item01_region_stateful.py:1": "FIXED",
@@ -223,7 +223,6 @@
   "item06_elif_local_dominance.py:6": "FIXED",
   "item07_bitwise_and.py:7": "CANNOT-REPRODUCE",
   "item08_subregion_two_callsites.py:8": "REPRODUCES",
-  "item09_sim_cache_helpers.py:9": "NOT-A-LIMITATION",
   "item10_error_source_location.py:10": "REPRODUCES",
   "item11_omp_team_size.py:11": "FIXED",
   "item14_wrapio_false_multidim.py:14": "REPRODUCES",
