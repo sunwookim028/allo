@@ -82,7 +82,7 @@ BASELINES = {
         dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
     # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
     # II=1 via s.dependence). Main's published numbers; re-measured by a no-diff
-    # control through this script, evidence/accept-control-476a70d8/.
+    # control through this script, dev/records/tinytpu/chia-evidence/accept-control-476a70d8/.
     ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
      "8f2e9aa9f518ef320cab163adc95e05737c777be"):
         dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686))),

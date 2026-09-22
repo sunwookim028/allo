@@ -273,7 +273,7 @@ No git worktree is created per worker. Each worker's spec, logs and
 
 ## First paid run on CHIA2026, 2026-09-19: one verified win, and two holes
 
-`evidence/isa-run1-20260919/` (its README has the per-worker detail): 2
+`dev/records/tinytpu/chia-evidence/isa-run1-20260919/` (its README has the per-worker detail): 2
 workers (`front-end`, `tail`) x <= 3 iterations, $30 cap, main @ `476a70d8`,
 **$28.54** (opencode's DB, all counted against CHIA2026's $100 cap), 100 min.
 
@@ -293,7 +293,7 @@ workers (`front-end`, `tail`) x <= 3 iterations, $30 cap, main @ `476a70d8`,
 
 ## Capped smoke run, 2026-09-19: nothing improved, and what it exposed
 
-`evidence/isa-smoke-20260919-035443/`: 2 workers (`operand-path`,
+`dev/records/tinytpu/chia-evidence/isa-smoke-20260919-035443/`: 2 workers (`operand-path`,
 `weight-prologue`), at most 3 iterations each, $15 hard cap, model
 `google-vertex/gemini-3.1-pro-preview`, harness @ `201f9342`..`68dfbc53` (same
 frozen files).
@@ -376,23 +376,23 @@ client and its timeout, `OpenCodeLLM`, keep-or-rewind, `variants.jsonl`,
 | f concurrent evaluations | responsive, no cross-talk | two cosims at once, `read_spec` worst 0.07 s; same-tool calls serialise |
 | accept on b | correct, not a win | ok, `claim: not-better`: 661 / 776 / 968 / 1028 / 1280, +409 / +393 / +377 / +361 / +361 over the five shapes, clock 2.431 ns |
 
-Full run: 43/43 cases in 22.3 min, $0.00, `evidence/harness-test-20260919-142252/`.
+Full run: 43/43 cases in 22.3 min, $0.00, `dev/records/tinytpu/chia-evidence/harness-test-20260919-142252/`.
 After the rebase onto main @ `e620576d` (stress_isa gate, gate_runner, pre-flight):
-49/49 cases in 22.8 min, $0.00, `evidence/harness-test-20260919-152522/`; the
+49/49 cases in 22.8 min, $0.00, `dev/records/tinytpu/chia-evidence/harness-test-20260919-152522/`; the
 loop phase took the pre-flight's test-model path (no cloud checks, $5 run cap).
 After the rebase onto main @ `476a70d8` (design 172 / 262 / 418 / 484 / 686):
-49/49 in 29.9 min, $0.00, `evidence/harness-test-20260919-164530/`. a:
+49/49 in 29.9 min, $0.00, `dev/records/tinytpu/chia-evidence/harness-test-20260919-164530/`. a:
 172 / 686. b (`spad = 0` restored) against the NEW design: 647 / 686 -> 1056,
 i.e. +475 / +370 at the two scored shapes; accept at all five shapes 647 / 710
 / 832 / 854 / 1056 = +475 / +448 / +414 / +370 / +370 (not the old +409 /
 +361). c: `gate:stress`, 251/492 exact. No-diff acceptance control:
-`evidence/accept-control-476a70d8/` -- 172 / 262 / 418 / 484 / 686, all five
+`dev/records/tinytpu/chia-evidence/accept-control-476a70d8/` -- 172 / 262 / 418 / 484 / 686, all five
 bit-exact, stress_isa 492/492, RTL stress testbench 0 mismatches over 6 calls
 at every shape, est. clock 2.431 ns.
 With the parametricity and documentation guards (phase g): **57/57** in
-30.7 min, $0.00, `evidence/harness-test-20260919-190240/`.
+30.7 min, $0.00, `dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/`.
 
-Evidence. `evidence/` holds what backs each claim here, trimmed: per run the
+Evidence. `dev/records/tinytpu/chia-evidence/` holds what backs each claim here, trimmed: per run the
 verdicts (`results.json`, `accept.json`, `variants.jsonl`, `summary.json`),
 the diffs, the costs from opencode's DB, and the timeline the workers were
 seeded with. Worker and cosim logs, csynth XMLs and the full branch history

@@ -69,7 +69,7 @@ Where the Code Lives
    * - ``main``
      - ``examples/accelerator/tinytpu_vitis/chia_agent/``: the loop for
        TinyTPU-isa, landed from ``chia-isa`` on 2026-09-19, with trimmed
-       evidence in ``chia_agent/evidence/``. The ``chia-isa`` branch is
+       evidence in ``dev/records/tinytpu/chia-evidence/``. The ``chia-isa`` branch is
        deleted; its history and raw run output are on the tag
        ``chia-isa-run1-evidence``.
    * - ``chia-codesign``
@@ -100,7 +100,7 @@ by RTL cosim.
 
 **Where it lives.** ``examples/accelerator/tinytpu_vitis/chia_agent/`` on
 ``main`` (landed 2026-09-19 from branch ``chia-isa``, now deleted). Its
-``README.md`` is the operator's manual; ``chia_agent/evidence/`` holds the
+``README.md`` is the operator's manual; ``dev/records/tinytpu/chia-evidence/`` holds the
 trimmed evidence behind every number below. The branch's full history and the
 raw run output (worker logs, cosim logs, csynth XMLs) are on the tag
 ``chia-isa-run1-evidence``, at ``chia_runs/<run>/``.
@@ -154,7 +154,7 @@ The evaluator
   ``C`` compared -- what sees an RTL-only failure such as a dependence pragma
   that is false at a short read-after-write distance). ``claim`` is ``win``
   only against the recorded baseline, itself measured by a no-diff run
-  (``evidence/accept-control-476a70d8/``: 172 / 262 / 418 / 484 / 686, RTL
+  (``dev/records/tinytpu/chia-evidence/accept-control-476a70d8/``: 172 / 262 / 418 / 484 / 686, RTL
   stress 0 mismatches at every shape).
 
 Guards
@@ -261,15 +261,15 @@ parametricity and documentation guards; **d** a deadlock killed at 240 s;
 **abf** no-op and a slower design scored concurrently; **loop** the real
 ``swarm -> loop -> opencode -> MCP`` path; **accept** ``accept.py`` on a
 correct-but-slower diff. 57/57 at landing
-(``evidence/harness-test-20260919-190240/``).
+(``dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/``).
 
 First paid run, 2026-09-19
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``evidence/isa-run1-20260919/``: 2 workers x at most 3 iterations, $30 cap,
+``dev/records/tinytpu/chia-evidence/isa-run1-20260919/``: 2 workers x at most 3 iterations, $30 cap,
 ``gemini-3.1-pro-preview`` on ``chia2026-tinytpu``, seeded with measured facts
 from the shipped design's 16x16x16 timeline
-(``evidence/timeline-476a70d8-16x16x16/``: 211 cycles of ``dma_ld`` and no MAC
+(``dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/``: 211 cycles of ``dma_ld`` and no MAC
 before cycle 285; the drain after the last PE). The pre-flight gate passed
 before any worker started.
 
@@ -317,7 +317,7 @@ a program's span stay inside the operand and land in buffer words the program
 never names. The diff as written also **deleted the 260-line design
 docstring** and hard-coded ``T = 4`` -- both invisible to the gate at the time,
 and the reason for guards 6 and 7. Re-expressed parametrically with the
-docstring intact (``evidence/isa-run1-20260919/param_burst.diff``, no model
+docstring intact (``dev/records/tinytpu/chia-evidence/isa-run1-20260919/param_burst.diff``, no model
 call) it gives identical cycles and area, passes the same acceptance, and is
 exact at MAXDIM 8 and 12. **It is not landed**: whether the burst widening is
 worth its block RAM is a separate decision.
@@ -338,7 +338,7 @@ Two observations worth keeping:
 Earlier: capped smoke run, 2026-09-19, old design, old project
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``evidence/isa-smoke-20260919-035443/``: 2 workers against the design shipped
+``dev/records/tinytpu/chia-evidence/isa-smoke-20260919-035443/``: 2 workers against the design shipped
 until ``e24e433b`` (252 / 383 / 591 / 667 / 919), $15 hard cap, billed to the
 general project ``test-adrs``. **$15.15**, 56 min, **no candidate completed**:
 opencode timed MCP calls out at 60 s while a cosim takes minutes, a hung

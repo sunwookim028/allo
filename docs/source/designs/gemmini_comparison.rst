@@ -220,7 +220,7 @@ therefore quoted as a range, 35-95 (65 averaged over both orders).
 between 42 and 93 cycles at the three shapes the branch did not measure (262
 against 220, 418 against 347, 484 against 391). The branch estimated where the
 16x16x16 residual sits from the stack's per-process timelines
-(``impact/results/``): operand staging (~84 cycles), the serial DMA ahead of
+(``dev/records/tinytpu/impact-results/``): operand staging (~84 cycles), the serial DMA ahead of
 the first weight, and the drain (~142). That split is an **estimate**, and no
 change against it has been built or measured.
 
@@ -371,7 +371,7 @@ in the instruction word fixed it in both ``spm`` (``v_wdirect``) and ``accu``;
 the landed sequencer does the same.
 
 The pre-landing design's per-process timeline at 16x16x16
-(``impact/results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
+(``dev/records/tinytpu/impact-results/base.rle.txt``) reads, in monitor cycles: 0-47 region start
 (``s_axilite`` programming, inside the cosim window), 47-120 program prefetch,
 120-204 operand bursts, 204-334 128 DMA rows through ``spm``, 334-799 ``vru``
 running 465 cycles back-to-back (its 464 words at II=1), and 799-921 the drain
@@ -555,7 +555,7 @@ elaborated chipyard tree, not argued from documentation.
 ``TestHarness.sv``. That ``SimDRAM`` fork only instantiates DRAMSim2 given
 ``+dramsim``; otherwise it is ``mm_magic_t`` at ~1-2 cycle AXI latency.
 Re-running the existing simulator and ELF both ways gives ``MLP 4.8.8.4`` = 1146
-without and 1174 with, and ``logs/gemmini_int8_dim4.log`` records 1146 with no
+without and 1174 with, and ``dev/records/tinytpu/logs/gemmini_int8_dim4.log`` records 1146 with no
 DRAMSim banner. **All five headline shapes are bit-identical either way**,
 because ``fill()`` plus the warm-up leaves A/B/C resident in L1/L2. Both sides
 are idealised. Disclosed, not corrected for.
@@ -612,8 +612,8 @@ answers immediately. That is Vitis's default and it was never stated, so it is
 stated here, along with what happens when it is not true.
 
 Rebuilding the design at a given read latency and cosimulating it there
-(``cosim.py`` with ``TPU_AXI_LATENCY``; ``logs/cosim_isa_landed_axi_latency.log``,
-and ``logs/cosim_isa_axi_latency_sweep.log`` for the pre-landing design):
+(``cosim.py`` with ``TPU_AXI_LATENCY``; ``dev/records/tinytpu/logs/cosim_isa_landed_axi_latency.log``,
+and ``dev/records/tinytpu/logs/cosim_isa_axi_latency_sweep.log`` for the pre-landing design):
 
 .. list-table::
    :header-rows: 1
@@ -892,7 +892,7 @@ Applying and running
 
 ``~/chipyard/env.sh`` activates Chipyard's own conda environment and so replaces
 the ``allo`` one; source it in a separate shell (``dev/toolchains.rst``).
-Raw Gemmini output is in ``logs/gemmini_int8_dim4.log``.
+Raw Gemmini output is in ``dev/records/tinytpu/logs/gemmini_int8_dim4.log``.
 
 ``allo_cmp.c`` measures what a user gets: ``tiled_matmul_auto``, driver and all.
 ``allo_bare5.c`` measures what the hardware does: ``rdcycle`` -> 5 ``config``\ s
@@ -912,7 +912,7 @@ Things that cost time to learn
   because of this; do not expect to get numbers from the shipped benchmarks.
 * **One Verilator run takes about 80 s**, not the 22 minutes an earlier
   revision of this page claimed -- wrong by ~17x, and contradicted by this
-  repository's own ``logs/gemmini_int8_dim4.log``, which records
+  repository's own ``dev/records/tinytpu/logs/gemmini_int8_dim4.log``, which records
   ``walltime 85.786 s; speed 13.101 us/s``. Re-measured: **79.6 s at
   14.1 us/s** for ``allo_cmp``. So the five-shape sweep *is* interactive and
   needs no special budgeting; the ``allo_bare5.c`` window run quoted above is

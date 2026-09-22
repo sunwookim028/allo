@@ -585,17 +585,19 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
    * - ``kpn_model.py``
      - a KPN model of the channel graph with bounded FIFOs and deadlock
        reporting
-   * - ``logs/``
-     - the csynth/cosim reports and sweep logs behind the numbers on these
-       pages
    * - ``gemmini/``
      - the patches and benchmarks for the matched Gemmini baseline
        (:ref:`gemmini-reproduce`)
    * - ``impact/``
      - the gap attribution's variants (generated from the pre-landing
-       baseline), their raw results and timelines, the Vitis shared-array
-       probe, and the RTL probe of the accumulator's dependence claim
-       (:ref:`gemmini-attribution-reproduce`)
+       baseline), the Vitis shared-array probe, and the RTL probe of the
+       accumulator's dependence claim (:ref:`gemmini-attribution-reproduce`)
+
+The csynth/cosim reports and sweep logs behind the numbers on these pages,
+and the gap attribution's raw results and timelines, are evidence rather than
+part of the design: they live under ``dev/records/tinytpu/logs/`` and
+``dev/records/tinytpu/impact-results/`` at the repository root, not in
+``examples/``.
 
 .. code-block:: bash
 
@@ -740,7 +742,7 @@ below. Run ``stress_isa.py`` after **any** change to ``microarch_isa.py``, and
    ``none`` control through the same loader), each run through ``bench_isa``
    and ``stress_isa``, and through the ``TPU_TB=stress`` cosim for the one
    RTL-only mutant (and for any mutant on request). **All 34 are caught**
-   (``logs/mutate_landed.log``). 20 fail ``bench_isa``. 13 get past it and are
+   (``dev/records/tinytpu/logs/mutate_landed.log``). 20 fail ``bench_isa``. 13 get past it and are
    caught **only** by ``stress_isa``: ``pe_psum_int16`` (int16 partial sum),
    ``clip_hi_off_by_one`` and ``clip_lo_off_by_one`` (both clip bounds),
    ``vadd_dst_is_src1`` and ``vrelu_dst_is_src`` (vadd/vrelu destination),
@@ -820,7 +822,7 @@ there. In the synthesized loop (II=1, depth 6) the ``ar`` load issues in
 pipeline state 5 and the store lands in state 7, so a row read one or two
 iterations after it was written returns its **old** value. Measured in RTL
 with ``isa_dsl.ar_distance_program(d)``, every read exactly ``d`` iterations
-after its write (``logs/cosim_isa_ar_distance.log``,
+after its write (``dev/records/tinytpu/logs/cosim_isa_ar_distance.log``,
 ``impact/ar_distance_probe.py``):
 
 .. list-table::
@@ -873,8 +875,8 @@ Cycle counts (current build)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Measured by Vitis ``cosim`` (xsim), one build, ``-m_axi_latency 0``
-(``logs/cosim_isa_landed_sweep.log``, ``e24e433b``), against the pre-landing
-build that was shipped until then (``logs/cosim_isa_widened_sweep.log``):
+(``dev/records/tinytpu/logs/cosim_isa_landed_sweep.log``, ``e24e433b``), against the pre-landing
+build that was shipped until then (``dev/records/tinytpu/logs/cosim_isa_widened_sweep.log``):
 
 .. list-table::
    :header-rows: 1
@@ -919,7 +921,7 @@ build that was shipped until then (``logs/cosim_isa_widened_sweep.log``):
 The two shapes the gap attribution measured (172 and 686, :ref:`gemmini-gap-attribution`)
 reproduce exactly; the other three were first measured on this build.
 ``TPU_TB=stress`` cosim at 4x4x4 and 16x16x16: 0 wrong over 6 calls each
-(``logs/cosim_isa_landed_stress.log``).
+(``dev/records/tinytpu/logs/cosim_isa_landed_stress.log``).
 
 Utilization against the 4x4 array's peak is 2.3% / 12.2% / 25.8% / 26.4% /
 37.3% (was 1.6% / 8.4% / 18.3% / 19.2% / 27.9%). Least squares against dynamic
@@ -1025,7 +1027,7 @@ Resources
 
 What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
 pre-landing design re-synthesized with the same toolchain
-(``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``). The
+(``dev/records/tinytpu/logs/csynth_isa_prelanding.rpt``, ``dev/records/tinytpu/logs/csynth_isa_landed.rpt``). The
 estimated clock is **2.431 ns** for both, so the design still meets 3.33 ns
 with the same margin. The last row is the remainder, and ``entry_proc`` is in
 it (6,363 FF = 6,360 + 3; 7,809 LUT = 7,780 + 29), so a re-derivation from the
