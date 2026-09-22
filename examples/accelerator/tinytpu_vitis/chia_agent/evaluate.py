@@ -44,7 +44,9 @@ The two tiers:
    cosim cycles over the requested shapes. It is an RTL measurement.
 
 The memory model is not the candidate's to choose: every `TPU_*` environment
-variable is scrubbed before `cosim.py` runs, so `-m_axi_latency` stays at its
+variable is scrubbed before `cosim.py` runs, except the scored configuration
+(`SCORED`: T=4, MAXDIM=16, pinned rather than left to the design's default)
+and the project path, so `-m_axi_latency` stays at its
 default 0 and `-random_stall` stays off, and the generated `kernel.cpp` / TCL are
 checked for interface-latency overrides afterwards.
 
@@ -97,20 +99,29 @@ PKG = "examples/accelerator/tinytpu_vitis"
 #: from what is COMMITTED, never from the working tree. Only a person, in a
 #: commit, can change them.
 FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
-#: main's commit this branch is based on. The design's own evaluator --
-#: cosim.py, bench_isa.py, shapes.py and the stress gate with its reference
-#: model -- must be byte-identical to it, so this branch cannot drift from how
-#: main measures and verifies the design. Moving it is a deliberate, reviewed
-#: commit, and it has to move in the SAME change as any edit to those files.
-#:
-#: History: 476a70d8 was the gap-attribution stack (172 / 262 / 418 / 484 /
-#: 686, and AR_RAW_DIST in check_program). acb080bd moves it for the five-shape
-#: deduplication only -- bench_isa.py, stress_isa.py and cosim.py now import
-#: the list from shapes.py instead of each spelling it out. The list, its
-#: order and every cycle count are unchanged; `git diff 476a70d8 acb080bd --
-#: examples/accelerator/tinytpu_vitis/{cosim,bench_isa,stress_isa}.py` is the
-#: whole of it.
-MAIN_BASE = "f59a65f6"
+#: The main commit the frozen ref is based on: the design's own evaluator
+#: (DESIGN_EVALUATOR) must be byte-identical there, so a branch cannot drift
+#: from how main measures the design. Derived, never typed in: a hand-pinned
+#: hash went stale three times in two days and refused every candidate at
+#: `setup`. `CHIA_MAIN_BASE` names a different commit deliberately (a held-out
+#: ref pins to its own).
+MAIN_REF = os.environ.get("CHIA_MAIN_REF", "origin/main")
+
+
+def main_base(ref: str) -> str:
+    """`CHIA_MAIN_BASE` if set, else the merge-base of `ref` and main."""
+    pinned = os.environ.get("CHIA_MAIN_BASE")
+    if pinned:
+        return resolve_ref(pinned)
+    for main in (MAIN_REF, "main"):
+        out = subprocess.run(["git", "merge-base", ref, main], cwd=REPO,
+                             capture_output=True, text=True)
+        if out.returncode == 0:
+            return out.stdout.strip()
+    raise Reject("setup", f"no merge-base of {ref} with {MAIN_REF} or main; set "
+                          f"CHIA_MAIN_BASE to the main commit this ref is based on")
+
+
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
     "shapes.py")]
@@ -137,6 +148,10 @@ FROZEN = [
 #: than for a wrong answer. MAXDIM=32 gives ratio 4 and every seed generates.
 PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"},
                  {"TPU_T": "8", "TPU_MAXDIM": "32"}]
+#: The scored configuration, set explicitly in every evaluation rather than
+#: assumed to be the design's default (the default moved to MAXDIM=64 and every
+#: candidate died at `invariant`). reproduce.sh pins the same point.
+SCORED = {"TPU_T": "4", "TPU_MAXDIM": "16"}
 EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
@@ -201,9 +216,10 @@ def compose(spec_dir: Path, tree: Path, ref: str):
     """Evaluation tree = frozen files from git + the candidate's two files.
 
     Returns {relative path: sha256} for every file in the tree."""
+    base = main_base(ref)
     for rel in DESIGN_EVALUATOR:
-        if git_show(ref, rel) != git_show(MAIN_BASE, rel):
-            raise Reject("setup", f"{rel} @ {ref[:8]} differs from main @ {MAIN_BASE}")
+        if git_show(ref, rel) != git_show(base, rel):
+            raise Reject("setup", f"{rel} @ {ref[:8]} differs from main @ {base[:8]}")
     # The policy is executed from git too, not imported from the working tree.
     policy = {"__name__": "spec_policy"}
     exec(compile(git_show(ref, f"{PKG}/chia_agent/spec_policy.py"),
@@ -258,6 +274,7 @@ def verify(tree: Path, manifest: dict, checkout: str, after: str):
 
 def env_for(tree: Path):
     env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+    env.update(SCORED)
     env.update({
         # tree first (the candidate + frozen files), then this checkout for the
         # `allo` package and its in-tree mlir bindings.
@@ -307,10 +324,11 @@ def check_invariants(tree, env, work):
     if rc:
         raise Reject("import", out[-3000:])
     inv = json.loads(out.strip().splitlines()[-1])
-    if inv["T"] != 4 or inv["MAXDIM"] != 16:
+    want = {"T": int(SCORED["TPU_T"]), "MAXDIM": int(SCORED["TPU_MAXDIM"])}
+    if {k: inv[k] for k in want} != want:
         raise Reject("invariant",
-                     f"T={inv['T']} MAXDIM={inv['MAXDIM']}; the comparison is a "
-                     f"4x4 array at MAXDIM 16 and both are frozen")
+                     f"T={inv['T']} MAXDIM={inv['MAXDIM']} under {SCORED}; the "
+                     f"design does not honour the scored configuration")
     return inv
 
 

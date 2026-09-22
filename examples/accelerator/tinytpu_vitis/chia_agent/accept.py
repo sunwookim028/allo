@@ -10,7 +10,8 @@ convenience, not evidence. A claim is accepted only by this script:
    (~40 s; no symlink into any other checkout),
 4. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
    `cosim.py`, and `cosim.py` again with `TPU_TB=stress` (the RTL correctness
-   testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
+   testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except
+   the scored configuration (`evaluate.SCORED`) and `TPU_PRJ` (where the Vitis
    project goes) -- so all five SHAPES, default memory model -- each run from
    that checkout under `chia_agent/gate_runner.py`, which vouches for each
    verdict with a per-run nonce instead of trusting printed lines,
@@ -54,7 +55,7 @@ sys.path.insert(0, str(AGENT_DIR))
 #: script imports it. It used to exist here as a second copy; a
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
-from evaluate import ALL_SHAPES, vouch  # noqa: E402
+from evaluate import ALL_SHAPES, PARAM_CONFIGS, SCORED, vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
@@ -153,7 +154,8 @@ def main():
     wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
     result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
               "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
-                             "clean checkout, all five SHAPES, TPU_* unset"}
+                             "clean checkout, all five SHAPES, TPU_* unset but "
+                             f"{SCORED} and TPU_PRJ"}
     subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
                    check=True, capture_output=True)
     try:
@@ -188,7 +190,7 @@ def main():
         tracked = lambda: sh(["git", "status", "--porcelain",
                               "--untracked-files=no"], wt)[1]
 
-        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")} | SCORED
         env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
                    OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
                    PYTHONDONTWRITEBYTECODE="1")
@@ -233,7 +235,7 @@ def main():
         # Parametricity, as in the search's gate: rebuilt at other MAXDIMs,
         # exact (param_check.py, frozen at --ref).
         result["param"], param_ok = {}, True
-        for cfg in ({"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"}):
+        for cfg in PARAM_CONFIGS:
             tag = ",".join(f"{k}={v}" for k, v in cfg.items())
             okp, rcp, op, secp = vouched("param_check", wt, wt, dict(env, **cfg),
                                          out / f"param_check_{tag}.log", cos,
