@@ -253,13 +253,6 @@ an API to access the source code of a Python function. We can call
 </span><span class="n">src</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">matrix_add</span><span class="p">)</span><span class="w">
 </span><span class="nb">print</span><span class="p">(</span><span class="n">src</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>def matrix_add(A: int32[M, N]) -&gt; int32[M, N]:
-    B: int32[M, N] = 0
-    for i, j in allo.grid(M, N):
-        B[i, j] = A[i, j] + 1
-    return B
-</pre></div>
-</div>
 <p>After we get the string representation of the source code, we can use
 the <code class="docutils literal notranslate"><span class="pre">ast</span></code> module to parse the code to an AST. The <code class="docutils literal notranslate"><span class="pre">astpretty</span></code> module
 can be used to print the AST in a human-readable format, which requires to
@@ -270,132 +263,6 @@ be installed through <code class="docutils literal notranslate"><span class="pre
 </span><span class="n">tree</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">src</span><span class="p">)</span><span class="w">
 </span><span class="n">astpretty</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">show_offsets</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Module(
-  body=[
-    FunctionDef(
-      name='matrix_add',
-      args=arguments(
-        posonlyargs=[],
-        args=[
-          arg(
-            arg='A',
-            annotation=Subscript(
-              value=Name(id='int32', ctx=Load()),
-              slice=Tuple(
-                elts=[
-                  Name(id='M', ctx=Load()),
-                  Name(id='N', ctx=Load()),
-                ],
-                ctx=Load(),
-              ),
-              ctx=Load(),
-            ),
-            type_comment=None,
-          ),
-        ],
-        vararg=None,
-        kwonlyargs=[],
-        kw_defaults=[],
-        kwarg=None,
-        defaults=[],
-      ),
-      body=[
-        AnnAssign(
-          target=Name(id='B', ctx=Store()),
-          annotation=Subscript(
-            value=Name(id='int32', ctx=Load()),
-            slice=Tuple(
-              elts=[
-                Name(id='M', ctx=Load()),
-                Name(id='N', ctx=Load()),
-              ],
-              ctx=Load(),
-            ),
-            ctx=Load(),
-          ),
-          value=Constant(value=0, kind=None),
-          simple=1,
-        ),
-        For(
-          target=Tuple(
-            elts=[
-              Name(id='i', ctx=Store()),
-              Name(id='j', ctx=Store()),
-            ],
-            ctx=Store(),
-          ),
-          iter=Call(
-            func=Attribute(
-              value=Name(id='allo', ctx=Load()),
-              attr='grid',
-              ctx=Load(),
-            ),
-            args=[
-              Name(id='M', ctx=Load()),
-              Name(id='N', ctx=Load()),
-            ],
-            keywords=[],
-          ),
-          body=[
-            Assign(
-              targets=[
-                Subscript(
-                  value=Name(id='B', ctx=Load()),
-                  slice=Tuple(
-                    elts=[
-                      Name(id='i', ctx=Load()),
-                      Name(id='j', ctx=Load()),
-                    ],
-                    ctx=Load(),
-                  ),
-                  ctx=Store(),
-                ),
-              ],
-              value=BinOp(
-                left=Subscript(
-                  value=Name(id='A', ctx=Load()),
-                  slice=Tuple(
-                    elts=[
-                      Name(id='i', ctx=Load()),
-                      Name(id='j', ctx=Load()),
-                    ],
-                    ctx=Load(),
-                  ),
-                  ctx=Load(),
-                ),
-                op=Add(),
-                right=Constant(value=1, kind=None),
-              ),
-              type_comment=None,
-            ),
-          ],
-          orelse=[],
-          type_comment=None,
-        ),
-        Return(
-          value=Name(id='B', ctx=Load()),
-        ),
-      ],
-      decorator_list=[],
-      returns=Subscript(
-        value=Name(id='int32', ctx=Load()),
-        slice=Tuple(
-          elts=[
-            Name(id='M', ctx=Load()),
-            Name(id='N', ctx=Load()),
-          ],
-          ctx=Load(),
-        ),
-        ctx=Load(),
-      ),
-      type_comment=None,
-      type_params=[],
-    ),
-  ],
-  type_ignores=[],
-)
-</pre></div>
-</div>
 <p>The AST is a tree structure that represents the syntactic structure of the
 source code. Each node is an operator or an annotation in the source code.
 For example, the <code class="docutils literal notranslate"><span class="pre">FunctionDef</span></code> node represents a function
@@ -508,7 +375,6 @@ Please refer to the <a class="reference external" href="https://github.com/corne
 After building the IR, you can call <code class="docutils literal notranslate"><span class="pre">s.module</span></code> to see the effect.</p>
 <p>Most of the MLIR operations can be found on this <a class="reference external" href="https://mlir.llvm.org/docs/Dialects/">webpage</a>, and now
 you can follow the definitions and add more amazing facilities to the new Allo compiler!</p>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.004 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-gallery-developer-01-ir-builder-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/3bd558739d56fea84d5bc34e888e3da9/developer_01_ir_builder.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">developer_01_ir_builder.ipynb</span></code></a></p>

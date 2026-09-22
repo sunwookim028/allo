@@ -240,48 +240,14 @@ To invoke the kernel with a specific data type, we can use the <code class="docu
 </span>    <span class="k">return</span> <span class="n">B</span><span class="w">
 </span><span class="w">
 </span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel(%arg0: memref&lt;10xi32&gt;) -&gt; memref&lt;10xi32&gt; attributes {itypes = "s", otypes = "s"} {
-    %alloc = memref.alloc() {name = "B"} : memref&lt;10xi32&gt;
-    affine.for %arg1 = 0 to 10 {
-      %0 = affine.load %arg0[%arg1] {from = "A"} : memref&lt;10xi32&gt;
-      %1 = arith.extsi %0 : i32 to i33
-      %c1_i32 = arith.constant 1 : i32
-      %c1_i32_0 = arith.constant 1 : i32
-      %2 = arith.extsi %c1_i32_0 : i32 to i33
-      %3 = arith.addi %1, %2 : i33
-      %4 = arith.trunci %3 : i33 to i32
-      affine.store %4, %alloc[%arg1] {to = "B"} : memref&lt;10xi32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc : memref&lt;10xi32&gt;
-  }
-}
-</pre></div>
-</div>
 <p>We can see that the kernel is specialized with the given <code class="docutils literal notranslate"><span class="pre">int32</span></code> data type.
 Similarly, we can directly declare a new kernel by specifying <code class="docutils literal notranslate"><span class="pre">float32</span></code> as the data type.</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">float32</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">float32</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel(%arg0: memref&lt;10xf32&gt;) -&gt; memref&lt;10xf32&gt; attributes {itypes = "_", otypes = "_"} {
-    %alloc = memref.alloc() {name = "B"} : memref&lt;10xf32&gt;
-    affine.for %arg1 = 0 to 10 {
-      %0 = affine.load %arg0[%arg1] {from = "A"} : memref&lt;10xf32&gt;
-      %c1_i32 = arith.constant 1 : i32
-      %c1_i32_0 = arith.constant 1 : i32
-      %1 = arith.sitofp %c1_i32_0 : i32 to f32
-      %2 = arith.addf %0, %1 : f32
-      affine.store %2, %alloc[%arg1] {to = "B"} : memref&lt;10xf32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc : memref&lt;10xf32&gt;
-  }
-}
-</pre></div>
-</div>
 <p>If we not only want to specialize the data type but also the shape of the array, we can provide another type variable, and pass it to the <code class="docutils literal notranslate"><span class="pre">instantiate</span></code> argument.
 Note that here we also use the <code class="docutils literal notranslate"><span class="pre">&lt;type_var&gt;:</span> <span class="pre">base_type</span></code> notation to constrain the type of the type variable. Here we constrain the type variable <code class="docutils literal notranslate"><span class="pre">M</span></code> to be an integer.</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">kernel2</span><span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">M</span><span class="p">:</span> <span class="n">int32</span><span class="p">]</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="s2">&quot;</span><span class="s2">T[M]</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">-</span><span class="o">&gt;</span> <span class="s2">&quot;</span><span class="s2">T[M]</span><span class="s2">&quot;</span><span class="p">:</span><span class="w">
@@ -291,27 +257,9 @@ Note that here we also use the <code class="docutils literal notranslate"><span 
 </span>    <span class="k">return</span> <span class="n">B</span><span class="w">
 </span><span class="w">
 </span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel2</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel2</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel2(%arg0: memref&lt;20xi32&gt;) -&gt; memref&lt;20xi32&gt; attributes {itypes = "s", otypes = "s"} {
-    %alloc = memref.alloc() {name = "B"} : memref&lt;20xi32&gt;
-    affine.for %arg1 = 0 to 20 {
-      %0 = affine.load %arg0[%arg1] {from = "A"} : memref&lt;20xi32&gt;
-      %1 = arith.extsi %0 : i32 to i33
-      %c1_i32 = arith.constant 1 : i32
-      %c1_i32_0 = arith.constant 1 : i32
-      %2 = arith.extsi %c1_i32_0 : i32 to i33
-      %3 = arith.addi %1, %2 : i33
-      %4 = arith.trunci %3 : i33 to i32
-      affine.store %4, %alloc[%arg1] {to = "B"} : memref&lt;20xi32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc : memref&lt;20xi32&gt;
-  }
-}
-</pre></div>
-</div>
 <p>Furthermore, Allo’s template also enables metaprogramming that can evaluate type variables at compile time.
 Specifically, we can use the <code class="docutils literal notranslate"><span class="pre">allo.meta_if</span></code>, <code class="docutils literal notranslate"><span class="pre">allo.meta_elif</span></code>, and <code class="docutils literal notranslate"><span class="pre">allo.meta_else</span></code> to conditionally generate code based on the type variables.
 Just to make sure the conditions can be determined at compile time.</p>
@@ -325,45 +273,11 @@ Just to make sure the conditions can be determined at compile time.</p>
 </span>    <span class="k">return</span> <span class="n">B</span><span class="w">
 </span></pre></div></div>
 <p>In final generated code, we can see that only a single branch is generated based on the given data type.</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel3</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel3</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">float32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel3</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel3</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="p">[</span><span class="n">float32</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel3(%arg0: memref&lt;20xi32&gt;) -&gt; memref&lt;20xi32&gt; attributes {itypes = "s", otypes = "s"} {
-    %alloc = memref.alloc() {name = "B"} : memref&lt;20xi32&gt;
-    affine.for %arg1 = 0 to 20 {
-      %0 = affine.load %arg0[%arg1] {from = "A"} : memref&lt;20xi32&gt;
-      %1 = arith.extsi %0 : i32 to i33
-      %c1_i32 = arith.constant 1 : i32
-      %c1_i32_0 = arith.constant 1 : i32
-      %2 = arith.extsi %c1_i32_0 : i32 to i33
-      %3 = arith.addi %1, %2 : i33
-      %4 = arith.trunci %3 : i33 to i32
-      affine.store %4, %alloc[%arg1] {to = "B"} : memref&lt;20xi32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc : memref&lt;20xi32&gt;
-  }
-}
-
-module {
-  func.func @kernel3(%arg0: memref&lt;20xf32&gt;) -&gt; memref&lt;20xf32&gt; attributes {itypes = "_", otypes = "_"} {
-    %alloc = memref.alloc() {name = "B"} : memref&lt;20xf32&gt;
-    affine.for %arg1 = 0 to 20 {
-      %0 = affine.load %arg0[%arg1] {from = "A"} : memref&lt;20xf32&gt;
-      %c1_i32 = arith.constant 1 : i32
-      %c1_i32_0 = arith.constant 1 : i32
-      %1 = arith.sitofp %c1_i32_0 : i32 to f32
-      %2 = arith.subf %0, %1 : f32
-      affine.store %2, %alloc[%arg1] {to = "B"} : memref&lt;20xf32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc : memref&lt;20xf32&gt;
-  }
-}
-</pre></div>
-</div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.239 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-gallery-dive-02-template-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/de72dcd3242a3c85b41c9c54a3424409/dive_02_template.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">dive_02_template.ipynb</span></code></a></p>

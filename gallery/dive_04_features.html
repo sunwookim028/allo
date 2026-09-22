@@ -237,65 +237,18 @@ but we can still run the LLVM module with arbitrary shapes of NumPy arrays.</p>
 </span>        <span class="n">B</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w">
 </span><span class="w">
 </span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">allo_A</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
-</span><span class="n">mod</span> <span class="o">=</span> <a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="p">)</span><span class="w">
-</span><span class="n">mod</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">allo_A</span></a><span class="p">,</span> <span class="mi">256</span><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">allo_A</span></a><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">np_A</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">allo_A</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="n">mod</span><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">allo_A</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span><span class="w">
+</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">allo_A</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel(%arg0: memref&lt;?xf32&gt;, %arg1: memref&lt;?xf32&gt;, %arg2: i32) attributes {itypes = "__s", otypes = ""} {
-    %c0_i32 = arith.constant 0 : i32
-    %c0_i32_0 = arith.constant 0 : i32
-    %0 = arith.index_cast %c0_i32_0 : i32 to index
-    %1 = arith.index_cast %arg2 : i32 to index
-    %c1_i32 = arith.constant 1 : i32
-    %c1_i32_1 = arith.constant 1 : i32
-    %2 = arith.index_cast %c1_i32_1 : i32 to index
-    scf.for %arg3 = %0 to %1 step %2 {
-      %3 = memref.load %arg0[%arg3] {from = "A"} : memref&lt;?xf32&gt;
-      memref.store %3, %arg1[%arg3] {to = "B"} : memref&lt;?xf32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return
-  }
-}
-</pre></div>
-</div>
 <p>We can also check the generated HLS code that the arguments are declared as pointers.</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">code</span> <span class="o">=</span> <a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">&quot;</span><span class="s2">vhls</span><span class="s2">&quot;</span><span class="p">)</span><span class="w">
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">code</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">&quot;</span><span class="s2">vhls</span><span class="s2">&quot;</span><span class="p">)</span><span class="w">
 </span><span class="nb">print</span><span class="p">(</span><span class="n">code</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>//===------------------------------------------------------------*- C++ -*-===//
-//
-// Automatically generated file for High-level Synthesis (HLS).
-//
-//===----------------------------------------------------------------------===//
-#include &lt;algorithm&gt;
-#include &lt;ap_axi_sdata.h&gt;
-#include &lt;ap_fixed.h&gt;
-#include &lt;ap_int.h&gt;
-#include &lt;hls_math.h&gt;
-#include &lt;hls_stream.h&gt;
-#include &lt;hls_vector.h&gt;
-#include &lt;math.h&gt;
-#include &lt;stdint.h&gt;
-using namespace std;
-/// This is top function.
-void kernel(
-  float *v0,
-  float *v1,
-  int32_t v2
-) {     // L2
-  int v3 = v2;  // L6
-  for (int v4 = 0; v4 &lt; v3; v4 += 1) {  // L10
-    float v5 = *v0[v4]; // L11
-    *v1[v4] = v5;       // L12
-  }
-}
-</pre></div>
-</div>
 </section>
 <section id="tuple-return">
 <h2>Tuple Return<a class="headerlink" href="#tuple-return" title="Link to this heading"><span>¶</span></a></h2>
@@ -315,54 +268,19 @@ also supports this by explicitly specifying the return type as a tuple.</p>
 </span>    <span class="k">return</span> <span class="n">C</span><span class="p">,</span> <span class="n">D</span><span class="w">
 </span><span class="w">
 </span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
-</span><span class="n">mod</span> <span class="o">=</span> <a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_B</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_C</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_D</span></a> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_B</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_C_ref</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_D_ref</span></a> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="n">np_A</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">np_B</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.random.html#numpy.random.random" title="numpy.random.random"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">np_C</span><span class="p">,</span> <span class="n">np_D</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">np_A</span><span class="p">,</span> <span class="n">np_B</span><span class="p">)</span><span class="w">
+</span><span class="n">np_C_ref</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
+</span><span class="n">np_D_ref</span> <span class="o">=</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.zeros.html#numpy.zeros" title="numpy.zeros"><span class="n">np</span><span class="o">.</span><span class="n">zeros</span></a><span class="p">(</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="p">)</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute reference external" href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float32" title="numpy.float32"><span class="n">np</span><span class="o">.</span><span class="n">float32</span></a><span class="p">)</span><span class="w">
 </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="p">:</span><span class="w">
-</span>    <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_C_ref</span></a><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_D_ref</span></a><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">callee</span><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_A</span></a><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_B</span></a><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_C</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_C_ref</span></a><span class="p">)</span><span class="w">
-</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_D</span></a><span class="p">,</span> <a class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray"><span class="n">np_D_ref</span></a><span class="p">)</span><span class="w">
+</span>    <span class="n">np_C_ref</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">,</span> <span class="n">np_D_ref</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">callee</span><span class="p">(</span><span class="n">np_A</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">,</span> <span class="n">np_B</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><span class="n">np_C</span><span class="p">,</span> <span class="n">np_C_ref</span><span class="p">)</span><span class="w">
+</span><a class="sphx-glr-backref-module-numpy-testing sphx-glr-backref-type-py-function reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html#numpy.testing.assert_allclose" title="numpy.testing.assert_allclose"><span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span></a><span class="p">(</span><span class="n">np_D</span><span class="p">,</span> <span class="n">np_D_ref</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @callee(%arg0: f32, %arg1: f32) -&gt; (f32, f32) attributes {itypes = "__", otypes = "__"} {
-    %0 = arith.addf %arg0, %arg1 : f32
-    %alloc = memref.alloc() {name = "c"} : memref&lt;f32&gt;
-    affine.store %0, %alloc[] {to = "c"} : memref&lt;f32&gt;
-    %1 = arith.subf %arg0, %arg1 : f32
-    %alloc_0 = memref.alloc() {name = "d"} : memref&lt;f32&gt;
-    affine.store %1, %alloc_0[] {to = "d"} : memref&lt;f32&gt;
-    %2 = affine.load %alloc[] {from = "c"} : memref&lt;f32&gt;
-    %3 = affine.load %alloc_0[] {from = "d"} : memref&lt;f32&gt;
-    return %2, %3 : f32, f32
-  }
-  func.func @kernel(%arg0: memref&lt;10xf32&gt;, %arg1: memref&lt;10xf32&gt;) -&gt; (memref&lt;10xf32&gt;, memref&lt;10xf32&gt;) attributes {itypes = "__", otypes = "__"} {
-    %c0_i32 = arith.constant 0 : i32
-    %c0_i32_0 = arith.constant 0 : i32
-    %0 = arith.sitofp %c0_i32_0 : i32 to f32
-    %alloc = memref.alloc() {name = "C"} : memref&lt;10xf32&gt;
-    linalg.fill ins(%0 : f32) outs(%alloc : memref&lt;10xf32&gt;)
-    %c0_i32_1 = arith.constant 0 : i32
-    %c0_i32_2 = arith.constant 0 : i32
-    %1 = arith.sitofp %c0_i32_2 : i32 to f32
-    %alloc_3 = memref.alloc() {name = "D"} : memref&lt;10xf32&gt;
-    linalg.fill ins(%1 : f32) outs(%alloc_3 : memref&lt;10xf32&gt;)
-    affine.for %arg2 = 0 to 10 {
-      %2 = affine.load %arg0[%arg2] {from = "A"} : memref&lt;10xf32&gt;
-      %3 = affine.load %arg1[%arg2] {from = "B"} : memref&lt;10xf32&gt;
-      %4:2 = func.call @callee(%2, %3) : (f32, f32) -&gt; (f32, f32)
-      affine.store %4#0, %alloc[%arg2] {to = "C"} : memref&lt;10xf32&gt;
-      affine.store %4#1, %alloc_3[%arg2] {to = "D"} : memref&lt;10xf32&gt;
-    } {loop_name = "i", op_name = "S_i_0"}
-    return %alloc, %alloc_3 : memref&lt;10xf32&gt;, memref&lt;10xf32&gt;
-  }
-}
-</pre></div>
-</div>
 </section>
 <section id="compile-time-constant-expressions-constexpr">
 <h2>Compile-Time Constant Expressions (ConstExpr)<a class="headerlink" href="#compile-time-constant-expressions-constexpr" title="Link to this heading"><span>¶</span></a></h2>
@@ -395,56 +313,9 @@ compile-time computations like computing coefficients or lookup indices.</p>
 </span>        <span class="n">B</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">A</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">*</span> <span class="n">coef</span><span class="w">
 </span><span class="w">
 </span><span class="w">
-</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel_with_constexpr</span><span class="p">)</span><span class="w">
-</span><span class="nb">print</span><span class="p">(</span><a class="sphx-glr-backref-module-allo-customize sphx-glr-backref-type-py-class sphx-glr-backref-instance reference internal" href="../api/index.html#allo.customize.Schedule" title="allo.customize.Schedule"><span class="n">s</span></a><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
+</span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel_with_constexpr</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span><span class="w">
 </span></pre></div></div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>module {
-  func.func @kernel_with_constexpr(%arg0: memref&lt;8xf32&gt;, %arg1: memref&lt;8xf32&gt;) attributes {itypes = "__", otypes = ""} {
-    %0 = affine.load %arg0[3] {from = "A"} : memref&lt;8xf32&gt;
-    %cst = arith.constant 1.000000e+00 : f32
-    %cst_0 = arith.constant 1.000000e+00 : f32
-    %1 = arith.mulf %0, %cst_0 : f32
-    affine.store %1, %arg1[0] {to = "B"} : memref&lt;8xf32&gt;
-    %2 = affine.load %arg0[4] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_1 = arith.constant 0.707106769 : f32
-    %cst_2 = arith.constant 0.707106769 : f32
-    %3 = arith.mulf %2, %cst_2 : f32
-    affine.store %3, %arg1[1] {to = "B"} : memref&lt;8xf32&gt;
-    %4 = affine.load %arg0[5] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_3 = arith.constant 6.12323426E-17 : f32
-    %cst_4 = arith.constant 6.12323426E-17 : f32
-    %5 = arith.mulf %4, %cst_4 : f32
-    affine.store %5, %arg1[2] {to = "B"} : memref&lt;8xf32&gt;
-    %6 = affine.load %arg0[6] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_5 = arith.constant -0.707106769 : f32
-    %cst_6 = arith.constant -0.707106769 : f32
-    %7 = arith.mulf %6, %cst_6 : f32
-    affine.store %7, %arg1[3] {to = "B"} : memref&lt;8xf32&gt;
-    %8 = affine.load %arg0[7] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_7 = arith.constant -1.000000e+00 : f32
-    %cst_8 = arith.constant -1.000000e+00 : f32
-    %9 = arith.mulf %8, %cst_8 : f32
-    affine.store %9, %arg1[4] {to = "B"} : memref&lt;8xf32&gt;
-    %10 = affine.load %arg0[0] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_9 = arith.constant -0.707106769 : f32
-    %cst_10 = arith.constant -0.707106769 : f32
-    %11 = arith.mulf %10, %cst_10 : f32
-    affine.store %11, %arg1[5] {to = "B"} : memref&lt;8xf32&gt;
-    %12 = affine.load %arg0[1] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_11 = arith.constant -1.83697015E-16 : f32
-    %cst_12 = arith.constant -1.83697015E-16 : f32
-    %13 = arith.mulf %12, %cst_12 : f32
-    affine.store %13, %arg1[6] {to = "B"} : memref&lt;8xf32&gt;
-    %14 = affine.load %arg0[2] {from = "A"} : memref&lt;8xf32&gt;
-    %cst_13 = arith.constant 0.707106769 : f32
-    %cst_14 = arith.constant 0.707106769 : f32
-    %15 = arith.mulf %14, %cst_14 : f32
-    affine.store %15, %arg1[7] {to = "B"} : memref&lt;8xf32&gt;
-    return
-  }
-}
-</pre></div>
-</div>
 <p>From the generated MLIR, you can see that the <code class="docutils literal notranslate"><span class="pre">coef</span></code> and <code class="docutils literal notranslate"><span class="pre">idx</span></code> values
 are embedded as constants in the code, not computed at runtime.</p>
 <p>Key points about <code class="docutils literal notranslate"><span class="pre">ConstExpr</span></code>:</p>
@@ -453,7 +324,6 @@ are embedded as constants in the code, not computed at runtime.</p>
 <li><p>You can use arbitrary Python functions (math, etc.)</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">ConstExpr[int32]</span></code> or <code class="docutils literal notranslate"><span class="pre">ConstExpr[float32]</span></code> for the type annotation</p></li>
 </ul>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.234 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-gallery-dive-04-features-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/90b883f891c63f481ffa4756cd7e0781/dive_04_features.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">dive_04_features.ipynb</span></code></a></p>

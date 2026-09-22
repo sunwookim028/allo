@@ -85,7 +85,7 @@ reproduce or re-point every row. The conda env, ``LLVM_BUILD_DIR`` and
 |                                                | ``~/.local/bin/verilator``                  | one is exported.                                |
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
 | Chipyard                                       | ``~/chipyard/env.sh``                       | No; ``source`` it. It ``conda activate``\ s     |
-|                                                |                                             | ``/home/sk3463/chipyard/.conda-env``, so it     |
+|                                                |                                             | ``~/chipyard/.conda-env``, so it                |
 |                                                |                                             | **replaces** the ``allo`` env — source it in a  |
 |                                                |                                             | separate shell.                                 |
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
@@ -168,7 +168,7 @@ no longer exists -- the ``chia-codesign`` worktree was retired on 2026-09-19
 learned from it:
 
 +----------------------+----------------------------------------------------------+-------------------------------------------------------------------+
-|                      | ``/home/sk3463/allo`` (``main``)                         | ``/home/sk3463/allo-chia-wt`` (``chia-codesign``)                 |
+|                      | ``<main worktree>`` (``main``)                           | ``<other worktree>`` (``chia-codesign``)                          |
 +======================+==========================================================+===================================================================+
 | ``allo/_mlir``       | symlink ``-> ../mlir/build/tools/allo/_mlir``,           | a **real directory** of installed output, not a symlink           |
 |                      | **relative, stays inside the worktree**                  |                                                                   |
@@ -177,16 +177,16 @@ learned from it:
 +----------------------+----------------------------------------------------------+-------------------------------------------------------------------+
 | runtime soname       | ``libAlloDataflowRuntime.so.22.0git``                    | ``libAlloDataflowRuntime.so.23.0git``                             |
 +----------------------+----------------------------------------------------------+-------------------------------------------------------------------+
-| build's ``LLVM_DIR`` | ``/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm`` | ``/home/sk3463/allo/externals/llvm-project/build/lib/cmake/llvm`` |
+| build's ``LLVM_DIR`` | ``/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm`` | ``<main worktree>/externals/llvm-project/build/lib/cmake/llvm``   |
 |                      |                                                          | -- **the other worktree**                                         |
 +----------------------+----------------------------------------------------------+-------------------------------------------------------------------+
 
-Worse, individual files inside ``/home/sk3463/allo-chia-wt/allo/_mlir`` are
+Worse, individual files inside ``<other worktree>/allo/_mlir`` are
 absolute symlinks out of the worktree: ``ir.py``, ``passmanager.py``, ``rewrite.py``
 and ``execution_engine.py`` all point into
-``/home/sk3463/allo/externals/llvm-project/mlir/python/mlir/``, i.e. into ``main``'s
+``<main worktree>/externals/llvm-project/mlir/python/mlir/``, i.e. into ``main``'s
 submodule checkout. Only ``schedule.py`` stays local
-(``-> /home/sk3463/allo-chia-wt/mlir/python/allo/schedule.py``).
+(``-> <other worktree>/mlir/python/allo/schedule.py``).
 
 **This is the mechanism by which the 2026-09-18 mistake above did its damage.**
 Checking out a different revision of ``main``'s submodule swapped four of

@@ -36,12 +36,6 @@ First, we import the necessary packages:
     from allo.ir.types import float32
 
 
-
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 19-23
 
 Create the Schedule
@@ -64,12 +58,6 @@ and produces a 32x32 output matrix. The reduction loop is used to accumulate the
 
 
 
-
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 34-36
 
 We create two schedules for the GEMM kernel using different transformations.
@@ -85,39 +73,6 @@ The first schedule, **s1**, applies a loop reordering transformation, while the 
     print(s1.module)
 
 
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @gemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
-        %c0_i32 = arith.constant 0 : i32
-        %0 = arith.sitofp %c0_i32 : i32 to f32
-        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
-        linalg.fill ins(%0 : f32) outs(%alloc : memref<32x32xf32>)
-        affine.for %arg2 = 0 to 32 {
-          affine.for %arg3 = 0 to 32 {
-            affine.for %arg4 = 0 to 32 {
-              %1 = affine.load %arg0[%arg2, %arg4] {from = "A"} : memref<32x32xf32>
-              %2 = affine.load %arg1[%arg4, %arg3] {from = "B"} : memref<32x32xf32>
-              %3 = arith.mulf %1, %2 : f32
-              %4 = affine.load %alloc[%arg2, %arg3] {from = "C"} : memref<32x32xf32>
-              %5 = arith.addf %4, %3 : f32
-              affine.store %5, %alloc[%arg2, %arg3] {to = "C"} : memref<32x32xf32>
-            } {loop_name = "k", op_name = "S_k_0", reduction}
-          } {loop_name = "j"}
-        } {loop_name = "i", op_name = "S_i_j_0"}
-        return %alloc : memref<32x32xf32>
-      }
-    }
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 42-44
 
 In the code above, **s1** is customized by reordering the loops corresponding to indices ``i`` and ``j``.
@@ -131,48 +86,6 @@ The printed intermediate representation (IR) shows the effect of this transforma
     s2 = allo.customize(gemm)
     s2.buffer_at(s2.C, axis="i")
     print(s2.module)
-
-
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @gemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
-        %c0_i32 = arith.constant 0 : i32
-        %0 = arith.sitofp %c0_i32 : i32 to f32
-        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
-        linalg.fill ins(%0 : f32) outs(%alloc : memref<32x32xf32>)
-        affine.for %arg2 = 0 to 32 {
-          %alloc_0 = memref.alloc() : memref<32xf32>
-          %cst = arith.constant 0.000000e+00 : f32
-          affine.for %arg3 = 0 to 32 {
-            affine.store %cst, %alloc_0[%arg3] : memref<32xf32>
-          } {buffer, loop_name = "j_init", pipeline_ii = 1 : i32}
-          affine.for %arg3 = 0 to 32 {
-            affine.for %arg4 = 0 to 32 {
-              %1 = affine.load %arg0[%arg2, %arg4] {from = "A"} : memref<32x32xf32>
-              %2 = affine.load %arg1[%arg4, %arg3] {from = "B"} : memref<32x32xf32>
-              %3 = arith.mulf %1, %2 : f32
-              %4 = affine.load %alloc_0[%arg3] : memref<32xf32>
-              %5 = arith.addf %4, %3 : f32
-              affine.store %5, %alloc_0[%arg3] : memref<32xf32>
-            } {loop_name = "k", op_name = "S_k_0", reduction}
-          } {loop_name = "j"}
-          affine.for %arg3 = 0 to 32 {
-            %1 = affine.load %alloc_0[%arg3] : memref<32xf32>
-            affine.store %1, %alloc[%arg2, %arg3] : memref<32x32xf32>
-          } {buffer, loop_name = "j_back", pipeline_ii = 1 : i32}
-        } {loop_name = "i", op_name = "S_i_j_0"}
-        return %alloc : memref<32x32xf32>
-      }
-    }
-
-
-
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 50-53
@@ -197,18 +110,6 @@ value if they are functionally identical.
     verifier = allo.verify(s1, s2)
     assert verifier, "Failed to verify the equivalence of two schedules!"
     print("s1 and s2 are equivalent!")
-
-
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    s1 and s2 are equivalent!
-
-
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 66-67
@@ -245,118 +146,6 @@ should not be equivalent to **s1**.
     print("s1 and s3 are not equivalent!")
 
 
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @gemm_wrong(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>) -> memref<32x32xf32> attributes {itypes = "__", otypes = "_"} {
-        %c0_i32 = arith.constant 0 : i32
-        %c0_i32_0 = arith.constant 0 : i32
-        %0 = arith.sitofp %c0_i32_0 : i32 to f32
-        %alloc = memref.alloc() {name = "C"} : memref<32x32xf32>
-        linalg.fill ins(%0 : f32) outs(%alloc : memref<32x32xf32>)
-        affine.for %arg2 = 0 to 32 {
-          affine.for %arg3 = 0 to 32 {
-            affine.for %arg4 = 0 to 32 {
-              %1 = affine.load %arg0[%arg2, %arg4] {from = "A"} : memref<32x32xf32>
-              %2 = affine.load %arg1[%arg4, %arg3] {from = "B"} : memref<32x32xf32>
-              %3 = arith.mulf %1, %2 : f32
-              affine.store %3, %alloc[%arg2, %arg3] {to = "C"} : memref<32x32xf32>
-            } {loop_name = "k", op_name = "S_k_0", reduction}
-          } {loop_name = "j"}
-        } {loop_name = "i", op_name = "S_i_j_0"}
-        return %alloc : memref<32x32xf32>
-      }
-    }
-
-    Verifier reported non-equivalence between schedules.
-    Differences between generated programs:
-    --- Program A (Schedule A)
-    +++ Program B (Schedule B)
-    @@ -15,26 +15,24 @@
-     #include <stdint.h>
-
-     using namespace std;
-
-     /// This is top function.
-
-    -void gemm(
-
-    +void gemm_wrong(
-
-       float v0[32][32],
-
-       float v1[32][32],
-
-       float v2[32][32]
-
-     ) {    // L2
-
-     #pragma pocc-region-start {
-
-    -  for (int v3 = 0; v3 < 32; v3++) {    // L6
-
-    -    for (int v4 = 0; v4 < 32; v4++) {  // L6
-
-    -      v2[v3][v4] = 0.000000f;  // L6
-
-    +  for (int v3 = 0; v3 < 32; v3++) {    // L7
-
-    +    for (int v4 = 0; v4 < 32; v4++) {  // L7
-
-    +      v2[v3][v4] = 0.000000f;  // L7
-
-         }
-
-       }
-
-    -  l_S_i_j_0_i: for (int i = 0; i < 32; i++) {  // L7
-
-    -    l_j: for (int j = 0; j < 32; j++) {        // L8
-
-    -      l_S_k_0_k: for (int k = 0; k < 32; k++) {        // L9
-
-    -        float v5 = v0[i][k];   // L10
-
-    -        float v6 = v1[k][j];   // L11
-
-    -        float v7 = v5 * v6;    // L12
-
-    -        float v8 = v2[i][j];   // L13
-
-    -        float v9 = v8 + v7;    // L14
-
-    -        v2[i][j] = v9; // L15
-
-    +  l_S_i_j_0_i: for (int i = 0; i < 32; i++) {  // L8
-
-    +    l_j: for (int j = 0; j < 32; j++) {        // L9
-
-    +      l_S_k_0_k: for (int k = 0; k < 32; k++) {        // L10
-
-    +        float v5 = v0[i][k];   // L11
-
-    +        float v6 = v1[k][j];   // L12
-
-    +        float v7 = v5 * v6;    // L13
-
-    +        v2[i][j] = v7; // L14
-
-           }
-
-         }
-
-       }
-
-    s1 and s3 are not equivalent!
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 92-94
 
 The verifier correctly detects that **s3** does not preserve the intended accumulation,
@@ -370,11 +159,6 @@ This tutorial has demonstrated how to use Allo's verifier facility to ensure tha
 scheduling transformations yield equivalent computational behavior. By verifying the equivalence
 of various schedules, you can confidently apply optimizations without compromising the
 functional correctness of your algorithms.
-
-
-.. rst-class:: sphx-glr-timing
-
-   **Total running time of the script:** (0 minutes 3.045 seconds)
 
 
 .. _sphx_glr_download_gallery_dive_05_verifier.py:

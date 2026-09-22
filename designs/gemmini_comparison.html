@@ -299,10 +299,11 @@ Gemmini trial; the 4x4x4 range spans both). Every shape uses exactly one
 <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code>, verified at runtime by replicating the driver’s own tiling search
 rather than assuming it.</p>
 <p>The decomposition closes, which is the reason to trust this. <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code>’s
-total minus this window, per shape: <strong>413, 396, 395, 394, 395</strong>. A flat ~395
-cycles of Rocket software across a 16x range of work is exactly what a per-call
-driver overhead looks like, and it confirms the 72% figure (below)
-independently.</p>
+total minus this window, per shape, <strong>all from trial 1</strong>: <strong>413, 395, 393,
+393, 393</strong>. (An earlier revision published 413 / 396 / 395 / 394 / 395, which
+mixed trials; the conclusion is unchanged.) A flat ~393 cycles of Rocket
+software across a 16x range of work is exactly what a per-call driver overhead
+looks like, and it confirms the 72% figure (below) independently.</p>
 <p>Three caveats, none of which flatter us:</p>
 <ul class="simple">
 <li><p><strong>4x4x4 is noisy, 161 vs 144</strong>, where the others are within +/-3. Published as
@@ -1095,7 +1096,10 @@ compile errors</strong> and the whole suite fails to build.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">roccTests_Makefile.patch</span></code></p></td>
 <td><p>same</p></td>
-<td><p>builds <code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code>.</p></td>
+<td><p>adds <code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code> <strong>and</strong> <code class="docutils literal notranslate"><span class="pre">allo_bare5</span></code> to <code class="docutils literal notranslate"><span class="pre">tests</span></code>. It listed only
+<code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code>, so the recipe below could not produce
+<code class="docutils literal notranslate"><span class="pre">allo_bare5-baremetal</span></code> at all; the patch is the committed artefact, so
+it is what was extended rather than the recipe.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1109,7 +1113,7 @@ compile errors</strong> and the whole suite fails to build.</p></td>
 git<span class="w"> </span>apply<span class="w"> </span><span class="nv">$G</span>/roccTests_gemmini_h.patch
 git<span class="w"> </span>apply<span class="w"> </span><span class="nv">$G</span>/roccTests_gemmini_params_h.patch
 git<span class="w"> </span>apply<span class="w"> </span><span class="nv">$G</span>/roccTests_Makefile.patch
-cp<span class="w"> </span><span class="nv">$G</span>/allo_cmp.c<span class="w"> </span>bareMetalC/
+cp<span class="w"> </span><span class="nv">$G</span>/allo_cmp.c<span class="w"> </span><span class="nv">$G</span>/allo_bare5.c<span class="w"> </span>bareMetalC/
 
 <span class="c1"># build the RTL and run</span>
 <span class="nb">cd</span><span class="w"> </span>~/chipyard<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>env.sh
@@ -1137,9 +1141,13 @@ real.</p>
 <li><p><strong>The stock</strong> <code class="docutils literal notranslate"><span class="pre">matmul</span></code> / <code class="docutils literal notranslate"><span class="pre">matmul_ws</span></code> <strong>tests print no cycle counts</strong> –
 their <code class="docutils literal notranslate"><span class="pre">read_cycles()</span></code> calls are commented out upstream. <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> exists
 because of this; do not expect to get numbers from the shipped benchmarks.</p></li>
-<li><p><strong>One Verilator run takes about 22 minutes</strong> at ~8.6 us/s simulated. Budget
-accordingly; the five-shape sweep is not interactive. (The <code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code>
-window run is the ~90 s one quoted above.)</p></li>
+<li><p><strong>One Verilator run takes about 80 s</strong>, not the 22 minutes an earlier
+revision of this page claimed – wrong by ~17x, and contradicted by this
+repository’s own <code class="docutils literal notranslate"><span class="pre">logs/gemmini_int8_dim4.log</span></code>, which records
+<code class="docutils literal notranslate"><span class="pre">walltime</span> <span class="pre">85.786</span> <span class="pre">s;</span> <span class="pre">speed</span> <span class="pre">13.101</span> <span class="pre">us/s</span></code>. Re-measured: <strong>79.6 s at
+14.1 us/s</strong> for <code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code>. So the five-shape sweep <em>is</em> interactive and
+needs no special budgeting; the <code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code> window run quoted above is
+the same order (~90 s), which is why the two are run together.</p></li>
 <li><p><strong>Stale binaries silently produce a wrong comparison.</strong> The 54 binaries found
 in <code class="docutils literal notranslate"><span class="pre">build/</span></code> were int8 artifacts from an earlier elaboration and would have
 been run against a differently-configured RTL without any error. Rebuild the

@@ -658,20 +658,20 @@ exercised, in this repository.</p>
 <p>The Allo MLIR backend (<code class="docutils literal notranslate"><span class="pre">.so</span></code> files) requires GCC 13’s <code class="docutils literal notranslate"><span class="pre">libstdc++</span></code>. RHEL 8 (zhang-21) ships
 GCC 8 only. The conda <code class="docutils literal notranslate"><span class="pre">allo</span></code> env includes the newer <code class="docutils literal notranslate"><span class="pre">libstdc++</span></code>, but it must be on
 <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> <em>before</em> activating the env so that subprocesses inherit it:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/lib:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">"</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"/path/to/miniconda3/envs/allo/lib:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">"</span>
 conda<span class="w"> </span>activate<span class="w"> </span>allo
 </pre></div>
 </div>
 <p>For a permanent fix, add to <code class="docutils literal notranslate"><span class="pre">~/.bashrc</span></code> on zhang-21:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>hostname<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"zhang-21.ece.cornell.edu"</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
-<span class="w">    </span><span class="nv">CONDA_ENV_LIB</span><span class="o">=</span><span class="s2">"/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/lib"</span>
+<span class="w">    </span><span class="nv">CONDA_ENV_LIB</span><span class="o">=</span><span class="s2">"/path/to/miniconda3/envs/allo/lib"</span>
 <span class="w">    </span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CONDA_ENV_LIB</span><span class="s2">:</span><span class="nv">$LD_LIBRARY_PATH</span><span class="s2">"</span>
 <span class="k">fi</span>
 </pre></div>
 </div>
 <p>Or use the wrapper at the repository root, <code class="docutils literal notranslate"><span class="pre">./run_allo.sh</span> <span class="pre">python</span> <span class="pre">my_script.py</span></code>, which sets
 this automatically (it also prepends a hard-coded <code class="docutils literal notranslate"><span class="pre">mlir/build/tools/allo/_mlir</span></code> path under
-<code class="docutils literal notranslate"><span class="pre">/work/shared/users/phd/sk3463/projects/allo</span></code>; edit both paths for another checkout).</p>
+<code class="docutils literal notranslate"><span class="pre">/path/to/allo</span></code>; edit both paths for another checkout).</p>
 <p><strong>LLVM build.</strong> The <code class="docutils literal notranslate"><span class="pre">.so</span></code> files in <code class="docutils literal notranslate"><span class="pre">allo/_mlir/_mlir_libs/</span></code> must be built against an LLVM that
 is compatible with RHEL 8’s glibc (the <code class="docutils literal notranslate"><span class="pre">build-rhel8</span></code> LLVM), not one compiled on a glibc 2.35 host;
 a build made against a newer glibc than the host’s fails at simulator init with a GLIBC_2.33 error.

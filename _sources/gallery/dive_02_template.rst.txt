@@ -36,12 +36,6 @@ By leveraging template kernels, we can achieve greater flexibility and reusabili
     from allo.ir.types import int32, float32
 
 
-
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 19-26
 
 We follow Python's convention to use *type variable* to define a template kernel.
@@ -69,34 +63,6 @@ To invoke the kernel with a specific data type, we can use the ``instantiate`` a
     print(s.module)
 
 
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @kernel(%arg0: memref<10xi32>) -> memref<10xi32> attributes {itypes = "s", otypes = "s"} {
-        %alloc = memref.alloc() {name = "B"} : memref<10xi32>
-        affine.for %arg1 = 0 to 10 {
-          %0 = affine.load %arg0[%arg1] {from = "A"} : memref<10xi32>
-          %1 = arith.extsi %0 : i32 to i33
-          %c1_i32 = arith.constant 1 : i32
-          %c1_i32_0 = arith.constant 1 : i32
-          %2 = arith.extsi %c1_i32_0 : i32 to i33
-          %3 = arith.addi %1, %2 : i33
-          %4 = arith.trunci %3 : i33 to i32
-          affine.store %4, %alloc[%arg1] {to = "B"} : memref<10xi32>
-        } {loop_name = "i", op_name = "S_i_0"}
-        return %alloc : memref<10xi32>
-      }
-    }
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 39-41
 
 We can see that the kernel is specialized with the given ``int32`` data type.
@@ -109,32 +75,6 @@ Similarly, we can directly declare a new kernel by specifying ``float32`` as the
 
     s = allo.customize(kernel, instantiate=[float32])
     print(s.module)
-
-
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @kernel(%arg0: memref<10xf32>) -> memref<10xf32> attributes {itypes = "_", otypes = "_"} {
-        %alloc = memref.alloc() {name = "B"} : memref<10xf32>
-        affine.for %arg1 = 0 to 10 {
-          %0 = affine.load %arg0[%arg1] {from = "A"} : memref<10xf32>
-          %c1_i32 = arith.constant 1 : i32
-          %c1_i32_0 = arith.constant 1 : i32
-          %1 = arith.sitofp %c1_i32_0 : i32 to f32
-          %2 = arith.addf %0, %1 : f32
-          affine.store %2, %alloc[%arg1] {to = "B"} : memref<10xf32>
-        } {loop_name = "i", op_name = "S_i_0"}
-        return %alloc : memref<10xf32>
-      }
-    }
-
-
-
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 46-48
@@ -157,34 +97,6 @@ Note that here we also use the ``<type_var>: base_type`` notation to constrain t
 
     s = allo.customize(kernel2, instantiate=[int32, 20])
     print(s.module)
-
-
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @kernel2(%arg0: memref<20xi32>) -> memref<20xi32> attributes {itypes = "s", otypes = "s"} {
-        %alloc = memref.alloc() {name = "B"} : memref<20xi32>
-        affine.for %arg1 = 0 to 20 {
-          %0 = affine.load %arg0[%arg1] {from = "A"} : memref<20xi32>
-          %1 = arith.extsi %0 : i32 to i33
-          %c1_i32 = arith.constant 1 : i32
-          %c1_i32_0 = arith.constant 1 : i32
-          %2 = arith.extsi %c1_i32_0 : i32 to i33
-          %3 = arith.addi %1, %2 : i33
-          %4 = arith.trunci %3 : i33 to i32
-          affine.store %4, %alloc[%arg1] {to = "B"} : memref<20xi32>
-        } {loop_name = "i", op_name = "S_i_0"}
-        return %alloc : memref<20xi32>
-      }
-    }
-
-
-
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 61-64
@@ -210,12 +122,6 @@ Just to make sure the conditions can be determined at compile time.
 
 
 
-
-
-
-
-
-
 .. GENERATED FROM PYTHON SOURCE LINES 77-78
 
 In final generated code, we can see that only a single branch is generated based on the given data type.
@@ -229,54 +135,6 @@ In final generated code, we can see that only a single branch is generated based
     print(s.module)
     s = allo.customize(kernel3, instantiate=[float32, 20])
     print(s.module)
-
-
-
-
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    module {
-      func.func @kernel3(%arg0: memref<20xi32>) -> memref<20xi32> attributes {itypes = "s", otypes = "s"} {
-        %alloc = memref.alloc() {name = "B"} : memref<20xi32>
-        affine.for %arg1 = 0 to 20 {
-          %0 = affine.load %arg0[%arg1] {from = "A"} : memref<20xi32>
-          %1 = arith.extsi %0 : i32 to i33
-          %c1_i32 = arith.constant 1 : i32
-          %c1_i32_0 = arith.constant 1 : i32
-          %2 = arith.extsi %c1_i32_0 : i32 to i33
-          %3 = arith.addi %1, %2 : i33
-          %4 = arith.trunci %3 : i33 to i32
-          affine.store %4, %alloc[%arg1] {to = "B"} : memref<20xi32>
-        } {loop_name = "i", op_name = "S_i_0"}
-        return %alloc : memref<20xi32>
-      }
-    }
-
-    module {
-      func.func @kernel3(%arg0: memref<20xf32>) -> memref<20xf32> attributes {itypes = "_", otypes = "_"} {
-        %alloc = memref.alloc() {name = "B"} : memref<20xf32>
-        affine.for %arg1 = 0 to 20 {
-          %0 = affine.load %arg0[%arg1] {from = "A"} : memref<20xf32>
-          %c1_i32 = arith.constant 1 : i32
-          %c1_i32_0 = arith.constant 1 : i32
-          %1 = arith.sitofp %c1_i32_0 : i32 to f32
-          %2 = arith.subf %0, %1 : f32
-          affine.store %2, %alloc[%arg1] {to = "B"} : memref<20xf32>
-        } {loop_name = "i", op_name = "S_i_0"}
-        return %alloc : memref<20xf32>
-      }
-    }
-
-
-
-
-
-
-.. rst-class:: sphx-glr-timing
-
-   **Total running time of the script:** (0 minutes 0.239 seconds)
 
 
 .. _sphx_glr_download_gallery_dive_02_template.py:

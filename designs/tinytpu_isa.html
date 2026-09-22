@@ -231,8 +231,9 @@ mesh-matched comparison against Gemmini is on <a class="reference internal" href
 shape as data, all five benchmark shapes are bit-exact in RTL
 co-simulation, and the design takes <strong>172 / 262 / 418 / 484 / 686</strong> cycles
 at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code>,
-<code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>). Measured over the same window as ours, Gemmini is
-<strong>1.07-1.24x faster</strong> at all five shapes; see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
+<code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>). Measured over the same window on both sides, the
+design is <strong>1.07-1.24x slower</strong> than Gemmini at all five shapes; see
+<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
 <p>Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> the shipped design took <strong>252 / 383 / 591 / 667 / 919</strong>
 (1.55-1.8x behind Gemmini). The step between the two is the gap
 attribution’s measured design stack, landed as the design
@@ -1200,7 +1201,9 @@ not a measurement. The same lesson, stated as a general rule, is
 pre-landing design re-synthesized with the same toolchain
 (<code class="docutils literal notranslate"><span class="pre">logs/csynth_isa_prelanding.rpt</span></code>, <code class="docutils literal notranslate"><span class="pre">logs/csynth_isa_landed.rpt</span></code>). The
 estimated clock is <strong>2.431 ns</strong> for both, so the design still meets 3.33 ns
-with the same margin.</p>
+with the same margin. The last row is the remainder, and <code class="docutils literal notranslate"><span class="pre">entry_proc</span></code> is in
+it (6,363 FF = 6,360 + 3; 7,809 LUT = 7,780 + 29), so a re-derivation from the
+report’s per-module rows matches.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>unit</p></th>
@@ -1259,7 +1262,7 @@ with the same margin.</p>
 <td><p>342 -&gt; 342</p></td>
 <td><p>511 -&gt; 511</p></td>
 </tr>
-<tr class="row-even"><td><p>FIFOs and top level</p></td>
+<tr class="row-even"><td><p>FIFOs, <code class="docutils literal notranslate"><span class="pre">entry_proc</span></code> and top level</p></td>
 <td><p>36 -&gt; 36</p></td>
 <td><p>0 -&gt; 0</p></td>
 <td><p>6,277 -&gt; 6,363</p></td>

@@ -289,7 +289,7 @@ one is exported.</p></td>
 <tr class="row-odd"><td><p>Chipyard</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">~/chipyard/env.sh</span></code></p></td>
 <td><p>No; <code class="docutils literal notranslate"><span class="pre">source</span></code> it. It <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span></code>s
-<code class="docutils literal notranslate"><span class="pre">/home/sk3463/chipyard/.conda-env</span></code>, so it
+<code class="docutils literal notranslate"><span class="pre">~/chipyard/.conda-env</span></code>, so it
 <strong>replaces</strong> the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env — source it in a
 separate shell.</p></td>
 </tr>
@@ -368,8 +368,8 @@ learned from it:</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo</span></code> (<code class="docutils literal notranslate"><span class="pre">main</span></code>)</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt</span></code> (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">&lt;main</span> <span class="pre">worktree&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">main</span></code>)</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">&lt;other</span> <span class="pre">worktree&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</p></th>
 </tr>
 </thead>
 <tbody>
@@ -388,17 +388,17 @@ learned from it:</p>
 </tr>
 <tr class="row-odd"><td><p>build’s <code class="docutils literal notranslate"><span class="pre">LLVM_DIR</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/llvm-allo-6b09f739/build/lib/cmake/llvm</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo/externals/llvm-project/build/lib/cmake/llvm</span></code>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;main</span> <span class="pre">worktree&gt;/externals/llvm-project/build/lib/cmake/llvm</span></code>
 – <strong>the other worktree</strong></p></td>
 </tr>
 </tbody>
 </table>
-<p>Worse, individual files inside <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-chia-wt/allo/_mlir</span></code> are
+<p>Worse, individual files inside <code class="docutils literal notranslate"><span class="pre">&lt;other</span> <span class="pre">worktree&gt;/allo/_mlir</span></code> are
 absolute symlinks out of the worktree: <code class="docutils literal notranslate"><span class="pre">ir.py</span></code>, <code class="docutils literal notranslate"><span class="pre">passmanager.py</span></code>, <code class="docutils literal notranslate"><span class="pre">rewrite.py</span></code>
 and <code class="docutils literal notranslate"><span class="pre">execution_engine.py</span></code> all point into
-<code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo/externals/llvm-project/mlir/python/mlir/</span></code>, i.e. into <code class="docutils literal notranslate"><span class="pre">main</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">&lt;main</span> <span class="pre">worktree&gt;/externals/llvm-project/mlir/python/mlir/</span></code>, i.e. into <code class="docutils literal notranslate"><span class="pre">main</span></code>’s
 submodule checkout. Only <code class="docutils literal notranslate"><span class="pre">schedule.py</span></code> stays local
-(<code class="docutils literal notranslate"><span class="pre">-&gt;</span> <span class="pre">/home/sk3463/allo-chia-wt/mlir/python/allo/schedule.py</span></code>).</p>
+(<code class="docutils literal notranslate"><span class="pre">-&gt;</span> <span class="pre">&lt;other</span> <span class="pre">worktree&gt;/mlir/python/allo/schedule.py</span></code>).</p>
 <p><strong>This is the mechanism by which the 2026-09-18 mistake above did its damage.</strong>
 Checking out a different revision of <code class="docutils literal notranslate"><span class="pre">main</span></code>’s submodule swapped four of
 <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>’s Python binding files to a different LLVM version, with no

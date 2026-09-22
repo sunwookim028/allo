@@ -340,7 +340,8 @@ emits, not an instruction’s semantics.</p>
 [-4, 4] setup), main’s <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> (492 runs: full-range, corner and
 boundary int8 at all 64 shapes, <code class="docutils literal notranslate"><span class="pre">C</span></code> prefilled and compared in full, vector
 and random programs against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, many calls on one build), and
-<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code> and <code class="docutils literal notranslate"><span class="pre">12</span></code> (below). Negative control:
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">12</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span>
+<span class="pre">TPU_MAXDIM=32</span></code> (below). Negative control:
 an int16 partial sum passes <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and every cosim testbench, and
 <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> rejects it (251/492 exact).</p></li>
 <li><p><strong>score</strong>: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
@@ -360,7 +361,7 @@ stress 0 mismatches at every shape).</p></li>
 <section id="guards">
 <h3>Guards<a class="headerlink" href="#guards" title="Link to this heading"><span>¶</span></a></h3>
 <p>Mechanical enforcement, not instructions:</p>
-<ol class="arabic simple">
+<ol class="arabic">
 <li><p><strong>Tool surface.</strong> opencode’s own file and shell tools are denied; the MCP
 edit tools accept only the two bare file names.</p></li>
 <li><p><strong>Frozen files from git</strong>, a fresh evaluation tree per candidate, anything
@@ -385,12 +386,24 @@ monkeypatching for the duration; only then is <code class="docutils literal notr
 <span class="pre">&lt;nonce&gt;</span></code> printed, and the evaluator requires that line.</p></li>
 <li><p><strong>Parametricity.</strong> The scored configuration is T=4, MAXDIM=16, so a design
 specialised to it would pass everything. <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> rebuilds the
-candidate at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code> and <code class="docutils literal notranslate"><span class="pre">12</span></code>, requires the build to report that
-MAXDIM, and requires every GEMM shape of the configuration (full-range,
-corner and boundary operands, <code class="docutils literal notranslate"><span class="pre">C</span></code> compared in full) and random programs to
-be exact (<code class="docutils literal notranslate"><span class="pre">gate:param</span></code>). The policy requires <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> to stay
-<code class="docutils literal notranslate"><span class="pre">int(os.environ.get(...))</span></code> parameters. T is not varied: the shipped design
-supports T=4 only.</p></li>
+candidate at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=12</span></code> and
+<code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span></code>, requires the build to report that configuration,
+and requires every GEMM shape of it (full-range, corner and boundary
+operands, <code class="docutils literal notranslate"><span class="pre">C</span></code> compared in full) and random programs to be exact
+(<code class="docutils literal notranslate"><span class="pre">gate:param</span></code>). The policy requires <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> to stay
+<code class="docutils literal notranslate"><span class="pre">int(os.environ.get(...))</span></code> parameters.</p>
+<p>An earlier revision of this page said “T is not varied: the shipped design
+supports T=4 only”. <strong>That was wrong.</strong> Measured on main,
+<code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span> <span class="pre">param_check.py</span></code> gives <code class="docutils literal notranslate"><span class="pre">PARAM</span> <span class="pre">OK:</span> <span class="pre">408/408</span> <span class="pre">runs</span>
+<span class="pre">exact</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span> <span class="pre">bench_isa.py</span> <span class="pre">32</span> <span class="pre">32</span> <span class="pre">32</span></code> gives
+<code class="docutils literal notranslate"><span class="pre">ALL</span> <span class="pre">EXACT</span></code>. What is limited is the <strong>harness</strong>, and the limit is
+<code class="docutils literal notranslate"><span class="pre">MAXDIM/T</span> <span class="pre">&gt;=</span> <span class="pre">3</span></code>, not <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">==</span> <span class="pre">4</span></code>: three test-program generators address
+column block 2, which exists only at that ratio, so at T=8 with MAXDIM=16
+(ratio 2) nine of 24 random seeds cannot be generated and <code class="docutils literal notranslate"><span class="pre">param_check</span></code>
+refuses for want of programs rather than for a wrong answer.
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>’s own docstring described the column-block-2 problem
+correctly all along; the conclusion drawn from it was the error.</p>
+</li>
 <li><p><strong>Documentation.</strong> A candidate may not remove, net, more than 15 lines of
 comments and docstrings against the frozen file; rewording is free.</p></li>
 <li><p><strong>Memory model and premises.</strong> Every <code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable but the project path
