@@ -135,7 +135,11 @@
 
     
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
-        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../story.html">Notes from building a small matrix accelerator</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
 </ul>
@@ -256,9 +260,9 @@ the generated code will use the C-style arrays which become registers clusters i
 <li><p><strong>HLS Emulation, Synthesis, and Execution</strong>:
 Users may also specify the target as <cite>“xlscc”</cite> but run the designs in our software emulation mode:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">sw_emu</span></code>: Software emulation mode, which is similar to C simulation that compiles the program using C compiler</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sw_emu</span></code>: Software emulation mode, which is similar to C simulation that compiles the program using C compiler
+and runs it on the CPU. Depending on the size of your input data, this mode may take within one minute.</p></li>
 </ul>
-<p>and runs it on the CPU. Depending on the size of your input data, this mode may take within one minute.</p>
 <blockquote>
 <div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"xlscc"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"sw_emu"</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">"gemm.prj"</span><span class="p">)</span>
 </pre></div>
@@ -275,10 +279,10 @@ Users may also specify the target as <cite>“xlscc”</cite> but run the design
 </ul>
 <p>If you set <cite>use_memory</cite> to <cite>True</cite>, the generated project will also include:</p>
 <ul class="simple">
-<li><p><strong>rewrites.textproto</strong>: The memory configuration file that is required by the XLS</p></li>
+<li><p><strong>rewrites.textproto</strong>: The memory configuration file that is required by the XLS
+backend to map any memory arrays to the hardware. Without this file or if this file is
+configured wrong, the XLS backend will error out during its IR optimization pass.</p></li>
 </ul>
-<p>backend to map any memory arrays to the hardware. Without this file or if this file is
-configured wrong, the XLS backend will error out during its IR optimization pass.</p>
 <p>If you are using the software emulation mode, you will also obtain the following files:</p>
 <ul class="simple">
 <li><p><strong>test_harness.cpp</strong>: The host-side (CPU) code that invokes the accelerator.</p></li>
