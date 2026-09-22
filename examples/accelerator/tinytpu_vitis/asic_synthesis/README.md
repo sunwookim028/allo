@@ -19,18 +19,78 @@ identically. It is not an ASIC verdict on any of them.
 
 ## Results
 
-| variant | total cell area | non-comb. | comb. | seq. cells | worst slack | violating paths |
-| --- | --- | --- | --- | --- | --- | --- |
-| shipped T=4, MAXDIM=16 (current, `T4_MAXDIM16_shipped_baseline`) | **1,136,598** | 906,098 (79.7%) | 230,501 | 200,561 | **+0.21 ns** | 0 |
-| *superseded* — an earlier export, before memories were derived from MAXDIM | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | +0.18 ns | 0 |
+| variant | total cell area | non-comb. | comb. | seq. cells | worst slack | violating | wall |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| T=4, MAXDIM=16, shipped (`T4_MAXDIM16_shipped_baseline`) | **1,136,598** | 906,098 (79.7%) | 230,501 | 200,561 | **+0.21 ns** | 0 | 37 min |
+| T=4, MAXDIM=64, shipped (`T4_MAXDIM64_shipped`) | **1,865,314** | 1,503,790 (80.6%) | 361,524 | 333,189 | **+0.21 ns** | 0 | 56 min |
+| T=8, MAXDIM=64 (`T8_MAXDIM64`) | **2,481,926** | 1,982,554 (79.9%) | 499,371 | 438,922 | **+0.20 ns** | 0 | 72 min |
+| T=4, MAXDIM=64, burst-widened, banked (`T4_MAXDIM64_burstwiden`) | see below | | | | | | |
+| *superseded* — an earlier export, before memories were derived from MAXDIM (`superseded_export_T4_MAXDIM16`) | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | +0.18 ns | 0 | 47 min |
 
-Clock 3.33 ns on `ap_clk`, the target the RTL was emitted at. The current
-design meets it with 62 logic levels on a 3.08 ns critical path and zero hold
-violations, in 37 min on zhang-21. The superseded row is kept because it was
-published before being replaced: it describes a netlist that no longer exists,
-and the current design is 10.6 % smaller. Power from DC here is indicative
-only (default toggle rates, no activity data); the superseded run's 57.1 mW is
-not carried over.
+Every run: identical settings, all close timing at 3.33 ns, all about 80%
+non-combinational. The T=8 run was done by the second zhang-21 session
+(`allo-zhang-21 [ebafc1]`) from `main` 287e4b68, same settings and tool
+versions.
+
+### The two clean comparisons
+
+| what it isolates | pair | result |
+| --- | --- | --- |
+| operand space, MAXDIM 16 → 64 | shipped vs shipped, T=4 fixed | **+64.1%** cell area (+65.9% non-comb, +56.9% comb) |
+| array size, T 4 → 8 | MAXDIM=64 fixed | **1.33x** cell area |
+
+**Never quote `T8_MAXDIM64` against the MAXDIM=16 baseline** (2.18x) without
+naming both changes: that ratio is the array doubling *and* the fourfold
+operand space, and it has already been withdrawn once for travelling without
+them.
+
+### What the memory treatment does to these numbers
+
+The operand-space pair states it exactly. Vitis measures the same change as
+**+2.4% FF** (17,075 → 17,488) and +30% BRAM (40 → 52); this flow measures
+**+64.1% cell area**, 66% of it non-combinational. Both are right: the change
+is almost entirely memory, and with `sram_mode='none'` the BRAM axis is what
+cell area renders. Read every row here as "BRAM plus logic, all in flops" — a
+memory-dominated change looks roughly 27x worse on the FF axis than the FPGA's
+own FF count says. All four designs land at ~80% non-combinational, which is
+why the *ratios* above transfer between them while the absolute areas do not
+transfer to any design with SRAM macros.
+
+### Cycles these areas belong beside
+
+Re-verified bit-exact on the current design: T=4 at MAXDIM=16 is
+**171 / 261 / 417 / 483 / 685**; T=8 at MAXDIM=64 is **285 / 424 / 493** at
+8x8x8, 16x16x8 and 16x16x16, and **7083** at 64x64x64.
+
+### The burst-widened variant needed a dual-write-port memory
+
+The first export of `T4_MAXDIM64_burstwiden` **could not be synthesised**. DC
+refused it in 2 minutes:
+
+```
+Error: tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W.v:60: Net 'ram[0][31]' or a
+directly connected net is driven by more than one source, and not all drivers
+are three-state. (ELAB-366)
+```
+
+Vitis had satisfied the widened loop's writes by emitting `rbA` as a **true
+dual-write-port RAM** — two `always @(posedge clk)` blocks writing one array —
+while still naming the module `_1R1W`. Auditing every RAM module in all four
+variants found exactly one such module, only in that variant. An FPGA block RAM
+has two write ports, so this is free there; standard cells have no such
+primitive, and with memories as registers it is a real multi-driver. **The
+refusal and the +123% BRAM figure are the same fact on two substrates**: the
+widening buys cycles with something free on FPGA that costs a memory macro on
+ASIC. It was re-exported with the buffer cyclically banked by 16, one writer per
+bank, at identical cycles — and the banked form costs 100 BRAM against the
+refused form's 116, so the legal version is also the cheaper one.
+
+Clock 3.33 ns on `ap_clk`, the target the RTL was emitted at. The superseded
+row is kept because it was published before being replaced: it describes a
+netlist that no longer exists, and the current design is 10.6% smaller and one
+cycle faster at every shape — both traceable to deriving the memory sizes from
+MAXDIM. Power from DC is indicative only (default toggle rates, no activity
+data); the superseded run's 57.1 mW is not carried over.
 
 Reports are under `reports/<variant>/`: the QoR and power reports verbatim, an
 area summary (full report is 716 KB, the reference report 4 MB; both stay in the
