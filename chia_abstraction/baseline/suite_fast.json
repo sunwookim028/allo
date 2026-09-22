@@ -3,8 +3,8 @@
   {
    "file": "tests/test_vhls.py",
    "rc": 1,
-   "seconds": 51.6,
-   "tail": "t32], /) -> None\nE       \nE       Invoked with types: int, ndarray\n\n../../../allo/backend/ip.py:422: TypeError\n----------------------------- Captured stdout call -----------------------------\ng++ -c -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/ext/robin_map/include -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src /home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_combined.cpp -o /tmp/tmp_ok24qe0/_tmp/nanobind.o\ng++ -shared -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/tmp/tmp_ok24qe0 -I/tmp/tmp_ok24qe0 -I/opt/xilinx/Vitis_HLS/2023.2/include /tmp/tmp_ok24qe0/_tmp/pytop_1790047218904665739.cpp /tmp/tmp_ok24qe0/_tmp/nanobind.o -L/home/sk3463/miniconda3/envs/allo/lib -o /tmp/tmp_ok24qe0/_tmp/pytop_1790047218904665739.cpython-312-x86_64-linux-gnu.so\n=========================== short test summary info ============================\nFAILED ../../../tests/test_vhls.py::test_vitis_io_stream - AssertionError: Pl...\nFAILED ../../../tests/test_vhls.py::test_pointer_generation - TypeError: top(...\nFAILED ../../../tests/test_vhls.py::test_scalar_not_array - TypeError: top():...\n3 failed, 27 passed in 51.24s\n",
+   "seconds": 51.5,
+   "tail": "t32], /) -> None\nE       \nE       Invoked with types: int, ndarray\n\n../../../allo/backend/ip.py:422: TypeError\n----------------------------- Captured stdout call -----------------------------\ng++ -c -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/ext/robin_map/include -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src /home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_combined.cpp -o /tmp/tmp8mr8mt37/_tmp/nanobind.o\ng++ -shared -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/tmp/tmp8mr8mt37 -I/tmp/tmp8mr8mt37 -I/opt/xilinx/Vitis_HLS/2023.2/include /tmp/tmp8mr8mt37/_tmp/pytop_1790097535839848150.cpp /tmp/tmp8mr8mt37/_tmp/nanobind.o -L/home/sk3463/miniconda3/envs/allo/lib -o /tmp/tmp8mr8mt37/_tmp/pytop_1790097535839848150.cpython-312-x86_64-linux-gnu.so\n=========================== short test summary info ============================\nFAILED ../../../tests/test_vhls.py::test_vitis_io_stream - AssertionError: Pl...\nFAILED ../../../tests/test_vhls.py::test_pointer_generation - TypeError: top(...\nFAILED ../../../tests/test_vhls.py::test_scalar_not_array - TypeError: top():...\n3 failed, 27 passed in 51.12s\n",
    "tests": {
     "tests/test_vhls.py::test_vhls::test_bit_slice_is_unsigned": "passed",
     "tests/test_vhls.py::test_vhls::test_csim_write_back": "passed",
@@ -42,8 +42,8 @@
   {
    "file": "tests/test_schedule_memory.py",
    "rc": 0,
-   "seconds": 5.2,
-   "tail": "..........................                                               [100%]\n26 passed in 4.92s\n",
+   "seconds": 5.8,
+   "tail": "..........................                                               [100%]\n26 passed in 5.41s\n",
    "tests": {
     "tests/test_schedule_memory.py::test_schedule_memory::test_avgpool_nchw": "passed",
     "tests/test_schedule_memory.py::test_schedule_memory::test_buffer_at": "passed",
@@ -77,8 +77,8 @@
   {
    "file": "tests/test_schedule_compute.py",
    "rc": 0,
-   "seconds": 3.2,
-   "tail": "......................                                                   [100%]\n22 passed in 2.89s\n",
+   "seconds": 3.3,
+   "tail": "......................                                                   [100%]\n22 passed in 2.98s\n",
    "tests": {
     "tests/test_schedule_compute.py::test_schedule_compute::test_access_imperfect_loops": "passed",
     "tests/test_schedule_compute.py::test_schedule_compute::test_compute_at": "passed",
@@ -108,8 +108,8 @@
   {
    "file": "tests/test_schedule_structure.py",
    "rc": 0,
-   "seconds": 2.6,
-   "tail": "............                                                             [100%]\n=============================== warnings summary ===============================\ntests/test_schedule_structure.py: 12 warnings\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs i32\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n12 passed, 12 warnings in 2.29s\n",
+   "seconds": 3.3,
+   "tail": "............                                                             [100%]\n=============================== warnings summary ===============================\ntests/test_schedule_structure.py: 12 warnings\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs i32\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n12 passed, 12 warnings in 2.85s\n",
    "tests": {
     "tests/test_schedule_structure.py::test_schedule_structure::test_matmul[axes0]": "passed",
     "tests/test_schedule_structure.py::test_schedule_structure::test_matmul[axes1]": "passed",
@@ -129,8 +129,8 @@
   {
    "file": "tests/test_schedule_stream.py",
    "rc": 0,
-   "seconds": 2.4,
-   "tail": "......                                                                   [100%]\n6 passed in 2.04s\n",
+   "seconds": 3.9,
+   "tail": "......                                                                   [100%]\n6 passed in 3.47s\n",
    "tests": {
     "tests/test_schedule_stream.py::test_schedule_stream::test_dataflow_function": "passed",
     "tests/test_schedule_stream.py::test_schedule_stream::test_dataflow_loop": "passed",
@@ -144,8 +144,8 @@
   {
    "file": "tests/test_types.py",
    "rc": 0,
-   "seconds": 11.1,
-   "tail": "x(np_array).astype(np_dtype)\n\ntests/test_types.py::test_fp16\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f16 vs f32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_bconv2D_nchw\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui1\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs fixed(26, 23)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs ufixed(25, 22)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs fixed(7, 1)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n34 passed, 40 warnings in 10.77s\n",
+   "seconds": 17.7,
+   "tail": "x(np_array).astype(np_dtype)\n\ntests/test_types.py::test_fp16\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f16 vs f32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_bconv2D_nchw\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui1\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs fixed(26, 23)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs ufixed(25, 22)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_types.py::test_fixed_gemm\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: f32 vs fixed(7, 1)\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n34 passed, 40 warnings in 17.02s\n",
    "tests": {
     "tests/test_types.py::test_types::test_anywidth_int_constant": "passed",
     "tests/test_types.py::test_types::test_arbitrary_bitwidth_gemm": "passed",
@@ -187,8 +187,8 @@
   {
    "file": "tests/test_bitop.py",
    "rc": 0,
-   "seconds": 3.3,
-   "tail": ".............                                                            [100%]\n=============================== warnings summary ===============================\ntests/test_bitop.py::test_get_bit\ntests/test_bitop.py::test_get_bit_slice\ntests/test_bitop.py::test_set_bit_tensor\ntests/test_bitop.py::test_set_slice\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs i32\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_bitop.py::test_set_bit_tensor\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui1\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_bitop.py::test_set_slice\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui2\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n13 passed, 6 warnings in 2.98s\n",
+   "seconds": 4.1,
+   "tail": ".............                                                            [100%]\n=============================== warnings summary ===============================\ntests/test_bitop.py::test_get_bit\ntests/test_bitop.py::test_get_bit_slice\ntests/test_bitop.py::test_set_bit_tensor\ntests/test_bitop.py::test_set_slice\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs i32\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_bitop.py::test_set_bit_tensor\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui1\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_bitop.py::test_set_slice\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i64 vs ui2\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n13 passed, 6 warnings in 3.77s\n",
    "tests": {
     "tests/test_bitop.py::test_bitop::test_bitcast_float2int": "passed",
     "tests/test_bitop.py::test_bitop::test_bitcast_float2uint": "passed",
@@ -209,8 +209,8 @@
   {
    "file": "tests/test_memory.py",
    "rc": 0,
-   "seconds": 1.8,
-   "tail": ".........................                                                [100%]\n25 passed in 1.47s\n",
+   "seconds": 2.1,
+   "tail": ".........................                                                [100%]\n25 passed in 1.70s\n",
    "tests": {
     "tests/test_memory.py::TestMemoryAnnotation::test_kernel_memory_with_storage_type": "passed",
     "tests/test_memory.py::TestMemoryAnnotation::test_kernel_multiple_memory_annotations": "passed",
@@ -243,8 +243,8 @@
   {
    "file": "tests/test_builder.py",
    "rc": 1,
-   "seconds": 13.0,
-   "tail": "ot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui1 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_complex_not\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_index_shift\ntests/test_builder.py::test_dynamic_subview\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: index vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_bit_operations_in_meta_for\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui8 vs ui2\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED ../../../tests/test_builder.py::test_minmax_cast - AssertionError: ass...\n1 failed, 56 passed, 6 warnings in 12.69s\n",
+   "seconds": 14.0,
+   "tail": "ot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui1 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_complex_not\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_index_shift\ntests/test_builder.py::test_dynamic_subview\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: index vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_builder.py::test_bit_operations_in_meta_for\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui8 vs ui2\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED ../../../tests/test_builder.py::test_minmax_cast - AssertionError: ass...\n1 failed, 56 passed, 6 warnings in 13.59s\n",
    "tests": {
     "tests/test_builder.py::test_builder::test_all_gemm": "passed",
     "tests/test_builder.py::test_builder::test_assign_logic": "passed",
@@ -309,8 +309,8 @@
   {
    "file": "tests/test_stateful_hls.py",
    "rc": 0,
-   "seconds": 1.5,
-   "tail": "...                                                                      [100%]\n3 passed in 1.17s\n",
+   "seconds": 1.7,
+   "tail": "...                                                                      [100%]\n3 passed in 1.30s\n",
    "tests": {
     "tests/test_stateful_hls.py::test_stateful_hls::test_moving_average_hls": "passed",
     "tests/test_stateful_hls.py::test_stateful_hls::test_stateful_isolate_hls": "passed",
@@ -321,8 +321,8 @@
   {
    "file": "tests/test_stateful.py",
    "rc": 1,
-   "seconds": 2.2,
-   "tail": "ul.py:419: AssertionError\n=============================== warnings summary ===============================\ntests/test_stateful.py::test_update_crc32\ntests/test_stateful.py::test_tpu\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_stateful.py::test_update_histogram\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_stateful.py::test_stateful_reset\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui1 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED ../../../tests/test_stateful.py::test_nested_stateful_collision - Asse...\nFAILED ../../../tests/test_stateful.py::test_multiple_nested_same_name - Asse...\n2 failed, 11 passed, 4 warnings in 1.89s\n",
+   "seconds": 2.5,
+   "tail": "ul.py:419: AssertionError\n=============================== warnings summary ===============================\ntests/test_stateful.py::test_update_crc32\ntests/test_stateful.py::test_tpu\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_stateful.py::test_update_histogram\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: i8 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\ntests/test_stateful.py::test_stateful_reset\n  /home/sk3463/allo-chia-abs/.chia_scratch/slot0/allo/_mlir/exceptions.py:76: RuntimeWarning: \n  \u001b[93m[Data Type]\u001b[0m \u001b[94mInput type mismatch: ui1 vs i32. Please use NumPy array to wrap the data to avoid possible result mismatch\u001b[0m\n    warnings.warn(self.message, category=self.category)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED ../../../tests/test_stateful.py::test_nested_stateful_collision - Asse...\nFAILED ../../../tests/test_stateful.py::test_multiple_nested_same_name - Asse...\n2 failed, 11 passed, 4 warnings in 2.07s\n",
    "tests": {
     "tests/test_stateful.py::test_stateful::test_kernel_rng": "passed",
     "tests/test_stateful.py::test_stateful::test_moving_average": "passed",
@@ -343,8 +343,8 @@
   {
    "file": "tests/test_template.py",
    "rc": 0,
-   "seconds": 2.6,
-   "tail": ".......                                                                  [100%]\n7 passed in 2.23s\n",
+   "seconds": 3.4,
+   "tail": ".......                                                                  [100%]\n7 passed in 2.95s\n",
    "tests": {
     "tests/test_template.py::test_template::test_different_functions": "passed",
     "tests/test_template.py::test_template::test_double_meta_if": "passed",
@@ -359,8 +359,8 @@
   {
    "file": "tests/test_unify.py",
    "rc": 0,
-   "seconds": 1.8,
-   "tail": ".....                                                                    [100%]\n5 passed in 1.52s\n",
+   "seconds": 3.3,
+   "tail": ".....                                                                    [100%]\n5 passed in 2.88s\n",
    "tests": {
     "tests/test_unify.py::test_unify::test_multi_time_loop": "passed",
     "tests/test_unify.py::test_unify::test_nested_loop": "passed",
@@ -373,8 +373,8 @@
   {
    "file": "tests/test_verify.py",
    "rc": 0,
-   "seconds": 10.1,
-   "tail": "      float v8 = v2[i][j]; \n              float v9 = (v8 + v7); \n              v2[i][j] = v9; \n            }\n          \n        }\n      \n    }\n  \n}\nvoid incorrect(float v10[32][32], float v11[32], float v12[32][32])\n{\n  for (int v13 = 0; v13 < 32; v13 = (v13 + 1))\n    {\n      for (int v14 = 0; v14 < 32; v14 = (v14 + 1))\n        {\n          v12[v13][v14] = _past_fp_value_0_000000; \n        }\n      \n    }\n  \nl_S_i_j_0_i1:\n  for (int i1 = 0; i1 < 32; i1 = (i1 + 1))\n    {\nl_j1:\n      for (int j1 = 0; j1 < 32; j1 = (j1 + 1))\n        {\n          float v15 = v10[i1][j1]; \n          float v16 = v11[j1]; \n          float v17 = (v15 - v16); \n          v12[i1][j1] = v17; \n        }\n      \n    }\n  \n}\nvoid top(float v18[32][32], float v19[32][32], float v20[32], float live_out[32][32])\n{\n  float v22[32][32]; \n  gemm(v18, v19, v22); \n  incorrect(v22, v20, live_out); \n}\n[PAST][AI][Equivalence] Interpret program P2...\n{\n  for (int v3 = 0; v3 < 32; v3 = (v3 + 1))\n    {\n      for (int v4 = 0; v4 < 32; v4 = (v4 + 1))\n        {\n          live_out[v3][v4] = _past_fp_value_0_000000; \n        }\n      \n    }\n  \nl_S_i_j_0_i:\n  for (int i = 0; i < 32; i = (i + 1))\n    {\nl_j:\n      for (int j = 0; j < 32; j = (j + 1))\n        {\n          float v5 = v0[i][j]; \n          float v6 = v1[j]; \n          float v7 = (v5 - v6); \n          live_out[i][j] = v7; \n        }\n      \n    }\n  \n}\n[PAST][AI][Equivalence] Start checking states for equivalence...\n[PAST] NO => Programs 0\ufffd\ufffdN\ufffd\u007f and P\ufffd\ufffdN\ufffd\u007f are NOT equivalent.\n",
+   "seconds": 11.0,
+   "tail": "      float v8 = v2[i][j]; \n              float v9 = (v8 + v7); \n              v2[i][j] = v9; \n            }\n          \n        }\n      \n    }\n  \n}\nvoid incorrect(float v10[32][32], float v11[32], float v12[32][32])\n{\n  for (int v13 = 0; v13 < 32; v13 = (v13 + 1))\n    {\n      for (int v14 = 0; v14 < 32; v14 = (v14 + 1))\n        {\n          v12[v13][v14] = _past_fp_value_0_000000; \n        }\n      \n    }\n  \nl_S_i_j_0_i1:\n  for (int i1 = 0; i1 < 32; i1 = (i1 + 1))\n    {\nl_j1:\n      for (int j1 = 0; j1 < 32; j1 = (j1 + 1))\n        {\n          float v15 = v10[i1][j1]; \n          float v16 = v11[j1]; \n          float v17 = (v15 - v16); \n          v12[i1][j1] = v17; \n        }\n      \n    }\n  \n}\nvoid top(float v18[32][32], float v19[32][32], float v20[32], float live_out[32][32])\n{\n  float v22[32][32]; \n  gemm(v18, v19, v22); \n  incorrect(v22, v20, live_out); \n}\n[PAST][AI][Equivalence] Interpret program P2...\n{\n  for (int v3 = 0; v3 < 32; v3 = (v3 + 1))\n    {\n      for (int v4 = 0; v4 < 32; v4 = (v4 + 1))\n        {\n          live_out[v3][v4] = _past_fp_value_0_000000; \n        }\n      \n    }\n  \nl_S_i_j_0_i:\n  for (int i = 0; i < 32; i = (i + 1))\n    {\nl_j:\n      for (int j = 0; j < 32; j = (j + 1))\n        {\n          float v5 = v0[i][j]; \n          float v6 = v1[j]; \n          float v7 = (v5 - v6); \n          live_out[i][j] = v7; \n        }\n      \n    }\n  \n}\n[PAST][AI][Equivalence] Start checking states for equivalence...\n[PAST] NO => Programs 0\u000e\ufffdo\ufffd\u007f and P\u000e\ufffdo\ufffd\u007f are NOT equivalent.\n",
    "tests": {
     "tests/test_verify.py::test_verify::test_compose_non_equivalence": "passed",
     "tests/test_verify.py::test_verify::test_fusion": "passed",
@@ -390,8 +390,8 @@
   {
    "file": "tests/test_traceback.py",
    "rc": 0,
-   "seconds": 3.2,
-   "tail": "...                                                                      [100%]\n3 passed in 3.05s\n",
+   "seconds": 3.9,
+   "tail": "...                                                                      [100%]\n3 passed in 3.71s\n",
    "tests": {
     "tests/test_traceback.py::test_traceback::test_traceback_line_number_nested_function": "passed",
     "tests/test_traceback.py::test_traceback::test_traceback_line_number_return_type_error": "passed",
@@ -402,8 +402,8 @@
   {
    "file": "tests/test_backend_utils.py",
    "rc": 0,
-   "seconds": 1.2,
-   "tail": "............                                                             [100%]\n12 passed in 0.92s\n",
+   "seconds": 1.4,
+   "tail": "............                                                             [100%]\n12 passed in 1.00s\n",
    "tests": {
     "tests/test_backend_utils.py::test_backend_utils::test_generate_nanobind_wrapper_uses_stdint_for_ap_int": "passed",
     "tests/test_backend_utils.py::test_backend_utils::test_parse_cpp_function_ap_int_array": "passed",
@@ -423,8 +423,8 @@
   {
    "file": "tests/dataflow/test_stream_ops_ir.py",
    "rc": 0,
-   "seconds": 1.5,
-   "tail": "...                                                                      [100%]\n3 passed in 1.18s\n",
+   "seconds": 1.7,
+   "tail": "...                                                                      [100%]\n3 passed in 1.29s\n",
    "tests": {
     "tests/dataflow/test_stream_ops_ir.py::test_stream_ops_ir::test_stream_empty_full": "passed",
     "tests/dataflow/test_stream_ops_ir.py::test_stream_ops_ir::test_stream_try_get": "passed",
@@ -435,8 +435,8 @@
   {
    "file": "tests/dataflow/test_stream_ops_hls.py",
    "rc": 0,
-   "seconds": 1.6,
-   "tail": ".x                                                                       [100%]\n1 passed, 1 xfailed in 1.25s\n",
+   "seconds": 1.7,
+   "tail": ".x                                                                       [100%]\n1 passed, 1 xfailed in 1.32s\n",
    "tests": {
     "tests/dataflow/test_stream_ops_hls.py::test_stream_ops_hls::test_tapa_stream_nb": "skipped",
     "tests/dataflow/test_stream_ops_hls.py::test_stream_ops_hls::test_vhls_stream_nb": "passed"
@@ -446,8 +446,8 @@
   {
    "file": "tests/dataflow/test_region_stateful.py",
    "rc": 0,
-   "seconds": 1.9,
-   "tail": ".....                                                                    [100%]\n5 passed in 1.60s\n",
+   "seconds": 2.2,
+   "tail": ".....                                                                    [100%]\n5 passed in 1.81s\n",
    "tests": {
     "tests/dataflow/test_region_stateful.py::test_region_stateful::test_kernel_private_stateful_still_builds_for_hls": "passed",
     "tests/dataflow/test_region_stateful.py::test_region_stateful::test_region_stateful_shared_by_two_kernels_is_rejected_for_hls": "passed",
@@ -460,8 +460,8 @@
   {
    "file": "tests/dataflow/test_df_unit.py",
    "rc": 0,
-   "seconds": 2.0,
-   "tail": ".....                                                                    [100%]\n5 passed in 1.70s\n",
+   "seconds": 2.2,
+   "tail": ".....                                                                    [100%]\n5 passed in 1.85s\n",
    "tests": {
     "tests/dataflow/test_df_unit.py::test_df_unit::test_arg_mapping": "passed",
     "tests/dataflow/test_df_unit.py::test_df_unit::test_const_arrays": "passed",
@@ -474,8 +474,8 @@
   {
    "file": "tests/dataflow/test_stream_of_blocks.py",
    "rc": 1,
-   "seconds": 16.4,
-   "tail": "Passed for multiple streams of blocks!\ng++ -c -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/ext/robin_map/include -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src /home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_combined.cpp -o /tmp/tmpbp0lqckb/_tmp/nanobind.o\ng++ -shared -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/tmp/tmpbp0lqckb -I/tmp/tmpbp0lqckb -I/opt/xilinx/Vitis_HLS/2023.2/include /tmp/tmpbp0lqckb/_tmp/pytop_multiple_stream_blocks_1790047326473909598.cpp /tmp/tmpbp0lqckb/_tmp/nanobind.o -L/home/sk3463/miniconda3/envs/allo/lib -o /tmp/tmpbp0lqckb/_tmp/pytop_multiple_stream_blocks_1790047326473909598.cpython-312-x86_64-linux-gnu.so\n=========================== short test summary info ============================\nFAILED ../../../tests/dataflow/test_stream_of_blocks.py::test_multiple_blocks\n1 failed, 2 passed in 16.10s\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 1\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 2\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 2\n",
+   "seconds": 17.5,
+   "tail": "Passed for multiple streams of blocks!\ng++ -c -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/ext/robin_map/include -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src /home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/src/nb_combined.cpp -o /tmp/tmppa033oz9/_tmp/nanobind.o\ng++ -shared -std=c++17 -fPIC -fvisibility=hidden -I/home/sk3463/miniconda3/envs/allo/lib/python3.12/site-packages/nanobind/include -I/home/sk3463/miniconda3/envs/allo/include/python3.12 -I/tmp/tmppa033oz9 -I/tmp/tmppa033oz9 -I/opt/xilinx/Vitis_HLS/2023.2/include /tmp/tmppa033oz9/_tmp/pytop_multiple_stream_blocks_1790097660086034233.cpp /tmp/tmppa033oz9/_tmp/nanobind.o -L/home/sk3463/miniconda3/envs/allo/lib -o /tmp/tmppa033oz9/_tmp/pytop_multiple_stream_blocks_1790097660086034233.cpython-312-x86_64-linux-gnu.so\n=========================== short test summary info ============================\nFAILED ../../../tests/dataflow/test_stream_of_blocks.py::test_multiple_blocks\n1 failed, 2 passed in 17.09s\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 1\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 2\nINFO [HLS SIM]: The maximum depth reached by any hls::stream() instance in the design is 2\n",
    "tests": {
     "tests/dataflow/test_stream_of_blocks.py::test_stream_of_blocks::test_2d_blocks": "passed",
     "tests/dataflow/test_stream_of_blocks.py::test_stream_of_blocks::test_blocks_compute": "passed",
@@ -780,7 +780,7 @@
   "tests/test_vhls.py::test_vhls::test_wrap_nonvoid[False]": "passed",
   "tests/test_vhls.py::test_vhls::test_wrap_nonvoid[True]": "passed"
  },
- "seconds": 140.2,
+ "seconds": 158.1,
  "tier": "fast",
  "verdicts": {
   "tests/dataflow/test_df_unit.py": "ok",

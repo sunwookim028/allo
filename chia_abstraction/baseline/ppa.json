@@ -41,10 +41,11 @@
     "4x4x4": 172
    },
    "estimated_ns": 2.431,
-   "seconds": 152.1
+   "retried_after_no_number": false,
+   "seconds": 136.4
   }
  },
- "measured": "2026-09-22T03:28:02Z",
- "ref": "882f1b3409ab72a8fa8d302b017553ec98c3b163",
+ "measured": "2026-09-22T17:26:43Z",
+ "ref": "2359f8506d8798e894134360d0789c1ec6f63238",
  "workload": "gemm_int8_16"
 }
