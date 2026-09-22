@@ -187,6 +187,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -1267,9 +1268,14 @@ memory, and equalising them means rebuilding one side’s SoC.</p></li>
 addresses it; only the window does, which is exactly what fixed the withdrawn
 claim recorded above.</p></li>
 </ul>
-<p>So the config delta that survives review is <strong>two fields, both of them the
-array size</strong> — <code class="docutils literal notranslate"><span class="pre">meshRows</span></code> and <code class="docutils literal notranslate"><span class="pre">meshColumns</span></code> — plus <code class="docutils literal notranslate"><span class="pre">has_training_convs</span> <span class="pre">=</span>
-<span class="pre">false</span></code> to remove conv hardware neither benchmark touches. Everything else is
+<p>So the config delta that survives review is <strong>three fields, two of which are
+the array size</strong> — <code class="docutils literal notranslate"><span class="pre">meshRows</span></code> and <code class="docutils literal notranslate"><span class="pre">meshColumns</span></code> — with the third being
+<code class="docutils literal notranslate"><span class="pre">has_training_convs</span> <span class="pre">=</span> <span class="pre">false</span></code>. (<code class="docutils literal notranslate"><span class="pre">tileRows</span></code> and <code class="docutils literal notranslate"><span class="pre">tileColumns</span></code> also appear in
+the <code class="docutils literal notranslate"><span class="pre">copy()</span></code>, restated at the values they already hold, so a reviewer counting
+changed fields finds three.) <code class="docutils literal notranslate"><span class="pre">has_training_convs</span></code> is read in <strong>exactly one
+place</strong> in the whole generator, six conv-loop flags in <code class="docutils literal notranslate"><span class="pre">LoopConv.scala</span></code>, and
+nowhere in <code class="docutils literal notranslate"><span class="pre">LoopMatmul</span></code>, the mesh, the scratchpad or the header generator — so
+a GEMM provably cannot observe it, verifiable in one grep. Everything else is
 named as unexercised. Two disclosures rather than fixes: <code class="docutils literal notranslate"><span class="pre">dataflow</span> <span class="pre">=</span>
 <span class="pre">Dataflow.BOTH</span></code> leaves Gemmini carrying an output-stationary datapath we never
 use, which favours it if anyone, so keeping it is the conservative choice; and
@@ -1284,7 +1290,8 @@ is slower” from “our design is slower at this one size.”</strong></p>
 4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
 Gemmini’s <strong>256 KiB scratchpad and 64 KiB accumulator</strong> — a 64x and 30x
 asymmetry.</p>
-<p>It does not buy Gemmini a single cycle at any published shape. Re-running
+<p>Stated precisely, that is <strong>64x the scratchpad and about 30x the
+accumulator</strong>. It does not buy Gemmini a single cycle at any published shape. Re-running
 <code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>’s own tiling search across capacities at DIM=4 gives the
 <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> call count below; every row is legal under the config’s <code class="docutils literal notranslate"><span class="pre">require</span></code>
 clauses:</p>
@@ -1355,9 +1362,15 @@ no-bias calls we make. In hardware it sets a bit on the preload’s accumulator
 address rather than issuing extra commands, so it adds no RoCC traffic, but it
 turns the k=0 accumulator writes into read-modify-writes and is therefore <strong>not
 guaranteed cycle-neutral</strong>.</p>
-<p>This sits inside all five published Gemmini figures. It is being measured both
-ways rather than argued about; until that lands, read 161 / 220 / 347 / 391 /
-593 as provisional. The fix is C-only and needs no re-elaboration.</p>
+<p><strong>Measured both ways, and settled: the published figures stand.</strong> The
+driver-matched <code class="docutils literal notranslate"><span class="pre">false</span></code> makes Gemmini <strong>0 to 4 cycles faster</strong> at the five
+shapes — so our deficit was very slightly understated, in the direction that
+does not flatter us. The effect is below the measurement’s own noise: the
+<code class="docutils literal notranslate"><span class="pre">true</span></code> column’s trial-to-trial spread reaches 20 cycles at one shape, larger
+than the effect itself. Its <em>sign is consistent</em> across all five shapes, so it
+is a small systematic effect under the single-trial noise floor rather than
+noise, and new work should use the driver-matched form. 161 / 220 / 347 / 391 /
+593 need no revision on this account.</p>
 <p>Two operational hazards found in the same survey, both of which have silently
 produced wrong comparisons before: <strong>every elaboration rewrites</strong>
 <code class="docutils literal notranslate"><span class="pre">gemmini_params.h</span></code> <strong>in place</strong>, so elaborating a second configuration
@@ -1366,6 +1379,76 @@ hardware — snapshot it, rebuild immediately, and check the <code class="docuti
 banner. And the committed <code class="docutils literal notranslate"><span class="pre">roccTests_Makefile.patch</span></code> adds only <code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code> to
 the <code class="docutils literal notranslate"><span class="pre">tests</span></code> list, <strong>not</strong> <code class="docutils literal notranslate"><span class="pre">allo_bare5</span></code>, so <code class="docutils literal notranslate"><span class="pre">build.sh</span></code> will not build the
 window benchmark; it needs its explicit make target.</p>
+</section>
+</section>
+<section id="reproduced-once-independently">
+<h2>Reproduced, once, independently<a class="headerlink" href="#reproduced-once-independently" title="Link to this heading"><span>¶</span></a></h2>
+<p>On 2026-09-22 a second agent re-ran the untouched window benchmark on the same
+hardware configuration and measured <strong>161, 144 / 220, 218 / 347, 344 / 391, 390
+/ 593, 590</strong> — the five published figures exactly, including the 161/144 spread
+at 4x4x4 that had been recorded and never explained.</p>
+<p>This is the <strong>first independent reproduction of the Gemmini column</strong>, and it is
+worth stating separately because until it happened neither this project’s nor
+MiniTPU’s Gemmini figures had ever been reproduced by anyone. It is one
+reproduction on the same host, not a second implementation, so it establishes
+that the numbers are re-derivable rather than that they are right.</p>
+<p>A cross-check fell out of the same work: a <code class="docutils literal notranslate"><span class="pre">gemmini_params.h</span></code> reconstructed
+independently from stock <code class="docutils literal notranslate"><span class="pre">HEAD</span></code> plus the committed patch is <strong>byte-identical</strong>
+to the header captured from the live tree.</p>
+<section id="the-measurement-noise-floor-which-constrains-every-claim-on-this-page">
+<h3>The measurement noise floor, which constrains every claim on this page<a class="headerlink" href="#the-measurement-noise-floor-which-constrains-every-claim-on-this-page" title="Link to this heading"><span>¶</span></a></h3>
+<p>The same reproduction exposed something that had been visible in the recorded
+numbers all along and never priced: <strong>the trial-to-trial spread reaches 20
+cycles at a shape whose total is 161</strong> — identical hardware, identical binary,
+consecutive runs. That is up to <strong>12 % noise at the small shapes</strong>, and it comes
+from each measured window’s sensitivity to the preceding call’s cache and
+scratchpad state.</p>
+<p>Two consequences, both binding:</p>
+<ul class="simple">
+<li><p><strong>No single-trial number at 4x4x4 or 8x8x8.</strong> Report a median and the spread.
+A 1.07-1.24x deficit measured at those shapes is, at the small end, partly
+inside the noise. It does not erase the result — the sign is consistent across
+all five shapes, and that consistency is the evidence — but any claim of a
+difference <em>smaller</em> than the spread is unsupportable.</p></li>
+<li><p><strong>The noise is the Gemmini column’s, not ours.</strong> This spread comes from a
+full SoC — Rocket, an L1 cache, a scratchpad whose state the previous call
+left behind. Our own figures are Vitis co-simulation of a fixed design on
+fixed inputs, which is <strong>deterministic</strong>: the five shapes reproduce exactly,
+run after run, and the alignment variant’s independent re-measurement
+reproduced every one of its numbers to the cycle. So repeats are needed on
+the Gemmini side and are not needed on ours, and a design A/B measured only
+by our cosim — the latency sensitivity grid above, for instance — does not
+need them either. A <em>cross-machine comparison</em> is still limited by the
+noisier side of it.</p></li>
+</ul>
+<p>This is the cycle-domain analogue of the synthesis noise floor recorded in
+<a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> — two builds of an identical netlist differing by 1,407
+LUT and 0.046 ns. Both say the same thing: <strong>state the noise before stating the
+difference</strong>, and say which measurement the noise belongs to.</p>
+</section>
+<section id="do-not-mix-the-two-benchmarks-columns">
+<h3>Do not mix the two benchmarks’ columns<a class="headerlink" href="#do-not-mix-the-two-benchmarks-columns" title="Link to this heading"><span>¶</span></a></h3>
+<p>There are now two window benchmarks, and they do <strong>not</strong> produce interchangeable
+latencies: the newer steady-state file reads <strong>2 to 14 cycles lower</strong> at the same
+shapes on the same hardware. The cause is the call sequence rather than the
+hardware — the files differ in how many trials they run per shape and in what
+runs between them, and each measured window is sensitive to the preceding call’s
+cache and scratchpad state.</p>
+<p>So a table must say which file produced it, and a comparison must take both
+columns from the same file. This is the same class of error as the window
+problem that produced the withdrawn claim: a real measurement, correctly taken,
+that means something different from what it is being used to mean.</p>
+</section>
+<section id="a-third-hazard-for-anyone-reproducing-at-another-array-size">
+<h3>A third hazard for anyone reproducing at another array size<a class="headerlink" href="#a-third-hazard-for-anyone-reproducing-at-another-array-size" title="Link to this heading"><span>¶</span></a></h3>
+<p>Beyond the in-place <code class="docutils literal notranslate"><span class="pre">gemmini_params.h</span></code> rewrite and <code class="docutils literal notranslate"><span class="pre">allo_bare5</span></code> missing from
+the patched <code class="docutils literal notranslate"><span class="pre">tests</span></code> list: <strong>rocc-tests at its pinned HEAD ships a header that
+no stock configuration generates.</strong> It carries DIM 16 with 4096 bank rows and
+1024 accumulator rows but <em>no</em> <code class="docutils literal notranslate"><span class="pre">ACC_READ_FULL_WIDTH</span></code>, while the default config
+sets <code class="docutils literal notranslate"><span class="pre">acc_read_full_width</span> <span class="pre">=</span> <span class="pre">true</span></code> and the generator emits that macro — so the
+committed header came from a leaner config than the one it appears to describe.
+A build that reuses the committed header instead of regenerating it will differ
+from a build that regenerates, for a reason invisible in the Scala.</p>
 </section>
 </section>
 </section>
@@ -1411,6 +1494,12 @@ window benchmark; it needs its explicit make target.</p>
 <li><a class="reference internal" href="#which-gemmini-configuration-is-the-honest-opponent">Which Gemmini configuration is the honest opponent</a><ul>
 <li><a class="reference internal" href="#the-capacity-asymmetry-is-cycle-neutral-and-this-is-the-finding">The capacity asymmetry is cycle-neutral, and this is the finding</a></li>
 <li><a class="reference internal" href="#open-ex-accumulate-in-the-window-benchmark">Open: <code class="docutils literal notranslate"><span class="pre">ex_accumulate</span></code> in the window benchmark</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#reproduced-once-independently">Reproduced, once, independently</a><ul>
+<li><a class="reference internal" href="#the-measurement-noise-floor-which-constrains-every-claim-on-this-page">The measurement noise floor, which constrains every claim on this page</a></li>
+<li><a class="reference internal" href="#do-not-mix-the-two-benchmarks-columns">Do not mix the two benchmarks’ columns</a></li>
+<li><a class="reference internal" href="#a-third-hazard-for-anyone-reproducing-at-another-array-size">A third hazard for anyone reproducing at another array size</a></li>
 </ul>
 </li>
 </ul>

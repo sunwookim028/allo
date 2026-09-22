@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Dataflow Simulation Semantics: Allo vs HLS CSIM" href="dataflow_semantics.html" />
-    <link rel="prev" title="MLIR Translation Guide" href="../gallery/developer_02_mlir.html" /> 
+    <link rel="prev" title="Extending Allo’s Abstractions" href="extending_allo.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
 <div id="top_nav">
@@ -187,6 +187,7 @@
 <li class="toctree-l1"><a class="reference internal" href="index.html">Developer Setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -230,6 +231,10 @@ the Vitis dataflow path to RTL co-simulation.</p></li>
 </ul>
 <p>Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.</p>
+<p>Gaps in Allo’s <em>abstractions</em> – things that are missing a type, a primitive
+or a pass rather than a bug fix – are ranked with their legality rules in
+<a class="reference internal" href="extending_allo.html"><span class="doc">Extending Allo’s Abstractions</span></a>, which is also the standard a new primitive
+has to meet before it lands.</p>
 <p>Related feature-gap tracking lives as fork issues and is not restated here:
 combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
@@ -1915,8 +1920,8 @@ sub-region – about five lines, not yet prototyped.</p>
         <div class="button_nav">
             <div class="left">
                 
-                <a href="../gallery/developer_02_mlir.html">
-                    <span class="icon">&lt;</span><span>MLIR Translation Guide</span></a>
+                <a href="extending_allo.html">
+                    <span class="icon">&lt;</span><span>Extending Allo’s Abstractions</span></a>
                 
             </div>
 

@@ -1045,9 +1045,14 @@ The four axes pull in different directions and are settled differently:
   addresses it; only the window does, which is exactly what fixed the withdrawn
   claim recorded above.
 
-So the config delta that survives review is **two fields, both of them the
-array size** — ``meshRows`` and ``meshColumns`` — plus ``has_training_convs =
-false`` to remove conv hardware neither benchmark touches. Everything else is
+So the config delta that survives review is **three fields, two of which are
+the array size** — ``meshRows`` and ``meshColumns`` — with the third being
+``has_training_convs = false``. (``tileRows`` and ``tileColumns`` also appear in
+the ``copy()``, restated at the values they already hold, so a reviewer counting
+changed fields finds three.) ``has_training_convs`` is read in **exactly one
+place** in the whole generator, six conv-loop flags in ``LoopConv.scala``, and
+nowhere in ``LoopMatmul``, the mesh, the scratchpad or the header generator — so
+a GEMM provably cannot observe it, verifiable in one grep. Everything else is
 named as unexercised. Two disclosures rather than fixes: ``dataflow =
 Dataflow.BOTH`` leaves Gemmini carrying an output-stationary datapath we never
 use, which favours it if anyone, so keeping it is the conservative choice; and
@@ -1066,7 +1071,8 @@ The obvious objection to this comparison is memory capacity: our design has a
 Gemmini's **256 KiB scratchpad and 64 KiB accumulator** — a 64x and 30x
 asymmetry.
 
-It does not buy Gemmini a single cycle at any published shape. Re-running
+Stated precisely, that is **64x the scratchpad and about 30x the
+accumulator**. It does not buy Gemmini a single cycle at any published shape. Re-running
 ``tiled_matmul_auto``'s own tiling search across capacities at DIM=4 gives the
 ``loop_ws`` call count below; every row is legal under the config's ``require``
 clauses:
@@ -1103,9 +1109,15 @@ address rather than issuing extra commands, so it adds no RoCC traffic, but it
 turns the k=0 accumulator writes into read-modify-writes and is therefore **not
 guaranteed cycle-neutral**.
 
-This sits inside all five published Gemmini figures. It is being measured both
-ways rather than argued about; until that lands, read 161 / 220 / 347 / 391 /
-593 as provisional. The fix is C-only and needs no re-elaboration.
+**Measured both ways, and settled: the published figures stand.** The
+driver-matched ``false`` makes Gemmini **0 to 4 cycles faster** at the five
+shapes — so our deficit was very slightly understated, in the direction that
+does not flatter us. The effect is below the measurement's own noise: the
+``true`` column's trial-to-trial spread reaches 20 cycles at one shape, larger
+than the effect itself. Its *sign is consistent* across all five shapes, so it
+is a small systematic effect under the single-trial noise floor rather than
+noise, and new work should use the driver-matched form. 161 / 220 / 347 / 391 /
+593 need no revision on this account.
 
 Two operational hazards found in the same survey, both of which have silently
 produced wrong comparisons before: **every elaboration rewrites**
@@ -1115,3 +1127,81 @@ hardware — snapshot it, rebuild immediately, and check the ``GEMMINI DIM=`` bo
 banner. And the committed ``roccTests_Makefile.patch`` adds only ``allo_cmp`` to
 the ``tests`` list, **not** ``allo_bare5``, so ``build.sh`` will not build the
 window benchmark; it needs its explicit make target.
+
+Reproduced, once, independently
+-------------------------------
+
+On 2026-09-22 a second agent re-ran the untouched window benchmark on the same
+hardware configuration and measured **161, 144 / 220, 218 / 347, 344 / 391, 390
+/ 593, 590** — the five published figures exactly, including the 161/144 spread
+at 4x4x4 that had been recorded and never explained.
+
+This is the **first independent reproduction of the Gemmini column**, and it is
+worth stating separately because until it happened neither this project's nor
+MiniTPU's Gemmini figures had ever been reproduced by anyone. It is one
+reproduction on the same host, not a second implementation, so it establishes
+that the numbers are re-derivable rather than that they are right.
+
+A cross-check fell out of the same work: a ``gemmini_params.h`` reconstructed
+independently from stock ``HEAD`` plus the committed patch is **byte-identical**
+to the header captured from the live tree.
+
+The measurement noise floor, which constrains every claim on this page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The same reproduction exposed something that had been visible in the recorded
+numbers all along and never priced: **the trial-to-trial spread reaches 20
+cycles at a shape whose total is 161** — identical hardware, identical binary,
+consecutive runs. That is up to **12 % noise at the small shapes**, and it comes
+from each measured window's sensitivity to the preceding call's cache and
+scratchpad state.
+
+Two consequences, both binding:
+
+- **No single-trial number at 4x4x4 or 8x8x8.** Report a median and the spread.
+  A 1.07-1.24x deficit measured at those shapes is, at the small end, partly
+  inside the noise. It does not erase the result — the sign is consistent across
+  all five shapes, and that consistency is the evidence — but any claim of a
+  difference *smaller* than the spread is unsupportable.
+- **The noise is the Gemmini column's, not ours.** This spread comes from a
+  full SoC — Rocket, an L1 cache, a scratchpad whose state the previous call
+  left behind. Our own figures are Vitis co-simulation of a fixed design on
+  fixed inputs, which is **deterministic**: the five shapes reproduce exactly,
+  run after run, and the alignment variant's independent re-measurement
+  reproduced every one of its numbers to the cycle. So repeats are needed on
+  the Gemmini side and are not needed on ours, and a design A/B measured only
+  by our cosim — the latency sensitivity grid above, for instance — does not
+  need them either. A *cross-machine comparison* is still limited by the
+  noisier side of it.
+
+This is the cycle-domain analogue of the synthesis noise floor recorded in
+:doc:`/designs/minitpu` — two builds of an identical netlist differing by 1,407
+LUT and 0.046 ns. Both say the same thing: **state the noise before stating the
+difference**, and say which measurement the noise belongs to.
+
+Do not mix the two benchmarks' columns
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are now two window benchmarks, and they do **not** produce interchangeable
+latencies: the newer steady-state file reads **2 to 14 cycles lower** at the same
+shapes on the same hardware. The cause is the call sequence rather than the
+hardware — the files differ in how many trials they run per shape and in what
+runs between them, and each measured window is sensitive to the preceding call's
+cache and scratchpad state.
+
+So a table must say which file produced it, and a comparison must take both
+columns from the same file. This is the same class of error as the window
+problem that produced the withdrawn claim: a real measurement, correctly taken,
+that means something different from what it is being used to mean.
+
+A third hazard for anyone reproducing at another array size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Beyond the in-place ``gemmini_params.h`` rewrite and ``allo_bare5`` missing from
+the patched ``tests`` list: **rocc-tests at its pinned HEAD ships a header that
+no stock configuration generates.** It carries DIM 16 with 4096 bank rows and
+1024 accumulator rows but *no* ``ACC_READ_FULL_WIDTH``, while the default config
+sets ``acc_read_full_width = true`` and the generator emits that macro — so the
+committed header came from a leaner config than the one it appears to describe.
+A build that reuses the committed header instead of regenerating it will differ
+from a build that regenerates, for a reason invisible in the Scala.

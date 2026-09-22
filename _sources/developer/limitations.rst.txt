@@ -37,6 +37,11 @@ passes:
 Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.
 
+Gaps in Allo's *abstractions* -- things that are missing a type, a primitive
+or a pass rather than a bug fix -- are ranked with their legality rules in
+:doc:`/developer/extending_allo`, which is also the standard a new primitive
+has to meet before it lands.
+
 Related feature-gap tracking lives as fork issues and is not restated here:
 combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
