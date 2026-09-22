@@ -1298,14 +1298,45 @@ files they exist to reject, in seconds and without Vitis:
    TPU_MAXDIM=16 TPU_SHAPES=16x16x16 TPU_PRJ=$PWD/saif_t4.prj python cosim.py
    python saif_capture.py saif_t4.prj -o <dir>/run.saif
 
-Measured on ``T4_MAXDIM16`` at 16x16x16 (the largest of the five published
-shapes, and so the most representative activity): 685 cycles, unchanged; a
-2 423 170 ps window, 727.7 clocks at 3.33 ns, which is the 685-cycle kernel
-plus the ``s_axi_control`` programming around it; 548 instances and 444 258
-nets, of which 67 633 toggle, for 4 990 787 transitions, 94% of them inside
-the DUT's submodules. All sixteen PEs of the 4x4 array appear with activity,
-and the hottest block is the accumulator's pipeline. The file is 41 MB -- SAIF
-is a per-net summary, so its size follows the net count, not the run length.
+Measured on the two handoff configurations at **16x16x16**, the largest of the
+five published shapes and so the most representative activity:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 13 13 14 14 12 12
+
+   * - configuration
+     - cycles
+     - window
+     - instances
+     - nets
+     - toggling
+     - size
+   * - ``T4_MAXDIM16``
+     - 685
+     - 727.7 clk
+     - 548
+     - 444 258
+     - 67 633
+     - 41 MB
+   * - ``T8_MAXDIM64``
+     - 493
+     - 535.1 clk
+     - 1 504
+     - 965 573
+     - 243 424
+     - 87 MB
+
+Both cycle counts are byte-identical to the ones their own cosim measured, so
+the instrumentation moved nothing. The window is wider than the cycle count
+because it spans the ``s_axi_control`` programming around the kernel as well:
+42 clocks of it at ``T4``, 42 at ``T8``. Activity is 4 990 787 transitions at
+``T4`` and 5 552 502 at ``T8``, 94% and 95% of it inside the DUT's submodules
+rather than on its ports, with the accumulator's pipeline the hottest block in
+both. Every PE appears with nonzero activity -- all 16 of the 4x4 array, all
+64 of the 8x8 -- which is the check that the SAIF describes the array and not
+just the wrapper around it. The files are 41 MB and 87 MB: SAIF is a per-net
+summary, so size follows the net count, not the run length.
 
 .. _tinytpu-isa-verify:
 
