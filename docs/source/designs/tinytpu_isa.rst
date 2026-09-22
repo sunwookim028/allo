@@ -322,7 +322,7 @@ generated region is hand-written rationale.
    fails if this region is stale.
 
 Bit layout
-^^^^^^^^^^
+~~~~~~~~~~
 
 Most significant on the left. ``enc()`` builds word 0 and ``enc_agu()`` word 1; both are generated from the field table below, so neither picture can go stale.
 
@@ -380,7 +380,7 @@ Bits 62, 63 of word 0 and bits 63:57 of word 1 are unused.
      - ``TINYTPU_ISA``: the compiler-side descriptor of what one instruction word can carry. It imports nothing from examples/, so its address_terms and loop_depth budgets are checked against ``agu.terms`` and ``loop_stack.depth`` rather than generated.
 
 Instruction word
-^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~
 
 An instruction is **2 64-bit words** (``IWORDS``). Word 0 carries the opcode and five fields; word 1 carries up to 3 address-generation terms.
 
@@ -452,7 +452,7 @@ Every field carries one more bit than its value range needs: an N-bit field safe
 A term resolves to ``field[target] += iv[level] * stride, for each term with target != 0, in term order``. Targets: 0 = unused, 1 = ``f0``, 2 = ``f1``, 3 = ``f2``, 4 = ``f3``.
 
 Opcodes
-^^^^^^^
+~~~~~~~
 
 .. list-table:: Opcodes
    :header-rows: 1
@@ -537,7 +537,7 @@ Opcodes
      - ``sequencer``
 
 Derived properties
-^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~
 
 Facts that **follow** from the tables above rather than being written in them. ``gen_isa.py --check`` recomputes each one from the spec and then confirms the design behaves that way, so they are checked rather than asserted -- every one of them was documented wrongly here until 2026-09-21, which is the argument for computing them.
 
@@ -577,7 +577,7 @@ Facts that **follow** from the tables above rather than being written in them. `
    The ``split_operand_load`` row is the one that makes the answer actionable rather than final: at T=8 MAXDIM=128 the shipped layout is over by 1 on ``max(M, K)`` for 32x128x128 and 64x128x128, but splitting the B load removes K from the row count and both assemble and compute A@B exactly -- measured on the design, not argued. 128x128x128 is over by 1 even then, and its accu header count is over by 2049, so it needs both a wider nr and a wider header slice.
 
 Per-unit rewrites
-^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~
 
 The sequencer hands two units a rewritten copy of the word, so each unit's flat row loop reads its own work count out of ``nr``:
 
@@ -598,7 +598,7 @@ The sequencer hands two units a rewritten copy of the word, so each unit's flat 
      - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
 
 Instruction memory header
-^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``imem[0:NHDR]`` (``NHDR = 8``) is a header of per-unit **work** counts; instructions follow, two words each. Each count is read back through a 16-bit slice, so it stops at 32767.
 
@@ -670,7 +670,7 @@ Instruction memory header
      - ``dma_ld``
 
 Memory map
-^^^^^^^^^^
+~~~~~~~~~~
 
 .. list-table:: Memories
    :header-rows: 1
@@ -735,7 +735,7 @@ Memory map
 No on-chip memory is cleared by the hardware, so every read of one is the program's obligation; see the contracts below.
 
 Contracts
-^^^^^^^^^
+~~~~~~~~~
 
 **Write before read.**
 
@@ -750,7 +750,7 @@ Enforced by microarch_isa.check_program, which microarch_isa.assemble calls, so 
 **The accumulator read-after-write distance.** A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on. ``AR_RAW_DIST = 4`` accu iterations; cost per opcode: ``mm`` 1 per row, ``vrelu`` 1 per row, ``mvout`` 1 per row, ``vadd`` 2 per row: first source on the even iteration, second source and the write on the odd one. Enforced by microarch_isa.check_program. Exercised at its edge by isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build.
 
 Parameters
-^^^^^^^^^^
+~~~~~~~~~~
 
 .. list-table:: Build parameters
    :header-rows: 1
@@ -843,7 +843,7 @@ Cross-parameter constraints, asserted by ``isa_encoding.check_parameters()``:
 * ``DMA_WORDS >= 1`` -- the operand burst moves at least one packed word per iteration
 
 What bounds ``MAXDIM``
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 
 Two ceilings, both in the **encoding** rather than the datapath. They answer different questions, so neither is a correction of the other, and which one binds depends on the program and on ``T``. The values below are **computed** by ``isa_encoding.maxdim_ceiling``, over multiples of ``T``: solving either inequality over the reals gives a number no build can use.
 
@@ -872,7 +872,7 @@ Two ceilings, both in the **encoding** rather than the datapath. They answer dif
 The binding ceiling for a build is the smaller of the two, and which one binds depends on the program. The design ships at MAXDIM=64, inside both.
 
 Numerics
-^^^^^^^^
+~~~~~~~~
 
 Active configuration: **int8**. A configuration states what happens to *values*, not only how wide they are, so that a format whose arithmetic is inexact can be added without restructuring anything above.
 
@@ -1357,7 +1357,7 @@ summary, so size follows the net count, not the run length.
 .. _tinytpu-isa-conformance:
 
 The spec, and holding both consumers to it
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``isa_ref.py`` was derived from ``microarch_isa.py``'s own comments and
 imported its opcode numbers, its field layout and its address resolution. It

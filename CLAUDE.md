@@ -18,6 +18,15 @@ the page, not to a new file. The fork-only pages:
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
+
+Dev notes (not published):
+
+| Topic | Page |
+| --- | --- |
+| Toolchains on this host, env, golden tests | `dev/toolchains.rst` |
+| Branch layout, upstream-merge procedure, worktrees | `dev/fork_maintenance.rst` |
+| Dated measurement records | `dev/records/` |
+| Session report, paper outline, ASIC handoff | `dev/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
 

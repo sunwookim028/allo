@@ -68,9 +68,13 @@ Takeaways
 - **It finds real design changes, not yet novel ones.** Best so far: a DMA
   burst widening worth 55-61 % of the steady-state gap to Gemmini (not
   landed; its banked form synthesises with no cycle loss).
-- **Two things are not yet shown:** a *rate* of discovery (every search is
-  n=1 per arm) and an agent-authored **architectural** abstraction (zero so
-  far -- the abstraction track produced apparatus findings instead).
+- **An agent proposed an architectural legality rule that passed its
+  discriminating test and is nonetheless unsound in both directions.**
+  ``s.memory_ports`` refused a design needing two write ports and accepted the
+  bit-exact banked one; it also accepts a block-partitioned design that needs
+  two, and refuses a sequential one that needs one. The property was **seeded**
+  (the arm was told where to look, never what to build).
+- **A *rate* of discovery is still not shown:** every search is n=1 per arm.
 - **The recurring hazard is instruments that fail open.** Four in one night
   reported success after failing. A negative result counts only if the
   instrument can be shown to have run.
@@ -94,6 +98,16 @@ Contributions
   passed 291 tests while aborting the compiler on first use -- any gate ladder
   that exercises a compiler only through existing designs cannot see a new
   capability in either direction.
+- **A resource predicate is the wrong shape for a port claim.** Counting
+  occupants against capacity discards *which* element is touched in *which*
+  cycle, and both measured failure directions recover exactly that discarded
+  information. The sound form is a calendar -- the index map composed with the
+  initiation interval, both of which the IR already carries. MiniTPU's
+  assembler (theirs, not ours) does not have the bug because its ``write_port``
+  is a **set of cycles** rather than a count; they note their register file has
+  one write port and no banking, so they avoided the bug by not yet having the
+  structure that creates it, which makes this predictive rather than a
+  comparison of care.
 
 How the loop is built
 ---------------------
@@ -610,6 +624,26 @@ The evidence behind the takeaways at the top of this page, one line per claim.
 
 **Demonstrated**
 
+- **An agent proposed an architectural legality rule, and the harness proved it
+  discriminates.** Pilot B (2026-09-22, ``chia-abstraction``):
+  ``s.memory_ports(target, write_ports)`` refuses when
+  ``stores > write_ports x banks``, *before* touching the IR. At a
+  harness-owned call site on a frozen design it **refused** the dual-write
+  probe (one RAM, two write statements) and **accepted** the cyclically banked
+  one (two instances, one write each), which was then bit-exact under csim.
+  Every other gate clean: 294/294 tests, ``stress_isa`` 492/492, all design
+  cases bit-exact, 20 limits verdicts unchanged, resources flat, +0 cycles. It
+  named its own unchecked premise unprompted. **The property was seeded**; the
+  abstraction was not. Its diagnosis was half wrong -- it claimed the language
+  could not *state* port counts, which is false on its own tree, so the gap was
+  enforcement only.
+- **The same rule is unsound in both directions**, measured by applying it:
+  ``Partition.Block`` factor 2 is **accepted** although both stores land in
+  bank 0 and that RTL emits two writes per bank; an unpipelined two-store loop
+  is **refused** although sequential stores need one port. Published here in
+  the same breath as the success, because a page reporting the primitive and
+  not its holes would repeat the failure this project keeps finding in its own
+  instruments.
 - **The loop runs end to end on real tools** (``chia_agent/`` on ``main``).
   Every accepted figure is RTL cosim cycles plus csynth area and clock,
   bit-exact against a frozen reference model.
@@ -638,10 +672,15 @@ The evidence behind the takeaways at the top of this page, one line per claim.
 - **A rate of discovery.** Every search is n=1 per arm. A rate does not need a
   seed -- it is a property of the sampling process -- so replication (E1 below)
   is the next paid run.
-- **An agent-authored architectural abstraction.** None yet. The abstraction
-  track's one candidate was an implementation of an existing primitive, it
-  leaked its answer through the documentation, and it aborts the compiler on
-  first use (:doc:`/extensions/agentic_experiments`).
+- **That such a rule is sound.** ``s.memory_ports`` is a heuristic and errs
+  both ways (above). The correct rule needs the layout map and the initiation
+  interval; neither is consulted.
+- **That an agent can *find* an architectural gap unaided.** The open arm,
+  given measurements only, landed in **both** of its runs on ``bind_storage``
+  -- a surface Allo already has as ``Memory(resource=, storage_type=)``, which
+  both HLS emitters already emit. Its spelling was new; its capability was not.
+  It also chose the property its most concrete seeded measurement pointed at,
+  which was pre-registered in advance as weak evidence of identification.
 - **Novelty.** The burst widening is a sensible engineering change, not a
   discovery.
 
