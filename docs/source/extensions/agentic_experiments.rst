@@ -157,6 +157,14 @@ what it was last time; a reader with their own measurements to reconcile checks
 whether the number *means* what it is being used to mean. That is the failure
 mode this project keeps hitting, and it is the one tests do not catch.
 
+The sharper form of it, owed to the engineer on the other side of those
+exchanges: in each case **the author had more evidence and the receiver had more
+distance.** We knew our own noise floor better than they did and generalised it
+anyway; they knew a claim of theirs was second-hand and relayed it anyway.
+Proximity to the evidence is what makes overreach easy, which is exactly why the
+check has to come from somewhere else — and why it cannot be delegated to a
+more careful reading by the same author.
+
 **Report resources and clock beside cycles, always.** A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist

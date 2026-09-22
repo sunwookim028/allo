@@ -1013,6 +1013,15 @@ simulator settings it is good for. MiniTPU's ranking inverted somewhere between
 figure that let them say their board sits nearer the low end rather than merely
 that one knob value beat another.
 
+So **the sweep is the primary form and any single latency value is a
+convenience**, not the other way round. One argument for that comes from the
+other side of the comparison, against their own interest: a *fitted* knob
+invites belief — 92 cycles was carried for months, looked authoritative, and
+inverted a ranking — whereas a latency of zero is so obviously not a claim about
+silicon that nobody is tempted to quote it as one. Having no memory model is not
+therefore better than having a fitted one; what is better than either is
+reporting the range over which a conclusion holds.
+
 One caveat on transplanting the number at all: theirs is a ZCU104's memory
 system seen through a descriptor-based DMA with two channels and 32-byte beats,
 on an AXI port that is not on the memory controller's clock. Our AXI slave is a
