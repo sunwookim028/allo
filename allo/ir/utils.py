@@ -45,7 +45,12 @@ def _get_global_vars(_func, skip: set[str] = None, stop: set[str] = None):
         stop = {"<module>"}
     if isinstance(_func, Callable):
         # Discussions: https://github.com/taichi-dev/taichi/issues/282
-        global_vars = _func.__globals__.copy()
+        # ``@df.region`` and ``@df.kernel`` return a ``functools.wraps``
+        # wrapper, whose ``__globals__`` is allo/dataflow.py's rather than the
+        # module the region was written in. Unwrap first, so a region's names
+        # resolve where it was written and not where the decorator lives; for
+        # everything else this is the same object it was.
+        global_vars = inspect.unwrap(_func).__globals__.copy()
     else:
         global_vars = {}
 

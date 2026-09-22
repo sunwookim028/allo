@@ -308,6 +308,20 @@ class Stream(AlloType):
     A FIFO type. Schedules using the `dataflow` schedule may find using this improves parallelism.
     """
 
+    def __class_getitem__(cls, item):
+        """``Stream[dtype, depth]`` as a value, so it can annotate a port.
+
+        A body annotation is only ever read off the AST, but a parameter
+        annotation is *evaluated* when the unit is defined, so the syntax has
+        to denote a type. ``Stream[int32[4], 2][8]`` composes: the inner
+        subscript is the element, the outer one the array shape.
+        """
+        dtype, depth = item if isinstance(item, tuple) else (item, 2)
+        shape = tuple()
+        if isinstance(dtype, TypeAnnotation):
+            dtype, shape = dtype.dtype, tuple(dtype.shape)
+        return cls(dtype=dtype, shape=shape, depth=depth)
+
     def __init__(self, dtype, shape, depth=2, size=1):
         assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
         self.dtype = dtype

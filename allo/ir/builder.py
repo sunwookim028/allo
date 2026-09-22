@@ -65,6 +65,7 @@ from .utils import (
     parse_ast,
 )
 from .infer import TypeInferer
+from .units import bind_ports
 from .types import (
     AlloType,
     Int,
@@ -2056,6 +2057,9 @@ class ASTTransformer(ASTBuilder):
                                 new_ctx.buffers = old_ctx.buffers.copy()
                                 new_ctx.scopes = old_ctx.scopes
                                 new_ctx.global_vars = old_ctx.global_vars.copy()
+                                new_ctx.global_vars.update(
+                                    getattr(node, "unit_globals", {})
+                                )
                                 for axis, val in enumerate(dim):
                                     new_ctx.global_vars.update(
                                         {"df.p" + str(axis): val}
@@ -2221,6 +2225,7 @@ class ASTTransformer(ASTBuilder):
                 ctx.put_symbol(name=name, val=mock_arg)
             ctx.func_args[func_name] = dtensors
             ctx.set_ip(func_op.entry_block)
+            bind_ports(ctx, node)
             stmts = build_stmts(ctx, node.body)
 
             # Insert calls to the kernels in the region (must be inside scope where args are visible)
