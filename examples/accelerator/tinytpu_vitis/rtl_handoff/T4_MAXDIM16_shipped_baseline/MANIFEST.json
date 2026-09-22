@@ -1,0 +1,26 @@
+{
+  "config": {
+    "TPU_MAXDIM": "16",
+    "TPU_T": "4"
+  },
+  "files": 145,
+  "resources": {
+    "BRAM": 40,
+    "DSP": 14,
+    "FF": 17075,
+    "LUT": 26558,
+    "URAM": 0,
+    "avail": {
+      "BRAM": 4032,
+      "DSP": 9024,
+      "FF": 2607360,
+      "LUT": 1303680,
+      "URAM": 960
+    },
+    "estimated_ns": 2.431,
+    "ok": true,
+    "target_ns": 3.33,
+    "uncertainty_ns": 0.9
+  },
+  "top": "tinytpu_isa"
+}

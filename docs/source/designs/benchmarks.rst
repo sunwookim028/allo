@@ -66,6 +66,32 @@ one verdict, because the questions are not the same question.
    produce, because it will be quoted without its caveat.
 
 
+.. important::
+
+   **Every figure names its window, and no figure counts a host.** A cycle
+   count without its window is not a measurement, so:
+
+   * **Ours** is Vitis ``cosim`` (xsim), ``ap_start`` to ``ap_done``, with the
+     program already in DRAM. There is **no host driver at all** --- not
+     excluded, absent.
+   * **Gemmini's** is ``rdcycle`` -> 5 ``config``\ s -> one hardware
+     ``loop_ws`` -> ``fence`` -> ``rdcycle``, which **excludes** its ~395-cycle
+     Rocket driver.
+   * **MiniTPU's** testbench figures likewise exclude its per-launch host
+     work, about 132 us with a 44 us register-access floor measured on board
+     .187, i.e. roughly 24 750 cycles at 187.5 MHz.
+
+   So: **no machine's host is counted anywhere on this page**, which is the
+   consistent choice, and it is stated rather than assumed.
+
+   **Both sides are idealised memory, and ours is a knob rather than a
+   model.** Every cycle figure here is at ``TPU_AXI_LATENCY=0`` unless the row
+   says otherwise; Vitis cosim has no DRAM model, so 0 is a value we chose.
+   Gemmini's harness uses ``WithBlackBoxSimMem(additionalLatency=0)``, roughly
+   1-2 cycle AXI. **Neither column contains a memory system.** What that costs
+   us is measured in :ref:`benchmarks-latency-grid`.
+
+
 .. _benchmarks-why-latency-is-not-throughput:
 
 Why the latency set is not a throughput comparison
@@ -456,6 +482,29 @@ target (``csynth_sweep.py``; reports kept under
      - 48
      - 14
      - 2.431 ns (411 MHz)
+   * - **8**
+     - 64
+     - 512
+     - 512
+     - 43 910
+     - 70 279
+     - 58
+     - 58
+     - 2.431 ns (411 MHz)
+
+Read the two parameters as separate columns, because they cost completely
+different things:
+
+* **MAXDIM resizes memories only.** 16 -> 64 is +413 FF (+2.4%), +59 LUT
+  (+0.2%), +8 BRAM, no clock change.
+* **T changes the shape of the region** --- T*T PE instances, T and T*T stream
+  arrays. T=4 -> T=8 at MAXDIM=64 is **2.51x the FF, 2.65x the LUT and 4.1x
+  the DSP**, for 4x the peak and a measured **3.12x** at 64x64x64. The
+  estimated clock does not move, so the array scales at close to constant
+  frequency and the trade is favourable: 2.5-2.65x the logic for 3.12x the
+  throughput. (Note T=8's *memories* are smaller than T=4's at the same
+  MAXDIM, since ``OPERAND_ROWS`` = MAXDIM^2/T --- a wider array packs more
+  lanes into each row.)
 
 **Raising MAXDIM from 16 to 64 costs +413 FF (+2.4%), +59 LUT (+0.2%) and
 +8 BRAM (+20%), and does not move the estimated clock.** That is the whole
@@ -756,6 +805,145 @@ That answers the honest open question directly: the 1.07-1.24x measured at the
 five small shapes was **a statement about pipeline depth and issue overhead,
 not about steady-state efficiency**, and at steady state the deficit shrinks
 to about 9% without disappearing.
+
+
+.. _benchmarks-latency-grid:
+
+Does the ranking survive the memory-latency range?
+==================================================
+
+.. important::
+
+   **The point of this grid is not which variant is faster. It is whether the
+   knob chose the answer.** Every cycle count on this page is at
+   ``TPU_AXI_LATENCY=0``, and Vitis cosim has no DRAM model, so 0 is a value
+   we *chose*. A variant whose whole benefit is wider DMA bursts is exactly
+   the kind whose advantage can grow or vanish with memory latency, so a win
+   measured at 0 is a win at one arbitrary point of a knob.
+
+   This is not hypothetical. MiniTPU's simulator ranked GEMM templates
+   **backwards** against a board A/B at its inferred 92-cycle value --- a 45%
+   simulated cut measured 3.6% on hardware --- and backwards again at 0. Two
+   wrong values, two wrong rankings, and the simulator was internally
+   consistent and confident both times. They found it only by running the A/B
+   on two boards.
+
+   **At zero latency the burst-widened candidate really is faster.** The
+   measurement is sound. It is the inference from it to "this design is
+   better" that the grid tests, and that is a much slipperier failure than a
+   bad measurement.
+
+The variant under test is a **parametric** burst width,
+``microarch_isa.DMA_WORDS`` (``TPU_DMA_WIDEN=1``), not a patch: at 1 it is the
+shipped loop, one packed word per iteration; at 16 each iteration reads a whole
+64-byte beat, which is what ``align_value(64)`` lets Vitis widen the port to.
+It is bit-exact on ``bench_isa`` and ``stress_isa`` (640/640) at both settings,
+and **the parametric refactor is cycle-neutral at DMA_WORDS=1**: the shipped
+path reproduces 10 289 and 22 123 exactly.
+
+Latency in **ns as well as cycles**, because cycles say which simulator
+settings a variant is good for and seconds say which real *memory systems* it
+is good for. MiniTPU's inversion sat between 213 and 490 ns, and it was the
+nanosecond figure that let them place their board inside that window. Our own
+clock is not fixed either --- variants have estimated 2.431 and 3.782 ns ---
+so a cycle-valued threshold moves when the frequency does and a time-valued
+one does not. Both builds here estimate **2.431 ns**, so at least the two
+columns share a clock.
+
+For reference, MiniTPU's own fitted figure is **213 ns** (about 40 cycles at
+187.5 MHz), which is **88 cycles at 2.431 ns** --- that is where the 88 comes
+from, and it is carried as a time rather than as their cycle count so their
+clock is not imported with it.
+
+.. list-table:: 48x48x48 and 64x64x64, one csynth per grid point
+   :header-rows: 1
+   :widths: 12 12 14 14 14 12 12
+
+   * - ``m_axi_latency``
+     - = ns @ 2.431
+     - shipped 48^3
+     - widened 48^3
+     - shipped 64^3
+     - widened 64^3
+     - widened wins?
+   * - 0
+     - 0
+     - 10 289
+     - **9 569**
+     - 22 123
+     - **21 163**
+     - yes, -7.0% / -4.3%
+   * - 16
+     - 39
+     - *pending*
+     - *pending*
+     - *pending*
+     - *pending*
+     -
+   * - 64
+     - 156
+     - *pending*
+     - *pending*
+     - *pending*
+     - *pending*
+     -
+   * - 88
+     - 214
+     - *pending*
+     - *pending*
+     - *pending*
+     - *pending*
+     -
+   * - 100
+     - 243
+     - *pending*
+     - *pending*
+     - *pending*
+     - *pending*
+     -
+
+What the widening costs, at every latency (it does not vary with the knob):
+
+.. list-table::
+   :header-rows: 1
+
+   * - variant
+     - FF
+     - LUT
+     - BRAM
+     - DSP
+     - estimated clock
+   * - shipped
+     - 17 488
+     - 26 554
+     - 52
+     - 14
+     - 2.431 ns
+   * - burst-widened
+     - 24 001
+     - 31 396
+     - **116**
+     - 14
+     - 2.431 ns
+   * - delta
+     - +6 513 (+37%)
+     - +4 842 (+18%)
+     - **+64 (+123%)**
+     - 0
+     - **unchanged**
+
+The clock not moving is worth stating: widening the DMA datapath **does not
+lengthen the critical path**, so the comparison is a pure cycles-for-area
+trade and the two columns can be compared in cycles without converting. The
+BRAM more than doubles, which is the real price.
+
+(The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
+parametric burst buffers carry ``DMA_WORDS`` words of rounding headroom in
+**both** variants, so the two differ only in the loop and not in the memory
+they address --- which is what makes the cycle columns comparable. The price
+is 4 BRAM on the shipped path against the pre-parametric build, at **zero
+cycles**: 10 289 and 22 123 are the same numbers the pre-refactor build
+produced.)
 
 
 .. _benchmarks-diagnosis:
