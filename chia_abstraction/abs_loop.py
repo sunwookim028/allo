@@ -64,6 +64,7 @@ from abs_tool import AlloCompilerTool                        # noqa: E402
 #: spend accounting over opencode's own DB, and the 40-minute-MCP-timeout LLM.
 import preflight                                             # noqa: E402
 from llm import IsaOpenCodeLLM                               # noqa: E402
+import spend                                                 # noqa: E402
 from spend import spent_since                                # noqa: E402
 
 MODEL = os.environ.get("CHIA_ABS_MODEL",
@@ -104,23 +105,94 @@ class BudgetExhausted(Exception):
 
 
 class Budget:
+    """This run's spend, attributed to THIS run's sessions.
+
+    `spend.spent_since(t0)` sums every opencode message on the account since
+    t0. Its docstring calls over-counting "the safe direction", and it is --
+    for one track at a time. With two tracks running concurrently on one
+    account it is not conservative, it is WRONG in a way that stops the wrong
+    run: measured 2026-09-22, `spent_since` for this run read $14.63 against a
+    $15 cap, of which $4.46 was this run and $10.17 was the co-design track's
+    two workers. This loop would have been halted before its second iteration
+    by another track's spending.
+
+    So the per-run cap sums only the sessions this loop has seen come back.
+    A call in flight is invisible until it returns -- its session id is not
+    known before then -- which is acceptable because the cap is checked BEFORE
+    a call, when every previous session is known. The in-flight blind spot is
+    bounded by `largest_call`, which is projected from the GLOBAL delta and so
+    stays conservative.
+
+    The CUMULATIVE cap (`CHIA_TOTAL_CAP_USD`, checked by preflight) is a
+    different question and is correctly account-wide: the account is shared, so
+    the ceiling is shared. It is the per-RUN cap that must be per-run.
+    """
+
     def __init__(self, cap_usd: float, t0_ms: int):
         self.cap, self.t0 = cap_usd, t0_ms
         self.largest_call = DEFAULT_CALL_USD
+        self.sessions: set[str] = set()
+
+    def note_session(self, session_id):
+        if session_id:
+            self.sessions.add(str(session_id))
 
     def spent(self) -> float:
+        """USD over this run's own sessions."""
+        if not self.sessions:
+            return 0.0
+        return spent_by_sessions(self.sessions, self.t0)["usd"]
+
+    def spent_account_wide(self) -> float:
+        """Every track's spend since t0. Used only to PROJECT the next call,
+        where over-counting really is the safe direction."""
         return spent_since(self.t0)["usd"]
 
     def check(self, what: str) -> float:
         spent = self.spent()
         if spent + self.largest_call > self.cap:
             raise BudgetExhausted(
-                f"not starting {what}: spent ${spent:.2f} + next call "
+                f"not starting {what}: this run has spent ${spent:.2f} over "
+                f"{len(self.sessions)} session(s) + next call "
                 f"~${self.largest_call:.2f} would pass the ${self.cap:.2f} cap")
         return spent
 
     def observe(self, usd: float):
         self.largest_call = max(self.largest_call, usd)
+
+
+def spent_by_sessions(session_ids, t0_ms: int) -> dict:
+    """USD and messages for the named opencode sessions, since t0.
+
+    Reads the same database `spend.py` reads, restricted to sessions this run
+    created. `spend.py` itself is the design track's frozen file and is not
+    edited here.
+    """
+    import sqlite3
+    out = {"usd": 0.0, "messages": 0}
+    ids = [str(s) for s in session_ids if s]
+    if not ids or not spend.DB.exists():
+        return out
+    con = sqlite3.connect(f"file:{spend.DB}?mode=ro", uri=True, timeout=30)
+    try:
+        marks = ",".join("?" * len(ids))
+        # `cost` is a field inside the message's `data` JSON blob, not a
+        # column -- the same shape `spend.spent_since` reads. A query against
+        # a `cost` column raises rather than returning 0, which is what a cap
+        # needs: an unexpected schema must be loud, not silently free.
+        rows = con.execute(
+            f"select data from message where session_id in ({marks}) "
+            f"and time_created >= ?", [*ids, t0_ms]).fetchall()
+    finally:
+        con.close()
+    for (data,) in rows:
+        d = json.loads(data)
+        if d.get("role") != "assistant":
+            continue
+        out["usd"] += d.get("cost", 0) or 0
+        out["messages"] += 1
+    out["usd"] = round(out["usd"], 4)
+    return out
 
 
 def vertex_provider(provider: str, model_id: str) -> AdditionalModelProvider:
@@ -158,6 +230,7 @@ def make_llm(tool, disposition, workload):
 def ask(llm, tool, text, budget: Budget, what: str, calls: list):
     for attempt in range(RATE_LIMIT_RETRIES + 1):
         before = budget.check(what)
+        before_account = budget.spent_account_wide()
         started = time.time()
         try:
             response = get(
@@ -171,7 +244,10 @@ def ask(llm, tool, text, budget: Budget, what: str, calls: list):
             time.sleep(delay)
             continue
         usage = dict(getattr(response, "usage", None) or {})
-        delta = budget.spent() - before
+        budget.note_session(getattr(response, "session_id", None))
+        # The projection uses the ACCOUNT-WIDE delta on purpose: it is an upper
+        # bound on what one call can cost, and over-projecting is safe.
+        delta = budget.spent_account_wide() - before_account
         budget.observe(max(usage.get("cost_usd", 0.0), delta))
         calls.append({"what": what, "seconds": round(time.time() - started, 1),
                       "session_id": getattr(response, "session_id", None),
@@ -399,7 +475,7 @@ gates pass. The harness re-measures your final tree independently either way.
             except patch_policy.PatchError:
                 touches = []
             entry["touches"] = touches
-            verdict = json.loads(tool._evaluate("loop", False))  # noqa: SLF001
+            verdict = tool._evaluate("loop", False)  # noqa: SLF001 -- returns a dict
             for attempt in range(1, args.max_debug_attempts + 1):
                 if verdict.get("ok"):
                     break
@@ -419,7 +495,7 @@ gates pass. The harness re-measures your final tree independently either way.
                     break
                 print(response.result, flush=True)
                 diff = tool.diff()
-                verdict = json.loads(tool._evaluate("loop", False))  # noqa: SLF001
+                verdict = tool._evaluate("loop", False)  # noqa: SLF001 -- returns a dict
             rung = reached(verdict)
             obj = verdict.get("objective") or {}
             # `expressive` counts, and ranks above `win`: an abstraction that
