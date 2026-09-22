@@ -10,11 +10,12 @@ them apart: charging every removed iteration predicts 1440 and 1920 cycles at
 48x48x48 and 64x64x64, against the 720 and 960 measured, while charging only
 the longer of the two bursts predicts both exactly.
 
-So `predict` is the overlapped law. It is still an extrapolation onto a model:
-both fitted shapes have *equal* activation and weight spans, and every MLP
-layer has unequal ones, which is the one regime where the law's shape is doing
-work rather than arithmetic. That is why the suite measures a model on RTL
-instead of adding up this column. Prose:
+So `predict` is the overlapped law, and it is the same quantity
+`parity_sweep.invariants` carries as `burst`. Measured against RTL on the
+suite, it is exact at the 8-row layers -- 480 predicted, 480 saved, twice --
+and over-predicts by 40 % at the 4-row ones, where the rest of the prologue
+hides about a hundred iterations of the burst. **Use it to say which layers
+the widening helps, not how much.** Prose:
 docs/source/designs/workload_suite.rst."""
 
 import os

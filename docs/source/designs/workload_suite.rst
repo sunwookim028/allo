@@ -186,7 +186,7 @@ held to. There is no second convention. ``run.py --emit`` writes them to
 ``workloads/specs/``, where they are readable next to the corpus's own.
 
 M is the product of every activation dimension but the last, so a batch is
-rows; K and L come from the Linear's ``in_features`` and ``out_features``. The
+rows; K and N come from the Linear's ``in_features`` and ``out_features``. The
 weight is transposed on the way into DRAM, because ``nn.Linear`` holds
 ``(out, in)`` and the spec's ``B`` is ``kn``.
 
@@ -208,7 +208,9 @@ Three checks, and a layer that fails any of them is reported, never rounded.
    matches on every byte. This is what makes the suite a workload rather than
    a shape table: the machine computes the model, not a GEMM of the model's
    size.
-#. **The RTL.** One model's layers go through ``cosim.py``'s machinery, below.
+#. **The RTL.** Three of the four models' layers go through ``cosim.py``'s
+   machinery, below, each compared against ``isa_ref`` over all 4096 bytes of
+   ``C`` rather than over the result region alone.
 
 The numbers
 ===========
@@ -396,7 +398,10 @@ The decision is the **burst-widening candidate**, ``TPU_DMA_WIDEN=1``: the
 ``dma_ld`` operand burst reads ``DMA_WORDS`` packed words per loop iteration
 instead of one, up to the 64-byte beat ``align_value(64)`` lets Vitis widen
 the port to. It is parametric, bit-exact at both settings, and costs +123 %
-BRAM. :doc:`benchmarks` measures it at two shapes:
+BRAM. It is also the knob in the ``parity-t4`` baseline
+(``TPU_T=4 TPU_MAXDIM=64 TPU_DMA_WIDEN=1``), so the widened column below is
+that baseline and not a variant invented here. :doc:`benchmarks` measures it
+at two shapes:
 
 .. list-table:: What the GEMM table says
    :header-rows: 1
@@ -586,20 +591,40 @@ The 64x64x64 point is missing, and why
 
 ``mlp_wide`` is in the suite precisely so that the steady-state shape could be
 measured on *these two builds* rather than compared across published ones, and
-**it does not complete in cosim** --- at ``TPU_QD=16``, 600 s, one progress
-line and no second, the same signature as everything else in
-:ref:`limitations item 24 <limitation-24>`. Its layers have ``Kt = 16``, so
-``Kt >= QD`` holds, which is the one condition the parity work does have a
-rule for.
+**it does not complete in cosim at any channel depth tried**. Six runs, four
+builds, both burst widths:
 
-Two honest consequences. First, the 4.3 % row above is carried from
+.. list-table::
+   :header-rows: 1
+
+   * - ``TPU_QD``
+     - bound
+     - last RTL progress
+     - verdict
+   * - 16
+     - 600 s
+     - ``@ 109000`` ps --- the first periodic report, no second
+     - no completion
+   * - 32
+     - 1500 s
+     - ``@ 33400115000`` ps = **33.4 ms, about 10 million cycles**
+     - no completion
+
+Its layers have ``Kt = 16``, so ``Kt >= QD`` holds at ``QD=16``, which is the
+one condition the parity work has a rule for --- but ``QD=32`` breaks that
+condition and does not fix the hang. What ``QD=32`` does change is the
+*evidence*: the simulation advanced ten million cycles on a program the model
+prices at 22 000 and still did not finish, which is a deadlock and not a slow
+run. So ``Kt >= QD`` is **not** the whole rule, and this is a distinct fact
+from the ``QD=8``/``QD=16`` cases at the small shapes, where the sim never got
+past its first report at all.
+
+One consequence for the headline. The 4.3 % row above is carried from
 :doc:`benchmarks`, measured at ``TPU_QD=8`` on the *hand* 64x64x64 mapping,
 while the three model rows are measured here at ``TPU_QD=16`` --- so the
-headline comparison crosses a build boundary, and the ratio should be read as
-four-to-eight-fold rather than as a precise multiple. Second, raising ``QD``
-again is the obvious next measurement and it was not made: it needs two more
-``csynth``\ es and four cosims of a 22 000-cycle program, and the conclusion
-does not turn on it.
+comparison crosses a build boundary, and the ratio should be read as
+four-to-eight-fold rather than as a precise multiple. The three model rows are
+internally controlled: one ``csynth`` per burst width, everything else equal.
 
 Limits
 ======
