@@ -291,6 +291,17 @@ Given only `symptom.md` — never told the primitive exists, working from
 `a4151ca0`, where it never has — the agent produced a 162-line candidate
 across five files in one 24.8-minute turn.
 
+### A finding in its own right: two retractions of one result
+
+The held-out result has now been retracted TWICE -- first for a leak through
+the docs (`limitations.rst:41`, missed because the leak detector failed open),
+then for a leak through the PROMPT. Both came from this track rather than from
+a reviewer. The general rule: **a held-out experiment must scan everything the
+agent reads, and the prompt is the thing most easily forgotten, because the
+experimenter wrote it.** `abs_loop --heldout` now assembles the full prompt and
+refuses on any hit; it finds five in the current maintaining prompt, which is
+the proof the repair was needed.
+
 ### SECOND CORRECTION (2026-09-22, evening): the system prompt described the answer
 
 **The first retraction below is incomplete, and its surviving claim does not
@@ -646,7 +657,15 @@ Measured tonight, all three the hard way:
    It cost the co-design track a paid run. This harness's teardown is
    `ray.shutdown()`, which disconnects this driver only; there is no `ray stop`
    anywhere in it.
-2. **Name your own cluster.** `ray.init(address="auto")` reads the host's
+2. **Name your own cluster -- and know that naming it does not protect it from
+   a `kill`.** On 2026-09-22 this track's Ray head was removed mid-session by
+   the coordinating agent, which harvested processes in `chia_env` older than
+   ~50 minutes, filtered by environment name and age rather than by owner, and
+   read this track's head as an orphan of a finished search. It cost one
+   launch at $0. It was an operator error, not a hazard of the environment,
+   and it is the same host-global mistake as `ray stop`: matching by name
+   rather than by owner. Kill only by the PID of a process whose owner is
+   confirmed. Separately,  `ray.init(address="auto")` reads the host's
    newest GCS address file and will attach to another track's cluster. Start a
    head on a distinct port and pass `CHIA_RAY_ADDRESS`.
 3. **Name your own tool ports.** CHIA's tool server actor reads
