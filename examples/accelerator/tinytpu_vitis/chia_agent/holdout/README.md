@@ -31,6 +31,18 @@ it added. Read those **after** the run, not before.
 
 ## What the agent is given
 
+`symptom.md` — the measurement and nothing else. It states what was observed,
+what was tried in hardware, and what that cost. It does not name the mechanism,
+the pragma, the primitive, or the vendor feature, and it does not say that a
+one-line fix exists. Read it before running the experiment and check it still
+leaks nothing; a symptom statement drifts toward its answer every time someone
+edits it.
+
+The agent must also be given the ordinary context a compiler engineer would
+have: the repository at the held-out commit, the ability to build and measure,
+and the tool documentation. Withholding those would not make the experiment
+harder in an interesting way — it would only make it a guessing game.
+
 ### One deliberate near-leak, recorded rather than removed
 
 `symptom.md` uses the word *dependence*, twice, to describe a loop-carried
@@ -46,18 +58,6 @@ the primitive's name and signature, the existence of a one-line fix, and any
 suggestion that the fix belongs in the compiler rather than in the design. If a
 run succeeds, note in the record whether the agent got there from that word or
 from the symptom.
-
-`symptom.md` — the measurement and nothing else. It states what was observed,
-what was tried in hardware, and what that cost. It does not name the mechanism,
-the pragma, the primitive, or the vendor feature, and it does not say that a
-one-line fix exists. Read it before running the experiment and check it still
-leaks nothing; a symptom statement drifts toward its answer every time someone
-edits it.
-
-The agent must also be given the ordinary context a compiler engineer would
-have: the repository at the held-out commit, the ability to build and measure,
-and the tool documentation. Withholding those would not make the experiment
-harder in an interesting way — it would only make it a guessing game.
 
 ## Grading
 
