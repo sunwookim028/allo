@@ -28,6 +28,8 @@ the in-tree C++ backend (:doc:`/backends/catapult`): the SystemC emitter on the
 established that the SystemC ``Wire`` is wrong in RTL. The authoritative statement of that last
 result is :ref:`limitation-22`; this page is how it was reached and how to re-run it.
 
+Why this flow was revisited at all is recorded in `Earlier measurements and corrections`_.
+
 The SystemC Emitter
 -------------------
 The SystemC path is a different fork, ``choonsik1/allo``, fetched in this clone as the
@@ -90,47 +92,6 @@ frontend/IR restriction common to both paths (see the classification below). The
 claim is read from source and comments, not from a run -- no SystemC library or MatchLib exists on
 ``ace-01``, so nothing here was csim'd or synthesized.
 
-Why Catapult Again: Decision History
-------------------------------------
-Vitis HLS is the primary backend and has the only end-to-end measured results
-(:doc:`/designs/tinytpu_isa`).
-
-**2026-09-17: "not pursuing Catapult further, CIRCT is the recommended long-term direction."** The
-reasoning then was: market niche (automotive/defense, Siemens-adjacent shops); not a standard
-research-community reference tool; Cadence Stratus is the stronger competitor for ASIC research
-citations; CIRCT (MLIR-native, Google/Intel-backed) has the better long-term trajectory. The
-synthesis results it rested on are in :doc:`/records/catapult_decoupled_2x1` (``top_decoupled_2x1``,
-1 MT + 2 CTs: CT latency 295 cycles each, MT 67, 657 sequential, throughput 298 cycles, area scores
-CT0=14991, CT1=14991, MT=16180 at Catapult 2024.2, ``nangate-45nm_beh``, 500 MHz).
-
-**Reopened 2026-09-18. Both halves of that decision moved:**
-
-- **Catapult is being pursued again**, as a bounded spike on ``zhang-21`` (the host that has the
-  tool). The reason is not the synthesis numbers; it is that the SystemC fork carries a ``Wire``,
-  and a MiniTPU-class VLIW delay line needs one. That ``Wire`` is currently **wrong in RTL, not
-  merely in csim** (:ref:`limitation-22`): simulating Catapult's own ``pe_wire`` netlist under xsim
-  fails 8/8 at all 18 producer/consumer pacings, while ``Stream`` and ``Channel`` pass all 18. The
-  failure is diagnosed rather than mysterious -- holding ``acc_0`` in reset 3-4 cycles longer and
-  stepping it once per product makes the *identical* RTL produce exact golden output, so only the
-  lockstep is missing and the correct window is 2 cycles wide. The spike's first deliverable is
-  that test passing under Catapult's own scheduler, not a TPU. A second, independent reason to want
-  the tool: it gives **ASIC PPA**, and the Gemmini comparison (:doc:`/designs/gemmini_comparison`)
-  is cycles-only today. No SystemC library or MatchLib exists on ``ace-01``, so csim cannot run
-  there for any design, which is itself part of why the move is worth making.
-- **The CIRCT path is not currently reproducible in this checkout.** Its clone
-  (``externals/circt``, 2.3 GB with its build tree) was deleted on 2026-09-18 in the pre-migration
-  cleanup. It was untracked, not a submodule, and referenced by nothing. The pin survives only
-  because the generated RTL stamps it: **CIRCT** ``af5369d``. The generator lives on
-  ``chia-codesign`` (``examples/accelerator/tinytpu/microarch.py``), not on ``main``, and the
-  artifacts worth keeping -- the per-unit modules, ``gen_ip.tcl``, and ``manifest.json`` -- are
-  committed there under ``examples/accelerator/tinytpu/rtlgen/``. ``manifest.json`` is a
-  per-module scheduling model (determinacy class, latency, per-port bank/factor/latency/width) and
-  so is directly relevant to :ref:`limitation-22`'s conclusion that the SystemC path lacks one. It is
-  a partial answer: the four ``counted_static`` units carry latencies, while the top and both DMA
-  units are ``indeterminate`` with none -- the data-dependent units a delay line actually has to
-  schedule against. (See also :doc:`/developer/fork_maintenance` on whether ``main`` ever tracked
-  ``externals/circt``.)
-
 What the C++ Path Can and Cannot Express
 ----------------------------------------
 **Scope: this section is about the C++ emitter path** (``EmitCatapultHLS.cpp`` -> ``ac_channel``),
@@ -178,23 +139,8 @@ reason to change backend. Six flagged items (2026-09-18):
      - **(C)** *on this path* -- neither ``hls::stream`` nor ``ac_channel`` has one. That is
        precisely why the SystemC path exists, and why the spike is aimed there
 
-TAPA Non-Blocking Streams: Added, Then Removed
-----------------------------------------------
-The fork once added ``emitStreamTryGet``, ``emitStreamTryPut``, ``emitStreamEmpty`` and
-``emitStreamFull`` overrides to ``EmitTapaHLS.cpp``, mapping to TAPA's ``.try_read()`` /
-``.try_write()``, with one test (``test_nb_ops_tapa_codegen``). Both were removed: TAPA is not used
-in the mesh research flow, non-blocking stream semantics are validated through Vitis HLS (the
-primary target), and the dead codepath was a maintenance burden.
-
-Status (verified 2026-09-17, corrected 2026-09-18): ``EmitTapaHLS.cpp`` has no ``try_write`` /
-``try_read`` emission and its visitor dispatches only construct/get/put. The base-class hooks in
-``EmitBaseHLS.h`` are empty but never reached: the op falls through to ``visitUnhandledOp`` and
-``emitBlock`` reports "can't be correctly emitted", so ``build(target="tapa")`` raises
-``RuntimeError`` rather than silently producing nothing. (The earlier "not diagnosed -- it simply
-produces nothing" reading was wrong.) The message it prints blames ``wrap_io``, which is unrelated
--- see :ref:`limitation-19`. ``tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb`` asserted
-``.try_read(`` / ``.try_write(`` and was therefore failing outright; it is now
-``xfail(strict=True, raises=RuntimeError)``.
+The TAPA emitter's non-blocking overrides, added and then removed, are recorded in
+`Earlier measurements and corrections`_.
 
 The Wire Investigation: Simulating Catapult's Netlists
 ------------------------------------------------------
@@ -431,3 +377,67 @@ Regenerating the netlists:
 
 The exploration branch that asked this question, ``sc-wire-guard``, is deleted; its answer is
 recorded here and in ``examples/systemc_rtlsim/guard_experiment/``.
+
+Earlier measurements and corrections
+------------------------------------
+Kept for the record: how the decision to revisit Catapult was reached, and an emitter feature that
+was added and then removed.
+
+Why Catapult Again: Decision History
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Vitis HLS is the primary backend and has the only end-to-end measured results
+(:doc:`/designs/tinytpu_isa`).
+
+**2026-09-17: "not pursuing Catapult further, CIRCT is the recommended long-term direction."** The
+reasoning then was: market niche (automotive/defense, Siemens-adjacent shops); not a standard
+research-community reference tool; Cadence Stratus is the stronger competitor for ASIC research
+citations; CIRCT (MLIR-native, Google/Intel-backed) has the better long-term trajectory. The
+synthesis results it rested on are in :doc:`/records/catapult_decoupled_2x1` (``top_decoupled_2x1``,
+1 MT + 2 CTs: CT latency 295 cycles each, MT 67, 657 sequential, throughput 298 cycles, area scores
+CT0=14991, CT1=14991, MT=16180 at Catapult 2024.2, ``nangate-45nm_beh``, 500 MHz).
+
+**Reopened 2026-09-18. Both halves of that decision moved:**
+
+- **Catapult is being pursued again**, as a bounded spike on ``zhang-21`` (the host that has the
+  tool). The reason is not the synthesis numbers; it is that the SystemC fork carries a ``Wire``,
+  and a MiniTPU-class VLIW delay line needs one. That ``Wire`` is currently **wrong in RTL, not
+  merely in csim** (:ref:`limitation-22`): simulating Catapult's own ``pe_wire`` netlist under xsim
+  fails 8/8 at all 18 producer/consumer pacings, while ``Stream`` and ``Channel`` pass all 18. The
+  failure is diagnosed rather than mysterious -- holding ``acc_0`` in reset 3-4 cycles longer and
+  stepping it once per product makes the *identical* RTL produce exact golden output, so only the
+  lockstep is missing and the correct window is 2 cycles wide. The spike's first deliverable is
+  that test passing under Catapult's own scheduler, not a TPU. A second, independent reason to want
+  the tool: it gives **ASIC PPA**, and the Gemmini comparison (:doc:`/designs/gemmini_comparison`)
+  is cycles-only today. No SystemC library or MatchLib exists on ``ace-01``, so csim cannot run
+  there for any design, which is itself part of why the move is worth making.
+- **The CIRCT path is not currently reproducible in this checkout.** Its clone
+  (``externals/circt``, 2.3 GB with its build tree) was deleted on 2026-09-18 in the pre-migration
+  cleanup. It was untracked, not a submodule, and referenced by nothing. The pin survives only
+  because the generated RTL stamps it: **CIRCT** ``af5369d``. The generator lives on
+  ``chia-codesign`` (``examples/accelerator/tinytpu/microarch.py``), not on ``main``, and the
+  artifacts worth keeping -- the per-unit modules, ``gen_ip.tcl``, and ``manifest.json`` -- are
+  committed there under ``examples/accelerator/tinytpu/rtlgen/``. ``manifest.json`` is a
+  per-module scheduling model (determinacy class, latency, per-port bank/factor/latency/width) and
+  so is directly relevant to :ref:`limitation-22`'s conclusion that the SystemC path lacks one. It is
+  a partial answer: the four ``counted_static`` units carry latencies, while the top and both DMA
+  units are ``indeterminate`` with none -- the data-dependent units a delay line actually has to
+  schedule against. (See also :doc:`/developer/fork_maintenance` on whether ``main`` ever tracked
+  ``externals/circt``.)
+
+TAPA Non-Blocking Streams: Added, Then Removed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The fork once added ``emitStreamTryGet``, ``emitStreamTryPut``, ``emitStreamEmpty`` and
+``emitStreamFull`` overrides to ``EmitTapaHLS.cpp``, mapping to TAPA's ``.try_read()`` /
+``.try_write()``, with one test (``test_nb_ops_tapa_codegen``). Both were removed: TAPA is not used
+in the mesh research flow, non-blocking stream semantics are validated through Vitis HLS (the
+primary target), and the dead codepath was a maintenance burden.
+
+Status (verified 2026-09-17, corrected 2026-09-18): ``EmitTapaHLS.cpp`` has no ``try_write`` /
+``try_read`` emission and its visitor dispatches only construct/get/put. The base-class hooks in
+``EmitBaseHLS.h`` are empty but never reached: the op falls through to ``visitUnhandledOp`` and
+``emitBlock`` reports "can't be correctly emitted", so ``build(target="tapa")`` raises
+``RuntimeError`` rather than silently producing nothing. (The earlier "not diagnosed -- it simply
+produces nothing" reading was wrong.) The message it prints blames ``wrap_io``, which is unrelated
+-- see :ref:`limitation-19`. ``tests/dataflow/test_stream_ops_hls.py::test_tapa_stream_nb`` asserted
+``.try_read(`` / ``.try_write(`` and was therefore failing outright; it is now
+``xfail(strict=True, raises=RuntimeError)``.

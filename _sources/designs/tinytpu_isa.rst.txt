@@ -36,53 +36,96 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
 
 .. note::
 
-   Headline, as of 2026-09-19 (``e24e433b``): one hardware build runs every
+   Headline, as of 2026-09-22 (``05169938``): one hardware build runs every
    shape as data, all five benchmark shapes are bit-exact in RTL
    co-simulation, and the design takes **171 / 261 / 417 / 483 / 685** cycles
    at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
-   .. note::
+   ``-m_axi_latency 0``).
 
-      **This row moved by one cycle at every shape on 2026-09-22**, from
-      172 / 262 / 418 / 484 / 686 to **171 / 261 / 417 / 483 / 685**, every
-      testbench still bit-exact. It was caught by the design's own reproduction
-      gate reporting ``DIFFERS`` rather than passing, and confirmed by two
-      independent co-simulation runs in separate processes with separate
-      syntheses, which reproduced it exactly.
+   **Those five are a ``T=4``, ``TPU_MAXDIM=16`` measurement**, which is the
+   configuration ``reproduce.sh`` pins. The shipped default is ``MAXDIM=64``,
+   and ``MAXDIM`` is the DRAM row stride of every operand, so the same shape
+   costs more on the bigger build -- 4x4x4 is 218 cycles at ``MAXDIM=64``
+   against 171 at 16. The ``MAXDIM=64`` sweep, and every shape large enough to
+   reach steady state, are on :doc:`benchmarks`.
 
-      A delta that is **uniform across shapes** is a fixed-cost change rather
-      than a per-work one. It arrives with the design edits that came in with
-      the benchmark work — sizing literals replaced by a derived
-      ``OPERAND_ROWS``, two encoding-ceiling assertions, and a test-window fix.
-      **Which of those saves the cycle is not yet identified**, and this note
-      stays until it is; a number whose mechanism nobody can state is a number
-      on probation, however well it reproduces.
-
-      Earlier figures elsewhere on this site quoting the old row describe the
-      design before those edits, not a disagreement.
-
-   ``-m_axi_latency 0``). Measured over the same window on both sides, the
-   design is **1.07-1.24x slower** than Gemmini at these five shapes. Over ten
-   shapes at ``MAXDIM=64`` the deficit **converges to 1.09x at 64x64x64** at
+   Measured over the same window on both sides, the design is
+   **1.07-1.24x slower** than Gemmini at these five shapes. Over ten shapes at
+   ``MAXDIM=64`` the deficit **converges to 1.09x at 64x64x64** at
    **74.1 % of peak**, and the two smallest shapes do not clear Gemmini's
    measurement spread; see :doc:`gemmini_comparison`.
 
-   Until ``e24e433b`` the shipped design took **252 / 383 / 591 / 667 / 919**
-   (1.55-1.8x behind Gemmini). The step between the two is the gap
-   attribution's measured design stack, landed as the design
-   (:ref:`tinytpu-isa-landing`, :ref:`gemmini-gap-attribution`).
+   Until ``e24e433b`` (2026-09-19) the shipped design took
+   **252 / 383 / 591 / 667 / 919** (1.55-1.8x behind Gemmini). The step
+   between the two is the gap attribution's measured design stack, landed as
+   the design (:ref:`tinytpu-isa-landing`, :ref:`gemmini-gap-attribution`).
+   The published row was **172 / 262 / 418 / 484 / 686** until 2026-09-22;
+   what moved it by one cycle at every shape, and the measurement that
+   isolated the cause, are in `Earlier measurements and corrections`_.
 
 
 Architecture
 ------------
 
+Eight kinds of unit, ``2*T*T + 6 = 38`` concurrent processes at ``T=4``.
+
+**Control.** One unit fetches and decodes, and sends each of the five
+instruction-executing units only the instructions it executes:
+
 .. code-block:: text
 
-           imem ─► sequencer ──(decoded instruction)──► every unit
-                   ┌─► spm[spad] ──(header, weights)──► wld ─┐
-     A,B ──► dma_ld┤                                          ├─► 4x4 WS array ─► accu[ar] ─► dma_st ─► C
-                   └─► vru[vr] ────(activations)──────────────┘
+                        +-----------+
+     imem ------------->| sequencer |  fetch, decode, resolve the AGU
+    (m_axi)             | owns imem |  terms, dispatch -- in dataflow
+                        +-----+-----+  order, which is load-bearing
+                              |
+        c_dld    c_spm    c_vru    c_acc    c_dst    Stream[UInt(64), QD]
+          |        |        |        |        |
+          v        v        v        v        v
+       dma_ld     spm      vru      accu    dma_st
 
-Eight kinds of unit, ``2*T*T + 6 = 38`` concurrent processes at ``T=4``:
+``wld`` and ``pe`` get no control word at all: their trip count rides the
+header word down the weight chain, so the array decodes nothing.
+
+**Data.** Every arrow is a declared ``Stream`` one packed word wide --
+``UInt(T*8)`` for operands, ``UInt(T*32)`` for accumulator words -- and no
+state is shared between units:
+
+.. code-block:: text
+
+    A, B (m_axi)
+        |
+        v
+    +--------+  dma2sp   +-----------+   wcol[0]   +-----------+
+    | dma_ld |---------->| spm       |------------>| wld[T][T] |
+    | owns   |           | owns spad |  header +   | one per PE|
+    | A, B   |           +-----------+  T weights  | wrow east |
+    +--------+                 |                   +-----------+
+        |                      | sp2vr (vld)             |
+        | dma2vr               v                         | wq,
+        |                +-----------+                   | depth 4:
+        +--------------->| vru       |                   | the
+                         | owns vr   |                   | shadow
+                         +-----------+                   | weight
+                               | acol[0]                 |
+                               | activations             |
+                               v                         v
+                        +--------------------------------+
+                        |            pe[T][T]            |
+                        | weight-stationary MAC,         |
+                        | a_fwd east, p_fwd south        |
+                        +---+----------------------------+
+                            | cw[T-1]
+                            v
+                        +--------+   ac2sp   +--------+
+                        |  accu  |---------->| dma_st |------> C
+                        | owns ar|  int8,    | owns C |     (m_axi)
+                        | + the  |  clipped  +--------+
+                        | vector |
+                        |  ALU   |
+                        +--------+
+
+The eight kinds of unit:
 
 .. list-table::
    :header-rows: 1
@@ -92,7 +135,7 @@ Eight kinds of unit, ``2*T*T + 6 = 38`` concurrent processes at ``T=4``:
      - does
    * - ``sequencer``
      - ``imem``
-     - fetch, decode, broadcast; consumes nothing
+     - fetch, decode, dispatch point-to-point; consumes nothing
    * - ``dma_ld``
      - ``A``, ``B``
      - DRAM -> scratchpad or operand vregs, packing T lanes/cycle
@@ -102,10 +145,10 @@ Eight kinds of unit, ``2*T*T + 6 = 38`` concurrent processes at ``T=4``:
    * - ``vru``
      - ``vr``
      - operand vregs; the array's activation port
-   * - ``wld`` x16
+   * - ``wld`` x ``T*T`` (16)
      - --
      - one per PE: walks the weight chain, double-buffers its PE's weight
-   * - ``pe`` x16
+   * - ``pe`` x ``T*T`` (16)
      - its lane
      - weight-stationary MAC, decodes nothing, one flat loop
    * - ``accu``
@@ -222,34 +265,26 @@ One owner per memory
 ``spad`` lives in ``spm`` and is written by ``dma_ld`` and read by ``vld`` and
 ``mm`` (weights); ``vr`` lives in ``vru`` and is written by ``dma_ld`` and
 ``vld`` and read by ``mm`` (activations); ``ar`` lives in ``accu`` and is
-touched by all four of its opcodes. Allo enforces single reader
-and single writer, and Vitis rejects the violation outright
-(HLS 200-779 / 200-979), so those three units keep every arm of their opcode
-dispatch in one process. This rules out a one-process-per-opcode split; see
-:ref:`tinytpu-history-rowflat`.
+touched by all four of its opcodes.
 
-.. note::
+**The rule is Allo's, not Vitis's.** Allo enforces single reader and single
+writer -- it rejects a region-scope ``Stateful`` shared by two kernels
+(``EmitVivadoHLS.cpp:3083-3122``) -- so those three units keep every arm of
+their opcode dispatch in one process. This rules out a one-process-per-opcode
+split; see :ref:`tinytpu-history-rowflat`. Vitis is not what refuses: a Vitis
+2023.2 probe (`impact/probe_shared/
+<https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
+shows that ``#pragma HLS stream variable=buf type=unsync`` makes it share an
+on-chip array between two processes, one per BRAM port (``HLS 200-824``,
+``200-755``, ``200-634``), and ``HLS 200-779`` applies only to *synchronized*
+arrays; Allo never emits ``stream type=unsync``. Vitis does separately forbid
+one ``m_axi`` bundle read by two processes (``HLS 200-1013`` / ``200-984``).
 
-   **Correction, 2026-09-19: the one-owner rule is Allo's, not Vitis's.** The
-   paragraph above charges it to both; only the Allo half holds. A Vitis
-   2023.2 probe (`impact/probe_shared/
-   <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
-   shows
-   that ``#pragma HLS stream variable=buf type=unsync`` makes Vitis share an
-   on-chip array between two processes, one per BRAM port (``HLS 200-824``,
-   ``200-755``, ``200-634``); ``HLS 200-779`` applies only to *synchronized*
-   arrays. Allo is what refuses: it rejects a region-scope ``Stateful`` shared
-   by two kernels (``EmitVivadoHLS.cpp:3083-3122``) and never emits
-   ``stream type=unsync``. Vitis does separately forbid one ``m_axi`` bundle
-   read by two processes (``HLS 200-1013`` / ``200-984``).
-
-   **Measured impact on this design: 0 cycles** -- every restructure the gap
-   attribution needed was Allo-legal (:ref:`gemmini-gap-attribution`). An
-   earlier claim in this project, that removing ``vru``'s double handling of B
-   would need a second producer on a shared memory, **was wrong**: the
-   ``v_wdirect`` / ``v_wdb`` variants remove it with ``spm`` still the one owner
-   of ``spad`` and one writer of ``wcol[0]``, and that is how the shipped
-   design has done it since ``e24e433b``. See :ref:`limitation-shared-memory`.
+**Measured impact of the rule on this design: 0 cycles** -- every restructure
+the gap attribution needed was Allo-legal (:ref:`gemmini-gap-attribution`).
+See :ref:`limitation-shared-memory`. This paragraph charged the rule to both
+tools until 2026-09-19, and a claim that rested on that reading was withdrawn;
+see `Earlier measurements and corrections`_.
 
 Data type
 ~~~~~~~~~
@@ -274,8 +309,24 @@ An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
 
 .. code-block:: text
 
-   word 0:  op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
-   word 1:  up to 3 terms of (target 4b, level 3b, stride 12b), 19 bits each
+   word 0, one cell per bit, most significant on the left (``enc()``):
+
+   +--+--------+------------+------------+------------+------------+------+
+   |  |   nr   |     f3     |     f2     |     f1     |     f0     |  op  |
+   |  | 61:54  |   53:42    |   41:30    |   29:18    |   17:6     | 5:0  |
+   +--+--------+------------+------------+------------+------------+------+
+     ^ 63:62 unused
+
+   word 1, up to AGU_TERMS = 3 address terms of 19 bits (``enc_agu()``):
+
+   +-------+-------------------+-------------------+-------------------+
+   |       |      term 2       |      term 1       |      term 0       |
+   | 63:57 |       56:38       |       37:19       |       18:0        |
+   +-------+-------------------+-------------------+-------------------+
+      ^ unused
+
+   one term:   stride [18:7]   level [6:4]   target [3:0]
+   resolves to:   field[target] += iv[level] * stride
 
 .. list-table:: Opcodes (``microarch_isa.py``)
    :header-rows: 1
@@ -330,33 +381,23 @@ the k loop names its weights at an offset by both the n tile and the k tile,
 Without this a loop body would reissue identical addresses every iteration and
 simply redo the same work.
 
-The spare-bit rule, and the signed bit-slice bug
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The spare-bit rule
+~~~~~~~~~~~~~~~~~~
 
-Every field carries one more bit than its value range needs. When the design
-was built, a bit-slice was extracted into a **signed** ``ap_int<N>`` in the
-emitted HLS:
-
-.. code-block:: cpp
-
-   ap_int<7> v268;  v268 = w02(60, 54);   // the nr field
-   int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
-
-So a field whose top bit is set read back negative, and a loop bounded by it ran
-zero times. Consolidating the ``vld`` broke 16x16x16 in cosim -- **251 of 256
-outputs wrong** -- while the Allo dataflow simulator passed it: ``nr = 64`` for a
-64-row ``vld`` read back as -64, the loop ran zero times, and the design silently
-produced zeros. It appeared exactly at the field's sign-bit boundary:
-``nr <= 63`` worked, 64 did not.
-
-The lesson for the methodology: **an N-bit ISA field safely carries
-0 .. 2^(N-1) - 1**, and the dataflow simulator did not model this, so it was a
-genuine simulator/RTL divergence. It is the argument for keeping cosim in the
-loop rather than running it once at the end -- this bug was invisible to every
-functional check that had been passing. ``nr`` is therefore 8 bits for
-``MAXROWS = 127``, the address fields are 12 bits for a 2047 maximum, AGU
+Every field carries one more bit than its value range needs, because
+**an N-bit ISA field safely carries 0 .. 2^(N-1) - 1**. So ``nr`` is 8 bits
+for ``MAXROWS = 127``, the address fields are 12 bits for a 2047 maximum, AGU
 targets are 4 bits for 0..4, levels 3 bits for 0..3, strides 12 bits for
 0..2047, and ``enc()`` asserts ``0 <= v < 2^(w-1)`` for every field.
+
+The rule was earned from an emitter bug that extracted a bit-slice into a
+**signed** ``ap_int<N>``, so a field whose top bit was set read back negative
+and the loop it bounded ran zero times. The general lesson it left is
+**keep cosim in the loop rather than running it once at the end**: the Allo
+dataflow simulator did not model the narrowing, so the fault was a genuine
+simulator/RTL divergence and was invisible to every functional check that had
+been passing. The bug itself is in
+`Earlier measurements and corrections`_.
 
 .. note::
 
@@ -522,29 +563,99 @@ elaboration, and ``allo_cmp.c`` passes ``MAXDIM`` as the stride for every shape.
      - ``TPU_T``
      - SIMD width == array dimension; ``T >= 4``
    * - ``MAXDIM``
-     - 16
+     - 64
      - ``TPU_MAXDIM``
      - largest M, K, N supported; A/B/C are flat ``int8[MAXDIM*MAXDIM]``
    * - ``SPAD_ROWS``
-     - 512
+     - ``max(TEST_WINDOW, OPERAND_ROWS)`` = 1024
      - ``TPU_SPAD``
-     - scratchpad rows, each one packed word
+     - scratchpad rows, each one packed ``UInt(T*8)`` word
    * - ``NVR``
-     - 256
+     - ``max(TEST_WINDOW, OPERAND_ROWS)`` = 1024
      - ``TPU_NVR``
-     - operand vector registers
+     - operand vector registers, one packed word each
    * - ``NAR``
-     - 128
+     - ``max(128, TEST_WINDOW, 2*MAXDIM+8)`` = 136
      - ``TPU_NAR``
-     - accumulator vector registers
+     - accumulator vector registers, ``UInt(T*32)`` each
    * - ``QD``
      - 8
      - ``TPU_QD``
      - stream depth
    * - ``IMEM_SIZE``
-     - ``NHDR + 2*24`` = 56
+     - ``NHDR + IWORDS*24`` = 56
      - ``TPU_IMEM``
      - instruction memory words
+   * - ``DMA_WORDS``
+     - 1
+     - ``TPU_DMA_WIDEN``, ``TPU_DMA_WORDS``
+     - packed words per operand-burst iteration; widening is opt-in and
+       parametric, not landed (:doc:`benchmarks`)
+
+**The memories are derived from** ``MAXDIM``, **not typed in.**
+``OPERAND_ROWS = (MAXDIM/T) * MAXDIM`` is the highest operand row the shipped
+GEMM layout names, and ``TEST_WINDOW = 64`` is the fixed window the stress
+harness's random programs address, so each memory is the larger of the two.
+They were three independent literals (512 / 256 / 128) until ``main``'s
+benchmark work: those happened to be large enough at ``MAXDIM=16`` and
+silently were not at 64, where the GEMM names 1024 operand rows against a
+256-entry vreg file -- a build that assembled and gave wrong answers.
+
+Where everything lives, with the shipped values at ``T=4``, ``MAXDIM=64``.
+Each on-chip memory has exactly one owner, and that is what the single
+reader / single writer rule above buys:
+
+.. code-block:: text
+
+      imem              A , B                          C
+        |                  |                           ^
+        | one burst,       | one burst per matrix,     | int8, clipped
+        | 8 words/cycle    | T lanes packed per word   | by dma_st
+        v                  v                           |
+   +--------------+  +----------------------+          |
+   | ib           |  | rbA, rbB             |          |
+   | UInt(64)     |  | UInt(T*8)            |          |
+   | [IMEM_SIZE]  |  | [MAXDIM*WPR          |          |
+   |  = 56 words, |  |  + DMA_WORDS]        |          |
+   |  cyclic x 8  |  |  = 1025 words each   |          |
+   | owner:       |  | owner: dma_ld        |          |
+   |   sequencer  |  +---+--------------+---+          |
+   +--------------+      |              |              |
+                  dma2sp |              | dma2vr       |
+                         v              v              |
+               +-----------------+ +-----------------+ |
+               | spad            | | vr              | |
+               | UInt(T*8)       | | UInt(T*8)       | |
+               | [SPAD_ROWS]     | | [NVR]           | |
+               |  = 1024 rows,   | |  = 1024 rows,   | |
+               |    4 KiB        | |    4 KiB        | |
+               | owner: spm      | | owner: vru      | |
+               +--------+--------+ +--------+--------+ |
+                weights |                   | activ-   |
+                        v                   v  ations  |
+                     +------------------------+        |
+                     | T x T array, no state  |        |
+                     +-----------+------------+        |
+                                 | packed psums        |
+                                 v                     |
+                        +---------------------+        |
+                        | ar  UInt(T*32)[NAR] |--------+
+                        |  = 136 rows, 2176 B |
+                        | owner: accu         |
+                        +---------------------+
+
+``WPR = MAXDIM / T`` is the packed words in one DRAM row (16 at the shipped
+values). ``spad`` and ``vr`` hold 4 KiB each, the whole of an operand matrix;
+``ar`` is the only output memory, and results never re-enter the scratchpad.
+
+**Two independent ceilings bound** ``MAXDIM``, **and both are in the
+encoding rather than the datapath**: an address field carries 11 usable bits,
+so ``MAXDIM*MAXDIM/T <= 2047`` gives ``MAXDIM <= 90`` at ``T=4``; a header
+count is read back through a 15-bit slice, and ``accu``'s iteration count
+``MAXDIM^3/T^2 + MAXDIM^2/T`` gives ``MAXDIM <= 76``. 64 is the largest round
+value inside both, and is what the design ships at. Neither limit is
+architectural; both were measured by raising ``MAXDIM`` until they fired
+(:doc:`benchmarks`).
 
 ``T`` is the one parameter that changes the *shape* of the generated region: the
 array is ``T*T`` kernel instances, so ``T=16`` is 262 instances and ~800 streams.
@@ -611,7 +722,8 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
 
    # One command, from a clean checkout: builds this checkout's MLIR bindings,
    # runs bench_isa + stress_isa, then the default cosim, and checks the five
-   # cycle counts against 172 / 262 / 418 / 484 / 686. Exits nonzero otherwise.
+   # cycle counts against 171 / 261 / 417 / 483 / 685 at the TPU_MAXDIM=16 it
+   # pins. Exits nonzero otherwise.
    examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
 
@@ -634,15 +746,13 @@ a field GEMM never varies. ``stress_isa.py`` and ``TPU_TB=stress`` are the
 **correctness** checks; ``mutate.py`` prints which level catches which bug. Any
 ``TPU_*`` variable left set changes what ``cosim.py`` measures.
 
-These commands replaced older reproduce instructions (``d18de251``) that named
-``TPU_M`` / ``TPU_K`` / ``TPU_N`` knobs, a ``simulator`` argument and
-``OMP_NUM_THREADS=32``, none of which the current scripts use. Since the fix
-recorded in :ref:`limitation-11` the simulator sizes its OpenMP team to the
-section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process design; the
-recorded numbers were produced at 32. ``kpn_model.py`` has been rewritten for the
-row-flattened units and is driven by the assembled header (``ef112868``); every
-shipped program completes in it at FIFO depth **1**. See
+Since the fix recorded in :ref:`limitation-11` the simulator sizes its OpenMP
+team to the section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process
+design. ``kpn_model.py`` is driven by the assembled header (``ef112868``);
+every shipped program completes in it at FIFO depth **1**. See
 :doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the Vitis install.
+Older reproduce instructions, and the thread count the recorded numbers were
+produced at, are in `Earlier measurements and corrections`_.
 
 ``bench_isa.py`` first asserts that the generated program is bit-identical to
 the hand-written one, then that the looped and unrolled programs expand to the
@@ -681,22 +791,25 @@ dataflow design and are documented in :doc:`/backends/vitis`.
 Verifying a change
 ~~~~~~~~~~~~~~~~~~
 
-Added on ``main`` on 2026-09-19. From a clean checkout, one command builds the
-checkout's own bindings, runs the functional gates, runs cosim, and checks the
-published cycle counts (172 / 262 / 418 / 484 / 686), exiting nonzero if any
-step fails or any number differs:
+From a clean checkout, one command builds the checkout's own bindings, runs the
+functional gates, runs cosim, and checks the published cycle counts
+(171 / 261 / 417 / 483 / 685, at the ``TPU_MAXDIM=16`` it pins), exiting
+nonzero if any step fails or any number differs:
 
 .. code-block:: bash
 
    examples/accelerator/tinytpu_vitis/reproduce.sh              # everything, with cosim
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim   # functional only, ~1 min
 
-``reproduce.sh`` was run from a pristine worktree, including a fresh MLIR
-build, and printed ``REPRODUCED`` with 172 / 262 / 418 / 484 / 686 and 0
-mismatches in **5m49s** (``96c3aef6``, re-run at the docs commit); against the pre-landing
-design it printed 252 / 383 / 591 / 667 / 919 in 5m48s (``d18de251``). It
-unsets every ``TPU_*`` knob and checks that ``allo`` resolves to the checkout
-it is run from (``92fb2f1b``).
+It unsets every ``TPU_*`` knob, pins ``TPU_MAXDIM=16``, and checks that
+``allo`` resolves to the checkout it is run from (``92fb2f1b``). Added on
+``main`` on 2026-09-19; the pristine-worktree runs it has printed, including
+the pre-landing design's, are in `Earlier measurements and corrections`_.
+
+**The gate is what catches a moved number.** It carries the published row as
+an expectation and refuses to pass on a change of one cycle, which is how the
+2026-09-22 shift was found minutes after the merge that caused it, on a
+refactor whose functional gates were all green.
 
 **Performance vs. correctness.** ``bench_isa.py`` and ``cosim.py`` with its
 default testbench are the **performance** setup: seed 0, operands in [-4, 4]
@@ -888,12 +1001,28 @@ distance of 4 itself rather than rely on the schedule; it was not measured.
 Results
 -------
 
-Cycle counts (current build)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Cycle counts
+~~~~~~~~~~~~
 
-Measured by Vitis ``cosim`` (xsim), one build, ``-m_axi_latency 0``
-(``logs/cosim_isa_landed_sweep.log``, ``e24e433b``), against the pre-landing
-build that was shipped until then (``logs/cosim_isa_widened_sweep.log``):
+**Current row, 2026-09-22 (``05169938``), ``T=4``, ``TPU_MAXDIM=16``,
+``-m_axi_latency 0``:**
+
+.. code-block:: text
+
+   4x4x4  171    8x8x8  261    12x12x12  417    16x16x8  483    16x16x16  685
+
+That is what ``reproduce.sh`` checks. The ``MAXDIM=64`` sweep, which is the
+shipped default and the one that reaches steady state, is on
+:doc:`benchmarks`.
+
+The table below is the **``e24e433b`` measurement**, which is one cycle higher
+at every shape: the derived memory sizing that landed afterwards takes one
+cycle out of the fixed term (`Earlier measurements and corrections`_). Every
+other column -- instruction counts, mismatches, the pre-landing comparison --
+is unaffected. Measured by Vitis ``cosim`` (xsim), one build,
+``-m_axi_latency 0`` (``logs/cosim_isa_landed_sweep.log``), against the
+pre-landing build that was shipped until then
+(``logs/cosim_isa_widened_sweep.log``):
 
 .. list-table::
    :header-rows: 1
@@ -948,41 +1077,49 @@ because the landing removed instructions (the ``vld``\ s) as well as cycles,
 so each remaining instruction carries more work. Against MACs instead: fixed
 **192**, **7.95** MAC/cycle marginal, 49.7% of peak (was 289 and 6.17, 38.6%).
 
+Where a run's cycles go, in the shape the units impose:
+
+.. code-block:: text
+
+   one GEMM, time to the right (not to scale)
+
+   sequencer  [prefetch][ dispatch, one instruction at a time ]
+   dma_ld             [ burst A ][ burst B ][ one operand row/cycle ]
+   spm                                     [ hdr + T weight rows / mm ]
+   vru                                     [ nr activation rows / mm  ]
+   wld + pe                                  [ one wavefront row/cycle ]
+   accu                                        [ 1 iteration per row ]
+   dma_st                                            [ mvout rows ] --> C
+
+   |<------ prologue ------>|<----- steady state ----->|<-- drain -->|
+
+* **Prefetch** is ``IMEM_SIZE / 8`` iterations -- 7 at the shipped 56 words,
+  since gmem0 is 512 bits wide and ``ib`` is cyclically partitioned by 8 --
+  and nothing else can start, because every unit blocks on its first control
+  word.
+* **The operand bursts** are ``na*WPR`` and ``nb*WPR`` packed words, one per
+  cycle at ``DMA_WORDS=1``, where ``na`` and ``nb`` are the DRAM row spans
+  ``assemble()`` computes. They are serial before the first weight reaches the
+  array, and they scale with ``MAXDIM`` rather than with the shape being run:
+  a 4x4x4 GEMM on a ``MAXDIM=64`` build bursts 4 x 16 = 64 words to use 4.
+  That is the largest remaining term in the deficit to Gemmini, and the one
+  the opt-in ``DMA_WORDS`` widening attacks (:doc:`benchmarks`).
+* **Steady state** is one word per cycle per link, every unit concurrent.
+* **Drain** is the last partial sums walking up to ``T-1`` links south and up
+  to ``T-1`` east before ``accu`` sees them, then ``mvout``'s rows leaving
+  through ``dma_st``.
+
 These numbers were measured with a memory that answers immediately; the
 latency sweep (``-m_axi_latency`` 16 and 64: 214 / 702 and 358 / 894 at
 4x4x4 / 16x16x16) and what a real memory system does to them is on
 :doc:`gemmini_comparison`. **They are not faster than Gemmini**: 1.07-1.24x
 slower like for like.
 
-How the design got from 1017 cycles at 4x4x4 to 172 is on
+How the design got from 1017 cycles at 4x4x4 to the current row is on
 :doc:`tinytpu_history`. What the last step was, where it came from, and what
-deficit to Gemmini remains is on :ref:`gemmini-gap-attribution`.
-
-.. _tinytpu-isa-landing:
-
-What landed in ``e24e433b``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The gap attribution priced the deficit to Gemmini on variants of the design
-(:ref:`gemmini-gap-attribution`); its best bit-exact stack,
-``v_design_dep_imem8``, is now the design, rebuilt from the sources rather than
-patched:
-
-* **Program prefetch, 8 words a cycle** into a cyclically partitioned ``ib``
-  (gmem0 is 512 bits wide): 56 words in 7 cycles instead of 56 (``v_imem8``).
-* **Weights by scratchpad address.** ``mm``'s ``f3`` names T scratchpad rows
-  and ``spm`` streams the header and weights down the weight chain; the weight
-  ``vld`` through the vregs is gone. A **per-PE weight loader** (``wld``)
-  double-buffers each PE's weight, and the PE is one flat loop (``v_wdb``).
-* **A straight into the vregs.** ``dma_ld``'s ``f0`` gained a destination bit;
-  the shipped GEMM sends A to the vregs, so the A ``spad -> vld -> vr`` trip is
-  gone (``v_design``). ``vld`` stays in the ISA.
-* ``accu`` **flat at II=1**, held there by the ``s.dependence`` claim and the
-  distance contract that makes it true (:ref:`tinytpu-isa-dependence`), not by
-  patching ``kernel.cpp`` (``v_accudep``).
-* **Per-unit work counts precomputed in the sequencer**: a flat loop whose row
-  count depends on the decoded opcode closes at ``Final II = 2`` on its
-  counter -- the trap the branch found in ``spm`` and ``accu``.
+deficit to Gemmini remains is on :ref:`gemmini-gap-attribution`; the five
+changes that step consisted of are listed in
+`Earlier measurements and corrections`_.
 
 .. _tinytpu-isa-csynth-bound:
 
@@ -1044,7 +1181,11 @@ Resources
 
 What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
 pre-landing design re-synthesized with the same toolchain
-(``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``). The
+(``logs/csynth_isa_prelanding.rpt``, ``logs/csynth_isa_landed.rpt``).
+Both columns are the ``e24e433b`` netlist; the derived memory sizing that
+landed on 2026-09-22 took BRAM 42 -> 40, FF 17,481 -> 17,075 and
+LUT 26,583 -> 26,558 at an unchanged 2.431 ns
+(`Earlier measurements and corrections`_). The
 estimated clock is **2.431 ns** for both, so the design still meets 3.33 ns
 with the same margin. The last row is the remainder, and ``entry_proc`` is in
 it (6,363 FF = 6,360 + 3; 7,809 LUT = 7,780 + 29), so a re-derivation from the
@@ -1191,3 +1332,127 @@ would bite the next person:
 - ``view-tiny`` is not usable for this: it has no technology file, no scan
   cells, and no driving cell, so DC runs and emits unmapped GTECH. Use
   ``view-standard``.
+
+
+Earlier measurements and corrections
+------------------------------------
+
+Superseded figures, withdrawn claims, and the accounts of how particular
+numbers moved. Nothing here is the current state; the design's own history,
+at greater length, is on :doc:`tinytpu_history`.
+
+The published row moved by one cycle, 2026-09-22
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**The row moved by one cycle at every shape on 2026-09-22**, from
+172 / 262 / 418 / 484 / 686 to **171 / 261 / 417 / 483 / 685**, every
+testbench still bit-exact. It was caught by the design's own reproduction
+gate reporting ``DIFFERS`` rather than passing, and confirmed by two
+independent co-simulation runs in separate processes with separate syntheses,
+which reproduced it exactly.
+
+A delta that is **uniform across shapes** is a fixed-cost change rather than a
+per-work one. It arrived with the design edits that came in with the benchmark
+work -- sizing literals replaced by a derived ``OPERAND_ROWS``, two
+encoding-ceiling assertions, and a test-window fix -- and this page recorded
+for several hours that *which of those saves the cycle is not yet identified*,
+on the grounds that a number whose mechanism nobody can state is a number on
+probation however well it reproduces.
+
+**It was then identified, by measurement rather than inference** (``05169938``,
+recorded in ``reproduce.sh``): rebuilding the same configuration with the
+memory sizes the design used to carry, ``TPU_SPAD=512 TPU_NVR=256
+TPU_NAR=128`` and nothing else reverted, returns all five of the old numbers
+exactly. The scratchpad and vreg files are now derived as ``MAXDIM^2/T``,
+64 rows each at ``MAXDIM=16`` against the literals 512 and 256 they replaced;
+a 64-row file is not implemented the way a 512-row one is (BRAM 42 -> 40 says
+two memories left block RAM), and the shorter operand read path takes one
+cycle out of the fixed term. That is why the delta is uniform. It is a small
+improvement, not a regression, and it changes no conclusion on this page.
+
+The same rebuild moved the csynth figures to BRAM 40, FF 17,075 and
+LUT 26,558 at an unchanged 2.431 ns. The full account, including the
+cycle-neutrality of the parametric burst loop, is at
+:ref:`benchmarks-one-cycle`.
+
+The signed bit-slice bug that the spare-bit rule came from
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the design was built, a bit-slice was extracted into a **signed**
+``ap_int<N>`` in the emitted HLS:
+
+.. code-block:: cpp
+
+   ap_int<7> v268;  v268 = w02(60, 54);   // the nr field
+   int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
+
+So a field whose top bit is set read back negative, and a loop bounded by it
+ran zero times. Consolidating the ``vld`` broke 16x16x16 in cosim -- **251 of
+256 outputs wrong** -- while the Allo dataflow simulator passed it: ``nr = 64``
+for a 64-row ``vld`` read back as -64, the loop ran zero times, and the design
+silently produced zeros. It appeared exactly at the field's sign-bit boundary:
+``nr <= 63`` worked, 64 did not. The emitter has since been fixed and the
+spare-bit encoding kept; see :ref:`limitation-12` and the rule in
+`The spare-bit rule`_.
+
+The one-owner rule was charged to Vitis as well as to Allo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Correction, 2026-09-19: the one-owner rule is Allo's, not Vitis's.**
+`One owner per memory`_ charged it to both until this date, citing
+``HLS 200-779 / 200-979`` as a Vitis refusal; only the Allo half holds. A Vitis 2023.2 probe (`impact/probe_shared/
+<https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
+shows that ``#pragma HLS stream variable=buf type=unsync`` makes Vitis share
+an on-chip array between two processes, one per BRAM port (``HLS 200-824``,
+``200-755``, ``200-634``); ``HLS 200-779`` applies only to *synchronized*
+arrays. Allo is what refuses: it rejects a region-scope ``Stateful`` shared by
+two kernels (``EmitVivadoHLS.cpp:3083-3122``) and never emits
+``stream type=unsync``. Vitis does separately forbid one ``m_axi`` bundle read
+by two processes (``HLS 200-1013`` / ``200-984``).
+
+An earlier claim in this project, that removing ``vru``'s double handling of B
+would need a second producer on a shared memory, **was wrong**: the
+``v_wdirect`` / ``v_wdb`` variants remove it with ``spm`` still the one owner
+of ``spad`` and one writer of ``wcol[0]``, and that is how the shipped design
+has done it since ``e24e433b``. See :ref:`limitation-shared-memory`.
+
+.. _tinytpu-isa-landing:
+
+What landed in ``e24e433b``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The gap attribution priced the deficit to Gemmini on variants of the design
+(:ref:`gemmini-gap-attribution`); its best bit-exact stack,
+``v_design_dep_imem8``, is now the design, rebuilt from the sources rather than
+patched:
+
+* **Program prefetch, 8 words a cycle** into a cyclically partitioned ``ib``
+  (gmem0 is 512 bits wide): 56 words in 7 cycles instead of 56 (``v_imem8``).
+* **Weights by scratchpad address.** ``mm``'s ``f3`` names T scratchpad rows
+  and ``spm`` streams the header and weights down the weight chain; the weight
+  ``vld`` through the vregs is gone. A **per-PE weight loader** (``wld``)
+  double-buffers each PE's weight, and the PE is one flat loop (``v_wdb``).
+* **A straight into the vregs.** ``dma_ld``'s ``f0`` gained a destination bit;
+  the shipped GEMM sends A to the vregs, so the A ``spad -> vld -> vr`` trip is
+  gone (``v_design``). ``vld`` stays in the ISA.
+* ``accu`` **flat at II=1**, held there by the ``s.dependence`` claim and the
+  distance contract that makes it true (:ref:`tinytpu-isa-dependence`), not by
+  patching ``kernel.cpp`` (``v_accudep``).
+* **Per-unit work counts precomputed in the sequencer**: a flat loop whose row
+  count depends on the decoded opcode closes at ``Final II = 2`` on its
+  counter -- the trap the branch found in ``spm`` and ``accu``.
+
+Earlier reproduce instructions, and the runs of them
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The commands in `Building and running`_ replaced older reproduce instructions
+(``d18de251``) that named ``TPU_M`` / ``TPU_K`` / ``TPU_N`` knobs, a
+``simulator`` argument and ``OMP_NUM_THREADS=32``, none of which the current
+scripts use; the numbers recorded then were produced at 32 threads.
+``kpn_model.py`` has since been rewritten for the row-flattened units.
+
+``reproduce.sh`` was run from a pristine worktree, including a fresh MLIR
+build, and printed ``REPRODUCED`` with 172 / 262 / 418 / 484 / 686 and 0
+mismatches in **5m49s** (``96c3aef6``, re-run at the docs commit); against the
+pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
+(``d18de251``). Both predate the one-cycle move above.

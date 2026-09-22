@@ -485,12 +485,10 @@ is <code class="docutils literal notranslate"><span class="pre">epoch.schedule</
 order-preserving greedy ASAP pass</strong>: no search, no backtracking, no priority
 heuristic. Its own docstring says it derives the sigma the emitted program
 <em>has</em>, and does not search for a better one.</p>
-<p>So the claim that “<code class="docutils literal notranslate"><span class="pre">epoch.schedule()</span></code> reproduces its makespan exactly, 100 ==
-100, over 200,000 random topological orders” is not merely absent from git –
-<strong>it describes a property ACT never claims and could not have.</strong> <code class="docutils literal notranslate"><span class="pre">depends</span></code>
-takes an edge’s source to be the earlier stream index (<code class="docutils literal notranslate"><span class="pre">epoch.py:372-386</span></code>), so
-permuting the stream changes which dependences exist, which changes the
-program’s meaning rather than its schedule.</p>
+<p>A claim this project once made for <code class="docutils literal notranslate"><span class="pre">epoch.schedule()</span></code> – that it reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders –
+<strong>is withdrawn</strong>: it describes a property ACT never claims and could not have.
+The argument is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <p>What is true and testable is pointwise minimality. Fix the epochs, the unit
 assignment and each epoch’s issue and depth; then the derived start times are
 the <strong>pointwise minimum</strong> over every assignment satisfying (a) non-negativity,
@@ -1039,42 +1037,6 @@ the win – what matters is that it is a <em>measured</em> win, chosen by a cost
 and confirmed by RTL, with the functional check passing in both cases.</p>
 </section>
 </section>
-<section id="corrections-to-this-page-s-earlier-numbers">
-<h2>Corrections to This Page’s Earlier Numbers<a class="headerlink" href="#corrections-to-this-page-s-earlier-numbers" title="Link to this heading"><span>¶</span></a></h2>
-<ul class="simple">
-<li><p>“A minimal ACT pilot was run, using a toy ISA.” <strong>No artifact exists.</strong> There
-are no <code class="docutils literal notranslate"><span class="pre">pilot</span></code> hits in either repo’s notes or git log. If it ran, it ran in
-a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
-<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>). Nothing in <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code> is it:
-<code class="docutils literal notranslate"><span class="pre">20260905-060830/variants.jsonl</span></code> is a single baseline line, and
-<code class="docutils literal notranslate"><span class="pre">swarm-20260905-063857/</span></code> is a 6-worker <strong>CHIA LLM-agent</strong> search (best
-126,432 -&gt; 31,056 cycles on the <code class="docutils literal notranslate"><span class="pre">dram</span></code> hypothesis), which is not a mapspace
-search.</p></li>
-<li><p>“ACT has a mapspace search” – it has a mapspace <em>file</em>, <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>, and
-nothing reaches it. The enumerator this page describes is the rebuilt one, not
-ACT’s.</p></li>
-<li><p>“Our 9 opcodes” listed <code class="docutils literal notranslate"><span class="pre">DMA_ST</span></code> as expressible. The machine <strong>refuses</strong> it
-(<code class="docutils literal notranslate"><span class="pre">check_program</span></code> rejects <code class="docutils literal notranslate"><span class="pre">OP_DMA_ST</span></code>) and <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code> has no emitter for
-it. There are 10 encodings, 9 executable: 7 data opcodes plus
-<code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code>.</p></li>
-<li><p>“<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 49 instructions = 106 words flat, 17
-instructions = 42 words looped, headroom 14 words.” Measured today: <strong>32
-instructions / 72 words flat, 14 instructions / 36 words looped</strong>, headroom
-<strong>20</strong> of <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE=56</span></code>.</p></li>
-<li><p>“The re-roll is the missing inverse of an identity we already test.” It is
-not an inverse of anything: <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> exposes no tiling parameter, so
-the adapter is a new emitter, which is what <code class="docutils literal notranslate"><span class="pre">act_target.py</span></code> is.</p></li>
-<li><p>“Of 1,226 nests, 54 are refused by a limit of the prototype emitter.” Fixed
-rather than corrected: <code class="docutils literal notranslate"><span class="pre">act_target</span></code> stages the activations at the innermost
-row loop wherever it sits, so those nests are now encodable or refused by a
-named hardware constraint, and five nests survive instead of three.</p></li>
-<li><p>“Three survivors, and the shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> is the cheapest by the proxy.”
-The proxy still says so. The <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> model does <strong>not</strong>: it puts
-<code class="docutils literal notranslate"><span class="pre">M2&gt;N4&gt;K4</span></code> first by 0.6%, which is inside any honest error bar for a model
-that charges no row-level overlap. That disagreement is what <code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code>
-is for; see <a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a>.</p></li>
-</ul>
-</section>
 <section id="the-co-design-loop-this-argues-for">
 <h2>The Co-design Loop This Argues For<a class="headerlink" href="#the-co-design-loop-this-argues-for" title="Link to this heading"><span>¶</span></a></h2>
 <p>The finding above is the shape of a publishable loop, because the thing that
@@ -1118,6 +1080,53 @@ a requirement, not a convenience.</p></li>
 </ul>
 </section>
 </section>
+<section id="earlier-measurements-and-corrections">
+<span id="act-earlier-corrections"></span><h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>Superseded numbers and claims this page has withdrawn. None of it is the
+current state; each entry is kept so the correction is checkable.</p>
+<p><strong>The makespan claim that was withdrawn.</strong> “<code class="docutils literal notranslate"><span class="pre">epoch.schedule()</span></code> reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders” is
+not merely absent from git – <strong>it describes a property ACT never claims and
+could not have.</strong> <code class="docutils literal notranslate"><span class="pre">depends</span></code> takes an edge’s source to be the earlier stream
+index (<code class="docutils literal notranslate"><span class="pre">epoch.py:372-386</span></code>), so permuting the stream changes which
+dependences exist, which changes the program’s meaning rather than its
+schedule. What replaced it is pointwise minimality; see
+<a class="reference internal" href="#the-scheduler-s-guarantee-and-the-claim-that-was-not-it">The scheduler’s guarantee, and the claim that was not it</a>.</p>
+<p><strong>Earlier numbers on this page:</strong></p>
+<ul class="simple">
+<li><p>“A minimal ACT pilot was run, using a toy ISA.” <strong>No artifact exists.</strong> There
+are no <code class="docutils literal notranslate"><span class="pre">pilot</span></code> hits in either repo’s notes or git log. If it ran, it ran in
+a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
+<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>). Nothing in <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code> is it:
+<code class="docutils literal notranslate"><span class="pre">20260905-060830/variants.jsonl</span></code> is a single baseline line, and
+<code class="docutils literal notranslate"><span class="pre">swarm-20260905-063857/</span></code> is a 6-worker <strong>CHIA LLM-agent</strong> search (best
+126,432 -&gt; 31,056 cycles on the <code class="docutils literal notranslate"><span class="pre">dram</span></code> hypothesis), which is not a mapspace
+search.</p></li>
+<li><p>“ACT has a mapspace search” – it has a mapspace <em>file</em>, <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>, and
+nothing reaches it. The enumerator this page describes is the rebuilt one, not
+ACT’s.</p></li>
+<li><p>“Our 9 opcodes” listed <code class="docutils literal notranslate"><span class="pre">DMA_ST</span></code> as expressible. The machine <strong>refuses</strong> it
+(<code class="docutils literal notranslate"><span class="pre">check_program</span></code> rejects <code class="docutils literal notranslate"><span class="pre">OP_DMA_ST</span></code>) and <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code> has no emitter for
+it. There are 10 encodings, 9 executable: 7 data opcodes plus
+<code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code>.</p></li>
+<li><p>“<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 49 instructions = 106 words flat, 17
+instructions = 42 words looped, headroom 14 words.” Measured today: <strong>32
+instructions / 72 words flat, 14 instructions / 36 words looped</strong>, headroom
+<strong>20</strong> of <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE=56</span></code>.</p></li>
+<li><p>“The re-roll is the missing inverse of an identity we already test.” It is
+not an inverse of anything: <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> exposes no tiling parameter, so
+the adapter is a new emitter, which is what <code class="docutils literal notranslate"><span class="pre">act_target.py</span></code> is.</p></li>
+<li><p>“Of 1,226 nests, 54 are refused by a limit of the prototype emitter.” Fixed
+rather than corrected: <code class="docutils literal notranslate"><span class="pre">act_target</span></code> stages the activations at the innermost
+row loop wherever it sits, so those nests are now encodable or refused by a
+named hardware constraint, and five nests survive instead of three.</p></li>
+<li><p>“Three survivors, and the shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> is the cheapest by the proxy.”
+The proxy still says so. The <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> model does <strong>not</strong>: it puts
+<code class="docutils literal notranslate"><span class="pre">M2&gt;N4&gt;K4</span></code> first by 0.6%, which is inside any honest error bar for a model
+that charges no row-level overlap. That disagreement is what <code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code>
+is for; see <a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a>.</p></li>
+</ul>
+</section>
 </section>
 
 
@@ -1158,11 +1167,11 @@ a requirement, not a convenience.</p></li>
 <li><a class="reference internal" href="#where-the-search-beats-the-hand-written-generator">Where the search beats the hand-written generator</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#corrections-to-this-page-s-earlier-numbers">Corrections to This Page’s Earlier Numbers</a></li>
 <li><a class="reference internal" href="#the-co-design-loop-this-argues-for">The Co-design Loop This Argues For</a><ul>
 <li><a class="reference internal" href="#failure-modes-named">Failure modes, named</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a></li>
 </ul>
 </li>
 </ul>

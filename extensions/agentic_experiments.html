@@ -225,7 +225,9 @@ wants the result rather than the apparatus. The apparatus is in
 <a class="reference internal" href="../designs/gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>. Current as of <strong>2026-09-22</strong>.</p>
 <p>Every number here is one that exists in git with a command that re-derives it.
 Where a claim was made and later withdrawn, the withdrawal is recorded rather
-than the claim quietly removed — that history is part of the result.</p>
+than the claim quietly removed — that history is part of the result. The
+withdrawals that no longer bear on a current reading are collected in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <section id="the-question">
 <h2>The question<a class="headerlink" href="#the-question" title="Link to this heading"><span>¶</span></a></h2>
 <p>Can LLM agents do accelerator co-design over a compiler’s abstractions? The
@@ -474,12 +476,6 @@ mismatches — and Vitis <strong>cosim does not complete.</strong> Two row-tiled
 with the simulator process still at 99 % CPU after <strong>32 minutes</strong>, against about
 two minutes for the shipped mapping. No deadlock is <em>reported</em>, so it is not
 called one.</p>
-<p>A correction to how this was first described, including here: the
-<code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span> <span class="pre">0/1</span></code> line is <strong>not a signature of the failure.</strong>
-It is Vitis’s first periodic report and it appears in <em>every</em> log, passing runs
-included — a completing run prints <code class="docutils literal notranslate"><span class="pre">0/1</span></code>, then <code class="docutils literal notranslate"><span class="pre">1/1</span></code>, then finishes. The
-observation is that <strong>the second line never comes.</strong> The number that was being
-quoted as diagnostic locates nothing.</p>
 <p>Two consequences, and the second is the uncomfortable one. <strong>An encodable count
 is not a runnable count</strong>: five nests are encodable by the encoder and the
 reference model, three are confirmed on RTL, and the smaller number is the one
@@ -487,38 +483,14 @@ any hardware claim has to use. And <strong>two of those four checkers are derive
 the assembler’s own header</strong>, so neither can see an error in the header formula
 itself — agreement among them is weaker evidence than it looks, because they
 share a premise.</p>
-<p><strong>The obvious explanation was tested and refuted.</strong> The suspicion was that the
-trigger is a transfer <em>inside</em> the emitted nest rather than hoisted into a
-prologue, and a coverage fact made it look stronger still — of the 23 programs
-the named gates run, <strong>none issues a memory load after a compute</strong>, while the
-random-program generator produces one in <strong>314 of 400 seeds</strong>. So the pattern is
-exercised constantly in the simulator and had never reached a co-simulation
-testbench.</p>
-<p>Four minimal programs, each verified against the reference model and by csim,
-then co-simulated under a hard bound: a prologue-only case, a load after a
-compute, a load in a loop before a compute, and a load sharing a loop body with
-a compute. <strong>All four completed.</strong></p>
-<p>A second track then killed the hypothesis from the opposite direction, which is
-the stronger refutation: <strong>both</strong> non-completing programs stage <em>every</em> transfer
-in a prologue, and <strong>both</strong> mappings that issue a load <em>inside</em> the output nest
-<strong>complete</strong> (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
-staging-based warning would have passed both failures and flagged two programs
-that run — it is exactly the wrong guard, and it had been shipped once before
-being reverted.</p>
 <p>The failure is also <strong>not monotone in size</strong>: halving any of the three tile
 counts makes it complete, and <em>doubling</em> the row count also makes it complete.
 The minimal reproduction is 16 instructions — plain int8 GEMM tiling, fully
 unrolled, no epilogue — filed with a test that runs its cheap half in seconds
 without Vitis. No positive characterisation is offered and the diagnosis is left
-open.</p>
-<p>Two things worth copying from how that was handled. A <cite>covered / UNCOVERED</cite>
-column had <strong>already been added</strong> to the flow on the strength of the suspicion,
-and it separated the candidates perfectly; it was <strong>reverted</strong> once the
-predicate was refuted, on the grounds that shipping a refuted predicate as a
-warning would mislead the very search it exists to guide. And the coverage gap
-survives as a finding in its own right even though it was not the cause: <strong>a
-pattern can be exercised thousands of times in a simulator and never once on
-RTL</strong>, and nothing in the gate list makes that visible.</p>
+open. The staging hypothesis raised and refuted along the way, and a withdrawn
+reading of the <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, are in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <p>The general lesson is about verification chains rather than about this design:
 <strong>a stack of cheap checks that all pass is not a substitute for the expensive
 one, when some of the cheap checks are derived from the same source.</strong> The
@@ -541,6 +513,50 @@ experiments are in <a class="reference internal" href="chia.html"><span class="d
 constraint; a trustworthy judge has.</strong> Most of the effort so far went into
 making a verdict mean something, and every hour of it was repaid the first time
 a worker claimed a win it did not have.</p>
+</section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>A withdrawn reading and a refuted hypothesis from the investigation reported
+under <a class="reference internal" href="#methodology-the-experiments-forced-on-us">Methodology the experiments forced on us</a>, kept because the withdrawal
+is part of the record.</p>
+<section id="the-inter-transaction-progress-line-withdrawn-as-a-signature">
+<h3>The <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, withdrawn as a signature<a class="headerlink" href="#the-inter-transaction-progress-line-withdrawn-as-a-signature" title="Link to this heading"><span>¶</span></a></h3>
+<p>A correction to how this was first described, including here: the
+<code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span> <span class="pre">0/1</span></code> line is <strong>not a signature of the failure.</strong>
+It is Vitis’s first periodic report and it appears in <em>every</em> log, passing runs
+included — a completing run prints <code class="docutils literal notranslate"><span class="pre">0/1</span></code>, then <code class="docutils literal notranslate"><span class="pre">1/1</span></code>, then finishes. The
+observation is that <strong>the second line never comes.</strong> The number that was being
+quoted as diagnostic locates nothing.</p>
+</section>
+<section id="the-staging-hypothesis-tested-and-refuted">
+<h3>The staging hypothesis, tested and refuted<a class="headerlink" href="#the-staging-hypothesis-tested-and-refuted" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The obvious explanation was tested and refuted.</strong> The suspicion was that the
+trigger is a transfer <em>inside</em> the emitted nest rather than hoisted into a
+prologue, and a coverage fact made it look stronger still — of the 23 programs
+the named gates run, <strong>none issues a memory load after a compute</strong>, while the
+random-program generator produces one in <strong>314 of 400 seeds</strong>. So the pattern is
+exercised constantly in the simulator and had never reached a co-simulation
+testbench.</p>
+<p>Four minimal programs, each verified against the reference model and by csim,
+then co-simulated under a hard bound: a prologue-only case, a load after a
+compute, a load in a loop before a compute, and a load sharing a loop body with
+a compute. <strong>All four completed.</strong></p>
+<p>A second track then killed the hypothesis from the opposite direction, which is
+the stronger refutation: <strong>both</strong> non-completing programs stage <em>every</em> transfer
+in a prologue, and <strong>both</strong> mappings that issue a load <em>inside</em> the output nest
+<strong>complete</strong> (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
+staging-based warning would have passed both failures and flagged two programs
+that run — it is exactly the wrong guard, and it had been shipped once before
+being reverted.</p>
+<p>Two things worth copying from how that was handled. A <cite>covered / UNCOVERED</cite>
+column had <strong>already been added</strong> to the flow on the strength of the suspicion,
+and it separated the candidates perfectly; it was <strong>reverted</strong> once the
+predicate was refuted, on the grounds that shipping a refuted predicate as a
+warning would mislead the very search it exists to guide. And the coverage gap
+survives as a finding in its own right even though it was not the cause: <strong>a
+pattern can be exercised thousands of times in a simulator and never once on
+RTL</strong>, and nothing in the gate list makes that visible.</p>
+</section>
 </section>
 </section>
 
@@ -570,6 +586,11 @@ a worker claimed a win it did not have.</p>
 <li><a class="reference internal" href="#what-is-not-established">What is not established</a></li>
 <li><a class="reference internal" href="#methodology-the-experiments-forced-on-us">Methodology the experiments forced on us</a></li>
 <li><a class="reference internal" href="#cost">Cost</a></li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#the-inter-transaction-progress-line-withdrawn-as-a-signature">The <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, withdrawn as a signature</a></li>
+<li><a class="reference internal" href="#the-staging-hypothesis-tested-and-refuted">The staging hypothesis, tested and refuted</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

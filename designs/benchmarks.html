@@ -291,14 +291,9 @@ work, about 132 us with a 44 us register-access floor measured on board
 .187, i.e. roughly 24 750 cycles at 187.5 MHz.</p></li>
 </ul>
 <p>So: <strong>no machine’s host is counted anywhere on this page</strong>, which is the
-consistent choice, and it is stated rather than assumed.</p>
-<p>That accounting turned out to be worth more than fairness. MiniTPU’s
-per-launch host cost was volunteered by its own side so the comparison
-would be honest, and putting ~24 750 cycles beside Gemmini’s ~395 of
-driver is what made the number look absurd rather than normal — both of
-the subsequent wins that doubled their board throughput came out of it.
-<strong>Naming the window is not only a reporting discipline; it is where the
-optimisations were hiding.</strong></p>
+consistent choice, and it is stated rather than assumed. What that
+accounting turned up on MiniTPU’s side is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and
+corrections</a>.</p>
 <p><strong>Both sides are idealised memory, and ours is a knob rather than a
 model.</strong> Every cycle figure here is at <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=0</span></code> unless the row
 says otherwise; Vitis cosim has no DRAM model, so 0 is a value we chose.
@@ -861,6 +856,8 @@ claim, which no simulator can see) needs a cosim of its own and was not run.</p>
 </tr>
 </tbody>
 </table>
+<p>The published MAXDIM=16 row was 172/262/418/484/686 before this work; see
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>The sampled shape set is a WEAKENING of the stress gate at large MAXDIM,
@@ -905,61 +902,9 @@ Both sets now pass through <code class="docutils literal notranslate"><span clas
 <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> is re-exported from <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code> (the one definition) and is
 read <em>positionally</em> by <code class="docutils literal notranslate"><span class="pre">act_compile</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>,
 <code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> and — through <code class="docutils literal notranslate"><span class="pre">accept.BASELINES</span></code> against
-<code class="docutils literal notranslate"><span class="pre">shapes.NAMES</span></code> — the CHIA harness. An earlier revision of this work put
-the <code class="docutils literal notranslate"><span class="pre">TPU_SET</span></code>/<code class="docutils literal notranslate"><span class="pre">TPU_SHAPES</span></code> knobs on <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> itself, which would have
-silently changed what all of those measured.</p></li>
+<code class="docutils literal notranslate"><span class="pre">shapes.NAMES</span></code> — the CHIA harness. <a class="footnote-reference brackets" href="#sweepknobs" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a></p></li>
 </ul>
 </section>
-</section>
-<section id="the-published-row-moved-by-one-cycle-and-why">
-<span id="benchmarks-one-cycle"></span><h2>The published row moved by one cycle, and why<a class="headerlink" href="#the-published-row-moved-by-one-cycle-and-why" title="Link to this heading"><span>¶</span></a></h2>
-<p>When this work landed, <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> printed <code class="docutils literal notranslate"><span class="pre">DIFFERS</span></code>:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
-got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
-</pre></div>
-</div>
-<p><strong>Exactly one cycle faster at every shape</strong>, every testbench bit-exact, and
-reproduced independently by two separate runs. A delta that does not scale
-with the work is a <strong>fixed-cost</strong> change, so it cannot be the burst loop’s
-per-iteration behaviour.</p>
-<p><strong>The cause, measured rather than inferred, and isolated to one variable.</strong>
-Rebuilding on current <code class="docutils literal notranslate"><span class="pre">main</span></code> with the memory sizes the design used to carry
-— <code class="docutils literal notranslate"><span class="pre">TPU_SPAD=512</span> <span class="pre">TPU_NVR=256</span> <span class="pre">TPU_NAR=128</span></code> and <em>nothing else changed</em>, so
-the derived-size expression, the two ceiling assertions, the test-window floor
-and the parametric burst loop are all still present — returns <strong>every one of
-the five published numbers exactly</strong>:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
-  4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
-</pre></div>
-</div>
-<p>So <strong>the memory sizing accounts for the entire shift and nothing else in that
-work changed cycles at all</strong> — in particular the parametric burst loop is
-cycle-neutral at <code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>, which is the same thing it was shown to be
-at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:</p>
-<blockquote>
-<div><p>the scratchpad and vreg files are now <strong>derived</strong> as
-<span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T\)</span>, which is 64 rows each at MAXDIM=16 against the
-literal 512 and 256 they replaced; a 64-row file is not implemented the
-way a 512-row one is (BRAM 42 -&gt; 40 says two memories left block RAM), and
-the shorter operand read path takes one cycle out of the <strong>fixed</strong> term.</p>
-</div></blockquote>
-<p>That is why the delta is uniform: it is one cycle of pipeline depth in the
-operand path, paid once per run rather than once per work item.</p>
-<p>It is a (very small) <strong>improvement</strong>, not a regression, and it changes no
-conclusion on this page — one cycle is 0.6% at 4x4x4 and 0.005% at
-64x64x64, and both of the shapes where it is largest were already inside
-Gemmini’s measurement spread. Every comparison here was measured <em>after</em> the
-change, so only the historical row needed restating.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><strong>The gate is what caught it.</strong> <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> carries the published
-numbers as expectations and refused to pass, minutes after the merge, on a
-one-cycle shift in a refactor whose functional gates were all green. That
-is the whole argument for wiring published numbers into a check rather than
-into prose: correctness is not cycles, and the resource counts moving
-(BRAM 42 -&gt; 40, FF 17 481 -&gt; 17 075, LUT 26 583 -&gt; 26 558 at an unchanged
-2.431 ns) proved the netlist had changed without saying by how much.</p>
-</div>
 </section>
 <section id="matched-against-gemmini">
 <span id="benchmarks-matched"></span><h2>Matched against Gemmini<a class="headerlink" href="#matched-against-gemmini" title="Link to this heading"><span>¶</span></a></h2>
@@ -1363,32 +1308,14 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 </section>
 <section id="t-8-vs-gemmini-dim-8-both-at-maxdim-64">
 <h3>T=8 vs Gemmini DIM=8, both at MAXDIM=64<a class="headerlink" href="#t-8-vs-gemmini-dim-8-both-at-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><strong>The T=8 cycle column was re-measured on current ``main`` and is
-unchanged.</strong> It had been taken before the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code>
-refactor, which is the exposure that moved the published MAXDIM=16 row by
-one cycle (<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). Re-run from a fresh <code class="docutils literal notranslate"><span class="pre">csynth</span></code>:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>8x8x8     285   (was 285)      16x16x16   493   (was 493)
-16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
-</pre></div>
-</div>
-<p>every one bit-exact and identical. That is consistent with the mechanism
-rather than merely reassuring: at T=8/MAXDIM=64 the memory <em>sizes</em> do not
-change (<code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> is 512 either way), only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by
-one word — which is what took BRAM 58 -&gt; 62 and nothing else. <strong>The
-burst loop is now shown cycle-neutral at ``DMA_WORDS=1`` in three
-independent configurations</strong>: T=4/MAXDIM=16, T=4/MAXDIM=64 and
-T=8/MAXDIM=64. That is what licenses the widening being a pure opt-in.</p>
-<p>The entry most exposed was <strong>16x16x8</strong>, the only shape where this design
-beats Gemmini on a supportable margin, and it returned 424 exactly.</p>
-</div>
 <p>The second matched point, and <strong>it does not agree with the first</strong>, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
 <code class="docutils literal notranslate"><span class="pre">gemmini/allo_bare_steady.c</span></code> at <code class="docutils literal notranslate"><span class="pre">DIM=8</span></code>, Gemmini as <strong>median of five
 trials</strong>, which drops 4x4x4 and 12x12x12 because they are not multiples of 8
 — the same <code class="docutils literal notranslate"><span class="pre">runnable()</span></code> rule our own side applies on T, so <strong>both machines
-drop the same shapes</strong>.</p>
+drop the same shapes</strong>. Our cycle column was re-measured on current <code class="docutils literal notranslate"><span class="pre">main</span></code>
+after the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor and is unchanged; see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier
+measurements and corrections</a>.</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 13.3%" />
@@ -1499,11 +1426,8 @@ at T=8) leaves the weight chain least amortised.</p>
 <p class="admonition-title">Note</p>
 <p><strong>Settled at five trials.</strong> The DIM=8 column above is the median of five,
 with the full min-max spread; the per-shape spread is 16-45 cycles, the
-same roughly-constant band measured at DIM=4. An earlier revision of this
-page read three shapes as wins from best-of-two and then downgraded all
-three to “level” as a precaution; the five-trial measurement shows the
-precaution was one shape too strong. <strong>One win is supportable, two are
-level.</strong></p>
+same roughly-constant band measured at DIM=4. <strong>One win is supportable,
+two are level.</strong> <a class="footnote-reference brackets" href="#bestoftwo" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a></p>
 </div>
 <p>The reason we are ahead there rather than behind is the reason the latency set
 exists: at T=8, 16x16x16 is only four tile-matmuls, so the machine with the
@@ -1610,8 +1534,8 @@ columns share a clock.</p>
 187.5 MHz), which is <strong>88 cycles at 2.431 ns</strong> — that is where the 88 comes
 from, and it is carried as a time rather than as their cycle count so their
 clock is not imported with it.</p>
-<table class="docutils align-default" id="id1">
-<caption><span class="caption-text">48x48x48 and 64x64x64, one csynth per grid point</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">48x48x48 and 64x64x64, one csynth per grid point</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
 <colgroup>
 <col style="width: 12.4%" />
 <col style="width: 11.2%" />
@@ -1945,15 +1869,8 @@ is 28x it.</p>
 </div>
 <p>Consequence, stated once and applied everywhere: <strong>the uncertainty on a
 cross-machine difference is Gemmini’s alone</strong>, and a claimed difference
-smaller than it is unsupportable.</p>
-<p><strong>Every steady-state conclusion on this page clears that bar by two to three
-orders of magnitude.</strong> The 1 748-cycle deficit at 64x64x64 is 874x the
-2-cycle spread there; the -960-cycle burst saving is 480x it. <strong>The one number
-that does not clear it is 4x4x4</strong>, where a 13-cycle deficit sits inside a
-10-cycle spread — so <em>the 1.06x at 4x4x4 is not a supportable claim of a
-difference</em> and is reported only as part of a sign that is consistent across
-all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
-155-cycle deficit, so it survives.</p>
+smaller than it is unsupportable. The earlier reading of that same bar is kept
+in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>And the trap on the other side, which matters more for how all of this
@@ -2221,6 +2138,116 @@ latency-set comparison at MAXDIM=16 and the gap attribution,
 <a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> for MiniTPU.</p>
 </div>
 </section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>Moved out of the sections above: superseded figures, readings that were
+withdrawn, and the accounts of how particular numbers moved.</p>
+<section id="why-naming-the-window-mattered">
+<h3>Why naming the window mattered<a class="headerlink" href="#why-naming-the-window-mattered" title="Link to this heading"><span>¶</span></a></h3>
+<p>That accounting turned out to be worth more than fairness. MiniTPU’s
+per-launch host cost was volunteered by its own side so the comparison would
+be honest, and putting ~24 750 cycles beside Gemmini’s ~395 of driver is what
+made the number look absurd rather than normal — both of the subsequent wins
+that doubled their board throughput came out of it. <strong>Naming the window is not
+only a reporting discipline; it is where the optimisations were hiding.</strong></p>
+</section>
+<section id="the-published-row-moved-by-one-cycle-and-why">
+<span id="benchmarks-one-cycle"></span><h3>The published row moved by one cycle, and why<a class="headerlink" href="#the-published-row-moved-by-one-cycle-and-why" title="Link to this heading"><span>¶</span></a></h3>
+<p>When this work landed, <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> printed <code class="docutils literal notranslate"><span class="pre">DIFFERS</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
+got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+</pre></div>
+</div>
+<p><strong>Exactly one cycle faster at every shape</strong>, every testbench bit-exact, and
+reproduced independently by two separate runs. A delta that does not scale
+with the work is a <strong>fixed-cost</strong> change, so it cannot be the burst loop’s
+per-iteration behaviour.</p>
+<p><strong>The cause, measured rather than inferred, and isolated to one variable.</strong>
+Rebuilding on current <code class="docutils literal notranslate"><span class="pre">main</span></code> with the memory sizes the design used to carry
+— <code class="docutils literal notranslate"><span class="pre">TPU_SPAD=512</span> <span class="pre">TPU_NVR=256</span> <span class="pre">TPU_NAR=128</span></code> and <em>nothing else changed</em>, so
+the derived-size expression, the two ceiling assertions, the test-window floor
+and the parametric burst loop are all still present — returns <strong>every one of
+the five published numbers exactly</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
+  4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
+</pre></div>
+</div>
+<p>So <strong>the memory sizing accounts for the entire shift and nothing else in that
+work changed cycles at all</strong> — in particular the parametric burst loop is
+cycle-neutral at <code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>, which is the same thing it was shown to be
+at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:</p>
+<blockquote>
+<div><p>the scratchpad and vreg files are now <strong>derived</strong> as
+<span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T\)</span>, which is 64 rows each at MAXDIM=16 against the
+literal 512 and 256 they replaced; a 64-row file is not implemented the
+way a 512-row one is (BRAM 42 -&gt; 40 says two memories left block RAM), and
+the shorter operand read path takes one cycle out of the <strong>fixed</strong> term.</p>
+</div></blockquote>
+<p>That is why the delta is uniform: it is one cycle of pipeline depth in the
+operand path, paid once per run rather than once per work item.</p>
+<p>It is a (very small) <strong>improvement</strong>, not a regression, and it changes no
+conclusion on this page — one cycle is 0.6% at 4x4x4 and 0.005% at
+64x64x64, and both of the shapes where it is largest were already inside
+Gemmini’s measurement spread. Every comparison here was measured <em>after</em> the
+change, so only the historical row needed restating.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The gate is what caught it.</strong> <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> carries the published
+numbers as expectations and refused to pass, minutes after the merge, on a
+one-cycle shift in a refactor whose functional gates were all green. That
+is the whole argument for wiring published numbers into a check rather than
+into prose: correctness is not cycles, and the resource counts moving
+(BRAM 42 -&gt; 40, FF 17 481 -&gt; 17 075, LUT 26 583 -&gt; 26 558 at an unchanged
+2.431 ns) proved the netlist had changed without saying by how much.</p>
+</div>
+</section>
+<section id="the-t-8-column-re-measured">
+<h3>The T=8 column, re-measured<a class="headerlink" href="#the-t-8-column-re-measured" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The T=8 cycle column was re-measured on current ``main`` and is
+unchanged.</strong> It had been taken before the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor,
+which is the exposure that moved the published MAXDIM=16 row by one cycle
+(<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). Re-run from a fresh <code class="docutils literal notranslate"><span class="pre">csynth</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>8x8x8     285   (was 285)      16x16x16   493   (was 493)
+16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
+</pre></div>
+</div>
+<p>every one bit-exact and identical. That is consistent with the mechanism
+rather than merely reassuring: at T=8/MAXDIM=64 the memory <em>sizes</em> do not
+change (<code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> is 512 either way), only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by one
+word — which is what took BRAM 58 -&gt; 62 and nothing else. <strong>The burst loop
+is now shown cycle-neutral at ``DMA_WORDS=1`` in three independent
+configurations</strong>: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
+what licenses the widening being a pure opt-in.</p>
+<p>The entry most exposed was <strong>16x16x8</strong>, the only shape where this design beats
+Gemmini on a supportable margin, and it returned 424 exactly.</p>
+</section>
+<section id="an-earlier-reading-of-the-same-bar">
+<h3>An earlier reading of the same bar<a class="headerlink" href="#an-earlier-reading-of-the-same-bar" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Every steady-state conclusion on this page clears that bar by two to three
+orders of magnitude.</strong> The 1 748-cycle deficit at 64x64x64 is 874x the
+2-cycle spread there; the -960-cycle burst saving is 480x it. <strong>The one number
+that does not clear it is 4x4x4</strong>, where a 13-cycle deficit sits inside a
+10-cycle spread — so <em>the 1.06x at 4x4x4 is not a supportable claim of a
+difference</em> and is reported only as part of a sign that is consistent across
+all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
+155-cycle deficit, so it survives.</p>
+<p class="rubric">Footnotes</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="sweepknobs" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>An earlier revision of this work put the
+<code class="docutils literal notranslate"><span class="pre">TPU_SET</span></code>/<code class="docutils literal notranslate"><span class="pre">TPU_SHAPES</span></code> knobs on <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> itself, which would have
+silently changed what all of those measured.</p>
+</aside>
+<aside class="footnote brackets" id="bestoftwo" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>An earlier revision of this page read three shapes as wins
+from best-of-two and then downgraded all three to “level” as a precaution;
+the five-trial measurement shows the precaution was one shape too strong.</p>
+</aside>
+</aside>
+</section>
+</section>
 </section>
 
 
@@ -2251,7 +2278,6 @@ latency-set comparison at MAXDIM=16 and the gap attribution,
 <li><a class="reference internal" href="#verification-per-configuration">Verification per configuration</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-and-why">The published row moved by one cycle, and why</a></li>
 <li><a class="reference internal" href="#matched-against-gemmini">Matched against Gemmini</a><ul>
 <li><a class="reference internal" href="#what-is-matched-and-what-is-not">What is matched, and what is not</a></li>
 <li><a class="reference internal" href="#the-gemmini-builds-in-terms-another-team-can-reproduce">The Gemmini builds, in terms another team can reproduce</a></li>
@@ -2267,6 +2293,13 @@ latency-set comparison at MAXDIM=16 and the gap attribution,
 <li><a class="reference internal" href="#where-the-remaining-cycles-go">Where the remaining cycles go</a></li>
 <li><a class="reference internal" href="#the-workload-set-a-gpt-2-projection-placeholder">The workload set: a GPT-2 projection (placeholder)</a></li>
 <li><a class="reference internal" href="#reproducing">Reproducing</a></li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#why-naming-the-window-mattered">Why naming the window mattered</a></li>
+<li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-and-why">The published row moved by one cycle, and why</a></li>
+<li><a class="reference internal" href="#the-t-8-column-re-measured">The T=8 column, re-measured</a></li>
+<li><a class="reference internal" href="#an-earlier-reading-of-the-same-bar">An earlier reading of the same bar</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

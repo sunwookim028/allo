@@ -870,15 +870,9 @@ variant of <code class="docutils literal notranslate"><span class="pre">gemm_8x8
 reports minimum channel depth 1 and no deadlock, the Allo simulator is
 bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, and Vitis csim reports 0 of 256 bytes wrong –
 and then <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> never finishes the transaction.</p>
-<p>What that looks like, and what it does not: a completing run of the same
-design prints two progress lines and a <code class="docutils literal notranslate"><span class="pre">$finish</span></code> –
-<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;109000&quot;</span></code>, then <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;777000&quot;</span></code>, then
-<code class="docutils literal notranslate"><span class="pre">$finish</span> <span class="pre">called</span> <span class="pre">at</span> <span class="pre">time</span> <span class="pre">:</span> <span class="pre">796590</span> <span class="pre">ps</span></code> for a 198-cycle program. A hanging run
-prints the <strong>first</strong> line and never the second. <code class="docutils literal notranslate"><span class="pre">109000</span></code> is picoseconds and
-is simply where Vitis makes its first periodic report, so it is the same
-number in every log, passing or hanging; it is not where the design stops, and
-nothing here locates the stall. No deadlock is reported by Vitis’ own detector,
-so this page does not call it one.</p>
+<p>No deadlock is reported by Vitis’ own detector, so this page does not call it
+one, and nothing here locates the stall. What a hanging run’s log looks like
+beside a completing one is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <p>The full characterisation, the bisection, and the two hypotheses it rules out
 are <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a> of the limitations register, with the repro
 in <code class="docutils literal notranslate"><span class="pre">tests/limits/item24_cosim_hang.py</span></code> and the family in
@@ -964,6 +958,20 @@ spec with their estimates, which is the fixture the rank test uses.</p></li>
 and <code class="docutils literal notranslate"><span class="pre">fast</span> <span class="pre">--cosim</span></code> need a build; <code class="docutils literal notranslate"><span class="pre">legal</span></code>, <code class="docutils literal notranslate"><span class="pre">specs</span></code> and <code class="docutils literal notranslate"><span class="pre">rules</span></code> are pure
 Python over the corpus.</p>
 </section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<section id="what-a-hanging-cosim-run-looks-like-in-the-log">
+<h3>What a hanging cosim run looks like in the log<a class="headerlink" href="#what-a-hanging-cosim-run-looks-like-in-the-log" title="Link to this heading"><span>¶</span></a></h3>
+<p>What that looks like, and what it does not: a completing run of the same
+design prints two progress lines and a <code class="docutils literal notranslate"><span class="pre">$finish</span></code> –
+<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;109000&quot;</span></code>, then <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;777000&quot;</span></code>, then
+<code class="docutils literal notranslate"><span class="pre">$finish</span> <span class="pre">called</span> <span class="pre">at</span> <span class="pre">time</span> <span class="pre">:</span> <span class="pre">796590</span> <span class="pre">ps</span></code> for a 198-cycle program. A hanging run
+prints the <strong>first</strong> line and never the second. <code class="docutils literal notranslate"><span class="pre">109000</span></code> is picoseconds and
+is simply where Vitis makes its first periodic report, so it is the same
+number in every log, passing or hanging; it is not where the design stops, and
+nothing here locates the stall.</p>
+</section>
+</section>
 </section>
 
 
@@ -1004,6 +1012,10 @@ Python over the corpus.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#how-to-work-on-this">How to work on this</a></li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#what-a-hanging-cosim-run-looks-like-in-the-log">What a hanging cosim run looks like in the log</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

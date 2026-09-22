@@ -219,10 +219,14 @@
             
   <section id="tinytpu-isa-design-history">
 <h1>TinyTPU-isa: Design History<a class="headerlink" href="#tinytpu-isa-design-history" title="Link to this heading"><span>¶</span></a></h1>
-<p>This page records how <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> reached its current numbers: the
-predecessor designs it replaced, each optimisation pass with its measured
-effect (including the ones that were reverted or measured slower), and the
-readings of those numbers that were later corrected.</p>
+<p>This page is the archive. It records the superseded measurements and the route
+by which the current design was reached: the predecessor designs it replaced,
+each optimisation pass with its measured effect (including the ones that were
+reverted or measured slower), and the readings of those numbers that were
+later corrected. <strong>Nothing on this page is the current state.</strong> The current
+design and ISA are on <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, the current cycle counts on
+<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>, and the matched like-for-like comparison against Gemmini on
+<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
 <p><strong>Everything here is history.</strong> Ratios against Gemmini on this page are
@@ -923,7 +927,8 @@ the burst is a separate loop outside it. <code class="docutils literal notransla
 M_AXI table, unchanged by any of this: all four ports 8/64-bit, Max Read and
 Write Burst Length 16, Num Read and Write Outstanding 16. A 56- or 256-beat
 burst is issued as requests of 16, at II=1 each.</p>
-<p>Cosim, one build, all five shapes bit-exact:</p>
+<p>Cosim, one build, all five shapes bit-exact; the <em>after</em> column is the
+burst-DMA build, superseded by the memset/widening pass below:</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
@@ -1093,7 +1098,7 @@ loop to II=2 under a dual-port BRAM, came free from the same partition.</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
 <th class="head"><p>dyn. instrs</p></th>
-<th class="head"><p>nested (<strong>shipped</strong>)</p></th>
+<th class="head"><p>nested (<strong>shipped</strong> at the burst-DMA build)</p></th>
 <th class="head"><p>rotated (reverted)</p></th>
 <th class="head"></th>
 </tr>
@@ -1188,7 +1193,7 @@ Cosim:</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
-<th class="head"><p>baseline</p></th>
+<th class="head"><p>baseline (the burst-DMA build)</p></th>
 <th class="head"><p>flat PE, II=2</p></th>
 <th class="head"><p>flat PE, II=1</p></th>
 </tr>
@@ -1284,6 +1289,8 @@ build’s <code class="docutils literal notranslate"><span class="pre">csynth.lo
 </section>
 <section id="measured-one-build-bit-exact-at-every-shape">
 <h3>Measured, one build, bit-exact at every shape<a class="headerlink" href="#measured-one-build-bit-exact-at-every-shape" title="Link to this heading"><span>¶</span></a></h3>
+<p>The <em>after</em> column is the build shipped from <code class="docutils literal notranslate"><span class="pre">b4be2b10</span></code> until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>,
+superseded by the landing below (<a class="reference internal" href="#tinytpu-history-landing"><span class="std std-ref">Landing the gap attribution: 919 -&gt; 686</span></a>).</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
@@ -1373,7 +1380,7 @@ patch. The changes are listed on <a class="reference internal" href="tinytpu_isa
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
 <th class="head"><p>919 build</p></th>
-<th class="head"><p>landed</p></th>
+<th class="head"><p>landed (<strong>current</strong>, <a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>)</p></th>
 <th class="head"><p>branch’s measurement of the stack</p></th>
 </tr>
 </thead>

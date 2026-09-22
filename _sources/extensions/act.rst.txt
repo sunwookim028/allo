@@ -291,12 +291,10 @@ order-preserving greedy ASAP pass**: no search, no backtracking, no priority
 heuristic. Its own docstring says it derives the sigma the emitted program
 *has*, and does not search for a better one.
 
-So the claim that "``epoch.schedule()`` reproduces its makespan exactly, 100 ==
-100, over 200,000 random topological orders" is not merely absent from git --
-**it describes a property ACT never claims and could not have.** ``depends``
-takes an edge's source to be the earlier stream index (``epoch.py:372-386``), so
-permuting the stream changes which dependences exist, which changes the
-program's meaning rather than its schedule.
+A claim this project once made for ``epoch.schedule()`` -- that it reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders --
+**is withdrawn**: it describes a property ACT never claims and could not have.
+The argument is in `Earlier measurements and corrections`_.
 
 What is true and testable is pointwise minimality. Fix the epochs, the unit
 assignment and each epoch's issue and depth; then the derived start times are
@@ -846,42 +844,6 @@ the win -- what matters is that it is a *measured* win, chosen by a cost model
 and confirmed by RTL, with the functional check passing in both cases.
 
 
-Corrections to This Page's Earlier Numbers
-==========================================
-
-- "A minimal ACT pilot was run, using a toy ISA." **No artifact exists.** There
-  are no ``pilot`` hits in either repo's notes or git log. If it ran, it ran in
-  a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
-  ``chia-codesign``). Nothing in ``chia_runs/`` is it:
-  ``20260905-060830/variants.jsonl`` is a single baseline line, and
-  ``swarm-20260905-063857/`` is a 6-worker **CHIA LLM-agent** search (best
-  126,432 -> 31,056 cycles on the ``dram`` hypothesis), which is not a mapspace
-  search.
-- "ACT has a mapspace search" -- it has a mapspace *file*, ``mapspace.py``, and
-  nothing reaches it. The enumerator this page describes is the rebuilt one, not
-  ACT's.
-- "Our 9 opcodes" listed ``DMA_ST`` as expressible. The machine **refuses** it
-  (``check_program`` rejects ``OP_DMA_ST``) and ``isa_dsl`` has no emitter for
-  it. There are 10 encodings, 9 executable: 7 data opcodes plus
-  ``LOOP``/``ENDLOOP``.
-- "``gemm.relu`` at 16x16x16 is 49 instructions = 106 words flat, 17
-  instructions = 42 words looped, headroom 14 words." Measured today: **32
-  instructions / 72 words flat, 14 instructions / 36 words looped**, headroom
-  **20** of ``IMEM_SIZE=56``.
-- "The re-roll is the missing inverse of an identity we already test." It is
-  not an inverse of anything: ``gemm_program`` exposes no tiling parameter, so
-  the adapter is a new emitter, which is what ``act_target.py`` is.
-- "Of 1,226 nests, 54 are refused by a limit of the prototype emitter." Fixed
-  rather than corrected: ``act_target`` stages the activations at the innermost
-  row loop wherever it sits, so those nests are now encodable or refused by a
-  named hardware constraint, and five nests survive instead of three.
-- "Three survivors, and the shipped ``N4>K4`` is the cheapest by the proxy."
-  The proxy still says so. The ``(makespan, emits)`` model does **not**: it puts
-  ``M2>N4>K4`` first by 0.6%, which is inside any honest error bar for a model
-  that charges no row-level overlap. That disagreement is what ``act_cosim.py``
-  is for; see `Where the cost model is honest and where it is not`_.
-
-
 The Co-design Loop This Argues For
 ==================================
 
@@ -923,3 +885,56 @@ Failure modes, named
 - **An inner search that is not exhaustive turns a hardware comparison into a
   search-quality comparison.** Keeping the mapspace small enough to enumerate is
   a requirement, not a convenience.
+
+
+
+.. _act-earlier-corrections:
+
+Earlier measurements and corrections
+====================================
+
+Superseded numbers and claims this page has withdrawn. None of it is the
+current state; each entry is kept so the correction is checkable.
+
+**The makespan claim that was withdrawn.** "``epoch.schedule()`` reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders" is
+not merely absent from git -- **it describes a property ACT never claims and
+could not have.** ``depends`` takes an edge's source to be the earlier stream
+index (``epoch.py:372-386``), so permuting the stream changes which
+dependences exist, which changes the program's meaning rather than its
+schedule. What replaced it is pointwise minimality; see
+`The scheduler's guarantee, and the claim that was not it`_.
+
+**Earlier numbers on this page:**
+
+- "A minimal ACT pilot was run, using a toy ISA." **No artifact exists.** There
+  are no ``pilot`` hits in either repo's notes or git log. If it ran, it ran in
+  a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
+  ``chia-codesign``). Nothing in ``chia_runs/`` is it:
+  ``20260905-060830/variants.jsonl`` is a single baseline line, and
+  ``swarm-20260905-063857/`` is a 6-worker **CHIA LLM-agent** search (best
+  126,432 -> 31,056 cycles on the ``dram`` hypothesis), which is not a mapspace
+  search.
+- "ACT has a mapspace search" -- it has a mapspace *file*, ``mapspace.py``, and
+  nothing reaches it. The enumerator this page describes is the rebuilt one, not
+  ACT's.
+- "Our 9 opcodes" listed ``DMA_ST`` as expressible. The machine **refuses** it
+  (``check_program`` rejects ``OP_DMA_ST``) and ``isa_dsl`` has no emitter for
+  it. There are 10 encodings, 9 executable: 7 data opcodes plus
+  ``LOOP``/``ENDLOOP``.
+- "``gemm.relu`` at 16x16x16 is 49 instructions = 106 words flat, 17
+  instructions = 42 words looped, headroom 14 words." Measured today: **32
+  instructions / 72 words flat, 14 instructions / 36 words looped**, headroom
+  **20** of ``IMEM_SIZE=56``.
+- "The re-roll is the missing inverse of an identity we already test." It is
+  not an inverse of anything: ``gemm_program`` exposes no tiling parameter, so
+  the adapter is a new emitter, which is what ``act_target.py`` is.
+- "Of 1,226 nests, 54 are refused by a limit of the prototype emitter." Fixed
+  rather than corrected: ``act_target`` stages the activations at the innermost
+  row loop wherever it sits, so those nests are now encodable or refused by a
+  named hardware constraint, and five nests survive instead of three.
+- "Three survivors, and the shipped ``N4>K4`` is the cheapest by the proxy."
+  The proxy still says so. The ``(makespan, emits)`` model does **not**: it puts
+  ``M2>N4>K4`` first by 0.6%, which is inside any honest error bar for a model
+  that charges no row-level overlap. That disagreement is what ``act_cosim.py``
+  is for; see `Where the cost model is honest and where it is not`_.
