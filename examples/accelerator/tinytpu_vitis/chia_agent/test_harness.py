@@ -667,6 +667,17 @@ class Suite:
         print("== loop: swarm.py + opencode + fake model (no LLM)", flush=True)
         from fake_model import FakeModel
         from spend import spent_since
+        # The prerequisite, named here rather than left to be read out of a
+        # worker log: without it CHIA's OpenCodeLLM fails per iteration with
+        # "[Errno 2] No such file or directory: 'opencode'", every iteration
+        # makes no edit, and the phase's own failures all say something else.
+        # A fresh worktree does not have it: node_modules/ is gitignored.
+        if not (AGENT_DIR / "node_modules/.bin/opencode").exists():
+            check("loop.opencode-installed",
+                  "node_modules/.bin/opencode (npm ci --prefix chia_agent)",
+                  "missing: this worktree has no opencode, so the loop phase "
+                  "cannot drive the scripted model", False)
+            return
         f, old, new = MUTANTS["spad_zero"]
         f2, old2, new2 = MUTANTS["narrow16"]
         cosim = head("cosim.py")
@@ -730,7 +741,7 @@ class Suite:
         check("loop.fake-model", "5 scripted sessions consumed, no errors",
               f"{len(fake.log)} sessions, errors={fake.errors}",
               len(fake.log) == 5 and not fake.errors and not fake.scripts)
-        base = by.get(("baseline", 0), {}).get("verdict", {})
+        base = by.get(("baseline", 0), {}).get("verdict") or {}
         check("loop.baseline", f"cycles == {BASELINE}", base.get("cycles"),
               base.get("cycles") == BASELINE)
         # What the agent itself received from score_cycles, mid-turn.
@@ -749,17 +760,17 @@ class Suite:
               f"accepted={e1.get('accepted')} reason={e1.get('reason')}",
               e1.get("accepted") is False and e1.get("reason") == "no diff")
         e2 = by.get(("candidate", 2), {})
-        v2 = e2.get("verdict", {})
+        v2 = e2.get("verdict") or {}   # None when the iteration made no diff
         check("b.spad_zero via loop", "bit-exact, delta > 0, REJECTED (not better)",
               f"ok={v2.get('ok')} {v2.get('cycles')} delta={e2.get('delta_cycles')} "
               f"accepted={e2.get('accepted')}",
               v2.get("ok") and (e2.get("delta_cycles") or 0) > 0
               and e2.get("accepted") is False)
         e3 = by.get(("candidate", 3), {})
+        v3 = e3.get("verdict") or {}
         check("c.narrow16 via loop", "REJECTED at gate:stress (after 1 debug session)",
-              f"stage={e3.get('verdict', {}).get('stage')} accepted={e3.get('accepted')}",
-              e3.get("verdict", {}).get("stage") == "gate:stress"
-              and e3.get("accepted") is False)
+              f"stage={v3.get('stage')} accepted={e3.get('accepted')}",
+              v3.get("stage") == "gate:stress" and e3.get("accepted") is False)
         e4 = by.get(("candidate", 4), {})
         replies = [c.get("result", "")[:40] for c in (fake.log[4]["calls"]
                                                        if len(fake.log) > 4 else [])]
@@ -773,8 +784,16 @@ class Suite:
         check("loop.artifacts", "best.diff empty, summary.json with no best",
               f"best.diff={best!r} best={summary.get('best')}",
               best == "" and summary.get("best") is None)
+        # This run's own cost, from what the loop recorded per model call.
+        # `spent_since` is a TIME WINDOW over opencode's global database, so a
+        # concurrent CHIA run on the same host lands in it -- conservative for
+        # a spend cap, and not the question here.
+        mine = sum(c.get("cost_usd", 0) for e in entries
+                   for c in e.get("llm_calls") or [])
         usd = spent_since(t0)["usd"]
-        check("loop.spend", "$0.00", f"${usd:.2f}", usd == 0)
+        check("loop.spend", "this run's own model calls cost $0.00",
+              f"${mine:.2f} (opencode's DB window, every run on this host: "
+              f"${usd:.2f})", mine == 0)
         check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
               bool(fake.log) and len(fake.log[0]["tools"]) == 7
