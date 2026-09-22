@@ -891,7 +891,7 @@ Applying and running
      ../../generators/gemmini/software/gemmini-rocc-tests/build/bareMetalC/allo_cmp-baremetal
 
 ``~/chipyard/env.sh`` activates Chipyard's own conda environment and so replaces
-the ``allo`` one; source it in a separate shell (:doc:`/developer/toolchains`).
+the ``allo`` one; source it in a separate shell (``dev/toolchains.rst``).
 Raw Gemmini output is in ``logs/gemmini_int8_dim4.log``.
 
 ``allo_cmp.c`` measures what a user gets: ``tiled_matmul_auto``, driver and all.
@@ -927,3 +927,191 @@ Things that cost time to learn
 * ``gemmini_counter.h`` exposes 8 hardware counters that were never read.
   Roughly an hour of work if a future comparison wants per-unit attribution
   rather than total cycles.
+
+Counting host overhead symmetrically
+------------------------------------
+
+This page's window analysis established that a flat **~393-413 cycles** of
+Rocket driver software sits inside Gemmini's end-to-end figure, independent of
+shape — which is 72 % of the 4x4x4 number and nearly the whole gap between the
+two windows. Our own figures are Vitis cosim counts from ``ap_start`` to
+``ap_done``, and so contain no host at all.
+
+MiniTPU's owner supplied the symmetric datum, unprompted, and it is the reason
+to state this as a methodological rule rather than as a point in our favour:
+**their per-launch host work is about 132 microseconds with a 44-microsecond
+register-access floor, measured on board .187** — roughly **24,750 cycles at
+187.5 MHz** — and their testbench numbers do not include it either.
+
+So the rule for any comparison on this page, and for the benchmark set
+generally:
+
+- **Name the window for every figure.** What is inside it, where it starts, and
+  where it stops. A cycle count without its window is not a measurement.
+- **Count every machine's host, or none of them.** Counting Gemmini's driver
+  while omitting our own or MiniTPU's host time is unfair to Gemmini, and a
+  comparison that omits all of them is fine *provided it says so*. What is not
+  acceptable is letting one machine's overhead count while another's vanishes.
+- **Where both windows are cheap to report, report both.** For Gemmini this
+  costs nothing, because the driver-inclusive and accelerator-only figures come
+  out of the same run.
+
+This is the same failure mode as the withdrawn claim recorded above: a number
+that is true of the measurement but not of the thing being measured. Two of
+those have now been caught by comparing notes across designs rather than by
+inspection, which is an argument for continuing to do so.
+
+Gemmini at a matched array size is being built independently by both sides as of
+2026-09-22 — deliberately twice, because neither side's Gemmini figure has ever
+been reproduced by anyone, and a disagreement between two independent builds of
+the same nominal configuration would be more informative than either number
+alone. Reproducing a build means recording the config object, array dimensions,
+datatypes, scratchpad and accumulator sizes, the chipyard and gemmini commits,
+the harness, and exactly what is inside the counter window.
+
+The memory-latency knob, and why the sweep outranks the value
+-------------------------------------------------------------
+
+Our cycle counts come from Vitis cosim, which has **no DRAM model**:
+``TPU_AXI_LATENCY`` is a value we choose, and the published figures are taken at
+0. Gemmini's side is idealised too — ``WithBlackBoxSimMem(additionalLatency=0)``
+gives roughly a 1-2 cycle AXI unless ``+dramsim`` is used — so neither column
+contains a memory system, and that is a disclosure rather than a defect. What
+would be a defect is choosing a latency that makes our design look good.
+
+MiniTPU's owner supplied their equivalent figure with the provenance that makes
+it usable: **about 40 cycles at 187.5 MHz — 213 ns — for a contiguous
+descriptor before its first beat lands, with up to 8 bursts in flight**
+(``tools/round_trip.py`` in their tree holds it with the derivation). Carry the
+**seconds**, not the cycles: 213 ns is about 88 cycles at our shipped design's
+estimated 2.431 ns period and about 64 at a 3.33 ns target, so converting
+through cycles imports their clock along with their memory system.
+
+It is a **fitted** value, not a measured DRAM latency — fitted so that a
+simulated schedule change matched a board A/B of the same commit — and its
+history is the reason this section exists. The value it replaced, 92 cycles,
+was also inferred, and at 92 their simulator **ranked GEMM templates backwards**
+against the board: a 45 % simulated cut in GEMM cycles was 3.6 % on hardware.
+At 0 it ranked them backwards as well. Two different wrong values, two
+different wrong rankings, and the simulator was internally consistent and
+confident in both cases; it was caught only by running the A/B on two boards.
+
+The conclusion to carry, which is theirs and which we are adopting: **the
+sensitivity sweep is worth more than any single value.** Ours runs 172 at 0
+cycles, 214 at 16, and 358 at 64. So the question a design decision has to
+answer is not "what is the right latency" but "does my ranking survive the
+range" — if a variant wins at 0 and loses at 88, the knob chose the design. If
+conclusions are stable from 0 to 100, the knob does not matter and can be
+disclosed and forgotten. If they invert somewhere in that range, **the inversion
+is the finding**.
+
+And when a ranking does invert, **the inversion point in seconds is the
+interesting quantity, not the inversion point in cycles**: seconds say which
+real memory systems the candidate is good for, where cycles only say which
+simulator settings it is good for. MiniTPU's ranking inverted somewhere between
+40 and 92 cycles at 187.5 MHz — 213 to 490 ns — and it was the nanosecond
+figure that let them say their board sits nearer the low end rather than merely
+that one knob value beat another.
+
+One caveat on transplanting the number at all: theirs is a ZCU104's memory
+system seen through a descriptor-based DMA with two channels and 32-byte beats,
+on an AXI port that is not on the memory controller's clock. Our AXI slave is a
+different design on different silicon. 213 ns is a far better starting point
+than zero and it is not a measurement of our machine.
+
+Which Gemmini configuration is the honest opponent
+--------------------------------------------------
+
+Surveyed from Gemmini's Scala source on 2026-09-22
+(``generators/gemmini/src/main/scala/gemmini/GemminiConfigs.scala`` has ~60
+configuration fields). The conclusion is to **change almost nothing**, and the
+reasoning is worth stating because every knob we touched would invite the
+question of whether we tuned the opponent to lose.
+
+The four axes pull in different directions and are settled differently:
+
+- **Array size — match it.** The only axis where a mismatch is a pure
+  multiplier on peak throughput, 16x for 16x16 against 4x4, with no
+  counterargument. This is why stock ``GemminiRocketConfig`` is not a usable
+  opponent.
+- **Datatype — match it, and we do.** int8xint8 into int32 on both sides,
+  which is Gemmini's *own* default. bf16 would be a step away from matched, not
+  toward it.
+- **Memory system — cannot be matched; enumerate it.** Gemmini is Rocket with a
+  32 KiB L1 D$, an L2 and ``WithBlackBoxSimMem(additionalLatency=0)``; ours is
+  Vitis cosim at zero AXI latency. Both idealised, neither is the other's
+  memory, and equalising them means rebuilding one side's SoC.
+- **Dispatch path — match it by *window*, not by configuration.** No knob
+  addresses it; only the window does, which is exactly what fixed the withdrawn
+  claim recorded above.
+
+So the config delta that survives review is **two fields, both of them the
+array size** — ``meshRows`` and ``meshColumns`` — plus ``has_training_convs =
+false`` to remove conv hardware neither benchmark touches. Everything else is
+named as unexercised. Two disclosures rather than fixes: ``dataflow =
+Dataflow.BOTH`` leaves Gemmini carrying an output-stationary datapath we never
+use, which favours it if anyone, so keeping it is the conservative choice; and
+a DIM=16 taken from stock would also flip ``has_training_convs`` to true,
+making the matched points differ in a second field.
+
+A second matched point is being added at DIM=8, because ``T`` is now a working
+parameter on our side and **a single matched point cannot separate "our design
+is slower" from "our design is slower at this one size."**
+
+The capacity asymmetry is cycle-neutral, and this is the finding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The obvious objection to this comparison is memory capacity: our design has a
+4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
+Gemmini's **256 KiB scratchpad and 64 KiB accumulator** — a 64x and 30x
+asymmetry.
+
+It does not buy Gemmini a single cycle at any published shape. Re-running
+``tiled_matmul_auto``'s own tiling search across capacities at DIM=4 gives the
+``loop_ws`` call count below; every row is legal under the config's ``require``
+clauses:
+
+=========================== ======= ========== ========== ========== =========
+Scratchpad / accumulator    4x4x4   16x16x16   32x32x32   64x64x64   64x32x64
+=========================== ======= ========== ========== ========== =========
+256 / 64 KB (what we ship)  1       1          1          1          1
+64 / 32 KB (``chipConfig``) 1       1          1          1          1
+32 / 8 KB                   1       1          1          4          4
+8 / 4 KB (~2x ours)         1       1          4          12         12
+4 / 4 KB (~matched to ours) 1       1          4          32         12
+=========================== ======= ========== ========== ========== =========
+
+Every capacity from 256 KB down to 4 KB issues exactly **one** ``loop_ws`` from
+4x4x4 through 16x16x16, so shrinking Gemmini's memories to match ours would not
+move any of the five published numbers. **The asymmetry is an area and power
+disclosure, not a cycle correction** — which is a far stronger position than
+"we could not match it". The binding limit is always the accumulator's half
+capacity, never the scratchpad.
+
+It stops being neutral at exactly 32x32x32, so as shapes grow this argument
+needs restating rather than reusing. Keeping Gemmini's own default capacity is
+also the choice that avoids hand-rolling a multi-tile nest and then arguing
+about whether our tiling was fair.
+
+Open: ``ex_accumulate`` in the window benchmark
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``gemmini/allo_bare5.c`` passes ``ex_accumulate`` as a literal ``true``, where
+the real driver computes ``!no_bias || D == NULL``, which is **false** for the
+no-bias calls we make. In hardware it sets a bit on the preload's accumulator
+address rather than issuing extra commands, so it adds no RoCC traffic, but it
+turns the k=0 accumulator writes into read-modify-writes and is therefore **not
+guaranteed cycle-neutral**.
+
+This sits inside all five published Gemmini figures. It is being measured both
+ways rather than argued about; until that lands, read 161 / 220 / 347 / 391 /
+593 as provisional. The fix is C-only and needs no re-elaboration.
+
+Two operational hazards found in the same survey, both of which have silently
+produced wrong comparisons before: **every elaboration rewrites**
+``gemmini_params.h`` **in place**, so elaborating a second configuration
+destroys the first's header and the next C build silently targets the wrong
+hardware — snapshot it, rebuild immediately, and check the ``GEMMINI DIM=`` boot
+banner. And the committed ``roccTests_Makefile.patch`` adds only ``allo_cmp`` to
+the ``tests`` list, **not** ``allo_bare5``, so ``build.sh`` will not build the
+window benchmark; it needs its explicit make target.

@@ -179,6 +179,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
@@ -538,6 +539,85 @@ push→result latency.</p>
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.</strong>
 Not reproduced here; what survives of it is §5.</p>
 </section>
+<section id="what-aligning-to-minitpu-s-semantics-costs">
+<h2>What aligning to MiniTPU’s semantics costs<a class="headerlink" href="#what-aligning-to-minitpu-s-semantics-costs" title="Link to this heading"><span>¶</span></a></h2>
+<p>An experiment, now stopped, asked whether TinyTPU-isa could be made
+semantically comparable to MiniTPU so the two machines’ cycle counts would mean
+the same thing. Six increments were built and independently re-measured; the
+answer is that the alignment is expensive enough to stop pursuing, and that
+result is the finding.</p>
+<p>The variant lives on the branch <code class="docutils literal notranslate"><span class="pre">tinytpu-align</span></code> (<code class="docutils literal notranslate"><span class="pre">10ee6882</span></code>), which is
+<strong>not merged into main</strong> and is kept as the record: the repros, the verification
+logs, the csynth report and the per-unit table are all in that commit. The
+shipped design (<a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>) is unaffected and remains the
+baseline for every performance claim.</p>
+<p>Measured, by cosim, at the five benchmark shapes: <strong>216 / 408 / 809 / 933 /
+1521</strong> cycles with zero mismatches, against the shipped design’s 172 / 262 /
+418 / 484 / 686 — <strong>1.26x to 2.22x the cycles</strong>. At <code class="docutils literal notranslate"><span class="pre">T=8</span></code> the variant measures
+302 / 474 / 699, also exact. Functional gates pass throughout: bench <code class="docutils literal notranslate"><span class="pre">ALL</span>
+<span class="pre">EXACT</span></code>, stress 487/487, 34 crafted bad programs rejected against 390 generated
+programs accepted, and 42 mutants caught (41 by the functional gates, one only
+by RTL cosim).</p>
+<p>The cycles are not the whole cost, and this is what stopped the track.
+Synthesis of the same build (xcu280, 3.33 ns target, <code class="docutils literal notranslate"><span class="pre">T=4</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>)
+estimates <strong>3.782 ns with -1.35 ns of top-level slack</strong> — the variant does not
+close at the shipped design’s frequency, where the shipped design estimates
+2.431 ns with margin. The critical path is in <code class="docutils literal notranslate"><span class="pre">vpu_0</span></code> and <code class="docutils literal notranslate"><span class="pre">vmu_0</span></code>, the two
+units the MiniTPU-semantics increments created and the only two carrying
+<code class="docutils literal notranslate"><span class="pre">style=flp</span></code> loops; every other unit still reports 2.431 ns. So the honest
+comparison multiplies a 1.26-2.22x cycle cost by a roughly 1.56x longer clock,
+and the variant’s resources are BRAM 41 / DSP 21 / FF 17,918 / LUT 24,244
+against the shipped design’s BRAM 42 / DSP 14 / FF 17,481 / LUT 26,583.</p>
+<p>Where the cycles went, per increment, at 4x4x4 and 16x16x16:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Increment</p></th>
+<th class="head"><p>Cycles</p></th>
+<th class="head"><p>Step</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1 (<code class="docutils literal notranslate"><span class="pre">b3793f85</span></code>)</p></td>
+<td><p>176 / 750</p></td>
+<td><p>+4 / +64</p></td>
+</tr>
+<tr class="row-odd"><td><p>2 (<code class="docutils literal notranslate"><span class="pre">8f113313</span></code>)</p></td>
+<td><p>186 / 1216</p></td>
+<td><p><strong>+10 / +466</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>3 (<code class="docutils literal notranslate"><span class="pre">7b087c44</span></code>)</p></td>
+<td><p>197 / 1904</p></td>
+<td><p><strong>+11 / +688</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>3b (<code class="docutils literal notranslate"><span class="pre">c565ebea</span></code>)</p></td>
+<td><p>199 / 1514</p></td>
+<td><p>+2 / -390</p></td>
+</tr>
+<tr class="row-even"><td><p>4 and 5a (branch HEAD)</p></td>
+<td><p>216 / 1521</p></td>
+<td><p>+17 / +7</p></td>
+</tr>
+</tbody>
+</table>
+<p>The two large steps are increments 2 and 3, and they are real: each was
+re-measured independently at its own commit with zero mismatches. Increment 3b
+recovered 390 cycles of increment 3’s 688.</p>
+<p>Three claims the building agent made were corrected by the re-measurement, and
+are recorded on the branch: there are 42 mutants rather than 41; <code class="docutils literal notranslate"><span class="pre">frp</span></code>
+<strong>passes</strong> the pipeline-style repro rather than deadlocking as the register
+said; and a 72-bit stream does not “run clean” — 65, 72 and 96 bits all corrupt
+the simulator heap, and what varies is only whether the overrun lands somewhere
+fatal (see <a class="reference internal" href="../developer/limitations.html"><span class="doc">Allo Limitations Register</span></a>). Two documentation defects also stand
+on that branch: <code class="docutils literal notranslate"><span class="pre">DELAY</span></code> is described as an honoured minimum issue spacing but
+appears nowhere in the implementation, and a cited <code class="docutils literal notranslate"><span class="pre">isa_dsl.eltwise_program</span></code>
+does not exist.</p>
+<p>One piece of the experiment was judged worth keeping independently of it:
+<code class="docutils literal notranslate"><span class="pre">s.pipeline(style=)</span></code> (<code class="docutils literal notranslate"><span class="pre">0038833c</span></code>), a ~20-line schedule primitive modelled on
+<code class="docutils literal notranslate"><span class="pre">rewind</span></code> and covered by <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_pipeline_style</span></code>. Any
+cyclic dataflow design needs it. Note that only <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> reads
+<code class="docutils literal notranslate"><span class="pre">pipeline_style</span></code>; the Intel, Catapult, Tapa and XLS emitters ignore it
+silently.</p>
+</section>
 <section id="provenance">
 <h2>Provenance<a class="headerlink" href="#provenance" title="Link to this heading"><span>¶</span></a></h2>
 <p>The “rescued scaling report” referred to above was kept in the repository as
@@ -580,6 +660,7 @@ be re-derived from source on another host.</p>
 <li><a class="reference internal" href="#what-this-says-about-our-own-cost-model">5. What this says about our own cost model</a></li>
 <li><a class="reference internal" href="#defects-reported-outward-to-that-design-s-owner">6. Defects reported outward to that design’s owner</a></li>
 <li><a class="reference internal" href="#where-the-two-source-trees-disagree">7. Where the two source trees disagree</a></li>
+<li><a class="reference internal" href="#what-aligning-to-minitpu-s-semantics-costs">What aligning to MiniTPU’s semantics costs</a></li>
 <li><a class="reference internal" href="#provenance">Provenance</a></li>
 </ul>
 </li>

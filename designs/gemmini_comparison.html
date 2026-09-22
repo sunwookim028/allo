@@ -179,6 +179,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT Compiler-Backend Flow</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
@@ -1123,7 +1124,7 @@ cp<span class="w"> </span><span class="nv">$G</span>/allo_cmp.c<span class="w"> 
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">~/chipyard/env.sh</span></code> activates Chipyard’s own conda environment and so replaces
-the <code class="docutils literal notranslate"><span class="pre">allo</span></code> one; source it in a separate shell (<a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>).
+the <code class="docutils literal notranslate"><span class="pre">allo</span></code> one; source it in a separate shell (<code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>).
 Raw Gemmini output is in <code class="docutils literal notranslate"><span class="pre">logs/gemmini_int8_dim4.log</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> measures what a user gets: <code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>, driver and all.
 <code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code> measures what the hardware does: <code class="docutils literal notranslate"><span class="pre">rdcycle</span></code> -&gt; 5 <code class="docutils literal notranslate"><span class="pre">config</span></code>s
@@ -1159,6 +1160,212 @@ numbers.</p></li>
 Roughly an hour of work if a future comparison wants per-unit attribution
 rather than total cycles.</p></li>
 </ul>
+</section>
+</section>
+<section id="counting-host-overhead-symmetrically">
+<h2>Counting host overhead symmetrically<a class="headerlink" href="#counting-host-overhead-symmetrically" title="Link to this heading"><span>¶</span></a></h2>
+<p>This page’s window analysis established that a flat <strong>~393-413 cycles</strong> of
+Rocket driver software sits inside Gemmini’s end-to-end figure, independent of
+shape — which is 72 % of the 4x4x4 number and nearly the whole gap between the
+two windows. Our own figures are Vitis cosim counts from <code class="docutils literal notranslate"><span class="pre">ap_start</span></code> to
+<code class="docutils literal notranslate"><span class="pre">ap_done</span></code>, and so contain no host at all.</p>
+<p>MiniTPU’s owner supplied the symmetric datum, unprompted, and it is the reason
+to state this as a methodological rule rather than as a point in our favour:
+<strong>their per-launch host work is about 132 microseconds with a 44-microsecond
+register-access floor, measured on board .187</strong> — roughly <strong>24,750 cycles at
+187.5 MHz</strong> — and their testbench numbers do not include it either.</p>
+<p>So the rule for any comparison on this page, and for the benchmark set
+generally:</p>
+<ul class="simple">
+<li><p><strong>Name the window for every figure.</strong> What is inside it, where it starts, and
+where it stops. A cycle count without its window is not a measurement.</p></li>
+<li><p><strong>Count every machine’s host, or none of them.</strong> Counting Gemmini’s driver
+while omitting our own or MiniTPU’s host time is unfair to Gemmini, and a
+comparison that omits all of them is fine <em>provided it says so</em>. What is not
+acceptable is letting one machine’s overhead count while another’s vanishes.</p></li>
+<li><p><strong>Where both windows are cheap to report, report both.</strong> For Gemmini this
+costs nothing, because the driver-inclusive and accelerator-only figures come
+out of the same run.</p></li>
+</ul>
+<p>This is the same failure mode as the withdrawn claim recorded above: a number
+that is true of the measurement but not of the thing being measured. Two of
+those have now been caught by comparing notes across designs rather than by
+inspection, which is an argument for continuing to do so.</p>
+<p>Gemmini at a matched array size is being built independently by both sides as of
+2026-09-22 — deliberately twice, because neither side’s Gemmini figure has ever
+been reproduced by anyone, and a disagreement between two independent builds of
+the same nominal configuration would be more informative than either number
+alone. Reproducing a build means recording the config object, array dimensions,
+datatypes, scratchpad and accumulator sizes, the chipyard and gemmini commits,
+the harness, and exactly what is inside the counter window.</p>
+</section>
+<section id="the-memory-latency-knob-and-why-the-sweep-outranks-the-value">
+<h2>The memory-latency knob, and why the sweep outranks the value<a class="headerlink" href="#the-memory-latency-knob-and-why-the-sweep-outranks-the-value" title="Link to this heading"><span>¶</span></a></h2>
+<p>Our cycle counts come from Vitis cosim, which has <strong>no DRAM model</strong>:
+<code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY</span></code> is a value we choose, and the published figures are taken at
+0. Gemmini’s side is idealised too — <code class="docutils literal notranslate"><span class="pre">WithBlackBoxSimMem(additionalLatency=0)</span></code>
+gives roughly a 1-2 cycle AXI unless <code class="docutils literal notranslate"><span class="pre">+dramsim</span></code> is used — so neither column
+contains a memory system, and that is a disclosure rather than a defect. What
+would be a defect is choosing a latency that makes our design look good.</p>
+<p>MiniTPU’s owner supplied their equivalent figure with the provenance that makes
+it usable: <strong>about 40 cycles at 187.5 MHz — 213 ns — for a contiguous
+descriptor before its first beat lands, with up to 8 bursts in flight</strong>
+(<code class="docutils literal notranslate"><span class="pre">tools/round_trip.py</span></code> in their tree holds it with the derivation). Carry the
+<strong>seconds</strong>, not the cycles: 213 ns is about 88 cycles at our shipped design’s
+estimated 2.431 ns period and about 64 at a 3.33 ns target, so converting
+through cycles imports their clock along with their memory system.</p>
+<p>It is a <strong>fitted</strong> value, not a measured DRAM latency — fitted so that a
+simulated schedule change matched a board A/B of the same commit — and its
+history is the reason this section exists. The value it replaced, 92 cycles,
+was also inferred, and at 92 their simulator <strong>ranked GEMM templates backwards</strong>
+against the board: a 45 % simulated cut in GEMM cycles was 3.6 % on hardware.
+At 0 it ranked them backwards as well. Two different wrong values, two
+different wrong rankings, and the simulator was internally consistent and
+confident in both cases; it was caught only by running the A/B on two boards.</p>
+<p>The conclusion to carry, which is theirs and which we are adopting: <strong>the
+sensitivity sweep is worth more than any single value.</strong> Ours runs 172 at 0
+cycles, 214 at 16, and 358 at 64. So the question a design decision has to
+answer is not “what is the right latency” but “does my ranking survive the
+range” — if a variant wins at 0 and loses at 88, the knob chose the design. If
+conclusions are stable from 0 to 100, the knob does not matter and can be
+disclosed and forgotten. If they invert somewhere in that range, <strong>the inversion
+is the finding</strong>.</p>
+<p>And when a ranking does invert, <strong>the inversion point in seconds is the
+interesting quantity, not the inversion point in cycles</strong>: seconds say which
+real memory systems the candidate is good for, where cycles only say which
+simulator settings it is good for. MiniTPU’s ranking inverted somewhere between
+40 and 92 cycles at 187.5 MHz — 213 to 490 ns — and it was the nanosecond
+figure that let them say their board sits nearer the low end rather than merely
+that one knob value beat another.</p>
+<p>One caveat on transplanting the number at all: theirs is a ZCU104’s memory
+system seen through a descriptor-based DMA with two channels and 32-byte beats,
+on an AXI port that is not on the memory controller’s clock. Our AXI slave is a
+different design on different silicon. 213 ns is a far better starting point
+than zero and it is not a measurement of our machine.</p>
+</section>
+<section id="which-gemmini-configuration-is-the-honest-opponent">
+<h2>Which Gemmini configuration is the honest opponent<a class="headerlink" href="#which-gemmini-configuration-is-the-honest-opponent" title="Link to this heading"><span>¶</span></a></h2>
+<p>Surveyed from Gemmini’s Scala source on 2026-09-22
+(<code class="docutils literal notranslate"><span class="pre">generators/gemmini/src/main/scala/gemmini/GemminiConfigs.scala</span></code> has ~60
+configuration fields). The conclusion is to <strong>change almost nothing</strong>, and the
+reasoning is worth stating because every knob we touched would invite the
+question of whether we tuned the opponent to lose.</p>
+<p>The four axes pull in different directions and are settled differently:</p>
+<ul class="simple">
+<li><p><strong>Array size — match it.</strong> The only axis where a mismatch is a pure
+multiplier on peak throughput, 16x for 16x16 against 4x4, with no
+counterargument. This is why stock <code class="docutils literal notranslate"><span class="pre">GemminiRocketConfig</span></code> is not a usable
+opponent.</p></li>
+<li><p><strong>Datatype — match it, and we do.</strong> int8xint8 into int32 on both sides,
+which is Gemmini’s <em>own</em> default. bf16 would be a step away from matched, not
+toward it.</p></li>
+<li><p><strong>Memory system — cannot be matched; enumerate it.</strong> Gemmini is Rocket with a
+32 KiB L1 D$, an L2 and <code class="docutils literal notranslate"><span class="pre">WithBlackBoxSimMem(additionalLatency=0)</span></code>; ours is
+Vitis cosim at zero AXI latency. Both idealised, neither is the other’s
+memory, and equalising them means rebuilding one side’s SoC.</p></li>
+<li><p><strong>Dispatch path — match it by *window*, not by configuration.</strong> No knob
+addresses it; only the window does, which is exactly what fixed the withdrawn
+claim recorded above.</p></li>
+</ul>
+<p>So the config delta that survives review is <strong>two fields, both of them the
+array size</strong> — <code class="docutils literal notranslate"><span class="pre">meshRows</span></code> and <code class="docutils literal notranslate"><span class="pre">meshColumns</span></code> — plus <code class="docutils literal notranslate"><span class="pre">has_training_convs</span> <span class="pre">=</span>
+<span class="pre">false</span></code> to remove conv hardware neither benchmark touches. Everything else is
+named as unexercised. Two disclosures rather than fixes: <code class="docutils literal notranslate"><span class="pre">dataflow</span> <span class="pre">=</span>
+<span class="pre">Dataflow.BOTH</span></code> leaves Gemmini carrying an output-stationary datapath we never
+use, which favours it if anyone, so keeping it is the conservative choice; and
+a DIM=16 taken from stock would also flip <code class="docutils literal notranslate"><span class="pre">has_training_convs</span></code> to true,
+making the matched points differ in a second field.</p>
+<p>A second matched point is being added at DIM=8, because <code class="docutils literal notranslate"><span class="pre">T</span></code> is now a working
+parameter on our side and <strong>a single matched point cannot separate “our design
+is slower” from “our design is slower at this one size.”</strong></p>
+<section id="the-capacity-asymmetry-is-cycle-neutral-and-this-is-the-finding">
+<h3>The capacity asymmetry is cycle-neutral, and this is the finding<a class="headerlink" href="#the-capacity-asymmetry-is-cycle-neutral-and-this-is-the-finding" title="Link to this heading"><span>¶</span></a></h3>
+<p>The obvious objection to this comparison is memory capacity: our design has a
+4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
+Gemmini’s <strong>256 KiB scratchpad and 64 KiB accumulator</strong> — a 64x and 30x
+asymmetry.</p>
+<p>It does not buy Gemmini a single cycle at any published shape. Re-running
+<code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>’s own tiling search across capacities at DIM=4 gives the
+<code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> call count below; every row is legal under the config’s <code class="docutils literal notranslate"><span class="pre">require</span></code>
+clauses:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Scratchpad / accumulator</p></th>
+<th class="head"><p>4x4x4</p></th>
+<th class="head"><p>16x16x16</p></th>
+<th class="head"><p>32x32x32</p></th>
+<th class="head"><p>64x64x64</p></th>
+<th class="head"><p>64x32x64</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>256 / 64 KB (what we ship)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-odd"><td><p>64 / 32 KB (<code class="docutils literal notranslate"><span class="pre">chipConfig</span></code>)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-even"><td><p>32 / 8 KB</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>8 / 4 KB (~2x ours)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>4</p></td>
+<td><p>12</p></td>
+<td><p>12</p></td>
+</tr>
+<tr class="row-even"><td><p>4 / 4 KB (~matched to ours)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>4</p></td>
+<td><p>32</p></td>
+<td><p>12</p></td>
+</tr>
+</tbody>
+</table>
+<p>Every capacity from 256 KB down to 4 KB issues exactly <strong>one</strong> <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> from
+4x4x4 through 16x16x16, so shrinking Gemmini’s memories to match ours would not
+move any of the five published numbers. <strong>The asymmetry is an area and power
+disclosure, not a cycle correction</strong> — which is a far stronger position than
+“we could not match it”. The binding limit is always the accumulator’s half
+capacity, never the scratchpad.</p>
+<p>It stops being neutral at exactly 32x32x32, so as shapes grow this argument
+needs restating rather than reusing. Keeping Gemmini’s own default capacity is
+also the choice that avoids hand-rolling a multi-tile nest and then arguing
+about whether our tiling was fair.</p>
+</section>
+<section id="open-ex-accumulate-in-the-window-benchmark">
+<h3>Open: <code class="docutils literal notranslate"><span class="pre">ex_accumulate</span></code> in the window benchmark<a class="headerlink" href="#open-ex-accumulate-in-the-window-benchmark" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">gemmini/allo_bare5.c</span></code> passes <code class="docutils literal notranslate"><span class="pre">ex_accumulate</span></code> as a literal <code class="docutils literal notranslate"><span class="pre">true</span></code>, where
+the real driver computes <code class="docutils literal notranslate"><span class="pre">!no_bias</span> <span class="pre">||</span> <span class="pre">D</span> <span class="pre">==</span> <span class="pre">NULL</span></code>, which is <strong>false</strong> for the
+no-bias calls we make. In hardware it sets a bit on the preload’s accumulator
+address rather than issuing extra commands, so it adds no RoCC traffic, but it
+turns the k=0 accumulator writes into read-modify-writes and is therefore <strong>not
+guaranteed cycle-neutral</strong>.</p>
+<p>This sits inside all five published Gemmini figures. It is being measured both
+ways rather than argued about; until that lands, read 161 / 220 / 347 / 391 /
+593 as provisional. The fix is C-only and needs no re-elaboration.</p>
+<p>Two operational hazards found in the same survey, both of which have silently
+produced wrong comparisons before: <strong>every elaboration rewrites</strong>
+<code class="docutils literal notranslate"><span class="pre">gemmini_params.h</span></code> <strong>in place</strong>, so elaborating a second configuration
+destroys the first’s header and the next C build silently targets the wrong
+hardware — snapshot it, rebuild immediately, and check the <code class="docutils literal notranslate"><span class="pre">GEMMINI</span> <span class="pre">DIM=</span></code> boot
+banner. And the committed <code class="docutils literal notranslate"><span class="pre">roccTests_Makefile.patch</span></code> adds only <code class="docutils literal notranslate"><span class="pre">allo_cmp</span></code> to
+the <code class="docutils literal notranslate"><span class="pre">tests</span></code> list, <strong>not</strong> <code class="docutils literal notranslate"><span class="pre">allo_bare5</span></code>, so <code class="docutils literal notranslate"><span class="pre">build.sh</span></code> will not build the
+window benchmark; it needs its explicit make target.</p>
 </section>
 </section>
 </section>
@@ -1197,6 +1404,13 @@ rather than total cycles.</p></li>
 <li><a class="reference internal" href="#files">Files</a></li>
 <li><a class="reference internal" href="#applying-and-running">Applying and running</a></li>
 <li><a class="reference internal" href="#things-that-cost-time-to-learn">Things that cost time to learn</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#counting-host-overhead-symmetrically">Counting host overhead symmetrically</a></li>
+<li><a class="reference internal" href="#the-memory-latency-knob-and-why-the-sweep-outranks-the-value">The memory-latency knob, and why the sweep outranks the value</a></li>
+<li><a class="reference internal" href="#which-gemmini-configuration-is-the-honest-opponent">Which Gemmini configuration is the honest opponent</a><ul>
+<li><a class="reference internal" href="#the-capacity-asymmetry-is-cycle-neutral-and-this-is-the-finding">The capacity asymmetry is cycle-neutral, and this is the finding</a></li>
+<li><a class="reference internal" href="#open-ex-accumulate-in-the-window-benchmark">Open: <code class="docutils literal notranslate"><span class="pre">ex_accumulate</span></code> in the window benchmark</a></li>
 </ul>
 </li>
 </ul>

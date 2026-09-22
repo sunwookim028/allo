@@ -86,6 +86,7 @@ Allo is an Accelerator Design Language (ADL) and compiler that facilitates the c
 
    extensions/catapult_systemc.rst
    extensions/chia.rst
+   extensions/agentic_experiments.rst
    extensions/act.rst
 
 
