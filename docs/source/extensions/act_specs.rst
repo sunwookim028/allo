@@ -459,12 +459,145 @@ What the cheap gate is worth
 ============================
 
 Measured with ``act/calibrate.py``, which runs one ``csynth_design`` and then
-one ``cosim_design`` per program on that same RTL.
+one ``cosim_design`` per program on that same RTL. Everything in this section
+was measured in this session
+(``logs/cosim_act_corpus_sweep.log``); ``PUBLISHED_CYCLES`` is the only
+attributed number on the page.
 
 .. code-block:: bash
 
    TPU_PRJ=/somewhere/with/room python act/calibrate.py specs
    TPU_PRJ=/somewhere/with/room python act/calibrate.py variants
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 10 8 10 9 9 8
+
+   * - spec
+     - critical
+     - work
+     - estimate
+     - cosim
+     - error
+     - in fit
+   * - ``gemm_4x4x4``
+     - ``spm``
+     - 9
+     - 188
+     - **172**
+     - +9.2%
+     - yes
+   * - ``gemm_8x8x8``
+     - ``vru``
+     - 48
+     - 251
+     - **262**
+     - -4.2%
+     - yes
+   * - ``gemm_12x12x12``
+     - ``vru``
+     - 144
+     - 407
+     - **418**
+     - -2.7%
+     - yes
+   * - ``gemm_16x16x8``
+     - ``vru``
+     - 192
+     - 484
+     - **484**
+     - +0.1%
+     - yes
+   * - ``gemm_16x16x16``
+     - ``vru``
+     - 320
+     - 692
+     - **686**
+     - +0.9%
+     - yes
+   * - ``gemm_reuse_m_16x16x4``
+     - ``vru``
+     - 128
+     - 381
+     - 383
+     - -0.6%
+     - no
+   * - ``gemm_reuse_n_4x4x16``
+     - ``spm``
+     - 36
+     - 232
+     - 269
+     - -13.9%
+     - no
+   * - ``gemm_reuse_k_4x16x4``
+     - ``spm``
+     - 36
+     - 232
+     - 256
+     - -9.5%
+     - no
+   * - ``batched_matmul_2x4x4x4``
+     - ``spm``
+     - 18
+     - 202
+     - 209
+     - -3.2%
+     - no
+   * - ``row_reduce_16x16``
+     - ``vru``
+     - 128
+     - 381
+     - 371
+     - +2.6%
+     - no
+
+Two things fall out of the left column before the model is even discussed.
+**The five published cycle counts reproduce exactly** -- 172 / 262 / 418 /
+484 / 686 -- through a testbench that compares all 256 bytes of ``C`` against
+``isa_ref.run`` rather than only the ``M x N`` region, which is a stricter
+check than the one the published numbers come from. And the corpus's two
+non-GEMM cases run on real RTL: ``batched_matmul_2x4x4x4`` at 209 cycles and
+``row_reduce_16x16`` at 371, both with 0 of 256 bytes wrong.
+
+On the model: **in sample, max error 9.2% over the five points it is fitted
+to; out of sample, max error 13.9% and mean absolute error 6.0% over the five
+held-out specs measured.** The two worst cases are both ones where ``spm`` is
+the critical unit at a small work count, where what the design is actually
+doing is filling the array's weight and activation chains -- a term the model
+does not have, because ``max`` over the unit counts cannot see a pipeline it
+does not model.
+
+A 6% mean is good enough to sort candidates that differ by more than that and
+useless for candidates that differ by less. The gate is set at 10% of the
+reference submission's estimate for that reason: it is a filter on the
+obviously-worse, not a ranking.
+
+.. _act-specs-rtl-hang:
+
+What the expensive judge found that nothing cheaper did
+-------------------------------------------------------
+
+``relu_16x16`` -- the pointwise spec, ``mm`` against a host-placed identity
+with ``vrelu`` and ``mvout`` inside the output loop -- **passes csim with 0 of
+256 bytes wrong and then does not complete in RTL.** Measured in this session:
+Vitis' C simulation of the same testbench prints
+``TB relu_16x16 mismatches = 0 / 256``, and the RTL co-simulation was still at
+``Inter-Transaction Progress 0 / 1`` at simulation time 109,000 ns -- about
+33,000 cycles against an estimate of 484 -- when it was stopped.
+
+Everything cheaper passes it: ``check_program`` accepts it, ``kpn_model.run``
+reports ``minimum channel depth 1`` and no deadlock, the Allo simulator gives
+bit-exact agreement with ``isa_ref`` on four operand distributions twice over,
+and csim agrees too. ``row_reduce_16x16``, whose program has nearly the same
+shape -- the same single four-row weight ``dma_ld``, the same weight tile
+reused by every ``mm``, the same ``mm`` inside a hardware loop -- completes
+normally at 371 cycles, so the corpus brackets the fault rather than merely
+reporting it.
+
+This is the reason the judge has an expensive tier at all, and it is a
+concrete instance of what :doc:`/designs/tinytpu_isa` calls cosim's role as a
+deadlock oracle. It is not a defect in the spec or in the submission: both
+pass every contract the machine states.
 
 
 How to work on this
