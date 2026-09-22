@@ -99,15 +99,29 @@ What is measured about it, verified in-tree today:
   * It dies at Kt>=3 with `f2=2, must be 0 (overwrite) or 1 (accumulate)`. The
     term's growth is ADDITIVE and MONOTONE where the k=0 test needs a step.
     Staticness is not the obstacle; monotonicity is.
-  * A term on `f2` COSTS ONE of the three AGU terms. At Nt>1 the accumulating
-    `mm` then needs four and does not fit at all, so this constraint and
-    `AGU_TERMS` are coupled rather than alternatives.
-  * `isa_ref.run` consumes `expand(prog)`, i.e. the AGU-RESOLVED fields. So
-    whatever resolves the step belongs in the AGU resolution -- the sequencer's
-    kernel, with `expand` kept in lockstep -- and then what reaches a unit is
-    still 0 or 1 and the instruction keeps its architectural meaning. Put it in
-    a unit's decode instead and you have changed what f2=2 means, which the
-    frozen `isa_ref` will reject.
+  * A term on `f2` COSTS ONE of the three AGU terms, and the two constraints
+    are IN SERIES with the first masking the second. The accumulating `mm`
+    names A (f0, one term), acc (f2, one term) and its weights at
+    B_SP + nb*MAXDIM + kb*T (f3, TWO terms): four in all as soon as the program
+    has an n loop at all. Measured, for the no-peel `mm` at each (Kt, Nt) --
+    reproduce it with `histogram.py --interaction`:
+
+        AGU_TERMS=3, every Kt in {2,3,4} x Nt in {1,2,4}:  refused, AGU budget
+        AGU_TERMS=4, Kt=2, any Nt:                         expressible, EXACT
+        AGU_TERMS=4, Kt>=3, any Nt:                        refused, f2 range
+
+    So at three terms the monotonicity limit is never reached and cannot be
+    observed at all; widen the budget and it becomes the binding one. Neither
+    change shows anything alone. Note also that Kt=2 is K <= 8 while the scored
+    shape is 16x16x16 with Kt=4, so four terms plus an additive term is
+    necessary and NOT sufficient.
+  * A rule of the environment, not a hint: `isa_ref.run` iterates
+    `expand(prog)`, i.e. the AGU-RESOLVED fields. A change resolved in the AGU
+    resolution (the sequencer's kernel, with `expand` kept in lockstep) leaves
+    what reaches a unit -- and so the instruction's architectural meaning and
+    the frozen reference model -- untouched. The same change resolved in a
+    unit's decode alters what a field VALUE means, and `isa_ref` will reject
+    it. Both locations are yours to edit; they cost you different things.
   * A first-cause histogram overstates the prize. Remove the position check and
     re-census and 897 of those 1,150 are refused by the OTHER acc-peel branch
     (K split across two emitted loops) and 274 by the encoder's own m/n
@@ -130,9 +144,12 @@ Two things are measured and should stop you wasting iterations:
   * `AGU_TERMS=4` (the 64-bit AGU word repacked to four 16-bit terms) raises
     encodable nests from 3 to 7 and drives the `agu-terms` refusals to zero --
     and the mapper's CHOSEN nest does not change, so the RTL runs the same
-    stream and the cycle count does not move while the area does. Widening the
-    address path alone is a cost with no benefit. A 6-frame loop stack alone
-    changes not one number. `IMEM_SIZE` 56 -> 104 changes not one number.
+    stream and the cycle count does not move while the area does. A 6-frame
+    loop stack alone changes not one number. `IMEM_SIZE` 56 -> 104 changes not
+    one number. Read on their own, each of those is a cost with no benefit --
+    but `histogram.py --interaction` shows the address-term budget MASKS a
+    second constraint on the accumulate field, so "alone" may be the problem
+    rather than the change.
   * The mapping search alone is worth 3 cycles, at one shape: at 4x4x4 the
     mapper's program is 24 words against the hand-written 28, with the same
     four dynamic issues.

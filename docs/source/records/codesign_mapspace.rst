@@ -453,6 +453,61 @@ three the machine could encode.
    measured to have a trial-to-trial spread reaching 20 cycles at a shape
    totalling 161.
 
+Pre-registration: what the search is being asked, and what I expect
+===================================================================
+
+Written **2026-09-22, before the corrected search was run**, and reported
+against afterwards either way. A pre-registered expectation that then happens is
+evidence; the same sentence written afterwards is an excuse.
+
+**What the run measures.** Not "can an agent find a design point". The
+interaction above changes the question to **can an agent find a two-part change
+where neither part shows anything on its own.** A candidate needs both a wider
+address-term budget *and* a mechanism that gives ``acc`` its step, and it has to
+get both right in one iteration for the cosim to show anything at all -- because
+with only the first the mapper's pick does not move (measured), and with only
+the second the instruction does not fit (measured). That is materially harder
+than either half, and it is the case a one-knob-at-a-time search cannot reach.
+
+**What I expect.** The most likely single outcome is that **the agent finds a
+mechanism but only reaches Kt=2, so the pick does not move and the cycle count
+is flat.** Kt=2 is K <= 8; the scored shape is 16x16x16 with Kt=4. Second most
+likely is a candidate that widens the AGU and stops there, which is already
+measured to change nothing. A cycle improvement at 16x16x16 requires the step to
+work at Kt=4, and I do not predict it.
+
+**A flat result is a result, given that this was said first.** It would be a
+measurement of the difficulty of a two-part co-design change rather than a
+failed search -- provided the difficulty was stated in advance, which is what
+this section is for.
+
+**What was seeded**, because the seeding is part of the experimental setup and a
+reader should know how much guidance any outcome came with. Everything seeded is
+a measurement from this page:
+
+- the first-cause histogram at 16x16x16 (3 of 1,226; 1150 / 54 / 17 / 2);
+- the second-cause census (897 / 274 / 35 / 8, 12 expressible), so no iteration
+  is spent believing a fixed ``acc`` frees 1,150 nests;
+- that ``agu4`` alone raises encodable nests to 7, zeroes the ``agu-terms``
+  refusals and **changes no pick**, so its cycles are flat while its area is
+  not; and that ``depth6`` alone and ``IMEM_SIZE`` 56 -> 104 each change nothing;
+- the masking grid: ``acc`` is ``f2``, ``f2`` is an AGU target, an AGU term is
+  additive and monotone, a term on ``f2`` costs one of the three, and at three
+  terms every cell is refused on the budget while at four Kt=2 is expressible
+  and exact and Kt>=3 is out of range;
+- that the mapping search alone is worth 3 cycles at 4x4x4, 24 words against 28;
+- the freeze boundary as a **rule of the environment**: ``isa_ref.run`` iterates
+  ``expand(prog)``, so a change resolved in the AGU leaves the instruction's
+  meaning and the frozen reference model untouched, while the same change
+  resolved in a unit's decode alters what a field value means and is rejected.
+
+**What was deliberately not seeded:** any mechanism. Saturation is not named,
+predicating on an induction variable is not named, and the workers are not told
+where to put a fix -- only what each location costs them. The stopped pilot
+shows that constraint is not redundant: it reached for a mechanism unprompted
+and put it at the forbidden site.
+
+
 Resources, for the pair
 =======================
 
@@ -482,3 +537,31 @@ the hardware side, in two vocabularies: ``mapspace.py``'s ``agu-terms`` /
 made to meet, and the one that lives in the compiler is the one to prefer. This
 record is the measured target for that work, not a competing implementation of
 it.
+
+
+A note on numbers and their derivations
+=======================================
+
+Three figures on this page were corrected on the day it was written, and in each
+case the correction came from someone being asked for a derivation rather than
+from anyone being more careful:
+
+- the explanation of the 1,150 refusals was wrong in three documents and two
+  worker prompts ("``acc`` is a static field"). Checking it took four minutes
+  and a thirty-line probe, which found that ``acc`` is AGU-reachable and that
+  the obstacle is monotonicity;
+- a census of 930 nests violating the RAW-distance contract, and an encodable
+  count of 5, were relayed from another measurement and are **not reproduced
+  here**. This page's counts carry ``histogram.py`` as their derivation and the
+  disagreement is recorded as open rather than settled by preference;
+- the selection rule under-charged control flow, because ``expand`` yields
+  nothing for ``LOOP``/``ENDLOOP``. Charging them changes no pick at any of the
+  five shapes, so nothing on this page moved -- but the rule was right for the
+  wrong reason until it was checked.
+
+The practical point is that **a derivation is usually much smaller than the work
+that produced the number.** Refusing the 930 cost nothing, because
+``--second-cause`` already existed; verifying the ``acc`` claim cost four minutes
+and overturned an explanation several documents rested on. That is why "a number
+travels with its derivation, or it does not travel" is a workable rule rather
+than a pious one.
