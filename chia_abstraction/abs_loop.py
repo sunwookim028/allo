@@ -342,6 +342,18 @@ def run(args, budget: Budget) -> int:
     # this host: the first pilot launch bound nothing, the agent was handed NO
     # TOOLS, and it spent two iterations making no edit. That is the same
     # failure the design loop's smoke run hit, from a different cause.
+    # The LLM binary must resolve on the PATH the WORKERS get, or every model
+    # call "returns" with no work done: measured twice. The first time a
+    # worker's PATH lacked it; the second time the worktree it was borrowed
+    # from had been deleted, and three iterations each scored `none` at $0.
+    import shutil as _sh
+    oc = _sh.which("opencode", path=os.environ.get("PATH", ""))
+    if not oc:
+        print("Refusing to search: `opencode` does not resolve on the PATH the "
+              "workers will get. Source chia.env, whose OPENCODE_BIN must "
+              "point at THIS worktree's node_modules/.bin.")
+        return 2
+    print(f"  opencode: {oc}", flush=True)
     runtime_env = {"working_dir": str(HERE),
                    "env_vars": {
                        "PYTHONPATH": str(DESIGN_AGENT),
@@ -482,6 +494,15 @@ gates pass. The harness re-measures your final tree independently either way.
                 break
             print(response.result, flush=True)
             agent_summary = str(response.result)[-4000:]
+            if (not getattr(response, "success", True)
+                    and "No such file or directory" in agent_summary):
+                # Infrastructure, not the agent: stop, do not score `none`.
+                print("  the model call could not START; stopping the run "
+                      "rather than recording an empty iteration", flush=True)
+                record(log, {"iteration": it, "kind": "stopped",
+                             "reason": "model call could not start: "
+                                       + agent_summary[-300:]})
+                break
             diff = tool.diff()
             entry = {"iteration": it, "kind": "candidate",
                      "disposition": args.disposition, "diff": diff,
