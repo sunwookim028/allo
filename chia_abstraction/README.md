@@ -429,6 +429,31 @@ guard holds, and a new abstraction can still show payoff. That is what the
 **Not implemented tonight.** Recorded here as a known limitation of the
 objective so that a `neutral` on a new primitive is read correctly.
 
+## Is the cosim deterministic? A cycle-identity count, not an assertion
+
+Measured 2026-09-22, no-patch controls of the full ladder at one ref:
+
+**8 successful cosims, 8 identical cycle counts, 0 differing counts, 1 run
+that yielded no number at all.**
+
+Every successful run gave `tinytpu_isa` 172 / 686 and `blocks_stream`
+interval 89 / latency 206, matching the recorded baseline and each other.
+The single failure was `4x4x4 cycles=None no TB line` **while 16x16x16
+returned 686 in the same run** — a MISSING number, never a different one.
+
+A nondeterministic simulation gives different numbers. A flaky pipeline gives
+no number. The evidence says the second. So:
+
+**The simulation is deterministic; the PIPELINE can fail to produce a number.
+A single `ppa:cosim` rejection is therefore not evidence and must be retried
+rather than believed.**
+
+Our documentation says the cosim is deterministic and uses that to justify
+single measurements. That remains true of the simulation while being
+incomplete about the pipeline. Logs are now copied out of the work directory
+**before** any rejection, because the first occurrence destroyed its own
+evidence and would otherwise have been a shrug.
+
 ## Name the disease: a check that fails open
 
 Four instances in one night, in four different instruments:
