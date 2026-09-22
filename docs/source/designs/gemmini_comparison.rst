@@ -1163,16 +1163,21 @@ Two consequences, both binding:
   inside the noise. It does not erase the result — the sign is consistent across
   all five shapes, and that consistency is the evidence — but any claim of a
   difference *smaller* than the spread is unsupportable.
-- **A design A/B needs repeats at every point.** If a candidate's win is 42-59
-  cycles and the per-point noise is 20, a single measurement per point can
-  manufacture a crossover that is not there or conceal one that is. This applies
-  directly to the latency sensitivity grid above: without repeats it cannot
-  answer the question it was built for.
+- **The noise is the Gemmini column's, not ours.** This spread comes from a
+  full SoC — Rocket, an L1 cache, a scratchpad whose state the previous call
+  left behind. Our own figures are Vitis co-simulation of a fixed design on
+  fixed inputs, which is **deterministic**: the five shapes reproduce exactly,
+  run after run, and the alignment variant's independent re-measurement
+  reproduced every one of its numbers to the cycle. So repeats are needed on
+  the Gemmini side and are not needed on ours, and a design A/B measured only
+  by our cosim — the latency sensitivity grid above, for instance — does not
+  need them either. A *cross-machine comparison* is still limited by the
+  noisier side of it.
 
 This is the cycle-domain analogue of the synthesis noise floor recorded in
 :doc:`/designs/minitpu` — two builds of an identical netlist differing by 1,407
 LUT and 0.046 ns. Both say the same thing: **state the noise before stating the
-difference.**
+difference**, and say which measurement the noise belongs to.
 
 Do not mix the two benchmarks' columns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
