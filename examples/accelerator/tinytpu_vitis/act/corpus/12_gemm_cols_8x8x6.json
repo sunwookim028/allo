@@ -1,0 +1,50 @@
+{
+  "name": "gemm_cols_8x8x6",
+  "stresses": "N=6 does not divide T=4 and mvout retires whole T-lane words, so the trailing two columns of the last block are unavoidably written",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 8,
+    "k": 8,
+    "n": 6
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "column_block"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

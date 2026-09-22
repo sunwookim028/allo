@@ -1,0 +1,50 @@
+{
+  "name": "gemm_reuse_m_16x16x4",
+  "stresses": "reuse in M: one output column block, so a single weight tile serves 16 activation rows and reloading it per row is pure waste",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 16,
+    "k": 16,
+    "n": 4
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

@@ -1,0 +1,50 @@
+{
+  "name": "gemm_reduce_8x6x8_zeropad",
+  "stresses": "K=6 does not divide T=4, and the host promises the pad is zero: rounding the reduction up to 8 is then exact and costs one extra k-tile",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 8,
+    "k": 6,
+    "n": 8
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "zero",
+  "known_gap": null
+}

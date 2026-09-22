@@ -1,0 +1,50 @@
+{
+  "name": "gemm_reduce_8x6x8",
+  "stresses": "the same ragged reduction with an arbitrary pad: rounding K up now sums garbage, and no opcode zeroes a scratchpad or vreg row",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 8,
+    "k": 6,
+    "n": 8
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": "the reduction pad must be zero for a T-granular mm to be exact, and the ISA has no way to produce a zero row: dma_ld is the only writer of spad and vr and it can only copy DRAM the host filled"
+}

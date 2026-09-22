@@ -1,0 +1,51 @@
+{
+  "name": "row_reduce_16x16",
+  "stresses": "a contraction whose output is a vector, so the reduction runs in the lane direction the array does not reduce in; the result is one column of a T-lane word the machine can only write whole",
+  "einsum": "mk->m",
+  "dims": {
+    "m": 16,
+    "k": 16
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "ones",
+      "kind": "ones_column",
+      "rows": 4,
+      "cols": 4,
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "output": {
+    "name": "s",
+    "subscript": "m",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "column_block"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}
