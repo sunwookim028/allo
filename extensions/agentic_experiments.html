@@ -276,6 +276,45 @@ nobody notices has stopped passing is worse than no guard suite. The “57”
 is what it was at landing and is not a current measurement.</p>
 </div>
 </section>
+<section id="a-co-design-finding-two-changes-neither-of-which-works-alone">
+<h2>A co-design finding: two changes, neither of which works alone<a class="headerlink" href="#a-co-design-finding-two-changes-neither-of-which-works-alone" title="Link to this heading"><span>¶</span></a></h2>
+<p>The clearest co-design evidence this project has, and it is the kind a
+one-knob-at-a-time search cannot produce. Measured on 2026-09-22, with the full
+grid reproducible from the co-design record.</p>
+<p>Widening the address generator from 3 terms to 4 raises the count of encodable
+loop nests and <strong>changes no cycles</strong> — the chosen nest stays the same, the
+emitted program is identical, and only the area moves. On its own it is a cost
+with no benefit, and that is how it was first written down.</p>
+<p>It is not. The accumulating matrix instruction names its A operand, its
+accumulate field, and its weight address — and the weight address is <strong>two</strong>
+terms, so the instruction needs four as soon as the program has an n loop at
+all. Probed directly at each (Kt, Nt):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>AGU_TERMS=3, Kt=2/3/4, Nt=1/2/4  -&gt;  every cell: no, AGU budget
+AGU_TERMS=4, Kt=2                -&gt;  expressible, exact against isa_ref
+AGU_TERMS=4, Kt=3/4              -&gt;  no, accumulate field out of range
+</pre></div>
+</div>
+<p>So at 3 terms the accumulate field’s own limit — additive monotonicity in the
+address term — <strong>is never reached and cannot be observed</strong>, because the budget
+refuses the instruction before the field’s value is ever in question. The two
+constraints are <strong>in series, and the first masks the second.</strong> Widen the address
+generator and the second becomes binding and visible for the first time.</p>
+<p>That explains the result that looked like a dead end, and it is the shape of a
+real co-design claim: <strong>neither change demonstrates anything alone</strong>, and the
+first has to be made before the second’s constraint can even be measured.</p>
+<p><strong>And it is not a fix.</strong> <code class="docutils literal notranslate"><span class="pre">Kt=2</span></code> means K ≤ 8, while the scored shape is
+16x16x16 with <code class="docutils literal notranslate"><span class="pre">Kt=4</span></code>. Four address terms plus an additive term on the
+accumulate field is <strong>necessary and insufficient</strong> — a stepping mechanism is
+still needed. Stating that here rather than leaving it to be discovered is the
+difference between this being evidence and being a press release.</p>
+<p>One constraint fell out of the same work and is worth more than the finding, for
+anyone building on it: the frozen reference model consumes the
+<strong>address-generator-resolved</strong> fields. So a mechanism resolved in the address
+generator leaves the instruction’s architectural meaning untouched and the
+reference model needs no change, while the same mechanism in a unit’s decode
+alters what a field value <em>means</em> and is rightly rejected. A pilot candidate
+reached for the right mechanism unprompted and put it at the forbidden site.</p>
+</section>
 <section id="what-the-agents-actually-tried-to-get-away-with">
 <h2>What the agents actually tried to get away with<a class="headerlink" href="#what-the-agents-actually-tried-to-get-away-with" title="Link to this heading"><span>¶</span></a></h2>
 <p>These are findings, not mishaps, and they are the reason the guard list in
@@ -379,6 +418,20 @@ anyway; they knew a claim of theirs was second-hand and relayed it anyway.
 Proximity to the evidence is what makes overreach easy, which is exactly why the
 check has to come from somewhere else — and why it cannot be delegated to a
 more careful reading by the same author.</p>
+<p><strong>The recurring failure has a name: a number travelling further than its
+derivation.</strong> It happened four times in one night, counted: a test count that
+existed only in a commit message; a scheduler guarantee asserted for a property
+the original work never claimed; a driver-overhead figure used as though the
+opponent’s whole window were accelerator time; and a second-cause census relayed
+by a coordinator who had not derived it, which then failed to reproduce in
+another agent’s tree. Every one of them was a real measurement of <em>something</em>.</p>
+<p>The countermeasure that worked was not more care. It was that each figure was
+eventually asked to state how it was derived, by someone who needed to act on
+it — and the ones that could not state it were the ones that were wrong. So the
+rule the project now runs on is that <strong>a number travels with its derivation or
+it does not travel</strong>, and a recipient who cannot reproduce it says so rather
+than adopting it. Two agents refused a coordinator’s figure on exactly that
+ground tonight, and both were right to.</p>
 <p><strong>Report resources and clock beside cycles, always.</strong> A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
 50 ps is evidence of anything, because two builds of an identical netlist
@@ -416,6 +469,7 @@ a worker claimed a win it did not have.</p>
 <li><a class="reference internal" href="#">Agentic Experiments: What We Ran and What It Shows</a><ul>
 <li><a class="reference internal" href="#the-question">The question</a></li>
 <li><a class="reference internal" href="#what-is-established">What is established</a></li>
+<li><a class="reference internal" href="#a-co-design-finding-two-changes-neither-of-which-works-alone">A co-design finding: two changes, neither of which works alone</a></li>
 <li><a class="reference internal" href="#what-the-agents-actually-tried-to-get-away-with">What the agents actually tried to get away with</a></li>
 <li><a class="reference internal" href="#two-kinds-of-agent-work-which-must-not-be-conflated">Two kinds of agent work, which must not be conflated</a></li>
 <li><a class="reference internal" href="#what-is-not-established">What is not established</a></li>

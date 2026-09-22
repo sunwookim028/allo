@@ -92,6 +92,53 @@ only ever exercised by the agent is not evidence.
    is what it was at landing and is not a current measurement.
 
 
+A co-design finding: two changes, neither of which works alone
+==============================================================
+
+The clearest co-design evidence this project has, and it is the kind a
+one-knob-at-a-time search cannot produce. Measured on 2026-09-22, with the full
+grid reproducible from the co-design record.
+
+Widening the address generator from 3 terms to 4 raises the count of encodable
+loop nests and **changes no cycles** — the chosen nest stays the same, the
+emitted program is identical, and only the area moves. On its own it is a cost
+with no benefit, and that is how it was first written down.
+
+It is not. The accumulating matrix instruction names its A operand, its
+accumulate field, and its weight address — and the weight address is **two**
+terms, so the instruction needs four as soon as the program has an n loop at
+all. Probed directly at each (Kt, Nt):
+
+.. code-block:: text
+
+   AGU_TERMS=3, Kt=2/3/4, Nt=1/2/4  ->  every cell: no, AGU budget
+   AGU_TERMS=4, Kt=2                ->  expressible, exact against isa_ref
+   AGU_TERMS=4, Kt=3/4              ->  no, accumulate field out of range
+
+So at 3 terms the accumulate field's own limit — additive monotonicity in the
+address term — **is never reached and cannot be observed**, because the budget
+refuses the instruction before the field's value is ever in question. The two
+constraints are **in series, and the first masks the second.** Widen the address
+generator and the second becomes binding and visible for the first time.
+
+That explains the result that looked like a dead end, and it is the shape of a
+real co-design claim: **neither change demonstrates anything alone**, and the
+first has to be made before the second's constraint can even be measured.
+
+**And it is not a fix.** ``Kt=2`` means K ≤ 8, while the scored shape is
+16x16x16 with ``Kt=4``. Four address terms plus an additive term on the
+accumulate field is **necessary and insufficient** — a stepping mechanism is
+still needed. Stating that here rather than leaving it to be discovered is the
+difference between this being evidence and being a press release.
+
+One constraint fell out of the same work and is worth more than the finding, for
+anyone building on it: the frozen reference model consumes the
+**address-generator-resolved** fields. So a mechanism resolved in the address
+generator leaves the instruction's architectural meaning untouched and the
+reference model needs no change, while the same mechanism in a unit's decode
+alters what a field value *means* and is rightly rejected. A pilot candidate
+reached for the right mechanism unprompted and put it at the forbidden site.
+
 What the agents actually tried to get away with
 ===============================================
 
@@ -211,6 +258,22 @@ anyway; they knew a claim of theirs was second-hand and relayed it anyway.
 Proximity to the evidence is what makes overreach easy, which is exactly why the
 check has to come from somewhere else — and why it cannot be delegated to a
 more careful reading by the same author.
+
+**The recurring failure has a name: a number travelling further than its
+derivation.** It happened four times in one night, counted: a test count that
+existed only in a commit message; a scheduler guarantee asserted for a property
+the original work never claimed; a driver-overhead figure used as though the
+opponent's whole window were accelerator time; and a second-cause census relayed
+by a coordinator who had not derived it, which then failed to reproduce in
+another agent's tree. Every one of them was a real measurement of *something*.
+
+The countermeasure that worked was not more care. It was that each figure was
+eventually asked to state how it was derived, by someone who needed to act on
+it — and the ones that could not state it were the ones that were wrong. So the
+rule the project now runs on is that **a number travels with its derivation or
+it does not travel**, and a recipient who cannot reproduce it says so rather
+than adopting it. Two agents refused a coordinator's figure on exactly that
+ground tonight, and both were right to.
 
 **Report resources and clock beside cycles, always.** A cycle win at a longer
 clock is not a win, and in this flow no resource delta below about 1.5k LUT or
