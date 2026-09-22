@@ -979,8 +979,8 @@ deficit at a shape both machines can run is a tuning result; being unable to
 express the shapes a real workload uses is a capability result, and no amount
 of cycle-level work closes it.
 
-**128x768x768 now runs bit-exactly** -- 14 static instructions, the same 14 the
-machine runs at 8x8x8 -- on the design's own simulator, and 16x128x16 runs in
+**128x768x768 now runs bit-exactly** -- 14 static instructions with the ReLU,
+the same 14 the machine runs at 8x8x8, over 110,976 dynamic issues -- on the design's own simulator, and 16x128x16 runs in
 RTL cosim on the same build that runs the published square sweep. The three
 changes it took, and the one that was expected and turned out not to be needed,
 are on :ref:`tinytpu-margins`:

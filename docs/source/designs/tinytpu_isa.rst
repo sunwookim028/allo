@@ -636,9 +636,10 @@ data**:
   stride resolved in a unit's decode would have changed what a field value
   means.
 
-``isa_dsl.gemm_tiled(M, K, N)`` is the mapping, and it is 14 static
-instructions at every shape from 8x8x8 to 128x768x768 -- the same 14 -- because
-the loop nest counts tiles.
+``isa_dsl.gemm_tiled(M, K, N)`` is the mapping, and it is 13 static
+instructions -- 14 with the ReLU -- at every shape from 8x8x8 to
+128x768x768, the same 13, because the loop nest counts tiles. The dynamic
+stream is what grows: 14 issues at 8x8x8 and 110,976 at 128x768x768.
 
 The fourth address term and the fifth loop level were not needed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
