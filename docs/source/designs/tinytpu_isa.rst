@@ -1143,6 +1143,9 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
      - mutation testing of the verification harness
    * - ``cosim.py``
      - one csynth, then Vitis ``cosim`` per shape on the same RTL
+   * - ``saif_capture.py``
+     - a switching-activity file (SAIF) from a project ``cosim.py`` has
+       already run in (:ref:`tinytpu-isa-saif`)
    * - ``kpn_model.py``
      - a KPN model of the channel graph with bounded FIFOs and deadlock
        reporting
@@ -1225,6 +1228,84 @@ row-count stream), then builds the simulator **once** and runs ``gemm`` and
 The toolchain fixes ``cosim.py`` applies (a plain C++ testbench, ``-B/usr/bin``,
 explicit ``m_axi`` depths, ``alignas(64)`` arrays) are general to any Allo
 dataflow design and are documented in :doc:`/backends/vitis`.
+
+.. _tinytpu-isa-saif:
+
+Switching activity from the cosim run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``saif_capture.py`` writes a **SAIF** -- toggle counts and time-in-state per
+net -- from the same xsim run whose cycle count is published, so an annotated
+power analysis and the cycle figure would describe one workload rather than
+two.
+
+**It does not go in a table, and that is settled.** Power is *absent* from the
+evaluation, for a reason activity annotation does not touch: under
+``sram_mode='none'`` and with no place-and-route, the power from that flow is
+dominated by clock power into flip-flop arrays and by guessed wire
+capacitance, both larger than the effect being measured. Annotation removes
+the default-toggle-rate objection and neither of the other two, so an
+annotated number from this flow would be compromised rather than merely
+imprecise. The cheapest credible energy axis is SRAM macros plus P&R -- the
+same prerequisite that would replace the area methodology wholesale. What this
+script buys is that when that day comes, the activity side is already done and
+is not what is holding it up.
+
+**Where it injects.** Vitis regenerates ``sim/verilog/tinytpu_isa.tcl`` and
+``sim/verilog/run_xsim.sh`` on every ``cosim_design``, so neither is edited:
+an edit would be undone by the next run, and it would make the published cycle
+counts depend on the instrumentation. Instead the script runs *after* a normal
+``cosim.py`` and re-runs **only the xsim step**, from sibling files it writes
+itself (``saif_dump.tcl``, ``saif_xsim.sh``) into a separate snapshot. The one
+change to the elaboration is ``-debug typical``, which is what makes the
+design's internal nets visible to ``get_objects`` at all -- Vitis's
+``-trace_level none`` elaboration carries no debug and ``log_saif`` would see
+nothing. It adds no logic and changes no timing, and the first check below is
+what holds that claim to evidence.
+
+**The DUT instance path**, which a downstream ``read_saif -map_names
+-instance_name`` needs and which is not guessable, because Vitis wraps the
+design in ``apatb_*`` layers:
+
+.. code-block:: text
+
+   apatb_tinytpu_isa_top/AESL_inst_tinytpu_isa
+
+Read out of the elaborated scope tree, not out of the generator. The script
+re-reads it from each SAIF it writes rather than asserting it, since the
+wrapper naming is Vitis's to change.
+
+**What it refuses to report as produced.** A SAIF that is empty, that holds
+only the testbench's nets, or whose counts are all zero annotates *cleanly*
+and yields a beautiful, meaningless power number -- the failure mode this
+project keeps catching, an instrument that succeeds without having run. So
+four things are checked, and ``--selftest`` feeds the content guards the three
+files they exist to reject, in seconds and without Vitis:
+
+1. the latency in ``tinytpu_isa.result.lat.rb`` is byte-identical to the one
+   the original cosim measured. If SAIF logging moved the cycle count, that is
+   a bug in the instrumentation, not a new result;
+2. the RTL output vectors still match the C golden vectors, so the
+   re-simulation computed the workload that is quoted;
+3. the SAIF names instances *inside* the DUT, and most of the activity is in
+   them rather than on its ports;
+4. the toggle counts are not all zero.
+
+.. code-block:: bash
+
+   python saif_capture.py --selftest          # the guards, rejecting bad SAIFs
+
+   TPU_MAXDIM=16 TPU_SHAPES=16x16x16 TPU_PRJ=$PWD/saif_t4.prj python cosim.py
+   python saif_capture.py saif_t4.prj -o <dir>/run.saif
+
+Measured on ``T4_MAXDIM16`` at 16x16x16 (the largest of the five published
+shapes, and so the most representative activity): 685 cycles, unchanged; a
+2 423 170 ps window, 727.7 clocks at 3.33 ns, which is the 685-cycle kernel
+plus the ``s_axi_control`` programming around it; 548 instances and 444 258
+nets, of which 67 633 toggle, for 4 990 787 transitions, 94% of them inside
+the DUT's submodules. All sixteen PEs of the 4x4 array appear with activity,
+and the hottest block is the accumulator's pipeline. The file is 41 MB -- SAIF
+is a per-net summary, so its size follows the net count, not the run length.
 
 .. _tinytpu-isa-verify:
 
