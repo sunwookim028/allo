@@ -394,6 +394,52 @@ Three cycles, at one shape, measured.
 Published is main @ ``476a70d8``: 172 / 262 / 418 / 484 / 686. It reproduces
 exactly wherever the program is the same one, which is the check that matters.
 
+The full five-shape co-design control, measured 2026-09-22 in one run
+(``evaluate.py --codesign``, all five shapes, 272 s of cosim, every testbench
+bit-exact, csynth 2.431 ns):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 14 14 12 46
+
+   * - shape
+     - co-design
+     - published
+     - delta
+     - the nest the mapper chose
+   * - 4x4x4
+     - **169**
+     - 172
+     - **-3**
+     - ``- rows=4`` -- no emitted loops at all
+   * - 8x8x8
+     - 262
+     - 262
+     - 0
+     - ``N2>K2 rows=8``
+   * - 12x12x12
+     - 418
+     - 418
+     - 0
+     - ``N3>K3 rows=12``
+   * - 16x16x8
+     - 484
+     - 484
+     - 0
+     - ``N2>K4 rows=16``
+   * - 16x16x16
+     - **686**
+     - 686
+     - 0
+     - ``N4>K4 rows=16``
+
+This was **predicted before it was measured**, and the prediction is recorded
+because it is the stronger claim: the middle three picks are bit-identical to
+the canonical nest, so their programs are ``gemm_program`` word for word and
+their cycles had to be the published ones; 4x4x4 is the only shape whose space
+is degenerate enough for the picks to differ. Four of five exact, and the fifth
+differing by the amount and for the reason stated.
+
 Those 3 cycles are **real, not sampling**: this cosim is deterministic and the
 five shapes reproduce run after run. They are also the *whole* of what a mapping
 search buys on this hardware, which confirms rather than contradicts what the

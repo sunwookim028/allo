@@ -92,6 +92,13 @@ PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
 #:
 #: Measured 2026-09-22 by this suite (k1) at codesign-loop; bit-exact, csynth
 #: 2.431 ns, BRAM18K 42 / DSP 14 / FF 17481 / LUT 26583.
+#:
+#: All five shapes, measured in one run the same day (272 s of cosim):
+#: 169 / 262 / 418 / 484 / 686. Four of the five ARE the published numbers,
+#: because at 8x8x8, 12x12x12 and 16x16x8 the mapper's pick (`N2>K2 rows=8`,
+#: `N3>K3 rows=12`, `N2>K4 rows=16`) is bit-identical to the canonical nest.
+CODESIGN_CONTROL_ALL = {"4x4x4": 169, "8x8x8": 262, "12x12x12": 418,
+                        "16x16x8": 484, "16x16x16": 686}
 BASELINE_CYCLES = {"4x4x4": 169, "16x16x16": 686}
 #: The whole refusal histogram at the two scored shapes on the shipped design.
 #: Pinned, not just spot-checked: the point of the loop is that these numbers
