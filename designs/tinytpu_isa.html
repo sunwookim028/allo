@@ -1516,6 +1516,31 @@ design <em>before</em> its memories were made derived from <code class="docutils
 longer exists. The current design is <strong>10.6 % smaller</strong> and one cycle faster,
 from the same change that took FPGA block RAM from 42 to 40 — so area and cycles
 now describe the same design.</p>
+<p><strong>Across configurations</strong>, synthesised identically and all closing at 3.33 ns
+(full table and reports: <code class="docutils literal notranslate"><span class="pre">asic_synthesis/</span></code>):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>comparison</p></th>
+<th class="head"><p>cell area</p></th>
+<th class="head"><p>FPGA says</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> 16 → 64, T=4 fixed</p></td>
+<td><p><strong>+64.1 %</strong></p></td>
+<td><p>+2.4 % FF</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">T</span></code> 4 → 8, <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>=64 fixed</p></td>
+<td><p><strong>1.33x</strong></p></td>
+<td><p>–</p></td>
+</tr>
+</tbody>
+</table>
+<p>The first row is the finding: the two substrates disagree about operand space
+by roughly <strong>27x</strong>. On the FPGA it disappears into block RAM and looks nearly
+free; with memories as flip-flops it is most of the design. So off the FPGA,
+<strong>``MAXDIM`` is the expensive knob, not ``T``</strong>. Never quote T=8 against the
+shipped baseline (2.18x) – that changes both at once.</p>
 <p><strong>Four fifths of the cell area is flip-flops</strong>, which is the predicted result
 rather than a surprising one: the scratchpad, the vector registers and the
 accumulator are block RAM on the FPGA and become registers when the flow is told

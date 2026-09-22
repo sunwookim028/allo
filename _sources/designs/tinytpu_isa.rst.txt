@@ -1308,6 +1308,22 @@ longer exists. The current design is **10.6 % smaller** and one cycle faster,
 from the same change that took FPGA block RAM from 42 to 40 — so area and cycles
 now describe the same design.
 
+**Across configurations**, synthesised identically and all closing at 3.33 ns
+(full table and reports: ``asic_synthesis/``):
+
+========================================= ============ ==========
+comparison                                cell area    FPGA says
+========================================= ============ ==========
+``MAXDIM`` 16 → 64, T=4 fixed              **+64.1 %**  +2.4 % FF
+``T`` 4 → 8, ``MAXDIM``\ =64 fixed         **1.33x**    --
+========================================= ============ ==========
+
+The first row is the finding: the two substrates disagree about operand space
+by roughly **27x**. On the FPGA it disappears into block RAM and looks nearly
+free; with memories as flip-flops it is most of the design. So off the FPGA,
+**``MAXDIM`` is the expensive knob, not ``T``**. Never quote T=8 against the
+shipped baseline (2.18x) -- that changes both at once.
+
 **Four fifths of the cell area is flip-flops**, which is the predicted result
 rather than a surprising one: the scratchpad, the vector registers and the
 accumulator are block RAM on the FPGA and become registers when the flow is told
