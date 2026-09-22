@@ -38,8 +38,28 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
 
    Headline, as of 2026-09-19 (``e24e433b``): one hardware build runs every
    shape as data, all five benchmark shapes are bit-exact in RTL
-   co-simulation, and the design takes **172 / 262 / 418 / 484 / 686** cycles
+   co-simulation, and the design takes **171 / 261 / 417 / 483 / 685** cycles
    at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
+   .. note::
+
+      **This row moved by one cycle at every shape on 2026-09-22**, from
+      172 / 262 / 418 / 484 / 686 to **171 / 261 / 417 / 483 / 685**, every
+      testbench still bit-exact. It was caught by the design's own reproduction
+      gate reporting ``DIFFERS`` rather than passing, and confirmed by two
+      independent co-simulation runs in separate processes with separate
+      syntheses, which reproduced it exactly.
+
+      A delta that is **uniform across shapes** is a fixed-cost change rather
+      than a per-work one. It arrives with the design edits that came in with
+      the benchmark work — sizing literals replaced by a derived
+      ``OPERAND_ROWS``, two encoding-ceiling assertions, and a test-window fix.
+      **Which of those saves the cycle is not yet identified**, and this note
+      stays until it is; a number whose mechanism nobody can state is a number
+      on probation, however well it reproduces.
+
+      Earlier figures elsewhere on this site quoting the old row describe the
+      design before those edits, not a disagreement.
+
    ``-m_axi_latency 0``). Measured over the same window on both sides, the
    design is **1.07-1.24x slower** than Gemmini at these five shapes. Over ten
    shapes at ``MAXDIM=64`` the deficit **converges to 1.09x at 64x64x64** at
