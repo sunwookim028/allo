@@ -22,22 +22,29 @@ Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied
    (`{"*": "deny"}`). The MCP tools are all the agent has.
-   `replace_text` / `apply_spec_patch` / `insert_after` reject any path except the two bare
-   file names. That includes a diff that also touches another file, and
+   `replace_text` / `apply_spec_patch` / `insert_after` reject any path except
+   the ones `design.py` names editable -- the fourteen files of the unit
+   library. That includes a diff that also touches another file, and
    `../` paths.
 2. **Frozen files come from git, never from disk.** `evaluate.py` composes a
    fresh evaluation tree for every candidate. The frozen files come from
-   `git show HEAD:...`, the spec directory supplies only the two editable
-   files, and any other file there is ignored. `cosim.py`, `bench_isa.py`,
-   `stress_isa.py`, `isa_ref.py` and `kpn_model.py` are also checked
-   byte-identical to main @ `476a70d8` (`MAIN_BASE` in `evaluate.py`), so the
-   loop measures and verifies the design exactly as main does. `loop.py`
+   `git show HEAD:...`, the spec directory supplies only the editable files
+   (`design.EDITABLE`), and any other file there is ignored. `cosim.py`,
+   `bench_isa.py`, `stress_isa.py`, `isa_ref.py`, `kpn_model.py` and
+   `shapes.py` are also checked byte-identical to main at the DERIVED
+   merge-base of the frozen ref with it (`evaluate.main_base()`; a hand-typed
+   `MAIN_BASE` went stale three times in two days and refused every
+   candidate), so the loop measures and verifies the design exactly as main
+   does. `ip/compose.py`, `ip/params.py` and the package `__init__`s are
+   frozen with them. `loop.py`
    refuses to start if any frozen path is dirty in the working tree.
-3. **Import-time code is policed.** The evaluator imports the two editable
+3. **Import-time code is policed.** The evaluator imports the editable
    files, so `spec_policy.py` (itself executed from git) refuses file I/O,
-   process spawning, `exec`/`eval`, `sys.modules`, dunder attribute access,
-   `os.environ` writes, and any `examples.*` import other than the two spec
-   modules. It runs at edit time and again at evaluation time. It also refuses
+   process spawning, `exec`/`eval`, `sys.modules`, the dunder attributes that
+   reach a namespace, the type graph, a frame or the importer (a deny-list
+   since 2026-09-22: the allow-list of `__name__`/`__doc__` refused the
+   unmodified design's `super().__init__`), `os.environ` writes, and any
+   `examples.*` import other than the design's own modules. It runs at edit time and again at evaluation time. It also refuses
    numpy's file writers (`savetxt`, `tofile`, `save*`, `dump`, `memmap`,
    `.lib`): `test_harness.py` showed `np.savetxt` at import time overwriting the
    tree's stress gate, so an int16-narrowed datapath passed the gate with

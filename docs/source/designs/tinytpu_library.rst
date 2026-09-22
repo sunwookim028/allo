@@ -429,41 +429,48 @@ to different opcodes. Where a field has one meaning in a unit, it is named
 after that meaning, and the per-opcode meanings are one-line comments on the
 declaration.
 
-What this breaks: the CHIA harness
-==================================
+What this cost the CHIA harness, and what it is now
+===================================================
 
-``chia_agent/`` is built on the premise that the design is two files: both
-``allo_tool.EDITABLE`` and ``evaluate.EDITABLE`` are
-``("microarch_isa.py", "isa_dsl.py")``, ``accept.py`` refuses a candidate diff
-touching anything else, the spec directory is flat, and the agent's own
-instructions in ``loop.py`` name those two files. After this refactor a CHIA
-agent can still edit ``microarch_isa.py``, but the hardware is not in it, so it
-cannot change the design at all.
-
-This is **not repaired here**, deliberately: the fix is a change to the spec
-interface of a harness that spends money, and it needs its own change with its
-own review (see :doc:`/extensions/chia`). The adaptation is written --
-``design-modular``'s commit ``4682046a`` adds ``chia_agent/design.py`` as the
-one definition of ``EDITABLE`` and ``FROZEN_DESIGN`` -- and it was landed with
-the design *without* its ``chia_agent/`` half, which is the harness owner's to
-merge onto its own rewrite of ``accept.py``. It is gated rather than silent --
+``chia_agent/`` was built on the premise that the design is two files: both
+``allo_tool.EDITABLE`` and ``evaluate.EDITABLE`` were
+``("microarch_isa.py", "isa_dsl.py")``, ``accept.py`` refused a candidate diff
+touching anything else, the spec directory was flat, and the agent's own
+instructions in ``loop.py`` named those two files. Between this refactor
+landing and the harness adaptation landing, a CHIA agent could still edit
+``microarch_isa.py``, but the hardware was not in it, so it could not change
+the design at all -- and the failure was gated rather than silent, because
 ``chia_agent/test_harness.py`` is the documented $0 preflight for any paid run
-and it fails, because all four of its mutant specs and its ``ANCHOR`` point at
-text that has moved. What has to change:
+and all four of its mutant specs pointed at text that had moved.
 
-1. ``EDITABLE`` in ``allo_tool.py`` and ``evaluate.py``, to the design tree
-   rather than two names;
-2. ``AlloSpecTool``'s flat ``self.sources`` mapping, ``evaluate.compose`` and
-   ``loop.seed_spec``, to carry nested paths;
-3. the allowed-file set in ``accept.py``, and its pinned control blobs;
-4. ``test_harness.py``'s ``MUTANTS`` and ``ANCHOR``;
-5. the file list in the agent prompt in ``loop.py``.
+**Both halves are now on** ``main``. ``chia_agent/design.py`` is the one
+definition of ``EDITABLE`` (14 paths) and ``FROZEN_DESIGN``
+(``ip/compose.py``, ``ip/params.py``, the package ``__init__``\ s), and the
+harness reads it everywhere. What changed, which is also the list of what any
+future move of a design file has to keep true:
 
-``chia_agent/param_check.py`` and ``gate_runner.py`` need no change: they work
-through ``microarch_isa``'s module attributes, which are unchanged.
+1. ``EDITABLE`` is ``design.py``'s list of paths, imported by ``allo_tool.py``,
+   ``evaluate.py``, ``loop.py``, ``accept.py`` and ``test_harness.py``;
+2. ``AlloSpecTool``'s ``self.sources``, ``evaluate.compose`` and
+   ``loop.seed_spec`` carry nested paths, and ``read_spec()`` lists the files
+   rather than concatenating fourteen of them;
+3. ``accept.py`` refuses a diff outside ``set(EDITABLE)``, and a control
+   record's identity is every editable file's blob;
+4. ``test_harness.py``'s mutants name the unit they break
+   (``ip/units/{scratchpad,pe,dma_load,sequencer}.py``) and ``ANCHOR`` is
+   ``import os`` in ``microarch_isa.py``;
+5. ``loop.py``'s prompt tells the agent to prefer editing ONE unit;
+6. ``spec_policy.ALLOWED_EXAMPLES`` names the package's modules -- a literal,
+   since the policy is exec'd from git and a candidate must not be able to
+   widen it, with a test that it equals ``design.IMPORTABLE_MODULES`` -- and
+   the documentation budget became the candidate's rather than each file's,
+   which on fourteen files was fourteen times the guard.
 
-``impact/make_variants.py`` is textually coupled the same way -- it builds the
-historical ablation variants by patching ``microarch_isa.py`` -- and is equally
-stale. Its measurements are recorded on :doc:`tinytpu_history`; regenerating
+``chia_agent/param_check.py`` and ``gate_runner.py`` needed no change: they
+work through ``microarch_isa``'s module attributes, which are unchanged.
+
+``impact/make_variants.py`` was textually coupled the same way -- it built the
+historical ablation variants by patching ``microarch_isa.py`` -- and is
+deleted. Its measurements are recorded on :doc:`tinytpu_history`; regenerating
 them would want the variants expressed as alternative *architectures* over the
 same units, which is the first thing the library makes possible.

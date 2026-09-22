@@ -35,6 +35,16 @@ Co-design Record: The Mapspace Refusal Histogram, Per Machine
    histogram is a count of loop nests. See :doc:`/extensions/codesign` for the
    loop, :doc:`/extensions/act` for why the mapper looks like this.
 
+   **Since this was measured the design moved twice**, and the histogram did
+   not: the derived memory sizing took one cycle off every shape
+   (``05169938``), and the decomposition into a unit library
+   (:doc:`/designs/tinytpu_library`) changed no number at all. The co-design
+   control on ``main`` today is **168 / 261 / 417 / 483 / 685** through
+   ``codesign_cosim`` (``control.PUBLISHED``, measured by a no-diff
+   ``accept.py --codesign`` run), against **169 / 262 / 418 / 484 / 686** here;
+   every refusal count, the chosen nest and the 3-of-1,226 below reproduce
+   exactly, which is what ``test_codesign.py`` k1 and k2 check on every run.
+
 What is being counted
 =====================
 

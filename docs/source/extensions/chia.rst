@@ -82,11 +82,13 @@ Contributions
   agent found the hole each closes -- mean a win is accepted only when real
   RTL measures it, which is why a worker's false win claim re-scored as
   exactly baseline.
-- **A pre-registered search result.** The unguided ``open`` arm, told only to
-  choose its own target from the numbers, independently reached the same
-  address-generator widening that directed analysis had found, with the
-  refusal bottleneck migrating and cycles flat exactly as predicted in
-  advance.
+- **A pre-registered prediction, reported against.** Run 2's outcome -- both
+  arms passing every gate, the encodable-nest count up, the chosen nest and
+  the cycles unmoved, area up -- is what was written down before the run. It
+  is not evidence that the loop found the idea: the unguided ``open`` arm's
+  prompt quoted the address-generator widening it then made, its histogram is
+  identical to the test fixture for that change, and both arms shared a system
+  message stating the diagnosis (``dev/records/codesign_mapspace.rst``).
 - **Why agent-built compiler extensions are hard to evaluate.** A new
   primitive has no callers, so an agent-implemented one scored neutral *and*
   passed 291 tests while aborting the compiler on first use -- any gate ladder
@@ -109,7 +111,9 @@ How the loop is built
                                       |  port per worker; opencode's own
                                       |  file and shell tools are denied
                                       v
-          read_spec    replace_text    apply_spec_patch    evaluate
+       read_spec  read_reference  replace_text  apply_spec_patch
+       insert_after  run_functional_check  score_cycles
+       (+ mapspace_report in the co-design mode)
                                       |
         EDITABLE  the design           |   FROZEN  reference model, gates,
                                       |           evaluator, acceptance
@@ -121,12 +125,13 @@ How the loop is built
                                       |  nonce-vouched verdict:
                                       |  cycles + area + clock
                                       v
-           accept.py: against a control measured in the same run
-                      win  |  not-better  |  rejected
+           accept.py: against a control measured in the same run,
+                      by the same driver
+           win  |  not-better  |  rejected  |  no-control
                                       |
                                       v
-           evidence/     spend read from opencode's database,
-                         capped per run and in total
+       dev/records/     spend read from opencode's database, per run by
+                        the run's own sessions and in total per account
 
 Two dispositions share this shape. **Using** edits the design with Allo's
 abstractions as they stand (``chia_agent/``, on ``main``). **Maintaining**
@@ -210,17 +215,28 @@ Editable vs. frozen
      - files
      - how it is enforced
    * - **editable**
-     - ``microarch_isa.py``, ``isa_dsl.py``
-     - The agent edits a private copy in ``<run>/<worker>/spec/``, never the
-       repository.
+     - the fourteen paths ``chia_agent/design.py`` names: the eight units
+       under ``ip/units/``, the wiring ``ip/tinytpu.py``, the ISA ``ip/isa.py``,
+       the assembler, the programs, ``microarch_isa.py`` (the parameter set)
+       and ``isa_dsl.py`` (the program generator)
+     - The agent edits a private copy in ``<run>/<worker>/spec/``, which
+       mirrors the package, never the repository. ``read_spec()`` with no
+       argument lists the files; ``read_spec(path=...)`` reads one.
    * - **frozen**
      - main's ``cosim.py`` (testbench, ``SHAPES``, golden reference, every
        Vitis/TCL setting), ``bench_isa.py``, ``stress_isa.py``,
        ``isa_ref.py``, ``kpn_model.py``; and ``chia_agent/``'s
        ``evaluate.py``, ``gate_runner.py``, ``param_check.py``,
        ``spec_policy.py``
-     - Read from git, never from disk; main's five files must also be
-       byte-identical to ``MAIN_BASE`` (``476a70d8``) in ``evaluate.py``.
+     - Read from git, never from disk; the design's own evaluator must also
+       be byte-identical at the frozen ref's **merge-base with main**, which
+       ``evaluate.main_base()`` derives (``CHIA_MAIN_BASE`` overrides it for a
+       held-out ref). It was a hand-typed hash until 2026-09-22 and went stale
+       three times in two days, each time refusing every candidate at stage
+       ``setup``. ``ip/compose.py``, ``ip/params.py`` and the package
+       ``__init__``\ s are frozen too: the composer uses ``exec`` and ``open``,
+       which a spec may not contain, and the parameter invariants are not the
+       candidate's to relax.
 
 Because ``isa_ref.py`` is frozen and ``stress_isa.py`` checks programs against
 it, **what each instruction means is part of the contract**: the agent may
@@ -264,9 +280,30 @@ Mechanical enforcement, not instructions:
    frozen path.
 3. **Static policy** (``spec_policy.py``, executed from git, at edit time and
    again at evaluation): no file I/O or numpy file readers/writers, process
-   spawning, ``exec``/``eval``, ``sys.modules``, dunder or frame walking,
+   spawning, ``exec``/``eval``, ``sys.modules``, frame walking,
    ``SystemExit``/``exit``, or assignment to an attribute of an imported module
-   or an alias of one.
+   or an alias of one. A candidate may not, net, delete more than
+   ``DOC_LOSS_MAX`` lines of documentation -- per file at edit time, and across
+   the whole candidate at evaluation, since fourteen files at the per-file
+   budget would be fourteen times the guard.
+
+   **The dunder rule is a deny-list.** It was an allow-list of ``__name__``
+   and ``__doc__``, which refused the *unmodified* design -- ``isa_dsl.py``'s
+   ``NestError`` calls ``super().__init__(message)`` -- so every candidate died
+   at stage ``policy`` before a gate ran. What is dangerous in a dunder is not
+   that it is a dunder but that a few of them return something the policy
+   cannot otherwise see: a namespace (``__dict__``, ``__globals__``,
+   ``__builtins__``, ``__closure__``, ``__code__``), the type graph
+   (``__class__``, ``__bases__``, ``__mro__``, ``__subclasses__``), name-based
+   attribute access that bypasses the denied-attribute list
+   (``__getattribute__``, ``__setattr__``), the import machinery, pickling's
+   callables, and frames. Those are denied by name; ordinary Python is not.
+   The cost of the inversion, stated plainly: a reaching dunder that is not on
+   the list now passes this layer, where the allow-list would have refused it.
+   It is the first of four layers -- the sandbox, the vouched verdicts and the
+   byte-for-byte tree comparison stand behind it -- and ``test_harness.py``'s
+   phase ``s`` checks that every denied name, and each of seven classic
+   escapes spelled the way an agent would write them, is still refused.
 4. **Sandbox.** Every process that imports the candidate runs under ``bwrap``:
    read-only filesystem and tree, only the work directory writable, own PID
    namespace. The tree and the checkout's tracked files are compared byte for
@@ -284,8 +321,12 @@ Mechanical enforcement, not instructions:
    check's *return value*, and ``numpy``/``allo`` are frozen against
    monkeypatching for the duration; only then is ``CHIA-GATE <check> OK
    <nonce>`` printed, and the evaluator requires that line.
-6. **Parametricity.** The scored configuration is T=4, MAXDIM=16, so a design
-   specialised to it would pass everything. ``param_check.py`` rebuilds the
+6. **Parametricity.** The scored configuration is T=4, MAXDIM=16, **pinned**
+   by ``evaluate.SCORED`` in every evaluation rather than left to the design's
+   default (which moved to MAXDIM=64, at which point ``check_invariants``
+   refused every candidate, the unmodified control included); ``reproduce.sh``
+   pins the same point for the same reason. A design specialised to the scored
+   point would pass everything. ``param_check.py`` rebuilds the
    candidate at ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and
    ``TPU_T=8 TPU_MAXDIM=32``, requires the build to report that configuration,
    and requires every GEMM shape of it (full-range, corner and boundary
@@ -305,10 +346,12 @@ Mechanical enforcement, not instructions:
    `Earlier measurements and corrections`_.
 7. **Documentation.** A candidate may not remove, net, more than 15 lines of
    comments and docstrings against the frozen file; rewording is free.
-8. **Memory model and premises.** Every ``TPU_*`` variable but the project path
-   is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness), T == 4,
-   MAXDIM == 16, the 3.33 ns target, and each shape's own cosim log and
-   simulated time must agree with the reported cycles.
+8. **Memory model and premises.** Every ``TPU_*`` variable but the project
+   path and the scored configuration is scrubbed before cosim
+   (``m_axi_latency`` 0, as Gemmini's harness), the build must report T == 4
+   and MAXDIM == 16 under that pin, the 3.33 ns target must be met, and each
+   shape's own cosim log and simulated time must agree with the reported
+   cycles.
 9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
    swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
    authentication.
@@ -323,7 +366,7 @@ Mechanical enforcement, not instructions:
     processes are sandboxed to their work directory (guard 4) and so cannot
     write a control record either, and the control's cosim verdict is
     nonce-vouched (guard 5) like every other. ``accept.json`` records it as
-    ``control`` -- cycles, the two editable files' blob ids, the ref, the
+    ``control`` -- cycles, the editable files' blob ids, the ref, the
     estimated clock, the wall time, when it was measured -- so an accepted
     result can be re-derived against the same control.
     ``--control <control-run>/accept.json`` reuses one control for the rest of
@@ -353,7 +396,7 @@ Mechanical enforcement, not instructions:
 
     ``control.RECORDED`` and the published numbers are a **cross-check**, not
     the control. They used to *be* the control, keyed by the blob ids of the
-    two editable files -- and a prose-only edit to ``microarch_isa.py``
+    editable files -- and a prose-only edit to ``microarch_isa.py``
     (docstring corrections, two dead constants) moved the key, so acceptance
     reported ``no-baseline`` and could accept nothing. Failing closed was
     right; keying a control on a file's bytes was not. As a cross-check the
@@ -422,7 +465,9 @@ Environment (once): the ``allo`` env with this checkout's ``mlir/build``,
    conda activate chia_env; set -a; source chia.env; set +a
    ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
    cd examples/accelerator/tinytpu_vitis/chia_agent
-   python test_harness.py --phases e,c    # ~1 min, $0; full suite ~30 min, $0
+   python test_harness.py --phases s      # the static guards alone, seconds
+   python test_harness.py                 # everything, ~40 min, $0
+   python test_codesign.py                # the co-design half, ~7 min, $0
    python preflight.py --budget-usd 30    # the gate alone, $0
    python swarm.py --workers 2 --iterations 3 --budget-usd 30
    python accept.py --out <run>/control                 # the run's control, once
@@ -446,17 +491,41 @@ in ``billing.json`` (opencode stores no GCP project with a session). These are
 opencode's figures from its price table, not the invoice; the remaining credit
 is only in the Cloud Console.
 
+**The per-run cap is per RUN.** It was ``spend.spent_since(t0)``, a time
+window over opencode's database, which holds every CHIA run on the host: with
+two tracks live it counted the other one's spending and stopped the wrong run.
+Run 2 was stopped after two of five iterations at "spent $52.60 + next call
+~$23.26 would pass the $64.50 cap" when its own six sessions had cost $47.65
+and its largest single call $11.06. Every session a worker opens now carries
+the run's tag (``opencode run --title "chia-run <run>@<t0> [<worker>]"``), and
+``spend.run_spend`` sums exactly those, for the loop's cap and for the swarm's
+hard cap alike; the account-wide window stays in the summary as context. The
+CUMULATIVE cap (``CHIA_TOTAL_CAP_USD``) is correctly account-wide, because the
+account is shared. **No cap reads ``usage``**: a call that hits opencode's
+40-minute timeout returns no session id and reports $0.00 while being billed
+in full -- $22.17 in run 1, and every one of run 2's six calls -- so money is
+read from the database, and a timed-out session is found by the title it
+carries.
+
 ``test_harness.py`` runs the whole harness with no LLM (a scripted
 OpenAI-compatible model on localhost; every cloud credential variable is
-cleared): **control** the control record a claim may rest on and its
+cleared): **s** the static guards -- the spec policy against the shipped
+design and against every denied dunder, the derived main base and its drift
+check, the pinned scored configuration, and the per-run cap's attribution
+against a fabricated database, including a call that timed out; **control**
+the control record a claim may rest on and its
 cross-check; **e** frozen-file and import-time attacks, forged verdicts,
 sandbox, and that a candidate can neither write nor fake a control record;
 **c** an int16 partial sum rejected by stress; **g** the
 parametricity and documentation guards; **d** a deadlock killed at 240 s;
 **abf** no-op and a slower design scored concurrently; **loop** the real
 ``swarm -> loop -> opencode -> MCP`` path; **accept** ``accept.py`` on a
-correct-but-slower diff, against a control measured in that same run. 57/57
-at landing (``dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/``).
+correct-but-slower diff, against a control measured in that same run.
+GUARD_SUITE_COUNT. ``test_codesign.py`` is the co-design half's own $0 suite
+(k1-k8: a no-op reproducing the control and the whole refusal histogram, a
+widening that unlocks nests, an encoder loosened by deleting a check, the same
+check made vacuous, a broken seam, a broken datapath, a program outgrowing
+IMEM_SIZE, and the frozen half attacked).
 
 First paid run, 2026-09-19
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -554,8 +623,13 @@ The evidence behind the takeaways at the top of this page, one line per claim.
   passed every gate and raised the encodable count -- 3 to 8 for the directed
   arm, 3 to 7 for the unguided ``open`` arm -- while the chosen nest, and
   therefore the cycles, did not move and area rose. The ``open`` arm's first
-  attempt made 16 nests encodable that computed the **wrong answer**, and the
-  reference-model sweep caught all 16.
+  attempt made 17 nests encodable at 16x16x16, **10 of which computed the
+  wrong answer** (including the one the mapper would have picked), and the
+  reference-model sweep caught every one. What the run does **not** show is a
+  discovery: both arms' encodability gain is the address-term widening their
+  prompts had already measured for them, and the directed arm's vanished
+  ``acc-peel`` refusals are the same 1,150 nests under a renamed error
+  (``dev/records/codesign_mapspace.rst``).
 - **The retired ``chia-codesign`` claims C1-C8** replay deterministically,
   including the two agent-found variants (4.07x and 1.98x) at exact numerics.
 
@@ -571,10 +645,23 @@ The evidence behind the takeaways at the top of this page, one line per claim.
 - **Novelty.** The burst widening is a sensible engineering change, not a
   discovery.
 
-**Known defects, being repaired.** Run 2 was stopped after 2 of 5 iterations by
-a per-run cap that summed the whole account rather than its own sessions. The
-$0 guard suite, 57 cases at landing, does not currently pass (one stale
-assertion, one crash in the loop phase).
+**Repaired 2026-09-22.** Run 2 was stopped after 2 of 5 iterations by a
+per-run cap that summed the whole account rather than its own sessions; the
+cap now sums the sessions the run's own tag names (`Running it`_), and nothing
+in the harness prices a call from ``usage``. The $0 guard suite passes:
+GUARD_SUITE_COUNT. Four other faults that stopped every candidate before a
+gate ran are fixed with it: a hand-pinned ``MAIN_BASE`` (derived), an
+unpinned scored configuration (``SCORED``), the spec policy's dunder
+allow-list refusing the unmodified design (a deny-list), and the harness's
+own assumption that the design is two files (``design.py``).
+
+**Known defects, open.** Every model call in run 2 hit opencode's 40-minute
+timeout, so no candidate in it is an agent's finished answer. And the mapspace
+refusal *histogram* takes its category names from exception text in
+``isa_dsl.py``, which the candidate may edit, so a candidate can move nests
+between categories without relieving them -- the encodable count cannot be
+moved that way, since every counted nest is proved against ``isa_ref``, but a
+histogram quoted by category needs the ``other:`` bucket quoted beside it.
 
 The Planned Experiments
 -----------------------
@@ -589,9 +676,11 @@ question. Cumulative spend was $28.54 when the split was made.
 
 The gate enforces ``CHIA_TOTAL_CAP_USD`` as a *cumulative* ceiling on
 ``chia2026_spend()`` and cannot tell two concurrent tracks apart, so a track's
-share is honoured by that track setting its own ceiling. Two tracks drawing on
-one account means a track that sees spend climbing faster than its own runs
-explain is seeing the other track, not an accounting bug.
+share is honoured by that track setting its own ceiling; that ceiling is
+correctly account-wide, because the account is shared. The *per-run* cap is
+not: it counts the sessions this run's tag names, so a track that sees the
+account's spend climbing faster than its own runs explain is seeing the other
+track, and its own runs are no longer stopped by it.
 
 The one thing every experiment below is designed to fix
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

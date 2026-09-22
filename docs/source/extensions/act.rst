@@ -850,7 +850,7 @@ The Co-design Loop This Argues For
 .. note::
 
    **It is built.** See :doc:`/extensions/codesign` for the loop as it exists,
-   its frozen/editable split, its measured control (169 / 686) and its
+   its frozen/editable split, its measured control (168 / 685) and its
    ``$0`` test suite. What follows is the argument that produced it; every
    point below is now enforced mechanically rather than stated.
 

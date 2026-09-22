@@ -100,8 +100,9 @@ What is editable, and what is frozen
        ``_MAX_STATIC``, the intrinsic tile) and ``isa_dsl.py`` (the encoder,
        including ``gemm_from_nest``)
      - the agent edits a private copy under ``<run>/<worker>/spec/``, never the
-       repository, and only through three MCP tools that refuse any path but
-       those two bare names
+       repository, and only through MCP tools that refuse any path outside
+       ``chia_agent/design.py``'s list -- the fourteen files of the unit
+       library since the decomposition (:doc:`/designs/tinytpu_library`)
    * - **frozen**
      - ``chia_agent/mapspace.py`` -- **the mapper: its enumerator, its
        selection rule and its objective** -- plus ``codesign_gate.py``,
@@ -111,9 +112,10 @@ What is editable, and what is frozen
        ``gate_runner.py``, ``evaluate.py``, ``spec_policy.py``
      - ``evaluate.py`` composes a fresh evaluation tree per candidate, with
        every frozen file read from ``git show`` and never from disk; the design
-       evaluator is additionally checked byte-identical to main @ ``MAIN_BASE``;
-       the two spec files are the only thing taken from the spec directory and
-       anything else there is **ignored**; every candidate process runs under
+       evaluator is additionally checked byte-identical to main at the frozen
+       ref's derived merge-base with it; the files ``design.EDITABLE`` names
+       are the only thing taken from the spec directory and anything else
+       there is **ignored**; every candidate process runs under
        ``bwrap`` and the tree is re-hashed after each stage
 
 The agent may **read** the mapper (``read_reference("mapspace.py")``). It should
@@ -223,12 +225,15 @@ rebinding, and only then prints the line the evaluator requires.
 The control
 ===========
 
-``accept.py``'s ``BASELINES`` table is keyed on the git blob of the two spec
-files, so prose-only edits invalidate it. The co-design loop therefore
-**measures its control in the same run**: ``loop.py`` iteration 0, and
-``test_codesign.py`` case k1.
+A control keyed on the design's blobs is invalidated by a prose-only edit,
+which is why the loop **measures its control in the same run** -- ``loop.py``
+iteration 0, and ``test_codesign.py`` case k1 -- and why ``control.py``'s
+published rows are a cross-check on that measurement rather than the control
+itself (:doc:`/extensions/chia`, guard 10).
 
-Measured 2026-09-22, unmodified design, same environment and tool state:
+Measured 2026-09-22 on ``main`` after the decomposition, by
+``accept.py --codesign`` with no diff (a clean worktree, its own bindings,
+all five shapes bit-exact):
 
 .. list-table::
    :header-rows: 1
@@ -239,24 +244,27 @@ Measured 2026-09-22, unmodified design, same environment and tool state:
      - published
      - why
    * - 4x4x4
-     - **169**
-     - 172
+     - **168**
+     - 171
      - N/T = K/T = 1, so the enumerator offers a nest with no emitted loops
        while the hand-written program keeps a trip-count-1 ``loop``/``endloop``
        pair around the output body: 24 words against 28, the same 4 dynamic
        issues, 3 fewer cycles. Bit-exact.
    * - 16x16x16
-     - **686**
-     - 686
+     - **685**
+     - 685
      - the mapper's pick **is** the canonical nest, so the program under the RTL
        is ``gemm_program`` word for word.
 
-The published column is main @ ``476a70d8``: 172 / 262 / 418 / 484 / 686. It
-reproduces exactly wherever the program is the same one, which is the check that
-matters -- the 4x4x4 difference is the mapper finding a better program, not the
-tools moving.
+The published column is ``reproduce.sh``'s row for the shipped design,
+171 / 261 / 417 / 483 / 685; the co-design row is 168 / 261 / 417 / 483 / 685.
+It reproduces exactly wherever the program is the same one, which is the check
+that matters -- the 4x4x4 difference is the mapper finding a better program,
+not the tools moving. (Both rows were one cycle higher at every shape until
+the memory sizing landed, which is what a cross-check is for: the numbers move
+together, for a stated reason, or the run is not trustworthy.)
 
-Resources at that build, ``csynth``: BRAM18K 42, DSP 14, FF 17,481, LUT 26,583,
+Resources at that build, ``csynth``: BRAM18K 40, DSP 14, FF 17,075, LUT 26,558,
 URAM 0, estimated clock 2.431 ns against the 3.33 ns target.
 
 
@@ -302,14 +310,16 @@ covers the design-level loop; this covers only what the co-design loop adds.
      - what it does
      - expected
    * - k1
-     - a no-op (re-save the two files)
+     - a no-op (re-save the design)
      - reproduces the control exactly: the cycles, and the **whole** pinned
        refusal histogram and chosen nest at both shapes
    * - k2
      - a real hardware widening: ``AGU_TERMS`` 3 -> 4 with the AGU word
-       repacked from three 19-bit terms to four 16-bit ones, in all five places
-       the 19 was a literal (encoder, sequencer kernel, ``expand``,
-       ``check_program``)
+       repacked from three 19-bit terms to four 16-bit ones: the two layout
+       constants in ``ip/isa.py``, the stride assertion, and the sequencer,
+       whose Allo kernel spells the width out and must declare the ISA name it
+       decodes. Defined once, in ``histogram.py``, which is what the record's
+       variants were measured with
      - the gate passes and the **encodable count rises**, 3 -> 7 at 16x16x16,
        with ``agu-terms`` going to 0 and the next constraint appearing. A
        fixture for the harness, not a recommendation
