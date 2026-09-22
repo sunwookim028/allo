@@ -571,9 +571,11 @@ Two things fall out of the left column before the model is even discussed.
 **The five published cycle counts reproduce exactly** -- 172 / 262 / 418 /
 484 / 686 -- through a testbench that compares all 256 bytes of ``C`` against
 ``isa_ref.run`` rather than only the ``M x N`` region, which is a stricter
-check than the one the published numbers come from. And the corpus's two
-non-GEMM cases run on real RTL: ``batched_matmul_2x4x4x4`` at 209 cycles and
-``row_reduce_16x16`` at 371, both with 0 of 256 bytes wrong.
+check than the one the published numbers come from. And two of the corpus's
+three non-GEMM einsums run on real RTL: ``batched_matmul_2x4x4x4``
+(``bmk,bkn->bmn``) at 209 cycles and ``row_reduce_16x16`` (``mk->m``) at 371,
+both with 0 of 256 bytes wrong. The third, ``relu_16x16`` (``mn->mn``), is
+:ref:`the one that does not <act-specs-rtl-hang>`.
 
 On the model: **in sample, max error 9.2% over the five points it is fitted
 to; out of sample, max error 13.9% and mean absolute error 6.0% over the five
