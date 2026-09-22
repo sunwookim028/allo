@@ -639,54 +639,60 @@ obviously-worse, not a ranking.
 What the expensive judge found that nothing cheaper did
 -------------------------------------------------------
 
-``relu_16x16`` -- the pointwise spec, ``mm`` against a host-placed identity
-with ``vrelu`` and ``mvout`` inside the output loop -- **passes csim with 0 of
-256 bytes wrong and then does not complete in RTL.** Measured in this session:
-Vitis' C simulation of the same testbench prints
-``TB relu_16x16 mismatches = 0 / 256``, and the RTL co-simulation was still at
-``Inter-Transaction Progress 0 / 1`` at simulation time 109,000 ns -- about
-33,000 cycles against an estimate of 484 -- when it was stopped.
+**Two of the programs the judge was given pass every cheap check and then do
+not complete in RTL**: ``relu_16x16``'s submission, and the ``row_blocked``
+variant of ``gemm_8x8x8``. For both, ``check_program`` accepts, ``kpn_model``
+reports minimum channel depth 1 and no deadlock, the Allo simulator is
+bit-exact against ``isa_ref``, and Vitis csim reports 0 of 256 bytes wrong --
+and then ``cosim_design`` never finishes the transaction.
 
-Everything cheaper passes it: ``check_program`` accepts it, ``kpn_model.run``
-reports ``minimum channel depth 1`` and no deadlock, the Allo simulator gives
-bit-exact agreement with ``isa_ref`` on four operand distributions twice over,
-and csim agrees too.
+What that looks like, and what it does not: a completing run of the same
+design prints two progress lines and a ``$finish`` --
+``0 / 1 @ "109000"``, then ``1 / 1 @ "777000"``, then
+``$finish called at time : 796590 ps`` for a 198-cycle program. A hanging run
+prints the **first** line and never the second. ``109000`` is picoseconds and
+is simply where Vitis makes its first periodic report, so it is the same
+number in every log, passing or hanging; it is not where the design stops, and
+nothing here locates the stall. No deadlock is reported by Vitis' own detector,
+so this page does not call it one.
 
-``act/relu_hang_repro.py`` brackets it (``logs/cosim_act_relu_hang.log``, one
-csynth and four cosims in this session, ``ACT_COSIM_TIMEOUT=240``):
+The full characterisation, the bisection, and the two hypotheses it rules out
+are :ref:`item 24 <limitation-24>` of the limitations register, with the repro
+in ``tests/limits/item24_cosim_hang.py`` and the family in
+``act/rtl_hang.py``. The part that belongs here is what it does to the judge.
+
+Three tiers, and an estimate is not one of them
+-----------------------------------------------
+
+The consequence for this judge is that **"is it fast" has a tier above it:
+does it run on RTL at all**, and the cheap gate cannot see that tier. So a
+result now says which tier it reached:
 
 .. list-table::
    :header-rows: 1
-   :widths: 34 22 44
+   :widths: 16 84
 
-   * - program
-     - cosim
-     -
-   * - the submission, as generated
-     - **hangs** at 109,000 ns
-     - ``mm``, ``vrelu``, ``mvout`` in a loop over the four column blocks
-   * - the same, ``vrelu`` removed
-     - **459 cycles**, 0/256 wrong
-     - one instruction different, and it completes
-   * - the same, loop unrolled
-     - **hangs** at 109,000 ns
-     - so it is not the hardware loop
-   * - ``gemm_relu_16x16x16``
-     - **750 cycles**, 0/256 wrong
-     - ``vrelu`` in a loop is not sufficient on its own
+   * - tier
+     - what has been shown
+   * - ``legal``
+     - ``check_program``, the ``assemble`` limits, ``kpn_model``, and the
+       spec's write window accept the program
+   * - ``correct``
+     - it computes the spec, bit-exact, on the Allo simulator against
+       ``isa_ref``
+   * - ``confirmed``
+     - Vitis cosim ran it to completion and produced a cycle count
 
-The hang is deterministic: both hanging forms stop at exactly 109,000 ns of
-simulation time. Deleting the single ``vrelu`` from an otherwise identical
-program is the whole difference between 459 cycles and never finishing, and
-unrolling the loop changes nothing, so the hardware loop is not involved. But
-``gemm_relu_16x16x16`` runs the same three opcodes in the same order inside the
-same loop and completes, so ``vrelu`` alone is not the condition either. The
-remaining structural difference between the two -- that the failing program's
-``vrelu`` follows a single non-accumulating ``mm`` while the working one's
-follows a chain of accumulating ones -- is a hypothesis these four runs do not
-test. Naming the blocked process is RTL debugging and belongs to
-:doc:`/designs/tinytpu_isa`, not here; what belongs here is that the judge
-found it, bracketed it in four runs, and did not hang doing so.
+``judge.py fast`` without ``--cosim`` prints in as many words that nothing it
+listed is confirmed; with ``--cosim`` it carries a ``tier`` column and exits
+nonzero naming anything the RTL did not finish -- **rankable, not pickable**.
+``calibrate.py`` marks the same thing. This is the convention ``act_compile.py``
+adopted on ``main`` (*encodable* versus *confirmed*), followed rather than
+reinvented.
+
+A cycle *estimate* is deliberately not on that ladder. Both hanging programs
+have estimates -- 484 and 264 cycles -- and a gate that ranked on them would
+have preferred one of them to a program that runs.
 
 This is the reason the judge has an expensive tier at all, and it is a
 concrete instance of what :doc:`/designs/tinytpu_isa` calls cosim's role as a
