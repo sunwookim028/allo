@@ -350,7 +350,8 @@ def gemm_tiled(M, K, N, Mt=None, relu=False):
     instruction set, are what decide the DRAM traffic.
 
     What it buys is that nothing here grows with M, K or N: the static
-    program is the same 14 instructions at 16x16x16 and at 128x768x768, the
+    program is the same 13 instructions -- 14 with the ReLU -- at 16x16x16
+    and at 128x768x768, the
     deepest nest is 3 of the 4 hardware loop levels, and **no instruction needs
     more than 2 of the 3 address terms**. The fourth term and the fifth loop
     level that were expected to be needed for large shapes are needed for a
