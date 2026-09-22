@@ -24,7 +24,7 @@ identically. It is not an ASIC verdict on any of them.
 | T=4, MAXDIM=16, shipped (`T4_MAXDIM16_shipped_baseline`) | **1,136,598** | 906,098 (79.7%) | 230,501 | 200,561 | **+0.21 ns** | 0 | 37 min |
 | T=4, MAXDIM=64, shipped (`T4_MAXDIM64_shipped`) | **1,865,314** | 1,503,790 (80.6%) | 361,524 | 333,189 | **+0.21 ns** | 0 | 56 min |
 | T=8, MAXDIM=64 (`T8_MAXDIM64`) | **2,481,926** | 1,982,554 (79.9%) | 499,371 | 438,922 | **+0.20 ns** | 0 | 72 min |
-| T=4, MAXDIM=64, burst-widened, banked (`T4_MAXDIM64_burstwiden`) | see below | | | | | | |
+| T=4, MAXDIM=64, burst-widened, **banked** (`T4_MAXDIM64_burstwiden`) | **3,254,024** | 2,628,257 (80.8%) | 625,767 | 581,616 | **+0.21 ns** | 0 | 98 min |
 | *superseded* — an earlier export, before memories were derived from MAXDIM (`superseded_export_T4_MAXDIM16`) | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | +0.18 ns | 0 | 47 min |
 
 Every run: identical settings, all close timing at 3.33 ns, all about 80%
@@ -38,6 +38,15 @@ versions.
 | --- | --- | --- |
 | operand space, MAXDIM 16 → 64 | shipped vs shipped, T=4 fixed | **+64.1%** cell area (+65.9% non-comb, +56.9% comb) |
 | array size, T 4 → 8 | MAXDIM=64 fixed | **1.33x** cell area |
+| burst widening | `T4_MAXDIM64_shipped` vs `T4_MAXDIM64_burstwiden`, MAXDIM=64 fixed | **+74.4%** cell area (+74.8% non-comb, +73.1% comb) |
+
+The burst-widening row is the design decision this set exists for. It buys
+−720 cycles at 48³ and −960 at 64³ — 55-61% of the steady-state deficit
+against Gemmini — for **+74.4% cell area here**, against Vitis's +43% FF and
++92% BRAM for the same change. As everywhere in this table, the BRAM axis is
+what cell area renders, so +74.4% is the flip-flop-memory price of the
+widening and not the price a design with SRAM macros would pay. Compare it
+only against `T4_MAXDIM64_shipped`: the pair differs in the widening alone.
 
 **Never quote `T8_MAXDIM64` against the MAXDIM=16 baseline** (2.18x) without
 naming both changes: that ratio is the array doubling *and* the fourfold
