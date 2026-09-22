@@ -1,0 +1,23 @@
+GEMMINI DIM=4 elem_t_bytes=1
+TILES 4x4x4 tile=1,1,1  I0J0K0=1,1,1  loop_ws_calls=1
+TILES 8x8x8 tile=2,2,2  I0J0K0=1,1,1  loop_ws_calls=1
+TILES 12x12x12 tile=3,3,3  I0J0K0=1,1,1  loop_ws_calls=1
+TILES 16x16x8 tile=4,2,4  I0J0K0=1,1,1  loop_ws_calls=1
+TILES 16x16x16 tile=4,4,4  I0J0K0=1,1,1  loop_ws_calls=1
+BARE 4x4x4 161
+BARE 4x4x4 144
+BARE00 4x4x4 160
+BARE 8x8x8 220
+BARE 8x8x8 218
+BARE 12x12x12 347
+BARE 12x12x12 344
+BARE 16x16x8 391
+BARE 16x16x8 390
+BARE 16x16x16 593
+BARE 16x16x16 590
+DONE
+[UART] UART0 is here (stdin/stdout).
+- /home/sk3463/chipyard/sims/verilator/generated-src/chipyard.harness.TestHarness.Int8Dim4GemminiRocketConfig/gen-collateral/TestDriver.v:158: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.051 devel
+- Verilator: $finish at 941us; walltime 72.630 s; speed 12.953 us/s
+- Verilator: cpu 72.200 s on 1 threads; allocated 14 MB
