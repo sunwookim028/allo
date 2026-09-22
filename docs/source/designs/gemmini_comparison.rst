@@ -1010,3 +1010,100 @@ system seen through a descriptor-based DMA with two channels and 32-byte beats,
 on an AXI port that is not on the memory controller's clock. Our AXI slave is a
 different design on different silicon. 213 ns is a far better starting point
 than zero and it is not a measurement of our machine.
+
+Which Gemmini configuration is the honest opponent
+--------------------------------------------------
+
+Surveyed from Gemmini's Scala source on 2026-09-22
+(``generators/gemmini/src/main/scala/gemmini/GemminiConfigs.scala`` has ~60
+configuration fields). The conclusion is to **change almost nothing**, and the
+reasoning is worth stating because every knob we touched would invite the
+question of whether we tuned the opponent to lose.
+
+The four axes pull in different directions and are settled differently:
+
+- **Array size — match it.** The only axis where a mismatch is a pure
+  multiplier on peak throughput, 16x for 16x16 against 4x4, with no
+  counterargument. This is why stock ``GemminiRocketConfig`` is not a usable
+  opponent.
+- **Datatype — match it, and we do.** int8xint8 into int32 on both sides,
+  which is Gemmini's *own* default. bf16 would be a step away from matched, not
+  toward it.
+- **Memory system — cannot be matched; enumerate it.** Gemmini is Rocket with a
+  32 KiB L1 D$, an L2 and ``WithBlackBoxSimMem(additionalLatency=0)``; ours is
+  Vitis cosim at zero AXI latency. Both idealised, neither is the other's
+  memory, and equalising them means rebuilding one side's SoC.
+- **Dispatch path — match it by *window*, not by configuration.** No knob
+  addresses it; only the window does, which is exactly what fixed the withdrawn
+  claim recorded above.
+
+So the config delta that survives review is **two fields, both of them the
+array size** — ``meshRows`` and ``meshColumns`` — plus ``has_training_convs =
+false`` to remove conv hardware neither benchmark touches. Everything else is
+named as unexercised. Two disclosures rather than fixes: ``dataflow =
+Dataflow.BOTH`` leaves Gemmini carrying an output-stationary datapath we never
+use, which favours it if anyone, so keeping it is the conservative choice; and
+a DIM=16 taken from stock would also flip ``has_training_convs`` to true,
+making the matched points differ in a second field.
+
+A second matched point is being added at DIM=8, because ``T`` is now a working
+parameter on our side and **a single matched point cannot separate "our design
+is slower" from "our design is slower at this one size."**
+
+The capacity asymmetry is cycle-neutral, and this is the finding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The obvious objection to this comparison is memory capacity: our design has a
+4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
+Gemmini's **256 KiB scratchpad and 64 KiB accumulator** — a 64x and 30x
+asymmetry.
+
+It does not buy Gemmini a single cycle at any published shape. Re-running
+``tiled_matmul_auto``'s own tiling search across capacities at DIM=4 gives the
+``loop_ws`` call count below; every row is legal under the config's ``require``
+clauses:
+
+=========================== ======= ========== ========== ========== =========
+Scratchpad / accumulator    4x4x4   16x16x16   32x32x32   64x64x64   64x32x64
+=========================== ======= ========== ========== ========== =========
+256 / 64 KB (what we ship)  1       1          1          1          1
+64 / 32 KB (``chipConfig``) 1       1          1          1          1
+32 / 8 KB                   1       1          1          4          4
+8 / 4 KB (~2x ours)         1       1          4          12         12
+4 / 4 KB (~matched to ours) 1       1          4          32         12
+=========================== ======= ========== ========== ========== =========
+
+Every capacity from 256 KB down to 4 KB issues exactly **one** ``loop_ws`` from
+4x4x4 through 16x16x16, so shrinking Gemmini's memories to match ours would not
+move any of the five published numbers. **The asymmetry is an area and power
+disclosure, not a cycle correction** — which is a far stronger position than
+"we could not match it". The binding limit is always the accumulator's half
+capacity, never the scratchpad.
+
+It stops being neutral at exactly 32x32x32, so as shapes grow this argument
+needs restating rather than reusing. Keeping Gemmini's own default capacity is
+also the choice that avoids hand-rolling a multi-tile nest and then arguing
+about whether our tiling was fair.
+
+Open: ``ex_accumulate`` in the window benchmark
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``gemmini/allo_bare5.c`` passes ``ex_accumulate`` as a literal ``true``, where
+the real driver computes ``!no_bias || D == NULL``, which is **false** for the
+no-bias calls we make. In hardware it sets a bit on the preload's accumulator
+address rather than issuing extra commands, so it adds no RoCC traffic, but it
+turns the k=0 accumulator writes into read-modify-writes and is therefore **not
+guaranteed cycle-neutral**.
+
+This sits inside all five published Gemmini figures. It is being measured both
+ways rather than argued about; until that lands, read 161 / 220 / 347 / 391 /
+593 as provisional. The fix is C-only and needs no re-elaboration.
+
+Two operational hazards found in the same survey, both of which have silently
+produced wrong comparisons before: **every elaboration rewrites**
+``gemmini_params.h`` **in place**, so elaborating a second configuration
+destroys the first's header and the next C build silently targets the wrong
+hardware — snapshot it, rebuild immediately, and check the ``GEMMINI DIM=`` boot
+banner. And the committed ``roccTests_Makefile.patch`` adds only ``allo_cmp`` to
+the ``tests`` list, **not** ``allo_bare5``, so ``build.sh`` will not build the
+window benchmark; it needs its explicit make target.
