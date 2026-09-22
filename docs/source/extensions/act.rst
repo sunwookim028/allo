@@ -104,9 +104,10 @@ onto it.
 - ``@isa.oracle`` is a functional simulator, JIT-executed through the MLIR
   execution engine.
 
-Two claims this page once made about ACT -- that a pilot was run, and that it
-has a mapspace search -- are withdrawn in `Earlier measurements and
-corrections`_.
+Two things we previously said about ACT that are **wrong**:
+
+- *"A minimal ACT pilot was run."* No artifact exists in either repo.
+- *"ACT has a mapspace search."* It has a mapspace *file*. See below.
 
 The one machine ACT has ever targeted, chia's TinyTPU
 (:doc:`/extensions/chia`), is **not a loop machine**: a flat PC walk, no loop
@@ -280,17 +281,20 @@ Census, which needs no build: **28 files, 230 test functions, 32
 ``ml_dtypes``), and no ``pytest.mark.skip`` anywhere. ``grep -rn makespan
 tests/`` is still zero hits.
 
-The scheduler's guarantee
--------------------------
+The scheduler's guarantee, and the claim that was not it
+--------------------------------------------------------
 
 ``Priced.cost = (makespan, emits)`` is confirmed, but it lives in
 ``mapspace.py:189-196`` -- the dead file -- not in the scheduler. The scheduler
 is ``epoch.schedule`` (``epoch.py:432``), and it is **one forward
 order-preserving greedy ASAP pass**: no search, no backtracking, no priority
 heuristic. Its own docstring says it derives the sigma the emitted program
-*has*, and does not search for a better one. A claim this page once made for
-``epoch.schedule`` -- that it reproduces its makespan over 200,000 random
-topological orders -- is withdrawn in `Earlier measurements and corrections`_.
+*has*, and does not search for a better one.
+
+A claim this project once made for ``epoch.schedule()`` -- that it reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders --
+**is withdrawn**: it describes a property ACT never claims and could not have.
+The argument is in `Earlier measurements and corrections`_.
 
 What is true and testable is pointwise minimality. Fix the epochs, the unit
 assignment and each epoch's issue and depth; then the derived start times are
@@ -508,10 +512,28 @@ histogram is a property of the check order and of the emitter's limits, not of
 the hardware, and only the independent census and the relieve-and-re-census
 numbers are comparable across implementations.
 
+Reconciling the encodable count: 5 against 3
+--------------------------------------------
+
 This flow reports **5** encodable nests at 16x16x16 where the earlier
-``act_nest.py`` prototype and an independently built enumerator report **3**;
-the two extra are the nests whose column loop is outside the row loop, and the
-reconciliation is in `Earlier measurements and corrections`_.
+``act_nest.py`` prototype and an independently built enumerator report **3**.
+The five are ``N4>K4``, ``M2>N4>K4``, ``M4>N4>K4``, ``N4>M2>K4`` and
+``N4>M4>K4``; the three are the first three. So the difference is exactly the two
+nests whose **column loop is outside the row loop**, and it is not a
+disagreement about the machine: ``act_nest.py`` refused them explicitly, in a
+message that called itself *"A limit of this file, not of the machine"*, because
+it staged the activations only outside the whole nest. This flow stages them
+immediately inside the innermost row loop wherever that loop sits, which costs
+redundant re-staging when a column loop encloses it -- correct, and ranked worse
+by the cost model, which is the right outcome for a mapper rather than a
+refusal.
+
+Both extra nests pass ``isa_ref.run``, and ``--gate`` verifies every encodable
+mapping of every registered workload at every shape. **But that is not enough
+to claim them, and the check that says so is below.** Read with the next
+section, the reconciliation is: 5 encodable by the encoder and the reference
+model, **3 confirmed on the RTL**, and the other tree's 3 is the better-grounded
+number for any claim about the hardware.
 
 .. _act-encodable-tiers:
 
@@ -547,12 +569,21 @@ count. For ``gemm.relu`` at 16x16x16:
      - **750 cycles**
      - **did not complete**
 
-Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
-at ``Inter-Transaction Progress: 0 / 1`` with the simulator burning a full core,
-one of them for over half an hour, where the shipped mapping's whole run --
-synthesis, csim and cosim -- takes about two minutes. No deadlock is *reported*,
-so this page does not call it one; what is measured is that the transaction does
-not complete.
+Two row-tiled mappings were tried and behaved the same way: no completion, with
+the simulator holding a full core, one of them for over half an hour, where the
+shipped mapping's whole run -- synthesis, csim and cosim -- takes about two
+minutes. No deadlock is *reported*, so this page does not call it one; what is
+measured is that the run does not finish.
+
+.. warning::
+
+   An earlier version of this page said the failing runs "sit at
+   ``Inter-Transaction Progress: 0 / 1``" as though that were a signature. **It
+   is not.** ``109000`` is picoseconds and that line is simply Vitis's first
+   periodic report, printed in every log including passing ones, which then
+   print ``1 / 1`` and finish. The observation is only that the second line
+   never comes; nothing measured locates the stall. See
+   :ref:`item 24 <limitation-24>`, where the failure was reduced.
 
 The lesson is the one this design's own history already taught once, when the
 dataflow simulator passed a bug that only cosim caught: **four checkers agreeing
@@ -568,17 +599,31 @@ and *confirmed* -- the RTL ran it. ``act_compile.py`` reports the first, and its
 ``act_cosim.py``.
 
 One reassurance, and it is a test rather than a hope: at every shape and every
-registered workload the mapping the flow **picks** is in the prologue-staging,
-RTL-confirmed class -- ``tests/act/test_tinytpu.py`` asserts it. The unconfirmed
-mappings are ranked, reported and never chosen, and ``act_compile.py`` prints a
-``staging`` column plus a warning whenever any of them appear.
+registered workload the mapping the flow **picks** is the one whose program
+cosim has actually measured -- ``tests/act/test_tinytpu.py`` asserts it. The
+unconfirmed mappings are ranked, reported and never chosen.
 
 This is also the sharpest ``cannot refuse`` gap found in this work, and it is
-not in the ISA: some property of a program with a data transfer *inside* the
-emitted nest, rather than all of them hoisted into a prologue, is not being
-checked by anything that can be run in seconds. Finding it is the highest-value
-next step for this flow, because until it is found the mapspace beyond
-prologue-only staging cannot be trusted, and that is most of it.
+not in the ISA. It is filed as :ref:`item 24 <limitation-24>`, reduced there to
+a sixteen-instruction program by the workload-specs track, with a bisection.
+
+**The suspicion this page raised is dead, killed twice.** It was that the
+trigger is a data transfer *inside* the emitted nest rather than hoisted into a
+prologue -- the one feature the failing mappings shared and the shipped one
+lacked. From the small end, four programs built to have exactly that feature all
+complete (169 / 189 / 171 / 186 cycles,
+``tests/limits/item24_cosim_small_programs_complete.py``). From the failing end,
+**both** non-completing programs stage every transfer in a prologue, and both
+mappings that do stage inside the nest complete. In-nest staging is neither
+necessary nor sufficient, which is why this flow ships no staging column: a
+predicate that passes both failures and flags two programs that run is worse
+than none. The bisection also rules out ``vrelu``, the hardware loop, and
+monotonicity in size.
+
+What survives is the consequence, not the cause. The mapspace this flow
+enumerates cannot be trusted past the mappings cosim has actually run, which is
+the real cost of the item and the reason it outranks widening any hardware
+parameter.
 
 **Five nests are encodable** (the prototype found three) and all five compute
 the spec against ``isa_ref.run`` -- but only three are confirmed on the RTL; see
@@ -729,7 +774,10 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - **750**
 
 The ``gemm`` rows reproduce **172 / 262 / 418 / 484 / 686** exactly, all five,
-so the harness is the one those figures came from. [#published]_ The
+so the harness is the one those figures came from. (That was the published row
+when this was measured. It moved to **171 / 261 / 417 / 483 / 685** on
+2026-09-22 when the memory sizing became derived; the reproduction above is of
+the design as it then stood, and is not a disagreement.) The
 ``gemm.relu`` row settles what they are: **plain** ``gemm``, because
 ``cosim.py``'s ``testbench(M, K, N)`` leaves ``relu`` at its default.
 ``gemm.relu`` at 16x16x16 is 750, and 750 - 686 = **64**, exactly the four
@@ -839,11 +887,25 @@ Failure modes, named
   a requirement, not a convenience.
 
 
+
+.. _act-earlier-corrections:
+
 Earlier measurements and corrections
 ====================================
 
-Corrections to This Page's Earlier Numbers
-------------------------------------------
+Superseded numbers and claims this page has withdrawn. None of it is the
+current state; each entry is kept so the correction is checkable.
+
+**The makespan claim that was withdrawn.** "``epoch.schedule()`` reproduces
+its makespan exactly, 100 == 100, over 200,000 random topological orders" is
+not merely absent from git -- **it describes a property ACT never claims and
+could not have.** ``depends`` takes an edge's source to be the earlier stream
+index (``epoch.py:372-386``), so permuting the stream changes which
+dependences exist, which changes the program's meaning rather than its
+schedule. What replaced it is pointwise minimality; see
+`The scheduler's guarantee, and the claim that was not it`_.
+
+**Earlier numbers on this page:**
 
 - "A minimal ACT pilot was run, using a toy ISA." **No artifact exists.** There
   are no ``pilot`` hits in either repo's notes or git log. If it ran, it ran in
@@ -876,43 +938,3 @@ Corrections to This Page's Earlier Numbers
   ``M2>N4>K4`` first by 0.6%, which is inside any honest error bar for a model
   that charges no row-level overlap. That disagreement is what ``act_cosim.py``
   is for; see `Where the cost model is honest and where it is not`_.
-
-The makespan claim that was withdrawn
--------------------------------------
-
-So the claim that "``epoch.schedule()`` reproduces its makespan exactly, 100 ==
-100, over 200,000 random topological orders" is not merely absent from git --
-**it describes a property ACT never claims and could not have.** ``depends``
-takes an edge's source to be the earlier stream index (``epoch.py:372-386``), so
-permuting the stream changes which dependences exist, which changes the
-program's meaning rather than its schedule.
-
-Reconciling the encodable count: 5 against 3
---------------------------------------------
-
-This flow reports **5** encodable nests at 16x16x16 where the earlier
-``act_nest.py`` prototype and an independently built enumerator report **3**.
-The five are ``N4>K4``, ``M2>N4>K4``, ``M4>N4>K4``, ``N4>M2>K4`` and
-``N4>M4>K4``; the three are the first three. So the difference is exactly the two
-nests whose **column loop is outside the row loop**, and it is not a
-disagreement about the machine: ``act_nest.py`` refused them explicitly, in a
-message that called itself *"A limit of this file, not of the machine"*, because
-it staged the activations only outside the whole nest. This flow stages them
-immediately inside the innermost row loop wherever that loop sits, which costs
-redundant re-staging when a column loop encloses it -- correct, and ranked worse
-by the cost model, which is the right outcome for a mapper rather than a
-refusal.
-
-Both extra nests pass ``isa_ref.run``, and ``--gate`` verifies every encodable
-mapping of every registered workload at every shape. **But that is not enough
-to claim them, and the check that says so is** :ref:`act-encodable-tiers`. Read
-with that section, the reconciliation is: 5 encodable by the encoder and the
-reference model, **3 confirmed on the RTL**, and the other tree's 3 is the
-better-grounded number for any claim about the hardware.
-
-.. rubric:: Footnotes
-
-.. [#published] That was the published row when this was measured. It moved to
-   **171 / 261 / 417 / 483 / 685** on 2026-09-22 when the memory sizing became
-   derived; the reproduction above is of the design as it then stood, and is
-   not a disagreement.
