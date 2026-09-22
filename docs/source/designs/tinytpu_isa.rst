@@ -1306,22 +1306,46 @@ comes from.
 
 **FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
 flatten effort 3, memories as flip-flops** (``sram_mode='none'``), Synopsys DC
-``W-2024.09``, via mflowgen 0.8.0 at commit ``aee0e5d6``. 47 minutes of wall
-time.
+``W-2024.09``, via mflowgen 0.8.0 at commit ``aee0e5d6``. 37 minutes of wall
+time, synthesising the current shipped design (``rtl_handoff/``,
+``T4_MAXDIM16_shipped_baseline``).
 
 ============================== ==========================================
-Total cell area                **1,271,692** FreePDK45 area units
-  non-combinational            1,016,187 — **79.9 %**
-  combinational                255,505, of which 26,741 buffer/inverter
+Total cell area                **1,136,598** FreePDK45 area units
+  non-combinational            906,098 — **79.7 %**
+  combinational                230,501
   macro / black box            0
-Sequential cells               224,987 (2,302 hierarchical cells)
-Timing                         **MET**, worst slack **+0.18 ns**, critical path
-                               3.11 ns of 3.33, 62 logic levels, zero violating
+Cells                          389,399 (200,561 sequential, 1,662
+                               hierarchical)
+Timing                         **MET**, worst slack **+0.21 ns**, critical path
+                               3.08 ns of 3.33, 62 logic levels, zero violating
                                and zero hold violations
-Power                          57.1 mW total, 22 mW leakage — **indicative
-                               only**, default toggle rates with no activity
-                               data; ``gmem0_m_axi`` alone accounts for 45 %
+Power                          not re-reported for this run; power from DC
+                               here is **indicative only** in any case, at
+                               default toggle rates with no activity data
 ============================== ==========================================
+
+This replaces a first run of **1,271,692** that synthesised an export of the
+design *before* its memories were made derived from ``MAXDIM``; that netlist no
+longer exists. The current design is **10.6 % smaller** and one cycle faster,
+from the same change that took FPGA block RAM from 42 to 40 — so area and cycles
+now describe the same design.
+
+**Across configurations**, synthesised identically and all closing at 3.33 ns
+(full table and reports: ``asic_synthesis/``):
+
+========================================= ============ ==========
+comparison                                cell area    FPGA says
+========================================= ============ ==========
+``MAXDIM`` 16 → 64, T=4 fixed              **+64.1 %**  +2.4 % FF
+``T`` 4 → 8, ``MAXDIM``\ =64 fixed         **1.33x**    --
+========================================= ============ ==========
+
+The first row is the finding: the two substrates disagree about operand space
+by roughly **27x**. On the FPGA it disappears into block RAM and looks nearly
+free; with memories as flip-flops it is most of the design. So off the FPGA,
+**``MAXDIM`` is the expensive knob, not ``T``**. Never quote T=8 against the
+shipped baseline (2.18x) -- that changes both at once.
 
 **Four fifths of the cell area is flip-flops**, which is the predicted result
 rather than a surprising one: the scratchpad, the vector registers and the

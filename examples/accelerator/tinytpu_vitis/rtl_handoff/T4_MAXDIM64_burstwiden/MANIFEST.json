@@ -9,12 +9,13 @@
   },
   "files": 146,
   "layout": "flat",
+  "operand_buffers": "cyclically banked by DMA_WORDS=16; one write port per bank",
   "readmemh_users": [],
   "resources": {
-    "BRAM": 116,
+    "BRAM": 100,
     "DSP": 14,
-    "FF": 24001,
-    "LUT": 31396,
+    "FF": 25026,
+    "LUT": 33799,
     "URAM": 0,
     "avail": {
       "BRAM": 4032,

@@ -1,0 +1,47 @@
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+Warning: Design has unannotated primary inputs. (PWR-414)
+Warning: Design has unannotated sequential cell outputs. (PWR-415)
+ 
+****************************************
+Report : power
+        -hier
+        -analysis_effort low
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 11:59:34 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM64_shipped/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: Inactive.
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+--------------------------------------------------------------------------------
+                                       Switch   Int      Leak     Total
+Hierarchy                              Power    Power    Power    Power    %
+--------------------------------------------------------------------------------
+tinytpu_isa                            7.33e+03 3.71e+04 3.19e+07 7.63e+04 100.0
+  accu_0_U0 (tinytpu_isa_accu_0)        164.536 1.21e+03 1.71e+06 3.09e+03   4.0
+  vru_0_U0 (tinytpu_isa_vru_0)           25.497 1.92e+03 3.10e+06 5.04e+03   6.6
+  spm_0_U0 (tinytpu_isa_spm_0)           33.945 1.97e+03 3.10e+06 5.10e+03   6.7
+  dma_ld_0_1_U0 (tinytpu_isa_dma_ld_0_1)  685.534 6.71e+03 6.34e+06 1.37e+04  18.0
+  sequencer_0_1_U0 (tinytpu_isa_sequencer_0_1)  292.570 1.40e+03 5.81e+05 2.27e+03   3.0
+  gmem3_m_axi_U (tinytpu_isa_gmem3_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS4_USER_RFIFONUM_WIDTH9)  192.259 1.09e+03 3.73e+05 1.66e+03   2.2
+  gmem2_m_axi_U (tinytpu_isa_gmem2_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  314.226 1.75e+03 9.87e+05 3.05e+03   4.0
+  gmem1_m_axi_U (tinytpu_isa_gmem1_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH32_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW32_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  321.956 1.75e+03 9.88e+05 3.06e+03   4.0
+  gmem0_m_axi_U (tinytpu_isa_gmem0_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH512_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW512_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9) 3.69e+03 1.01e+04 1.23e+07 2.61e+04  34.2
+1
