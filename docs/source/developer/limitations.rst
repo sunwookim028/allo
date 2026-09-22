@@ -1222,6 +1222,14 @@ compile:
    subscript, an access under a guard, or an inner loop without constant
    bounds all yield no proof, which is the accepting answer.
 
+   **What the evidence is worth.** Every refusal in ``tests/test_dependence.py``
+   is against a kernel constructed to be refused; the rule has never fired on a
+   real design here, because there is no false claim in the tree to fire on.
+   The real mistake it would catch is a plainly written recurrence
+   (``C[i] = C[i-1] + A[i]``) whose author reaches for ``inter false`` to
+   silence ``Unable to enforce a carried dependence constraint`` instead of
+   restructuring the loop. See :ref:`extending-allo-dependence`.
+
    **What is still an obligation**, and now says so: ``s.dependence(...,
    because=...)`` records the premise, which appears in
    ``s.dependence_obligations`` and as ``// dependence obligation, checked by

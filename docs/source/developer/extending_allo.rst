@@ -319,6 +319,25 @@ confirms a true one**, and a passing check is not evidence that a claim holds.
 kernel (``A[idx[i]] = A[idx[i]] + 1``) whose dependence is real, is asserted to
 be real by running it, and is accepted anyway.
 
+**What that evidence is worth, stated plainly.** Every refusal in
+``tests/test_dependence.py`` is against a kernel *constructed* to be refused.
+The rule has never fired on a real design in this tree -- because there is no
+false claim in the tree to fire on. All three live claims (TinyTPU-isa's ``ar``
+and the two in ``tests/test_vhls.py``) have subscripts the analysis cannot
+resolve, so they are accepted for exactly the reason the primitive exists. A
+stack of cheap checks agreeing is weaker evidence than it looks, and this one
+has not been tested by a real mistake yet.
+
+The real mistake it *would* catch has a recognisable shape: an author pipelines
+a reduction or a sliding window whose recurrence is written plainly in the
+subscripts -- ``C[i] = C[i-1] + A[i]``, ``ar[r] = ar[r-1] + v`` -- meets
+``Unable to enforce a carried dependence constraint (II = 1, distance = 1)``,
+and reaches for ``inter false`` to make the message go away instead of
+restructuring the loop. That claim is false, the IR says so, and the rule
+refuses it. The mistake it cannot catch is the one TinyTPU-isa's design has
+legitimately: the recurrence runs through a register-computed index, the
+subscript says nothing, and only the obligation covers it.
+
 What the analysis is: a same-element test over subscripts written as
 ``constant + sum(coefficient * induction variable)``. Two accesses provably
 alias at distance ``k`` when their forms agree in every coefficient and the
