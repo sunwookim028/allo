@@ -21,10 +21,12 @@ OP_VRELU = 6      # f0=ar_d f1=ar_s                      nr=rows
 OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
 OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
 OP_ENDLOOP = 9    # close the innermost loop
+OP_VADDRELU = 10  # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
 
 OPCODE_NAMES = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
                 OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
-                OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop"}
+                OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop",
+                OP_VADDRELU: "vaddrelu"}
 
 # `dma_ld`'s f0: bit 0 is the SOURCE matrix, bit 1 the DESTINATION memory.
 #   0: A -> spad    1: B -> spad    2: A -> vr    3: B -> vr
@@ -80,7 +82,7 @@ ISA_NAMESPACE = {
     "OP_NOP": OP_NOP, "OP_DMA_LD": OP_DMA_LD, "OP_DMA_ST": OP_DMA_ST,
     "OP_VLD": OP_VLD, "OP_MM": OP_MM, "OP_VADD": OP_VADD,
     "OP_VRELU": OP_VRELU, "OP_MVOUT": OP_MVOUT, "OP_LOOP": OP_LOOP,
-    "OP_ENDLOOP": OP_ENDLOOP,
+    "OP_ENDLOOP": OP_ENDLOOP, "OP_VADDRELU": OP_VADDRELU,
     "DMA_SRC_B": DMA_SRC_B, "DMA_TO_VR": DMA_TO_VR,
     "AGU_TERMS": AGU_TERMS, "AGU_F0": AGU_F0, "AGU_F1": AGU_F1,
     "AGU_F2": AGU_F2, "AGU_F3": AGU_F3,

@@ -32,7 +32,8 @@ def sequencer_directives(s, ctx):
     parameters=("IMEM_SIZE", "T"),
     isa=("LOOP_DEPTH", "NHDR", "IWORDS", "AGU_TERMS", "AGU_F0", "AGU_F1",
          "AGU_F2", "AGU_F3", "OP_LOOP", "OP_ENDLOOP", "OP_DMA_LD", "OP_VLD",
-         "OP_MM", "OP_VADD", "OP_VRELU", "OP_MVOUT", "DMA_TO_VR"),
+         "OP_MM", "OP_VADD", "OP_VRELU", "OP_VADDRELU", "OP_MVOUT",
+         "DMA_TO_VR"),
     directives=sequencer_directives,
 )
 def sequencer(dram_imem: UInt(64)[IMEM_SIZE]):
@@ -136,6 +137,11 @@ def sequencer(dram_imem: UInt(64)[IMEM_SIZE]):
                 c_acc.put(accu_copy)
             if op == OP_VRELU:
                 c_acc.put(resolved)
+            if op == OP_VADDRELU:
+                # Two sources, so two `accu` steps a row, as for `vadd`.
+                fused_copy: UInt(64) = resolved
+                fused_copy[54:62] = nr * 2
+                c_acc.put(fused_copy)
             if op == OP_MVOUT:
                 c_acc.put(resolved)
                 c_dst.put(resolved)
