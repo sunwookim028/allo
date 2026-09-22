@@ -1,0 +1,75 @@
+{
+ "workers": {
+  "front-end": [
+   {
+    "iteration": 1,
+    "accepted": true,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 627,
+     "4x4x4": 172
+    },
+    "total": 799,
+    "llm_usd": 5.171
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": false,
+    "stage": "gate:bench_isa",
+    "cycles": null,
+    "total": null,
+    "llm_usd": 0
+   }
+  ],
+  "tail": [
+   {
+    "iteration": 1,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 686,
+     "4x4x4": 172
+    },
+    "total": 858,
+    "llm_usd": 1.1998
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 686,
+     "4x4x4": 176
+    },
+    "total": 862,
+    "llm_usd": 0
+   }
+  ]
+ },
+ "baseline": {
+  "16x16x16": 686,
+  "4x4x4": 172
+ },
+ "best": {
+  "worker": "front-end",
+  "iteration": 1,
+  "total": 799,
+  "cycles": {
+   "16x16x16": 627,
+   "4x4x4": 172
+  }
+ },
+ "spend": {
+  "usd": 28.5384,
+  "messages": 371,
+  "input": 7241153,
+  "output": 174355,
+  "cache_read": 42878597
+ },
+ "wall_seconds": 5995.8,
+ "hard_cap_hit": false
+}

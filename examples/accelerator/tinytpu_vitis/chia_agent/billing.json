@@ -1,0 +1,20 @@
+{
+ "comment": "Which GCP billing account CHIA's opencode spend is attributed to, by time. opencode's DB does not record the GCP project a session billed (session.model holds only providerID/modelID), so attribution is by cutover time: every google-vertex session created at or after cutover_ms is counted against CHIA2026. See spend.py.",
+ "current": {
+  "project": "chia2026-tinytpu",
+  "project_number": "762944961825",
+  "billing_account": "01BF39-94AA3F-36BACB",
+  "billing_account_name": "CHIA2026",
+  "cutover_ms": 1789831055464,
+  "cutover_utc": "2026-09-19T15:17:35Z",
+  "cutover_event": "chia.env's GOOGLE_CLOUD_PROJECT switched from test-adrs to chia2026-tinytpu"
+ },
+ "previous": [
+  {
+   "project": "test-adrs",
+   "billing_account": "01BC37-C4DA99-068A2F",
+   "billing_account_name": "My Billing Account (general, shared with unrelated projects)",
+   "until_ms": 1789831055464
+  }
+ ]
+}

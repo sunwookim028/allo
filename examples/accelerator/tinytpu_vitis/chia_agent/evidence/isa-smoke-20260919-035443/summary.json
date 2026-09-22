@@ -1,0 +1,20 @@
+{
+ "workers": {
+  "operand-path": [],
+  "weight-prologue": []
+ },
+ "baseline": {
+  "16x16x16": 919,
+  "4x4x4": 252
+ },
+ "best": null,
+ "spend": {
+  "usd": 15.147,
+  "messages": 234,
+  "input": 4210084,
+  "output": 57433,
+  "cache_read": 18254434
+ },
+ "wall_seconds": 3367.1,
+ "hard_cap_hit": true
+}

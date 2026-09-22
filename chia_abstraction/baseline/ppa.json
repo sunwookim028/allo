@@ -1,0 +1,50 @@
+{
+ "cases": {
+  "blocks_stream": {
+   "area": {
+    "bram_18k": 4,
+    "dsp": 0,
+    "ff": 4873,
+    "lut": 7029,
+    "uram": 0
+   },
+   "cycles": {
+    "interval": 89,
+    "latency": 206
+   },
+   "estimated_ns": 2.68
+  },
+  "mlp_layered": {
+   "area": {
+    "bram_18k": 5,
+    "dsp": 48,
+    "ff": 10397,
+    "lut": 9069,
+    "uram": 0
+   },
+   "cycles": {
+    "interval": 4109,
+    "latency": 4183
+   },
+   "estimated_ns": 3.064
+  },
+  "tinytpu_isa": {
+   "area": {
+    "bram_18k": 42,
+    "dsp": 14,
+    "ff": 17481,
+    "lut": 26583,
+    "uram": 0
+   },
+   "cycles": {
+    "16x16x16": 686,
+    "4x4x4": 172
+   },
+   "estimated_ns": 2.431,
+   "seconds": 152.1
+  }
+ },
+ "measured": "2026-09-22T03:28:02Z",
+ "ref": "882f1b3409ab72a8fa8d302b017553ec98c3b163",
+ "workload": "gemm_int8_16"
+}
