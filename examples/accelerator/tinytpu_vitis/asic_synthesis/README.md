@@ -21,12 +21,16 @@ identically. It is not an ASIC verdict on any of them.
 
 | variant | total cell area | non-comb. | comb. | seq. cells | worst slack | violating paths |
 | --- | --- | --- | --- | --- | --- | --- |
-| shipped T=4, MAXDIM=16 | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | **+0.18 ns** | 0 |
+| shipped T=4, MAXDIM=16 (current, `T4_MAXDIM16_shipped_baseline`) | **1,136,598** | 906,098 (79.7%) | 230,501 | 200,561 | **+0.21 ns** | 0 |
+| *superseded* — an earlier export, before memories were derived from MAXDIM | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | +0.18 ns | 0 |
 
-Clock 3.33 ns on `ap_clk`, the target the RTL was emitted at. Timing is met with
-62 levels of logic on the critical path (3.11 ns) and zero hold violations.
-Power, indicative: 57.1 mW total, 45% of it in `gmem0_m_axi`, 22 mW leakage.
-Wall time 47 min on zhang-21.
+Clock 3.33 ns on `ap_clk`, the target the RTL was emitted at. The current
+design meets it with 62 logic levels on a 3.08 ns critical path and zero hold
+violations, in 37 min on zhang-21. The superseded row is kept because it was
+published before being replaced: it describes a netlist that no longer exists,
+and the current design is 10.6 % smaller. Power from DC here is indicative
+only (default toggle rates, no activity data); the superseded run's 57.1 mW is
+not carried over.
 
 Reports are under `reports/<variant>/`: the QoR and power reports verbatim, an
 area summary (full report is 716 KB, the reference report 4 MB; both stay in the
