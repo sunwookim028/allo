@@ -797,3 +797,102 @@ Summary: Demonstrated vs. Not
 - The *rate* at which a search finds a good design (S1), the ~100x yield spread
   across hypotheses (S2), and accept rates / trajectories (S3): all n=1 or
   unanalysed, and the search is not seeded.
+
+The Planned Experiments
+-----------------------
+
+Written 2026-09-22, before the runs, so that the design of each experiment can
+be read against its result rather than after it. **$300 is authorised for the
+overnight runs and about $500 remains for the experiments below.** The split of
+the overnight money is recorded in ``chia_agent/allocation.json``: the
+abstraction-maintaining track is weighted 2:1 over the design-point search,
+because the search's pipeline is proven while the abstraction work is the open
+question. Cumulative spend was $28.54 when the split was made.
+
+The gate enforces ``CHIA_TOTAL_CAP_USD`` as a *cumulative* ceiling on
+``chia2026_spend()`` and cannot tell two concurrent tracks apart, so a track's
+share is honoured by that track setting its own ceiling. Two tracks drawing on
+one account means a track that sees spend climbing faster than its own runs
+explain is seeing the other track, not an accounting bug.
+
+The one thing every experiment below is designed to fix
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every claim this page makes about the TinyTPU-isa search is **n=1**. One paid
+run found one improvement. That is enough to show the loop works and not enough
+to say anything about how well it works, and no amount of further single runs
+will change that. So the planned experiments buy *replication and rate* before
+they buy anything else, and each one states in advance what result would count
+as a negative.
+
+E1. Rate of discovery, replicated
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run the design-point search from the same baseline **at least three times**
+with different seeds, and report the distribution rather than the best run:
+how many candidates were proposed, how many passed the static gates, how many
+passed acceptance, and what each accepted candidate bought. The deliverable is
+an accept rate with an interval around it.
+
+A negative result here is publishable and should be reported as such: if two
+of three runs find nothing, the honest claim is that the loop finds an
+improvement *sometimes*, and the paper says so.
+
+Prerequisite, and it is not optional: **seed the search**. Outstanding item 2
+below has blocked this since 2026-09-07. Without a seed a run is re-runnable
+but not repeatable, and a distribution over unrepeatable runs cannot be
+attributed to the search rather than to sampling.
+
+E2. Does the refusal bound the search?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Of 1,226 candidate loop nests, **1,150 are refused because ``acc`` is a static
+instruction field with no predicate on an induction variable.** The search can
+therefore reach 76 nests out of 1,226, and the interesting question is whether
+the designs worth finding are among the refused 94 %.
+
+The experiment: run the search unchanged, then run it against a design whose
+``acc`` field carries a predicate, and compare what each finds. If the second
+finds strictly better design points, the refusal is a real bound on the search
+and the ISA field is the thing to fix. If it finds nothing better, the refusal
+is a red herring and the 76 reachable nests already contain the good designs --
+also a result, and a cheaper one to act on.
+
+E3. Can an agent maintain the abstractions, and at what rate?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The track this project most wants to measure, and the one expected to fail most
+often. An agent is asked to extend Allo itself -- a dialect operation, a type, a
+schedule primitive or a pass -- rather than to edit a design. Success means the
+extension arrives the way ``s.dependence(...)`` did: with its analyses, its
+legality rule, tests, and the golden dataflow tests still passing.
+
+Bounded attempts with a hard pass/fail gate, not one long run, because the
+result wanted is the *shape of the success rate* and its failure modes, not one
+expensive lucky sample. Keep every transcript: when an agent cannot extend a
+compiler abstraction, *why* it could not is the evidence.
+
+The stated hypothesis, from the CAKE result (a typed IR reaching 1.144x where
+raw generation reached 0.928x at equal budget): an agent given a typed
+abstraction with construction-time checking succeeds more often than one given
+free rein over the emitter. Testing that needs both arms, so run both.
+
+E4. Co-design, both sides moving
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Everything above moves one side at a time. The claim the paper wants is
+co-design: a search that changes the instruction set and the microarchitecture
+together, where neither change is worth anything alone. The evidence for it is
+a design point plus the demonstration that ablating either half loses the gain.
+That ablation is the experiment, and it is cheap once a candidate exists --
+it is two extra evaluations, no model calls.
+
+What will not be spent on
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Breadth for its own sake.** A fourth hypothesis at n=1 is worth less than a
+  second run of an existing one.
+- **Re-deriving numbers that are already recorded.** The evidence directories
+  hold every accepted diff with its reports; replay is free.
+- **The semantics-alignment variant.** Stopped; see
+  :doc:`/designs/minitpu`.
