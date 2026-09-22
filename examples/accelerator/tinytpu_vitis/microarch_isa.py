@@ -396,10 +396,10 @@ DMA_TO_VR = 2
 # affected. `TPU_TB=stress` cosim runs `ar_distance_program(AR_RAW_DIST)` on
 # every build; a re-synthesis that widened the window fails there.
 #
-# `rbA`/`rbB` (dma_ld's burst buffers) and `ib` (the sequencer's program
-# buffer) are also unzeroed but cannot be read early: `ib` is filled by an
-# unconditional IMEM_SIZE-word burst, and the A/B spans are computed by
-# `assemble()` from the same resolved trace that names the rows `dma_ld` reads.
+# `ib` (the sequencer's program buffer) is also unzeroed but cannot be read
+# early: it is filled by an unconditional IMEM_SIZE-word burst before the first
+# fetch. `dma_ld` holds no buffer at all now -- it reads the DRAM word an
+# instruction names, so there is nothing of its own to read early.
 #
 # `check_program()` below enforces all of this statically, and `assemble()`
 # calls it, so a program that violates the contract cannot be assembled.
