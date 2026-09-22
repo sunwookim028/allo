@@ -60,7 +60,7 @@ A straight line in M with **one** fixed intercept — 1 782 cycles at T=4, 1 014
 | --- | --- | --- |
 | search, run 1 | burst widening, −160 cycles, 2.3x BRAM | real, **not landed**, "a sensible engineering change, not an architectural discovery" |
 | search, co-design | `AGU_TERMS` 3→4 raises encodable nests 3→7→8, bottleneck migrates twice, **chosen nest never changes** | cost with no benefit — then found to be a **prerequisite**, not an alternative |
-| abstraction, held-out | 162-line `Schedule.dependence(...)`, 5 places, incl. rejecters in 3 emitters the human commit lacks (#23/#24/#31) | **near miss** — leaked, and aborts the compiler on first call (unsigned vs signless attr) |
+| abstraction, held-out | 162-line `Schedule.dependence(...)`, 5 places | **implementation from a prose specification, near miss** — its system prompt named the pattern, the attribute shape, the emitter, "must reject" and "a false claim produces wrong RTL", so none of those features are the agent's; it also leaked via the docs, and aborts the compiler on first call |
 
 ---
 
