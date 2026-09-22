@@ -187,6 +187,11 @@ class Action:
     is how a composition says that the accumulator's write is the array's
     product and not something it invented.
 
+    ``offset`` is the lane offset within the element -- the column block a
+    ``dma_ld`` takes out of a DRAM row. Without it an action can say which
+    ROW it touches and not which part of it, which is the same gap as a
+    reduction tree whose leaf order cannot be stated.
+
     ``at`` is the effect's DECLARED LATENCY: the cycles after its inputs are
     ready at which it lands. With it an action is an entry in a calendar --
     "this unit writes element f(i) at offset d from issue, repeating every
@@ -202,6 +207,7 @@ class Action:
     port: str = None
     state: str = None
     base: str = None
+    offset: str = None
     count: str = "1"
     per: str = PER_ROW
     when: str = None
@@ -290,6 +296,7 @@ class Effect:
     kind: str
     state: str = None
     row: int = None
+    offset: int = None
     count: int = 1
     role: str = None
     into: str = None
@@ -470,6 +477,9 @@ class Machine:
                     port=action.port or action.kind, kind=action.kind,
                     state=action.state,
                     row=None if base is None else base + row,
+                    offset=evaluate(action.offset, env,
+                                     *((0,) if loose else ()))
+                    if action.offset else None,
                     role=action.role, into=action.into, args=action.args,
                     compute=action.compute, lanes=self._lanes_of(action, env),
                     action=action)
@@ -765,6 +775,22 @@ def value_flow_violations(machine):
         for a in i.actions:
             for name in a.args:
                 if (a.unit, name) in producer:
+                    continue
+                if a.kind == RECEIVE:
+                    # A receive's argument is a cross-unit value by
+                    # definition: it names what arrives on the channel. What
+                    # is checked instead is that a matching emit exists.
+                    senders = {u for u, n in producer if n == name}
+                    ports = {p for u, p in
+                             {(x.unit, x.port) for x in i.actions
+                              if x.kind == EMIT} if u in senders}
+                    if a.port not in ports:
+                        out.append(Violation(
+                            "receive with no sender", f"{i.name}/{a.unit}",
+                            f"{a.unit!r} receives {name!r} on {a.port!r} and "
+                            f"nothing emits it there",
+                            f"emit {name!r} on {a.port!r} from the unit that "
+                            f"produces it"))
                     continue
                 elsewhere = sorted({u for u, n in producer if n == name})
                 if not elsewhere:

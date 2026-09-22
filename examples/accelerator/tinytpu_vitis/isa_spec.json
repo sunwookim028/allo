@@ -365,7 +365,8 @@
           "base": "dram_row0",
           "when": "(mode & 1) == 0",
           "into": "from_a",
-          "role": "the source rows"
+          "role": "the source rows",
+          "offset": "col_block * T"
         },
         {
           "unit": "dma_ld",
@@ -375,7 +376,8 @@
           "base": "dram_row0",
           "when": "(mode & 1) == 1",
           "into": "from_b",
-          "role": "the source rows"
+          "role": "the source rows",
+          "offset": "col_block * T"
         },
         {
           "unit": "dma_ld",
@@ -411,7 +413,10 @@
           "kind": "receive",
           "port": "dma2sp",
           "into": "landing",
-          "when": "(mode & 2) == 0"
+          "when": "(mode & 2) == 0",
+          "args": [
+            "beat"
+          ]
         },
         {
           "unit": "spm",
@@ -429,7 +434,10 @@
           "kind": "receive",
           "port": "dma2vr",
           "into": "landing",
-          "when": "(mode & 2) == 2"
+          "when": "(mode & 2) == 2",
+          "args": [
+            "beat"
+          ]
         },
         {
           "unit": "vru",
@@ -496,7 +504,10 @@
           "unit": "vru",
           "kind": "receive",
           "port": "sp2vr",
-          "into": "word"
+          "into": "word_in",
+          "args": [
+            "word"
+          ]
         },
         {
           "unit": "vru",
@@ -505,7 +516,7 @@
           "state": "vr",
           "base": "vr0",
           "args": [
-            "word"
+            "word_in"
           ]
         }
       ]
@@ -571,7 +582,10 @@
           "port": "wcol",
           "count": "T + 1",
           "per": "instruction",
-          "into": "weights"
+          "into": "weights_in",
+          "args": [
+            "weights"
+          ]
         },
         {
           "unit": "array",
@@ -579,7 +593,7 @@
           "port": "instructions",
           "per": "instruction",
           "args": [
-            "weights"
+            "weights_in"
           ]
         },
         {
@@ -603,7 +617,10 @@
           "unit": "array",
           "kind": "receive",
           "port": "acol",
-          "into": "activation"
+          "into": "activation_in",
+          "args": [
+            "activation"
+          ]
         },
         {
           "unit": "array",
@@ -611,8 +628,8 @@
           "port": "mac",
           "compute": "matmul",
           "args": [
-            "activation",
-            "weights"
+            "activation_in",
+            "weights_in"
           ],
           "into": "psum"
         },
@@ -628,7 +645,10 @@
           "unit": "accu",
           "kind": "receive",
           "port": "cw",
-          "into": "psum"
+          "into": "psum_in",
+          "args": [
+            "psum"
+          ]
         },
         {
           "unit": "accu",
@@ -647,7 +667,7 @@
           "compute": "acc_add",
           "args": [
             "carried",
-            "psum"
+            "psum_in"
           ],
           "into": "total"
         },
@@ -834,7 +854,10 @@
           "unit": "dma_st",
           "kind": "receive",
           "port": "ac2sp",
-          "into": "clipped"
+          "into": "clipped_in",
+          "args": [
+            "clipped"
+          ]
         },
         {
           "unit": "dma_st",
@@ -843,8 +866,9 @@
           "state": "C",
           "base": "dram_row0",
           "args": [
-            "clipped"
-          ]
+            "clipped_in"
+          ],
+          "offset": "col_block * T"
         }
       ]
     },
