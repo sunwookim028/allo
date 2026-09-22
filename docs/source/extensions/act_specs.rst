@@ -646,15 +646,9 @@ reports minimum channel depth 1 and no deadlock, the Allo simulator is
 bit-exact against ``isa_ref``, and Vitis csim reports 0 of 256 bytes wrong --
 and then ``cosim_design`` never finishes the transaction.
 
-What that looks like, and what it does not: a completing run of the same
-design prints two progress lines and a ``$finish`` --
-``0 / 1 @ "109000"``, then ``1 / 1 @ "777000"``, then
-``$finish called at time : 796590 ps`` for a 198-cycle program. A hanging run
-prints the **first** line and never the second. ``109000`` is picoseconds and
-is simply where Vitis makes its first periodic report, so it is the same
-number in every log, passing or hanging; it is not where the design stops, and
-nothing here locates the stall. No deadlock is reported by Vitis' own detector,
-so this page does not call it one.
+No deadlock is reported by Vitis' own detector, so this page does not call it
+one, and nothing here locates the stall. What a hanging run's log looks like
+beside a completing one is in `Earlier measurements and corrections`_.
 
 The full characterisation, the bisection, and the two hypotheses it rules out
 are :ref:`item 24 <limitation-24>` of the limitations register, with the repro
@@ -735,3 +729,19 @@ Environment is the fork's usual one (``CLAUDE.md``): the ``allo`` env,
 ``LLVM_BUILD_DIR`` exported by hand, ``OMP_NUM_THREADS=8``. Only ``correct``
 and ``fast --cosim`` need a build; ``legal``, ``specs`` and ``rules`` are pure
 Python over the corpus.
+
+
+Earlier measurements and corrections
+====================================
+
+What a hanging cosim run looks like in the log
+----------------------------------------------
+
+What that looks like, and what it does not: a completing run of the same
+design prints two progress lines and a ``$finish`` --
+``0 / 1 @ "109000"``, then ``1 / 1 @ "777000"``, then
+``$finish called at time : 796590 ps`` for a 198-cycle program. A hanging run
+prints the **first** line and never the second. ``109000`` is picoseconds and
+is simply where Vitis makes its first periodic report, so it is the same
+number in every log, passing or hanging; it is not where the design stops, and
+nothing here locates the stall.
