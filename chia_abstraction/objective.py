@@ -121,28 +121,50 @@ def case_verdict(base: dict, now: dict) -> dict:
     return out
 
 
-def classify(cases: dict) -> dict:
+def classify(cases: dict, newly_expressible=(), limits_fixed=()) -> dict:
     """The candidate's verdict across every design case.
 
-    win     no case lost cycles, no case left its resource budget, and at
-            least one case gained cycles.
-    trade   at least one case gained cycles AND at least one case left its
-            resource budget or lost cycles. Reported as a trade, never a win.
-    neutral nothing moved.
-    worse   no case gained.
+    THREE ways to succeed, not one, and the third is the one the project
+    actually asks for. The design driver's end state is a library of
+    parametrized, modular TPU IPs that compose into different architectural
+    choices -- Groq's LPU, OpenAI's Jalapeno, Meta's MTIA, AMD's XDNA -- with
+    TinyTPU-isa as something such a library INSTANTIATES. So an abstraction
+    that makes a SECOND ARCHITECTURE EXPRESSIBLE is worth more than one that
+    makes the current design faster, and an acceptance criterion that measures
+    only cycles on the current design would reject exactly the extensions the
+    project wants.
+
+    expressive  something that could not be expressed or built before now can:
+                a design case that did not synthesise now does
+                (`newly_expressible`), or a `tests/limits/` verdict moved
+                REPRODUCES -> FIXED (`limits_fixed`). Correctness must hold
+                everywhere and no case may lose cycles or leave its resource
+                budget, but NO CYCLE GAIN IS REQUIRED. Kept.
+    win         no case lost cycles, no case left its resource budget, and at
+                least one case gained cycles. Kept.
+    trade       at least one case gained cycles AND at least one case left its
+                resource budget or lost cycles. Reported as a trade, never a
+                win, and not kept: a trade needs a person to price it.
+    neutral     nothing moved.
+    worse       no case gained, and something got worse.
     """
     gained = [c for c, v in cases.items() if v["cycles_verdict"] == "better"]
     lost = [c for c, v in cases.items() if v["cycles_verdict"] == "worse"]
     over = [c for c, v in cases.items() if not v["resources"]["ok"]]
-    if gained and not lost and not over:
+    opened = sorted(set(newly_expressible)) + sorted(set(limits_fixed))
+    if opened and not lost and not over:
+        verdict = "expressive"
+    elif gained and not lost and not over:
         verdict = "win"
-    elif gained:
+    elif gained or opened:
         verdict = "trade"
     elif lost or over:
         verdict = "worse"
     else:
         verdict = "neutral"
     return {
+        "newly_expressible": sorted(set(newly_expressible)),
+        "limits_fixed": sorted(set(limits_fixed)),
         "verdict": verdict, "gained": sorted(gained), "lost": sorted(lost),
         "over_budget": sorted(over),
         #: The one-line statement of the result. Per case, never aggregated:
@@ -165,5 +187,8 @@ def classify(cases: dict) -> dict:
 
 
 #: What the loop uses to decide keep-or-rewind. `trade` is NOT kept: a trade
-#: needs a person to price it.
-KEEP = ("win",)
+#: needs a person to price it. `expressive` IS kept, and ranks above `win`:
+#: making a second architecture expressible is the project's standard, and a
+#: faster current design is not.
+KEEP = ("expressive", "win")
+RANK = {"expressive": 0, "win": 1, "neutral": 2, "trade": 3, "worse": 4}

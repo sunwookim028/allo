@@ -465,7 +465,12 @@ def gate_design_functional(slot, env, work, out):
     return res
 
 
-def gate_cases(slot, env, work, out, names, csyn: bool):
+def gate_cases(slot, env, work, out, names, csyn: bool,
+               allow_csyn_failure: bool = False):
+    """Every named design case, vouched. `allow_csyn_failure` is for the PPA
+    pass over cases `design_cases.CSYN_OK` says Vitis refuses today: a failure
+    there is the status quo, not a regression, and a SUCCESS there is a
+    newly-expressible architecture."""
     res = {}
     for name in names:
         args = [name, "--work", str(work / "cases")]
@@ -475,7 +480,13 @@ def gate_cases(slot, env, work, out, names, csyn: bool):
                                  CASE_TIMEOUT, args=args,
                                  log=out / f"case_{name}.log")
         rep = _payload(o, "CASE")
+        tolerated = (allow_csyn_failure
+                     and not design_cases.CSYN_OK.get(name, True))
         if not ok or rep is None:
+            if tolerated:
+                res[name] = {"case": name, "csyn": {"failed_as_expected": True},
+                             "seconds_total": sec}
+                continue
             raise Reject(f"gate:case:{name}", o[-4000:])
         res[name] = {**rep, "seconds_total": sec}
     return res
@@ -497,11 +508,9 @@ def gate_limits(slot, env, work, out, tier, record=False):
                       "--tier", lim_tier, "--work", str(work / "limits")],
                      slot, env, LIMITS_TIMEOUT[tier], writable=work, ro=slot)
     (out / "limits.log").write_text(o)
-    _, report = None, None
-    try:
-        report = json.loads(o[o.index("{"):o.rindex("}") + 1])
-    except (ValueError, json.JSONDecodeError):
-        raise Reject("gate:limits", f"limits_runner produced no JSON:\n"
+    report = _payload(o, "LIMITS")
+    if report is None:
+        raise Reject("gate:limits", f"limits_runner produced no LIMITS line:\n"
                                     f"{o[-4000:]}")
     if record:
         BASELINE_DIR.mkdir(parents=True, exist_ok=True)
@@ -703,12 +712,24 @@ def main():
             "ppa_tinytpu",
             lambda: cosim_ppa(slot, env, work, a.out, spec["scored_shapes"]))
         check("cosim")
+        # Every case is asked for csynth, including the ones that do not
+        # synthesise at HEAD: a candidate that made `systolic_1d`
+        # synthesisable has made a second architecture EXPRESSIBLE, which is
+        # this project's standard and is worth more than a faster current
+        # design. `CSYN_OK` says which cases csynth refuses today, and a case
+        # that csynths anyway is recorded in `newly_expressible`.
         syn = stage("ppa_cases", lambda: gate_cases(
-            slot, env, work, a.out, design_cases.PPA_CASES, True))
+            slot, env, work, a.out, design_cases.ALL_CASES, True,
+            allow_csyn_failure=True))
         check("the design cases' csynth")
+        newly = sorted(
+            n for n, rep in (syn or {}).items()
+            if not design_cases.CSYN_OK.get(n, True)
+            and (rep.get("csyn") or {}).get("latency_worst") is not None)
+        result["newly_expressible"] = newly
         for name, rep in (syn or {}).items():
             c = rep.get("csyn") or {}
-            if "skipped" in c:
+            if "skipped" in c or "failed_as_expected" in c or not c:
                 continue
             ppa[name] = {"cycles": {"latency": c.get("latency_worst"),
                                     "interval": c.get("interval_max")},
@@ -731,7 +752,11 @@ def main():
             base = baseline_ppa(ref)
             cases = {n: objective.case_verdict(base["cases"][n], ppa[n])
                      for n in ppa if n in base.get("cases", {})}
-            result["objective"] = {"cases": cases, **objective.classify(cases)}
+            limits_fixed = (result["stages"].get("limits") or {}).get("fixed", [])
+            result["objective"] = {
+                "cases": cases,
+                **objective.classify(cases, newly_expressible=newly,
+                                     limits_fixed=limits_fixed)}
             if base.get("WARNING"):
                 result["objective"]["WARNING"] = base["WARNING"]
             over = result["objective"]["over_budget"]

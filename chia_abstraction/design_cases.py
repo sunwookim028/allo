@@ -318,7 +318,12 @@ def run(argv) -> tuple[int, dict]:
     ap = argparse.ArgumentParser()
     ap.add_argument("name", choices=sorted(CASES))
     ap.add_argument("--work", required=True)
-    ap.add_argument("--csyn", action="store_true")
+    ap.add_argument("--csyn", action="store_true",
+                    help="run csynth. It is ATTEMPTED even for a case CSYN_OK "
+                         "says Vitis refuses today: a candidate that made it "
+                         "synthesise has made a second architecture "
+                         "expressible, and the harness has to be able to see "
+                         "that. The caller tolerates the failure.")
     ap.add_argument("--no-csim", action="store_true")
     a = ap.parse_args(argv)
 
@@ -364,10 +369,7 @@ def run(argv) -> tuple[int, dict]:
             return 1, rep
 
     # 3. csynth: the PPA feedback for this case.
-    if a.csyn and not CSYN_OK[a.name]:
-        rep["csyn"] = {"skipped": "this case is not synthesisable on this "
-                                  "host; see CSYN_OK"}
-    elif a.csyn:
+    if a.csyn:
         t = time.time()
         prj = work / f"{a.name}.csyn.prj"
         s3 = df.customize(region)

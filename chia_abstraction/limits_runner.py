@@ -147,10 +147,11 @@ def main() -> int:
     if a.against:
         print(json.dumps(compare(json.loads(a.against.read_text()), report),
                          indent=1))
-    else:
-        print(json.dumps({"verdicts": report["verdicts"],
-                          "silent": report["silent"],
-                          "seconds": report["seconds"]}, indent=1))
+    # A TAGGED single line, as suite_runner's `SUITE` is: the per-item
+    # progress lines above contain `{...}` too, so an untagged "first { to
+    # last }" extraction is not JSON. It was not, and gate:limits rejected the
+    # unmodified tree on it.
+    print("LIMITS " + json.dumps(report, sort_keys=True), flush=True)
     return rc
 
 
