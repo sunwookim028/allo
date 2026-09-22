@@ -712,6 +712,17 @@ express on this build at all.
      - not expressible (K > MAXDIM)
      - **4305**
 
+The tiled row is the interesting one twice over: the shape has K twice
+``MAXDIM``, and 4305 cycles is 1.05x the 4096 items its critical unit (``vru``,
+one per activation row and one per ``mm`` row) is promised in the header --
+so the machine is not idling its way through a tiled program.
+
+**Why 128x768x768 is a simulator result and not a cosim one.** That header
+promises ``vru`` 9,437,184 items, so no RTL simulation of it finishes in a
+night; 32x512x128 promises 262,144 and is the largest that was attempted here.
+The shapes above and their dynamic work counts come from ``expand()``, which
+is the same walk the assembler uses to fill the header.
+
 Resources and the estimated clock, same two builds:
 
 .. list-table::
