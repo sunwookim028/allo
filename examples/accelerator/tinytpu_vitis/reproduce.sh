@@ -48,7 +48,10 @@ Stages, in order:
      reference model held to it; must print ISA OK;
   2. bench_isa.py -- the published functional sweep, must print ALL EXACT;
   3. stress_isa.py -- the correctness gate, must print STRESS OK;
-  3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK;
+  3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK, then
+     mutate_actions.py, which breaks one Action of one instruction in
+     isa_spec.json instead of breaking the design, and must print
+     MUTATE ACTIONS OK;
   4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
      csynth, one cosim per shape -- and compares the cycle counts with the
      published 171 / 261 / 417 / 483 / 685. Skipped by --no-cosim.
@@ -155,6 +158,11 @@ if [ "$WITH_MUTANTS" = 1 ]; then
         "$PY" mutate.py | tee "$LOGS/mutate-reproduce.log"
     fi
     grep -q "MUTATE OK" "$LOGS/mutate-reproduce.log"
+    # The same question asked of the DECLARATION rather than the design: is a
+    # wrong Action refused, and by which level? ~3 min, no Vitis.
+    echo "== mutate_actions.py (does a wrong Action get refused, and by what?)"
+    "$PY" mutate_actions.py | tee "$LOGS/mutate-actions-reproduce.log"
+    grep -q "MUTATE ACTIONS OK" "$LOGS/mutate-actions-reproduce.log"
 fi
 
 [ "$NO_COSIM" = 1 ] && { echo "REPRODUCED (functional only)"; exit 0; }
