@@ -14,10 +14,10 @@ is `tinytpu_isa`.
 - `NAR` = 136
 - `IMEM_SIZE` = 56
 - `DMA_WORDS` = 16
-- `selected by` = TPU_DMA_WIDEN=1 (parametric; DMA_WORDS=1 is the shipped design)
+- `selected by` = `TPU_DMA_WIDEN=1` (parametric; `DMA_WORDS=1` is shipped)
 - `data type` = int8 x int8 -> int32, mvout clips to int8
 
-Emitted from allo commit `4f950780d607d5989a8549b4aa8b44c988720d70`.
+Emitted from allo commit `136520426248e415865ca62b21ccc8d270031733`.
 
 ## Measured on this configuration
 
@@ -33,17 +33,49 @@ Vitis `csynth` on `xcu280-fsvh2892-2L-e`, 3.33 ns target:
 - LUT: 31396
 - BRAM: 116
 - DSP: 14
-- estimated clock: 2.431 ns (411.4 MHz)
-- vs shipped: FF +6513 (+37%), LUT +4842 (+18%), BRAM +64 (+123%), clock unchanged
+- target clock period: 3.33 ns
+- estimated clock period: 2.431 ns (411.4 MHz)
+
+## What an ASIC number from this can and cannot say
+
+The agreed scope is **DC synthesis only**: memories as
+flip-flops (`sram_mode='none'`), FreePDK-45nm with
+`view-tiny`, `topographical=True`. That yields **relative cell
+area** and nothing else -- no absolute area, no routed timing,
+no power, no DRC or LVS. The FPGA figures above are the
+reference point the design is known by, not something an ASIC
+flow should reproduce: a 45 nm standard-cell area has no
+relationship to a BRAM count.
+
+- **Flip-flop memories are not this design's memories.** On
+  the FPGA the scratchpad, vector registers and accumulator
+  are block RAM; mapped to flops they will **dominate the cell
+  area**, and the resulting number then says more about the
+  memory treatment than about the datapath. A comparison
+  against any flow that used provided SRAM macros needs the
+  same memory treatment on both sides.
+- **The useful comparison is between our own variants**,
+  synthesised identically -- the shipped design against the
+  burst-widened candidate against T=8 -- and not between these
+  and another project's numbers.
+- **There is no testbench here.** The design's testbench is
+  C++, generated per shape by `cosim.py`, and drives the
+  design through its AXI interfaces; it is not synthesisable
+  and would not help a synthesis-only flow.
 
 ## Notes
 
-- THE LIVE DESIGN DECISION. Differs from the shipped build ONLY in dma_ld's burst loop: 16 packed words per iteration (one 64-byte beat) instead of 1. Everything else, including the memories it addresses, is identical -- which is what makes the cycle difference price the burst prologue exactly.
-- Worth 720 cycles at 48^3 and 960 at 64^3, i.e. 61% and 55% of the whole deficit against Gemmini DIM=4. Landing it would take the T=4 steady-state deficit from 1.09x to 1.04x at 64x64x64.
-- The win is LATENCY-INVARIANT: exactly -720 / -960 at m_axi_latency 0, 16, 64, 88 and 100 (0-243 ns). The knob does not choose this decision -- see docs/source/designs/benchmarks.rst. The estimated clock does not move either, so widening the DMA datapath does not lengthen the critical path and this is a pure cycles-for-BRAM trade.
-- The +123% BRAM is the whole argument against it and is the only open question.
-- Bit-exact on bench_isa (ALL EXACT) and stress_isa (STRESS OK 640/640), and deterministic: two independent csynth+cosim runs returned 9569 / 21163 both times.
-- Descended from chia_agent/evidence/isa-run1-20260919/param_burst.diff, which was a patch; here it is a build parameter.
+- **THE LIVE DESIGN DECISION.** Differs from the shipped build ONLY in `dma_ld`'s burst loop: 16 packed words per iteration (one 64-byte beat) instead of 1. Everything else, including the memories it addresses, is identical -- which is what makes the cycle difference price the burst prologue exactly.
+- Worth 720 cycles at 48^3 and 960 at 64^3: **61% and 55% of the whole deficit against Gemmini DIM=4**. Landing it takes the T=4 steady-state deficit from 1.09x to 1.04x at 64x64x64.
+- The win is LATENCY-INVARIANT: exactly -720 / -960 at `m_axi_latency` 0, 16, 64, 88 and 100 (0-243 ns). The estimated clock does not move either, so widening the DMA datapath does not lengthen the critical path -- this is a pure cycles-for-BRAM trade. See `docs/source/designs/benchmarks.rst`.
+- **The +123% BRAM is the whole argument against it** and, on the FPGA side, the only open question. On the ASIC side that BRAM becomes flip-flops, so this variant is where the memory-treatment caveat above bites hardest -- expect it to look far worse in cell area than its +64 BRAM suggests.
+- Bit-exact on `bench_isa` (ALL EXACT) and `stress_isa` (STRESS OK 640/640), and deterministic: two independent csynth+cosim runs returned 9569 / 21163 both times.
+- Descended from `chia_agent/evidence/isa-run1-20260919/param_burst.diff`, which was a patch; here it is a build parameter.
+- Vitis HLS 2023.2, `csynth_design`, part `xcu280-fsvh2892-2L-e`, 3.33 ns target, `wrap_io=False`, `configs={'align_value': 64}`, `config_interface -m_axi_max_widen_bitwidth 512`.
+- Vitis also emits one four-line `.dat` memory-initialisation file for the sequencer's LOOP_DEPTH-deep `iv_now` RAM. **No module in this export references it** -- verified by grepping every file for `$readmemh`, zero hits -- so it is inert for a synthesis-only flow. `export_rtl.py` now copies such files anyway (they are data, not compile units, and are deliberately absent from the manifest); this export predates that fix, so regenerate if a flow ever needs it.
 
 `sv2v_manifest.f` and `MANIFEST.json` are generated by
-`examples/accelerator/tinytpu_vitis/export_rtl.py`.
+`examples/accelerator/tinytpu_vitis/export_rtl.py` from the
+module instantiation graph of these files. Vitis emits no
+compile-order file for a dataflow region, so the graph is the
+only source; do not hand-edit either.
