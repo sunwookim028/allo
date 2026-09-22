@@ -282,7 +282,7 @@ Four layers, reported in the order a program fails them:
        Static, so "you padded M into C" is caught before anything runs
 
 The rejection message is part of the deliverable
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A generating agent acts on the message and on nothing else, so every
 rejection carries a rule name, what happened, the rule that was broken, what
@@ -391,6 +391,13 @@ testbench to keep are all imported from ``cosim.py`` rather than restated.
 Point ``TPU_PRJ`` somewhere with room and delete the project afterwards; disk
 on this host is tight.
 
+``cosim_design`` runs under a deadline (``ACT_COSIM_TIMEOUT``, default 600 s),
+and on expiry the whole process group -- ``vitis_hls`` and the ``xsim`` it
+spawned -- is killed and the verdict reads ``RTL DID NOT COMPLETE``, with what
+csim said and the last inter-transaction progress line. A submission whose RTL
+never finishes is a verdict about the submission; it must not be a hung judge.
+That case is not hypothetical: see :ref:`act-specs-rtl-hang`.
+
 
 .. _act-specs-kpn-verdict:
 
@@ -420,33 +427,42 @@ measured in this session:
      - cost to compute
      - max \|error\| in sample, 5 points
    * - ``kpn_rounds`` (barrier-synchronous KPN)
-     - ~0.1-3 s per program
+     - 0.6-16 ms
      - **12.6%**
    * - dynamic instruction count
-     - microseconds
+     - 0.1-0.3 ms
      - 12.9%
    * - ``accu`` header count
-     - microseconds
+     - 0.1-0.3 ms
      - 13.1%
    * - ``dma_ld`` header count
-     - microseconds
+     - 0.1-0.3 ms
      - 8.0%
    * - ``vru`` header count
-     - microseconds
+     - 0.1-0.3 ms
      - 8.7%
    * - ``max`` over the five unit counts
-     - microseconds
+     - 0.1-0.3 ms
      - **9.2%**
 
+(Timed in this session: 116-314 us for ``cycles.estimate``, 0.6-15.5 ms for
+``cycles.kpn_rounds``, on the same programs.)
+
 So the KPN round count is *less* accurate than a single number the assembler
-already computes, and four orders of magnitude more expensive: at
-``gemm_16x16x16`` it predicts 1484 rounds against 686 measured cycles, and the
-1484 is dominated by the 4x4 array's 32 weight-loader and PE processes each
-taking a round to pass a token along a chain that the RTL walks in one cycle.
-A barrier-synchronous scheduler charges a round per *process* per hop; the
-hardware charges a cycle per *link*. Fixing that means modelling the array's
-chains as pipelines rather than as processes, which is a different model, not
-a calibration of this one.
+already computes, and fifty times more expensive: at ``gemm_16x16x16`` it
+predicts 1484 rounds against 686 measured cycles, and the 1484 is dominated by
+the 4x4 array's 32 weight-loader and PE processes each taking a round to pass a
+token along a chain that the RTL walks in one cycle. A barrier-synchronous
+scheduler charges a round per *process* per hop; the hardware charges a cycle
+per *link*. Fixing that means modelling the array's chains as pipelines rather
+than as processes, which is a different model, not a calibration of this one.
+
+It is not a complete deadlock oracle either. On ``relu_16x16`` it reports
+``minimum channel depth 1`` and no deadlock, and the RTL does not complete
+(:ref:`act-specs-rtl-hang`). It models the channel *counts* -- who is promised
+how much work -- and not the latencies and pipeline depths a real hang can
+come from, so it catches assembler/microarchitecture mismatches and nothing
+else. That is still worth having, and it is worth knowing its edge.
 
 ``kpn_model``'s real value is the layer it already occupies in the judge: it
 is the ``protocol`` check in ``judge.py legal``, where a promised-work

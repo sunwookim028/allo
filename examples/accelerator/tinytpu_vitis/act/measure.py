@@ -10,6 +10,8 @@ promise requires -- is imported from `cosim.py` rather than restated. Prose:
 docs/source/extensions/act_specs.rst."""
 
 import os
+import signal
+import subprocess
 import sys
 
 import numpy as np
@@ -25,6 +27,39 @@ from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E40
 PRJ = os.path.abspath(os.environ.get(
     "TPU_PRJ", os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "act_sweep.prj")))
+COSIM_TIMEOUT = int(os.environ.get("ACT_COSIM_TIMEOUT", 600))
+
+
+def vitis_bounded(prj, tcl, log, timeout=COSIM_TIMEOUT):
+    """`cosim.vitis` with a deadline, because an RTL that never completes must
+    be a verdict on the submission rather than a hung judge. Returns
+    `(log text, whether it finished)`; on expiry the whole process group,
+    ``vitis_hls`` and the ``xsim`` it spawned, is killed."""
+    open(os.path.join(prj, "run.tcl"), "w").write(tcl)
+    with open(os.path.join(prj, log), "w") as f:
+        p = subprocess.Popen(
+            ["bash", "-lc",
+             f"source {cosim.VITIS} && cd {prj} && vitis_hls -f run.tcl"],
+            stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            p.wait(timeout=timeout)
+            finished = True
+        except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            p.wait()
+            finished = False
+    return open(os.path.join(prj, log), errors="replace").read(), finished
+
+
+def free_bytes(sp):
+    """Bytes of `C` the spec leaves free: inside the write window, outside the
+    output region. Everything else must equal what `isa_ref` leaves there."""
+    free = np.zeros((MAXDIM, MAXDIM), np.int8)
+    wrs, wcs = spec_mod.write_window(sp)
+    free[wrs, wcs] = 1
+    _, rs, cs = spec_mod.region(sp, sp["output"])
+    free[rs, cs] = 0
+    return free
 
 
 def testbench(sp, prog, dist="small", seed=700):
@@ -35,7 +70,7 @@ def testbench(sp, prog, dist="small", seed=700):
     words = assemble(prog)
     imem = np.zeros(IMEM_SIZE, np.uint64)
     imem[: len(words)] = np.array(words, np.uint64)
-    allowed, _ = _window_mask(sp)
+    free = free_bytes(sp)
     return "".join([
         "#include <cstdio>\n#include <cstdint>\n",
         'extern "C" void tinytpu_isa(uint64_t *, int8_t *, int8_t *, int8_t *);\n',
@@ -44,7 +79,7 @@ def testbench(sp, prog, dist="small", seed=700):
         cosim.carr("B", B, "int8_t"),
         cosim.carr("C0", C0, "int8_t"),
         cosim.carr("want", want, "int8_t"),
-        cosim.carr("free_byte", allowed.reshape(-1), "int8_t"),
+        cosim.carr("free_byte", free.reshape(-1), "int8_t"),
         f"static alignas(64) int8_t C[{MAXDIM * MAXDIM}];\n",
         f"""
 int main() {{
@@ -59,16 +94,6 @@ int main() {{
 """])
 
 
-def _window_mask(sp):
-    """Bytes of `C` whose value the spec leaves free, and the output region."""
-    allowed = np.zeros((MAXDIM, MAXDIM), np.int8)
-    wrs, wcs = spec_mod.write_window(sp)
-    allowed[wrs, wcs] = 1
-    _, rs, cs = spec_mod.region(sp, sp["output"])
-    allowed[rs, cs] = 0
-    return allowed, (rs, cs)
-
-
 def synthesize(prj=PRJ):
     from allo.dataflow import customize
     s = customize(tinytpu_isa)
@@ -81,13 +106,25 @@ def synthesize(prj=PRJ):
     return prj
 
 
-def measure(sp, prog, prj=PRJ, tag=None):
-    """`(cycles, testbench line)` from one `cosim_design` on an existing build."""
+def last_rtl_progress(text):
+    lines = [l for l in text.splitlines() if "RTL Simulation :" in l and "@" in l]
+    return lines[-1].strip() if lines else ""
+
+
+def measure(sp, prog, prj=PRJ, tag=None, timeout=COSIM_TIMEOUT):
+    """`(cycles, one line about the run)` from one `cosim_design` on an
+    existing build. `cycles` is None when the RTL did not pass, and the line
+    says whether that was a mismatch, a timeout, or no testbench output."""
     tag = tag or sp["name"]
     open(os.path.join(prj, "tb.cpp"), "w").write(testbench(sp, prog))
     rpt = os.path.join(prj, "out.prj/solution1/sim/report/tinytpu_isa_cosim.rpt")
     if os.path.exists(rpt):
         os.remove(rpt)
-    text = cosim.vitis(prj, cosim.TCL_COSIM, f"cosim_{tag}.log")
+    text, finished = vitis_bounded(prj, cosim.TCL_COSIM, f"cosim_{tag}.log",
+                                   timeout)
     lines = [l.strip() for l in text.splitlines() if "mismatches" in l]
+    if not finished:
+        return None, (f"RTL DID NOT COMPLETE within {timeout}s; csim said "
+                      f"{lines[0] if lines else 'nothing'}; last RTL progress "
+                      f"{last_rtl_progress(text) or 'none'}")
     return cosim.cycles(prj), (lines[-1] if lines else "no TB line")
