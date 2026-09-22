@@ -148,14 +148,20 @@ class BudgetExhausted(Exception):
 
 
 class Budget:
-    """Global spend cap across every worker, read from opencode's DB."""
+    """Global spend cap across every worker, read from opencode's DB.
 
-    def __init__(self, cap_usd: float, t0_ms: int):
-        self.cap, self.t0 = cap_usd, t0_ms
+    `billable` is what pre-flight decided: the scripted test model on loopback
+    cannot be billed, and opencode's DB has no project on a session, so its
+    window also holds any OTHER CHIA run on this host. Counting that against a
+    run that cannot spend is how `test_harness.py`'s loop phase came to refuse
+    its first model call at $0 while another track's paid run was live."""
+
+    def __init__(self, cap_usd: float, t0_ms: int, billable: bool = True):
+        self.cap, self.t0, self.billable = cap_usd, t0_ms, billable
         self.largest_call = DEFAULT_CALL_USD
 
     def spent(self) -> float:
-        return spent_since(self.t0)["usd"]
+        return spent_since(self.t0)["usd"] if self.billable else 0.0
 
     def check(self, what: str):
         spent = self.spent()
@@ -427,11 +433,11 @@ def main() -> None:
     # Before any worker, tool server or model call: the right billing account,
     # the API, a per-run cap, and room under the cumulative cap.
     t0 = args.t0_ms or int(time.time() * 1000)
-    preflight.require(args.budget_usd, run_t0_ms=t0)
+    charge = preflight.require(args.budget_usd, run_t0_ms=t0)
     args.budget_usd = float(args.budget_usd)
     spec = args.spec_dir or args.log_dir / "spec"
     work = args.work_dir or REPO_ROOT / ".chia_scratch" / args.log_dir.name / "eval"
-    budget = Budget(args.budget_usd, t0)
+    budget = Budget(args.budget_usd, t0, charge.get("mode") != "test-model")
     raise SystemExit(run(args.task, args.iterations, args.max_debug_attempts,
                          args.log_dir.resolve(), spec.resolve(), work.resolve(),
                          args.tool_name, budget))
