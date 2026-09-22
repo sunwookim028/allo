@@ -327,7 +327,7 @@ def run(args, budget: Budget) -> int:
         # no tools -- and the agent then spends an iteration doing nothing.
         # Measured: that is exactly what happened on the first launch.
         probe = tool.check_policy()
-        print(f"  tool server: {tool.tool_info.hostname}:{tool.tool_info.port}"
+        print(f"  tool server: {getattr(tool, 'hostname', '?')}:{getattr(tool, 'port', '?')}"
               f" -- check_policy says {probe!r}", flush=True)
         if "No changes" not in probe:
             print(f"Refusing to search: the tool surface is not answering "
