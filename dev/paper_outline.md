@@ -122,6 +122,30 @@ hole was the one its author predicted. The correct rule needs the layout map
 composed with each store's affine index, plus the initiation interval — **both
 already in the IR, neither consulted.** Counting banks is not checking layout.
 
+**A second observation about Arm A, from its later real run:** it reached for
+`bind_storage` *again* — 142 lines across `customize.py` and two emitters,
+declaring `s.bind_storage("i", "buf", "ram_s2p", "bram")`. So across both of
+its runs it independently chose memory ports **and** the already-existing
+declaration surface. The consistency is itself the finding: what an agent
+reaches for is stable, and it is a declaration rather than a checker.
+
+**The class-level result**, which is what survives past this design:
+
+> A resource predicate is the wrong **shape** for this class of claim.
+> Counting occupants against capacity discards which element is touched in
+> which cycle, and both failure directions are recoveries of that discarded
+> information. The sound form is a **calendar**: index map composed with
+> initiation interval. The IR already carries both.
+
+The structural contrast is MiniTPU's assembler, whose `write_port` is a *set of
+cycles* rather than a count, so a bundle advances until none of its writeback
+cycles meets one already booked — both failure directions become impossible by
+construction. Two honesty constraints travel with it: their safety is **partly
+structural luck** (one write port, no banking, hence no layout to compose,
+which makes the finding *predictive* — the bug arrives with banking), and the
+calendar has its **own exposure one level down**, being only as right as the
+declared writeback span it books.
+
 **Gap.** n=2 arms, one seeded measurement. Replication (3+ unseeded runs) is
 queued. And Arm B's diagnosis was *factually wrong on its own tree* while its
 artefact was right, which needs stating rather than smoothing over.
@@ -189,6 +213,11 @@ repeatable ways, and the failures are about the *instruments*, not the agents.
   export; and a leak detector that crashed and was read as clean. Hence the
   standing rule: *a negative result from an instrument is only evidence if the
   instrument can be shown to have run.*
+- The billing instrument **recurred with a diagnosed cause**: a call that
+  reported $0.00 had in fact cost $4.33, because a **timed-out call is billed
+  and reports zero**. The spend caps read the database rather than the usage
+  field for exactly this reason. Worth including because it is the one case
+  where the failure mode was later *explained* rather than merely observed.
 
 **Gap.** None in the evidence; the risk is tonal. This section is only worth
 writing if it generalises past our harness, and the generalisable form is the
