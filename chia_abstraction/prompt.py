@@ -217,6 +217,82 @@ without any design being edited. A primitive and its analyses must land
 TOGETHER: syntax with no effects and no legality rules makes the IR less
 analysable, not more.
 
+
+FIRST, DIAGNOSE THE REFUSAL. THIS IS GRADED SEPARATELY FROM THE REPAIR.
+
+When something will not compile, will not schedule, or will not synthesise, it
+is one of four things, and they need different answers:
+
+  (1) CANNOT EXPRESS   the abstraction has no way to say what the design means.
+                       Answer: a new primitive, attribute or pass.
+  (2) CANNOT REFUSE    the abstraction accepts it and silently produces
+                       something wrong, or accepts it and drops it. Answer: a
+                       legality rule or an `emitError`, NOT a new feature.
+                       Issues #23, #24 and #31 are all of this kind.
+  (3) NOT AN ALLO PROBLEM the constraint lives in the target toolchain, the
+                       instruction encoding, or the design's own contract.
+                       Answer: say so and stop. A patch to Allo here is a
+                       misdiagnosis that will pass every gate and help nothing.
+  (4) ALREADY EXPRESSIBLE the abstraction can already say it and nobody used
+                       it. Answer: say which primitive, and stop.
+
+This project's own engineers have got this wrong twice in one night, on the
+same example, in both directions. So: state which of the four you think you
+have, and what evidence you have for it, BEFORE you propose anything. A correct
+diagnosis with no patch is a real result here. A patch built on a wrong
+diagnosis is worse than nothing, because it will pass the gates.
+
+Two specific traps, both measured on this project:
+
+  * A mapping census over this design refused 1,150 of 1,226 candidate loop
+    nests with the reason code `acc-peel`. That was attributed to Allo, twice,
+    and it is NOT an Allo limitation: at the Allo level the predicate is an
+    `scf.if` on `cmpi eq, index_cast(k), 0`, Allo builds it happily, nothing
+    refuses it, and no primitive removes it. The obstacle is ADDITIVE
+    MONOTONICITY IN AN ADDRESS TERM of the design's own instruction encoding.
+    It is case (3). An agent that "fixes" it in the compiler has misdiagnosed
+    it.
+  * Widening that design's address-generation unit raised the count of
+    encodable nests from 5 to 7 and DID NOT CHANGE THE NEST THE MAPPER CHOSE.
+    Cycles did not move; area did. If you propose an abstraction on the promise
+    of unlocking mapping space, say why your case is not that one.
+
+ONE TARGET WHOSE VALUE IS ALREADY DEMONSTRATED, if you want a concrete one.
+
+Two things now exist that are the same question in two vocabularies:
+
+  * `allo/encoding.py`'s `Encoding` and `s.encodable_on` make a target's
+    INSTRUCTION-WORD BUDGET a checkable schedule property, with five legality
+    rules -- `predicated-field`, `address-terms`, `loop-depth`,
+    `static-trip-count`, `affine-addressing` -- re-checked after EVERY
+    subsequent primitive, so `s.split("i", 3)` on an extent of 10 is refused at
+    the split rather than at the build. `tests/test_encoding.py` has 12 tests;
+    the brief is `docs/source/developer/extending_allo.rst`.
+  * A hand-written mapper in the design's own harness enumerates 1,226
+    candidate loop nests at 16x16x16 and refuses them with ITS OWN reason
+    codes.
+
+One is resident in the compiler; the other is hand-coded per design. Making a
+design DECLARE its encoding and get its refusals FROM THE COMPILER, instead of
+someone writing a refusal table per design, is the generalisation this project
+wants.
+
+The test of success is NOT that the current design still works. It is that a
+SECOND design with a different instruction word gets its legal mapping set
+without anyone writing a second mapper. That is what "generalisable across
+design cases" means here.
+
+If you take this on, two facts about the answer key, because a plausible
+summary of it is wrong in a way that looks right:
+
+  * The census must be ALL CAUSES, not first cause. By first cause it is 1,150
+    `acc-peel` / 55 `ar-distance` / 13 `AGU_TERMS` / 3 `LOOP_DEPTH` -- but 930
+    of those nests ALSO violate the RAW-distance contract. A first-cause
+    histogram hides the overlap, and a unification that reproduces only first
+    causes is subtly wrong.
+  * Sorted by the express/refuse distinction above it is 1,166 EXPRESS against
+    55 REFUSE. Most of the refusals are case (2) or (3), not case (1).
+
 MEASURED LIMITATIONS WORTH ATTACKING. These are OPEN items from Allo's
 limitations register, each with a GitHub issue on `sunwookim028/allo`. They are
 problems, not solutions; several have no prototype at all. Pick one, or propose
@@ -349,8 +425,15 @@ Already attempted in this search:
 {tried}
 
 Propose ONE candidate. Read before you edit. Build before you claim anything
-about C++. Then, in your final message: what abstraction you added, which
-limitation it removes, which design cases it should pay off on and why, the
-test you would add and where, and whether it relies on anything the gates
-happen not to exercise.
+about C++. Then, in your final message, in this order:
+
+1. THE DIAGNOSIS: which of the four kinds of refusal you think you found, and
+   your evidence. If it is (3) or (4), say so and stop -- that is a result.
+2. What abstraction you added, and which of the five places a primitive lands
+   in you touched.
+3. Which design cases it should pay off on, and why. If it helps one and not
+   another, say so -- that is a finding, not a failure.
+4. The test you WOULD add: which file, which three cases. You cannot write it.
+5. Whether it relies on anything the gates happen not to exercise, and whether
+   what it expresses is a promise rather than a fact.
 """

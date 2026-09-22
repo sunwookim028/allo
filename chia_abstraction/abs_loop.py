@@ -54,6 +54,7 @@ DESIGN_AGENT = REPO / "examples/accelerator/tinytpu_vitis/chia_agent"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DESIGN_AGENT))
 
+import heldout                                               # noqa: E402
 import objective                                             # noqa: E402
 import patch_policy                                          # noqa: E402
 import prompt as brief                                       # noqa: E402
@@ -225,8 +226,16 @@ def ensure_tree(tree: Path, ref: str) -> None:
 
 
 def run(args, budget: Budget) -> int:
-    ref = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO,
-                         capture_output=True, text=True).stdout.strip()
+    # CHIA_FROZEN_REF, not HEAD: the held-out experiment evaluates at a
+    # generated ref where the answer has been removed, and the agent's tree,
+    # the evaluator's slot and the prompt must all agree on it.
+    ref = subprocess.run(
+        ["git", "rev-parse", "--verify",
+         os.environ.get("CHIA_FROZEN_REF", "HEAD") + "^{commit}"],
+        cwd=REPO, capture_output=True, text=True).stdout.strip()
+    if not ref:
+        print("cannot resolve CHIA_FROZEN_REF")
+        return 2
     dirty = [l for l in subprocess.run(
         ["git", "status", "--porcelain", "--", "chia_abstraction", "tests",
          "examples/accelerator/tinytpu_vitis"], cwd=REPO, capture_output=True,
@@ -288,6 +297,12 @@ def run(args, budget: Budget) -> int:
             started, n_calls = time.time(), len(calls)
             text = brief.task(args.disposition, args.workload, args.angle,
                               baseline["cases"], history)
+            if args.heldout:
+                # The held-out experiment: the agent is given the SYMPTOM and
+                # nothing else. `heldout.py` has already removed the answer,
+                # its tests and every mention of it from the ref the agent
+                # reads, so this is the whole of its starting information.
+                text += "\n" + heldout.SYMPTOM
             text += f"""
 Your tools are prefixed `{tool.name}_`. Read first
 (`{tool.name}_read_source`, `{tool.name}_read_reference`), edit with
@@ -390,6 +405,7 @@ gates pass. The harness re-measures your final tree independently either way.
         summary = {
             "disposition": args.disposition, "workload": args.workload,
             "angle": args.angle, "model": MODEL, "ref": ref,
+            "heldout": args.heldout,
             "iterations": len(iters), "rungs_reached": rates,
             "rates": {r: round(rates[r] / n, 3) for r in RUNGS},
             "llm_usd": round(sum(c.get("cost_usd", 0) for c in calls), 4),
@@ -433,12 +449,29 @@ def main() -> None:
     ap.add_argument("--max-debug-attempts", type=int, default=1)
     ap.add_argument("--log-dir", type=Path, required=True)
     ap.add_argument("--slot", type=int, default=0)
+    ap.add_argument("--heldout", default=None, choices=("dependence",),
+                    help="the rediscovery experiment: append the measured "
+                         "SYMPTOM to the task. Requires CHIA_FROZEN_REF to be "
+                         "the held-out ref that heldout.py generated -- the "
+                         "loop refuses to start otherwise, because a run at "
+                         "HEAD would hand the agent the answer.")
     ap.add_argument("--tool-name", default="allo")
     ap.add_argument("--budget-usd", type=float,
                     default=os.environ.get("CHIA_BUDGET_USD"))
     ap.add_argument("--t0-ms", type=int,
                     default=int(os.environ.get("CHIA_RUN_T0_MS", "0")) or None)
     a = ap.parse_args()
+    if a.heldout:
+        ref = os.environ.get("CHIA_FROZEN_REF", "")
+        leak = subprocess.run(
+            ["git", "grep", "-l", "-E", heldout.LEAK_RE, ref or "HEAD"],
+            cwd=REPO, capture_output=True, text=True).stdout.strip()
+        if not ref or leak:
+            raise SystemExit(
+                f"--heldout {a.heldout} needs CHIA_FROZEN_REF set to a "
+                f"held-out ref with no leaks. ref={ref or '(unset)'}; "
+                f"leaks:\n{leak or '(none)'}\n"
+                f"Build one with: python chia_abstraction/heldout.py make")
     t0 = a.t0_ms or int(time.time() * 1000)
     # The design loop's pre-flight, reused verbatim: the right billing account,
     # the API enabled, an explicit per-run cap, and room under the cumulative

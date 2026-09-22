@@ -542,6 +542,16 @@ def cosim_ppa(slot, env, work, out, shapes):
     env = dict(env, TPU_SHAPES=",".join(shapes), TPU_PRJ=str(prj))
     ok, rc, o, sec = vouched("cosim", slot, work, env, work, COSIM_TIMEOUT,
                              log=out / "cosim.log")
+    # Preserve the evidence BEFORE any rejection: the work directory is wiped
+    # by the next evaluation, and the first time a shape failed here
+    # (4x4x4 `no TB line`, 2026-09-22) the logs were gone before they could be
+    # read. A failure with no log is not diagnosable, and a flaky PPA gate that
+    # cannot be diagnosed is worse than a slow one.
+    for f in list(prj.glob("cosim_*.log")) + list(prj.glob("*.log")):
+        try:
+            shutil.copy2(f, out / f.name)
+        except OSError:
+            pass
     if not ok:
         raise Reject("ppa:cosim", o[-4000:])
     try:
@@ -575,7 +585,6 @@ def cosim_ppa(slot, env, work, out, shapes):
                 raise Reject("ppa:cosim", f"{s}: report says {n} cycles, "
                                           f"simulated time says {sim:.0f}")
         cycles[s] = int(n)
-        shutil.copy2(log, out / log.name) if log.exists() else None
     return {"cycles": cycles, "area": synth["area"],
             "estimated_ns": synth["estimated_ns"], "seconds": sec}
 

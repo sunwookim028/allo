@@ -243,10 +243,17 @@ def evaluate(patch: Path | None, out: Path, slot: int, disposition="maintaining"
         line = line.strip()
         if line.startswith("{") and line.endswith("}"):
             try:
-                return json.loads(line)
+                v = json.loads(line)
             except json.JSONDecodeError:
                 continue
-    return {"ok": False, "stage": "evaluator", "detail": text[-3000:]}
+            # `evaluate_abs.main` POPS `detail` out of the JSON and prints it
+            # on its own lines, so a test that reads `verdict["detail"]` sees
+            # nothing. The captured stdout is where the rejection's evidence
+            # is -- the compiler diagnostic, the failing test names.
+            v["_stdout"] = text
+            return v
+    return {"ok": False, "stage": "evaluator", "detail": text[-3000:],
+            "_stdout": text}
 
 
 # ---------------------------------------------------------------------------
@@ -434,8 +441,7 @@ def phase_known_good(R, work, slot):
            True)
     # 1. blocking: gate:tests must catch it.
     v = evaluate(patch, work / "revert_blocking", slot)
-    regressions = json.dumps((v.get("stages") or {}).get("tests", {}))
-    detail = str(v.get("detail", ""))
+    detail = v.get("_stdout", "") or str(v.get("detail", ""))
     R.case("b reverting s.dependence's emitter branch is REJECTED",
            "rejected at gate:tests, naming test_dependence_pragma",
            f"{v.get('stage')}; mentions dependence: "
@@ -464,13 +470,14 @@ def phase_broken(R, work, slot):
     patch = make_patch([(EMIT, INVERT_OLD, INVERT_NEW)],
                        work / "invert_dependence.diff")
     v = evaluate(patch, work / "invert", slot)
+    detail = v.get("_stdout", "")
     R.case("c a false dependence claim (the pragma's truth value inverted)",
            "builds and imports, then REJECTED by a correctness gate",
            f"{v.get('stage')} (build "
            f"{'ok' if (v.get('stages') or {}).get('build') else 'not reached'})",
            (not v.get("ok")
             and v.get("stage") not in ("policy", "gate:build", "gate:import")),
-           {"detail": str(v.get("detail", ""))[-1200:]})
+           {"detail": detail[-1500:]})
 
 
 # -- phase e: a C++ change that does not compile -----------------------------
@@ -479,7 +486,7 @@ def phase_cpp_fails(R, work, slot):
                        work / "cpp_break.diff")
     t = time.time()
     v = evaluate(patch, work / "cpp_break", slot)
-    detail = str(v.get("detail", ""))
+    detail = v.get("_stdout", "")
     left = subprocess.run(
         ["bash", "-lc",
          f"pgrep -af 'slot{slot}' | grep -v pgrep | head -5"],

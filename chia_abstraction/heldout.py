@@ -78,6 +78,24 @@ VHLS_TESTS = "tests/test_vhls.py"
 
 HELDOUT_BRANCH = "chia-abstraction-heldout-dependence"
 
+#: The BETTER held-out base, prepared on main at
+#: `examples/accelerator/tinytpu_vitis/chia_agent/holdout/`: the parent of the
+#: commit that introduced `s.dependence`. At that commit the primitive has
+#: never existed, no test mentions it, the design does not call it and no
+#: document describes it -- the absence is REAL rather than simulated, and
+#: there is no redaction to get wrong. Its `symptom.md` also records one
+#: deliberate near-leak (the word "dependence" itself, which is the vendor's
+#: own term and what the scheduling report says) rather than removing it.
+#:
+#: `--base` uses it. The redaction path below (`make`) is kept as the
+#: alternative for a primitive with no such parent commit, and because its
+#: leak detector is the thing that showed how many traces a redaction leaves:
+#: eleven, including the design loop's own recorded evidence.
+PREPARED_BASE = "a4151ca0"
+PREPARED_ANSWER = "bbea2af0"
+PREPARED_SYMPTOM = ("examples/accelerator/tinytpu_vitis/chia_agent/holdout/"
+                    "symptom.md")
+
 #: ONE pattern set, used both to redact and to detect a leak, so the two
 #: cannot disagree. A held-out ref whose leak check passes because the checker
 #: looks for less than the redactor removed is worthless.
@@ -308,15 +326,95 @@ def make(out: Path) -> dict:
     return removed
 
 
+def graft(out: Path, base: str = PREPARED_BASE) -> dict:
+    """The prepared base commit, with THIS harness grafted on.
+
+    `a4151ca0` predates `chia_abstraction/` entirely, so the evaluator's own
+    files are not in it -- and the ladder runs them FROM the slot. So the
+    held-out ref is `base` plus this harness and the design's gates, with the
+    redaction applied to the harness's OWN text only (the prompt, the policy
+    comments, this file). Allo, the design, the tests and the documentation are
+    untouched at `base`: the absence there is real.
+    """
+    head = sh(["git", "rev-parse", "HEAD"]).strip()
+    base_ref = sh(["git", "rev-parse", "--verify", base + "^{commit}"]).strip()
+    wt = REPO / ".chia_scratch" / "heldout-graft"
+    if (wt / ".git").exists():
+        sh(["git", "worktree", "remove", "--force", str(wt)], check=False)
+    sh(["git", "worktree", "add", "--detach", str(wt), base_ref])
+    # This harness, and the design gates the ladder runs, from HEAD.
+    for path in ("chia_abstraction",
+                 "examples/accelerator/tinytpu_vitis/chia_agent",
+                 "examples/accelerator/tinytpu_vitis/stress_isa.py",
+                 "examples/accelerator/tinytpu_vitis/isa_ref.py",
+                 "examples/accelerator/tinytpu_vitis/kpn_model.py",
+                 "tests/limits"):
+        sh(["git", "checkout", head, "--", path], cwd=wt, check=False)
+    # Redact only what the graft brought in.
+    grafted = [l for l in sh(["git", "diff", "--name-only", base_ref],
+                             cwd=wt).splitlines() if l.strip()]
+    redacted = []
+    for rel in grafted:
+        f = wt / rel
+        if not f.is_file():
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if not re.search(LEAK_RE, text):
+            continue
+        f.write_text(redact(text), encoding="utf-8")
+        redacted.append(rel)
+    sh(["git", "add", "-A"], cwd=wt)
+    sh(["git", "-c", "user.email=sk3463@cornell.edu",
+        "-c", "user.name=Sunwoo Kim", "commit", "-q", "-m",
+        f"HELD OUT (grafted): the abstraction harness on {base_ref[:12]}\n\n"
+        f"The held-out base is {base_ref[:12]}, the parent of the commit that "
+        f"introduced the answer; at that commit the primitive has never "
+        f"existed, so the absence is real and there is nothing to redact in "
+        f"Allo, the design, the tests or the docs. Grafted on: "
+        f"chia_abstraction/, the design's gates and tests/limits, with the "
+        f"redaction applied to those {len(redacted)} grafted files only.\n\n"
+        f"DO NOT MERGE.\n\n"
+        "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n"
+        "Claude-Session: https://claude.ai/code/session_01BmrdaXYkbAqVL8kc9ikwRk"],
+       cwd=wt)
+    ref = sh(["git", "rev-parse", "HEAD"], cwd=wt).strip()
+    sh(["git", "branch", "-f", HELDOUT_BRANCH + "-graft", ref])
+    sh(["git", "worktree", "remove", "--force", str(wt)], check=False)
+    leak = sh(["git", "grep", "-l", "-E", LEAK_RE, ref], check=False)
+    r = {"ref": ref, "base": base_ref, "answer_at": PREPARED_ANSWER,
+         "branch": HELDOUT_BRANCH + "-graft", "grafted": len(grafted),
+         "redacted_grafted": redacted,
+         "leaks": [l for l in leak.splitlines() if l.strip()],
+         "symptom": PREPARED_SYMPTOM,
+         "note": "the symptom to hand the agent is main's prepared one, which "
+                 "records its own deliberate near-leak; read its README."}
+    (out / "heldout_graft.json").write_text(json.dumps(r, indent=1))
+    return r
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("action", choices=("make", "show"))
+    ap.add_argument("action", choices=("make", "graft", "show"))
+    ap.add_argument("--base", default=PREPARED_BASE)
     ap.add_argument("--out", type=Path,
                     default=REPO / ".chia_scratch" / "heldout")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     if a.action == "show":
         print(SYMPTOM)
+        return 0
+    if a.action == "graft":
+        r = graft(a.out, a.base)
+        print(json.dumps(r, indent=1))
+        if r["leaks"]:
+            print(f"\nWARNING: leaks remain in {r['leaks']}")
+            return 1
+        print(f"\nheld-out ref {r['ref'][:12]} on {r['branch']}, based on "
+              f"{r['base'][:12]} (the answer is at {r['answer_at']}).\n"
+              f"Hand the agent main's {r['symptom']}.")
         return 0
     r = make(a.out)
     print(json.dumps(r, indent=1))
