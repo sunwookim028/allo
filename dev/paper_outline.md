@@ -297,10 +297,37 @@ exist**, so they cannot be bent afterwards by whatever comes back:
   produced anyway, which moves the first row of that cost table from "1–2 days
   of bring-up" to "already done".
 
-**Gap.** DC has not run. The channel-depth fix (`QD=16`, which takes three
-non-terminating tiled programs to completion) costs **+9.3% FF** and must
-appear next to the cycles, not be absorbed; and if the five published shapes
-move under `QD=16`, the row and the gate move with them.
+**Gap.** DC has not run.
+
+**The channel-depth decision is measured, and the answer is adopt.** `QD=16`
+takes three legal tiled programs from *never completing* to completing
+bit-exact, and the five published shapes move like this, paired against a
+`QD=8` control in the same tree that reproduced `171 / 261 / 417 / 483 / 685`
+exactly:
+
+| shape | QD=8 | QD=16 | delta |
+| --- | --- | --- | --- |
+| 4x4x4 | 171 | 175 | +4 |
+| 8x8x8 | 261 | 265 | +4 |
+| 12x12x12 | 417 | 421 | +4 |
+| 16x16x8 | 483 | 482 | -1 |
+| 16x16x16 | 685 | **674** | **-11** |
+
+**It is lumpy, and the lumpiness is the interesting part.** The three smallest
+shapes pay +4 of deeper-FIFO pipeline skew -- the same +4 item 24's family
+paid. The two largest get *faster*, because a deeper queue lets the sequencer
+run further ahead of the units it dispatches to. So depth is not a pure cost:
+it buys completion **and** throughput at the shapes that matter, and charges
+four cycles at the shapes that do not. `stress_isa` holds at 492/492 and the
+RTL stress gate passes, including `ar_distance(4)`, so the accumulator's
+dependence contract survives the deeper queues.
+
+**Two things this does not settle.** The FPGA price is **+9.3% flip-flops**
+and the ASIC price is unmeasured, so the cost must appear next to the cycles
+rather than be absorbed. And the Gemmini parity sweep was measured at `QD=8`;
+since the largest shape gets *faster*, **the deficit must be re-measured
+before any comparison is restated** -- a narrower deficit claimed on the old
+sweep would be unearned.
 
 **One correction the area work turned up, which the design pages owe
 themselves:** the often-quoted "4 KiB scratchpad, 4 KiB vector registers,
