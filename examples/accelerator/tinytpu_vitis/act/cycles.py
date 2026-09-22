@@ -23,12 +23,9 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
 UNITS = ("dma_ld", "spm", "vru", "accu", "dma_st")
 HEADER_SLOT = {"dma_ld": 1, "spm": 2, "vru": 3, "accu": 5, "dma_st": 6}
 
-#: Least squares of `fixed + marginal * critical_work` over the five published
-#: cosim points, which are Vitis measurements this fork attributes to
-#: `logs/cosim_isa_landed_sweep.log` at `e24e433b`.
-CRITICAL_WORK_FIT = (173.2, 1.621)
 PUBLISHED_CYCLES = {"gemm_4x4x4": 172, "gemm_8x8x8": 262, "gemm_12x12x12": 418,
                     "gemm_16x16x8": 484, "gemm_16x16x16": 686}
+CRITICAL_WORK_FIT = (173.2, 1.621)
 
 
 def work(prog):
@@ -98,6 +95,27 @@ def kpn_rounds(prog, QD=QD):
     return rounds
 
 
+def refit():
+    """`CRITICAL_WORK_FIT`, recomputed from `PUBLISHED_CYCLES`.
+
+    The two constants are typed in so that `estimate` needs neither numpy nor
+    the corpus, and this recovers them so that a typo cannot survive: it is
+    called by this module's `__main__`. `PUBLISHED_CYCLES` are Vitis
+    measurements this fork attributes to `logs/cosim_isa_landed_sweep.log` at
+    `e24e433b`, not measurements made here."""
+    import numpy as np
+    from examples.accelerator.tinytpu_vitis.act import baseline
+    from examples.accelerator.tinytpu_vitis.act import spec as spec_mod
+    x, y = [], []
+    for name, measured in PUBLISHED_CYCLES.items():
+        x.append(critical_work(baseline.program(spec_mod.by_name(name))))
+        y.append(measured)
+    fixed, marginal = np.linalg.lstsq(
+        np.stack([np.ones(len(x)), np.array(x, float)], 1),
+        np.array(y, float), rcond=None)[0]
+    return round(float(fixed), 1), round(float(marginal), 3)
+
+
 def report(prog):
     w = work(prog)
     return (f"{w['static']:3d} static, {w['dynamic']:4d} dynamic instructions; "
@@ -108,9 +126,17 @@ def report(prog):
 if __name__ == "__main__":
     from examples.accelerator.tinytpu_vitis.act import baseline
     from examples.accelerator.tinytpu_vitis.act import spec as spec_mod
+    assert refit() == CRITICAL_WORK_FIT, (
+        f"CRITICAL_WORK_FIT is {CRITICAL_WORK_FIT}, least squares over "
+        f"PUBLISHED_CYCLES gives {refit()}")
+    print(f"cycles = {CRITICAL_WORK_FIT[0]} + {CRITICAL_WORK_FIT[1]} * "
+          f"critical work, refitted from the published points")
     print(f"{'spec':28s} " + " ".join(f"{u:>8s}" for u in UNITS)
           + "  critical  estimate  rounds  published")
     for sp in spec_mod.corpus():
+        if spec_mod.fits_build(sp) is not None:
+            print(f"{sp['name']:28s} {spec_mod.fits_build(sp)}")
+            continue
         prog = baseline.program(sp)
         w = work(prog)
         pub = PUBLISHED_CYCLES.get(sp["name"])

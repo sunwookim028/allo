@@ -44,6 +44,10 @@ ACT Compiler-Backend Flow
    does not republish it. Refer to the upstream repository for the code itself.
    See also :doc:`/developer/fork_maintenance` for how the lineages relate.
 
+The other side of that connection -- the workload specs a compiler would be
+given and the judge that decides whether what comes out is right, legal and
+fast -- is on :doc:`act_specs`, and contains no part of ACT.
+
 This page records what exists in ACT, what connecting it to the
 :doc:`/designs/tinytpu_isa` accelerator would take, and which earlier claims
 about it were wrong. Audited 2026-09-18 against ``chia-codesign``
