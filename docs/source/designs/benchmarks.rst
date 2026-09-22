@@ -57,10 +57,13 @@ one verdict, because the questions are not the same question.
      array has 16x the MAC/cycle peak and a different window, so a cycle
      ratio against it is a statement about array size. It becomes well posed
      only through fraction-of-peak, or through an equal-array-size build.
-     Every MiniTPU figure carried elsewhere in these docs is **current as of
-     2026-09-22** and may move; its board clock is 187.5 MHz while its
-     bitstream closes timing at 200 MHz, so a cycles-to-seconds conversion
-     uses 187.5 and a timing-closure claim uses 200.
+     Every MiniTPU figure carried elsewhere in these docs is **dated, not
+     permanent** --- its board throughput moved on unchanged silicon within a
+     day of being recorded, so the 79.16 / 129.70 tok/s pair is superseded and
+     must not be quoted. **No figure on this page depends on it**; nothing
+     here quotes a MiniTPU throughput at all. Its board clock is 187.5 MHz
+     while its bitstream closes timing at 200 MHz, so a cycles-to-seconds
+     conversion uses 187.5 and a timing-closure claim uses 200.
 
    A single blended verdict across the three machines is the one thing not to
    produce, because it will be quoted without its caveat.
@@ -83,6 +86,14 @@ one verdict, because the questions are not the same question.
 
    So: **no machine's host is counted anywhere on this page**, which is the
    consistent choice, and it is stated rather than assumed.
+
+   That accounting turned out to be worth more than fairness. MiniTPU's
+   per-launch host cost was volunteered by its own side so the comparison
+   would be honest, and putting ~24 750 cycles beside Gemmini's ~395 of
+   driver is what made the number look absurd rather than normal --- both of
+   the subsequent wins that doubled their board throughput came out of it.
+   **Naming the window is not only a reporting discipline; it is where the
+   optimisations were hiding.**
 
    **Both sides are idealised memory, and ours is a knob rather than a
    model.** Every cycle figure here is at ``TPU_AXI_LATENCY=0`` unless the row
