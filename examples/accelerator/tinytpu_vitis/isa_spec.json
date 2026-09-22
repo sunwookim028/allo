@@ -907,6 +907,82 @@
           "into": "frame"
         }
       ]
+    },
+    {
+      "name": "vaddrelu",
+      "value": 10,
+      "software_constant": "OP_VADDRELU",
+      "rows": "nr accumulator rows",
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar_d",
+          "meaning": "first destination accumulator row"
+        },
+        {
+          "field": "f1",
+          "name": "ar_s1",
+          "meaning": "first row of the left source"
+        },
+        {
+          "field": "f2",
+          "name": "ar_s2",
+          "meaning": "first row of the right source"
+        }
+      ],
+      "rows_expression": "nr",
+      "actions": [
+        {
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
+          "base": "ar_s1",
+          "into": "left",
+          "role": "a source"
+        },
+        {
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
+          "base": "ar_s2",
+          "into": "right",
+          "role": "a source"
+        },
+        {
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "add",
+          "args": [
+            "left",
+            "right"
+          ],
+          "into": "total"
+        },
+        {
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "max0",
+          "args": [
+            "total"
+          ],
+          "into": "rectified"
+        },
+        {
+          "unit": "accu",
+          "kind": "write",
+          "port": "ar.write",
+          "state": "ar",
+          "base": "ar_d",
+          "args": [
+            "rectified"
+          ]
+        }
+      ],
+      "note": "`vadd` then `vrelu` in one pass: the accumulator already has both the adder and the rectifier, so the composition costs a mux and saves a pass over `ar` and an intermediate row. Two `ar` reads a row, so two accu steps a row -- which nothing here says, because it follows from `accu` having one `ar` read port."
     }
   ],
   "dispatch": {
@@ -1808,7 +1884,9 @@
             "name": "ar.write"
           },
           {
-            "name": "alu"
+            "name": "alu",
+            "physical": 2,
+            "note": "Two CHAINED lane operations per step. `vadd` and `vrelu` use one; `vaddrelu` uses both, which is exactly what fusing them into one accumulator pass claims. It is a TIMING claim about combinational depth, not a count of anything, so it is the one number here that has to be measured against synthesis rather than declared -- raise it far enough and the model will happily compose an instruction the clock cannot close."
           },
           {
             "name": "ac2sp"

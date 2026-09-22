@@ -102,6 +102,7 @@ OP_VRELU = 6
 OP_MVOUT = 7
 OP_LOOP = 8
 OP_ENDLOOP = 9
+OP_VADDRELU = 10
 
 OPCODE_NAME = {
     OP_NOP: "nop",
@@ -114,6 +115,7 @@ OPCODE_NAME = {
     OP_MVOUT: "mvout",
     OP_LOOP: "loop",
     OP_ENDLOOP: "endloop",
+    OP_VADDRELU: "vaddrelu",
 }
 RETIRED = frozenset({OP_DMA_ST})
 
@@ -130,6 +132,7 @@ OPERAND_NAME = {
     OP_MVOUT: ("ar0", "dram_row0", "col_block", None),
     OP_LOOP: (None, None, None, None),
     OP_ENDLOOP: (None, None, None, None),
+    OP_VADDRELU: ("ar_d", "ar_s1", "ar_s2", None),
 }
 
 #: Values `op` field of an opcode admits, where the spec restricts them.
@@ -414,7 +417,7 @@ UNITS = (
     ('spm', 1, True, (('spad.read', 1), ('spad.write', 1), ('dma2sp', 1), ('sp2vr', 1), ('wcol', 1))),
     ('vru', 1, True, (('vr.read', 1), ('vr.write', 1), ('acol', 1), ('sp2vr', 1), ('dma2vr', 1))),
     ('array', 1, True, (('wcol', 1), ('acol', 1), ('instructions', 1), ('mac', 1), ('cw', 1))),
-    ('accu', 1, True, (('cw', 1), ('ar.read', 1), ('ar.write', 1), ('alu', 1), ('ac2sp', 1))),
+    ('accu', 1, True, (('cw', 1), ('ar.read', 1), ('ar.write', 1), ('alu', 2), ('ac2sp', 1))),
     ('dma_st', 1, True, (('ac2sp', 1), ('dram.write', 1))),
 )
 
@@ -494,6 +497,13 @@ ACTIONS = {
     9: (
         _A('sequencer', 'compute', port='fetch', compute='pop_loop', per='instruction', into='frame'),
     ),
+    10: (
+        _A('accu', 'read', port='ar.read', state='ar', base='ar_s1', into='left', role='a source'),
+        _A('accu', 'read', port='ar.read', state='ar', base='ar_s2', into='right', role='a source'),
+        _A('accu', 'compute', port='alu', compute='add', args=('left', 'right'), into='total'),
+        _A('accu', 'compute', port='alu', compute='max0', args=('total',), into='rectified'),
+        _A('accu', 'write', port='ar.write', state='ar', base='ar_d', args=('rectified',)),
+    ),
 }
 
 #: How many rows one issue of each opcode runs.
@@ -508,6 +518,7 @@ ROWS_EXPRESSION = {
     7: 'nr',
     8: '1',
     9: '1',
+    10: 'nr',
 }
 
 #: Properties of PROGRAMS that no instruction can establish on its own.

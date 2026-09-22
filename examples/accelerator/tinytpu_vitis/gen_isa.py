@@ -1690,26 +1690,28 @@ def _sequencer_rewrites():
     """Which units the sequencer hands a rewritten `nr`, and the expression it
     rewrites it to, read out of the hardware.
 
-    A `<queue>_copy[54:62] = <expr>` in the sequencer's body IS the rewrite;
-    the actions say which ones should be there and what they should say."""
+    A `<name>_copy[54:62] = <expr>` followed by a `c_<queue>.put(<name>_copy)`
+    IS the rewrite. The actions say which ones should be there and what they
+    should say; this says what the hardware does."""
     path = os.path.join(HERE, "ip", "units", "sequencer.py")
     with open(path) as f:
         text = f.read()
-    out, current = {}, None
-    copies = {}
+    rewritten, sent, opcode_of, current = {}, {}, {}, None
     for line in text.splitlines():
         body = line.split("#", 1)[0]
         m = re.match(r"\s*(?:el)?if op == OP_([A-Z_]+):", body)
         if m:
             current = m.group(1).lower()
             continue
-        m = re.match(r"\s*([a-z_]+)_copy: UInt\(64\) = resolved", body)
-        if m:
-            copies[m.group(1)] = current
         m = re.match(r"\s*([a-z_]+)_copy\[54:62\] = (.+)$", body)
-        if m and m.group(1) in copies:
-            out[(copies[m.group(1)], m.group(1))] = m.group(2).strip()
-    return out
+        if m:
+            rewritten[m.group(1)] = m.group(2).strip()
+            opcode_of[m.group(1)] = current
+        m = re.match(r"\s*c_([a-z]+)\.put\(([a-z_]+)_copy\)", body)
+        if m:
+            sent[m.group(2)] = DISPATCH_QUEUE["c_" + m.group(1)]
+    return {(opcode_of[name], sent[name]): expression
+            for name, expression in rewritten.items() if name in sent}
 
 
 def check_actions(spec, U, E):

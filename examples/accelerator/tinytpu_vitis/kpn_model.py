@@ -31,6 +31,14 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 from examples.accelerator.tinytpu_vitis import microarch_isa as U  # noqa: E402
+from examples.accelerator.tinytpu_vitis.isa_encoding import (  # noqa: E402
+    OPCODE_NAME, machine, operands)
+
+#: Which dispatch queue each unit is fed by. The queues are the design's, the
+#: units the spec's; which opcode reaches which queue, and with what work
+#: count in `nr`, is derived from the actions rather than restated here.
+QUEUE = {"dma_ld": "c_dld", "spm": "c_spm", "vru": "c_vru", "accu": "c_acc",
+         "dma_st": "c_dst"}
 
 T = U.T
 
@@ -46,24 +54,21 @@ def build(prog):
                       ("c_dst", hdr[6])):
             yield ("put", ch, w)
         for op, nr, f0, f1, f2, f3 in dyn:
-            if op == U.OP_DMA_LD:
-                yield ("put", "c_dld", (op, nr, f0))
-                yield ("put", "c_vru" if f0 & U.DMA_TO_VR else "c_spm", (op, nr, f0))
-            elif op == U.OP_VLD:
-                yield ("put", "c_spm", (op, nr, f0))
-                yield ("put", "c_vru", (op, nr, f0))
-            elif op == U.OP_MM:
-                # spm's copy: its own work count T + 1, the array's rows in f1
-                yield ("put", "c_spm", (op, T + 1, nr))
-                yield ("put", "c_vru", (op, nr, f0))
-                yield ("put", "c_acc", (op, nr, f0))
-            elif op == U.OP_VADD:
-                yield ("put", "c_acc", (op, 2 * nr, f0))
-            elif op == U.OP_VRELU:
-                yield ("put", "c_acc", (op, nr, f0))
-            elif op == U.OP_MVOUT:
-                yield ("put", "c_acc", (op, nr, f0))
-                yield ("put", "c_dst", (op, nr, f0))
+            name = OPCODE_NAME[op]
+            i = operands(op, f0, f1, f2, f3, nr)
+            for unit in machine().units_of(name):
+                queue = QUEUE.get(unit)
+                if queue is None:          # the array takes no dispatch
+                    continue
+                steps = machine().work(unit, name, i)
+                if not steps:              # a predicated-off destination
+                    continue
+                # Every unit gets its OWN work count in `nr`, which is what
+                # the sequencer rewrites; the third element is the field that
+                # unit's body reads, and `spm` on an `mm` is the one place it
+                # is not f0 -- the array's row count rides in f1.
+                rides = nr if (name == "mm" and unit == "spm") else f0
+                yield ("put", queue, (op, steps, rides))
 
     def flat(ctl, n_row, body):
         """The row-flattened loop every unit runs: fetch an instruction when

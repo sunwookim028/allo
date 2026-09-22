@@ -535,6 +535,14 @@ Opcodes
      -
      - none
      - ``sequencer``
+   * - ``OP_VADDRELU``
+     - 10
+     - vaddrelu
+     - | ``f0`` = ar_d: first destination accumulator row
+       | ``f1`` = ar_s1: first row of the left source
+       | ``f2`` = ar_s2: first row of the right source
+     - nr accumulator rows
+     - ``accu``
 
 The ``units`` column is **derived** from the actions below, not written beside each opcode: an opcode reaches whichever units its actions name. It used to be typed, and it was wrong twice -- ``mm`` did not name the array, and ``dma_ld`` named its destination in prose.
 
@@ -874,6 +882,46 @@ Every instruction is an ordered list of per-unit **effects**. Each effect names 
      - --
      - 1
      - --
+   * - vaddrelu
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s1
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s2
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - alu
+     - compute
+     - ``add``
+     - --
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - alu
+     - compute
+     - ``max0``
+     - --
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - ar.write
+     - write
+     - ``ar``
+     - ar_d
+     - nr
+     - --
 
 .. list-table:: Units: ports, step rate, elasticity
    :header-rows: 1
@@ -903,7 +951,7 @@ Every instruction is an ordered list of per-unit **effects**. Each effect names 
      - 1
      - yes
    * - accu
-     - ``cw``, ``ar.read``, ``ar.write``, ``alu``, ``ac2sp``
+     - ``cw``, ``ar.read``, ``ar.write``, ``alu`` x2, ``ac2sp``
      - 1
      - yes
    * - dma_st
@@ -973,6 +1021,10 @@ The sequencer hands two units a rewritten copy of the word, so each unit's flat 
      - ``accu``
      - ``nr`` = 2 * nr
      - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
+   * - ``vaddrelu``
+     - ``accu``
+     - ``nr`` = 2 * nr
+     -
 
 Which units need a rewrite, and to what, is **derived**: it is every unit the sequencer dispatches to whose own work count differs from the instruction's row count. Nothing states it, so adding an instruction adds no entry here.
 
@@ -1090,6 +1142,9 @@ Every count but the static one is **the work a unit does**, summed over the issu
    * - endloop
      - sequencer
      - 1 at nr=8
+   * - vaddrelu
+     - accu
+     - ``2 x nr``
 
 Memory map
 ^^^^^^^^^^
@@ -1122,8 +1177,8 @@ Memory map
      - ``accu``
      - ``NAR``
      - ``T * 32`` bits
-     - ``mm``, ``vadd``, ``vrelu``
-     - ``mm`` (the accumulate base) [acc == 1], ``vadd`` (a source), ``vrelu`` (a source), ``mvout`` (the value to retire)
+     - ``mm``, ``vadd``, ``vrelu``, ``vaddrelu``
+     - ``mm`` (the accumulate base) [acc == 1], ``vadd`` (a source), ``vrelu`` (a source), ``mvout`` (the value to retire), ``vaddrelu`` (a source)
      - **no**
    * - ``imem``
      - ``sequencer``
