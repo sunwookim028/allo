@@ -100,6 +100,36 @@ The general lesson is unflattering to the naive setup and worth stating plainly:
 were never meant to be part of the design.** Every guard above exists because
 the search found a way to satisfy the objective without satisfying the intent.
 
+Two kinds of agent work, which must not be conflated
+====================================================
+
+Most of what this fork has built was built by agents, and almost none of it was
+built by the *search*. The distinction decides what can be claimed:
+
+**Directed agent work.** An engineer states a goal, an agent works in a
+worktree with the full toolchain, and a person verifies and merges the result.
+The ACT rebuild, the ``Encoding`` prototype, the gap analysis, the
+re-measurements and most of this documentation are of this kind. What it
+demonstrates is that a capable agent under direction can do compiler
+engineering — which is a claim about present-day agents, not about this
+project's method, and the same claim anyone with the same tools could make.
+
+**The search.** A harness scores candidates a model proposes, with the
+objective, the gates and the reference model frozen out of the model's reach,
+and no human in the loop of a single iteration. This is the part that is a
+contribution, because the interesting question is what a *loop* discovers, not
+what an agent does when told what to do.
+
+So: the burst widening was found by the search. The `Encoding` primitive, the
+ACT rebuild, and the correction that ``acc``'s obstacle is additive
+monotonicity rather than a static field were all directed work. Reporting the
+second kind as evidence for the first would be the most damaging overstatement
+available to this project, and it is an easy one to make by accident — the
+transcripts look similar.
+
+The planned experiments in :doc:`/extensions/chia` are all of the second kind
+for exactly this reason.
+
 What is not established
 =======================
 
