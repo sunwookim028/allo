@@ -383,13 +383,13 @@ Found by raising MAXDIM until each fired:
      - how it fails
    * - address field, 11 usable bits
      - :math:`\text{MAXDIM}^2/T \le 2047`
-     - MAXDIM <= 90
+     - MAXDIM <= 88 (90 unrounded; MAXDIM is a multiple of T)
      - MAXDIM=96: ``check_program``, "AGU-resolved f3=2112 is outside the
        0..2047 range"
    * - header count, 15-bit slice
      - :math:`\text{MAXDIM}^3/T^2 + \text{MAXDIM}^2/T \le 32767`
        (``accu``'s iteration count)
-     - MAXDIM <= 76
+     - MAXDIM <= 76 for a cubic shape
      - MAXDIM=80: ``assemble``, "header count 33600 does not fit 15 bits"
 
 **MAXDIM=64 is the largest round value inside both**, and it is asserted at
@@ -1733,13 +1733,64 @@ i.e. **M=128, K=768, N=768**. (The fused QKV projection is the same M and K
 with N=2304, three times the work; the MLP is 768->3072->768. The output
 projection is chosen because it is the smallest square one.)
 
-**What our build would need to run it.** Not a bigger MAXDIM: 768 is past both
-encoding ceilings by orders of magnitude (:math:`768^2/4 = 147\,456` operand
-rows against 2047), and M=128 is already past ``MAXROWS`` = 127. The real
-blocker is that the region's operands are declared ``int8[MAXDIM * MAXDIM]``
-and addressed ``row * MAXDIM + col``, so the machine cannot *address* a
-128x768 matrix at all, whatever its on-chip capacity. Three changes, in
-dependency order:
+**Which dimension binds first, and at what value.** "We cannot run
+128x768x768" is true and useless; what a reader needs is the binding dimension
+and its number, because that is what says which field to widen. Derived from
+the encoding rules, not estimated:
+
+.. list-table:: Ceilings, largest legal value (MAXDIM must be a multiple of T)
+   :header-rows: 1
+   :widths: 30 22 16 16 16
+
+   * - limit
+     - what it bounds
+     - T=4
+     - T=8
+     - T=16
+   * - address field, 11 usable bits
+       (:math:`\text{MAXDIM}^2/T \le 2047`)
+     - **MAXDIM**, hence M, K and N together
+     - **88**
+     - **120**
+     - **176**
+   * - ``nr``, 7 usable bits (``MAXROWS``)
+     - any single instruction's row count, so M and K
+     - 127
+     - 127
+     - 127
+   * - header count, 15 usable bits
+     - ``accu`` iterations,
+       :math:`(N/T)(K/T)M + (N/T)M`
+     - shape-dependent
+     - shape-dependent
+     - shape-dependent
+
+So **the address field binds first, through MAXDIM, at 88 (T=4) and 120
+(T=8)** --- and note that ``nr``'s 127 is *not* a function of T, so it becomes
+the wall as soon as the array is wide enough to push MAXDIM past it.
+
+Against the shapes another team proposed, this is precise rather than
+approximate:
+
+* **32 x 512 x 128** (their recommended single shape). K=512 needs
+  MAXDIM >= 512: we are short **5.8x** at T=4 and **4.3x** at T=8 on the
+  address field, **4.0x** on ``nr``, and 4.0x / 1.0x on the header count.
+* **K-sweep at M=32, N=128.** Raising MAXDIM to match K, the first failure is
+  at **K=92** (T=4) and **K=128** (T=8), in both cases the address field;
+  last good K is 88 and 120.
+* **Tall sweep at K=N=128.** Blocked for *every* M, because N=128 alone
+  exceeds the MAXDIM ceiling --- at T=8 by **eight** (120 against 128). And
+  M=128 additionally exceeds ``nr`` by **one** (127 against 128).
+
+Those last two are worth stating as margins rather than as failures: at T=8 we
+miss their tall sweep by 8 in one dimension and by 1 in another.
+
+**What our build would need to run the GPT-2 shape.** Not simply a bigger
+MAXDIM --- 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
+is that the region's operands are declared ``int8[MAXDIM * MAXDIM]`` and
+addressed ``row * MAXDIM + col``, so the machine cannot *address* a 128x768
+matrix at all, whatever its on-chip capacity. Three changes, in dependency
+order:
 
 #. **A runtime base and row stride on** ``dma_ld`` **and** ``mvout``, so a
    MAXDIM=64 on-chip tile is a *window* into a larger DRAM matrix rather than

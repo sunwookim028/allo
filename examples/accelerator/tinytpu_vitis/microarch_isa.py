@@ -518,7 +518,8 @@ QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 #
 #   * an address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so
 #     an operand row must be <= 2047:  MAXDIM*MAXDIM/T <= 2047, i.e. MAXDIM <= 90
-#     at T=4. MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
+#     at T=4 -- and since MAXDIM is a multiple of T the largest legal value is
+#     88 (120 at T=8, 176 at T=16). MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
 #     outside the 0..2047 range".
 #   * a header count is read back through a 15-bit slice, and the largest is
 #     `accu`'s iteration count, MAXDIM^3/T^2 + MAXDIM^2/T for a cubic GEMM, so
