@@ -47,21 +47,32 @@ def jobs(mode, names):
 
 
 def rank_agreement(measured):
-    """Pairs of variants of one spec the estimate orders as cosim does."""
-    agree = total = 0
+    """How the estimate orders each pair of variants of one spec against cosim.
+
+    A tie in the estimate is neither right nor wrong: it is the gate declining
+    to order the pair, and it is reported separately, because a model that
+    gives two mappings the same number cannot choose between them however
+    accurate it is elsewhere."""
+    right = wrong = tied = 0
     lines = []
     for name, rows in measured.items():
         for (t1, e1, c1), (t2, e2, c2) in itertools.combinations(rows, 2):
             if c1 is None or c2 is None or c1 == c2:
                 continue
-            total += 1
-            ok = (e1 < e2) == (c1 < c2) or (e1 == e2 and False)
-            agree += ok
-            if not ok:
+            gap = abs(c1 - c2) / min(c1, c2) * 100
+            if e1 == e2:
+                tied += 1
+                lines.append(f"    {name}: estimate ties {t1} and {t2} at "
+                             f"{e1:.0f}; cosim says {c1} vs {c2} ({gap:.1f}% "
+                             f"apart)")
+            elif (e1 < e2) == (c1 < c2):
+                right += 1
+            else:
+                wrong += 1
                 lines.append(f"    {name}: estimate puts {t1} ({e1:.0f}) "
                              f"{'below' if e1 < e2 else 'above'} {t2} "
                              f"({e2:.0f}), cosim says {c1} vs {c2}")
-    return agree, total, lines
+    return right, wrong, tied, lines
 
 
 def main(argv):
@@ -91,11 +102,19 @@ def main(argv):
               f"{cycles.critical_work(prog):6d} {est:9.0f} {str(n):>7s} "
               f"{err:>8s}   {line}", flush=True)
         measured.setdefault(sp["name"], []).append((tag, est, n))
+    unconfirmed = [f"{name}/{tag}" for name, rows in measured.items()
+                   for tag, _, n in rows if n is None]
     if mode == "variants":
-        agree, total, lines = rank_agreement(measured)
-        print(f"  rank agreement: {agree}/{total} ordered pairs")
+        right, wrong, tied, lines = rank_agreement(measured)
+        print(f"  rank: {right} ordered correctly, {wrong} ordered wrongly, "
+              f"{tied} the estimate cannot order at all "
+              f"({right + wrong + tied} pairs both of whose variants are "
+              f"confirmed on RTL)")
         for line in lines:
             print(line)
+    if unconfirmed:
+        print(f"  NOT CONFIRMED ON RTL, rankable but not pickable: "
+              f"{', '.join(unconfirmed)}")
     return 0
 
 

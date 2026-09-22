@@ -24,6 +24,10 @@ from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E40
 
 GATE_MARGIN = 1.10
 
+#: What a result is allowed to claim, cheapest first. A cycle *estimate* is not
+#: on this ladder: see docs/source/developer/limitations.rst, item 24.
+TIERS = ("legal", "correct", "confirmed")
+
 
 def chosen(args):
     """The specs to judge: everything this build can hold, unless named."""
@@ -150,20 +154,34 @@ def cmd_fast(args):
         rows.append((sp, prog, est, passed))
     if not args.cosim:
         print("  GATE OK" if not bad else f"  {bad} REJECTED BY THE GATE")
+        print("  tier reached: legal, correct. NOT confirmed -- an estimate is "
+              "not evidence the RTL runs the program at all; see "
+              "docs/source/developer/limitations.rst item 24. Re-run with "
+              "--cosim before treating any of these as a result.")
         return 0 if not bad else 1
     from examples.accelerator.tinytpu_vitis.act import measure
     prj = measure.PRJ
     print(f"  synthesizing once into {prj} ...", flush=True)
     measure.synthesize(prj)
-    print(f"  {'spec':28s} {'estimate':>9s} {'cosim':>7s} {'error':>7s}   testbench")
+    print(f"  {'spec':28s} {'estimate':>9s} {'cosim':>7s} {'error':>7s} "
+          f"{'tier':>10s}   testbench")
+    unconfirmed = []
     for sp, prog, est, passed in rows:
         if not passed and not args.measure_rejected:
             continue
         n, line = measure.measure(sp, prog, prj)
         err = "" if not n else f"{(est - n) / n * 100:+6.1f}%"
-        print(f"  {sp['name']:28s} {est:9.0f} {str(n):>7s} {err:>7s}   {line}",
-              flush=True)
-    return 0
+        tier = "confirmed" if n else "correct"
+        if not n:
+            unconfirmed.append(sp["name"])
+        print(f"  {sp['name']:28s} {est:9.0f} {str(n):>7s} {err:>7s} "
+              f"{tier:>10s}   {line}", flush=True)
+    if unconfirmed:
+        print(f"  {len(unconfirmed)} NOT CONFIRMED ON RTL: "
+              f"{', '.join(unconfirmed)}. These passed every cheap check and "
+              f"the RTL did not produce a cycle count; they may be ranked but "
+              f"must not be picked.")
+    return 1 if unconfirmed else 0
 
 
 def main(argv=None):
