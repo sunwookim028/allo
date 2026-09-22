@@ -13,11 +13,11 @@
 # mem_ext/mem_0_ext on Gemmini's side -- the scratchpad
 # and the accumulator, nothing else, on both. DMA
 # buffers and control-path RAMs stay on both sides.
-# Replaced here (20,480 bits):
-#   tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_3795_1_ar_RAM_AUTO_1R1W.v  (16,384 bits)
-#     -> tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_3795_1_ar_RAM_AUTO_1R1W_stub.v
-#   tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1_spad_RAM_AUTO_1R1W.v  (4,096 bits)
-#     -> tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1_spad_RAM_AUTO_1R1W_stub.v
+# Replaced here (82,944 bits):
+#   tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_5491_1_ar_RAM_AUTO_1R1W.v  (17,408 bits)
+#     -> tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_5491_1_ar_RAM_AUTO_1R1W_stub.v
+#   tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_2610_1_spad_RAM_AUTO_1R1W.v  (65,536 bits)
+#     -> tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_2610_1_spad_RAM_AUTO_1R1W_stub.v
 # The figure keeps everything that DRIVES the memories
 # -- address generation, enables, write masks -- and
 # excludes the arrays and the arrays' own interfaces,
@@ -27,17 +27,18 @@
 # does not give DC a black box, it gives DC an
 # unresolved reference and the link fails (LINK-5).
 # '#' comments and a leading '!' excludes a file.
-tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_3795_1_ar_RAM_AUTO_1R1W_stub.v
+tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_5491_1_ar_RAM_AUTO_1R1W_stub.v
 tinytpu_isa_flow_control_loop_pipe_sequential_init.v
-tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_3795_1.v
+tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_5491_1.v
 tinytpu_isa_accu_0.v
 tinytpu_isa_control_s_axi.v
-tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1.v
-tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_712_2.v
-tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_781_3.v
+tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_1565_2.v
+tinytpu_isa_sparsemux_33_4_32_1_1.v
+tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_2477_3.v
+tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_654_1.v
 tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W.v
 tinytpu_isa_dma_ld_0_1.v
-tinytpu_isa_dma_st_0_1_Pipeline_VITIS_LOOP_4406_1.v
+tinytpu_isa_dma_st_0_1_Pipeline_VITIS_LOOP_6102_1.v
 tinytpu_isa_dma_st_0_1.v
 tinytpu_isa_entry_proc.v
 tinytpu_isa_fifo_w128_d8_S.v
@@ -53,37 +54,37 @@ tinytpu_isa_gmem3_m_axi.v
 tinytpu_isa_mac_muladd_8s_8s_32s_32_4_1.v
 tinytpu_isa_mul_32s_12ns_32_2_1.v
 tinytpu_isa_mul_8s_8s_16_1_1.v
-tinytpu_isa_pe_0_0_Pipeline_VITIS_LOOP_2358_1.v
+tinytpu_isa_pe_0_0_Pipeline_VITIS_LOOP_4054_1.v
 tinytpu_isa_pe_0_0.v
-tinytpu_isa_pe_0_1_Pipeline_VITIS_LOOP_2449_1.v
+tinytpu_isa_pe_0_1_Pipeline_VITIS_LOOP_4145_1.v
 tinytpu_isa_pe_0_1.v
-tinytpu_isa_pe_0_2_Pipeline_VITIS_LOOP_2532_1.v
+tinytpu_isa_pe_0_2_Pipeline_VITIS_LOOP_4228_1.v
 tinytpu_isa_pe_0_2.v
-tinytpu_isa_pe_0_3_Pipeline_VITIS_LOOP_2614_1.v
+tinytpu_isa_pe_0_3_Pipeline_VITIS_LOOP_4310_1.v
 tinytpu_isa_pe_0_3.v
-tinytpu_isa_pe_1_0_Pipeline_VITIS_LOOP_2697_1.v
+tinytpu_isa_pe_1_0_Pipeline_VITIS_LOOP_4393_1.v
 tinytpu_isa_pe_1_0.v
-tinytpu_isa_pe_1_1_Pipeline_VITIS_LOOP_2791_1.v
+tinytpu_isa_pe_1_1_Pipeline_VITIS_LOOP_4487_1.v
 tinytpu_isa_pe_1_1.v
-tinytpu_isa_pe_1_2_Pipeline_VITIS_LOOP_2877_1.v
+tinytpu_isa_pe_1_2_Pipeline_VITIS_LOOP_4573_1.v
 tinytpu_isa_pe_1_2.v
-tinytpu_isa_pe_1_3_Pipeline_VITIS_LOOP_2962_1.v
+tinytpu_isa_pe_1_3_Pipeline_VITIS_LOOP_4658_1.v
 tinytpu_isa_pe_1_3.v
-tinytpu_isa_pe_2_0_Pipeline_VITIS_LOOP_3047_1.v
+tinytpu_isa_pe_2_0_Pipeline_VITIS_LOOP_4743_1.v
 tinytpu_isa_pe_2_0.v
-tinytpu_isa_pe_2_1_Pipeline_VITIS_LOOP_3141_1.v
+tinytpu_isa_pe_2_1_Pipeline_VITIS_LOOP_4837_1.v
 tinytpu_isa_pe_2_1.v
-tinytpu_isa_pe_2_2_Pipeline_VITIS_LOOP_3227_1.v
+tinytpu_isa_pe_2_2_Pipeline_VITIS_LOOP_4923_1.v
 tinytpu_isa_pe_2_2.v
-tinytpu_isa_pe_2_3_Pipeline_VITIS_LOOP_3312_1.v
+tinytpu_isa_pe_2_3_Pipeline_VITIS_LOOP_5008_1.v
 tinytpu_isa_pe_2_3.v
-tinytpu_isa_pe_3_0_Pipeline_VITIS_LOOP_3396_1.v
+tinytpu_isa_pe_3_0_Pipeline_VITIS_LOOP_5092_1.v
 tinytpu_isa_pe_3_0.v
-tinytpu_isa_pe_3_1_Pipeline_VITIS_LOOP_3498_1.v
+tinytpu_isa_pe_3_1_Pipeline_VITIS_LOOP_5194_1.v
 tinytpu_isa_pe_3_1.v
-tinytpu_isa_pe_3_2_Pipeline_VITIS_LOOP_3596_1.v
+tinytpu_isa_pe_3_2_Pipeline_VITIS_LOOP_5292_1.v
 tinytpu_isa_pe_3_2.v
-tinytpu_isa_pe_3_3_Pipeline_VITIS_LOOP_3693_1.v
+tinytpu_isa_pe_3_3_Pipeline_VITIS_LOOP_5389_1.v
 tinytpu_isa_pe_3_3.v
 tinytpu_isa_sequencer_0_1_Pipeline_VITIS_LOOP_74_1.v
 tinytpu_isa_sequencer_0_1_Pipeline_VITIS_LOOP_78_2.v
@@ -98,8 +99,8 @@ tinytpu_isa_sequencer_0_1_iv_now_RAM_1WNR_AUTO_1R1W.v
 tinytpu_isa_sequencer_0_1_lp_start_RAM_AUTO_1R1W.v
 tinytpu_isa_sequencer_0_1_lp_trip_RAM_AUTO_1R1W.v
 tinytpu_isa_sequencer_0_1.v
-tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1_spad_RAM_AUTO_1R1W_stub.v
-tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_914_1.v
+tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_2610_1_spad_RAM_AUTO_1R1W_stub.v
+tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_2610_1.v
 tinytpu_isa_spm_0.v
 tinytpu_isa_start_for_accu_0_U0.v
 tinytpu_isa_start_for_dma_st_0_1_U0.v
@@ -137,38 +138,38 @@ tinytpu_isa_start_for_wld_3_0_U0.v
 tinytpu_isa_start_for_wld_3_1_U0.v
 tinytpu_isa_start_for_wld_3_2_U0.v
 tinytpu_isa_start_for_wld_3_3_U0.v
-tinytpu_isa_vru_0_Pipeline_VITIS_LOOP_1058_1.v
+tinytpu_isa_vru_0_Pipeline_VITIS_LOOP_2754_1.v
 tinytpu_isa_vru_0.v
-tinytpu_isa_wld_0_0_Pipeline_VITIS_LOOP_1187_1.v
+tinytpu_isa_wld_0_0_Pipeline_VITIS_LOOP_2883_1.v
 tinytpu_isa_wld_0_0.v
-tinytpu_isa_wld_0_1_Pipeline_VITIS_LOOP_1269_1.v
+tinytpu_isa_wld_0_1_Pipeline_VITIS_LOOP_2965_1.v
 tinytpu_isa_wld_0_1.v
-tinytpu_isa_wld_0_2_Pipeline_VITIS_LOOP_1343_1.v
+tinytpu_isa_wld_0_2_Pipeline_VITIS_LOOP_3039_1.v
 tinytpu_isa_wld_0_2.v
-tinytpu_isa_wld_0_3_Pipeline_VITIS_LOOP_1414_1.v
+tinytpu_isa_wld_0_3_Pipeline_VITIS_LOOP_3110_1.v
 tinytpu_isa_wld_0_3.v
-tinytpu_isa_wld_1_0_Pipeline_VITIS_LOOP_1487_1.v
+tinytpu_isa_wld_1_0_Pipeline_VITIS_LOOP_3183_1.v
 tinytpu_isa_wld_1_0.v
-tinytpu_isa_wld_1_1_Pipeline_VITIS_LOOP_1567_1.v
+tinytpu_isa_wld_1_1_Pipeline_VITIS_LOOP_3263_1.v
 tinytpu_isa_wld_1_1.v
-tinytpu_isa_wld_1_2_Pipeline_VITIS_LOOP_1641_1.v
+tinytpu_isa_wld_1_2_Pipeline_VITIS_LOOP_3337_1.v
 tinytpu_isa_wld_1_2.v
-tinytpu_isa_wld_1_3_Pipeline_VITIS_LOOP_1712_1.v
+tinytpu_isa_wld_1_3_Pipeline_VITIS_LOOP_3408_1.v
 tinytpu_isa_wld_1_3.v
-tinytpu_isa_wld_2_0_Pipeline_VITIS_LOOP_1785_1.v
+tinytpu_isa_wld_2_0_Pipeline_VITIS_LOOP_3481_1.v
 tinytpu_isa_wld_2_0.v
-tinytpu_isa_wld_2_1_Pipeline_VITIS_LOOP_1863_1.v
+tinytpu_isa_wld_2_1_Pipeline_VITIS_LOOP_3559_1.v
 tinytpu_isa_wld_2_1.v
-tinytpu_isa_wld_2_2_Pipeline_VITIS_LOOP_1937_1.v
+tinytpu_isa_wld_2_2_Pipeline_VITIS_LOOP_3633_1.v
 tinytpu_isa_wld_2_2.v
-tinytpu_isa_wld_2_3_Pipeline_VITIS_LOOP_2008_1.v
+tinytpu_isa_wld_2_3_Pipeline_VITIS_LOOP_3704_1.v
 tinytpu_isa_wld_2_3.v
-tinytpu_isa_wld_3_0_Pipeline_VITIS_LOOP_2078_1.v
+tinytpu_isa_wld_3_0_Pipeline_VITIS_LOOP_3774_1.v
 tinytpu_isa_wld_3_0.v
-tinytpu_isa_wld_3_1_Pipeline_VITIS_LOOP_2152_1.v
+tinytpu_isa_wld_3_1_Pipeline_VITIS_LOOP_3848_1.v
 tinytpu_isa_wld_3_1.v
-tinytpu_isa_wld_3_2_Pipeline_VITIS_LOOP_2226_1.v
+tinytpu_isa_wld_3_2_Pipeline_VITIS_LOOP_3922_1.v
 tinytpu_isa_wld_3_2.v
-tinytpu_isa_wld_3_3_Pipeline_VITIS_LOOP_2297_1.v
+tinytpu_isa_wld_3_3_Pipeline_VITIS_LOOP_3993_1.v
 tinytpu_isa_wld_3_3.v
 tinytpu_isa.v

@@ -21,7 +21,8 @@
   "layout": "flat",
   "manifests": {
     "full": "sv2v_manifest.f",
-    "logic_only": "sv2v_manifest_nomem.f"
+    "logic_only": "sv2v_manifest_nomem.f",
+    "logic_only_alias": "sv2v_manifest_nomem_stubbed.f"
   },
   "memory_array_files": [
     "mem_0_ext.v",
@@ -29,6 +30,12 @@
     "split_mem_0_ext.v",
     "split_mem_ext.v"
   ],
+  "memory_stubs": {
+    "mem_0_ext.v": "mem_0_ext_stub.v",
+    "mem_ext.v": "mem_ext_stub.v",
+    "split_mem_0_ext.v": "split_mem_0_ext_stub.v",
+    "split_mem_ext.v": "split_mem_ext_stub.v"
+  },
   "read_options": [
     "+define+SYNTHESIS"
   ],

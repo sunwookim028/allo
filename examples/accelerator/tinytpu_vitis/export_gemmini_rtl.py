@@ -18,9 +18,19 @@ Two file lists come out of each export, from one set of files:
   memories arrive as behavioural flop arrays (`split_mem_ext` and friends,
   `reg [7:0] ram [0:N]`), which is exactly `sram_mode='none'` on our side.
 * `sv2v_manifest_nomem.f` -- the same list with the four memory-array modules
-  removed, so DC sees `mem`/`mem_0` as empty black boxes and reports the
-  accelerator's LOGIC area. That figure is the one that survives the memory
-  treatment, and it costs a second `make` rather than a second export.
+  replaced by port-compatible EMPTY modules, so DC reports the accelerator's
+  LOGIC area. That figure is the one that survives the memory treatment, and it
+  costs a second `make` rather than a second export.
+
+  **The stubs are not optional.** Merely omitting a module's source does not
+  give DC a black box, it gives DC an unresolved reference -- `Unable to
+  resolve reference 'mem_ext' in 'mem'` (LINK-5) -- and the link fails. Each
+  stub's header is copied verbatim from the real module so it cannot disagree
+  about a port, and the result is a better boundary than dangling nets: the
+  figure keeps everything that DRIVES the memories, and excludes the arrays and
+  the arrays' own interfaces.
+
+    python export_gemmini_rtl.py --manifests    # rewrite lists and stubs only
 
 **The memories must be capacity-matched before this means anything.** Stock
 Gemmini carries 256 KiB of scratchpad and 64 KiB of accumulator against our
@@ -57,7 +67,8 @@ GENERATED = os.path.join(CHIPYARD, "sims", "verilator", "generated-src")
 TOP = "Gemmini"
 
 sys.path.insert(0, HERE)
-from export_rtl import ExportError, compile_order, _MODULE, _INST, _KW  # noqa: E402
+from export_rtl import (ExportError, compile_order, write_stubs,  # noqa: E402
+                        _MODULE, _INST, _KW)
 
 #: Gemmini's local memories, as firtool emits them: a wrapper module per
 #: `SyncReadMem` (`mem`, `mem_0`) instantiating a `*_ext` blackbox that the
@@ -316,7 +327,7 @@ def hardware(mems):
             "ACC_DIM": acc["width"] // 32}
 
 
-def manifest(dest, name, order, skip=()):
+def manifest(dest, name, order, skip=(), stubs=None):
     drop = set(skip)
     kept = [f for f in order if f not in drop]
     with open(os.path.join(dest, name), "w") as fh:
@@ -331,14 +342,20 @@ def manifest(dest, name, order, skip=()):
                  f"# patterns outside any `ifdef`, so Verilog-2001 rejects\n"
                  f"# this; sv2v or `analyze -format sverilog` is required.\n")
         if drop:
-            fh.write(f"# {len(drop)} memory-array module(s) OMITTED, so\n"
-                     f"# mem/mem_0 elaborate as empty black boxes and the area\n"
-                     f"# reported is the accelerator's LOGIC alone:\n")
+            fh.write(f"# LOGIC-ONLY LIST. {len(drop)} memory-array module(s)\n"
+                     f"# are replaced by port-compatible EMPTY modules, so the\n"
+                     f"# area reported is the accelerator's LOGIC alone. The\n"
+                     f"# stubs are NOT optional: merely omitting a module does\n"
+                     f"# not give DC a black box, it gives DC an unresolved\n"
+                     f"# reference and the link fails (LINK-5).\n")
             for f in sorted(drop):
-                fh.write(f"#   {f}\n")
+                fh.write(f"#   {f} -> {(stubs or {}).get(f, '(NO STUB)')}\n")
+            fh.write(f"# The figure keeps everything that DRIVES the memories\n"
+                     f"# -- address generation, enables, write masks -- and\n"
+                     f"# excludes the arrays and the arrays' own interfaces.\n")
         fh.write("# '#' comments and a leading '!' excludes a file.\n")
-        for f in kept:
-            fh.write(f"{f}\n")
+        for f in order:
+            fh.write(f"{(stubs or {})[f]}\n" if f in drop else f"{f}\n")
     return kept
 
 
@@ -626,12 +643,58 @@ def export(key):
     return meta
 
 
+def regenerate_manifests(dest):
+    """Rewrite both file lists, and the memory stubs, for a directory that is
+    already exported -- no chipyard elaboration needed.
+
+    The stubs arrived after these directories shipped. Omitting a module's
+    source does NOT give DC a black box; it gives DC an unresolved reference
+    and the link fails (``Unable to resolve reference 'mem_ext' in 'mem'``,
+    LINK-5). The logic-only run needs each omitted module to exist and be
+    empty, and the empty module's header is copied verbatim from the real one
+    so it cannot disagree about a port.
+    """
+    meta = json.load(open(os.path.join(dest, "MANIFEST.json")))
+    files = {n: open(os.path.join(dest, n), errors="replace").read()
+             for n in sorted(os.listdir(dest))
+             if n.endswith((".v", ".sv")) and not n.endswith("_stub.v")}
+    order = compile_order(files, top=TOP)
+    dropped = [n for n in order if MEM_ARRAY.match(os.path.splitext(n)[0])]
+    if sorted(dropped) != sorted(meta["memory_array_files"]):
+        raise ExportError(
+            f"{dest}: the files matching {MEM_ARRAY.pattern!r} are "
+            f"{sorted(dropped)} but MANIFEST.json records "
+            f"{sorted(meta['memory_array_files'])}. Regenerating against a "
+            f"different set than the one already synthesised would silently "
+            f"change what the logic-only area measures.")
+    stubs = write_stubs(dest, files, dropped)
+    manifest(dest, "sv2v_manifest.f", order)
+    for name in ("sv2v_manifest_nomem.f", "sv2v_manifest_nomem_stubbed.f"):
+        manifest(dest, name, order, skip=dropped, stubs=stubs)
+    meta["manifests"] = {"full": "sv2v_manifest.f",
+                         "logic_only": "sv2v_manifest_nomem.f",
+                         "logic_only_alias": "sv2v_manifest_nomem_stubbed.f"}
+    meta["memory_stubs"] = {k: stubs[k] for k in sorted(stubs)}
+    with open(os.path.join(dest, "MANIFEST.json"), "w") as fh:
+        json.dump(meta, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    print(f"{os.path.basename(dest)}: {len(order)} files, {len(dropped)} "
+          f"stubbed -> " + ", ".join(sorted(stubs.values())))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--only", choices=sorted(CONFIGS), action="append")
+    ap.add_argument("--manifests", action="store_true",
+                    help="rewrite the file lists and stubs for directories "
+                         "that already shipped; no elaboration needed")
     args = ap.parse_args()
-    for key in (args.only or sorted(CONFIGS)):
-        export(key)
+    keys = args.only or sorted(CONFIGS)
+    for key in keys:
+        if args.manifests:
+            regenerate_manifests(os.path.join(DEST, CONFIGS[key]["dest"]))
+        else:
+            export(key)
 
 
 if __name__ == "__main__":
