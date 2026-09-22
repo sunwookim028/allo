@@ -39,7 +39,10 @@ PUBLISHED = {
     # run. Four shapes are the published row because the mapper's pick there
     # IS the canonical nest; 4x4x4 is three lower because its pick emits 24
     # instruction words against the hand-written 28.
-    "codesign_cosim": dict(zip(ALL_SHAPES, (0, 0, 0, 0, 0))),
+    # Measured 2026-09-22 by `accept.py --codesign` with no diff, on a clean
+    # worktree of main with its own bindings: bit-exact at all five shapes,
+    # csynth 2.431 ns, BRAM18K 40 / DSP 14 / FF 17,075 / LUT 26,558.
+    "codesign_cosim": dict(zip(ALL_SHAPES, (168, 261, 417, 483, 685))),
 }
 #: Controls measured by earlier no-diff runs: `key(driver, blobs)` -> cycles.
 #: Cross-check only; a design whose cycles deliberately move gets its entry in
