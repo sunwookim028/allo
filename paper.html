@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design &#8212; Allo Documentation</title>
+    <title>A Co-Design Compilation Flow as a Harness for Language Models to Improve It &#8212; Allo Documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/basic_mod.css?v=9b2032db" />
     <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
@@ -137,7 +137,7 @@
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
@@ -215,243 +215,272 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="substrate-disagreement-and-agent-proposed-legality-rules-in-accelerator-co-design">
-<h1>Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design<a class="headerlink" href="#substrate-disagreement-and-agent-proposed-legality-rules-in-accelerator-co-design" title="Link to this heading"><span>¶</span></a></h1>
-<p><strong>Abstract.</strong> We present a programmable GEMM accelerator written in a Python
-accelerator design language, decomposed into eight reusable units, and
-evaluated on both FPGA and a 45 nm standard-cell flow against Gemmini at
-matched array size. Three results follow. First, the two substrates disagree
-about cost so strongly that FPGA-only evaluation is misleading: an optimisation
-that appears inexpensive on FPGA costs <strong>+74.4% cell area</strong>, of which <strong>99.1%
-is two AXI adapters</strong> rather than compute or memory, and the instruction-fetch
-adapter alone is <strong>60.0%</strong> of the baseline design. Second, evaluating on
-multi-layer models rather than GEMM shapes changes that optimisation’s measured
-worth by <strong>four to eight times</strong>, because model depth repays a fixed per-call
-cost that a single large GEMM amortises away. Third, two independent LLM search
-arms — one without the target property in its prompt — proposed the <em>same</em>
-architectural legality rule for memory write ports, and the same unsound form
-of it, which localises the error to the shape of the abstraction rather than to
-either run. We give the corrected shape, and a measured evaluation of modelling
-instructions as compositions of per-unit actions.</p>
+  <section id="a-co-design-compilation-flow-as-a-harness-for-language-models-to-improve-it">
+<h1>A Co-Design Compilation Flow as a Harness for Language Models to Improve It<a class="headerlink" href="#a-co-design-compilation-flow-as-a-harness-for-language-models-to-improve-it" title="Link to this heading"><span>¶</span></a></h1>
+<p><strong>Abstract.</strong> We describe a compilation flow that takes an architectural and
+microarchitectural specification of an accelerator and produces, from that one
+source, both the RTL and the compiler that targets it — so that a proposed
+design change yields measured cycles and measured silicon area rather than an
+estimate. The flow is built on schedule-level design abstractions over MLIR,
+each of which states a machine property and refuses programs that violate it.
+We then use the flow as a harness for a language model, and report experiments
+in which the model is asked not to tune the design but to <strong>improve the
+abstractions themselves</strong>. Two independent search arms proposed the same
+architectural legality rule, and the same unsound form of it, which localises
+the defect to the shape of the abstraction rather than to either run; we give
+the corrected shape. Separately we evaluate modelling instructions as
+compositions of per-unit <em>actions</em>, and report where it pays and what it
+provably cannot check. Measurements from the flow are given throughout as
+evidence that its numbers are decision-grade: they reverse two conclusions that
+cycle-only, single-substrate evaluation had reached.</p>
 <section id="introduction">
 <h2>1. Introduction<a class="headerlink" href="#introduction" title="Link to this heading"><span>¶</span></a></h2>
-<p>Co-design decisions require cost on more than one axis. A flow that reports
-cycles alone cannot rank a change that trades area for time, and a flow that
-reports one substrate cannot see a structure that is free on that substrate and
-dominant elsewhere. This work reports measurements from a design carried
-through both, and from an agentic loop given write access to the compiler.</p>
+<p>Co-design requires a loop, and a loop requires a flow that answers questions
+about a <em>changed</em> design cheaply enough to ask many of them. The usual
+obstruction is that cycles and area come from different descriptions: a
+simulator model, an RTL implementation, and a compiler that targets the machine
+are written separately and drift apart. A change then costs three edits and a
+reconciliation, and a language model driving such a loop spends its effort on
+the reconciliation rather than on the design.</p>
+<p>We describe a flow in which one specification generates the machine, the
+compiler’s model of it, and the checks that hold them together, and in which
+the design abstractions are <em>legality rules</em> rather than annotations — each
+refuses a program or a schedule that violates the machine property it states.
+This makes the flow usable as a harness: a model may edit the specification, or
+the abstractions, and is answered by measurement.</p>
 <p>Contributions:</p>
 <ol class="arabic simple">
-<li><p><strong>A substrate-disagreement result with component-level attribution.</strong> Two
-structures that are near-free on FPGA dominate standard-cell area, and we
-attribute the cost to specific instances rather than reporting a total.</p></li>
-<li><p><strong>A workload-dependence result.</strong> The same optimisation measured on GEMM
-shapes and on multi-layer models differs by 4–8×, with a stated mechanism.</p></li>
-<li><p><strong>A convergence result on agent-proposed abstractions.</strong> Two arms produced
-the same architectural legality rule and the same unsoundness; we give the
-corrected form (a schedule over cycles, not a count over resources).</p></li>
+<li><p><strong>A spec-driven co-design flow</strong> in which architecture, ISA, generated RTL
+and the mapping compiler derive from one source, with the consistency
+checked rather than maintained by hand (§2).</p></li>
+<li><p><strong>Its use as a language-model harness</strong>, with the guards and the graded
+judge that make an agent’s claim checkable rather than plausible (§3).</p></li>
+<li><p><strong>Experiments on agent-improved abstractions.</strong> Two arms, one unseeded,
+converged on the same architectural legality rule <em>and the same
+unsoundness</em>; we give the corrected form — a schedule over cycles, not a
+count over resources (§4).</p></li>
 <li><p><strong>A measured evaluation of per-unit action composition</strong> for defining
-instructions, including what it provably cannot check.</p></li>
+instructions, including the class of error it cannot detect (§5).</p></li>
+<li><p><strong>Evidence that the flow’s numbers change decisions</strong>: results that reverse
+what cycle-only and FPGA-only evaluation concluded (§6).</p></li>
 </ol>
 </section>
-<section id="design">
-<h2>2. Design<a class="headerlink" href="#design" title="Link to this heading"><span>¶</span></a></h2>
-<p>A T×T int8 systolic array with int32 accumulation and a 10-opcode instruction
-set (load, multiply-accumulate, vector add, rectify, move-out, loop). The
-machine is expressed as eight parametrized units composed by an explicit
-architecture description of roughly 100 lines; unit declarations are checked
-against their bodies by recomputing free names from the AST.</p>
-<p>The shipped configuration (T=4, MAXDIM=16) executes five reference shapes in
-<strong>171 / 261 / 417 / 483 / 685 cycles</strong>, bit-exact against a numpy reference,
-reproduced independently three times and enforced by a single command.</p>
+<section id="the-flow">
+<h2>2. The flow<a class="headerlink" href="#the-flow" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Specification.</strong> A machine is an <em>architecture</em> — units, channels and
+memories, each unit declaring the names it reads and writes and the parameters
+it takes — plus a machine-readable ISA. The architecture is roughly 100 lines
+composing eight parametrized units. Declarations are not trusted: unit
+signatures are checked by recomputing free names from the AST and requiring
+equality with the declaration, and the ISA specification has nine consumers
+that a checker holds to it. Two configurations (T=4 and T=8) share the same
+unit objects.</p>
+<p><strong>Design abstractions over MLIR.</strong> The units are written in a Python
+accelerator design language whose schedule primitives lower to MLIR. The
+primitives relevant here each state a machine property and enforce it:</p>
+<ul class="simple">
+<li><p>a <strong>dependence</strong> claim that refuses a provably-false assertion, accepts an
+unprovable one, and records the residue as an obligation the assembler must
+discharge;</p></li>
+<li><p>an <strong>encoding</strong> constraint making an instruction word’s bit budget a
+checkable schedule property, re-checked after every later primitive so an
+error names the primitive that broke it;</p></li>
+<li><p><strong>memory resource and storage type</strong>, lowered to storage bindings in the
+emitted design;</p></li>
+<li><p><strong>stream ports</strong> on dataflow kernels, with nine legality rules.</p></li>
+</ul>
+<p><strong>Backend and mapper.</strong> The same specification drives HLS to RTL, from which
+cosimulation gives exact cycles, and a standard-cell flow gives area and a
+timing estimate. A mapping compiler takes a workload as an einsum with extents,
+dtypes and an epilogue, searches the legal mappings onto the fixed machine, and
+is graded by a tiered judge: <em>legal</em> (the mapping satisfies the machine’s
+stated rules), <em>correct</em> (bit-exact against a reference), <em>fast</em> (cycles), with
+<em>confirmed</em> above <em>fast</em> so an estimate can never select a candidate. Workload
+specifications are extracted from PyTorch models by tracing and shape
+propagation only — the existing PyTorch path synthesises a machine <em>for</em> a
+model and is the wrong direction for this purpose.</p>
+<p><strong>What closes the loop.</strong> A change to the specification produces a new machine,
+a new mapping, new cycles and new area, with the consistency of the parts
+checked by construction rather than by review.</p>
 </section>
-<section id="evaluation-methodology">
-<h2>3. Evaluation methodology<a class="headerlink" href="#evaluation-methodology" title="Link to this heading"><span>¶</span></a></h2>
-<p><strong>Against Gemmini.</strong> Matched array dimension, both sides measured over the same
-window, with host overhead treated symmetrically and the comparison design’s
-own run-to-run spread reported. Our cosim is deterministic; the ±spread in the
-tables is Gemmini’s.</p>
-<p><strong>Area.</strong> The accelerator boundary is the <em>transitive closure of the module
-instantiation graph</em> from Gemmini’s top module — computed, not hand-picked (138
-modules at DIM=4). Rocket, caches and SoC are excluded because we have no host.
-Blocks kept although unexercised — the convolution pipeline, the
-output-stationary datapath, an fp32 scaling pipeline — are kept because
-removing them would tune the opponent.</p>
-<p>Two figures are reported per design. The <strong>logic-only</strong> figure excludes the
-operand scratchpad and accumulator by an identical semantic rule on both sides,
-with stubs supplying empty module headers (omission alone is a link error, not
-a black box), so the boundary is <em>everything that drives the memories and
-nothing inside them</em>. The <strong>capacity-matched</strong> figure is secondary: a total is
-defensible only at DIM=8, where capacities agree to 2%; at DIM=4 a 4.8×
-capacity gap makes a total meaningless in either direction.</p>
-<p><strong>Instruction supply is excluded, symmetrically.</strong> Gemmini has no instruction
-port — its instructions arrive over RoCC from the excluded host. Ours arrive
-from DRAM. Charging us for the mechanism that replaces the deleted block is not
-a small distortion at 60% of area. We report the excluded figure as the
-<em>comparable</em> one and the full figure as the <em>buildable</em> one, and state that the
-difference is the cost of not having a host. The correction running the other
-way is stated alongside: our sequencer is counted while Gemmini’s decode
-happens in an excluded block.</p>
-<p><strong>Frequency</strong> is a synthesis-stage estimate at a 3.33 ns constraint, identical
-flow on both sides, reported as a floor and never as an achieved frequency.</p>
-<p><strong>Power is absent, with cause.</strong> Without SRAM macros and place-and-route, power
-is dominated by clock power into flip-flop arrays and by estimated wire
-capacitance, both larger than the effect under study. Activity annotation
-removes one of three objections and not the other two, so an annotated figure
-would be compromised rather than imprecise. We report no power number.</p>
+<section id="the-flow-as-a-harness">
+<h2>3. The flow as a harness<a class="headerlink" href="#the-flow-as-a-harness" title="Link to this heading"><span>¶</span></a></h2>
+<p>An agent is given the repository, an objective, and a gate ladder; it proposes
+a diff. The guards that make the resulting claim worth reading were each bought
+by an observed failure: candidate trees are reconstructed from git with the
+gate files frozen, so a candidate cannot overwrite the gate that judges it;
+verdicts are vouched with a nonce, so a candidate cannot print a passing string
+and exit zero; parametricity and documentation guards exist because a candidate
+once hard-coded an array dimension and deleted documentation, both of which
+improved its score.</p>
+<p>Two negative results about harness design generalise beyond this system.</p>
+<p><strong>A gate ladder that exercises a compiler only through existing designs cannot
+observe a new capability in either direction.</strong> A newly added primitive has no
+callers, so it is simultaneously unrewardable by the objective and undetectably
+broken by the gates. This one structural fact explains both halves of a failed
+run.</p>
+<p><strong>Selection must compare against the incumbent, not the baseline.</strong> Our keep
+rule accepted any candidate whose verdict was in the keep set while scoring
+every candidate against the original design, so all accepted candidates scored
+alike and a later, worse candidate displaced a genuine improvement (−31% LUT,
+latency 206→149). Reported improvement counts overstate accordingly, and we
+report the raw counts with the audit rather than the counts alone.</p>
 </section>
-<section id="results">
-<h2>4. Results<a class="headerlink" href="#results" title="Link to this heading"><span>¶</span></a></h2>
-<section id="speed">
-<h3>4.1 Speed<a class="headerlink" href="#speed" title="Link to this heading"><span>¶</span></a></h3>
-<p>The deficit against Gemmini <strong>converges with problem size</strong> rather than
-growing: 1.27× at 16³ to <strong>1.09× at 64³</strong>, at 74.1% of peak. At T=8 on one
-shape (16×16×8) we are <strong>1.18× faster</strong>, clearing the comparison’s spread by
-4.8×. The residual is localised to a fixed DMA prologue worth 55–61% of it.
-A second team, measuring an unrelated design, independently found the same
-<em>shape</em> of loss, supporting the joint conclusion that Gemmini’s advantage at
-these sizes is its software rather than its array.</p>
-</section>
-<section id="substrate-disagreement">
-<h3>4.2 Substrate disagreement<a class="headerlink" href="#substrate-disagreement" title="Link to this heading"><span>¶</span></a></h3>
-<p>Widening the operand DMA recovers much of the deficit and appears inexpensive
-on FPGA. In 45 nm it costs <strong>+74.4% cell area</strong> (3,254,024 against 1,865,314
-µm², differing in the widening alone, both meeting timing at +0.21 ns).
-Hierarchical attribution places <strong>99.1% of the delta in two AXI master ports</strong>,
-which grow 13× when widened; the scratchpad, vector registers and accumulator
-do not move. The FPGA reported +43% flip-flops and +92% block RAM for the same
-change — the block-RAM axis being exactly the buffering that dominates in
-standard cells.</p>
-<p>The instruction-fetch adapter is <strong>60.0% of the baseline design</strong> (681,537 of
-1,136,598 µm²) against 1.1% for the scratchpad and 2.9% for the sequencer, and
-is <strong>constant at ≈700k across all four synthesised variants</strong> — independent
-evidence that it is infrastructure rather than part of the machine.</p>
-<p>This is not idiosyncratic. Gemmini’s published breakdown (Intel 22 nm, 16×16
-int8) reports <strong>SRAM at 67.1%</strong> of accelerator area and the spatial array at
-<strong>11.3%</strong>.</p>
-<p>A third instance: a dual-write-port buffer is free on FPGA block RAM and is
-<strong>rejected outright</strong> by the standard-cell flow; a banked rewrite preserves
-every cycle.</p>
-</section>
-<section id="workload-dependence">
-<h3>4.3 Workload dependence<a class="headerlink" href="#workload-dependence" title="Link to this heading"><span>¶</span></a></h3>
-<p>On GEMM shapes the DMA widening is worth <strong>4.3–7.0%</strong> of runtime. On a suite of
-multi-layer models it is worth <strong>25–34%</strong>. The mechanism: a model does not make
-the problem larger, it makes it longer, so a fixed per-call cost is repaid at
-every layer rather than amortised by one large problem. An optimisation ranked
-on GEMM shapes is therefore ranked on the workload least sensitive to the cost
-it removes.</p>
-<p>Three instrument errors surfaced only under the model suite: an analytic cycle
-estimator 26–36% low against the shipped build, a burst-cost law 40% optimistic
-at short layers, and a mapping that does not terminate in cosim at the shipped
-channel depth.</p>
-</section>
-<section id="a-channel-depth-threshold">
-<h3>4.4 A channel-depth threshold<a class="headerlink" href="#a-channel-depth-threshold" title="Link to this heading"><span>¶</span></a></h3>
-<p>Three legal tiled programs never complete at the shipped stream depth and all
-complete bit-exact at twice that depth — same tree, same toolchain, one knob.
-The published shapes move <strong>+4 / +4 / +4 / −1 / −11</strong>: small shapes pay
-pipeline skew, large shapes get <em>faster</em>, because a deeper queue lets the
-sequencer run ahead of the units it dispatches to.</p>
-<p>The cure is not a characterisation. A depth-versus-tile-count predicate does
-not cover the failing family, and the obvious counting rule is refuted by our
-own shipped GEMM, which issues 272 instructions to one unit at the shallow
-depth and completes. The verification gap is identified: our Kahn-process model
-runs the protocol at the declared depth and pronounces these deadlock-free,
-because it does not model the sequencer blocking <em>mid-instruction</em> across the
-queues one instruction fans out to.</p>
-</section>
-</section>
-<section id="agent-proposed-abstractions">
-<h2>5. Agent-proposed abstractions<a class="headerlink" href="#agent-proposed-abstractions" title="Link to this heading"><span>¶</span></a></h2>
-<p>We gave an LLM loop write access to the compiler, a gate ladder, and a seeded
-measurement, and asked for a capability the language lacked.</p>
-<p><strong>Both arms proposed an architectural legality rule for memory write ports</strong>,
-one with the property named in its prompt and one without. Both refused the
-design the synthesis flow rejects and accepted the bit-exact banked rewrite
-with all gates clean; one stated its unchecked premise unprompted.</p>
+<section id="experiment-can-a-model-improve-the-abstractions">
+<h2>4. Experiment: can a model improve the abstractions?<a class="headerlink" href="#experiment-can-a-model-improve-the-abstractions" title="Link to this heading"><span>¶</span></a></h2>
+<p>The question is not whether a model can tune a parameter — it can — but whether
+it can add an abstraction that lets the <em>language</em> state something about the
+machine it previously could not.</p>
+<p><strong>Setup.</strong> Two arms over the same compiler and gate ladder, differing in one
+respect: one had the target property named in its prompt and a ground-truth
+pair of designs seeded in its environment; the other had only the measurements.
+A probe rung graded expressiveness by requiring a candidate to <strong>refuse</strong> a
+design the standard-cell flow rejects and <strong>accept</strong> a bit-exact rewrite of it.</p>
+<p><strong>Result.</strong> Both arms proposed an architectural legality rule for memory write
+ports. Both passed the probe. One stated its unchecked premise unprompted.
+Neither is an annotation: both refuse before modifying the IR.</p>
 <p><strong>Both are unsound in the same two directions</strong>, found by applying them to
-cases their authors had not designed for: a block-partitioned array is
-<em>accepted</em> although both stores land in one bank, and an unpipelined two-store
-loop is <em>refused</em> although the stores occupy different cycles. Convergence
-across an unseeded arm localises the error to the abstraction’s shape:</p>
+cases their authors had not designed for. A block-partitioned array is
+<em>accepted</em> although both stores land in one bank; an unpipelined two-store loop
+is <em>refused</em> although its stores occupy different cycles. That an unseeded arm
+reproduced the defect localises it to the abstraction’s shape:</p>
 <blockquote>
 <div><p>A predicate over resources is the wrong form for this class of claim.
 Counting occupants against capacity discards <em>which</em> element is touched in
 <em>which</em> cycle, and both failure directions recover exactly that discarded
-information. The sound form is a <strong>calendar</strong> — index map composed with
-initiation interval — and the IR already carries both.</p>
+information. The sound form is a <strong>calendar</strong> — an index map composed with
+the initiation interval — and the IR already carries both.</p>
 </div></blockquote>
-<p>An independently developed scheduler in another design is safe against both
-directions because its port model is a <em>set of cycles</em> rather than a count. Its
-authors note they also lack the banking that makes the error possible, so the
-finding is predictive rather than comparative.</p>
-<p>Two negative results about the apparatus. A gate ladder that exercises a
-compiler only through existing designs cannot observe a new capability in
-either direction, because a new primitive has no callers. And the loop’s keep
-rule compared each candidate against the <em>baseline</em> rather than the incumbent,
-so it discarded a genuine improvement (−31% LUT, latency 206→149) in favour of
-a later, worse one; reported improvement counts overstate accordingly.</p>
+<p>An independently developed scheduler in an unrelated accelerator is immune to
+both directions because its port model is a <em>set of cycles</em> rather than a
+count. Its authors observe that they also lack the banking that makes the error
+possible, so the finding is predictive — the defect arrives with banking —
+rather than a comparison of care.</p>
+<p><strong>What this does not show.</strong> The property was seeded in one arm, and the other
+chose the most salient measurement available to it. Neither demonstrates that a
+model can <em>find</em> an architectural gap unaided; an earlier arm reached
+repeatedly for a surface that already existed, adding a new spelling rather
+than a new capability. One arm also arrived at a correct artefact through a
+factually wrong diagnosis: the port count was already declarable, and only
+enforcement was missing.</p>
 </section>
-<section id="instructions-as-compositions-of-per-unit-actions">
-<h2>6. Instructions as compositions of per-unit actions<a class="headerlink" href="#instructions-as-compositions-of-per-unit-actions" title="Link to this heading"><span>¶</span></a></h2>
-<p>We evaluated defining an instruction as a sequence of per-unit <em>actions</em> rather
-than restating it in each consumer, by adding one fused instruction both ways
-on otherwise identical trees.</p>
-<p><strong>It does not reduce code</strong>: +79/−1 lines in one file, against +77/−6 across
-three. It reduces <em>the number of independent statements that must agree</em> — from
-five specification regions plus two consumers, to one region plus one declared
-hardware fact. Two of the replaced restatements were already wrong, and a third
-consumer deadlocked on first contact with the new instruction, which is how its
-staleness was discovered.</p>
+<section id="experiment-instructions-as-compositions-of-per-unit-actions">
+<h2>5. Experiment: instructions as compositions of per-unit actions<a class="headerlink" href="#experiment-instructions-as-compositions-of-per-unit-actions" title="Link to this heading"><span>¶</span></a></h2>
+<p>If an instruction is a declaration rather than a diff over a compiler, the move
+set available to a search changes shape. We tested this directly by defining an
+instruction as a sequence of per-unit <em>actions</em> and adding one new fused
+instruction both ways, on otherwise identical trees, with the shared hardware
+change cherry-picked identically into both so only the difference is measured.</p>
+<p><strong>Cost.</strong> +79/−1 lines in one file with actions, against +77/−6 across three
+files without. <strong>It does not reduce code.</strong> What it reduces is the number of
+independent statements that must agree: five specification regions plus two
+consumers, down to one region plus one declared hardware fact. Two of the
+replaced restatements were already wrong, and a third consumer deadlocked on
+first contact with the new instruction, which is how its staleness surfaced.</p>
 <p><strong>The discriminating test.</strong> Two actions, each legal in an instruction of its
 own, compose into an instruction that is not: two units writing one port in one
-cycle. The model refuses it, and the repair is a cycle offset rather than a
-port. A count cannot refuse this — the count is one write per unit, and one
-port per unit is what the machine has. This is the same predicate/calendar
-distinction as §5, reached independently.</p>
+cycle. The model refuses it, and the repair is a cycle offset, not a port. A
+count cannot refuse this — the count is one write per unit, and one port per
+unit is what the machine has. This is the predicate/calendar distinction of §4,
+reached independently and by a different route.</p>
 <p><strong>What it cannot check.</strong> Of fifteen deliberately incorrect declarations, five
-are refused structurally and four caught by a cost check; <strong>six are invisible
-to every static check</strong> — a source naming the wrong operand, subtraction for
-addition. The model verifies composition, not arithmetic.</p>
-<p>We therefore recommend it where several consumers would otherwise restate one
-per-unit fact, and <strong>not</strong> as a default, because only one machine has exercised
-it.</p>
+are refused structurally and four are caught by a cost check; <strong>six are
+invisible to every static check</strong> — an action naming the wrong operand,
+subtraction where addition was meant. The model verifies <em>composition</em>, not
+arithmetic. A control mutant that changes nothing is correctly not caught,
+which is what shows the harness ran the file it was given.</p>
+<p><strong>Recommendation.</strong> Worth using where several consumers would otherwise restate
+one per-unit fact; <strong>not</strong> a default, because one machine has exercised it.
+This is directed work, not a search result, and is reported as such.</p>
+</section>
+<section id="do-the-flow-s-numbers-change-decisions">
+<h2>6. Do the flow’s numbers change decisions?<a class="headerlink" href="#do-the-flow-s-numbers-change-decisions" title="Link to this heading"><span>¶</span></a></h2>
+<p>Three results, each of which reverses or reframes a conclusion that a cheaper
+evaluation had reached.</p>
+<p><strong>6.1 Speed, against a matched baseline.</strong> Against Gemmini at matched array
+dimension, measured over the same window with host overhead treated
+symmetrically, the deficit <strong>converges</strong> rather than growing — 1.27× at 16³ to
+<strong>1.09× at 64³</strong>, at 74.1% of peak — with the residual localised to a fixed DMA
+prologue worth 55–61% of it. At T=8 on one shape we are <strong>1.18× faster</strong>,
+clearing the comparison’s spread by 4.8×. A second team measuring an unrelated
+design independently found the same <em>shape</em> of loss, supporting the joint
+conclusion that the advantage at these sizes is software, not array. Our
+cosimulation is deterministic; the spread in the tables is the comparison’s.</p>
+<p><strong>6.2 The substrates disagree, and the FPGA is the misleading one.</strong> An
+optimisation that recovers much of the deficit appears inexpensive on FPGA. In
+45 nm it costs <strong>+74.4% cell area</strong>, and hierarchical attribution places
+<strong>99.1% of the delta in two AXI master ports</strong>, which grow 13× when widened;
+the scratchpad, vector registers and accumulator do not move. The FPGA reported
++43% flip-flops and +92% block RAM — the block-RAM axis being exactly the
+buffering that dominates in standard cells.</p>
+<p>Separately, the <strong>instruction-fetch adapter is 60.0% of the baseline design</strong>,
+against 1.1% for the scratchpad and 2.9% for the sequencer, and is constant
+across all four synthesised variants — independent evidence that it is
+infrastructure rather than part of the machine. This is not idiosyncratic:
+Gemmini’s published breakdown reports SRAM at 67.1% of accelerator area and the
+spatial array at 11.3%. A third instance: a dual-write-port buffer is free on
+FPGA block RAM and is <strong>rejected outright</strong> by the standard-cell flow, while a
+banked rewrite preserves every cycle.</p>
+<p><strong>6.3 The workload class changes the answer by four to eight times.</strong> On GEMM
+shapes the same optimisation is worth <strong>4.3–7.0%</strong> of runtime; on multi-layer
+models, <strong>25–34%</strong>. A model does not make the problem larger, it makes it
+longer, so a fixed per-call cost is repaid at every layer rather than amortised
+by one large problem. An optimisation ranked on GEMM shapes is ranked on the
+workload least sensitive to the cost it removes. Three instrument errors
+surfaced only under the model suite, including an analytic cycle estimator
+26–36% low against the shipped build.</p>
+<p><strong>6.4 A threshold the model could not see.</strong> Three legal tiled programs never
+complete at the shipped channel depth and all complete bit-exact at twice that
+depth — same tree, same toolchain, one knob — with the published shapes moving
++4/+4/+4/−1/−11, the largest getting <em>faster</em> because a deeper queue lets the
+sequencer run ahead. The cure is not a characterisation: the obvious counting
+rule is refuted by our own shipped program, and our Kahn-process model
+pronounces these deadlock-free because it does not model a unit blocking
+<em>mid-instruction</em> across the queues one instruction fans out to. This is a
+stated gap in the flow, not a solved problem.</p>
 </section>
 <section id="threats-to-validity">
 <h2>7. Threats to validity<a class="headerlink" href="#threats-to-validity" title="Link to this heading"><span>¶</span></a></h2>
-<p>Single machine and single new instruction in §6, with the demonstrating
-instruction chosen by the abstraction’s author. Two arms and one seeded
-measurement in §5; replication under unseeded conditions is not done. The
-agent-proposed rule reached a correct artefact through a factually wrong
-diagnosis — the port count was already declarable; only enforcement was
-missing. Area results carry flip-flop memories rather than SRAM macros, which
-inflates memory-resident structures and understates nothing in the adapters.
-The comparison design’s area is not yet measured. Published third-party area
-figures are a different node, configuration and scope, and are used only as an
-order-of-magnitude check.</p>
+<p><strong>The area comparison is incomplete.</strong> Our four designs are synthesised; the
+comparison design’s RTL is exported, lint-clean and queued, but <strong>not yet
+run</strong>. Every area claim above is about our own designs or is cited from
+published third-party figures at a different node, configuration and scope,
+used only as an order-of-magnitude check.</p>
+<p>Area results use flip-flop memories rather than SRAM macros, which inflates
+memory-resident structures; it does not flatter the adapter findings, which are
+the ones we rely on. Power is reported nowhere: without macros and
+place-and-route it would be dominated by clock power into flip-flop arrays and
+estimated wire capacitance, both larger than the effect under study, so
+activity annotation would remove one of three objections and leave two.</p>
+<p>§4 is two arms and one seeded property, without unseeded replication. §5 is one
+machine and one new instruction, with the demonstrating instruction chosen by
+the abstraction’s author.</p>
 <p><strong>Instrument failures.</strong> Four instruments were observed reporting success
 without having run: a tool server that answered without binding, a cost meter
 reporting zero for a billed call, a self-consistent manifest describing a
 truncated export, and a leak detector that crashed and was read as clean. Three
-further checks were run against the wrong object and passed: an incremental
+further checks ran against the wrong object and passed: an incremental
 documentation build that skips the files it was meant to inspect, a simulation
 run at a different configuration than the one claimed, and a repository check
 reading commit titles rather than contents. We therefore treat a negative
 result as evidence only when the instrument can be shown to have run, on the
-object being claimed.</p>
+object being claimed — and we report that rule here because it changed which of
+our own results we were willing to keep.</p>
 </section>
 <section id="conclusion">
 <h2>8. Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"><span>¶</span></a></h2>
-<p>Cycles on one substrate and one workload class are insufficient to rank an
-architectural change: we show a factor of 4–8 from the workload axis and a
-structure at 60% of area that is invisible on the other substrate. An agentic
-loop over a compiler can propose a genuine architectural legality rule, and two
-arms converging on the same unsound form is more informative than either arm
-alone — it identifies the defect as belonging to the abstraction’s shape.
-Modelling instructions as per-unit actions removes duplicated statements
-without removing code, and cannot see arithmetic errors at all. Whether it
-generalises is settled by a second machine, which is the next experiment.</p>
+<p>A co-design flow whose machine, compiler and checks derive from one
+specification is usable as a harness: a language model can be pointed at the
+abstractions rather than at the parameters, and answered by measurement. Doing
+so produced an architectural legality rule twice over, independently, together
+with the same unsoundness — which is more informative than either arm alone,
+because it identifies the defect as belonging to the abstraction’s shape rather
+than to a run. The corrected shape is a schedule over cycles, and the same
+distinction reappears when instructions are modelled as compositions of
+per-unit actions. Whether that modelling generalises is decided by a second
+machine, which is the next experiment; and the flow’s own numbers are worth
+having chiefly because they reversed two conclusions we had already drawn
+without them.</p>
 </section>
 </section>
 
@@ -469,19 +498,13 @@ generalises is settled by a second machine, which is the next experiment.</p>
             <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
             <div class="page_toc">
                 <ul>
-<li><a class="reference internal" href="#">Substrate Disagreement and Agent-Proposed Legality Rules in Accelerator Co-Design</a><ul>
+<li><a class="reference internal" href="#">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a><ul>
 <li><a class="reference internal" href="#introduction">1. Introduction</a></li>
-<li><a class="reference internal" href="#design">2. Design</a></li>
-<li><a class="reference internal" href="#evaluation-methodology">3. Evaluation methodology</a></li>
-<li><a class="reference internal" href="#results">4. Results</a><ul>
-<li><a class="reference internal" href="#speed">4.1 Speed</a></li>
-<li><a class="reference internal" href="#substrate-disagreement">4.2 Substrate disagreement</a></li>
-<li><a class="reference internal" href="#workload-dependence">4.3 Workload dependence</a></li>
-<li><a class="reference internal" href="#a-channel-depth-threshold">4.4 A channel-depth threshold</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#agent-proposed-abstractions">5. Agent-proposed abstractions</a></li>
-<li><a class="reference internal" href="#instructions-as-compositions-of-per-unit-actions">6. Instructions as compositions of per-unit actions</a></li>
+<li><a class="reference internal" href="#the-flow">2. The flow</a></li>
+<li><a class="reference internal" href="#the-flow-as-a-harness">3. The flow as a harness</a></li>
+<li><a class="reference internal" href="#experiment-can-a-model-improve-the-abstractions">4. Experiment: can a model improve the abstractions?</a></li>
+<li><a class="reference internal" href="#experiment-instructions-as-compositions-of-per-unit-actions">5. Experiment: instructions as compositions of per-unit actions</a></li>
+<li><a class="reference internal" href="#do-the-flow-s-numbers-change-decisions">6. Do the flow’s numbers change decisions?</a></li>
 <li><a class="reference internal" href="#threats-to-validity">7. Threats to validity</a></li>
 <li><a class="reference internal" href="#conclusion">8. Conclusion</a></li>
 </ul>
