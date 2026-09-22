@@ -816,7 +816,7 @@ one account means a track that sees spend climbing faster than its own runs
 explain is seeing the other track, not an accounting bug.
 
 The one thing every experiment below is designed to fix
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Every claim this page makes about the TinyTPU-isa search is **n=1**. One paid
 run found one improvement. That is enough to show the loop works and not enough
@@ -859,7 +859,7 @@ is a red herring and the 76 reachable nests already contain the good designs --
 also a result, and a cheaper one to act on.
 
 E3. Can an agent maintain the abstractions, and at what rate?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The track this project most wants to measure, and the one expected to fail most
 often. An agent is asked to extend Allo itself -- a dialect operation, a type, a
@@ -917,7 +917,7 @@ it the right place to calibrate how much guidance an agent needs before the
 open-ended attempts in E3 are worth paying for.
 
 Why the design driver's end state matters to all of this
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The target is not one accelerator. It is **a library of parametrized, modular
 TPU IPs that compose into different architectural choices** -- the named class
