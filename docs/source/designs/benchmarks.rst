@@ -888,9 +888,24 @@ verified). Gemmini: Verilator, **median of five trials**, every shape one
      - **1.09x**
      - yes (54x)
 
-(``+/-`` is the full min-max spread over five trials, not a standard error.
-The two non-cubic shapes, 64x32x64 and 32x64x32, were measured at n=2:
-11 245 and 5 478, giving 1.15x and 1.25x.)
+   * - 64x32x64
+     - steady
+     - 12 907
+     - 11 175 +/- 18
+     - 63.5%
+     - 73.3%
+     - 1.16x
+     - yes (96x)
+   * - 32x64x32
+     - steady
+     - 6 824
+     - 5 570 +/- 147
+     - 60.0%
+     - 73.5%
+     - 1.23x
+     - yes (8.5x)
+
+(``+/-`` is the full min-max spread over five trials, not a standard error.)
 
 **Answer at this array size: we do not beat Gemmini at any shape, but the
 deficit converges rather than persisting.** On the cubic sweep it goes 1.27x
@@ -1377,10 +1392,29 @@ Gemmini DIM=4 at MAXDIM=64, **five trials per shape**
      - 34
      - 0.17%
      - 1 836 / 34 = **54x**
+   * - 64x32x64
+     - 5
+     - 11 175
+     - 11 165
+     - 11 183
+     - 18
+     - 0.16%
+     - 1 732 / 18 = 96x
+   * - 32x64x32
+     - 5
+     - 5 570
+     - 5 474
+     - 5 621
+     - **147**
+     - 2.6%
+     - 1 254 / 147 = 8.5x
 
-The spread is roughly **constant in absolute terms** (17-44 cycles) rather
-than proportional, which is what a fixed-size cache and coherence effect looks
-like --- so it matters enormously at 4x4x4 and not at all at 64x64x64.
+The spread is mostly **constant in absolute terms** (17-44 cycles) rather than
+proportional, which is what a fixed-size cache and coherence effect looks like
+--- so it matters enormously at 4x4x4 and not at all at 64x64x64. **32x64x32
+is the exception at 147 cycles**, and it is the only steady-state shape whose
+spread is not small; it still clears its own deficit by 8.5x, but a future
+comparison at that shape should carry more than five trials.
 
 .. warning::
 
