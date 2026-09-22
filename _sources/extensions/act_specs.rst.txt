@@ -612,7 +612,8 @@ only attributed number on the page.
 
 Two things fall out of the left column before the model is even discussed.
 **The five published cycle counts reproduce exactly** -- 172 / 262 / 418 /
-484 / 686 -- through a testbench that compares all 256 bytes of ``C`` against
+484 / 686, the published row *as it then stood* -- through a testbench that
+compares all 256 bytes of ``C`` against
 ``isa_ref.run`` rather than only the ``M x N`` region, which is a stricter
 check than the one the published numbers come from. And two of the corpus's
 three non-GEMM einsums run on real RTL: ``batched_matmul_2x4x4x4``

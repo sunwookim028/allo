@@ -170,6 +170,7 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -844,7 +845,8 @@ only attributed number on the page.</p>
 </table>
 <p>Two things fall out of the left column before the model is even discussed.
 <strong>The five published cycle counts reproduce exactly</strong> – 172 / 262 / 418 /
-484 / 686 – through a testbench that compares all 256 bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> against
+484 / 686, the published row <em>as it then stood</em> – through a testbench that
+compares all 256 bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> against
 <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> rather than only the <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">x</span> <span class="pre">N</span></code> region, which is a stricter
 check than the one the published numbers come from. And two of the corpus’s
 three non-GEMM einsums run on real RTL: <code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code>

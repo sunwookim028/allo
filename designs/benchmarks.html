@@ -171,6 +171,7 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -717,8 +718,9 @@ deliberately undersized build. MAXDIM itself defaults to <strong>64</strong>.</p
 </thead>
 <tbody>
 <tr class="row-even"><td><p>address field, 11 usable bits</p></td>
-<td><p><span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T \le 2047\)</span></p></td>
-<td><p>MAXDIM &lt;= 88 (90 unrounded; MAXDIM is a multiple of T)</p></td>
+<td><p><span class="math notranslate nohighlight">\((\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048\)</span>
+(a row <em>count</em>; the highest address is 2047)</p></td>
+<td><p>MAXDIM &lt;= 88 (90.5 unrounded; MAXDIM is a multiple of T)</p></td>
 <td><p>MAXDIM=96: <code class="docutils literal notranslate"><span class="pre">check_program</span></code>, “AGU-resolved f3=2112 is outside the
 0..2047 range”</p></td>
 </tr>
@@ -737,8 +739,13 @@ header slices moves them — but the field widths are load-bearing for a
 different reason: a synthesis tool bounds a runtime-bounded loop by the <em>range
 of the index</em>, which is why <code class="docutils literal notranslate"><span class="pre">nr</span></code> is 8 bits (see <code class="docutils literal notranslate"><span class="pre">microarch_isa</span></code>’s encoding
 note). Widening means re-measuring every loop bound Vitis derives.</p>
-<p>At T=8 the same two expressions give MAXDIM &lt;= 120, verified: the ceiling is a
-property of <span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T\)</span>, so a wider array buys a longer edge.</p>
+<p>At T=8 the same two expressions separate: the address field allows <strong>128</strong> —
+the layout names exactly 2048 rows, so its highest address is 2047 — and the
+cubic header allows 120. Both are computed by <code class="docutils literal notranslate"><span class="pre">isa_encoding.maxdim_ceiling</span></code>
+from <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> and confirmed against the design by
+<code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code>, which is what caught 120 being written for the address
+field: that is the count-versus-highest-address off-by-one, right at T=4 by
+luck and wrong at T=8.</p>
 </section>
 <section id="the-instruction-memory-does-not-need-to-grow">
 <h3>The instruction memory does <strong>not</strong> need to grow<a class="headerlink" href="#the-instruction-memory-does-not-need-to-grow" title="Link to this heading"><span>¶</span></a></h3>
@@ -2218,10 +2225,10 @@ the encoding rules, not estimated:</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>address field, 11 usable bits
-(<span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T \le 2047\)</span>)</p></td>
+(<span class="math notranslate nohighlight">\((\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048\)</span>)</p></td>
 <td><p><strong>MAXDIM</strong>, hence M, K and N together</p></td>
 <td><p><strong>88</strong></p></td>
-<td><p><strong>120</strong></p></td>
+<td><p><strong>128</strong></p></td>
 <td><p><strong>176</strong></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code>, 7 usable bits (<code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code>)</p></td>
@@ -2239,24 +2246,31 @@ the encoding rules, not estimated:</p>
 </tr>
 </tbody>
 </table>
-<p>So <strong>the address field binds first, through MAXDIM, at 88 (T=4) and 120
-(T=8)</strong> — and note that <code class="docutils literal notranslate"><span class="pre">nr</span></code>’s 127 is <em>not</em> a function of T, so it becomes
-the wall as soon as the array is wide enough to push MAXDIM past it.</p>
+<p>So <strong>the address field binds first at T=4, through MAXDIM, at 88</strong> — and
+<code class="docutils literal notranslate"><span class="pre">nr</span></code>’s 127 is <em>not</em> a function of T, so it becomes the wall as soon as the
+array is wide enough to push MAXDIM past it. That is already the case at
+<strong>T=8</strong>, where the address field admits 128 and <code class="docutils literal notranslate"><span class="pre">nr</span></code> refuses any dimension
+above 127: measured at <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=128</span></code>, a 32x128x128 GEMM is
+refused by <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>’s <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">&lt;=</span> <span class="pre">MAXROWS</span> <span class="pre">and</span> <span class="pre">K</span> <span class="pre">&lt;=</span> <span class="pre">MAXROWS</span></code>, while 32x120x128
+assembles.</p>
 <p>Against the shapes another team proposed, this is precise rather than
 approximate:</p>
 <ul class="simple">
 <li><p><strong>32 x 512 x 128</strong> (their recommended single shape). K=512 needs
-MAXDIM &gt;= 512: we are short <strong>5.8x</strong> at T=4 and <strong>4.3x</strong> at T=8 on the
+MAXDIM &gt;= 512: we are short <strong>5.8x</strong> at T=4 and <strong>4.0x</strong> at T=8 on the
 address field, <strong>4.0x</strong> on <code class="docutils literal notranslate"><span class="pre">nr</span></code>, and 4.0x / 1.0x on the header count.</p></li>
 <li><p><strong>K-sweep at M=32, N=128.</strong> Raising MAXDIM to match K, the first failure is
-at <strong>K=92</strong> (T=4) and <strong>K=128</strong> (T=8), in both cases the address field;
-last good K is 88 and 120.</p></li>
-<li><p><strong>Tall sweep at K=N=128.</strong> Blocked for <em>every</em> M, because N=128 alone
-exceeds the MAXDIM ceiling — at T=8 by <strong>eight</strong> (120 against 128). And
-M=128 additionally exceeds <code class="docutils literal notranslate"><span class="pre">nr</span></code> by <strong>one</strong> (127 against 128).</p></li>
+at <strong>K=92</strong> (T=4, the address field, which refuses the build at import) and
+at <strong>K=128</strong> (T=8, <code class="docutils literal notranslate"><span class="pre">nr</span></code>, which refuses the program); last good K is 88
+and 120.</p></li>
+<li><p><strong>Tall sweep at K=N=128.</strong> Blocked at T=4 for <em>every</em> M, because N=128
+alone is past the 88 ceiling. At T=8 the address field admits 128 exactly,
+so what blocks it is <code class="docutils literal notranslate"><span class="pre">nr</span></code>: K=128 and M=128 each exceed it by <strong>one</strong> (127
+against 128).</p></li>
 </ul>
 <p>Those last two are worth stating as margins rather than as failures: at T=8 we
-miss their tall sweep by 8 in one dimension and by 1 in another.</p>
+miss their tall sweep by one row, in two dimensions, on a field with two spare
+bits in the instruction word.</p>
 <p><strong>What our build would need to run the GPT-2 shape.</strong> Not simply a bigger
 MAXDIM — 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
 is that the region’s operands are declared <code class="docutils literal notranslate"><span class="pre">int8[MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM]</span></code> and

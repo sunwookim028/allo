@@ -170,6 +170,7 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -678,6 +679,27 @@ consumer kernel. The closure surface is <em>exclusively</em> streams: 0 shared
 arrays, 0 captured Python values, 0 captured region parameters. The blocker
 for lifting a kernel is 2 captured streams at best (<code class="docutils literal notranslate"><span class="pre">dma_st</span></code>) and 5 at
 worst (<code class="docutils literal notranslate"><span class="pre">sequencer</span></code>, <code class="docutils literal notranslate"><span class="pre">pe</span></code>). Nothing else stands in the way.</p></li>
+<li><p>A second, smaller constraint, measured on the decomposed design
+(2026-09-22): <strong>a bit slice’s bounds cannot be symbolic.</strong>
+<code class="docutils literal notranslate"><span class="pre">word[OP_LO:OP_HI]</span></code> with the bounds in the region’s namespace parses,
+builds and computes the right answer, but <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py:582</span></code> warns
+“Cannot infer the bitwidth of the slice, use UInt(32) as default” and every
+extract widens to i32 – 796 lines of normalized MLIR difference on one
+unit. The consequence is concrete: an instruction’s bit layout can be named
+once for the software that encodes it and must be written out again for the
+hardware that decodes it (<a class="reference internal" href="../designs/tinytpu_library.html#tinytpu-library-symbolic-slice"><span class="std std-ref">The third site cannot, and that is a front-end limitation</span></a>).</p></li>
+<li><p>That design has since been decomposed as far as the current syntax allows
+(<a class="reference internal" href="../designs/tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a>): all 8 units are module-level functions
+with no closure, and the parameters and ISA constants are passed rather than
+captured. It took <strong>composing the region’s source</strong> to do it, because a
+kernel is reached only as a nested <code class="docutils literal notranslate"><span class="pre">ast.FunctionDef</span></code>. The 29 capture edges
+did not go away – they became 29 <em>declarations</em>, checked against each
+body’s free names, and they are listed per unit at
+<a class="reference internal" href="../designs/tinytpu_library.html#tinytpu-library-capture-census"><span class="std std-ref">The census of what is still bound by name</span></a>. That table is the exact scope of what
+this extension would replace, and the three things still impossible without
+it: two architectures must agree on a channel’s <em>name</em>, a unit cannot be
+instantiated twice against different channels, and a unit cannot be built or
+tested outside a composed region.</p></li>
 <li><p>Upstream’s own suite, independently: <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_1D_systolic.py</span></code>,
 <code class="docutils literal notranslate"><span class="pre">test_systolic.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_tiled_systolic.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_packed_systolic.py</span></code>
 and <code class="docutils literal notranslate"><span class="pre">test_weight_stationary_gemm.py</span></code> are five separate files, each one

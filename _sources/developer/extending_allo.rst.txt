@@ -493,6 +493,27 @@ separately from the units it wires.
   arrays, 0 captured Python values, 0 captured region parameters. The blocker
   for lifting a kernel is 2 captured streams at best (``dma_st``) and 5 at
   worst (``sequencer``, ``pe``). Nothing else stands in the way.
+* A second, smaller constraint, measured on the decomposed design
+  (2026-09-22): **a bit slice's bounds cannot be symbolic.**
+  ``word[OP_LO:OP_HI]`` with the bounds in the region's namespace parses,
+  builds and computes the right answer, but ``allo/ir/infer.py:582`` warns
+  "Cannot infer the bitwidth of the slice, use UInt(32) as default" and every
+  extract widens to i32 -- 796 lines of normalized MLIR difference on one
+  unit. The consequence is concrete: an instruction's bit layout can be named
+  once for the software that encodes it and must be written out again for the
+  hardware that decodes it (:ref:`tinytpu-library-symbolic-slice`).
+* That design has since been decomposed as far as the current syntax allows
+  (:doc:`/designs/tinytpu_library`): all 8 units are module-level functions
+  with no closure, and the parameters and ISA constants are passed rather than
+  captured. It took **composing the region's source** to do it, because a
+  kernel is reached only as a nested ``ast.FunctionDef``. The 29 capture edges
+  did not go away -- they became 29 *declarations*, checked against each
+  body's free names, and they are listed per unit at
+  :ref:`tinytpu-library-capture-census`. That table is the exact scope of what
+  this extension would replace, and the three things still impossible without
+  it: two architectures must agree on a channel's *name*, a unit cannot be
+  instantiated twice against different channels, and a unit cannot be built or
+  tested outside a composed region.
 * Upstream's own suite, independently: ``tests/dataflow/test_1D_systolic.py``,
   ``test_systolic.py``, ``test_tiled_systolic.py``, ``test_packed_systolic.py``
   and ``test_weight_stationary_gemm.py`` are five separate files, each one

@@ -170,6 +170,7 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -1736,9 +1737,12 @@ pending re-verification.</p>
 <span id="limitation-24"></span><h3>24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes<a class="headerlink" href="#five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes" title="Link to this heading"><span>¶</span></a></h3>
 <div class="admonition-status-2026-09-22 admonition">
 <p class="admonition-title">Status (2026-09-22)</p>
-<p>REPRODUCES. Cheap half: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code>
-(seconds, no Vitis). RTL half: <code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file
-(one csynth, ten cosims, tens of minutes). Family and bisection:
+<p>REPRODUCES at the shipped <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>, and <strong>DIAGNOSED as a channel-depth
+threshold</strong>: the same ten programs, same tree, same toolchain, all complete
+at <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> (<a class="reference internal" href="#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). Cheap half:
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code> (seconds, no Vitis). RTL half:
+<code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file (one csynth, ten cosims, tens of
+minutes). Family and bisection:
 <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act/rtl_hang.py</span></code>; log:
 <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log</span></code>.</p>
 </div>
@@ -1892,15 +1896,313 @@ complete, and so does <em>doubling</em> the row count. It is neither “too big�
 <p>No positive characterisation is offered: the four surviving programs that fail
 share three or more <code class="docutils literal notranslate"><span class="pre">accu</span></code> instructions per output tile and four or more
 output tiles, but <code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r8</span></code> has both and completes, so that is a
-correlation and not a condition. <strong>The diagnosis is open.</strong></p>
+correlation and not a condition. <strong>The diagnosis was open</strong>, until the
+channel-depth measurement below.</p>
+</section>
+<section id="the-diagnosis-it-is-a-channel-depth-threshold-and-tpu-qd-16-clears-it">
+<span id="limitation-24-qd"></span><h4>The diagnosis: it is a channel-depth threshold, and <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> clears it<a class="headerlink" href="#the-diagnosis-it-is-a-channel-depth-threshold-and-tpu-qd-16-clears-it" title="Link to this heading"><span>¶</span></a></h4>
+<p>The whole family run twice in one tree on one day, <code class="docutils literal notranslate"><span class="pre">ACT_COSIM_TIMEOUT=300</span></code>,
+the only difference being the stream depth every channel is declared at:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 38.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>program</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=8</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=16</span></code></p></th>
+<th class="head"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p><strong>359</strong></p></td>
+<td><p>the minimal case</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n1</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>320</p></td>
+<td><p>324</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b1</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>320</p></td>
+<td><p>324</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n1</span> <span class="pre">b1</span> <span class="pre">k2</span> <span class="pre">r4</span></code></p></td>
+<td><p>295</p></td>
+<td><p>299</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k1</span> <span class="pre">r4</span></code></p></td>
+<td><p>327</p></td>
+<td><p>331</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tiled</span> <span class="pre">n2</span> <span class="pre">b2</span> <span class="pre">k2</span> <span class="pre">r8</span></code></p></td>
+<td><p>549</p></td>
+<td><p>553</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r16</span> <span class="pre">relu</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p><strong>681</strong></p></td>
+<td><p>the other case the judge found</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n1</span> <span class="pre">r16</span> <span class="pre">relu</span></code></p></td>
+<td><p>484</p></td>
+<td><p>488</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r16</span> <span class="pre">norelu</span></code></p></td>
+<td><p>652</p></td>
+<td><p>656</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pointwise</span> <span class="pre">n4</span> <span class="pre">r4</span> <span class="pre">relu</span></code></p></td>
+<td><p><strong>no completion</strong></p></td>
+<td><p><strong>280</strong></p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>All ten complete at QD=16, bit-exact</strong>, and the three that do not complete at
+QD=8 are exactly the three this item was filed for. The control is in the same
+run: every program that completed at QD=8 still completes, four cycles slower,
+which is the deeper FIFOs’ pipeline skew and is the sanity check that the two
+columns are the same design.</p>
+<p>This also explains “not monotone in size”, which was the observation nobody
+could place: a threshold is not monotone. Halving a tile count or doubling the
+row count moves the program off the threshold from either side.</p>
+<p><strong>A second, independent instance, found from the other end.</strong> Two reordered
+GEMM programs (<code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program_interleaved</span></code> and <code class="docutils literal notranslate"><span class="pre">_b_per_tile</span></code>, which
+issue an operand <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> between two <code class="docutils literal notranslate"><span class="pre">mm</span></code>s instead of hoisting every
+load into a prologue) hang in cosim <strong>exactly when</strong> <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">&gt;=</span> <span class="pre">QD</span></code> – at T=4
+32x32x32 and above, and at T=8 64x64x64 and 32x64x32, but not at T=4 16x16x16
+(<code class="docutils literal notranslate"><span class="pre">Kt=4</span></code>), T=8 48x48x48 (<code class="docutils literal notranslate"><span class="pre">Kt=6</span></code>) or T=8 64x32x64 (<code class="docutils literal notranslate"><span class="pre">Kt=4</span></code>). 30 million
+simulated cycles, no second progress line, Vitis’ deadlock detector silent –
+the same signature. <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> completes the identical program bit-exact
+(32x32x32: 3,355 cycles). Two generators, two shapes of program, one knob.</p>
+<p><strong>What is fixed and what is still open.</strong> Fixed: the fault is a bounded-channel
+hazard between the sequencer’s in-order dispatch across five queues and the
+units’ in-order consumption, and the depth those queues are declared at is the
+threshold. Open: the <em>predicate</em>. <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">&gt;=</span> <span class="pre">QD</span></code> holds for the reordered GEMMs
+and says nothing about this item’s family, and the obvious counting rule –
+“more than <code class="docutils literal notranslate"><span class="pre">QD</span></code> instructions sent to one unit” – is refuted by the shipped
+GEMM itself, which sends <code class="docutils literal notranslate"><span class="pre">accu</span></code> 20 instructions at 16x16x16 and 272 at
+64x64x64 at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> and completes. So depth is the cure without yet being the
+characterisation, and a program cannot be screened by counting.</p>
+</section>
+<section id="what-qd-16-costs-the-shipped-design">
+<span id="limitation-24-price"></span><h4>What <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> costs the shipped design<a class="headerlink" href="#what-qd-16-costs-the-shipped-design" title="Link to this heading"><span>¶</span></a></h4>
+<p>Raising the depth is a change to the <strong>shipped</strong> design, which the reproduce
+gate pins at five numbers, so it is measured in the same paired form: one
+tree, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>, everything else unset, <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> and then <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=8</span></code> (published)</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=16</span></code></p></th>
+<th class="head"><p>delta</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p>171</p></td>
+<td><p>175</p></td>
+<td><p>+4</p></td>
+</tr>
+<tr class="row-odd"><td><p>8x8x8</p></td>
+<td><p>261</p></td>
+<td><p>265</p></td>
+<td><p>+4</p></td>
+</tr>
+<tr class="row-even"><td><p>12x12x12</p></td>
+<td><p>417</p></td>
+<td><p>421</p></td>
+<td><p>+4</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>483</p></td>
+<td><p><strong>482</strong></p></td>
+<td><p><strong>-1</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>685</p></td>
+<td><p><strong>674</strong></p></td>
+<td><p><strong>-11</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The row moves and it is not uniform</strong>, which is the interesting part: the
+three smallest shapes pay the pipeline skew of deeper FIFOs (+4 each, the same
++4 the item-24 family paid), and the two largest <strong>get faster</strong>, because a
+deeper queue lets the sequencer run further ahead of the units it dispatches
+to. The QD=8 column reproduces the published <code class="docutils literal notranslate"><span class="pre">171</span> <span class="pre">/</span> <span class="pre">261</span> <span class="pre">/</span> <span class="pre">417</span> <span class="pre">/</span> <span class="pre">483</span> <span class="pre">/</span> <span class="pre">685</span></code>
+exactly, which is the control.</p>
+<p>Correctness at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> is unchanged: <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> prints <strong>STRESS OK:
+492/492</strong>, and the RTL gate (<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code>) is 0 wrong over six calls at
+both 4x4x4 and 16x16x16 – including <code class="docutils literal notranslate"><span class="pre">ar_distance(4)</span></code>, so the accumulator’s
+dependence contract still holds at the deeper queues.</p>
+</section>
+<section id="the-price-on-the-fpga">
+<h4>The price, on the FPGA<a class="headerlink" href="#the-price-on-the-fpga" title="Link to this heading"><span>¶</span></a></h4>
+<p>csynth on xcu280 at the 3.33 ns target, shipped config (T=4, MAXDIM=16):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD</span></code></p></th>
+<th class="head"><p>BRAM</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>estimated period</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>8</p></td>
+<td><p>40</p></td>
+<td><p>14</p></td>
+<td><p>17,075</p></td>
+<td><p>26,558</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>16</strong></p></td>
+<td><p><strong>40</strong></p></td>
+<td><p>14</p></td>
+<td><p><strong>18,699</strong> (+9.5 %)</p></td>
+<td><p><strong>27,210</strong> (+2.5 %)</p></td>
+<td><p><strong>2.431 ns</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>32</p></td>
+<td><p>40</p></td>
+<td><p>14</p></td>
+<td><p>19,779 (+15.8 %)</p></td>
+<td><p>28,420 (+7.0 %)</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+</tbody>
+</table>
+<p>At T=4/MAXDIM=64 the same step costs +1,624 FF (+9.3 %) and +652 LUT, also
+with BRAM and the period unchanged.</p>
+<p><strong>Where the queues live, because “BRAM unchanged” is not a property of the
+knob.</strong> Every one of the 106 FIFOs maps to <strong>shift registers</strong> at QD=8, 16 and
+32 alike – measured, not assumed (<code class="docutils literal notranslate"><span class="pre">RTMG</span> <span class="pre">210-285</span></code> in the csynth log) – and
+BRAM stays at 40 throughout. The widths are what decide when that stops: the
+control queues are 64 bits, the operand and array chains 32, the activation
+forwards 8, and the accumulator return path <code class="docutils literal notranslate"><span class="pre">cw</span></code> is 128, the widest. At
+depth 32 that widest queue is still only 4,096 bits, which is why nothing has
+migrated yet. <strong>This says depth is cheap up to 32 at these widths; it does not
+say depth is cheap.</strong> A wider design, or depth 64, has to re-measure –
+MiniTPU’s equivalent is block RAM they are already at 47 % of, where a 4 KiB
+register file costs 96 of 312 tiles because the <em>width</em> forces four tiles
+whatever the depth.</p>
+</section>
+<section id="the-price-on-standard-cells-which-is-a-different-object">
+<h4>The price, on standard cells – which is a different object<a class="headerlink" href="#the-price-on-standard-cells-which-is-a-different-object" title="Link to this heading"><span>¶</span></a></h4>
+<p><strong>The FPGA figure must not stand in for the ASIC one by silence</strong>, because the
+mechanism that makes depth cheap on the FPGA does not exist in 45 nm. Vitis
+emits every one of these FIFOs as</p>
+<div class="highlight-verilog notranslate"><div class="highlight"><pre><span></span><span class="kt">reg</span><span class="w"> </span><span class="p">[</span><span class="n">DATA_WIDTH</span><span class="o">-</span><span class="mh">1</span><span class="o">:</span><span class="mh">0</span><span class="p">]</span><span class="w"> </span><span class="n">SRL_SIG</span><span class="w"> </span><span class="p">[</span><span class="mh">0</span><span class="o">:</span><span class="n">DEPTH</span><span class="o">-</span><span class="mh">1</span><span class="p">];</span><span class="w">   </span><span class="c1">// MEM_STYLE = "shiftReg"</span>
+</pre></div>
+</div>
+<p>an unconditional shift of a <code class="docutils literal notranslate"><span class="pre">DEPTH</span> <span class="pre">x</span> <span class="pre">DATA_WIDTH</span></code> register array. Vivado
+infers <code class="docutils literal notranslate"><span class="pre">SRL16</span></code> primitives from that, and <strong>an SRL16 holds sixteen bits per
+LUT whether the FIFO is eight deep or sixteen</strong> – which is exactly why the
+FPGA bill for 8 -&gt; 16 is only +652 LUT and why the +1,624 FF is pointer and
+output-register overhead rather than storage. Standard cells have no such
+primitive: the array is flip-flops, and the cost is linear in depth.</p>
+<p>Counted from the instance list of the very RTL the ASIC flow reads (the two
+csynth runs above, <code class="docutils literal notranslate"><span class="pre">wq</span></code> excluded because it is declared at a fixed depth 4
+and does not scale with <code class="docutils literal notranslate"><span class="pre">QD</span></code>):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>queue width x instances</p></th>
+<th class="head"><p>bits at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code></p></th>
+<th class="head"><p>bits at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>128 x 4 (<code class="docutils literal notranslate"><span class="pre">cw</span></code>)</p></td>
+<td><p>4,096</p></td>
+<td><p>8,192</p></td>
+</tr>
+<tr class="row-odd"><td><p>64 x 5 (control)</p></td>
+<td><p>2,560</p></td>
+<td><p>5,120</p></td>
+</tr>
+<tr class="row-even"><td><p>32 x 36 (operands, chains)</p></td>
+<td><p>9,216</p></td>
+<td><p>18,432</p></td>
+</tr>
+<tr class="row-odd"><td><p>8 x 12 (<code class="docutils literal notranslate"><span class="pre">a_fwd</span></code>)</p></td>
+<td><p>768</p></td>
+<td><p>1,536</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>total</strong></p></td>
+<td><p><strong>16,640</strong></p></td>
+<td><p><strong>33,280</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>So <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> adds <strong>16,640 flip-flops</strong> on standard cells. Against the shipped
+MAXDIM=16 baseline’s DC run – 200,561 sequential cells, 1,136,598 total cell
+area, 906,098 of it non-combinational – that is <strong>+8.3 % sequential cells</strong>
+and, at that run’s 4.52 area units per sequential cell, <strong>about +6.6 % of
+total cell area</strong>.</p>
+<p><strong>A full DC run was not available here</strong>: the flow is mflowgen on <code class="docutils literal notranslate"><span class="pre">zhang-21</span></code>
+with <code class="docutils literal notranslate"><span class="pre">/scratch</span></code>, the module system and a DC licence, none of which exist on
+this host, and a run is 37-72 minutes there. The figures above are therefore a
+<strong>count from the RTL plus the measured area-per-sequential-cell of the same
+design in the same flow</strong>, not a synthesis result, and they should be replaced
+by one when that host is free. What is not an estimate is the mechanism: the
+FIFO is a register array in the Verilog, and there is no SRL in 45 nm.</p>
+<p>That the two substrates land at a similar percentage (+9.5 % FPGA FF, +8.3 %
+ASIC sequential cells) is a <strong>coincidence of this depth, not agreement</strong>: the
+FPGA number is control overhead with the storage free in SRLs, the ASIC number
+is the storage itself. At QD=32 the ASIC cost doubles again (+33,280 flops,
+linear) where the FPGA adds only a further 1,080 FF.</p>
+</section>
+<section id="the-recommendation">
+<h4>The recommendation<a class="headerlink" href="#the-recommendation" title="Link to this heading"><span>¶</span></a></h4>
+<p><strong>Raise the default to ``QD=16``.</strong> A design that does not complete on legal
+programs is worse than one four cycles slower, and every reason to hesitate
+was checked rather than assumed:</p>
+<ul class="simple">
+<li><p>the five-shape row moves by +4 / +4 / +4 / -1 / -11, and <strong>no margin against
+Gemmini flips</strong>: at these shapes the design is behind Gemmini at QD=8 and
+still behind by the same few per cent at QD=16, and at the matched MAXDIM=64
+points the two largest shapes move the <em>right</em> way;</p></li>
+<li><p>correctness is unchanged (492/492, and the RTL stress gate including the
+dependence-contract case);</p></li>
+<li><p>the clock does not move: 2.431 ns estimated at QD 8, 16 and 32 alike;</p></li>
+<li><p>the cost is +9.5 % FF and +2.5 % LUT on FPGA with no BRAM, and about +8.3 %
+sequential cells on standard cells – <strong>which must be quoted beside the
+cycles</strong>, because the ASIC area comparison against Gemmini is being
+assembled and a sequential-cell change of that size lands directly on it.</p></li>
+</ul>
+<p>The one honest caveat is that this <strong>buys termination with area</strong>, and it buys
+it for a hazard whose predicate is still open. Nobody should read “depth is
+the cure” as “depth is free at any depth”: the FPGA ladder is sub-linear only
+because of SRL16, and the ASIC cost is linear.</p>
 <ul class="simple">
 <li><p><strong>Priority: High as a warning, Medium as an action.</strong> The warning is that on
 this design the cheap checks do not substitute for cosim, and two of them
 (<code class="docutils literal notranslate"><span class="pre">kpn_model</span></code> and the header the simulator consumes) are derived from
 <code class="docutils literal notranslate"><span class="pre">assemble()</span></code>’s own header, so their agreement is weaker evidence than it
-looks. The action is to find the blocked process, which needs
-<code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-trace_level</span> <span class="pre">all</span></code> on the sixteen-instruction case and a look
-at the stream handshakes – affordable now that the repro is that small.</p></li>
+looks. <strong>``kpn_model`` is the specific gap</strong>: it runs the channel protocol
+at depth <code class="docutils literal notranslate"><span class="pre">QD</span></code> and reports these programs deadlock-free, so it is missing
+the sequencer’s ability to block part-way through the several queues one
+instruction is dispatched to. Making the model block mid-instruction is now
+a well-posed change with ten programs to check it against, and it is the
+action that would let a program be screened before Vitis.</p></li>
+<li><p>The remaining action on the design side is the predicate, not the cure:
+<code class="docutils literal notranslate"><span class="pre">cosim_design</span> <span class="pre">-trace_level</span> <span class="pre">all</span></code> on the sixteen-instruction case at
+<code class="docutils literal notranslate"><span class="pre">QD=8</span></code> would name the blocked process and the full channel, which is what
+turns “raise <code class="docutils literal notranslate"><span class="pre">QD</span></code>” into a rule the assembler could enforce.</p></li>
 <li><p><strong>Run the RTL half in its own process group.</strong> Killing <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> does not
 kill <code class="docutils literal notranslate"><span class="pre">xsim</span></code>: one orphaned <code class="docutils literal notranslate"><span class="pre">xsimk</span></code> from a non-completing case here was
 still holding a full core <strong>32 minutes</strong> after its parent died, and several
@@ -2144,6 +2446,11 @@ sub-region – about five lines, not yet prototyped.</p>
 <li><a class="reference internal" href="#what-does-not-complete-is-exactly">What “does not complete” is, exactly</a></li>
 <li><a class="reference internal" href="#the-minimal-program">The minimal program</a></li>
 <li><a class="reference internal" href="#the-bisection-and-what-it-rules-out">The bisection, and what it rules out</a></li>
+<li><a class="reference internal" href="#the-diagnosis-it-is-a-channel-depth-threshold-and-tpu-qd-16-clears-it">The diagnosis: it is a channel-depth threshold, and <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> clears it</a></li>
+<li><a class="reference internal" href="#what-qd-16-costs-the-shipped-design">What <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> costs the shipped design</a></li>
+<li><a class="reference internal" href="#the-price-on-the-fpga">The price, on the FPGA</a></li>
+<li><a class="reference internal" href="#the-price-on-standard-cells-which-is-a-different-object">The price, on standard cells – which is a different object</a></li>
+<li><a class="reference internal" href="#the-recommendation">The recommendation</a></li>
 </ul>
 </li>
 </ul>

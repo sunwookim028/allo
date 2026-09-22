@@ -170,6 +170,7 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -273,9 +274,13 @@ also exercised with no model at all.</p></li>
 <li><p><strong>It finds real design changes, not yet novel ones.</strong> Best so far: a DMA
 burst widening worth 55-61 % of the steady-state gap to Gemmini (not
 landed; its banked form synthesises with no cycle loss).</p></li>
-<li><p><strong>Two things are not yet shown:</strong> a <em>rate</em> of discovery (every search is
-n=1 per arm) and an agent-authored <strong>architectural</strong> abstraction (zero so
-far – the abstraction track produced apparatus findings instead).</p></li>
+<li><p><strong>An agent proposed an architectural legality rule that passed its
+discriminating test and is nonetheless unsound in both directions.</strong>
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> refused a design needing two write ports and accepted the
+bit-exact banked one; it also accepts a block-partitioned design that needs
+two, and refuses a sequential one that needs one. The property was <strong>seeded</strong>
+(the arm was told where to look, never what to build).</p></li>
+<li><p><strong>A *rate* of discovery is still not shown:</strong> every search is n=1 per arm.</p></li>
 <li><p><strong>The recurring hazard is instruments that fail open.</strong> Four in one night
 reported success after failing. A negative result counts only if the
 instrument can be shown to have run.</p></li>
@@ -298,6 +303,16 @@ primitive has no callers, so an agent-implemented one scored neutral <em>and</em
 passed 291 tests while aborting the compiler on first use – any gate ladder
 that exercises a compiler only through existing designs cannot see a new
 capability in either direction.</p></li>
+<li><p><strong>A resource predicate is the wrong shape for a port claim.</strong> Counting
+occupants against capacity discards <em>which</em> element is touched in <em>which</em>
+cycle, and both measured failure directions recover exactly that discarded
+information. The sound form is a calendar – the index map composed with the
+initiation interval, both of which the IR already carries. MiniTPU’s
+assembler (theirs, not ours) does not have the bug because its <code class="docutils literal notranslate"><span class="pre">write_port</span></code>
+is a <strong>set of cycles</strong> rather than a count; they note their register file has
+one write port and no banking, so they avoided the bug by not yet having the
+structure that creates it, which makes this predictive rather than a
+comparison of care.</p></li>
 </ul>
 </section>
 <section id="how-the-loop-is-built">
@@ -675,6 +690,26 @@ the per-call usage.</p></li>
 <p>The evidence behind the takeaways at the top of this page, one line per claim.</p>
 <p><strong>Demonstrated</strong></p>
 <ul class="simple">
+<li><p><strong>An agent proposed an architectural legality rule, and the harness proved it
+discriminates.</strong> Pilot B (2026-09-22, <code class="docutils literal notranslate"><span class="pre">chia-abstraction</span></code>):
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports(target,</span> <span class="pre">write_ports)</span></code> refuses when
+<code class="docutils literal notranslate"><span class="pre">stores</span> <span class="pre">&gt;</span> <span class="pre">write_ports</span> <span class="pre">x</span> <span class="pre">banks</span></code>, <em>before</em> touching the IR. At a
+harness-owned call site on a frozen design it <strong>refused</strong> the dual-write
+probe (one RAM, two write statements) and <strong>accepted</strong> the cyclically banked
+one (two instances, one write each), which was then bit-exact under csim.
+Every other gate clean: 294/294 tests, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, all design
+cases bit-exact, 20 limits verdicts unchanged, resources flat, +0 cycles. It
+named its own unchecked premise unprompted. <strong>The property was seeded</strong>; the
+abstraction was not. Its diagnosis was half wrong – it claimed the language
+could not <em>state</em> port counts, which is false on its own tree, so the gap was
+enforcement only.</p></li>
+<li><p><strong>The same rule is unsound in both directions</strong>, measured by applying it:
+<code class="docutils literal notranslate"><span class="pre">Partition.Block</span></code> factor 2 is <strong>accepted</strong> although both stores land in
+bank 0 and that RTL emits two writes per bank; an unpipelined two-store loop
+is <strong>refused</strong> although sequential stores need one port. Published here in
+the same breath as the success, because a page reporting the primitive and
+not its holes would repeat the failure this project keeps finding in its own
+instruments.</p></li>
 <li><p><strong>The loop runs end to end on real tools</strong> (<code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>).
 Every accepted figure is RTL cosim cycles plus csynth area and clock,
 bit-exact against a frozen reference model.</p></li>
@@ -698,10 +733,15 @@ including the two agent-found variants (4.07x and 1.98x) at exact numerics.</p><
 <li><p><strong>A rate of discovery.</strong> Every search is n=1 per arm. A rate does not need a
 seed – it is a property of the sampling process – so replication (E1 below)
 is the next paid run.</p></li>
-<li><p><strong>An agent-authored architectural abstraction.</strong> None yet. The abstraction
-track’s one candidate was an implementation of an existing primitive, it
-leaked its answer through the documentation, and it aborts the compiler on
-first use (<a class="reference internal" href="agentic_experiments.html"><span class="doc">Agentic Experiments: What We Ran and What It Shows</span></a>).</p></li>
+<li><p><strong>That such a rule is sound.</strong> <code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> is a heuristic and errs
+both ways (above). The correct rule needs the layout map and the initiation
+interval; neither is consulted.</p></li>
+<li><p><strong>That an agent can *find* an architectural gap unaided.</strong> The open arm,
+given measurements only, landed in <strong>both</strong> of its runs on <code class="docutils literal notranslate"><span class="pre">bind_storage</span></code>
+– a surface Allo already has as <code class="docutils literal notranslate"><span class="pre">Memory(resource=,</span> <span class="pre">storage_type=)</span></code>, which
+both HLS emitters already emit. Its spelling was new; its capability was not.
+It also chose the property its most concrete seeded measurement pointed at,
+which was pre-registered in advance as weak evidence of identification.</p></li>
 <li><p><strong>Novelty.</strong> The burst widening is a sensible engineering change, not a
 discovery.</p></li>
 </ul>

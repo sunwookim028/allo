@@ -470,8 +470,9 @@ Found by raising MAXDIM until each fired:
      - ceiling at T=4
      - how it fails
    * - address field, 11 usable bits
-     - :math:`\text{MAXDIM}^2/T \le 2047`
-     - MAXDIM <= 88 (90 unrounded; MAXDIM is a multiple of T)
+     - :math:`(\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048`
+       (a row *count*; the highest address is 2047)
+     - MAXDIM <= 88 (90.5 unrounded; MAXDIM is a multiple of T)
      - MAXDIM=96: ``check_program``, "AGU-resolved f3=2112 is outside the
        0..2047 range"
    * - header count, 15-bit slice
@@ -488,8 +489,13 @@ different reason: a synthesis tool bounds a runtime-bounded loop by the *range
 of the index*, which is why ``nr`` is 8 bits (see ``microarch_isa``'s encoding
 note). Widening means re-measuring every loop bound Vitis derives.
 
-At T=8 the same two expressions give MAXDIM <= 120, verified: the ceiling is a
-property of :math:`\text{MAXDIM}^2/T`, so a wider array buys a longer edge.
+At T=8 the same two expressions separate: the address field allows **128** ---
+the layout names exactly 2048 rows, so its highest address is 2047 --- and the
+cubic header allows 120. Both are computed by ``isa_encoding.maxdim_ceiling``
+from ``isa_spec.json`` and confirmed against the design by
+``gen_isa.py --check``, which is what caught 120 being written for the address
+field: that is the count-versus-highest-address off-by-one, right at T=4 by
+luck and wrong at T=8.
 
 The instruction memory does **not** need to grow
 ------------------------------------------------
@@ -1840,10 +1846,10 @@ the encoding rules, not estimated:
      - T=8
      - T=16
    * - address field, 11 usable bits
-       (:math:`\text{MAXDIM}^2/T \le 2047`)
+       (:math:`(\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048`)
      - **MAXDIM**, hence M, K and N together
      - **88**
-     - **120**
+     - **128**
      - **176**
    * - ``nr``, 7 usable bits (``MAXROWS``)
      - any single instruction's row count, so M and K
@@ -1857,25 +1863,32 @@ the encoding rules, not estimated:
      - shape-dependent
      - shape-dependent
 
-So **the address field binds first, through MAXDIM, at 88 (T=4) and 120
-(T=8)** --- and note that ``nr``'s 127 is *not* a function of T, so it becomes
-the wall as soon as the array is wide enough to push MAXDIM past it.
+So **the address field binds first at T=4, through MAXDIM, at 88** --- and
+``nr``'s 127 is *not* a function of T, so it becomes the wall as soon as the
+array is wide enough to push MAXDIM past it. That is already the case at
+**T=8**, where the address field admits 128 and ``nr`` refuses any dimension
+above 127: measured at ``TPU_T=8 TPU_MAXDIM=128``, a 32x128x128 GEMM is
+refused by ``isa_dsl``'s ``M <= MAXROWS and K <= MAXROWS``, while 32x120x128
+assembles.
 
 Against the shapes another team proposed, this is precise rather than
 approximate:
 
 * **32 x 512 x 128** (their recommended single shape). K=512 needs
-  MAXDIM >= 512: we are short **5.8x** at T=4 and **4.3x** at T=8 on the
+  MAXDIM >= 512: we are short **5.8x** at T=4 and **4.0x** at T=8 on the
   address field, **4.0x** on ``nr``, and 4.0x / 1.0x on the header count.
 * **K-sweep at M=32, N=128.** Raising MAXDIM to match K, the first failure is
-  at **K=92** (T=4) and **K=128** (T=8), in both cases the address field;
-  last good K is 88 and 120.
-* **Tall sweep at K=N=128.** Blocked for *every* M, because N=128 alone
-  exceeds the MAXDIM ceiling --- at T=8 by **eight** (120 against 128). And
-  M=128 additionally exceeds ``nr`` by **one** (127 against 128).
+  at **K=92** (T=4, the address field, which refuses the build at import) and
+  at **K=128** (T=8, ``nr``, which refuses the program); last good K is 88
+  and 120.
+* **Tall sweep at K=N=128.** Blocked at T=4 for *every* M, because N=128
+  alone is past the 88 ceiling. At T=8 the address field admits 128 exactly,
+  so what blocks it is ``nr``: K=128 and M=128 each exceed it by **one** (127
+  against 128).
 
 Those last two are worth stating as margins rather than as failures: at T=8 we
-miss their tall sweep by 8 in one dimension and by 1 in another.
+miss their tall sweep by one row, in two dimensions, on a field with two spare
+bits in the instruction word.
 
 **What our build would need to run the GPT-2 shape.** Not simply a bigger
 MAXDIM --- 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
