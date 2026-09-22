@@ -846,17 +846,42 @@ attributed to the search rather than to sampling.
 E2. Does the refusal bound the search?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Of 1,226 candidate loop nests, **1,150 are refused because ``acc`` is a static
-instruction field with no predicate on an induction variable.** The search can
-therefore reach 76 nests out of 1,226, and the interesting question is whether
-the designs worth finding are among the refused 94 %.
+Of 1,226 candidate loop nests, **1,150 are refused at ``acc``**, and *why* went
+through two wrong diagnoses before the right one, which is itself worth
+recording. It is not that ``acc`` is a static instruction field with no
+predicate on an induction variable — this page said that, and it is false.
+``acc`` is ``mm``'s ``f2``, ``f2`` is a legal AGU target, and driving it from
+the reduce loop assembles for exactly two k-tiles before rejecting at Kt≥3. **The
+obstacle is additive monotonicity in the address term**, not staticness (see
+:doc:`/extensions/act`).
 
-The experiment: run the search unchanged, then run it against a design whose
-``acc`` field carries a predicate, and compare what each finds. If the second
-finds strictly better design points, the refusal is a real bound on the search
-and the ISA field is the thing to fix. If it finds nothing better, the refusal
-is a red herring and the 76 reachable nests already contain the good designs --
-also a result, and a cheaper one to act on.
+That correction matters because it changes what the fix costs: making a static
+field dynamic is a different and more expensive change than saturating a term
+or predicating it on ``iv_now[level] == 0``, and a search framed on the wrong
+diagnosis would have priced the wrong hardware.
+
+A second correction, to the arithmetic rather than the mechanism: a **first-cause
+census hides overlap.** By first cause it is 1,150 ``acc`` / 55 ``ar-distance`` /
+13 ``AGU_TERMS`` / 3 ``LOOP_DEPTH``, but **930 of those nests also violate the
+accumulator RAW-distance contract**, so relieving ``acc`` alone does not free
+1,150 nests. Sorted by the express/refuse distinction it is **1,166 express
+against 55 refuse**: Allo can *build* nearly all of these, and our machine
+cannot *encode* most of them.
+
+The experiment: run the search unchanged, then against a design that relieves
+the monotonicity constraint, and compare what each finds. If the second finds
+strictly better design points, the refusal is a real bound and the ISA is the
+thing to fix. If it finds nothing better, the reachable nests already contain
+the good designs — also a result, and a cheaper one to act on.
+
+There is already evidence for the second outcome, which should be stated before
+the experiment rather than after: widening ``AGU_TERMS`` from 3 to 4 raises the
+encodable count and **does not change the chosen nest**, so the RTL runs the
+same stream, the cycles do not move, and the area rises. A cost with no benefit.
+If relieving ``acc`` unlocks 1,150 nests and the pick *still* does not move,
+then the mapping space was never the binding constraint on this machine — a
+stronger and more surprising claim than a cycle win, and the one this experiment
+is now most likely to produce.
 
 E3. Can an agent maintain the abstractions, and at what rate?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

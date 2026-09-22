@@ -255,28 +255,31 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.dependence" title="allo.customize.Schedule.dependence"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dependence</span></code></a>(axis, target[, dep_type, ...])</p></td>
 <td><p>Tells HLS about the loop-carried (or intra-iteration) dependences of one array in one loop -- Vitis's <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>, emitted inside the loop:</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.parallel" title="allo.customize.Schedule.parallel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallel</span></code></a>(axis)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.encodable_on" title="allo.customize.Schedule.encodable_on"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encodable_on</span></code></a>(encoding)</p></td>
+<td><p>Declares that this schedule must stay expressible in one instruction word of <code class="docutils literal notranslate"><span class="pre">encoding</span></code>, and checks it now and after every later primitive.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.parallel" title="allo.customize.Schedule.parallel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallel</span></code></a>(axis)</p></td>
 <td><p>Instantiates a loop with index <cite>axis</cite> to be computed in parallel with the loops it is nested with.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.inline" title="allo.customize.Schedule.inline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inline</span></code></a>([axis])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.inline" title="allo.customize.Schedule.inline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inline</span></code></a>([axis])</p></td>
 <td><p>Inlines a function <cite>axis</cite>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.dataflow" title="allo.customize.Schedule.dataflow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataflow</span></code></a>(axis)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.dataflow" title="allo.customize.Schedule.dataflow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataflow</span></code></a>(axis)</p></td>
 <td><p>Applies a &quot;dataflow&quot; attribute to function <cite>axis</cite>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.compute_at" title="allo.customize.Schedule.compute_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_at</span></code></a>(from_loop, target_loop)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.compute_at" title="allo.customize.Schedule.compute_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_at</span></code></a>(from_loop, target_loop)</p></td>
 <td><p>If <cite>from_loop</cite> and <cite>target_loop</cite> are indices over the same range, <cite>&lt;schedule&gt;.compute_at(from_loop, target_loop)</cite> merges the two loops, taking the body of <cite>from_loop</cite> and appending it to the body of <cite>target_loop</cite>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.reuse_at" title="allo.customize.Schedule.reuse_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reuse_at</span></code></a>(target, axis)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.reuse_at" title="allo.customize.Schedule.reuse_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reuse_at</span></code></a>(target, axis)</p></td>
 <td><p>Takes an array in a kernel, for example if the array is <cite>B</cite>, this would be <cite>&lt;schedule&gt;.B</cite>, accessed by index <cite>axis</cite> and creates a reuse buffer to reuse values from <cite>target</cite> which are accessed in a sequentially moving window.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.to" title="allo.customize.Schedule.to"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to</span></code></a>(target, dst[, axis, depth])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.to" title="allo.customize.Schedule.to"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to</span></code></a>(target, dst[, axis, depth])</p></td>
 <td><p>Takes an array in the kernel, <cite>target</cite>, for example if the array is <cite>B</cite>, this would be <cite>target</cite> would be <cite>&lt;schedule&gt;.B</cite>, and converts it into a stream.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.unfold" title="allo.customize.Schedule.unfold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unfold</span></code></a>(band_name, axes)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.unfold" title="allo.customize.Schedule.unfold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unfold</span></code></a>(band_name, axes)</p></td>
 <td><p>Finds a set of nested loops with name <cite>band_name</cite> and for every <cite>&lt;i&gt;</cite> in list <cite>axes</cite>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#allo.customize.Schedule.compose" title="allo.customize.Schedule.compose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compose</span></code></a>(schs[, id, instantiate])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#allo.customize.Schedule.compose" title="allo.customize.Schedule.compose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compose</span></code></a>(schs[, id, instantiate])</p></td>
 <td><p>Uses <cite>schs</cite>, a schedule for a kernel called in this kernel, in this kernel.</p></td>
 </tr>
 </tbody>
@@ -452,6 +455,23 @@ A bare name is looked up in the loop’s function.</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="allo.customize.Schedule.encodable_on">
+<span class="sig-name descname"><span class="pre">encodable_on</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">encoding</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.encodable_on"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.encodable_on" title="Link to this definition"><span>¶</span></a></dt>
+<dd><p>Declares that this schedule must stay expressible in one instruction
+word of <code class="docutils literal notranslate"><span class="pre">encoding</span></code>, and checks it now and after every later
+primitive. Raises <code class="docutils literal notranslate"><span class="pre">allo.encoding.EncodingError</span></code>, which names every
+offending site, the budget it exceeds and the repair.</p>
+<p>A declaration constrains nothing that the encoding leaves unset, so
+<code class="docutils literal notranslate"><span class="pre">Encoding()</span></code> is a no-op. See
+<code class="docutils literal notranslate"><span class="pre">docs/source/developer/extending_allo.rst</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>encoding</strong> (<em>allo.encoding.Encoding</em>) – The target’s encoding budgets.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="allo.customize.Schedule.parallel">
 <span class="sig-name descname"><span class="pre">parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/allo/customize.html#Schedule.parallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#allo.customize.Schedule.parallel" title="Link to this definition"><span>¶</span></a></dt>
 <dd><p>Instantiates a loop with index <cite>axis</cite> to be computed in parallel with the loops it is nested with.</p>
@@ -607,6 +627,7 @@ This schedule in <cite>self</cite> must be annotated if <cite>id</cite> is speci
 <li><a class="reference internal" href="#allo.customize.Schedule.reshape"><code class="docutils literal notranslate"><span class="pre">Schedule.reshape()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.pipeline"><code class="docutils literal notranslate"><span class="pre">Schedule.pipeline()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.dependence"><code class="docutils literal notranslate"><span class="pre">Schedule.dependence()</span></code></a></li>
+<li><a class="reference internal" href="#allo.customize.Schedule.encodable_on"><code class="docutils literal notranslate"><span class="pre">Schedule.encodable_on()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.parallel"><code class="docutils literal notranslate"><span class="pre">Schedule.parallel()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.inline"><code class="docutils literal notranslate"><span class="pre">Schedule.inline()</span></code></a></li>
 <li><a class="reference internal" href="#allo.customize.Schedule.dataflow"><code class="docutils literal notranslate"><span class="pre">Schedule.dataflow()</span></code></a></li>

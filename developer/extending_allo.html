@@ -627,19 +627,36 @@ autoscheduler’s own constraints with no target parameter.</p>
 <p><strong>The gap.</strong> Allo’s whole mapping vocabulary is <code class="docutils literal notranslate"><span class="pre">split</span></code> and <code class="docutils literal notranslate"><span class="pre">reorder</span></code>.
 There is no way to give one iteration of a loop a different body from the
 rest – no <code class="docutils literal notranslate"><span class="pre">peel</span></code>, no index-set split, no <code class="docutils literal notranslate"><span class="pre">tensorize</span></code>, nothing. So a
-reduction on a machine whose accumulate bit is a static instruction field can
-only be expressed by writing two loop nests by hand, and once they are two
-nests no primitive can tile or reorder them together.</p>
+reduction whose first tile must behave differently from the rest can only be
+expressed by writing two loop nests by hand, and once they are two nests no
+primitive can tile or reorder them together.</p>
 <p><strong>The evidence.</strong> Measured on a two-level loop-nest mapspace for TinyTPU-isa
 (branch <code class="docutils literal notranslate"><span class="pre">act-investigation</span></code>,
 <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act_nest.py</span></code>; reproduced here):
-<strong>1,226 nests enumerated, 3 encodable, and 1,150 of them refused by one static
-instruction field, ``acc``.</strong> The accumulate bit cannot be predicated on an
-induction variable, so the <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">0</span></code> tile has to be a peelable prefix, which
-pins the reduction innermost and unsplit and kills every permutation that moves
-it. The next constraint down, the 3-term address generator, refuses 17. The
-4-deep loop stack refuses none. One missing primitive costs 94% of that
-mapspace.</p>
+<strong>1,226 nests enumerated, 3 encodable, and 1,150 of them refused at one
+instruction field, ``acc``.</strong> The <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">0</span></code> tile has to be a peelable prefix,
+which pins the reduction innermost and unsplit and kills every permutation that
+moves it. The next constraint down, the 3-term address generator, refuses 17.
+The 4-deep loop stack refuses none.</p>
+<p><strong>Two corrections to that evidence, both found after this page was first
+written, and both worth reading before relying on the headline.</strong> First, the
+mechanism: <code class="docutils literal notranslate"><span class="pre">acc</span></code> is <em>not</em> a static field that cannot be driven from an
+induction variable. It is <code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">f2</span></code> is a legal AGU target, and
+driving it from the reduce loop assembles for exactly two k-tiles before
+rejecting at Kt≥3 — the obstacle is <strong>additive monotonicity in the address
+term</strong>. The need for <code class="docutils literal notranslate"><span class="pre">s.peel</span></code> is unaffected, since a peelable prefix is still
+the only way to express the first tile differently; what changes is that the
+hardware fix is cheaper than “make the field dynamic” implies. Second, the
+count: a first-cause census hides overlap, and <strong>930 of those 1,150 nests also
+violate the accumulator RAW-distance contract</strong>, so the primitive does not
+recover 94 % of the mapspace on its own. Sorted by the distinction this page
+argues for, it is <strong>1,166 express against 55 refuse</strong>.</p>
+<p>A third fact, which is the one that should temper any promise made for this
+primitive: widening the address generator from 3 terms to 4 raises the
+encodable count and <strong>does not change the chosen nest</strong>, so the emitted program
+is identical, the cycles do not move, and the area rises. Enlarging a legal set
+is not the same as improving a design, and this mapspace has already
+demonstrated the difference.</p>
 <p><strong>Legality rule.</strong> <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count)</span></code> is legal if and only if <code class="docutils literal notranslate"><span class="pre">axis</span></code>
 names a loop with constant bounds whose trip count exceeds <code class="docutils literal notranslate"><span class="pre">count</span></code>. Peeling
 is an index-set split, not a reordering, so it is unconditionally

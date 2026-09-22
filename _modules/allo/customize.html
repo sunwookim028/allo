@@ -263,6 +263,7 @@
 <span class="p">)</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">primitives</span> <span class="k">as</span> <span class="n">prim</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodingError</span><span class="p">,</span> <span class="n">violations</span> <span class="k">as</span> <span class="n">encoding_violations</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.visitor</span><span class="w"> </span><span class="kn">import</span> <span class="n">ASTContext</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockArg</span><span class="p">,</span> <span class="n">MockBuffer</span><span class="p">,</span> <span class="n">parse_ast</span><span class="p">,</span> <span class="n">get_global_vars</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">ASTTransformer</span>
@@ -314,6 +315,7 @@
         <span class="c1"># Record primitive sequences</span>
         <span class="k">if</span> <span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">!=</span> <span class="s2">"compose"</span><span class="p">:</span>
             <span class="n">sch</span><span class="o">.</span><span class="n">primitive_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="n">kwargs</span><span class="p">))</span>
+        <span class="n">sch</span><span class="o">.</span><span class="n">recheck_encoding</span><span class="p">(</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span>
 
     <span class="k">return</span> <span class="n">wrapper</span>
@@ -357,6 +359,7 @@
                     <span class="bp">self</span><span class="o">.</span><span class="n">func_args</span><span class="p">[</span><span class="n">func_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">func_instances</span> <span class="o">=</span> <span class="n">func_instances</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">systolic</span> <span class="o">=</span> <span class="n">check_systolic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_loops</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
@@ -1191,6 +1194,36 @@
         <span class="p">)</span>
         <span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"dependence"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">old</span> <span class="o">+</span> <span class="p">[</span><span class="n">DictAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">entry</span><span class="p">)])</span></div>
 
+
+<div class="viewcode-block" id="Schedule.encodable_on">
+<a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.encodable_on">[docs]</a>
+    <span class="nd">@wrapped_apply</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encodable_on</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Declares that this schedule must stay expressible in one instruction</span>
+<span class="sd">        word of ``encoding``, and checks it now and after every later</span>
+<span class="sd">        primitive. Raises ``allo.encoding.EncodingError``, which names every</span>
+<span class="sd">        offending site, the budget it exceeds and the repair.</span>
+
+<span class="sd">        A declaration constrains nothing that the encoding leaves unset, so</span>
+<span class="sd">        ``Encoding()`` is a no-op. See</span>
+<span class="sd">        ``docs/source/developer/extending_allo.rst``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        encoding: allo.encoding.Encoding</span>
+<span class="sd">            The target's encoding budgets.</span>
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="n">encoding</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">recheck_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">context</span><span class="p">:</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="n">encoding_violations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">found</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span> <span class="n">found</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="n">after</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Schedule.parallel">
 <a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.parallel">[docs]</a>

@@ -285,6 +285,31 @@ documentation guard.</p></li>
 were never meant to be part of the design.</strong> Every guard above exists because
 the search found a way to satisfy the objective without satisfying the intent.</p>
 </section>
+<section id="two-kinds-of-agent-work-which-must-not-be-conflated">
+<h2>Two kinds of agent work, which must not be conflated<a class="headerlink" href="#two-kinds-of-agent-work-which-must-not-be-conflated" title="Link to this heading"><span>¶</span></a></h2>
+<p>Most of what this fork has built was built by agents, and almost none of it was
+built by the <em>search</em>. The distinction decides what can be claimed:</p>
+<p><strong>Directed agent work.</strong> An engineer states a goal, an agent works in a
+worktree with the full toolchain, and a person verifies and merges the result.
+The ACT rebuild, the <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> prototype, the gap analysis, the
+re-measurements and most of this documentation are of this kind. What it
+demonstrates is that a capable agent under direction can do compiler
+engineering — which is a claim about present-day agents, not about this
+project’s method, and the same claim anyone with the same tools could make.</p>
+<p><strong>The search.</strong> A harness scores candidates a model proposes, with the
+objective, the gates and the reference model frozen out of the model’s reach,
+and no human in the loop of a single iteration. This is the part that is a
+contribution, because the interesting question is what a <em>loop</em> discovers, not
+what an agent does when told what to do.</p>
+<p>So: the burst widening was found by the search. The <cite>Encoding</cite> primitive, the
+ACT rebuild, and the correction that <code class="docutils literal notranslate"><span class="pre">acc</span></code>’s obstacle is additive
+monotonicity rather than a static field were all directed work. Reporting the
+second kind as evidence for the first would be the most damaging overstatement
+available to this project, and it is an easy one to make by accident — the
+transcripts look similar.</p>
+<p>The planned experiments in <a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a> are all of the second kind
+for exactly this reason.</p>
+</section>
 <section id="what-is-not-established">
 <h2>What is not established<a class="headerlink" href="#what-is-not-established" title="Link to this heading"><span>¶</span></a></h2>
 <p><strong>Rate.</strong> One paid run, one win. Nothing here supports a claim about how often a
@@ -377,6 +402,7 @@ a worker claimed a win it did not have.</p>
 <li><a class="reference internal" href="#the-question">The question</a></li>
 <li><a class="reference internal" href="#what-is-established">What is established</a></li>
 <li><a class="reference internal" href="#what-the-agents-actually-tried-to-get-away-with">What the agents actually tried to get away with</a></li>
+<li><a class="reference internal" href="#two-kinds-of-agent-work-which-must-not-be-conflated">Two kinds of agent work, which must not be conflated</a></li>
 <li><a class="reference internal" href="#what-is-not-established">What is not established</a></li>
 <li><a class="reference internal" href="#methodology-the-experiments-forced-on-us">Methodology the experiments forced on us</a></li>
 <li><a class="reference internal" href="#cost">Cost</a></li>
