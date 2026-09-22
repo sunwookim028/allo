@@ -1094,3 +1094,62 @@ lacked, which makes it a useful oracle for the class of bug in
 :ref:`limitation-11`. ``csim`` passing is the first functional check of the
 *emitted HLS code* rather than of the Allo simulator's interpretation of the
 design.
+
+Standard-cell synthesis: one number, and what it is not
+-------------------------------------------------------
+
+The shipped configuration has been synthesised to standard cells for the first
+time, on 2026-09-22, on a different host from the one every other figure here
+comes from.
+
+**FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
+flatten effort 3, memories as flip-flops** (``sram_mode='none'``), Synopsys DC
+``W-2024.09``, via mflowgen 0.8.0 at commit ``aee0e5d6``. 47 minutes of wall
+time.
+
+============================== ==========================================
+Total cell area                **1,271,692** FreePDK45 area units
+  non-combinational            1,016,187 — **79.9 %**
+  combinational                255,505, of which 26,741 buffer/inverter
+  macro / black box            0
+Sequential cells               224,987 (2,302 hierarchical cells)
+Timing                         **MET**, worst slack **+0.18 ns**, critical path
+                               3.11 ns of 3.33, 62 logic levels, zero violating
+                               and zero hold violations
+Power                          57.1 mW total, 22 mW leakage — **indicative
+                               only**, default toggle rates with no activity
+                               data; ``gmem0_m_axi`` alone accounts for 45 %
+============================== ==========================================
+
+**Four fifths of the cell area is flip-flops**, which is the predicted result
+rather than a surprising one: the scratchpad, the vector registers and the
+accumulator are block RAM on the FPGA and become registers when the flow is told
+to use no memory macros.
+
+That is the whole interpretive caveat, and it runs in a direction worth naming.
+**This number says more about the memory treatment than about the datapath**, so
+it cannot be compared against any flow that used provided SRAM macros without
+giving that flow the same treatment. It also means a *variant* comparison —
+which is the useful thing this run enables — will **overstate** the area cost of
+any change that buys cycles with more on-chip memory, because memory is being
+priced as registers rather than as macros. The burst-widening candidate, which
+costs +123 % block RAM, is exactly such a change.
+
+What the run gives up, stated plainly: relative cell area only, no place and
+route and therefore no routed timing and no real area, no DRC or LVS, and power
+without activity data. The one thing it does establish beyond relative area is
+that the design **closes timing at 3.33 ns in 45 nm standard cells**, which no
+FPGA figure could have told us.
+
+Two flow defects were found and worked around rather than papered over, and both
+would bite the next person:
+
+- The RTL-collection step rejects a top module whose declaration carries an
+  attribute, because it matches ``^\s*module\s+<name>`` and Vitis emits the
+  ``CORE_GENERATION_INFO`` attribute and the ``module`` keyword on one line.
+  ``sv2v`` itself converted all 146 files without complaint; the failure is
+  downstream of it. Bypassing ``sv2v`` is correct on the merits here anyway —
+  Vitis emits Verilog-2001 — and it keeps the RTL byte-identical.
+- ``view-tiny`` is not usable for this: it has no technology file, no scan
+  cells, and no driving cell, so DC runs and emits unmapped GTECH. Use
+  ``view-standard``.
