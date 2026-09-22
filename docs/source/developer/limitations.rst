@@ -312,85 +312,51 @@ Open
 Fixed or closed
 ~~~~~~~~~~~~~~~
 
+Closed items are tracked as closed GitHub issues, not as rows in this file:
+the issue body carries the status, root cause, fix commit/PR and repro that
+used to live here. This keeps live state in git/GitHub rather than in a
+checked-in snapshot.
+
 .. list-table::
    :header-rows: 1
-   :widths: 6 16 9 27 16 26
+   :widths: 10 60 15
 
    * - Item
-     - Status
-     - Layer
-     - Root cause
-     - Upstream
-     - Repro
+     - What it was
+     - Issue
    * - :ref:`1 <limitation-1>` (+ :ref:`6 <limitation-6>`)
-     - FIXED by ``5c4d1b53``
-     - frontend
-     - Region-scope Stateful not propagated through ``ASTContext.copy()``.
-       Item 6 was a symptom of this, not a separate bug.
-     - **fork-only -- upstreaming candidate** (the ``global_op_cache`` copy
-       crash itself landed upstream via PR #577)
-     - `item01_region_stateful.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item01_region_stateful.py>`__,
-       `item06_elif_local_dominance.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item06_elif_local_dominance.py>`__
+     - Region-scope ``@ Stateful`` lowering incomplete
+     - `#36 <https://github.com/sunwookim028/allo/issues/36>`__
    * - :ref:`2 <limitation-2>`
-     - FIXED by upstream PR #577
-     - frontend
-     - ``global_op_cache`` missing from the copied ``ASTContext``.
-     - upstream
-     - `item02_kernel_stateful.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item02_kernel_stateful.py>`__
+     - ``@ Stateful`` could not be declared inside ``@df.kernel`` bodies
+     - `#37 <https://github.com/sunwookim028/allo/issues/37>`__
    * - :ref:`3 <limitation-3>`
-     - FIXED by ``5bc104c8``
-     - simulator
-     - ``_process_function_streams`` scanned only the top-level block's ops.
-     - **fork-only -- upstreaming candidate**
-     - `item03_nested_call_streams.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item03_nested_call_streams.py>`__
+     - Simulator dropped nested-call stream lowering
+     - `#38 <https://github.com/sunwookim028/allo/issues/38>`__
    * - :ref:`7 <limitation-7>`
-     - CANNOT-REPRODUCE (bitwise ops work in the default rule set since
-       ``12f898d7``, 2023)
-     - frontend
-     - None in the default rules; the AIE ``cpp-style`` gap is item F.
-     - --
-     - `item07_bitwise_and.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item07_bitwise_and.py>`__
+     - No bitwise ``&`` operator support
+     - `#39 <https://github.com/sunwookim028/allo/issues/39>`__
    * - :ref:`9 <limitation-9>`
-     - NOT-A-LIMITATION
-     - --
-     - The stale ``.cache/llvm_sim/`` belonged to another project's Makefile;
-       Allo keeps no simulator cache.
-     - --
-     - `item09_sim_cache_helpers.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item09_sim_cache_helpers.py>`__
+     - Sim cache invalidation misses imported helpers
+     - `#40 <https://github.com/sunwookim028/allo/issues/40>`__
    * - :ref:`11 <limitation-11>`
-     - FIXED by ``f193c057``
-     - simulator
-     - The OpenMP team defaulted to the core count instead of the section
-       count.
-     - **fork-only -- upstreaming candidate**; upstream draft PR #611
-     - `item11_omp_team_size.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item11_omp_team_size.py>`__
+     - Simulator deadlocked when processes outnumbered OMP threads
+     - `#41 <https://github.com/sunwookim028/allo/issues/41>`__
    * - :ref:`12 <limitation-12>`
-     - FIXED by upstream PR #612 and fork ``3de74846``, merged in ``dc6b8fa6``
-     - emitter
-     - Bit slices were emitted as signed ``ap_int<N>``.
-     - upstream
-     - --
-   * - :ref:`13 <limitation-13>`
-     - retracted 2026-09-18 by its own entry (not in the 2026-09-19 pass); the
-       convenience gap (no ``allo.dma`` intrinsic) remains
-     - --
-     - A contiguous runtime-length copy already infers a variable-length AXI
-       burst.
-     - --
-     - --
+     - Bit-slices lowered to signed ``ap_int<N>``, silently
+     - `#42 <https://github.com/sunwookim028/allo/issues/42>`__
    * - :ref:`20 <limitation-20>`
-     - FIXED by ``aece11c9``
-     - emitter
-     - Generated identifiers and parameter names shared no namespace.
-     - **fork-only -- upstreaming candidate**
-     - `item20_emitter_name_collision.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py>`__
+     - Emitter could generate a local colliding with a parameter name
+     - `#43 <https://github.com/sunwookim028/allo/issues/43>`__
    * - :ref:`21 <limitation-21>`
-     - FIXED by ``bbea2af0`` (``s.dependence``); TinyTPU-isa uses it since
-       ``e24e433b``
-     - frontend, emitter
-     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
-     - **fork-only -- upstreaming candidate**
-     - ``tests/test_vhls.py::test_dependence_pragma*``
+     - No ``#pragma HLS dependence`` primitive
+     - `#10 <https://github.com/sunwookim028/allo/issues/10>`__ (predates this
+       migration; not reused for anything else)
+
+:ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
+retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
+under the same item number, so its status is not unambiguous enough to close
+as a GitHub issue outright -- see its own section below.
 
 Two sub-items sit inside rows of the open table: 10(b) and 17(b) are
 CANNOT-REPRODUCE.
@@ -466,81 +432,30 @@ item :ref:`H <limitation-h>`, not item 3 as an earlier revision said).
 
 .. _limitation-1:
 
-1. Region-scope ``@ Stateful`` lowering is incomplete on ``main``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Region-scope ``@ Stateful`` lowering was incomplete (+ item 6) -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by ``5c4d1b53`` (fork-only; upstreaming candidate). Item 6 is merged into this item.
-
-- Declaring ``int32[N] @ Stateful = 0`` at ``@df.region`` body scope (so the
-  buffer is shared across every ``@df.kernel`` in the region) is the
-  natural way to express a Gemmini-style decoder + driver split with
-  shared spad / acc / imem.
-- On ``allo/main``, this either crashes with
-  ``AttributeError: 'ASTContext' object has no attribute 'global_op_cache'``
-  or trips an MLIR ``Assertion 'value' failed`` (null Value) when a kernel
-  reads-and-writes a region-scope Stateful inside a loop or branch.
-- Update (2026-07-15): the ``AttributeError: 'ASTContext' object has no attribute 'global_op_cache'`` copy-crash landed on ``main`` via upstream
-  PR #577 (global_op_cache copy fix). The broader region-scope stateful
-  propagation block (``stateful_var_map`` / ``stateful_counter`` through
-  ``ASTContext.copy()``, per-function ``global_op_cache`` reset, anchoring
-  ``memref.get_global`` at each function's entry block) remains fork-local
-  on ``main``; it did not need its own branch (the former
-  ``feature/region-scope-stateful`` branch, commit ``5c4d1b5``, is deleted).
-- Net effect: the crash fix is upstream; the sharing-scratchpad/acc-across-
-  decoder-and-driver-kernels feature itself is still fork-local, tracked in
-  fork issue #7.
+FIXED by ``5c4d1b53`` (fork-only; upstreaming candidate). Closed as
+`issue #36 <https://github.com/sunwookim028/allo/issues/36>`__, which carries
+the root cause, the fix and the repro.
 
 .. _limitation-2:
 
-2. ``@ Stateful`` cannot be declared inside ``@df.kernel`` bodies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2. ``@ Stateful`` could not be declared inside ``@df.kernel`` bodies -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by upstream PR #577.
-
-- Putting ``pc: int32[1] @ Stateful = 0`` inside a ``@df.kernel`` triggers
-  ``AttributeError: 'ASTContext' object has no attribute 'global_op_cache'``.
-- Forces all PC / loop-counter / preload-latch state to be hoisted to
-  region scope, even when conceptually private to a single kernel.
-- For an L2 decoder this means 8 single-element ``int32[1] @ Stateful``
-  arrays at region scope (``pc``, ``halted``, ``iter_count``, ``iter_idx``,
-  ``loop_start_pc``, ``iter_stride_a/b/d``) just to get persistence.
-- **Priority: High** — currently forces 8 single-element region-scope arrays
-  in the L2 decoder.
+FIXED by upstream PR #577. Closed as
+`issue #37 <https://github.com/sunwookim028/allo/issues/37>`__, which carries
+the root cause and the repro.
 
 .. _limitation-3:
 
-3. Simulator drops nested-call stream lowering
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+3. Simulator dropped nested-call stream lowering -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by ``5bc104c8`` (fork-only; upstreaming candidate).
-
-- ``_process_function_streams`` in ``allo/backend/simulator.py`` only
-  scans ``func.body.blocks[0].operations`` for ``func.call`` ops. If a
-  PE call (e.g. ``mxu_fp32``) is nested inside an ``affine.for`` /
-  ``affine.if`` (the natural shape of a decoder + driver split), the
-  callee is never recursively processed. Its ``allo.stream_put / get``
-  ops survive into LLVM lowering, where ``convert-func-to-llvm`` fails
-  with:
-
-  .. code-block:: text
-
-     cannot be converted to LLVM IR: missing
-     `LLVMTranslationDialectInterface` registration for dialect for op:
-     func.func
-
-- The fix is mechanical (deep-scan ``func_d.CallOp`` via
-  ``recursive_collect_ops`` in addition to the top-level scan) but it has
-  to be patched into the library — there is no user-side workaround
-  short of inlining the sub-region.
-
-- Symptom is opaque: error points at the *callee* ``func.func``, not at
-  the top-level for-loop that hides the call.
+FIXED by ``5bc104c8`` (fork-only; upstreaming candidate). Closed as
+`issue #38 <https://github.com/sunwookim028/allo/issues/38>`__, which carries
+the root cause, the fix and the repro.
 
 .. _limitation-4:
 
@@ -577,48 +492,22 @@ item :ref:`H <limitation-h>`, not item 3 as an earlier revision said).
 
 .. _limitation-6:
 
-6. Local ``int32`` decls inside ``elif`` branches don't dominate uses
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6. Local ``int32`` decls inside ``elif`` branches don't dominate uses -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by ``5c4d1b53`` -- and the diagnosis below was wrong. Plain locals in ``elif`` arms always worked; the failure was item 1's cause. Merged into :ref:`limitation-1`.
-
-- Pattern that fails: declaring a fresh local inside an ``elif`` branch
-  and then referencing it in another branch's calc.
-- For example, ``eff_d: int32 = rs1_lo + d_off`` inside
-  ``elif funct7 == FUNCT7_PRELOAD:`` and ``new_idx: int32 = iter_idx[0] + 1``
-  inside ``elif funct7 == FUNCT7_LOOP_END:`` produced MLIR that didn't
-  verify (cryptic dominance / null-Value errors during lowering).
-- Workaround: hoist every such temporary out of the if/elif chain so it
-  is declared in a block that dominates all uses. This bloats the
-  decoder body.
-- **Priority: Medium** — bloats the decoder.
+Merged into :ref:`limitation-1` -- the diagnosis for this item was wrong:
+plain locals in ``elif`` arms always worked, and the failure was item 1's
+cause. See `issue #36 <https://github.com/sunwookim028/allo/issues/36>`__.
 
 .. _limitation-7:
 
-7. No bitwise ``&`` operator support in Allo expression DSL
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+7. No bitwise ``&`` operator support in Allo expression DSL -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   CANNOT-REPRODUCE: bitwise ops work in the default typing rules since ``12f898d7`` (2023). Only the AIE ``cpp-style`` rules lack them: :ref:`limitation-f`.
-
-- For decoding instruction flag bits we wanted ``(iflags & 2) >> 1``.
-
-- Allo rejects ``&`` inside ``@df.kernel`` bodies; we end up emulating bit
-  extraction with arithmetic:
-
-  .. code-block:: text
-
-     a_stride_on: int32 = (iflags // 2) - ((iflags // 4) * 2)
-     b_stride_on: int32 = (iflags // 4) - ((iflags // 8) * 2)
-     d_stride_on: int32 = (iflags // 8) - ((iflags // 16) * 2)
-
-- Works, but verbose and obscures intent (the reader has to recognize
-  the division-pair as a single-bit extraction).
-
-- **Priority: Low** — arithmetic emulation works.
+CANNOT-REPRODUCE: bitwise ops work in the default typing rules since
+``12f898d7`` (2023). Only the AIE ``cpp-style`` rules lack them:
+:ref:`limitation-f`. Closed as
+`issue #39 <https://github.com/sunwookim028/allo/issues/39>`__.
 
 .. _limitation-8:
 
@@ -643,23 +532,12 @@ item :ref:`H <limitation-h>`, not item 3 as an earlier revision said).
 
 .. _limitation-9:
 
-9. Sim cache invalidation misses imported helpers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+9. Sim cache invalidation misses imported helpers -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   NOT-A-LIMITATION: the ``.cache/llvm_sim/`` cache belonged to another project's Makefile; Allo keeps no simulator cache.
-
-- ``.cache/llvm_sim/`` is keyed on the level's ``tpu.py`` and top-level
-  ``tpu_config.py`` only. Editing an imported helper (e.g.
-  ``levels/_common/mxu_fp32.py`` or ``kernels/*.py``) does not invalidate
-  the cache.
-- Stale cache will hide compilation failures: the build appears to
-  succeed (cache hit), runtime then misbehaves.
-- Has bitten this project at least twice during the session — commit
-  messages claim "validated" because the cached object loaded fine,
-  but a clean rebuild fails.
-- **Priority: High** (allo-tpu side) — repeated stale-cache "validated".
+NOT-A-LIMITATION: the ``.cache/llvm_sim/`` cache belonged to another
+project's Makefile; Allo keeps no simulator cache. Closed as
+`issue #40 <https://github.com/sunwookim028/allo/issues/40>`__.
 
 .. _limitation-10:
 
@@ -701,117 +579,24 @@ by when they were found.
 
 .. _limitation-11:
 
-11. The dataflow simulator deadlocks when processes outnumber OMP threads — **FIXED**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+11. The dataflow simulator deadlocked when processes outnumbered OMP threads -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by ``f193c057`` (fork-only; upstreaming candidate, upstream draft PR #611).
-
-The simulator appears to give each ``df.kernel`` instance an OMP thread and to
-block that thread on an empty/full stream. With fewer threads than processes, a
-blocked process can hold a thread its own producer needed, and the region
-wedges **silently** -- no message, no indication of which process is blocked on
-which channel.
-
-Measured on a 22-process region (``T*T + 6``) at 16x16x16 with stream depth 16:
-
-=================== ==== ==== ==== ====
-``OMP_NUM_THREADS`` 8    16   24   32
-=================== ==== ==== ==== ====
-\                   hang hang pass pass
-=================== ==== ==== ==== ====
-
-The threshold is exactly the process count. With 32 threads the design runs at
-**depth 4**, and a shape that had never passed at *any* depth passed at depth 8.
-
-- Deep FIFOs mask it, by letting producers finish before anyone must block, so
-  the symptom presents as "required stream depth grows with the program" -- a
-  plausible-looking *design* problem. This cost multiple sessions.
-- ``CLAUDE.md`` currently advises ``OMP_NUM_THREADS=8``, which is fine for the small
-  regions in ``tests/dataflow`` but is **not a safe default**. The rule is
-  ``OMP_NUM_THREADS >= number of kernel instances``.
-- ``examples/accelerator/tinytpu_vitis/kpn_model.py`` is a ~140-line model of a
-  channel graph that reports which processes are blocked on which channels and
-  at what occupancy. It found this in one run. That report is cheap.
-- **FIXED 2026-09-17** in ``allo/backend/simulator.py``
-  ``_inject_omp_parallel_sections``: the OpenMP team is now sized to the section
-  count (``num_threads = len(pe_call_define_ops)``) instead of defaulting to the
-  core count. Our 22-process design now runs every shape exactly at
-  ``OMP_NUM_THREADS=8``, the value that used to hang; the golden tests and the
-  upstream dataflow suite still pass.
-- Credit: independently found and fixed by ``chhzh123`` on the SPMW branch
-  (``a03edb85``, 2026-09-05) from the other direction -- "56 at 8x8 FEATHER on a
-  48-core host". Two unrelated projects hitting the same wall is the argument
-  for it being upstreamed rather than carried.
-- **Diagnosis, tier 0 -- DONE 2026-09-18** (``7bc6d413``). ``LLVMOMPModule.__call__``
-  now arms a watchdog around the blocking ``execution_engine.invoke``, default ON
-  at 600 s (``ALLO_SIM_TIMEOUT=<sec>``, ``=0`` to silence). On a real deadlock it
-  prints the top function, the kernel-instance count, ``OMP_NUM_THREADS``, the
-  pid, the likely causes, and an explicit note that the process is NOT being
-  killed and Ctrl-C will not work (the simulator is inside a blocking C call),
-  with the ``kill -9`` line. It repeats with geometric backoff.
-
-  - The watchdog is **one reused thread parked on a** ``Condition``, not a
-    per-call ``threading.Timer``: the Timer version was measured at **+170 us per
-    call**, a fifth of a small region's runtime and inside the window
-    ``tests/dataflow/mesh_perf.py`` measures throughput over -- a watchdog that
-    perturbs what it watches. The reused thread costs **+12.6 us**.
-  - It is advisory: nothing is killed, nothing is raised, and a healthy run that
-    trips the timeout still returns a correct result. There is a test asserting
-    exactly that, which is what makes defaulting it ON defensible.
-  - ``tests/dataflow/test_sim_timeout.py``, 4 tests, 15 s, cannot hang the suite.
-
-- **Still open: tier 1, the per-channel report.** The watchdog says *that* the
-  region is stuck, not *who* is stuck on *which* channel. The natural hook now
-  exists: ``fc08bb6b`` collapsed three byte-identical spin-wait sites into one
-  ``_build_spin_wait_loop``, so instrumenting the generated spin -- beside the
-  ``usleep(1)`` it already contains -- is a one-line change rather than three.
-  The remaining cost is a runtime shared library to receive the callback, and
-  its risk is linkage (see the ``LLVM_BUILD_DIR`` / GLIBC pitfall).
-  ``examples/accelerator/tinytpu_vitis/kpn_model.py`` shows the report format;
-  what does not transfer is its mechanism -- it is a single-threaded
-  cooperative scheduler that can observe "a full sweep advanced nobody", and
-  the real simulator's processes are opaque JIT'd code on OpenMP threads.
+FIXED 2026-09-17 by ``f193c057`` (fork-only; upstreaming candidate, upstream
+draft PR #611): the OpenMP team is now sized to the section count instead of
+defaulting to the core count. A tier-0 diagnostic watchdog (``7bc6d413``) was
+added at the same time; the tier-1 per-channel report remains unbuilt --
+track as a fresh enhancement rather than here. Closed as
+`issue #41 <https://github.com/sunwookim028/allo/issues/41>`__.
 
 .. _limitation-12:
 
-12. Bit-slices lower to *signed* ``ap_int<N>``, silently, and the simulator disagrees
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+12. Bit-slices lowered to *signed* ``ap_int<N>``, silently, and the simulator disagreed -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by upstream PR #612 together with fork ``3de74846``, merged into ``main`` in ``dc6b8fa6``.
-
-.. note::
-
-   Pending re-verification (added 2026-09-19): bit-slice emission has since
-   changed. Commit ``3de74846`` ("hls: emit bit slices as unsigned",
-   2026-09-18) on the fork, and upstream PR #612 ("Preserve unsigned
-   bit-slice types during HLS codegen", ``094ab413``, merged into ``main`` by
-   ``dc6b8fa6`` on 2026-09-19), both address this item. Its status above is
-   left as last recorded until it is re-verified.
-
-``w[54:61]`` on an unsigned value emits:
-
-.. code-block:: cpp
-
-   ap_int<7> v268;  v268 = w02(60, 54);
-   int32_t nr = v268;                     // 64 -> 0b1000000 -> -64
-
-so any field whose top bit is set reads back **negative**. A loop bounded by it
-runs zero times.
-
-- Cost: an ISA row-count field of 64 silently loaded nothing and the design
-  produced zeros -- **251 of 256 outputs wrong**. It failed exactly at the
-  sign-bit boundary (63 fine, 64 not).
-- **The dataflow simulator treats the slice as unsigned and passed the same
-  program.** This is a genuine simulator/RTL divergence, and it is the reason
-  this bug survived every functional check that had been passing.
-- Workaround: an N-bit field safely carries ``0 .. 2^(N-1) - 1``; budget one
-  spare bit per field and assert it at the assembler.
-- **Priority: High.** Either lower unsigned slices to ``ap_uint<N>``, or make the
-  simulator model the sign so the two agree.
+FIXED by upstream PR #612 together with fork ``3de74846``, merged into
+``main`` in ``dc6b8fa6``. Closed as
+`issue #42 <https://github.com/sunwookim028/allo/issues/42>`__.
 
 .. _limitation-13:
 
@@ -1130,107 +915,26 @@ The actual cause was #11, in the simulator, not in any of these.
 
 .. _limitation-20:
 
-20. The emitter can generate a local whose name collides with a parameter
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20. The emitter could generate a local whose name collided with a parameter -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (re-verified 2026-09-19)
-
-   FIXED by ``aece11c9`` (fork-only; upstreaming candidate).
-
-A kernel body that produces enough SSA temporaries can emit a local with the
-same name as one of the function's own parameters, giving C++ that does not
-compile:
-
-.. code-block:: cpp
-
-   void mover_0(int32_t v0[8], int8_t v1[256], hls::stream< int32_t >& v2) {
-     ...
-     int8_t v2;          // shadows the stream parameter
-     v2 = v50;
-     ...                 // later use of v2 as a stream:
-   }
-   // ERROR: [HLS 207-3746] subscripted value is not an array, pointer, or vector
-
-- Found while probing m_axi burst behaviour (item 13): a ``@df.kernel`` taking
-  three arguments, the third a ``Stream``, with a ``meta_for`` body creating
-  several temporaries. The parameter list is numbered ``v0, v1, v2`` and the
-  body's temporaries restart into the same namespace.
-- The failure is late and the message is unhelpful: it surfaces from the C++
-  front end as a subscript error on a name the user never wrote, with no
-  indication that a collision happened. Nothing in Allo warns.
-- Workaround: change the kernel's arity or restructure the body so the counters
-  do not meet -- which is to say, guess.
-- **Priority: Medium.** It is silent at the Allo level, and the diagnostic
-  points nowhere near the cause.
+FIXED by ``aece11c9`` (fork-only; upstreaming candidate). Closed as
+`issue #43 <https://github.com/sunwookim028/allo/issues/43>`__, which carries
+the root cause, the fix and the repro.
 
 .. _limitation-21:
 
-21. No ``#pragma HLS dependence`` primitive, so a false dependence cannot be asserted away
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+21. No ``#pragma HLS dependence`` primitive, so a false dependence could not be asserted away -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (2026-09-19)
-
-   **FIXED by** ``bbea2af0`` (fork-only; upstreaming candidate): a schedule
-   primitive, ``s.dependence(axis, target, dep_type="inter"|"intra",
-   direction=None|"RAW"|"WAR"|"WAW", distance=None, dependent=False,
-   dep_class=None|"array"|"pointer")``, next to ``s.partition`` in
-   ``allo/customize.py``. It stores the claim as a ``dependence`` attribute on
-   the loop and ``emitLoopDirectives`` in ``EmitVivadoHLS.cpp`` emits
-   ``#pragma HLS dependence variable=<array> ...`` inside that loop (affine and
-   ``scf`` loops alike). The array is a local buffer or an argument of the
-   loop's function. It is reachable on a dataflow region through
-   ``allo.dataflow.customize`` by the kernel instance's name, as ``s.partition``
-   is. Tests: ``tests/test_vhls.py::test_dependence_pragma``,
-   ``::test_dependence_pragma_rejects_bad_claims``,
-   ``::test_dependence_pragma_dataflow_region``. 112 lines of Python (about
-   half of them the docstring and argument checks) and 46 of C++, against the
-   30-50 sized: larger than sized, not blocked. TinyTPU-isa has used it for its
-   accumulator since ``e24e433b`` (:ref:`tinytpu-isa-dependence`); the price
-   below is what that recovered.
-
-   The text below is the item as it stood before the fix.
-
-Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
-where the scheduler cannot prove two accesses are independent but the author
-can. **Allo emits no dependence pragmas and has no primitive for one** -- the
-only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
-``allo/backend/vitis.py:410``, plus per-array ``bind_storage`` / ``array_partition``.
-
-- Cost, measured: an accumulator doing ``ar[f1+r] = ar[f1+r] + v`` with ``r``
-  carried schedules at ``Final II = 3`` in BRAM (store/load distance 1) and II=2
-  fully partitioned into registers. One pragma line would have said the reads
-  and writes never alias.
-- Without it the recurrence has to be engineered away in *hardware*: a
-  write-behind rotation (hold the last two rows in registers, write ``ar`` two
-  iterations late, answer reads in that window from a bypass mux) takes the
-  memory off the carried path and reaches II=1 -- at **13.7x the flip-flops in
-  that unit** (1,270 -> 17,450) for a 2.3% end-to-end gain.
-- **And the redesign did not survive its own price.** The rotation was built,
-  was bit-exact at all five shapes, and was reverted at the 2026-09-18
-  checkpoint: ``ar`` scales with the array dimension, so the flip-flop cost grows
-  with T while the 2.3% does not. The shipped design is back to the nested form
-  at II=2.
-- **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
-  ``#pragma HLS dependence variable=ar inter false`` into the emitted
-  ``kernel.cpp`` (``v_accudep``, now under ``examples/accelerator/tinytpu_vitis/impact/``)
-  measures **35 cycles** at 16x16x16 on the then-shipped design (919 -> 884; 5
-  at 4x4x4), and **95** once the design fixes are in (``v_design_dep``). The
-  pragma form costs **1,744 FF** in ``accu`` against **17,438** for the
-  reverted rotation. Before the fix the only way to get it was patching
-  ``kernel.cpp`` between ``s.build(mode="csyn")`` and running Vitis.
-  Attribution: :ref:`gemmini-gap-attribution`.
-- **A dependence claim is a contract, and the primitive does not check it.**
-  Landing the claim on TinyTPU-isa showed that ``inter false`` on ``ar`` is
-  true only for programs that never read an accumulator row within two
-  iterations of writing it: the synthesized loop loads in state 5 and stores in
-  state 7, and a distance-1 or -2 read returns the old row in RTL while every
-  simulator (Allo's, and Vitis csim) is exact. The design makes the claim true
-  in its assembler. Nothing in Allo can see a false claim; only RTL can.
-- So the missing primitive is not cosmetic: it is the difference between a
-  one-line assertion and a hardware redesign with a real area price.
-- **Priority: Medium-High.** It is the standard HLS escape hatch for II
-  problems and Allo cannot reach it. A ``s.dependence(...)`` primitive alongside
-  the existing ``s.partition(...)`` is the natural shape.
+FIXED by ``bbea2af0`` (fork-only; upstreaming candidate): the ``s.dependence``
+schedule primitive, next to ``s.partition`` in ``allo/customize.py``. Tracked
+as the pre-existing `issue #10
+<https://github.com/sunwookim028/allo/issues/10>`__ (not reused for anything
+else by this migration). The price TinyTPU-isa paid for this claim on its
+accumulator, and what the primitive does and does not check, are design
+rationale rather than issue material and live in
+:doc:`/designs/tinytpu_isa` ("The accumulator's dependence claim").
 
 .. _limitation-22:
 
