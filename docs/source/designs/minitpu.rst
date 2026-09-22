@@ -64,8 +64,13 @@ two to compare; the bitstream id is part of the figure.
      - 7.880 W on-chip (vectorless)
      -
    * - GPT-2 body throughput
-     - 79.16 tok/s at 32 rows, 129.70 at 256 — **medians of five runs**,
-       spread 128.83–130.50 at 256
+     - **SUPERSEDED 2026-09-22, do not quote.** Was 79.16 tok/s at 32 rows and
+       129.70 at 256 (medians of five runs, spread 128.83–130.50 at 256). Two
+       commits on MiniTPU's master have taken the 32-row figure to a **claimed
+       160.38 tok/s on this same bitstream at 187.498 MHz** — the hardware did
+       not change. Treat 160.38 as provisional pending their full-board suite
+       and the 256-row median; what is certain is that the old pair is stale.
+       See "The concession that became the win" below.
      - 23.255 GFLOP/s, 24.2 % of the 96 GFLOP/s array peak
    * - Kernel checks
      - 17/17 GPT-2, 6/6 Qwen
@@ -308,6 +313,41 @@ push→result latency.
 Consequence: **the rescued report's 8-stage TinyTPU scaling plan rests on the
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.**
 Not reproduced here; what survives of it is §5.
+
+The concession that became the win
+----------------------------------
+
+The most instructive thing to come out of comparing two designs, and it is a
+method finding rather than an architectural one.
+
+While establishing that a fair comparison must **count every machine's host or
+none of them** (:doc:`/designs/gemmini_comparison`), MiniTPU's owner volunteered
+a figure against their own interest: their per-launch host work is about **132
+microseconds with a 44-microsecond register-access floor**, roughly **24,750
+cycles at 187.5 MHz**, none of which their simulator numbers include. It was
+offered so that a comparison counting Gemmini's ~390 cycles of driver would not
+quietly omit theirs.
+
+Stating it next to Gemmini's ~390 is what made it **absurd rather than
+normal** — two orders of magnitude, for the same job. Within hours, two commits
+on their master attacked exactly that cost, reading a configuration file once
+instead of once per launch and spinning past the slowest launch, and took the
+GPT-2 body from 79.16 to a claimed **160.38 tok/s on the same bitstream**.
+Neither cost was visible to their simulator, which is why both survived as long
+as they did.
+
+So the fairness adjustment was a **diagnostic**. The honest accounting did not
+merely make the comparison defensible; it located the largest measured win of
+that night, in a quantity nobody had been optimising because nothing in the
+measurement setup showed it.
+
+The transferable form, and the reason this is recorded on our side too: **an
+overhead you exclude from a window is an overhead you cannot see.** Our cosim
+figures contain no host at all — not a fast host, none — so we have no
+equivalent number to be shocked by yet, and a real deployment eventually will.
+The rule that follows is not only "say what your window excludes" but "put the
+excluded quantity beside someone else's, because the comparison is what makes an
+absurd value look absurd."
 
 What aligning to MiniTPU's semantics costs
 ------------------------------------------
