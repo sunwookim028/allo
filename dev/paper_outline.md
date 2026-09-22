@@ -185,6 +185,24 @@ because it is where a fair comparison is usually fudged:
   memories match to 2% and the total is defensible. The paper must not quote a
   total at DIM=4.
 
+**Frequency and power — two methodology commitments made before the numbers
+exist**, so they cannot be bent afterwards by whatever comes back:
+
+- **Frequency is reported as a DC topographical estimate at a 3.33 ns
+  constraint, same flow both sides — never as an achieved frequency.** There is
+  no routing and no parasitics beyond wire-load estimates. It is fair for
+  comparing designs run identically, which is the only use it gets. This also
+  closes a real hole: two designs at different achievable frequencies are not
+  comparable on cycles at all, and today we have no frequency figure for
+  Gemmini whatsoever.
+- **Power is published only if *both* sides are activity-annotated.** An
+  annotated number set beside a default-toggle-rate number is worse than no
+  number. Our side is reachable — SAIF from the cosim run of a workload we
+  already quote cycles for, so power and cycles describe one run. Gemmini's
+  requires driving the same GEMM through its RoCC interface in RTL simulation,
+  and whether that is practical is an open question. **If only one side can be
+  annotated, the paper reports no power comparison and says why.**
+
 **Gap.** DC has not run. The channel-depth fix (`QD=16`, which takes three
 non-terminating tiled programs to completion) costs **+9.3% FF** and must
 appear next to the cycles, not be absorbed; and if the five published shapes
