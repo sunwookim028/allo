@@ -163,6 +163,20 @@ def scan_leaks(ref: str) -> list[str]:
     return out
 
 
+def scan_text(text: str, where: str = "prompt") -> list[str]:
+    """`file:line:text` for every leak in one piece of text -- the PROMPT.
+
+    `scan_leaks` covers the tree. It was not enough: the held-out system
+    prompt is assembled from the live tree's prompt.py, not from the redacted
+    graft, and on the first run it named the answer's name, attribute shape,
+    emitter location, and legality style. The tree was clean; the channel was
+    not. So the assembled prompt is scanned too, with the same pattern.
+    """
+    pat = re.compile(LEAK_RE)
+    return [f"{where}:{i}: {l.strip()[:110]}"
+            for i, l in enumerate(text.splitlines(), 1) if pat.search(l)]
+
+
 def redact(text: str) -> str:
     for pat, sub in LEAK:
         text = re.sub(pat, sub, text)

@@ -231,6 +231,53 @@ Given only `symptom.md` — never told the primitive exists, working from
 `a4151ca0`, where it never has — the agent produced a 162-line candidate
 across five files in one 24.8-minute turn.
 
+### SECOND CORRECTION (2026-09-22, evening): the system prompt described the answer
+
+**The first retraction below is incomplete, and its surviving claim does not
+survive either.** The held-out loop assembles its system prompt from THIS
+tree's `chia_abstraction/prompt.py` — never from the redacted graft, whose own
+redacted `prompt.py` was therefore cosmetic. At the time of the run
+(`ecdf6e96`) the maintaining brief said, in so many words:
+
+- `s.dependence` (`allo/customize.py:833-943`) **is the pattern**;
+- it has **"five explicit `AlloValueError` raises"**;
+- it sets **"a `dependence` `ArrayAttr` of `DictAttr` appended to (not
+  overwriting) the loop's attributes"**;
+- it has **"one branch in `EmitVivadoHLS.cpp:emitLoopDirectives`
+  (2603-2647)"**;
+- **"Other emitters that cannot honour it must REJECT it, not ignore it"**;
+- `s.dependence` is a claim that, **"if false, produce[s] wrong RTL while every
+  software simulation passes."**
+
+Every feature credited to the agent below is in that list: the name, the
+attribute and its shape, the append, the emitter location, the rejecters, and
+the promise-not-fact docstring. So:
+
+- **The attribution paragraph below is WRONG** where it says the diagnosis and
+  the rejecters are the agent's. Both were in its prompt.
+- **"On a filed, still-open defect its version is better than the tree's" is
+  withdrawn as a claim about the agent.** It remains true that the candidate
+  has rejecters and `bbea2af0` does not; it is not evidence of judgement, it
+  is compliance with an instruction.
+- **"It noticed the claim is a promise" is withdrawn.** It was told.
+- **The differences table is not evidence of reconstruction.** It is where an
+  implementation deviated from a specification it was given.
+
+**What is left, stated at its true strength:** given a prose specification of
+a primitive in its system prompt, the agent wrote a 162-line, five-place
+implementation that builds, passes every gate, and aborts the compiler on first
+call because its Python and C++ halves disagree on an IR type. That is an
+*implementation-from-specification* result, graded **near miss**, and it says
+nothing about whether an agent can find an abstraction.
+
+**Why the leak detector did not catch it:** it scanned the TREE. The channel
+that carried the most information — the prompt — was never scanned. A detector
+that proves it looked is not enough if it looked in the wrong place. Fixed:
+`abs_loop --heldout` now assembles the full system and task prompt, runs it
+through the same `LEAK_RE`, and **refuses to start** on any hit. A held-out
+re-run also needs a frame whose pattern exemplar is not the held-out answer;
+the current frame uses `s.dependence` as the exemplar and would be refused.
+
 ### RETRACTED AS A REDISCOVERY RESULT. Read this before anything below.
 
 **The held-out ref leaked the answer, and the leak was in the agent's read

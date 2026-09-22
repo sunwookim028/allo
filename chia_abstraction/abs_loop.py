@@ -444,6 +444,21 @@ def run(args, budget: Budget) -> int:
                         + "\n\nYOUR ANGLE for this search:" + tail
                         + brief.PILOT_CLOSING.replace("{tool}", tool.name))
             if args.heldout:
+                # The PROMPT is a channel too. Scan the whole assembled prompt
+                # -- system message and task -- and refuse on any hit. The first
+                # held-out run's tree was clean and its prompt named the answer.
+                sysmsg = (brief.pilot_brief(args.pilot, args.workload, tool.name)
+                          if args.pilot else brief.system_message(
+                              args.disposition).format(
+                              workload=workloads.brief(
+                                  workloads.get(args.workload)),
+                              common=brief.COMMON))
+                leaks = heldout.scan_text(sysmsg + "\n" + text + "\n"
+                                          + heldout.symptom())
+                if leaks:
+                    print("Refusing the held-out run: the PROMPT names the "
+                          "answer:\n  " + "\n  ".join(leaks[:20]))
+                    return 2
                 # The held-out experiment: the agent is given the SYMPTOM and
                 # nothing else. `heldout.py` has already removed the answer,
                 # its tests and every mention of it from the ref the agent
