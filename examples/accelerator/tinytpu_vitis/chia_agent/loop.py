@@ -10,7 +10,12 @@ agent's word or the agent's own tool output:
   score  cosim.py at the search shapes           (RTL cosim cycles, ~2-4 min)
 
 A candidate is kept only if it passes both and strictly lowers the summed cosim
-cycles; otherwise the spec is rewound and the next iteration is told why.
+cycles; otherwise the spec is rewound and the next iteration is told why. What
+it is lowered against is measured, not looked up: iteration 0 scores the
+unmodified design in this environment, records the design's blob ids with it,
+and cross-checks it against the published numbers (`control.py`) so that a
+toolchain that moved is loud at the start of the run rather than implicit in
+every verdict after it.
 
 A spend cap is enforced before every model call: if the global spend since the
 run started (opencode's own DB, all workers) plus the largest single call seen
