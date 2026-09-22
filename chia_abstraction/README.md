@@ -231,12 +231,53 @@ Given only `symptom.md` — never told the primitive exists, working from
 `a4151ca0`, where it never has — the agent produced a 162-line candidate
 across five files in one 24.8-minute turn.
 
-**Four-way outcome: `same-abstraction`. NOT YET VERIFIED TO WORK** — see the
-gate result below. Until it passes, the honest phrasing is "produced a
-candidate graded `same-abstraction`, not yet verified to work". If it fails
-the gate that is still a strong result and a more interesting one: reaching
-the right abstraction and getting it wrong is a different finding from not
-reaching it.
+### RETRACTED AS A REDISCOVERY RESULT. Read this before anything below.
+
+**The held-out ref leaked the answer, and the leak was in the agent's read
+path.** `docs/source/developer/limitations.rst` line **41** — inside the
+lines 1-150 the agent actually read — says:
+
+> combinational wires (fork issue #9), **HLS dependence pragma (fork issue
+> #10)**, ...
+
+and the same file says at :204 "No schedule primitive and no emitter path for
+``#pragma HLS dependence``", at :1171 "21. No ``#pragma HLS dependence``
+primitive, so a false dependence cannot be asserted away", and at :1178
+"Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the
+case". `microarch_isa.py` carries the pragma verbatim in a comment.
+**14 leaks in total across 5 files.**
+
+**Why the leak check said zero: it failed open.** `scan_leaks` used
+`git grep -E LEAK_RE`, and `git grep -E` is POSIX ERE — it rejects `(?:...)`
+and exited **128**. The helper was called with `check=False`, so the failure
+was read as "no matches". *The detector reported a clean tree because it had
+crashed.* This is the same disease as the tool server that never bound and
+returned anyway, and as `usage` reporting $0.00: **a check that fails open.**
+I built one while cataloguing them. It now uses Python's `re` over `git show`,
+raises on any git failure, and returns `file:line:text`.
+
+Why the redaction did not cover these files: `graft` deliberately leaves the
+design's own evaluator and the docs at the base commit, so only the *grafted*
+harness files were redacted. That decision was right for the evaluator and
+wrong for the docs, and the failing-open detector is what stopped the mistake
+being seen.
+
+**What does NOT survive:** the word *rediscovery*. The agent was shown a line
+naming the pragma as a known gap.
+
+**What does survive, and is weaker but real:** the agent was pointed at a
+*gap* — "no schedule primitive and no emitter path for `#pragma HLS
+dependence`" — not at a design, and turned it into a correct, building,
+validated, five-place implementation that passes every gate, including
+rejecters in three emitters that the human commit did not write. That is an
+**implementation** result, not a rediscovery result. The gate numbers below,
+the differences table, and every harness finding stand unchanged.
+
+**Before any rediscovery claim is made, the experiment must be re-run** with
+the docs redacted at the held-out ref and the fixed detector.
+
+**Four-way outcome, as an implementation result: `same-abstraction`, verified
+to build and to be correct, and INERT** — see the gate result below.
 
 What it produced:
 

@@ -118,6 +118,51 @@ LEAK = (
 LEAK_RE = "|".join(pat for pat, _ in LEAK)
 
 
+def scan_leaks(ref: str) -> list[str]:
+    """Every tracked text file at `ref` that still names the answer.
+
+    Uses PYTHON's `re` over `git show`, not `git grep -E`. That is not taste:
+    `git grep -E` is POSIX ERE and rejects `(?:...)`, so the original check
+    exited 128 -- and because it was called with `check=False`, the failure was
+    read as "no leaks". **The leak detector failed open**, and it reported a
+    clean tree while `docs/source/developer/limitations.rst` said, in the first
+    fifty lines, "HLS dependence pragma (fork issue #10)", and
+    `microarch_isa.py` carried the pragma verbatim in a comment. The agent read
+    lines 1-150 of that file.
+
+    So this function raises on any git failure and returns `file:line:text` for
+    every match, and `make`/`graft` refuse to hand over a ref with any.
+    """
+    # `-r` alone lists a submodule's path with no readable blob; ask for the
+    # object type so a gitlink is identified rather than guessed.
+    listing = sh(["git", "ls-tree", "-r", ref]).split("\n")
+    files = [l.split("\t", 1)[1] for l in listing
+             if "\t" in l and l.split()[1] == "blob"]
+    pat = re.compile(LEAK_RE)
+    out = []
+    for rel in files:
+        rel = rel.strip()
+        if not rel:
+            continue
+        raw = subprocess.run(["git", "show", f"{ref}:{rel}"], cwd=REPO,
+                             capture_output=True)
+        if raw.returncode:
+            # A gitlink (submodule) has no blob. Anything else that cannot be
+            # read is a hard failure: a leak scan that skips a file it could
+            # not open is the failure mode this function exists to prevent.
+            raise SystemExit(f"scan_leaks: cannot read blob {rel} at {ref}")
+        if b"\0" in raw.stdout[:8000]:
+            continue
+        try:
+            text = raw.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if pat.search(line):
+                out.append(f"{rel}:{i}: {line.strip()[:110]}")
+    return out
+
+
 def redact(text: str) -> str:
     for pat, sub in LEAK:
         text = re.sub(pat, sub, text)
@@ -380,8 +425,7 @@ def make(out: Path) -> dict:
     removed["branch"] = HELDOUT_BRANCH
     removed["from"] = head
     # A held-out ref that still mentions the answer is not held out.
-    leak = sh(["git", "grep", "-l", "-E", LEAK_RE, ref], check=False)
-    removed["leaks"] = [l for l in leak.splitlines() if l.strip()]
+    removed["leaks"] = scan_leaks(ref)
     (out / "heldout.json").write_text(json.dumps(removed, indent=1))
     (out / "symptom.md").write_text(SYMPTOM)
     return removed
@@ -450,12 +494,11 @@ def graft(out: Path, base: str = PREPARED_BASE) -> dict:
     ref = sh(["git", "rev-parse", "HEAD"], cwd=wt).strip()
     sh(["git", "branch", "-f", HELDOUT_BRANCH + "-graft", ref])
     sh(["git", "worktree", "remove", "--force", str(wt)], check=False)
-    leak = sh(["git", "grep", "-l", "-E", LEAK_RE, ref], check=False)
     r = {"ref": ref, "base": base_ref, "answer_at": PREPARED_ANSWER,
          "CHIA_MAIN_BASE": base_ref,
          "branch": HELDOUT_BRANCH + "-graft", "grafted": len(grafted),
          "redacted_grafted": redacted,
-         "leaks": [l for l in leak.splitlines() if l.strip()],
+         "leaks": scan_leaks(ref),
          "symptom": PREPARED_SYMPTOM,
          "note": "the symptom to hand the agent is main's prepared one, which "
                  "records its own deliberate near-leak; read its README."}
