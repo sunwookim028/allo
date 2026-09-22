@@ -473,8 +473,11 @@ def gemm_from_nest(nest, M, K, N, relu=False):
             body(ivs)
             return
         lv = loops[0]
-        with k.loop(lv.factor, f"{lv.rank.lower()}{len(ivs)}") as iv:
-            nxt = ivs + [(lv.rank, iv, lv.factor)]
+        # Named `ivar`, not `iv`: `spec_policy`'s monkeypatch rule tracks names
+        # derived from an imported module without knowing about scopes, and a
+        # second `iv` here would taint `Program.loop`'s own `iv.live = False`.
+        with k.loop(lv.factor, f"{lv.rank.lower()}{len(ivs)}") as ivar:
+            nxt = ivs + [(lv.rank, ivar, lv.factor)]
             if lv.rank == "M" and len(nxt) == len(ms):
                 stage_a(steps(nxt, "M", Mt))     # innermost m loop reached
             walk(loops[1:], nxt)
