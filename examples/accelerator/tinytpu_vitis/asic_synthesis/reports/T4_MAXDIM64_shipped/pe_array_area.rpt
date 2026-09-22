@@ -1,0 +1,46 @@
+PE array area, T4_MAXDIM64_shipped
+Source: the mapped database at /scratch/users/sk3463/build_T4_MAXDIM64_shipped/4-synopsys-dc-synthesis/
+(no re-synthesis). DC W-2024.09, FreePDK45 view-standard, 3.33 ns, topographical,
+flatten_effort 3, sram_mode='none'.
+
+THERE IS NO PE-ARRAY HIERARCHY LINE. report_area -hierarchy carries accu_0_U0,
+dma_ld_0_1_U0 and gmem0..3_m_axi_U, but no pe_R_C_U0 instance: at flatten_effort 3
+DC dissolved every PE instance into the top level, so the array's area is inside
+tinytpu_isa's local area. get_cells -hier confirms zero hierarchical pe_*_U0 cells.
+
+The figures below are therefore a NAME-PREFIX SUM over flattened leaf cells, not a
+hierarchy line: every non-hierarchical cell whose name begins pe_<row>_<col>_,
+grouped by that prefix. 5,020 leaf cells matched, none unmatched.
+
+  PE          area (um2)
+  pe_0_0         870.352
+  pe_0_1         653.296
+  pe_0_2         653.296
+  pe_0_3         617.120
+  pe_1_0        1525.776
+  pe_1_1        1308.720
+  pe_1_2        1308.720
+  pe_1_3        1236.368
+  pe_2_0        1417.248
+  pe_2_1        1308.720
+  pe_2_2        1308.720
+  pe_2_3        1236.368
+  pe_3_0        1302.868
+  pe_3_1        1736.980
+  pe_3_2        2171.092
+  pe_3_3        2532.852
+  -----------------------
+  total       21188.496   over 16 PEs
+  mean          1324.28   um2/PE
+
+Identical in both designs to the digit, which is expected: MAXDIM changes memory
+depth, not the array.
+
+Against Gemmini's published 116K um2 for 256 PEs = 453 um2/PE at 22 nm. A node
+difference of 45/22 is about 4.2x in area, so that figure corresponds to roughly
+1,900 um2/PE at 45 nm, against 1,324 um2/PE here. Treat as order-of-magnitude
+only: the node scaling is a rule of thumb, the two PEs may not contain the same
+functions (accumulator registers in particular), and the per-PE spread here
+(617 to 2,533) shows DC optimising PEs differently by position, so a mean hides
+structure. It is one clearly-named uncertainty rather than four compounding ones,
+which was the point of asking.
