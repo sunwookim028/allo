@@ -125,6 +125,25 @@ That explains the result that looked like a dead end, and it is the shape of a
 real co-design claim: **neither change demonstrates anything alone**, and the
 first has to be made before the second's constraint can even be measured.
 
+A prediction stated in advance, confirmed to the cycle
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Worth recording separately, because it is the difference between a flow that is
+understood and one that merely works. Before measuring, the co-design track
+predicted its five-shape control would read **169 / 262 / 418 / 484 / 686** —
+differing from the published row at the smallest shape only, by three cycles,
+because at that shape the mapper's program is 24 instruction words against the
+hand-written 28 with the same four dynamic issues, while the middle three picks
+are bit-identical to the canonical nest and would not differ at all.
+
+It measured **169 / 262 / 418 / 484 / 686**, every testbench bit-exact, at an
+unchanged 2.431 ns and unchanged resources. No tolerance was added for the three
+cycles; they are two fewer instruction fetches, measured three times.
+
+A number predicted with its mechanism and then confirmed is worth more than the
+same number measured first and explained afterwards, and the distinction is
+cheap to maintain: say it before, in the record, with the date.
+
 **And it is not a fix.** ``Kt=2`` means K ≤ 8, while the scored shape is
 16x16x16 with ``Kt=4``. Four address terms plus an additive term on the
 accumulate field is **necessary and insufficient** — a stepping mechanism is

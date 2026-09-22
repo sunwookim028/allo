@@ -302,6 +302,21 @@ generator and the second becomes binding and visible for the first time.</p>
 <p>That explains the result that looked like a dead end, and it is the shape of a
 real co-design claim: <strong>neither change demonstrates anything alone</strong>, and the
 first has to be made before the second’s constraint can even be measured.</p>
+<section id="a-prediction-stated-in-advance-confirmed-to-the-cycle">
+<h3>A prediction stated in advance, confirmed to the cycle<a class="headerlink" href="#a-prediction-stated-in-advance-confirmed-to-the-cycle" title="Link to this heading"><span>¶</span></a></h3>
+<p>Worth recording separately, because it is the difference between a flow that is
+understood and one that merely works. Before measuring, the co-design track
+predicted its five-shape control would read <strong>169 / 262 / 418 / 484 / 686</strong> —
+differing from the published row at the smallest shape only, by three cycles,
+because at that shape the mapper’s program is 24 instruction words against the
+hand-written 28 with the same four dynamic issues, while the middle three picks
+are bit-identical to the canonical nest and would not differ at all.</p>
+<p>It measured <strong>169 / 262 / 418 / 484 / 686</strong>, every testbench bit-exact, at an
+unchanged 2.431 ns and unchanged resources. No tolerance was added for the three
+cycles; they are two fewer instruction fetches, measured three times.</p>
+<p>A number predicted with its mechanism and then confirmed is worth more than the
+same number measured first and explained afterwards, and the distinction is
+cheap to maintain: say it before, in the record, with the date.</p>
 <p><strong>And it is not a fix.</strong> <code class="docutils literal notranslate"><span class="pre">Kt=2</span></code> means K ≤ 8, while the scored shape is
 16x16x16 with <code class="docutils literal notranslate"><span class="pre">Kt=4</span></code>. Four address terms plus an additive term on the
 accumulate field is <strong>necessary and insufficient</strong> — a stepping mechanism is
@@ -314,6 +329,7 @@ generator leaves the instruction’s architectural meaning untouched and the
 reference model needs no change, while the same mechanism in a unit’s decode
 alters what a field value <em>means</em> and is rightly rejected. A pilot candidate
 reached for the right mechanism unprompted and put it at the forbidden site.</p>
+</section>
 </section>
 <section id="what-the-agents-actually-tried-to-get-away-with">
 <h2>What the agents actually tried to get away with<a class="headerlink" href="#what-the-agents-actually-tried-to-get-away-with" title="Link to this heading"><span>¶</span></a></h2>
@@ -489,7 +505,10 @@ a worker claimed a win it did not have.</p>
 <li><a class="reference internal" href="#">Agentic Experiments: What We Ran and What It Shows</a><ul>
 <li><a class="reference internal" href="#the-question">The question</a></li>
 <li><a class="reference internal" href="#what-is-established">What is established</a></li>
-<li><a class="reference internal" href="#a-co-design-finding-two-changes-neither-of-which-works-alone">A co-design finding: two changes, neither of which works alone</a></li>
+<li><a class="reference internal" href="#a-co-design-finding-two-changes-neither-of-which-works-alone">A co-design finding: two changes, neither of which works alone</a><ul>
+<li><a class="reference internal" href="#a-prediction-stated-in-advance-confirmed-to-the-cycle">A prediction stated in advance, confirmed to the cycle</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#what-the-agents-actually-tried-to-get-away-with">What the agents actually tried to get away with</a></li>
 <li><a class="reference internal" href="#two-kinds-of-agent-work-which-must-not-be-conflated">Two kinds of agent work, which must not be conflated</a></li>
 <li><a class="reference internal" href="#what-is-not-established">What is not established</a></li>
