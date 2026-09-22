@@ -48,6 +48,7 @@ from ._mlir.exceptions import (
 )
 
 from . import primitives as prim
+from .encoding import EncodingError, violations as encoding_violations
 from .ir.visitor import ASTContext
 from .ir.utils import MockArg, MockBuffer, parse_ast, get_global_vars
 from .ir.builder import ASTTransformer
@@ -99,6 +100,7 @@ def wrapped_apply(fn):
         # Record primitive sequences
         if fn.__name__ != "compose":
             sch.primitive_sequences.append((fn.__name__, list(args[1:]), kwargs))
+        sch.recheck_encoding(fn.__name__)
         return res
 
     return wrapper
@@ -140,6 +142,7 @@ class Schedule:
                     self.func_args[func_name] = []
         self.func_instances = func_instances
         self.systolic = check_systolic(self)
+        self.encoding = None
 
     def get_loops(self, func=None):
         if isinstance(func, str):
@@ -941,6 +944,33 @@ class Schedule:
             else []
         )
         loop.attributes["dependence"] = ArrayAttr.get(old + [DictAttr.get(entry)])
+
+    @wrapped_apply
+    def encodable_on(self, encoding):
+        """
+        Declares that this schedule must stay expressible in one instruction
+        word of ``encoding``, and checks it now and after every later
+        primitive. Raises ``allo.encoding.EncodingError``, which names every
+        offending site, the budget it exceeds and the repair.
+
+        A declaration constrains nothing that the encoding leaves unset, so
+        ``Encoding()`` is a no-op. See
+        ``docs/source/developer/extending_allo.rst``.
+
+        Parameters
+        ----------
+        encoding: allo.encoding.Encoding
+            The target's encoding budgets.
+        """
+        self.encoding = encoding
+
+    def recheck_encoding(self, after=None):
+        if self.encoding is None:
+            return
+        with self.module.context:
+            found = encoding_violations(self.module, self.encoding)
+        if found:
+            raise EncodingError(self.encoding, found, after=after)
 
     @wrapped_apply
     def parallel(self, axis):
