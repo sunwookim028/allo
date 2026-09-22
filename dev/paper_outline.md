@@ -246,6 +246,12 @@ because it is where a fair comparison is usually fudged:
   fixed-width adapter. That is independent evidence for the reading: it is
   infrastructure, not part of the machine being compared.
 
+  *Provenance: the T=8 row was run by a second synthesis session, settings
+  verified identical — every DC and mflowgen parameter, and the standard-cell
+  library by md5. Recorded because four rows from more than one build directory
+  is how a table acquires an error nobody can find later; it is not a caveat,
+  because the check removed the doubt rather than raising one.*
+
 - **The correction that runs the other way, stated in the same breath.** Our
   **sequencer stays in** at ~33k, while Gemmini has no decoder of its own
   because Rocket decodes for it — so we keep paying for something they get free
