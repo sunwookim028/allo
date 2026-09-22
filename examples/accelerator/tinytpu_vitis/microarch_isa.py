@@ -203,11 +203,16 @@ condemned the access pattern, not the configuration. Both of the design's
     `imem[NHDR + pc * IWORDS]` is a data-dependent address that Vitis can only
     burst **two words at a time**, and the fetch loop closes at II=13 instead
     of 5. This, not the operand path, was most of the 39.8.
-  * `dma_ld` opens with one variable-length burst per operand matrix, covering
-    exactly the DRAM rows the program will name -- the assembler resolves the
-    control flow and the AGU and passes the two spans in the header. Every
-    instruction afterwards is one BRAM read, and the flat row loop is back to
-    II=1 from II=4.
+  * `dma_ld` USED TO open with one variable-length burst per operand matrix,
+    covering exactly the DRAM rows the program would name, and read an on-chip
+    mirror of them afterwards. That is no longer what it does, and the reason
+    is capability rather than cycles: a mirror sized to the operand makes the
+    largest runnable shape a property of BRAM. It now reads one packed word
+    per row straight from `m_axi` at `((f1 + r) * wpr + f2) * T`, with `wpr`
+    -- the words per DRAM row -- coming from the header, which is what lets a
+    matrix be TILED INTO the addressable space instead of having to fit it.
+    See `dma_ld` and THE DRAM GEOMETRY below, and the cycles this cost and
+    bought are in the table below.
 
 Measured over the five shapes, one build each:
 
@@ -241,10 +246,32 @@ here; the probe matrix is on `docs/source/designs/tinytpu_history.rst`.
 loop bounded by `max(na, nb)` halves the burst time -- they are separate
 bundles and Vitis attributes a variable-length burst on each to the one loop --
 and it was built, measured, and changed the cosim count at all five shapes by
-exactly **zero cycles**. The operand burst is already entirely hidden behind
-the sequencer's dispatch and the units' pipeline fill, so the version that
-reads the fewest bytes is the one kept. Halving something off the critical path
-buys nothing, which is worth writing down.
+exactly **zero cycles**. The operand burst was already entirely hidden behind
+the sequencer's dispatch and the units' pipeline fill. (Both of those
+measurements are of the mirror, which is gone; they are kept because they are
+why the mirror was not defended on cycles when it was removed.)
+
+**AND THE MIRROR WAS NOT PAYING FOR ITSELF.** Its burst read whole DRAM rows,
+so it cost `MAXDIM/T` words per row the program named whatever the shape was:
+at MAXDIM=64 a 16x16x16 GEMM names 128 rows and the mirror moved 512 words to
+serve them. Reading the T bytes the instruction actually asks for is the
+strided pattern, and Vitis reports exactly what it reported in 2026 --
+`Multiple burst reads of length T` -- but there are far fewer of them.
+Measured, one build each, MAXDIM=64, this host, `-m_axi_latency` default:
+
+| shape | mirror + BRAM | per-row `m_axi` |
+|---|---|---|
+| 4x4x4    | 218 | **178** |
+| 8x8x8    | 357 | **262** |
+| 12x12x12 | 563 | **416** |
+| 16x16x8  | 677 | **478** |
+| 16x16x16 | 879 | **696** |
+
+The second column is within eleven cycles of what the MIRROR build measures at
+MAXDIM=**16** (171 / 261 / 417 / 483 / 685, `reproduce.sh`), and better than
+it at two shapes -- which says the thing plainly: the mirror made the cost of
+a shape depend on the BUILD it ran on, and addressing DRAM per row is what
+stops MAXDIM being a tax on every shape smaller than itself.
 
 **One toolchain avenue that was wrongly called closed, and is now open.**
 `config_interface -m_axi_max_widen_bitwidth 512` lets Vitis widen the 8-bit
@@ -280,7 +307,8 @@ import allo.dataflow as df
 # ---------------------------------------------------------------- the ISA ----
 # One 64-bit instruction word: a 6-bit opcode and five fields. The fields are
 # deliberately wide enough that the encoding is not the limit on problem size.
-#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:62]
+#   op [0:6]  f0 [6:18]  f1 [18:30]  f2 [30:42]  f3 [42:54]  nr [54:54+NR_BITS]
+#   -- and that is the whole 64 bits: there are no spare bits left.
 #
 # **Every field carries one more bit than its value range needs, because a
 # bit-slice USED TO BE extracted into a *signed* `ap_int<N>` in the emitted HLS:**
@@ -380,6 +408,13 @@ DMA_TO_VR = 2
 LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's loop stack
 IWORDS = 2                     # an instruction is two 64-bit words
 
+# The width of `nr`, as a build parameter, so that what one more bit costs can
+# be MEASURED rather than argued: `TPU_NR_BITS=8` rebuilds the design with the
+# field it used to have, and everything that reads the field follows this.
+NR_BITS = int(os.environ.get("TPU_NR_BITS", 10))
+NR_HI = 54 + NR_BITS
+assert 8 <= NR_BITS <= 10, "`nr` starts at bit 54 of a 64-bit instruction word"
+
 
 AGU_TERMS = 3                  # address terms per instruction
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
@@ -420,7 +455,7 @@ def enc(op, f0=0, f1=0, f2=0, f3=0, nr=0):
     levels from nesting instead of having them typed."""
     # `< (1 << (w - 1))`, not `< (1 << w)`: the top bit is the sign bit once the
     # field is extracted, see the encoding note above.
-    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, 8)):
+    for v, w in ((f0, 12), (f1, 12), (f2, 12), (f3, 12), (nr, NR_BITS)):
         assert 0 <= v < (1 << (w - 1)), (
             f"field {v} does not fit in {w - 1} usable bits "
             f"(bit {w - 1} is the sign bit after extraction)")
@@ -460,7 +495,12 @@ VW = T * 8                     # packed operand word: T int8 lanes
 AW = T * 32                    # packed accumulator word: T int32 lanes
 
 MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))     # largest M, K, N supported
-# A, B and C are **flat** at the region boundary, addressed `row * MAXDIM + col`.
+# A, B and C are **flat** at the region boundary, addressed
+# `(row * words_per_row + col_block) * T + lane`, and `words_per_row` is
+# RUNTIME data (the header), not `MAXDIM // T`. MAXDIM is therefore the largest
+# shape that fits the addressable space in ONE tile, not the largest shape the
+# machine runs: `isa_dsl.gemm_tiled` tiles a matrix of any size into it (THE
+# DRAM GEOMETRY, below).
 # That is what DRAM is, and it is what makes `wrap_io=False` legal -- it refuses
 # multi-dimensional arguments to nested kernels ("Top-level multi-dimensional
 # arrays are linearized to 1D pointers"). The design is built that way, and the
@@ -535,7 +575,15 @@ assert OPERAND_ROWS <= (1 << 11), (
     f"MAXDIM={MAXDIM} at T={T} needs {OPERAND_ROWS} operand rows, past the "
     f"2047 an 11-bit address field carries")
 
-MAXROWS = 127                                      # `nr` is 8 bits, top bit spare
+# `nr` IS 10 BITS, AND THAT FILLS THE INSTRUCTION WORD. It was 8, which left
+# bits 62 and 63 idle -- the only idle bits in the word -- and put two separate
+# ceilings at 127: the rows one instruction may name, and the TRIP COUNT of a
+# hardware loop, which shares the same field. The second is the one a tiled
+# GEMM walks into first, because its loops count TILES: 768 columns at T=4 is a
+# 192-trip loop, and 128 rows of B is a 128-row `dma_ld`. Both ceilings move to
+# 511 for the price of the two spare bits, and the word is now full -- any
+# further widening has to take bits from another field.
+MAXROWS = (1 << (NR_BITS - 1)) - 1                 # `nr`'s top bit is spare
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 
 # Instruction slots. Sized to the longest program shipped, not to a round
@@ -555,21 +603,77 @@ NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 _MAX_STATIC = 24               # longest program shipped, plus headroom
 IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
-# Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
-# largest supported shape rather than for the shape being run.
-WPR = MAXDIM // T              # packed words per DRAM row
-# Operand-burst width in packed words per loop iteration. 1 is the shipped
-# design. `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds
-# (`align_value(64)`), capped at one whole DRAM row, because rounding the row
-# span up to a multiple of that never leaves the MAXDIM x MAXDIM operand --
-# the extra words land in `rbA`/`rbB` rows no instruction of the program
-# names. Any integer may be given directly with `TPU_DMA_WORDS`.
-BUS_BYTES = 64
-DMA_WORDS = int(os.environ.get(
-    "TPU_DMA_WORDS",
-    min(WPR, max(1, BUS_BYTES // (VW // 8)))
-    if os.environ.get("TPU_DMA_WIDEN") == "1" else 1))
-assert DMA_WORDS >= 1
+# ---- THE DRAM GEOMETRY ----
+# What an operand port addresses is a CAPACITY in bytes, and the shape laid out
+# inside it is runtime data. `DRAM_WORDS` is that capacity; `Dram` below is the
+# geometry one invocation runs against, and its words-per-row reaches the units
+# through the header, exactly as the per-unit work counts do.
+#
+# It used to be neither: the ports were `int8[MAXDIM*MAXDIM]` AND `dma_ld`
+# opened by copying every row the program named into an on-chip mirror
+# (`rbA`/`rbB`, MAXDIM*MAXDIM/T packed words each), so a shape had to FIT the
+# addressable space rather than be tiled into it, and the mirror made that a
+# hard on-chip bound rather than a merely encoded one. A 128x768x768 GEMM is
+# 576 KB of B alone; no widening of an address field reaches it and no
+# scratchpad holds it. Tiling does, and tiling needs exactly this: a base and a
+# stride the PROGRAM supplies.
+DRAM_WORDS = int(os.environ.get("TPU_DRAM", MAXDIM * MAXDIM))
+WPR = MAXDIM // T              # packed words per DRAM row of the square default
+
+
+class Dram:
+    """The DRAM geometry one invocation runs against: the shape of each operand.
+
+    A program names `(matrix, row, column block)`; what turns that into an
+    address is `words_per_row`, and this is where it comes from. It is data --
+    `assemble` puts it in the header and `dma_ld`/`dma_st` read it there -- so
+    one RTL build runs every geometry, exactly as it already ran every shape.
+
+    `Dram.square(MAXDIM)` is the default everywhere, which is the geometry
+    every program written before this existed was assuming.
+    """
+
+    __slots__ = ("a", "b", "c")
+
+    def __init__(self, a, b, c):
+        for rows, cols in (a, b, c):
+            if cols % T:
+                raise ProgramError(
+                    f"a DRAM row of {cols} int8 is not a whole number of "
+                    f"{T}-lane packed words")
+            if rows * cols > DRAM_WORDS:
+                raise ProgramError(
+                    f"a {rows}x{cols} operand is {rows * cols} bytes, past the "
+                    f"DRAM_WORDS={DRAM_WORDS} an operand port addresses")
+        self.a, self.b, self.c = tuple(a), tuple(b), tuple(c)
+
+    @staticmethod
+    def square(n=None):
+        n = MAXDIM if n is None else n
+        return Dram((n, n), (n, n), (n, n))
+
+    @staticmethod
+    def gemm(M, K, N):
+        """The geometry of `C[M, N] = A[M, K] @ B[K, N]`, row-major and packed
+        -- no padding to a square, which is the point of having a geometry."""
+        return Dram((M, K), (K, N), (M, N))
+
+    def wpr(self, which):
+        return self[which][1] // T
+
+    def __getitem__(self, which):
+        return (self.a, self.b, self.c)[which]
+
+    def __eq__(self, other):
+        return (isinstance(other, Dram)
+                and (self.a, self.b, self.c) == (other.a, other.b, other.c))
+
+    def __repr__(self):
+        return f"Dram(A{self.a}, B{self.b}, C{self.c})"
+
+
+DEFAULT_DRAM = Dram.square()   # what every program assumed before `Dram`
+
 A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)
 B_SP = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
 AR_C = 0                       # the accumulator, up to MAXDIM words
@@ -582,9 +686,9 @@ assert IMEM_SIZE % 8 == 0, "the program prefetch moves 8 words per iteration"
 @df.region()
 def tinytpu_isa(
     imem: UInt(64)[IMEM_SIZE],
-    A: int8[MAXDIM * MAXDIM],
-    B: int8[MAXDIM * MAXDIM],
-    C: int8[MAXDIM * MAXDIM],
+    A: int8[DRAM_WORDS],
+    B: int8[DRAM_WORDS],
+    C: int8[DRAM_WORDS],
 ):
     # Control: the decoded instruction word, one point-to-point queue per unit.
     # The sequencer sends each unit only the instructions it executes, in
@@ -665,7 +769,7 @@ def tinytpu_isa(
                 ib[8 * i + e8] = l_imem[8 * i + e8]
 
         iw: UInt(64) = ib[0]
-        n_instr: int32 = iw[0:16]
+        n_instr: int32 = iw[0:32]
 
         c_dld.put(ib[1])
         c_dld.put(ib[7])
@@ -674,6 +778,7 @@ def tinytpu_isa(
         c_vru.put(ib[3])
         c_acc.put(ib[5])
         c_dst.put(ib[6])
+        c_dst.put(ib[7])
 
         lp_start: int32[LOOP_DEPTH] = 0
         lp_iv: int32[LOOP_DEPTH] = 0
@@ -687,7 +792,7 @@ def tinytpu_isa(
             w0: UInt(64) = ib[NHDR + pc * IWORDS]
             w1: UInt(64) = ib[NHDR + pc * IWORDS + 1]
             op: int32 = w0[0:6]
-            nr: int32 = w0[54:62]
+            nr: int32 = w0[54:NR_HI]
 
             if op == OP_LOOP:
                 lp_start[sp] = pc + 1
@@ -742,14 +847,14 @@ def tinytpu_isa(
                     c_vru.put(rw)
                 if op == OP_MM:
                     ws: UInt(64) = rw
-                    ws[54:62] = T + 1
+                    ws[54:NR_HI] = T + 1
                     ws[18:30] = nr
                     c_spm.put(ws)
                     c_vru.put(rw)
                     c_acc.put(rw)
                 if op == OP_VADD:
                     wv: UInt(64) = rw
-                    wv[54:62] = nr * 2
+                    wv[54:NR_HI] = nr * 2
                     c_acc.put(wv)
                 if op == OP_VRELU:
                     c_acc.put(rw)
@@ -762,7 +867,7 @@ def tinytpu_isa(
                 running = 0
 
     @df.kernel(mapping=[1], args=[A, B])
-    def dma_ld(lA: int8[MAXDIM * MAXDIM], lB: int8[MAXDIM * MAXDIM]):
+    def dma_ld(lA: int8[DRAM_WORDS], lB: int8[DRAM_WORDS]):
         """DRAM -> scratchpad or operand vregs. Sole reader of A and B.
 
         Split from the store unit deliberately: a single unit doing both put
@@ -770,14 +875,31 @@ def tinytpu_isa(
         body variant tried. Gemmini splits the same way (`LoadController` /
         `StoreController`).
 
-        **Two variable-length bursts, then every instruction runs from BRAM.**
-        A per-row strided read, `lA[(f1 + r) * MAXDIM + f2 * T + e]`, is a
-        separate four-beat AXI transaction per row (`[HLS 214-115] Multiple
-        burst reads of length 4`, `Final II = 4`); a contiguous sweep with a
-        runtime trip count is one real burst. So the unit opens with one burst
-        per operand matrix covering exactly the DRAM rows the program names --
-        `na`/`nb` come from the assembler -- packing T lanes per word as it
-        goes, and each row afterwards is one BRAM read.
+        **One packed word per row, at an address the program computes.** The
+        row is `f1 + r`, the column block is `f2`, and the words per row come
+        from the header, so the address is
+
+            ((f1 + r) * wpr + f2) * T + lane
+
+        with `wpr` runtime data. That last property is the whole of the
+        capability: a matrix no longer has to FIT the addressable space, it is
+        tiled into it, because the program says where each tile is.
+
+        This unit used to open by copying every DRAM row the program named
+        into an on-chip mirror and reading the mirror afterwards -- one
+        contiguous variable-length burst, which Vitis turns into a real AXI
+        transaction, against the per-row strided read here, which it reports
+        as `[HLS 214-115] Multiple burst reads of length T`. The mirror is
+        gone for two reasons, and only the first is about capability:
+
+          * it sized an on-chip buffer to the OPERAND (MAXDIM*MAXDIM/T packed
+            words), so the largest runnable shape was bounded by BRAM and not
+            merely by an address field;
+          * it read whole DRAM rows. A tiled GEMM names ONE column block of
+            each row it touches, so mirroring the row over-fetches by
+            `wpr` -- 192x at K=768, T=4. Even at the published shapes it
+            over-fetched by MAXDIM/shape: 512 mirror iterations at 16x16x16
+            on a MAXDIM=64 build, against 128 rows the program actually reads.
 
         **Where a row goes is the instruction's.** `f0` bit 0 picks the source
         matrix, bit 1 the destination: the scratchpad (`dma2sp`), or the
@@ -787,51 +909,15 @@ def tinytpu_isa(
         scratchpad, where `spm` streams it into the array as weights.
 
         One flat loop over rows, the instruction fetched on the iteration that
-        needs it (the ROW-FLATTENING note above); the burst loops sit outside
-        it on purpose."""
+        needs it (the ROW-FLATTENING note above). The two matrices are read in
+        separate arms of the mux: they are separate `m_axi` bundles, so that
+        is one reader per port rather than the two-readers-on-one-memory trap
+        the flattening note warns about."""
         nw: UInt(64) = c_dld.get()
-        n_row: int32 = nw[0:16]
-        sw: UInt(64) = c_dld.get()  # the DRAM row span of each source matrix
-        na: int32 = sw[0:16]
-        nb: int32 = sw[16:32]
-
-        # One burst per matrix, each covering exactly that matrix's own span.
-        # Merging the two into one loop bounded by `max(na, nb)` was measured
-        # and moved nothing: the bursts are hidden behind the prefetch.
-        #
-        # BURST WIDTH IS PARAMETRIC (`TPU_DMA_WIDEN`, default off). At
-        # DMA_WORDS=1 this is the shipped loop, one packed word an iteration.
-        # Above 1 each iteration reads DMA_WORDS whole words -- up to a
-        # 64-byte beat, which is what `align_value(64)` lets Vitis widen the
-        # port to -- so the burst costs a factor of DMA_WORDS fewer
-        # iterations. Written as a `meta_for` inside a runtime loop, so the
-        # inner copy unrolls and the trip count stays runtime data.
-        #
-        # Kept parametric rather than landed because it is a real trade and
-        # the measurement that would decide it is not the one it was found
-        # with: it was found at `-m_axi_latency 0`, and a change whose whole
-        # benefit is wider DMA bursts is exactly the kind whose advantage can
-        # grow or vanish with memory latency. The grid is in
-        # `docs/source/designs/benchmarks.rst`; the original candidate is
-        # `chia_agent/evidence/isa-run1-20260919/param_burst.diff`.
-        rbA: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
-        rbB: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
-        ga_n: int32 = (na * WPR + (DMA_WORDS - 1)) // DMA_WORDS
-        for ga in range(ga_n):
-            with allo.meta_for(DMA_WORDS) as wa:
-                pa: UInt(VW) = 0
-                with allo.meta_for(T) as e:
-                    av: int8 = lA[(ga * DMA_WORDS + wa) * T + e]
-                    pa[8 * e : 8 * (e + 1)] = av
-                rbA[ga * DMA_WORDS + wa] = pa
-        gb_n: int32 = (nb * WPR + (DMA_WORDS - 1)) // DMA_WORDS
-        for gb in range(gb_n):
-            with allo.meta_for(DMA_WORDS) as wb:
-                pb: UInt(VW) = 0
-                with allo.meta_for(T) as e2:
-                    bv: int8 = lB[(gb * DMA_WORDS + wb) * T + e2]
-                    pb[8 * e2 : 8 * (e2 + 1)] = bv
-                rbB[gb * DMA_WORDS + wb] = pb
+        n_row: int32 = nw[0:32]
+        gw: UInt(64) = c_dld.get()  # packed words per DRAM row, per matrix
+        wpr_a: int32 = gw[0:16]
+        wpr_b: int32 = gw[16:32]
 
         f0: int32 = 0
         f1: int32 = 0
@@ -846,13 +932,21 @@ def tinytpu_isa(
                 f0 = w0[6:18]
                 f1 = w0[18:30]
                 f2 = w0[30:42]
-                cnt = w0[54:62]
+                cnt = w0[54:NR_HI]
                 r = 0
+            wpr: int32 = wpr_a
+            if (f0 & DMA_SRC_B) != 0:
+                wpr = wpr_b
+            addr: int32 = ((f1 + r) * wpr + f2) * T
             pw: UInt(VW) = 0
             if (f0 & DMA_SRC_B) == 0:
-                pw = rbA[(f1 + r) * WPR + f2]
+                with allo.meta_for(T) as e:
+                    av: int8 = lA[addr + e]
+                    pw[8 * e : 8 * (e + 1)] = av
             else:
-                pw = rbB[(f1 + r) * WPR + f2]
+                with allo.meta_for(T) as e2:
+                    bv: int8 = lB[addr + e2]
+                    pw[8 * e2 : 8 * (e2 + 1)] = bv
             if f0 >= DMA_TO_VR:
                 dma2vr.put(pw)
             else:
@@ -885,11 +979,21 @@ def tinytpu_isa(
         `sequencer`)."""
         spad: UInt(VW)[SPAD_ROWS]
         nw: UInt(64) = c_spm.get()
-        n_row: int32 = nw[0:16]
+        n_row: int32 = nw[0:32]
         mw: UInt(64) = c_spm.get()
+        # The array's two trip counts, ONE PER CHAIN WORD. They used to share
+        # one packed word, 16 bits each -- and a packed word is T*8 bits, so at
+        # T=4 that capped a program at 32767 wavefront rows however it was
+        # tiled: 128x128x128 needs 131072. A second word down the same chain
+        # costs one cycle here and one hop in each `wld`, and it is the only
+        # place in the design where a count is bounded by T rather than by a
+        # header slice.
         nmo: UInt(VW) = 0
-        nmo[0:32] = mw[0:32]        # mm count | wavefront rows << 16
+        nmo[0:31] = mw[0:31]        # how many `mm`s
         wcol[0].put(nmo)
+        nro: UInt(VW) = 0
+        nro[0:31] = mw[32:63]       # how many wavefront rows in total
+        wcol[0].put(nro)
         op: int32 = 0
         f1: int32 = 0
         f3: int32 = 0
@@ -902,7 +1006,7 @@ def tinytpu_isa(
                 op = w0[0:6]
                 f1 = w0[18:30]
                 f3 = w0[42:54]
-                cnt = w0[54:62]
+                cnt = w0[54:NR_HI]
                 r = 0
             ra: int32 = f1 + r
             if op == OP_MM:
@@ -942,7 +1046,7 @@ def tinytpu_isa(
         ONE `vr` read and ONE `vr` write per iteration, each at a muxed address
         (and the write from a muxed source), holds II=1."""
         nw: UInt(64) = c_vru.get()
-        n_word: int32 = nw[0:16]
+        n_word: int32 = nw[0:32]
         vr: UInt(VW)[NVR]
         op: int32 = 0
         f0: int32 = 0
@@ -956,7 +1060,7 @@ def tinytpu_isa(
                 op = w0[0:6]
                 f0 = w0[6:18]
                 f3 = w0[42:54]
-                cnt = w0[54:62]
+                cnt = w0[54:NR_HI]
                 r = 0
             if op == OP_MM:
                 vv: UInt(VW) = vr[f0 + r]
@@ -995,9 +1099,18 @@ def tinytpu_isa(
             nmw = wrow[i, j - 1].get()
         with allo.meta_if(j != T - 1):
             wrow[i, j].put(nmw)
-        nmm: int32 = nmw[0:16]
+        nrw: UInt(VW) = 0
+        with allo.meta_if(j == 0):
+            nrw = wcol[i].get()
+            with allo.meta_if(i != T - 1):
+                wcol[i + 1].put(nrw)
+        with allo.meta_else():
+            nrw = wrow[i, j - 1].get()
+        with allo.meta_if(j != T - 1):
+            wrow[i, j].put(nrw)
+        nmm: int32 = nmw[0:31]
         tq: UInt(32) = 0
-        tq[0:16] = nmw[16:32]       # the PE's own trip count: wavefront rows
+        tq[0:31] = nrw[0:31]        # the PE's own trip count: wavefront rows
         wq[i, j].put(tq)
         for c in range(nmm):
             hdr: UInt(VW) = 0
@@ -1038,7 +1151,7 @@ def tinytpu_isa(
         adder latencies are pipeline depth, not initiation interval."""
         i, j = df.get_pid()
         tq: UInt(32) = wq[i, j].get()
-        nt: int32 = tq[0:16]
+        nt: int32 = tq[0:31]
         w: int8 = 0
         cnt: int32 = 0
         r: int32 = -1               # advanced at the TOP: see the II note
@@ -1116,7 +1229,7 @@ def tinytpu_isa(
         docs/source/designs/tinytpu_history.rst)."""
         ar: UInt(AW)[NAR]
         nw: UInt(64) = c_acc.get()
-        n_row: int32 = nw[0:16]
+        n_row: int32 = nw[0:32]
         op: int32 = 0
         f0: int32 = 0
         f1: int32 = 0
@@ -1132,7 +1245,7 @@ def tinytpu_isa(
                 f0 = w0[6:18]
                 f1 = w0[18:30]
                 f2 = w0[30:42]
-                cnt = w0[54:62]
+                cnt = w0[54:NR_HI]
                 r = 0
             rr: int32 = r
             ph: int32 = 0
@@ -1194,7 +1307,7 @@ def tinytpu_isa(
                 ar[wa] = z
 
     @df.kernel(mapping=[1], args=[C])
-    def dma_st(lC: int8[MAXDIM * MAXDIM]):
+    def dma_st(lC: int8[DRAM_WORDS]):
         """Accumulator -> DRAM. Sole writer of C.
 
         Declared **last on purpose**. Allo emits the process calls in
@@ -1206,7 +1319,9 @@ def tinytpu_isa(
         are concurrent -- but it decides whether `csim` works, and `csim` is the
         fast functional check."""
         nw: UInt(64) = c_dst.get()
-        n_row: int32 = nw[0:16]
+        n_row: int32 = nw[0:32]
+        gw: UInt(64) = c_dst.get()  # packed words per DRAM row of C
+        wpr_c: int32 = gw[32:48]
         f1: int32 = 0
         f2: int32 = 0
         cnt: int32 = 0
@@ -1218,12 +1333,13 @@ def tinytpu_isa(
                 w0: UInt(64) = c_dst.get()
                 f1 = w0[18:30]
                 f2 = w0[30:42]
-                cnt = w0[54:62]
+                cnt = w0[54:NR_HI]
                 r = 0
+            addr: int32 = ((f1 + r) * wpr_c + f2) * T
             qw: UInt(VW) = ac2sp.get()
             with allo.meta_for(T) as e:
                 ov: int8 = qw[8 * e : 8 * (e + 1)]
-                lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
+                lC[addr + e] = ov
 
 def gemm_program_handwritten(M, K, N, relu=False):
     """Tiled GEMM as a program with **control flow**, hand-emitted.
@@ -1375,7 +1491,7 @@ def _trace(prog):
         w0, w1 = prog[pc]
         op = w0 & 0x3F
         if op == OP_LOOP:
-            trip = (w0 >> 54) & 0xFF
+            trip = (w0 >> 54) & ((1 << NR_BITS) - 1)
             iv_now[len(stack)] = 0
             stack.append([pc + 1, 0, trip])
             pc += 1
@@ -1397,7 +1513,7 @@ def _trace(prog):
                 st = (w1 >> (base + 7)) & 0xFFF
                 if tw != 0:
                     f[tw - 1] += iv_now[lw] * st
-            yield (pc, tuple(iv_now[:len(stack)]), op, (w0 >> 54) & 0xFF,
+            yield (pc, tuple(iv_now[:len(stack)]), op, (w0 >> 54) & ((1 << NR_BITS) - 1),
                    f[0], f[1], f[2], f[3])
             pc += 1
 
@@ -1411,8 +1527,12 @@ _OPNAME = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
            OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop"}
 
 
-def check_program(prog):
+def check_program(prog, dram=None):
     """Reject a program the hardware cannot run correctly. Called by `assemble`.
+
+    `dram` is the geometry the program is to run against (`Dram.gemm(M, K, N)`
+    for a tiled GEMM); the square `MAXDIM` default is what every program
+    written before geometry existed assumed.
 
     **Static, and exact rather than conservative.** The program has no
     data-dependent control flow -- trip counts and AGU strides are instruction
@@ -1448,6 +1568,7 @@ def check_program(prog):
 
     Raises `ProgramError` naming the static instruction, the loop iteration,
     and the rows; returns None."""
+    dram = DEFAULT_DRAM if dram is None else dram
     if not prog:
         raise ProgramError("empty program")
     depth = 0
@@ -1460,7 +1581,7 @@ def check_program(prog):
         if op == OP_LOOP:
             if depth >= LOOP_DEPTH:
                 raise ProgramError(f"{where}: nesting exceeds LOOP_DEPTH={LOOP_DEPTH}")
-            if (w0 >> 54) & 0xFF < 1:
+            if (w0 >> 54) & ((1 << NR_BITS) - 1) < 1:
                 raise ProgramError(f"{where}: trip count 0 still runs the body once")
             depth += 1
         elif op == OP_ENDLOOP:
@@ -1532,9 +1653,12 @@ def check_program(prog):
             if f0 not in (0, 1, 2, 3):
                 raise ProgramError(f"{where}: f0={f0}, must be source (0 A, 1 B) "
                                    f"| destination (0 spad, 2 vr)")
-            if f2 >= WPR or f1 + nr > MAXDIM:
-                raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
-                                   f"col block {f2} outside the {MAXDIM}x{MAXDIM} operand")
+            src = 1 if f0 & DMA_SRC_B else 0
+            rows, cols = dram[src]
+            if f2 >= cols // T or f1 + nr > rows:
+                raise ProgramError(
+                    f"{where}: DRAM rows {f1}..{f1 + nr - 1}, col block {f2} "
+                    f"outside the {rows}x{cols} {'B' if src else 'A'}")
             for r in span("vr" if f0 & DMA_TO_VR else "spad", f3, nr):
                 written["vr" if f0 & DMA_TO_VR else "spad"][r] = True
         elif op == OP_VLD:
@@ -1569,21 +1693,27 @@ def check_program(prog):
             for i, r in enumerate(span("ar", f0, nr)):
                 ar_read(r, it + i, "the value to retire")
             it += nr
-            if f2 >= WPR or f1 + nr > MAXDIM:
+            rows, cols = dram[2]
+            if f2 >= cols // T or f1 + nr > rows:
                 raise ProgramError(f"{where}: C rows {f1}..{f1 + nr - 1}, col "
-                                   f"block {f2} outside the {MAXDIM}x{MAXDIM} result")
+                                   f"block {f2} outside the {rows}x{cols} result")
 
 
-def assemble(prog, check=True):
+def assemble(prog, dram=None, check=True):
     """Two words per instruction, behind a header of dynamic per-unit counts.
 
-        imem[0] static instruction count   imem[4] mm count | mm rows << 16
+        imem[0] static instruction count   imem[4] mm count | mm rows << 32
         imem[1] dma_ld  rows               imem[5] accu   iterations
         imem[2] spm     rows               imem[6] dma_st rows
-        imem[3] vru     rows               imem[7] A rows | B rows << 16
+        imem[3] vru     rows               imem[7] the DRAM geometry
 
     imem[0] bounds the sequencer's fetch; every other count is dynamic, from
     `expand`. They must match the sequencer's dispatch rules exactly.
+
+    **imem[7] is the geometry, not a count**: packed words per DRAM row of A,
+    B and C, three 16-bit fields. It is what makes a tiled matmul addressable
+    -- `dma_ld` and `dma_st` multiply by it -- and it replaced the row spans
+    the on-chip operand mirror used to need, which went with the mirror.
 
     **These are work counts, not instruction counts.** Each unit runs one flat
     loop over the rows (or words, or iterations) it will actually process, so
@@ -1604,8 +1734,9 @@ def assemble(prog, check=True):
     only so a test can put a known-bad program on the machine and watch it
     fail; nothing that ships passes it.
     """
+    dram = DEFAULT_DRAM if dram is None else dram
     if check:
-        check_program(prog)
+        check_program(prog, dram)
     ev = expand(prog)
 
     def rows(*ops):
@@ -1614,35 +1745,40 @@ def assemble(prog, check=True):
     def count(*ops):
         return sum(1 for e in ev if e[0] in ops)
 
-    def span(src):
-        # The DRAM row span `dma_ld` must burst for one source matrix: the
-        # highest row any of its `dma_ld`s names, after the AGU is resolved.
-        return max([e[3] + e[1] for e in ev
-                    if e[0] == OP_DMA_LD and (e[2] & DMA_SRC_B) == src] + [0])
-
-    a_span, b_span = span(0), span(1)
-    assert a_span <= MAXDIM and b_span <= MAXDIM, (
-        f"dma_ld row span {a_span}/{b_span} exceeds MAXDIM={MAXDIM}")
+    geom = 0
+    for which in range(3):
+        w = dram.wpr(which)
+        assert 0 < w < (1 << 15), (
+            f"{w} packed words per DRAM row does not fit the 15 usable bits "
+            f"of a geometry field")
+        geom |= w << (16 * which)
 
     n_mm = count(OP_MM)
     mm_rows = rows(OP_MM)
-    assert n_mm < (1 << 15) and mm_rows < (1 << 15), "array counts overflow"
+    # THE ARRAY'S OWN CEILING, and it is the one ceiling tiling does not move:
+    # `spm` hands the array its two trip counts in ONE packed operand word
+    # (`nmo`, VW = T*8 bits), 16 bits each at T=4. Everything else here is a
+    # 32-bit header slice.
+    assert n_mm < (1 << 31) and mm_rows < (1 << 31), (
+        f"{n_mm} mm / {mm_rows} mm rows: the array's counts travel one per "
+        f"chain word, 31 usable bits each")
     ld_vr = sum(e[1] for e in ev if e[0] == OP_DMA_LD and e[2] & DMA_TO_VR)
     ld_sp = rows(OP_DMA_LD) - ld_vr
     hdr = [len(prog),
            rows(OP_DMA_LD),
            ld_sp + rows(OP_VLD) + n_mm * (T + 1),
            ld_vr + rows(OP_VLD) + mm_rows,
-           n_mm | (mm_rows << 16),
+           n_mm | (mm_rows << 32),
            rows(OP_MM, OP_VRELU, OP_MVOUT) + 2 * rows(OP_VADD),
            rows(OP_MVOUT),
-           a_span | (b_span << 16)]
+           geom]
     assert len(hdr) == NHDR
-    # Every count is read back through a 16-bit slice, which used to extract
-    # to a signed ap_int<16>, so the usable range stops at 2^15 - 1 (see the
-    # encoding note at the top of the file; the spare bit is kept).
-    for h in hdr[1:4] + hdr[5:7]:
-        assert 0 <= h < (1 << 15), f"header count {h} does not fit 15 bits"
+    # Every per-unit count is read back through a 32-bit slice, so the usable
+    # range stops at 2^31 - 1 (the spare-bit rule at the top of the file). It
+    # was a 16-bit slice, and a tiled GEMM walks past 32767 rows the moment it
+    # is worth tiling: 128x768x768 charges `accu` 4.7 million iterations.
+    for h in hdr[0:4] + hdr[5:7]:
+        assert 0 <= h < (1 << 31), f"header count {h} does not fit 31 bits"
     words = list(hdr)
     for w0, w1 in prog:
         words.append(int(w0))

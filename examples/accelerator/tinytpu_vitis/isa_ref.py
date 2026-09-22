@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_VLD, OP_MM, OP_VADD, OP_VRELU, OP_MVOUT,
     DMA_SRC_B, DMA_TO_VR,
-    MAXDIM, T, SPAD_ROWS, NVR, NAR, check_program, expand,
+    DEFAULT_DRAM, T, SPAD_ROWS, NVR, NAR, check_program, expand,
 )
 
 
@@ -36,13 +36,20 @@ def _wrap32(x):
     return ((np.asarray(x, np.int64) + (1 << 31)) % (1 << 32) - (1 << 31))
 
 
-def run(prog, A, B, C):
-    """Execute `prog` on flat int8 `A`, `B`, `C` (MAXDIM*MAXDIM each).
-    Returns the new `C`; the arguments are not modified."""
-    check_program(prog)
-    A = np.asarray(A, np.int8).reshape(MAXDIM, MAXDIM)
-    B = np.asarray(B, np.int8).reshape(MAXDIM, MAXDIM)
-    C = np.array(C, np.int8).reshape(MAXDIM, MAXDIM)
+def run(prog, A, B, C, dram=None):
+    """Execute `prog` on flat int8 `A`, `B`, `C`, laid out as `dram` says.
+    Returns the new `C`; the arguments are not modified.
+
+    `dram` is the geometry, and it is the ONLY thing the reference model needed
+    when the DMA paths gained a runtime stride -- because a stride resolved in
+    the address generator leaves every instruction's meaning alone. A stride
+    resolved in a unit's decode would have changed what a field value means,
+    and this model would have had to change with it."""
+    dram = DEFAULT_DRAM if dram is None else dram
+    check_program(prog, dram)
+    A = np.asarray(A, np.int8).reshape(dram.a)
+    B = np.asarray(B, np.int8).reshape(dram.b)
+    C = np.array(C, np.int8).reshape(dram.c)
     spad = np.zeros((SPAD_ROWS, T), np.int64)   # one row = T int8 lanes
     vr = np.zeros((NVR, T), np.int64)
     ar = np.zeros((NAR, T), np.int64)           # one row = T int32 lanes

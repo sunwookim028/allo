@@ -35,15 +35,15 @@ from examples.accelerator.tinytpu_vitis import microarch_isa as U  # noqa: E402
 T = U.T
 
 
-def build(prog):
-    words = U.assemble(prog)
+def build(prog, dram=None):
+    words = U.assemble(prog, dram)
     hdr = words[:U.NHDR]
     dyn = U.expand(prog)
 
     def seq():
         for ch, w in (("c_dld", hdr[1]), ("c_dld", hdr[7]), ("c_spm", hdr[2]),
                       ("c_spm", hdr[4]), ("c_vru", hdr[3]), ("c_acc", hdr[5]),
-                      ("c_dst", hdr[6])):
+                      ("c_dst", hdr[6]), ("c_dst", hdr[7])):
             yield ("put", ch, w)
         for op, nr, f0, f1, f2, f3 in dyn:
             if op == U.OP_DMA_LD:
@@ -79,17 +79,18 @@ def build(prog):
             yield from body(word, r)
 
     def dma_ld():
-        n_row = (yield ("get", "c_dld")) & 0xFFFF
-        yield ("get", "c_dld")                       # the A/B spans
+        n_row = (yield ("get", "c_dld")) & 0xFFFFFFFF
+        yield ("get", "c_dld")                       # the DRAM geometry
 
         def body(word, r):
             yield ("put", "dma2vr" if word[2] & U.DMA_TO_VR else "dma2sp", 0)
         yield from flat("c_dld", n_row, body)
 
     def spm():
-        n_row = (yield ("get", "c_spm")) & 0xFFFF
+        n_row = (yield ("get", "c_spm")) & 0xFFFFFFFF
         mw = yield ("get", "c_spm")
-        yield ("put", "wcol0", (mw & 0xFFFF, mw >> 16))   # the array's counts
+        yield ("put", "wcol0", mw & 0xFFFFFFFF)           # how many `mm`s
+        yield ("put", "wcol0", mw >> 32)                  # how many rows
 
         def body(word, r):
             op = word[0]
@@ -104,7 +105,7 @@ def build(prog):
         yield from flat("c_spm", n_row, body)
 
     def vru():
-        n_word = (yield ("get", "c_vru")) & 0xFFFF
+        n_word = (yield ("get", "c_vru")) & 0xFFFFFFFF
 
         def body(word, r):
             op = word[0]
@@ -125,7 +126,8 @@ def build(prog):
         return v
 
     def wld(i, j):
-        nmm, nrows = yield from chain_in(i, j)
+        nmm = yield from chain_in(i, j)
+        nrows = yield from chain_in(i, j)
         yield ("put", f"wq{i}_{j}", nrows)                   # the PE's trip
         for _ in range(nmm):
             rows = yield from chain_in(i, j)                  # header
@@ -166,7 +168,7 @@ def build(prog):
                 yield ("put", f"a_fwd{i}_{j}", 0)
 
     def accu():
-        n_row = (yield ("get", "c_acc")) & 0xFFFF
+        n_row = (yield ("get", "c_acc")) & 0xFFFFFFFF
 
         def body(word, r):
             if word[0] == U.OP_MM:
@@ -176,7 +178,8 @@ def build(prog):
         yield from flat("c_acc", n_row, body)
 
     def dma_st():
-        n_row = (yield ("get", "c_dst")) & 0xFFFF
+        n_row = (yield ("get", "c_dst")) & 0xFFFFFFFF
+        yield ("get", "c_dst")                       # the DRAM geometry
 
         def body(word, r):
             yield ("get", "ac2sp")
@@ -196,10 +199,10 @@ def depth(ch, QD):
     return min(QD, 4) if ch.startswith("wq") else QD
 
 
-def run(prog, QD=U.QD):
+def run(prog, dram=None, QD=U.QD):
     """-> (True, None) if the program runs to completion with every channel
     drained, else (False, report lines)."""
-    procs = build(prog)
+    procs = build(prog, dram)
     q = collections.defaultdict(collections.deque)
     pending = {n: None for n in procs}
     recv = {n: None for n in procs}
