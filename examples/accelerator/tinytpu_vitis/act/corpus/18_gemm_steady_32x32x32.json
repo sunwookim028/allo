@@ -1,0 +1,50 @@
+{
+  "name": "gemm_steady_32x32x32",
+  "stresses": "the steady-state set's first rung: eight times the MACs of the headline shape, so the fixed pipeline term stops dominating and MACs per cycle starts to characterise the machine rather than its latency",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 32,
+    "k": 32,
+    "n": 32
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

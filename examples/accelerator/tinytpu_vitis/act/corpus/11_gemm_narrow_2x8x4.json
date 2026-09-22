@@ -1,0 +1,50 @@
+{
+  "name": "gemm_narrow_2x8x4",
+  "stresses": "M=2 is below AR_RAW_DIST=4, so the obvious program is rejected for legality rather than for arithmetic: rows must be padded to 4 and only 2 retired",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 2,
+    "k": 8,
+    "n": 4
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

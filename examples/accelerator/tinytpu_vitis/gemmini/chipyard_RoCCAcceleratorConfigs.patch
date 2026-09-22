@@ -1,8 +1,8 @@
 diff --git a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
-index 7b2de98c..8fbd8c1a 100644
+index 7b2de98c..9629e6b5 100644
 --- a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
 +++ b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
-@@ -14,6 +14,15 @@ class GemminiRocketConfig extends Config(
+@@ -14,6 +14,23 @@ class GemminiRocketConfig extends Config(
    new chipyard.config.AbstractConfig)
  // DOC include end: GemminiRocketConfig
  
@@ -11,6 +11,14 @@ index 7b2de98c..8fbd8c1a 100644
 +// the Allo TinyTPU comparison (see gemmini.GemminiCustomConfigs.int8Dim4Config).
 +class Int8Dim4GemminiRocketConfig extends Config(
 +  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim4Config) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new chipyard.config.AbstractConfig)
++
++// int8/int32 Gemmini at DIM=8 -- the second array-size-matched baseline, for
++// TinyTPU-isa built at T=8 (see gemmini.GemminiCustomConfigs.int8Dim8Config).
++class Int8Dim8GemminiRocketConfig extends Config(
++  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim8Config) ++
 +  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
 +  new chipyard.config.WithSystemBusWidth(128) ++
 +  new chipyard.config.AbstractConfig)

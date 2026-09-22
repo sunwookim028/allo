@@ -475,7 +475,7 @@ GCC 8 only. The conda ``allo`` env includes the newer ``libstdc++``, but it must
 
 .. code-block:: bash
 
-   export LD_LIBRARY_PATH="/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/lib:$LD_LIBRARY_PATH"
+   export LD_LIBRARY_PATH="/path/to/miniconda3/envs/allo/lib:$LD_LIBRARY_PATH"
    conda activate allo
 
 For a permanent fix, add to ``~/.bashrc`` on zhang-21:
@@ -483,13 +483,13 @@ For a permanent fix, add to ``~/.bashrc`` on zhang-21:
 .. code-block:: bash
 
    if [[ "$(hostname)" == "zhang-21.ece.cornell.edu" ]]; then
-       CONDA_ENV_LIB="/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/lib"
+       CONDA_ENV_LIB="/path/to/miniconda3/envs/allo/lib"
        export LD_LIBRARY_PATH="$CONDA_ENV_LIB:$LD_LIBRARY_PATH"
    fi
 
 Or use the wrapper at the repository root, ``./run_allo.sh python my_script.py``, which sets
 this automatically (it also prepends a hard-coded ``mlir/build/tools/allo/_mlir`` path under
-``/work/shared/users/phd/sk3463/projects/allo``; edit both paths for another checkout).
+``/path/to/allo``; edit both paths for another checkout).
 
 **LLVM build.** The ``.so`` files in ``allo/_mlir/_mlir_libs/`` must be built against an LLVM that
 is compatible with RHEL 8's glibc (the ``build-rhel8`` LLVM), not one compiled on a glibc 2.35 host;

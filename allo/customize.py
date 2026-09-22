@@ -48,6 +48,12 @@ from ._mlir.exceptions import (
 )
 
 from . import primitives as prim
+from .dependence import (
+    Claim,
+    accept as accept_dependence_claim,
+    recheck as recheck_dependence_claims,
+)
+from .encoding import EncodingError, violations as encoding_violations
 from .ir.visitor import ASTContext
 from .ir.utils import MockArg, MockBuffer, parse_ast, get_global_vars
 from .ir.builder import ASTTransformer
@@ -99,6 +105,8 @@ def wrapped_apply(fn):
         # Record primitive sequences
         if fn.__name__ != "compose":
             sch.primitive_sequences.append((fn.__name__, list(args[1:]), kwargs))
+        sch.recheck_encoding(fn.__name__)
+        sch.recheck_dependence(fn.__name__)
         return res
 
     return wrapper
@@ -140,6 +148,8 @@ class Schedule:
                     self.func_args[func_name] = []
         self.func_instances = func_instances
         self.systolic = check_systolic(self)
+        self.encoding = None
+        self.dependence_obligations = []
 
     def get_loops(self, func=None):
         if isinstance(func, str):
@@ -803,7 +813,7 @@ class Schedule:
         allo_d.ReshapeOp(memref_type, target.result, ip=self.ip)
 
     @wrapped_apply
-    def pipeline(self, axis, initiation_interval=1, rewind=False):
+    def pipeline(self, axis, initiation_interval=1, rewind=False, style=None):
         """
         Pipelines a loop with index `axis` into `initiation_interval` stages.
 
@@ -818,8 +828,26 @@ class Schedule:
         rewind: bool
             If true, rewinding is allowed, allowing continuous loop pipelining.
             This is only effective for perfect loop nests inside a top level function.
+
+        style: str | None
+            Vitis's pipeline control style: ``"stp"`` (stall, the tool's
+            default), ``"flp"`` (flushable) or ``"frp"`` (free-running),
+            emitted as ``#pragma HLS pipeline ... style=<style>``.
+
+            It exists for a failure no simulation shows. A process that puts a
+            request on one stream and gets the response on another inside one
+            pipelined loop can deadlock in RTL under ``stp``, because the
+            blocked read of a later iteration freezes the earlier iteration's
+            put; a flushable or free-running pipeline keeps the earlier
+            iterations draining. **Which styles survive depends on the loop
+            shape, and the choice is a measurement, not a rule**: see
+            ``docs/source/backends/vitis.rst``. Only the Vivado/Vitis emitter
+            writes ``style=``; building a styled loop for another HLS backend
+            is refused rather than silently dropped.
         """
 
+        if style is not None and style not in ("stp", "flp", "frp"):
+            raise AlloValueError(f"pipeline: style {style!r} is not stp/flp/frp")
         i32 = IntegerType.get_unsigned(32)
         ii = IntegerAttr.get(i32, initiation_interval)
         func, axis = self._get_func_and_axis(axis)
@@ -828,6 +856,10 @@ class Schedule:
             self.get_loops(func)[band_name][axis].loop.attributes[
                 "rewind"
             ] = UnitAttr.get()
+        if style is not None:
+            self.get_loops(func)[band_name][axis].loop.attributes[
+                "pipeline_style"
+            ] = StringAttr.get(style)
         self.get_loops(func)[band_name][axis].loop.attributes["pipeline_ii"] = ii
 
     @wrapped_apply
@@ -840,6 +872,7 @@ class Schedule:
         distance=None,
         dependent=False,
         dep_class=None,
+        because=None,
     ):
         """
         Tells HLS about the loop-carried (or intra-iteration) dependences of
@@ -855,6 +888,20 @@ class Schedule:
         say) pipeline at II=1; if the claim is false the RTL computes a wrong
         answer while every software simulation, which ignores the pragma,
         still passes.
+
+        **The rule.** A claim that the IR *disproves* -- a dependence provable
+        at a distance the claim denies -- raises
+        ``allo.dependence.DependenceError``, here and again after every later
+        primitive. The check is one-sided: it refuses a demonstrably false
+        claim, it never confirms a true one, and it never refuses a claim just
+        because no proof was found. Asserting away what the compiler cannot
+        prove is the whole point of the primitive.
+
+        **The obligation.** Everything the rule accepts is therefore still the
+        author's to discharge, outside the compiler; ``because`` records what
+        the claim rests on, and every claim is listed in
+        ``s.dependence_obligations``. Omitting ``because`` warns
+        (``allo.dependence.UndeclaredPremise``).
 
         Parameters
         ----------
@@ -874,6 +921,9 @@ class Schedule:
             Whether the dependence exists (True) or is claimed absent (False).
         dep_class: str | None
             ``"array"`` or ``"pointer"``; None leaves Vitis's default.
+        because: str | None
+            What makes the claim true, in the author's words. Nothing checks
+            it; it is emitted beside the pragma and recorded as an obligation.
         """
         from ._mlir.ir import ArrayAttr, BoolAttr, DictAttr
 
@@ -917,6 +967,7 @@ class Schedule:
         entry = {
             "type": StringAttr.get(dep_type),
             "dependent": BoolAttr.get(bool(dependent)),
+            "variable": StringAttr.get(target.name),
         }
         if isinstance(mlir_target, MockArg):
             entry["arg_index"] = IntegerAttr.get(IntegerType.get_signless(64), idx)
@@ -928,19 +979,70 @@ class Schedule:
                         f"dependence: {target.name} is declared inside the loop"
                     )
                 parent = parent.parent
-            entry["variable"] = StringAttr.get(target.name)
         if direction is not None:
             entry["direction"] = StringAttr.get(direction)
         if distance is not None:
             entry["distance"] = IntegerAttr.get(IntegerType.get_signless(64), distance)
         if dep_class is not None:
             entry["class"] = StringAttr.get(dep_class)
+        if because is not None:
+            entry["because"] = StringAttr.get(because)
+        self.dependence_obligations.append(
+            accept_dependence_claim(
+                loop,
+                mlir_target.result,
+                Claim(
+                    target=target.name,
+                    dep_type=dep_type,
+                    direction=direction,
+                    distance=distance,
+                    dependent=bool(dependent),
+                    dep_class=dep_class,
+                    because=because,
+                ),
+                f"{func_name}:{axis}",
+                stacklevel=4,
+            )
+        )
         old = (
             list(loop.attributes["dependence"])
             if "dependence" in loop.attributes
             else []
         )
         loop.attributes["dependence"] = ArrayAttr.get(old + [DictAttr.get(entry)])
+
+    @wrapped_apply
+    def encodable_on(self, encoding):
+        """
+        Declares that this schedule must stay expressible in one instruction
+        word of ``encoding``, and checks it now and after every later
+        primitive. Raises ``allo.encoding.EncodingError``, which names every
+        offending site, the budget it exceeds and the repair.
+
+        A declaration constrains nothing that the encoding leaves unset, so
+        ``Encoding()`` is a no-op. See
+        ``docs/source/developer/extending_allo.rst``.
+
+        Parameters
+        ----------
+        encoding: allo.encoding.Encoding
+            The target's encoding budgets.
+        """
+        self.encoding = encoding
+
+    def recheck_encoding(self, after=None):
+        if self.encoding is None:
+            return
+        with self.module.context:
+            found = encoding_violations(self.module, self.encoding)
+        if found:
+            raise EncodingError(self.encoding, found, after=after)
+
+    def recheck_dependence(self, after=None):
+        if not self.dependence_obligations:
+            return
+        with self.module.context:
+            recheck_dependence_claims(self.module, after=after)
 
     @wrapped_apply
     def parallel(self, axis):

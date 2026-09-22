@@ -35,6 +35,10 @@ ACT, and Why We Cite It
 Audited 2026-09-22 against ``chia-codesign-final``: ``allo/exp/dsa/`` is 12
 files, 8,347 lines.
 
+The other side of that connection -- the workload specs a compiler would be
+given and the judge that decides whether what comes out is right, legal and
+fast -- is on :doc:`act_specs`, and contains no part of ACT.
+
 
 Verdict
 =======
@@ -567,12 +571,21 @@ count. For ``gemm.relu`` at 16x16x16:
      - **750 cycles**
      - **did not complete**
 
-Two row-tiled mappings were tried and behaved the same way: RTL simulation sits
-at ``Inter-Transaction Progress: 0 / 1`` with the simulator burning a full core,
-one of them for over half an hour, where the shipped mapping's whole run --
-synthesis, csim and cosim -- takes about two minutes. No deadlock is *reported*,
-so this page does not call it one; what is measured is that the transaction does
-not complete.
+Two row-tiled mappings were tried and behaved the same way: no completion, with
+the simulator holding a full core, one of them for over half an hour, where the
+shipped mapping's whole run -- synthesis, csim and cosim -- takes about two
+minutes. No deadlock is *reported*, so this page does not call it one; what is
+measured is that the run does not finish.
+
+.. warning::
+
+   An earlier version of this page said the failing runs "sit at
+   ``Inter-Transaction Progress: 0 / 1``" as though that were a signature. **It
+   is not.** ``109000`` is picoseconds and that line is simply Vitis's first
+   periodic report, printed in every log including passing ones, which then
+   print ``1 / 1`` and finish. The observation is only that the second line
+   never comes; nothing measured locates the stall. See
+   :ref:`item 24 <limitation-24>`, where the failure was reduced.
 
 The lesson is the one this design's own history already taught once, when the
 dataflow simulator passed a bug that only cosim caught: **four checkers agreeing
@@ -588,29 +601,31 @@ and *confirmed* -- the RTL ran it. ``act_compile.py`` reports the first, and its
 ``act_cosim.py``.
 
 One reassurance, and it is a test rather than a hope: at every shape and every
-registered workload the mapping the flow **picks** is in the prologue-staging,
-RTL-confirmed class -- ``tests/act/test_tinytpu.py`` asserts it. The unconfirmed
-mappings are ranked, reported and never chosen, and ``act_compile.py`` prints a
-``staging`` column plus a warning whenever any of them appear.
+registered workload the mapping the flow **picks** is the one whose program
+cosim has actually measured -- ``tests/act/test_tinytpu.py`` asserts it. The
+unconfirmed mappings are ranked, reported and never chosen.
 
 This is also the sharpest ``cannot refuse`` gap found in this work, and it is
-not in the ISA. It is filed as :ref:`item 24 <limitation-24>` of the
-limitations register, **unreduced**: the obvious suspicion -- that the trigger
-is a data transfer *inside* the emitted nest rather than hoisted into a
-prologue -- was tested with a four-case ladder of minimal programs and
-**refuted**. A transfer after a compute (189 cycles), a transfer inside a loop
-(171) and a transfer sharing a loop body with a compute (186) all complete on
-the RTL. So the trigger needs something those do not have, and the candidates
-left are nested loops, longer trip counts, larger ``rows``, an accumulating
-``mm`` inside a loop, or plain scale.
+not in the ISA. It is filed as :ref:`item 24 <limitation-24>`, reduced there to
+a sixteen-instruction program by the workload-specs track, with a bisection.
 
-Until it is found, the mapspace beyond prologue-only staging cannot be trusted,
-and that is most of it -- which is the real cost of this item and the reason it
-outranks widening any hardware parameter. One coverage fact worth carrying with
-it: of the 23 programs the named gates run, **none** issues a ``dma_ld`` after a
-compute, while ``stress_isa.random_program`` produces one in 314 of 400 seeds.
-The pattern is heavily exercised in the simulator and had never reached a cosim
-testbench before item 24's ladder put four of them there.
+**The suspicion this page raised is dead, killed twice.** It was that the
+trigger is a data transfer *inside* the emitted nest rather than hoisted into a
+prologue -- the one feature the failing mappings shared and the shipped one
+lacked. From the small end, four programs built to have exactly that feature all
+complete (169 / 189 / 171 / 186 cycles,
+``tests/limits/item24_cosim_small_programs_complete.py``). From the failing end,
+**both** non-completing programs stage every transfer in a prologue, and both
+mappings that do stage inside the nest complete. In-nest staging is neither
+necessary nor sufficient, which is why this flow ships no staging column: a
+predicate that passes both failures and flags two programs that run is worse
+than none. The bisection also rules out ``vrelu``, the hardware loop, and
+monotonicity in size.
+
+What survives is the consequence, not the cause. The mapspace this flow
+enumerates cannot be trusted past the mappings cosim has actually run, which is
+the real cost of the item and the reason it outranks widening any hardware
+parameter.
 
 **Five nests are encodable** (the prototype found three) and all five compute
 the spec against ``isa_ref.run`` -- but only three are confirmed on the RTL; see
@@ -760,8 +775,11 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - 517
      - **750**
 
-The ``gemm`` rows reproduce the published **172 / 262 / 418 / 484 / 686**
-exactly, all five, so the harness is the one those figures came from. The
+The ``gemm`` rows reproduce **172 / 262 / 418 / 484 / 686** exactly, all five,
+so the harness is the one those figures came from. (That was the published row
+when this was measured. It moved to **171 / 261 / 417 / 483 / 685** on
+2026-09-22 when the memory sizing became derived; the reproduction above is of
+the design as it then stood, and is not a disagreement.) The
 ``gemm.relu`` row settles what they are: **plain** ``gemm``, because
 ``cosim.py``'s ``testbench(M, K, N)`` leaves ``relu`` at its default.
 ``gemm.relu`` at 16x16x16 is 750, and 750 - 686 = **64**, exactly the four
@@ -831,6 +849,17 @@ and confirmed by RTL, with the functional check passing in both cases.
 Corrections to This Page's Earlier Numbers
 ==========================================
 
+- "A minimal ACT pilot was run, using a toy ISA." **No artifact exists.** There
+  are no ``pilot`` hits in either repo's notes or git log. If it ran, it ran in
+  a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
+  ``chia-codesign``). Nothing in ``chia_runs/`` is it:
+  ``20260905-060830/variants.jsonl`` is a single baseline line, and
+  ``swarm-20260905-063857/`` is a 6-worker **CHIA LLM-agent** search (best
+  126,432 -> 31,056 cycles on the ``dram`` hypothesis), which is not a mapspace
+  search.
+- "ACT has a mapspace search" -- it has a mapspace *file*, ``mapspace.py``, and
+  nothing reaches it. The enumerator this page describes is the rebuilt one, not
+  ACT's.
 - "Our 9 opcodes" listed ``DMA_ST`` as expressible. The machine **refuses** it
   (``check_program`` rejects ``OP_DMA_ST``) and ``isa_dsl`` has no emitter for
   it. There are 10 encodings, 9 executable: 7 data opcodes plus

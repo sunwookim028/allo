@@ -1,0 +1,31 @@
+  tiled n2 b2 k2 r4         16 instrs;  16 static,   16 dynamic instructions; critical unit spm at 56 work items; estimate 264 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  tiled n1 b2 k2 r4          9 instrs;   9 static,    9 dynamic instructions; critical unit vru at 32 work items; estimate 225 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  tiled n2 b1 k2 r4         10 instrs;  10 static,   10 dynamic instructions; critical unit spm at 36 work items; estimate 232 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  tiled n1 b1 k2 r4          6 instrs;   6 static,    6 dynamic instructions; critical unit spm at 18 work items; estimate 202 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  tiled n2 b2 k1 r4         11 instrs;  11 static,   11 dynamic instructions; critical unit accu at 32 work items; estimate 225 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  tiled n2 b2 k2 r8         16 instrs;  16 static,   16 dynamic instructions; critical unit vru at 96 work items; estimate 329 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  pointwise n4 r16 relu     17 instrs;  17 static,   17 dynamic instructions; critical unit accu at 192 work items; estimate 484 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  pointwise n1 r16 relu      5 instrs;   5 static,    5 dynamic instructions; critical unit accu at 48 work items; estimate 251 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  pointwise n4 r16 norelu   13 instrs;  13 static,   13 dynamic instructions; critical unit vru at 128 work items; estimate 381 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  pointwise n4 r4 relu      17 instrs;  17 static,   17 dynamic instructions; critical unit accu at 48 work items; estimate 251 cycles
+                           check_program ACCEPTS; kpn_model OK, minimum depth 1; simulator vs isa_ref BIT-EXACT
+  synthesizing once into /home/sk3463/allo/.claude/worktrees/agent-a1f24845a563ff30d/examples/accelerator/tinytpu_vitis/act/act_sweep.prj ...
+  tiled n2 b2 k2 r4        cosim=None   RTL DID NOT COMPLETE within 200s; csim said TB relu_16x16 mismatches = 0 / 256; last RTL progress // RTL Simulation : 0 / 1 [n/a] @ "109000"
+  tiled n1 b2 k2 r4        cosim=223   TB relu_16x16 mismatches = 0 / 256
+  tiled n2 b1 k2 r4        cosim=223   TB relu_16x16 mismatches = 0 / 256
+  tiled n1 b1 k2 r4        cosim=198   TB relu_16x16 mismatches = 0 / 256
+  tiled n2 b2 k1 r4        cosim=230   TB relu_16x16 mismatches = 0 / 256
+  tiled n2 b2 k2 r8        cosim=356   TB relu_16x16 mismatches = 0 / 256
+  pointwise n4 r16 relu    cosim=None   RTL DID NOT COMPLETE within 200s; csim said TB relu_16x16 mismatches = 0 / 256; last RTL progress // RTL Simulation : 0 / 1 [n/a] @ "109000"
+  pointwise n1 r16 relu    cosim=291   TB relu_16x16 mismatches = 0 / 256
+  pointwise n4 r16 norelu  cosim=459   TB relu_16x16 mismatches = 0 / 256
+  pointwise n4 r4 relu     cosim=None   RTL DID NOT COMPLETE within 200s; csim said TB relu_16x16 mismatches = 0 / 256; last RTL progress // RTL Simulation : 0 / 1 [n/a] @ "109000"

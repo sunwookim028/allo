@@ -32,10 +32,18 @@ passes:
   (``levels/L2/tpu.py``);
 * the second pass (items 11-23), from building the instruction-programmable
   TinyTPU-isa (:doc:`/designs/tinytpu_isa`) on ``main`` and taking it through
-  the Vitis dataflow path to RTL co-simulation.
+  the Vitis dataflow path to RTL co-simulation;
+* the third pass (item :ref:`24 <limitation-24>`), from compiling *for* that
+  design rather than building it -- generated programs that every cheap check
+  accepts and the RTL does not run.
 
 Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.
+
+Gaps in Allo's *abstractions* -- things that are missing a type, a primitive
+or a pass rather than a bug fix -- are ranked with their legality rules in
+:doc:`/developer/extending_allo`, which is also the standard a new primitive
+has to meet before it lands.
 
 Related feature-gap tracking lives as fork issues and is not restated here:
 combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
@@ -306,17 +314,6 @@ Open
      - ~5 lines (merge the callee's own module globals over the caller's);
        not prototyped
      - `new_subregion_foreign_globals.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py>`__
-   * - :ref:`24 <limitation-24>`
-     - REPRODUCES on two mappings; **NOT reduced** -- four minimal programs all
-       complete
-     - cosim / design
-     - Unknown. RTL cosim sits at ``Inter-Transaction Progress: 0 / 1`` with no
-       deadlock reported, for programs ``isa_ref``, ``check_program``,
-       ``kpn_model``, the dataflow simulator and Vitis csim all accept.
-     - Bounds what a mapper may claim: **encodable is not runnable**, and only
-       cosim tells them apart
-     - unknown
-     - `item24_cosim_stalls_on_in_nest_dma.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item24_cosim_stalls_on_in_nest_dma.py>`__
 
 .. _limitations-closed:
 
@@ -1199,6 +1196,73 @@ compile:
    accumulator since ``e24e433b`` (:ref:`tinytpu-isa-dependence`); the price
    below is what that recovered.
 
+.. admonition:: Update (2026-09-22): the claim is now checked, one-sidedly
+
+   The entry below closed with "**A dependence claim is a contract, and the
+   primitive does not check it.** ... Nothing in Allo can see a false claim;
+   only RTL can." The first half of that no longer holds, and the second half
+   was always too strong: a *provably* false claim is visible in the IR.
+
+   ``allo/dependence.py`` is the rule, with ``tests/test_dependence.py`` (20
+   tests). The legality sentence:
+
+       A ``dependence`` claim is legal **unless** the IR proves a dependence on
+       the claimed array at a distance the claim denies.
+
+   ``inter`` with ``dependent=False`` denies every distance of one iteration or
+   more; ``inter`` with ``dependent=True, distance=d`` denies 1 through
+   ``d-1``; ``intra`` with ``dependent=False`` denies distance 0. A dependence
+   provable at a denied distance is refused, at the ``s.dependence`` call and
+   again after every later primitive, with an error naming both accesses, the
+   direction, the distance and the claim that would be legal instead. A
+   dependence that is **not** provable is accepted -- that is the whole point
+   of the primitive, so the rule must never refuse for lack of proof. It
+   therefore catches only demonstrably false claims and **confirms nothing**.
+
+   The analysis is a same-element test over subscripts of the form
+   ``constant + sum(coefficient * induction variable)``. A loaded or carried
+   index, a non-uniform stride (``A[2*i] = A[i]``), a ``mod``/``floordiv``
+   subscript, an access under a guard, or an inner loop without constant
+   bounds all yield no proof, which is the accepting answer.
+
+   **What the evidence is worth.** Every refusal in ``tests/test_dependence.py``
+   is against a kernel constructed to be refused; the rule has never fired on a
+   real design here, because there is no false claim in the tree to fire on.
+   The real mistake it would catch is a plainly written recurrence
+   (``C[i] = C[i-1] + A[i]``) whose author reaches for ``inter false`` to
+   silence ``Unable to enforce a carried dependence constraint`` instead of
+   restructuring the loop. See :ref:`extending-allo-dependence`.
+
+   **What is still an obligation**, and now says so: ``s.dependence(...,
+   because=...)`` records the premise, which appears in
+   ``s.dependence_obligations`` and as ``// dependence obligation, checked by
+   no tool: ...`` above the emitted pragma; omitting it warns
+   (``allo.dependence.UndeclaredPremise``). TinyTPU-isa's claim is the example
+   -- it is true only because ``check_program`` enforces THE ACCUMULATOR
+   DISTANCE CONTRACT in ``assemble()``, outside the compiler -- and the rule
+   accepts it, as it must. ``mutate.py``'s ``ar_claim_false`` is the standing
+   evidence that this half is undecidable: it passes ``bench_isa``,
+   ``stress_isa`` and the rule, and only ``TPU_TB=stress`` cosim catches it.
+
+   **Two corrections to the text below and to**
+   :doc:`extending_allo`. (1) Both pages said the analysis "already exists in
+   C++ (``analyzeDependency``, ``checkDependence``)". ``allo::checkDependence``
+   (``mlir/lib/Support/Utils.cpp:520``) is ``return true;`` with its body
+   commented out since ``cec32446`` and has no callers -- wiring it would have
+   refused every claim including TinyTPU-isa's true one, which is the backwards
+   failure the rule is designed against. ``analyzeDependency`` is live but
+   answers a question about whole loop bands with no distance. The rule is a
+   new analysis in Python. (2) The rule found **no false claim already in the
+   tree**: both existing claims (TinyTPU-isa's ``ar``, and the two in
+   ``tests/test_vhls.py``) are unprovable and accepted.
+
+   **Found and not fixed.** ``s.split`` rewrites a band onto two new loops and
+   carries the ``dependence`` attribute onto neither, so a claim made before a
+   split disappears silently along with its pragma
+   (``tests/test_dependence.py::test_a_loop_transformation_drops_the_claim_rather_than_moving_it``).
+   A defect in ``LoopTransformations.cpp``, not in the rule, and the reason no
+   primitive in this tree can currently falsify a standing claim.
+
    The text below is the item as it stood before the fix.
 
 Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
@@ -1237,6 +1301,9 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   state 7, and a distance-1 or -2 read returns the old row in RTL while every
   simulator (Allo's, and Vitis csim) is exact. The design makes the claim true
   in its assembler. Nothing in Allo can see a false claim; only RTL can.
+  (Superseded in part by the 2026-09-22 update above: a *provably* false claim
+  is now refused. This one is not provable, and is accepted with its premise
+  declared.)
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II
@@ -1449,6 +1516,164 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    :doc:`/backends/vitis`. The status of this item is left as last recorded
    pending re-verification.
 
+.. _limitation-24:
+
+24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (2026-09-22)
+
+   REPRODUCES. Cheap half: ``python tests/limits/item24_cosim_hang.py``
+   (seconds, no Vitis). RTL half: ``ALLO_LIMITS_COSIM=1`` on the same file
+   (one csynth, ten cosims, tens of minutes). Family and bisection:
+   ``examples/accelerator/tinytpu_vitis/act/rtl_hang.py``; log:
+   ``examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log``.
+
+A legal, bit-exact TinyTPU-isa program of **sixteen instructions** passes every
+check the fork has short of RTL and then does not finish in ``cosim_design``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - check
+     - result on the minimal program
+   * - ``microarch_isa.check_program`` / ``assemble``
+     - accepts
+   * - ``kpn_model.run`` (bounded FIFOs, deadlock reporting)
+     - no deadlock, minimum channel depth 1
+   * - ``isa_ref.run`` (the ISA as numpy)
+     - correct
+   * - ``df.build(target="simulator")``
+     - completes, bit-exact against ``isa_ref``, 0 of 256 bytes wrong
+   * - Vitis **csim**
+     - ``mismatches = 0 / 256``
+   * - Vitis **cosim** (xsim, RTL)
+     - **does not complete**
+
+This is the second independent occurrence. The first is on
+:doc:`/extensions/act`, where two row-tiled ACT mappings behaved the same way
+and the flow withdrew its "5 encodable" claim in favour of "3 confirmed on
+RTL"; that instance was found by a different tree, from a different generator,
+on the same design.
+
+What "does not complete" is, exactly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A completing run of this design prints two progress lines and a ``$finish``:
+
+.. code-block:: text
+
+   // RTL Simulation : 0 / 1 [n/a] @ "109000"
+   // RTL Simulation : 1 / 1 [n/a] @ "777000"
+   $finish called at time : 796590 ps
+
+for a 198-cycle program. A non-completing run prints the **first** line and
+never the second. ``109000`` is **picoseconds** and is simply where Vitis makes
+its first periodic report, so it is the same number in every log, passing or
+hanging -- **it is not where the design stops, and nothing measured here
+locates the stall.** Vitis' own deadlock detector reports nothing, so this item
+does not call it a deadlock. What is measured is: no second progress line, no
+report, and no completion against a neighbour that finishes in under a second
+of simulated time.
+
+The minimal program
+^^^^^^^^^^^^^^^^^^^
+
+``act.rtl_hang.tiled(n_out=2, n_block=2, n_reduce=2, rows=4)``: two output
+column blocks x two row blocks, each a two-deep accumulation of four rows
+followed by an ``mvout``. Fully unrolled -- no ``LOOP``/``ENDLOOP`` at all --
+four ``dma_ld`` and twelve compute instructions, plain int8 GEMM tiling with no
+``vrelu`` and no epilogue.
+
+The bisection, and what it rules out
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Ten programs, one csynth, one cosim each, ``ACT_COSIM_TIMEOUT=200``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - program
+     - cosim
+     - knob changed
+   * - ``tiled n2 b2 k2 r4``
+     - **no completion**
+     - the minimal case
+   * - ``tiled n1 b2 k2 r4``
+     - 223
+     - one output block
+   * - ``tiled n2 b1 k2 r4``
+     - 223
+     - one row block
+   * - ``tiled n1 b1 k2 r4``
+     - 198
+     - both
+   * - ``tiled n2 b2 k1 r4``
+     - 230
+     - no accumulate step
+   * - ``tiled n2 b2 k2 r8``
+     - 356
+     - eight rows instead of four
+   * - ``pointwise n4 r16 relu``
+     - **no completion**
+     - the other program the judge found
+   * - ``pointwise n1 r16 relu``
+     - 291
+     - one output block
+   * - ``pointwise n4 r16 norelu``
+     - 459
+     - the ``vrelu`` deleted
+   * - ``pointwise n4 r4 relu``
+     - **no completion**
+     - four rows instead of sixteen
+
+Four hypotheses die here, and they are the useful part of the item:
+
+- **Not the hardware loop.** The looped and fully unrolled forms of the
+  ``pointwise`` program behave identically, and the whole ``tiled`` family is
+  unrolled.
+- **Not ``vrelu``.** The entire ``tiled`` family has no ``vrelu`` and the
+  minimal case is in it. Conversely ``gemm.relu`` at 16x16x16 has a ``vrelu``
+  in a loop and completes in 750 cycles.
+- **Not "a transfer inside the emitted nest rather than hoisted into a
+  prologue"** -- the hypothesis left open on :doc:`/extensions/act`. Measured
+  the other way round, twice each: **both** non-completing programs have every
+  transfer in a prologue, and **both** ``weights_reloaded`` mappings, which
+  issue a ``dma_ld`` between ``mvout``\ s inside the output nest, complete
+  (256 cycles at 8x8x8, 638 at 16x16x16, 0 of 256 wrong). In-nest staging is
+  neither necessary nor sufficient, so a staging column does not separate the
+  two classes. The same hypothesis was killed independently from the small end:
+  ``tests/limits/item24_cosim_small_programs_complete.py`` cosims four
+  deliberately constructed programs at ``rows=4`` -- a prologue-only control, a
+  ``dma_ld`` after an ``mm``, a ``dma_ld`` inside a loop, and a ``dma_ld``
+  sharing a loop body with an ``mm`` and an ``mvout`` -- and **all four
+  complete**, at 169 / 189 / 171 / 186 cycles. Two trees, two directions, one
+  dead hypothesis.
+- **Not monotone in size.** Halving any one of the three tile counts makes it
+  complete, and so does *doubling* the row count. It is neither "too big" nor
+  "too small", which rules out simple capacity and fill explanations.
+
+No positive characterisation is offered: the four surviving programs that fail
+share three or more ``accu`` instructions per output tile and four or more
+output tiles, but ``tiled n2 b2 k2 r8`` has both and completes, so that is a
+correlation and not a condition. **The diagnosis is open.**
+
+- **Priority: High as a warning, Medium as an action.** The warning is that on
+  this design the cheap checks do not substitute for cosim, and two of them
+  (``kpn_model`` and the header the simulator consumes) are derived from
+  ``assemble()``'s own header, so their agreement is weaker evidence than it
+  looks. The action is to find the blocked process, which needs
+  ``cosim_design -trace_level all`` on the sixteen-instruction case and a look
+  at the stream handshakes -- affordable now that the repro is that small.
+- **Run the RTL half in its own process group.** Killing ``vitis_hls`` does not
+  kill ``xsim``: one orphaned ``xsimk`` from a non-completing case here was
+  still holding a full core **32 minutes** after its parent died, and several
+  agents share this host. ``item24_cosim_small_programs_complete.py`` starts
+  each child with ``start_new_session=True`` and kills the group on timeout;
+  anything that cosims a program which may not finish should do the same.
+
 
 Surfaced by the 2026-09-19 re-verification and impact analysis
 ---------------------------------------------------------------
@@ -1513,121 +1738,6 @@ separately forbid one ``m_axi`` bundle read by two processes (``200-1013`` /
 - **Measured impact on TinyTPU-isa: 0 cycles.** Every restructure the design
   needed was Allo-legal. The earlier claim that removing ``vru``'s double
   handling needs a second producer on a shared memory **was wrong**.
-
-.. _limitation-24:
-
-24. RTL cosim does not complete for some legal TinyTPU-isa programs, and five checkers cannot tell which
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. admonition:: Status (2026-09-22)
-
-   REPRODUCES on two row-tiled mappings. **Filed unreduced**: a four-case
-   ladder of minimal programs designed to isolate it all completed, so the
-   trigger is not the structural feature that was suspected. Diagnosis open.
-
-Two mappings produced by :doc:`/extensions/act` for ``gemm.relu`` at 16x16x16 --
-``M2>N4>K4`` and ``N4>M2>K4``, 16 static instructions each -- do not finish RTL
-cosim. What is **measured**, and nothing beyond it:
-
-- RTL simulation sits at ``Inter-Transaction Progress: 0 / 1`` and prints no
-  further progress line;
-- ``xsimk`` holds a full core throughout -- one instance survived killing its
-  parent ``vitis_hls`` and was still at 99% CPU **32 minutes** later;
-- no deadlock is reported, although the design is elaborated with Vitis's
-  ``AESL_deadlock_detect_unit`` instances;
-- the shipped ``N4>K4`` mapping, in the same project with the same settings,
-  completes in about two minutes end to end (synthesis, csim and cosim) and
-  measures 750 cycles.
-
-This page does **not** call it a deadlock. A simulator at 100% CPU proves the
-simulator is alive, not that the design is progressing; what is established is
-non-completion at orders of magnitude over the expected wall time.
-
-Five checkers pass, and two of them share a premise
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. list-table::
-   :header-rows: 1
-   :widths: 46 27 27
-
-   * - checker
-     - shipped ``N4>K4``
-     - ``N4>M2>K4``
-   * - ``isa_ref.run`` (numpy, the ISA's meaning)
-     - correct
-     - correct
-   * - ``check_program`` / ``assemble``
-     - accepts
-     - accepts
-   * - ``kpn_model.run`` (channel protocol, bounded FIFOs)
-     - runs, minimum depth 1
-     - runs, minimum depth 1
-   * - ``df.build(target="simulator")``
-     - completes, correct
-     - completes, correct
-   * - Vitis **csim**
-     - ``mismatches = 0``
-     - ``mismatches = 0``
-   * - Vitis **cosim** (RTL)
-     - **750 cycles**
-     - **did not complete**
-
-``kpn_model`` and ``assemble``'s own consistency both derive from the header
-``assemble`` writes, so neither can see an error in the header formula itself,
-and their agreement is weaker evidence than it looks. ``isa_ref`` models the
-ISA, not the machine. csim compiles the units' C without their handshakes.
-**Only cosim exercises the streams.**
-
-The reduction that failed, which is the useful part
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The suspicion was that the trigger is a data transfer *inside* the emitted loop
-nest rather than hoisted into a prologue -- the one structural feature the
-failing mappings share and the shipped one lacks. A supporting coverage fact:
-of the 23 programs any named gate runs, **none** issues a ``dma_ld`` after a
-compute, while ``stress_isa.random_program`` produces one in 314 of 400 seeds --
-so the pattern is heavily exercised in the *simulator* and has never reached a
-cosim testbench.
-
-``item24_cosim_stalls_on_in_nest_dma.py`` tests that suspicion with four tiny
-programs at ``rows=4``, each verified by ``isa_ref`` and csim, each cosimmed
-under a hard wall-clock bound. Measured 2026-09-22:
-
-.. code-block:: text
-
-   prologue_only                 4 instr  csim ok  cycles=169
-   dma_after_compute             7 instr  csim ok  cycles=189
-   dma_in_loop_before_compute    6 instr  csim ok  cycles=171
-   dma_in_loop_with_compute      6 instr  csim ok  cycles=186
-
-   ITEM24 NOT REPRODUCED: 0 of 4 cases produced no cosim report
-
-**All four complete**, including a ``dma_ld`` and an ``mm`` inside one loop
-body. So the suspicion is refuted at this scale: a transfer after a compute, a
-transfer inside a loop, and a transfer sharing a loop body with a compute are
-each fine on the RTL. Whatever the trigger is, it needs something the ladder
-does not have -- candidates not yet tried, in rough order of suspicion: **nested
-loops** (the failing mappings are two deep, the ladder one), trip counts above
-2, ``rows`` above 4, an accumulating ``mm`` inside a loop, or simply scale.
-
-That is a negative result, and it is filed rather than discarded because it
-rules out the three cheapest explanations and leaves a ladder someone can
-extend by adding one function.
-
-Why it matters beyond this design
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-It bounds what a mapper may claim. :doc:`/extensions/act` enumerates 1,226 loop
-nests and calls 5 encodable at 16x16x16; **3 are confirmed on the RTL**. An
-independently built mapspace gate on the co-design track proves every survivor
-against ``isa_ref`` and would have counted the same two. So "encodable" is a
-claim about the encoder in both implementations, not a promise of runnability,
-and a search that spends only pure-python budget cannot tell the difference.
-
-Fork-only: the design is fork-only, but nothing here implicates fork code
-specifically -- the cause may be in the design, in Allo's emitted RTL, or in
-Vitis. Priority: **High**, because it is the one gap that makes an otherwise
-cheap search unable to trust its own survivors.
 
 .. _limitation-a:
 

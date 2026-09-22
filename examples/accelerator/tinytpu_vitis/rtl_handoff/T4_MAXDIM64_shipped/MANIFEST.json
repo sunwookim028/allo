@@ -1,0 +1,32 @@
+{
+  "aux_files": [
+    "tinytpu_isa_sequencer_0_1_iv_now_RAM_1WNR_AUTO_1R1W.dat"
+  ],
+  "config": {
+    "TPU_MAXDIM": "64",
+    "TPU_T": "4"
+  },
+  "files": 145,
+  "layout": "flat",
+  "readmemh_users": [],
+  "resources": {
+    "BRAM": 52,
+    "DSP": 14,
+    "FF": 17488,
+    "LUT": 26554,
+    "URAM": 0,
+    "avail": {
+      "BRAM": 4032,
+      "DSP": 9024,
+      "FF": 2607360,
+      "LUT": 1303680,
+      "URAM": 960
+    },
+    "estimated_ns": 2.431,
+    "ok": true,
+    "target_ns": 3.33,
+    "uncertainty_ns": 0.9
+  },
+  "top": "tinytpu_isa",
+  "top_defined_in": "tinytpu_isa.v"
+}

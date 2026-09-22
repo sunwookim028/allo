@@ -20,7 +20,7 @@ report a worst-case bound. See docs/source/designs/tinytpu_isa.rst.
 TWO TESTBENCH MODES -- which one you ran decides what a PASS means:
 
   * `TPU_TB` unset (the DEFAULT, and the only mode the published cycle counts
-    172 / 262 / 418 / 484 / 686 come from): one GEMM call per shape, operands
+    171 / 261 / 417 / 483 / 685 come from): one GEMM call per shape, operands
     in [-4, 4] from seed 0 -- the distribution Gemmini's `allo_cmp.c` fills,
     kept so the comparison is like for like -- `C` zeroed, and only the
     `M x N` region compared. It is a PERFORMANCE testbench. It cannot see a
@@ -69,7 +69,7 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E40
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 LDFLAGS = "-B/usr/bin"
-_ALL = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
+from examples.accelerator.tinytpu_vitis.shapes import SHAPES as _ALL  # noqa: E402
 # Only shapes the built array can express: every dimension must be a multiple
 # of T, since one vmatpush-equivalent is a whole packed word of T lanes.
 SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]

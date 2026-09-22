@@ -82,6 +82,7 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
     OP_VRELU, enc, enc_agu,
     A_VR, AR_C, B_SP, DMA_SRC_B, DMA_TO_VR, MAXDIM, MAXROWS, T,
+    SPAD_ROWS, NVR, NAR,
 )
 
 _TARGETS = (AGU_F0, AGU_F1, AGU_F2, AGU_F3)
@@ -338,23 +339,66 @@ def vector_program(M=8):
       * `mvout` from nonzero `ar`, to nonzero DRAM rows and column blocks, and
         through a loop whose AGU walks `f0`, `f1` and `f2` at once.
 
-    Its gold is `isa_ref.run`, not a formula."""
-    assert 2 * M <= MAXDIM and M % 2 == 0
+    Its gold is `isa_ref.run`, not a formula.
+
+    **What it requires of the build, and why each is here.** These used to be
+    unstated, and at T=8 the program silently asked `mm` to read weight rows
+    no `dma_ld` had written -- `check_program` caught it, but as a confusing
+    rejection of a shipped test program rather than as a configuration limit:
+
+      * `M >= T`, because the `dma_ld` at spad 40 loads M rows and the third
+        `mm` reads T weight rows from that same region. With M < T the tail is
+        unwritten.
+      * `MAXDIM // T >= 4`, because it names column block 3 to vary a field
+        the GEMM leaves at 0. That is the constraint behind "T=8 needs
+        MAXDIM >= 32".
+      * room in DRAM for `dram_row=5` plus its `2 * T` rows, and in `ar` for
+        the fixed region names (80 .. 80 + M).
+    """
+    assert M % 2 == 0 and 2 * M <= MAXDIM
+    assert M >= T, (
+        f"vector_program({M}) at T={T}: `mm` reads T={T} weight rows from the "
+        f"region a {M}-row dma_ld filled, so M must be at least T")
+    assert MAXDIM // T >= 4, (
+        f"vector_program needs column block 3, so MAXDIM // T >= 4; "
+        f"MAXDIM={MAXDIM}, T={T} gives {MAXDIM // T}")
+    assert 5 + 2 * T <= MAXDIM, (
+        f"vector_program reads {2 * T} DRAM rows from row 5, past "
+        f"MAXDIM={MAXDIM}")
+    # THE REGION ADDRESSES ARE DERIVED, NOT TYPED IN. They used to be the
+    # literals 40 / 100 / 10 / 30 / 20 / 40 / 60 / 80, which fit only because
+    # the memories were themselves literals (spad 512, vr 256, ar 128). Once
+    # the memories are sized from MAXDIM (`microarch_isa`), spad row 100 is
+    # off the end of a MAXDIM=16 build and this program stopped assembling.
+    # Nothing about it needs a particular address: the regions only have to be
+    # DISTINCT, NON-ZERO and in range, which is what makes it a test of the
+    # fields the GEMM leaves at zero. `STRIDE` is the widest region any single
+    # instruction here touches, so consecutive bases cannot overlap.
+    STRIDE = max(M, 2 * T)
+    sp_a, sp_w = 1, 1 + STRIDE               # A rows; the two weight blocks
+    vr_1, vr_2 = 1, 1 + STRIDE               # vld destination; B from DRAM
+    ar_1, ar_2, ar_3, ar_4 = (1 + i * STRIDE for i in range(4))
+    assert sp_w + 2 * T <= SPAD_ROWS, (
+        f"vector_program needs {sp_w + 2 * T} spad rows, have {SPAD_ROWS}")
+    assert vr_2 + M <= NVR, (
+        f"vector_program needs {vr_2 + M} vregs, have {NVR}")
+    assert ar_4 + M <= NAR, (
+        f"vector_program needs {ar_4 + M} accumulator rows, have {NAR}")
     k = Program(f"vector {M}")
-    k.dma_ld(src=0, dram_row=3, col_block=1, spad=40, rows=M)   # A -> spad
-    k.dma_ld(src=1, dram_row=2, col_block=2, vr=30, rows=M)     # B -> vr
-    k.dma_ld(src=1, dram_row=5, col_block=3, spad=100, rows=2 * T)
-    k.vld(10, 40, rows=M)                    # activations 1: A rows via spad
-    k.mm(10, 20, 100, rows=M)                # ar20 = act1 @ W1 (spad 100..)
-    k.mm(30, 40, 100 + T, rows=M)            # ar40 = act2 @ W2 (spad 104..)
-    k.mm(10, 40, 40, rows=M, acc=True)       # ar40 += act1 @ (A rows 40..)
-    k.vadd(60, 20, 40, rows=M)               # ar60 = ar20 + ar40
-    k.vrelu(80, 60, rows=M)                  # ar80 = relu(ar60)
-    k.mvout(60, dram_row=0, col_block=1, rows=M)
-    k.mvout(20, dram_row=1, col_block=0, rows=M)
+    k.dma_ld(src=0, dram_row=3, col_block=1, spad=sp_a, rows=M)  # A -> spad
+    k.dma_ld(src=1, dram_row=2, col_block=2, vr=vr_2, rows=M)    # B -> vr
+    k.dma_ld(src=1, dram_row=5, col_block=3, spad=sp_w, rows=2 * T)
+    k.vld(vr_1, sp_a, rows=M)                # activations 1: A rows via spad
+    k.mm(vr_1, ar_1, sp_w, rows=M)           # ar_1 = act1 @ W1
+    k.mm(vr_2, ar_2, sp_w + T, rows=M)       # ar_2 = act2 @ W2
+    k.mm(vr_1, ar_2, sp_a, rows=M, acc=True)  # ar_2 += act1 @ (the A rows)
+    k.vadd(ar_3, ar_1, ar_2, rows=M)         # ar_3 = ar_1 + ar_2
+    k.vrelu(ar_4, ar_3, rows=M)              # ar_4 = relu(ar_3)
+    k.mvout(ar_3, dram_row=0, col_block=1, rows=M)
+    k.mvout(ar_1, dram_row=1, col_block=0, rows=M)
     h = M // 2
-    with k.loop(2, "half") as i:             # ar80.. -> C rows M.., blocks 2, 3
-        k.mvout(Ref(80).at(i, h), dram_row=Ref(M).at(i, h),
+    with k.loop(2, "half") as i:             # ar_4.. -> C rows M.., blocks 2, 3
+        k.mvout(Ref(ar_4).at(i, h), dram_row=Ref(M).at(i, h),
                 col_block=Ref(2).at(i, 1), rows=h)
     return k.emit()
 

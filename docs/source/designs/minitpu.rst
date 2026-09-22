@@ -34,30 +34,79 @@ findings outlive the tree. Everything was read-only. Distilled from two rescued
 scratchpad reports; *(verified)* means re-checked against ``~/core/minitpu`` on
 2026-09-18.
 
-1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2) *(verified)*
----------------------------------------------------------------------------
+1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2)
+--------------------------------------------------------------
 
-+---------------+----------------------------------------+----------------------------------------+
-|               | value                                  | source under                           |
-|               |                                        | ``board_package/minitpu/qor/``         |
-+===============+========================================+========================================+
-| CLB LUT       | 191,231 (83.00 %)                      | ``utilization_report.txt``             |
-+---------------+----------------------------------------+----------------------------------------+
-| CLB registers | 118,684 (25.76 %)                      | same                                   |
-+---------------+----------------------------------------+----------------------------------------+
-| DSP           | 838 (48.50 %)                          | same                                   |
-+---------------+----------------------------------------+----------------------------------------+
-| BRAM tile     | 147 (47.12 %)                          | same                                   |
-+---------------+----------------------------------------+----------------------------------------+
-| URAM          | 15 (15.63 %)                           | same                                   |
-+---------------+----------------------------------------+----------------------------------------+
-| WNS           | +0.114 ns on ``clk_pl_0``, 5.000 ns    | ``timing_summary.txt``                 |
-|               | constraint                             |                                        |
-+---------------+----------------------------------------+----------------------------------------+
-| Power         | 8.255 W on-chip (vectorless)           | ``power_report.txt``                   |
-+---------------+----------------------------------------+----------------------------------------+
+Every figure here is a **board measurement of a named bitstream**, reported by
+MiniTPU's owner. Two builds are kept, because §2's noise-floor argument needs
+two to compare; the bitstream id is part of the figure.
 
-LUT is the scarce resource, not DSP.
+.. list-table:: Current: bitstream ``0xB1FF21F4``, 187.5 MHz, verified current against MiniTPU's RTL at its HEAD
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * -
+     - value
+     - note
+   * - CLB LUT
+     - 194,459 (84.4 %)
+     - LUT is the scarce resource, not DSP
+   * - CLB registers
+     - 123,294
+     -
+   * - DSP
+     - 838
+     -
+   * - WNS
+     - +0.053 ns at 200 MHz
+     -
+   * - Power
+     - 7.880 W on-chip (vectorless)
+     -
+   * - GPT-2 body throughput
+     - **160.60 tok/s at 32 rows, 158.04 at 256** — medians of five runs,
+       2026-09-22. 28.4 GFLOP/s, **29.6 % of the 96 GFLOP/s array peak**
+       (was 24.2 %).
+     - **Confirmed on a second board**: .189 measured 160.43 and 158.40 on the
+       same commit, agreeing within 0.4 %. Supersedes the earlier
+       79.16 / 129.70 pair — **the hardware did not change**; see "The
+       concession that became the win" below.
+   * - Kernel checks
+     - 17/17 GPT-2, 6/6 Qwen
+     - batch invariance bit-identical for ``B = 1..16`` — read with the
+       row-wise qualifier in §4
+
+.. list-table:: Earlier: bitstream ``0xB182E69D``, read 2026-09-18 under ``board_package/minitpu/qor/``
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * -
+     - value
+     - source
+   * - CLB LUT
+     - 191,231 (83.00 %)
+     - ``utilization_report.txt``
+   * - CLB registers
+     - 118,684 (25.76 %)
+     - same
+   * - DSP
+     - 838 (48.50 %)
+     - same
+   * - BRAM tile
+     - 147 (47.12 %)
+     - same
+   * - URAM
+     - 15 (15.63 %)
+     - same
+   * - WNS
+     - +0.114 ns on ``clk_pl_0``, 5.000 ns constraint
+     - ``timing_summary.txt``
+   * - Power
+     - 8.255 W on-chip (vectorless)
+     - ``power_report.txt``
+
+BRAM and URAM were not re-reported for ``0xB1FF21F4``; the earlier build's
+figures are the only ones on record for them, and are not restated as current.
 
 **Every board number was taken at 187.5 MHz, not the 200 MHz the bitstream is
 constrained to.** PL0 is set by hand (``scripts/set_pl_clock.sh``,
@@ -66,8 +115,8 @@ check still passes, and ``clk_summary`` misreports it.
 ``tools/dma_fence_report.py`` hardcodes ``CLOCK_HZ = 187.5e6``. Any cycles→seconds
 or GFLOP/s comparison must use 187.5 MHz; 200 MHz overstates it by 6.7 %.
 
-The design's README once stated **7.255 W**, which was stale. Fixed after we
-reported it; it now reads 8.255 W.
+The design's README once stated **7.255 W**, which was stale for the
+``0xB182E69D`` build. Fixed after we reported it; it then read 8.255 W.
 
 2. The QoR noise floor — the most reusable finding here
 -------------------------------------------------------
@@ -86,8 +135,9 @@ is a fact about the tool flow, not about MiniTPU, and it applies to us:
   reported as a result.
 
 Provenance: the ±1407 pair came from rescued build logs that did not survive —
-the nine ``~/core/minitpu*`` worktrees today all report 191,231 / +0.114 ns, so it
-cannot be re-derived. The magnitude is the load-bearing part.
+the nine ``~/core/minitpu*`` worktrees as of 2026-09-18 all reported 191,231 /
++0.114 ns (the ``0xB182E69D`` build in §1), so it cannot be re-derived. The
+magnitude is the load-bearing part.
 
 3. Architecture
 ---------------
@@ -96,7 +146,12 @@ cannot be re-derived. The magnitude is the load-bearing part.
 |               |                                                                                  |
 +===============+==================================================================================+
 | Array         | 16×16 weight-stationary BF16 PEs; ``psum_in`` zero only at row 0, so it          |
-|               | accumulates exactly 16 deep in hardware — deeper is a BF16 ``vadd`` in the VPU   |
+|               | accumulates sixteen **terms** deep in hardware — deeper is a BF16 ``vadd`` in    |
+|               | the VPU. **Not an exactness guarantee**: per MiniTPU's owner, only the first     |
+|               | term is exact (via a zero bypass) and every later add rounds. An earlier         |
+|               | revision of this page said "exactly 16 deep", which read as exactness.           |
+|               | Their arithmetic semantics are documented by them at                             |
+|               | ``core/minitpu/docs/ARITHMETIC.md``, which is the source of record.              |
 +---------------+----------------------------------------------------------------------------------+
 | Accumulator   | **24-bit float** per PE (sign + 8 exp + 15 frac, ``MXU_ACC_W``), not fixed point |
 +---------------+----------------------------------------------------------------------------------+
@@ -152,12 +207,24 @@ banked model.
 4. Measured performance, and the bound that is not a measurement
 ----------------------------------------------------------------
 
-Cycle model, exact over 20 simulated points (``tools/gemm_cycle_model.py``); ``n``
-output column tiles, ``B`` contraction blocks of 32:
+Cycle model — a **simulator** number from MiniTPU's own
+``tools/gemm_cycle_model.py``, not a board figure; ``n`` output column tiles,
+``B`` contraction blocks of 32. The current fit, per MiniTPU's owner,
+re-measured over 20 points with **maximum residual 0**:
 
 .. code-block:: text
 
-   cycles = 46 + 194·n + 64.5·B + 303·n·B
+   cycles = 46 + 281·n + 64.5·B + 111·n·B
+
+The fit this page previously carried, exact over 20 simulated points before the
+``vmatpop`` occupancy correction (``72c8b78``), was
+``46 + 194·n + 64.5·B + 303·n·B``. Kept as the earlier reading, not as current.
+The fixed term and the ``B`` coefficient did not move; the ``n`` and ``n·B``
+terms did.
+
+The **matrix step is 52 cycles**, and the bottleneck is the **write port of the
+3R1W vector-register file** — port C is shared by store and matrix — **not the
+array** (from MiniTPU's owner).
 
 - **19.0 % of peak is the MEASURED figure** at the margin.
 - **36.4 % of peak is a BOUND**, set by the matrix controller not overlapping a
@@ -166,9 +233,10 @@ output column tiles, ``B`` contraction blocks of 32:
   and corrected.
 
 A 16×16×16 matmul takes **168 cycles**, capped by the serialized matrix-command
-FSM (push and pop share one controller). (*From the rescued comparison work; not
-stated in either surviving source doc nor in the current* ``~/core/minitpu``
-*docs, so not re-verifiable today.*)
+FSM (push and pop share one controller). (*Originally from the rescued
+comparison work and not stated in either surviving source doc; MiniTPU's owner
+now reports the same 168 for the 16×16 GEMM Verilator workload, so it is
+corroborated.*)
 
 The rest of the gap is result latency — 82 cycles from ``vmatpush`` to first
 result — and it **cannot be hidden by reordering**: loading the next weights
@@ -177,12 +245,21 @@ cycle (``mxu_pe.sv``). Recovering it needs hardware (hold commit until the array
 drains, or a second weight bank); splitting the matrix controller alone was
 measured and gains nothing.
 
-Board-validated targets: 32×64 BF16 add 119 cy, 32×64 multiply-add 155 cy,
-16×16 GEMM 283 cy, 16×16 GEMM→GELU 253 cy, 32×32 DMA-streamed multiply-add 929
-cy, 768-element LayerNorm 941 core cy / 218 bundles. Accuracy: GPT-2 124M block
-0.68 % vs fp32, Qwen2.5-0.5B decoder layer 3.81 %. ``B = 1..16`` is bit-identical
-row-wise only — an earlier claim omitted the qualifier and was wrong for
-attention.
+**Board-validated** means exactly three bring-up kernels: ``halt`` 4 cy,
+``vreg`` 12 cy, ``scalar`` 8 cy. Nothing else on this page is a board cycle
+count, and an earlier revision of this section said otherwise.
+
+The workload figures below are **Verilator** counts, not board figures, and
+this page had them stale as well. Per MiniTPU's owner, after its commit
+``72c8b78`` corrected ``vmatpop`` occupancy from 7 to 4, 16×16 GEMM is **168**
+cy (was published here as 283) and 16×16 GEMM→GELU is **155** cy (was 253). The
+remaining Verilator targets are unchanged on record: 32×64 BF16 add 119 cy,
+32×64 multiply-add 155 cy, 32×32 DMA-streamed multiply-add 929 cy, 768-element
+LayerNorm 941 core cy / 218 bundles.
+
+Accuracy: GPT-2 124M block 0.68 % vs fp32, Qwen2.5-0.5B decoder layer 3.81 %.
+``B = 1..16`` is bit-identical row-wise only — an earlier claim omitted the
+qualifier and was wrong for attention.
 
 5. What this says about our own cost model
 ------------------------------------------
@@ -198,7 +275,8 @@ semantics, not an ``(ii, depth)`` pair).
 
 Writeback offsets for scale: ALU 5, SFU 7, cross-lane reduction 15 (it crosses
 all 64 elements — a reduction tree, not a per-lane pipe), ``vld`` 6, ``vmatpop``
-3..6. Occupancies: ``vmatload`` 18, ``vmatpush`` 5, ``vmatpop`` 7.
+3..6. Occupancies: ``vmatload`` 18, ``vmatpush`` 5, ``vmatpop`` **4** (was 7
+here; corrected by MiniTPU's commit ``72c8b78``).
 
 Also worth carrying: **the binding resource is the instruction encoding, not the
 silicon.** The compute bundle has 1 spare bit — doubling VMEM rows per slot fits
@@ -234,6 +312,108 @@ push→result latency.
 Consequence: **the rescued report's 8-stage TinyTPU scaling plan rests on the
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.**
 Not reproduced here; what survives of it is §5.
+
+The concession that became the win
+----------------------------------
+
+The most instructive thing to come out of comparing two designs, and it is a
+method finding rather than an architectural one.
+
+While establishing that a fair comparison must **count every machine's host or
+none of them** (:doc:`/designs/gemmini_comparison`), MiniTPU's owner volunteered
+a figure against their own interest: their per-launch host work is about **132
+microseconds with a 44-microsecond register-access floor**, roughly **24,750
+cycles at 187.5 MHz**, none of which their simulator numbers include. It was
+offered so that a comparison counting Gemmini's ~390 cycles of driver would not
+quietly omit theirs.
+
+Stating it next to Gemmini's ~390 is what made it **absurd rather than
+normal** — two orders of magnitude, for the same job. Within hours, two commits
+on their master attacked exactly that cost, reading a configuration file once
+instead of once per launch and spinning past the slowest launch, and took the
+GPT-2 body from 79.16 to a claimed **160.38 tok/s on the same bitstream**.
+Neither cost was visible to their simulator, which is why both survived as long
+as they did.
+
+So the fairness adjustment was a **diagnostic**. The honest accounting did not
+merely make the comparison defensible; it located the largest measured win of
+that night, in a quantity nobody had been optimising because nothing in the
+measurement setup showed it.
+
+The transferable form, and the reason this is recorded on our side too: **an
+overhead you exclude from a window is an overhead you cannot see.** Our cosim
+figures contain no host at all — not a fast host, none — so we have no
+equivalent number to be shocked by yet, and a real deployment eventually will.
+The rule that follows is not only "say what your window excludes" but "put the
+excluded quantity beside someone else's, because the comparison is what makes an
+absurd value look absurd."
+
+What aligning to MiniTPU's semantics costs
+------------------------------------------
+
+An experiment, now stopped, asked whether TinyTPU-isa could be made
+semantically comparable to MiniTPU so the two machines' cycle counts would mean
+the same thing. Six increments were built and independently re-measured; the
+answer is that the alignment is expensive enough to stop pursuing, and that
+result is the finding.
+
+The variant lives on the branch ``tinytpu-align`` (``10ee6882``), which is
+**not merged into main** and is kept as the record: the repros, the verification
+logs, the csynth report and the per-unit table are all in that commit. The
+shipped design (:doc:`/designs/tinytpu_isa`) is unaffected and remains the
+baseline for every performance claim.
+
+Measured, by cosim, at the five benchmark shapes: **216 / 408 / 809 / 933 /
+1521** cycles with zero mismatches, against the shipped design's 172 / 262 /
+418 / 484 / 686 — **1.26x to 2.22x the cycles**. At ``T=8`` the variant measures
+302 / 474 / 699, also exact. Functional gates pass throughout: bench ``ALL
+EXACT``, stress 487/487, 34 crafted bad programs rejected against 390 generated
+programs accepted, and 42 mutants caught (41 by the functional gates, one only
+by RTL cosim).
+
+The cycles are not the whole cost, and this is what stopped the track.
+Synthesis of the same build (xcu280, 3.33 ns target, ``T=4``, ``MAXDIM=16``)
+estimates **3.782 ns with -1.35 ns of top-level slack** — the variant does not
+close at the shipped design's frequency, where the shipped design estimates
+2.431 ns with margin. The critical path is in ``vpu_0`` and ``vmu_0``, the two
+units the MiniTPU-semantics increments created and the only two carrying
+``style=flp`` loops; every other unit still reports 2.431 ns. So the honest
+comparison multiplies a 1.26-2.22x cycle cost by a roughly 1.56x longer clock,
+and the variant's resources are BRAM 41 / DSP 21 / FF 17,918 / LUT 24,244
+against the shipped design's BRAM 42 / DSP 14 / FF 17,481 / LUT 26,583.
+
+Where the cycles went, per increment, at 4x4x4 and 16x16x16:
+
+============================= ================= ==================================
+Increment                     Cycles            Step
+============================= ================= ==================================
+1 (``b3793f85``)              176 / 750         +4 / +64
+2 (``8f113313``)              186 / 1216        **+10 / +466**
+3 (``7b087c44``)              197 / 1904        **+11 / +688**
+3b (``c565ebea``)             199 / 1514        +2 / -390
+4 and 5a (branch HEAD)        216 / 1521        +17 / +7
+============================= ================= ==================================
+
+The two large steps are increments 2 and 3, and they are real: each was
+re-measured independently at its own commit with zero mismatches. Increment 3b
+recovered 390 cycles of increment 3's 688.
+
+Three claims the building agent made were corrected by the re-measurement, and
+are recorded on the branch: there are 42 mutants rather than 41; ``frp``
+**passes** the pipeline-style repro rather than deadlocking as the register
+said; and a 72-bit stream does not "run clean" — 65, 72 and 96 bits all corrupt
+the simulator heap, and what varies is only whether the overrun lands somewhere
+fatal (see :doc:`/developer/limitations`). Two documentation defects also stand
+on that branch: ``DELAY`` is described as an honoured minimum issue spacing but
+appears nowhere in the implementation, and a cited ``isa_dsl.eltwise_program``
+does not exist.
+
+One piece of the experiment was judged worth keeping independently of it:
+``s.pipeline(style=)`` (``0038833c``), a ~20-line schedule primitive modelled on
+``rewind`` and covered by ``tests/test_vhls.py::test_pipeline_style``. Any
+cyclic dataflow design needs it. Note that only ``EmitVivadoHLS.cpp`` reads
+``pipeline_style``; the Intel, Catapult, Tapa and XLS emitters ignore it
+silently.
 
 Provenance
 ----------

@@ -1,0 +1,51 @@
+{
+  "name": "batched_matmul_2x4x4x4",
+  "stresses": "a batch dimension present in both inputs and the output, which a GEMM mapper has no rank for; it is also the only spec here whose natural program fills all AGU_TERMS=3 address terms at once",
+  "einsum": "bmk,bkn->bmn",
+  "dims": {
+    "b": 2,
+    "m": 4,
+    "k": 4,
+    "n": 4
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "bmk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "bkn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "bmn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

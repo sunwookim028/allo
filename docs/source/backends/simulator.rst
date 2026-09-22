@@ -79,25 +79,34 @@ Controlling OpenMP Threads in Simulator Tests
 
 When running simulations or tests that use the simulator backend, the number of threads created by OpenMP can be controlled via the ``OMP_NUM_THREADS`` environment variable. This variable controls the number of CPU threads OpenMP uses for parallel execution.
 
-Some dataflow designs may require a large number of threads to simulate properly (otherwise, you might experience "hang" or "stuck"). In such cases, please set ``OMP_NUM_THREADS`` to a larger value.
+.. note::
+
+   ``OMP_NUM_THREADS`` is a **performance** knob, not a correctness
+   requirement. This page used to say that a dataflow design may need a large
+   pool "to simulate properly (otherwise, you might experience hang or stuck)"
+   and to advise raising it to 64 or 128. That requirement is gone: a region
+   whose kernel instances outnumbered the pool used to wedge silently, because
+   a process blocked on a stream held a thread its own producer needed, and
+   since ``f193c057`` the simulator sizes the OpenMP team to the region's
+   section count rather than to the core count. A region now runs whatever
+   ``OMP_NUM_THREADS`` is set to. See :ref:`item 11 <limitation-11>` of the
+   limitations register for the measurement this replaces.
 
 For example:
 
 .. code-block:: bash
 
-    export OMP_NUM_THREADS=64
+    export OMP_NUM_THREADS=8
     python3 tests/dataflow/test_1D_systolic.py
 
 
-The OpenMP runtime determines the size of its thread pool during initialization based on the value of ``OMP_NUM_THREADS``.  
-Once the thread pool has been created, modifying ``OMP_NUM_THREADS`` afterward will **not** affect the existing pool size.  
+The OpenMP runtime determines the size of its thread pool during initialization based on the value of ``OMP_NUM_THREADS``.
+Once the thread pool has been created, modifying ``OMP_NUM_THREADS`` afterward will **not** affect the existing pool size.
 
-**Please ensure that the thread pool is large enough when running the simulator.**
+So if you want a particular pool size for a particular test, export it before the process starts,
+or adjust it individually within each process as needed.
 
-You can either export ``OMP_NUM_THREADS`` to a sufficiently large value before running all simulators,  
-or adjust it individually within each process as needed.  
-
-**Tip:** If you are using ``pytest`` to run multiple tests and have not pre-exported a large enough ``OMP_NUM_THREADS``,  
+**Tip:** If you are using ``pytest`` to run multiple tests and want each one's ``OMP_NUM_THREADS`` to take effect,
 be sure to use the ``--forked`` option so that each test runs in a separate process and the ``OMP_NUM_THREADS`` setting in ``setup_env`` takes effect.
 
 
@@ -110,7 +119,7 @@ Example: To ensure that each test runs in a separate process and the thread pool
 
     @pytest.fixture(scope="module", autouse=True)
     def setup_env():
-        os.environ["OMP_NUM_THREADS"] = "128"
+        os.environ["OMP_NUM_THREADS"] = "8"
         yield
         del os.environ["OMP_NUM_THREADS"]
 

@@ -39,16 +39,22 @@ import argparse
 import json
 import os
 import re
-import secrets
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
+sys.path.insert(0, str(AGENT_DIR))
+#: The nonce-vouched gate call has ONE definition, in evaluate.py, and this
+#: script imports it. It used to exist here as a second copy; a
+#: security-critical primitive that can drift between two copies is the one
+#: kind of duplication this harness cannot afford.
+from evaluate import ALL_SHAPES, vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
@@ -56,24 +62,30 @@ LLVM_BUILD_DIR = os.environ.get(
 ENV_BIN = str(Path(ALLO_PYTHON).parent)
 #: Control runs of the unmodified design: (microarch_isa.py blob, isa_dsl.py
 #: blob) -> five-shape cosim cycles. Measured by this script with no --diff.
+#: The cycles are positional against `ALL_SHAPES`, which is the one five-shape
+#: definition (`{PKG}/shapes.py`); the keys are not written out again here.
+#:
+#: NOTE: no entry matches HEAD. A prose-only edit to `microarch_isa.py`
+#: (docstring corrections, two dead constants removed; no change to the design)
+#: moved its blob away from the 476a70d8 entry below, and re-recording the
+#: control needs a fresh five-shape cosim run, which is not this change's to
+#: make. Until one is recorded, acceptance reports `claim: "no-baseline"`
+#: unless `--baseline` names a control run's accept.json.
 BASELINES = {
     # main @ e2451b81 (the branch point before the rebase)
     ("ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
      "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
-        {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
-         "16x16x16": 919},
+        dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
     # main @ e620576d (check_program in assemble(), docstring fixes)
     ("cb26d5683338184f02bfcb6be13bc1ace4e5e3e9",
      "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
-        {"4x4x4": 252, "8x8x8": 383, "12x12x12": 591, "16x16x8": 667,
-         "16x16x16": 919},
+        dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
     # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
     # II=1 via s.dependence). Main's published numbers; re-measured by a no-diff
     # control through this script, evidence/accept-control-476a70d8/.
     ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
      "8f2e9aa9f518ef320cab163adc95e05737c777be"):
-        {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418, "16x16x8": 484,
-         "16x16x16": 686},
+        dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686))),
 }
 
 
@@ -101,14 +113,13 @@ def sh(cmd, cwd, env=None, log=None, timeout=7200, stdin=None):
 
 
 def vouched(check, wt, cwd, env, log, writable, timeout=7200):
-    """As evaluate.py: the check under gate_runner.py (from the checkout, i.e.
-    from git at --ref), passed only on its nonce line. Returns (ok, rc, out, s)."""
-    nonce = secrets.token_hex(16)
-    rc, out, sec = sh(boxed([ALLO_PYTHON, str(wt / PKG / "chia_agent" / "gate_runner.py"),
-                             check], writable), cwd, env, None, timeout,
-                      stdin=nonce + "\n")
-    ok = rc == 0 and f"CHIA-GATE {check} OK {nonce}" in out.splitlines()
-    out = out.replace(nonce, "<nonce>")
+    """`evaluate.vouch` with this script's sandbox and logging: the check runs
+    under the WORKTREE's gate_runner.py (i.e. from git at --ref), and is passed
+    only on its nonce line. Returns (ok, rc, out, s)."""
+    ok, rc, out, sec = vouch(
+        check, wt,
+        lambda cmd, stdin: sh(boxed(cmd, writable), cwd, env, None, timeout,
+                              stdin=stdin))
     Path(log).write_text(out)
     return ok, rc, out, sec
 

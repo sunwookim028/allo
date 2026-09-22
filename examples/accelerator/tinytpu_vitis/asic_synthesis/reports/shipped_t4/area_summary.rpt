@@ -1,0 +1,76 @@
+ 
+****************************************
+Report : area
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 00:47:39 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_tinytpu_t4/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Number of ports:                        19210
+Number of nets:                        448035
+Number of cells:                       434225
+Number of combinational cells:         205743
+Number of sequential cells:            224987
+Number of macros/black boxes:               0
+Number of buf/inv:                      36536
+Number of references:                     351
+
+Combinational area:             255505.241336
+Buf/Inv area:                    26741.245521
+Noncombinational area:         1016186.729495
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:               1271691.970831
+
+--- top-level instances (first 40 rows of the hierarchical breakdown) ---
+Hierarchical cell                 Absolute      Percent  Combi-       Noncombi-     Black-
+                                  Total         Total    national     national      boxes   Design
+--------------------------------  ------------  -------  -----------  ------------  ------  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tinytpu_isa                       1271691.9708    100.0   34812.2184   100819.8483  0.0000  tinytpu_isa
+accu_0_U0                           98031.6376      7.7   19095.6084    78393.3892  0.0000  tinytpu_isa_accu_0
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ap_enable_reg_pp0_iter6_reg       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_129
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ap_phi_reg_pp0_iter5_z_3_ph_reg_210_reg       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_141
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ap_phi_reg_pp0_iter6_z_3_ph_reg_210_reg       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_130
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_0_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_1
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_100_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_101
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_101_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_102
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_102_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_103
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_103_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_104
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_104_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_105
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_105_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_106
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_106_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_107
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_107_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_108
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_108_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_109
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_109_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_110
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_10_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_11
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_110_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_111
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_111_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_112
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_112_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_113
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_113_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_114
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_114_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_115
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_115_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_116
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_116_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_117
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_117_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_118
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_118_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_119
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_119_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_120
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_11_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_12
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_120_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_121
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_121_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_122
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_122_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_123
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_123_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_124
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_124_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_125
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_125_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_126
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_126_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_127
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_127_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_128
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_12_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_13
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_13_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_14
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_14_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_15
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_15_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_16
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_16_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_17
+accu_0_U0/clk_gate_grp_accu_0_Pipeline_VITIS_LOOP_3785_1_fu_28_ar_U_ram_reg_17_       3.9900     0.0      0.0000       3.9900 0.0000 SNPS_CLOCK_GATE_HIGH_tinytpu_isa_accu_0_18

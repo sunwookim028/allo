@@ -1,0 +1,50 @@
+{
+  "name": "gemm_steady_64x64x64",
+  "stresses": "the largest shape the widened build holds: the one place a 4x4 array can be asked for its peak and have the answer be about the array",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 64,
+    "k": 64,
+    "n": 64
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null
+}

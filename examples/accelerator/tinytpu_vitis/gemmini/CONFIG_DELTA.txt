@@ -1,0 +1,263 @@
+Int8Dim4GemminiRocketConfig vs stock GemminiRocketConfig -- the COMPLETE field delta
+====================================================================================
+
+Written to be CHECKED, not believed. Every row cites the file and line that sets
+the value; nothing here should be taken on trust. Read against the pins:
+
+    chipyard                              e0207441
+    generators/gemmini                    25809f7
+    .../software/gemmini-rocc-tests       1a1a1c6
+
+Paths are relative to the chipyard root. Two abbreviations:
+
+    GC.scala   generators/gemmini/src/main/scala/gemmini/GemminiConfigs.scala
+    C.scala    generators/gemmini/src/main/scala/gemmini/Configs.scala
+    CC.scala   generators/gemmini/src/main/scala/gemmini/CustomConfigs.scala
+    RA.scala   generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
+
+Why the complete list and not the interesting subset: a silently inherited
+default is the likeliest way two independent builds diverge for a reason nobody
+can reconstruct afterwards. Section 3 is the part that matters most for that,
+because those values are DERIVED -- two builds can agree on every written field
+and still differ in hardware.
+
+
+1. WHAT THE TWO CONFIGS ARE
+---------------------------
+
+  GemminiRocketConfig        RA.scala:10-14   -> gemmini.DefaultGemminiConfig
+                                              -> GemminiConfigs.defaultConfig   (C.scala:21)
+  Int8Dim4GemminiRocketConfig RA.scala:20-24  -> gemmini.GemminiCustomConfig(int8Dim4Config)
+                                              -> defaultConfig.copy(...)        (CC.scala:60-66)
+
+The two Chisel wrappers are STRUCTURALLY IDENTICAL -- both are
+`case BuildRoCC => up(BuildRoCC) ++ Seq(...)`, i.e. both APPEND one Gemmini:
+
+  DefaultGemminiConfig   C.scala:249-259
+  GemminiCustomConfig    CC.scala:73-83
+
+so the wrapper is not a source of difference. The surrounding SoC stack is
+character-for-character the same in both classes:
+
+  new freechips.rocketchip.rocket.WithNHugeCores(1)
+  new chipyard.config.WithSystemBusWidth(128)
+  new chipyard.config.AbstractConfig
+
+(RA.scala:12-14 vs RA.scala:22-24). So the Rocket core, its 32 KiB L1 D$
+(nSets 64 x nWays 8 x 64 B; generators/rocket-chip/src/main/scala/rocket/
+Configs.scala:36-41), the 128-bit system bus, and the memory model
+(WithBlackBoxSimMem(additionalLatency=0); chipyard AbstractConfig.scala:19 ->
+HarnessBinders.scala:122-129) are identical on both sides.
+
+
+2. WRITTEN FIELDS -- the complete diff (5 rows, of which 2 are no-ops)
+----------------------------------------------------------------------
+
+`int8Dim4Config` is `defaultConfig.copy()` with exactly five named arguments
+(CC.scala:60-66). All five are listed, including the two that change nothing:
+
+  field               stock      ours   set at                changes hardware?
+  ------------------- ---------- ------ --------------------- -----------------
+  meshRows            16         4      C.scala:31 / CC:61    YES
+  meshColumns         16         4      C.scala:32 / CC:62    YES
+  tileRows            1          1      C.scala:29 / CC:63    no -- same value
+  tileColumns         1          1      C.scala:30 / CC:64    no -- same value
+  has_training_convs  true       false  C.scala:48 / CC:65    YES, conv only
+
+tileRows / tileColumns are restated at the value they already hold. They are
+in the copy() for legibility, not to change anything. Stock defaultConfig sets
+them to 1 at C.scala:29-30 and the case-class default is also 1 (GC.scala:26-27).
+
+has_training_convs is read in EXACTLY ONE place in the whole generator:
+LoopConv.scala:1358-1363, where it gates six conv-loop flags to constant false
+(wrot180, input_dilated, trans_output_1203, trans_weight_1203,
+trans_weight_0132, trans_input_3120). It is threaded there via
+Controller.scala:153 and LoopConv.scala:1174/1538/1545. It is read NOWHERE in
+LoopMatmul.scala, Mesh.scala, MeshWithDelays.scala, ExecuteController.scala,
+Scratchpad.scala or AccumulatorMem.scala, and it does not appear in
+GC.scala's generateHeader (GC.scala:275-500). A GEMM therefore cannot observe
+it, and it is absent from gemmini_params.h. Verify with:
+    grep -rn 'has_training_convs' generators/gemmini/src/main/scala/gemmini/
+
+EVERY OTHER FIELD IS INHERITED UNCHANGED. The full inherited set, so that
+"unchanged" is checkable rather than asserted -- 55 fields, value then where it
+is set (C.scala = explicit in defaultConfig; GC.scala = case-class default that
+defaultConfig does not override):
+
+  inputType                      SInt(8.W)                 C.scala:23
+  accType                        SInt(32.W)                C.scala:24
+  spatialArrayOutputType         SInt(20.W)                C.scala:26
+  opcodes                        OpcodeSet.custom3         GC.scala:18  (default)
+  dataflow                       Dataflow.BOTH             C.scala:35
+  sp_capacity                    CapacityInKilobytes(256)  C.scala:38
+  acc_capacity                   CapacityInKilobytes(64)   C.scala:39
+  sp_banks                       4                         C.scala:41
+  acc_banks                      2                         C.scala:42
+  sp_singleported                true                      C.scala:44
+  acc_singleported               false                     C.scala:45
+  has_max_pool                   true                      C.scala:49
+  has_nonlinear_activations      true                      C.scala:50
+  reservation_station_entries_ld 8                         C.scala:53
+  reservation_station_entries_st 4                         C.scala:54
+  reservation_station_entries_ex 16                        C.scala:55
+  ld_queue_length                8                         C.scala:58
+  st_queue_length                2                         C.scala:59
+  ex_queue_length                8                         C.scala:60
+  max_in_flight_mem_reqs         16                        C.scala:63
+  dma_maxbytes                   64                        C.scala:65
+  dma_buswidth                   128                       C.scala:66
+  tlb_size                       4                         C.scala:69
+  mvin_scale_args                Some(ScaleArguments(...))  C.scala:72-109
+  mvin_scale_acc_args            None                      C.scala:111
+  mvin_scale_shared              false                     C.scala:112
+  acc_scale_args                 Some(ScaleArguments(...))  C.scala:114-151
+  num_counter                    8                         C.scala:154
+  acc_read_full_width            true                      C.scala:157
+  acc_read_small_width           true                      C.scala:158
+  ex_read_from_spad              true                      C.scala:160
+  ex_read_from_acc               true                      C.scala:161
+  ex_write_to_spad               true                      C.scala:162
+  ex_write_to_acc                true                      C.scala:163
+  spad_read_delay                4                         GC.scala:42  (default)
+  acc_latency                    2                         GC.scala:48  (default)
+  tile_latency                   0                         GC.scala:78  (default)
+  mesh_output_delay              1                         GC.scala:79  (default)
+  acc_sub_banks                  -1                        GC.scala:46  (default)
+  shifter_banks                  1                         GC.scala:53  (default)
+  aligned_to                     1                         GC.scala:55  (default)
+  use_dedicated_tl_port          true                      GC.scala:64  (default)
+  use_tlb_register_filter        true                      GC.scala:67  (default)
+  hardcode_d_to_garbage_addr     false                     GC.scala:75  (default)
+  use_shared_tlb                 true                      GC.scala:76  (default)
+  use_tree_reduction_if_possible true                      GC.scala:81  (default)
+  has_dw_convs                   true                      GC.scala:88  (default)
+  has_normalizations             false                     GC.scala:89  (default)
+  has_first_layer_optimizations  true                      GC.scala:90  (default)
+  use_firesim_simulation_counters false                    GC.scala:92  (default)
+  use_shared_ext_mem             false                     GC.scala:94  (default)
+  clock_gate                     false                     GC.scala:95  (default)
+  headerFileName                 "gemmini_params.h"        GC.scala:97  (default)
+
+The four pipeline-depth fields are called out because they set fixed cost
+directly and are the ones a reviewer will ask about: spad_read_delay 4,
+tile_latency 0, mesh_output_delay 1, acc_latency 2. defaultConfig does NOT
+override any of them -- they sit at their case-class defaults. For contrast
+GemminiFPConfigs.defaultFPConfig sets spad_read_delay = 1 (ConfigsFP.scala:41),
+tile_latency = 1..2 and mesh_output_delay = 0, so a materially shallower
+Gemmini exists in-tree and was deliberately NOT used. Same for dataflow:
+ours inherits Dataflow.BOTH although both benchmarks only ever pass WS, so
+Gemmini carries an output-stationary datapath we never exercise
+(the WS-only variant is leanConfig, C.scala:238).
+
+
+3. DERIVED FIELDS -- where two builds can agree on the config and still differ
+------------------------------------------------------------------------------
+
+None of these is written anywhere. All are computed in the GemminiArrayConfig
+body from the fields above, so they change when DIM changes even though no
+field naming them was touched. This is the section to cross-check hardest.
+
+  derived value            formula (GC.scala line)                   stock(16)     ours(4)
+  ------------------------ ----------------------------------------- ------------- ----------
+  sp_width                 meshColumns*tileColumns*inputType.W (99)  128           32
+  sp_bank_entries          sp_kb*1024*8/(sp_banks*sp_width) (100-103) 4096         16384
+  acc_bank_entries         acc_kb*1024*8/(acc_banks*DIM*accType.W)
+                                                            (104-107) 512           2048
+  BLOCK_ROWS / BLOCK_COLS  tileRows*meshRows (182-183)               16            4
+  DIM                      BLOCK_ROWS (186)                          16            4
+  LOG2_DIM                 log2Up(DIM) (187)                         4             2
+  LOG2_DIM_COUNT           log2Up(DIM+1) (188)                       5             3
+  cisc_dim                 (meshRows*tileRows)/2 (203)               8             2
+  ITYPE_BYTES              (8+cisc_dim-1)/cisc_dim (206)             1             4
+  LOG2_ITYPE_BYTES         (207)                                     0             2
+  OTYPE_BYTES              (32+cisc_dim-1)/cisc_dim (211)            4             16
+  LOG2_OTYPE_BYTES         (212)                                     2             4
+  SP_ROWS                  sp_banks*sp_bank_entries (216)            16384         65536
+  LOG2_SP_ROWS             log2Up(SP_ROWS) (217)                     14            16
+  ACC_ROWS                 acc_banks*acc_bank_entries (221)          1024          4096
+  LOG2_ACC_ROWS            log2Up(ACC_ROWS) (222)                    10            12
+  MNK_BYTES                Int.MaxValue/DIM (224)                    134217727     536870911
+  I_TILE_BYTE_WIDTH        DIM*ITYPE_BYTES (237)                     16            16   <-- SAME
+  O_TILE_BYTE_WIDTH        DIM*OTYPE_BYTES (238)                     64            64   <-- SAME
+  GBL_B_SP_ROW_ADDR_1      SP_ROWS - 2*DIM (245)                     16352         65528
+  GBL_B_SP_ROW_ADDR_2      SP_ROWS - 1*DIM (246)                     16368         65532
+  USABLE_SP_TILES          SP_ROWS/DIM - 2 (248)                     1022          16382
+  TOTAL_ACC_TILES          ACC_ROWS/DIM (249)                        64            1024
+  SQRT_ACC_TILES           sqrt(TOTAL_ACC_TILES) (250)               8             32
+  BYTE_ROWS_PER_TILE       DIM (257)                                 16            4
+  local_addr_t             LocalAddr(sp_banks, sp_bank_entries,
+                             acc_banks, acc_bank_entries) (110)      widths differ
+  OG_HEIGHT_MAP            1..TOTAL_ACC_TILES, resorted (253-255)    64 entries    1024 entries
+  tree_reduction           WS && tileRows>1 (175)                    false         false
+
+I_TILE_BYTE_WIDTH and O_TILE_BYTE_WIDTH come out EQUAL at DIM=16 and DIM=4,
+because DIM halves twice while ITYPE_BYTES/OTYPE_BYTES quadruple. Both must be
+powers of two (require at GC.scala:239-241) and both are 16 / 64 at every DIM
+in {2,4,8,16,32,64} for int8/int32, so that require never fires in this family.
+
+Note that sp_capacity and acc_capacity are UNCHANGED (256 KB / 64 KB) while
+sp_bank_entries and acc_bank_entries QUADRUPLE. The scratchpad is 256 KiB and
+the accumulator 64 KiB at both DIMs; only the row shape changes. A 4x4 array
+therefore gets the same on-chip memory as a 16x16 one.
+
+
+4. GENERATED HEADER -- gemmini_params.h
+---------------------------------------
+
+The header is GENERATED, not written: Controller.scala:30 writes
+config.generateHeader() to config.headerFilePath during Chisel elaboration, and
+headerFilePath (GC.scala:505-524) resolves to
+generators/gemmini/software/gemmini-rocc-tests/include/gemmini_params.h
+whenever cwd is the chipyard root, which is how make launches sbt.
+
+Fields that differ between the two configs (generateHeader GC.scala:337-347):
+
+  #define DIM                 16      ->  4
+  #define BANK_ROWS           4096    ->  16384
+  #define ACC_ROWS            1024    ->  4096
+  #define MAX_BLOCK_LEN       (64/(DIM*1))   ->  same expression, 4 -> 16
+  #define MAX_BLOCK_LEN_ACC   (64/(DIM*4))   ->  same expression, 1 -> 4
+
+Everything else in the header is identical, because it depends only on fields
+section 2 shows unchanged: elem_t int8_t, acc_t int32_t, full_t int64_t,
+BANK_NUM 4, scale_t float, MVIN_SCALE_IDENTITY 1.0, ACC_SCALE_IDENTITY 1.0,
+ACC_READ_SMALL_WIDTH, ACC_READ_FULL_WIDTH, HAS_FIRST_LAYER_OPTIMIZATIONS.
+
+TWO HAZARDS THAT MATTER FOR A CROSS-CHECK:
+
+  (a) Every elaboration REWRITES THIS FILE IN PLACE. Elaborate a second config
+      and the first one's header is gone, silently, with no error. Snapshot it,
+      and rebuild the C tests immediately after each elaboration. Verify which
+      hardware produced a number from the run's own banner -- both benchmarks
+      print "GEMMINI DIM=%d elem_t_bytes=%d" as their first line.
+
+  (b) rocc-tests HEAD (1a1a1c6) ships a header with DIM 16, BANK_ROWS 4096,
+      ACC_ROWS 1024 and NO ACC_READ_FULL_WIDTH. The first three match stock
+      GemminiRocketConfig; the missing ACC_READ_FULL_WIDTH does not, because
+      defaultConfig sets acc_read_full_width = true (C.scala:157) and
+      generateHeader emits the macro for it (GC.scala:485-486). That committed
+      header was therefore generated by some LEANER config (leanConfig sets
+      acc_read_full_width = false, C.scala:238), not by defaultConfig. Do not
+      treat the committed header as the stock-config header; regenerate it.
+
+  (c) Header-only regeneration, no build: GEMMINI_ONLY_GENERATE_GEMMINI_H=1
+      makes Controller.scala:31 System.exit(1) right after the write, so
+          GEMMINI_ONLY_GENERATE_GEMMINI_H=1 make -C sims/verilator firrtl CONFIG=<X>
+      writes the header and then fails on purpose. ~1 minute. This is the
+      pattern generators/gemmini/scripts/build-spike.sh:20-24 uses.
+
+
+5. THE SECOND MATCHED POINT (DIM=8)
+-----------------------------------
+
+int8Dim8Config (CC.scala:82-88) is the same delta again: meshRows/meshColumns 8,
+tileRows/tileColumns 1, has_training_convs false. Its derived values follow the
+same formulas -- BANK_ROWS 8192, ACC_ROWS 2048, sp_width 64, cisc_dim 4,
+ITYPE_BYTES 2, OTYPE_BYTES 8, I_TILE_BYTE_WIDTH 16, O_TILE_BYTE_WIDTH 64.
+Elaborated as Int8Dim8GemminiRocketConfig (RA.scala, beside the DIM=4 class).
+
+For a DIM=16 point to be a CONSISTENT third member of this family it must set
+has_training_convs = false. Stock GemminiRocketConfig leaves it true
+(C.scala:48), which is the only field besides the mesh that separates it from
+this family, and it is exactly the kind of silently inherited default that
+would make a disagreement between two independent builds untraceable.

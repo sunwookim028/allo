@@ -226,12 +226,16 @@ instructions, which is past the longest program this MAXDIM admits (45), so the
 burst build wins everywhere it can be run -- but it would not at a larger
 MAXDIM without also fixing what the marginal term buys.
 
-**What the remaining +5 cycles/instruction is.** `dma_st` still writes `C` with
-the strided pattern -- `[HLS 214-115] Multiple burst writes of length 4 and bit
-width 8`, II=4 -- because a contiguous write-back would have to either clobber
-the columns the program never named or be deferred to the end of the run, where
-it would serialize behind the last `mvout` instead of overlapping the compute
-it currently overlaps. That is the next thing to measure, not an oversight.
+**What the remaining +5 cycles/instruction was -- settled.** At that build
+`dma_st` wrote `C` with the strided pattern -- `[HLS 214-115] Multiple burst
+writes of length 4 and bit width 8`, II=4 -- and neither way of bursting it was
+free: a contiguous write-back would have to either clobber the columns the
+program never named or be deferred to the end of the run, where it would
+serialize behind the last `mvout` instead of overlapping the compute it
+overlaps. So it was measured rather than assumed. A unit-level probe matrix
+found the cause was element width, not the stride (a contiguous int8 write is
+also II=4), and the alignment change below takes `dma_st` to II=1. No open work
+here; the probe matrix is on `docs/source/designs/tinytpu_history.rst`.
 
 **What the operand burst is NOT worth.** Merging the A and B bursts into one
 loop bounded by `max(na, nb)` halves the burst time -- they are separate
@@ -299,8 +303,9 @@ import allo.dataflow as df
 # is therefore 8 bits for MAXROWS = 127, and the address fields are 12 bits for
 # a 2047 maximum, which is comfortably above SPAD_ROWS and NVR.
 #
-# `nr` is the row count for *every* instruction that has one, and it is only 7
-# bits wide (<= MAXROWS = 127). That width is load-bearing, not cosmetic: a
+# `nr` is the row count for *every* instruction that has one, and it is only 8
+# bits wide, 7 of them usable (<= MAXROWS = 127) under the spare-bit rule above.
+# That width is load-bearing, not cosmetic: a
 # synthesis tool bounds a runtime-bounded loop by the *range of the index*, so
 # when the row count came out of a 12-bit field Vitis assumed up to 4095 rows
 # per instruction and reported `Trip = 1023 / 2049` with a top-level latency of
@@ -454,7 +459,7 @@ assert T >= 4, "a packed operand word must be at least 32 bits"
 VW = T * 8                     # packed operand word: T int8 lanes
 AW = T * 32                    # packed accumulator word: T int32 lanes
 
-MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
+MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))     # largest M, K, N supported
 # A, B and C are **flat** at the region boundary, addressed `row * MAXDIM + col`.
 # That is what DRAM is, and it is what makes `wrap_io=False` legal -- it refuses
 # multi-dimensional arguments to nested kernels ("Top-level multi-dimensional
@@ -463,10 +468,72 @@ MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))     # largest M, K, N supported
 # hoists every argument into a local buffer before the region starts, sized to
 # the *declared* array rather than to the shape being run, and that copy was
 # 907 of the 1586 cycles at 16x16x16 and 90% of them at 4x4x4.
-SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))   # rows, each one packed word
-NVR = int(os.environ.get("TPU_NVR", 256))          # operand vector registers
-NAR = int(os.environ.get("TPU_NAR", 128))          # accumulator vector registers
+
+# ---- THE MEMORIES ARE DERIVED FROM MAXDIM, NOT TYPED IN ----
+# They used to be three independent literals (512 / 256 / 128) that happened to
+# be big enough for MAXDIM=16 and silently were not for anything larger: the
+# shipped GEMM lays A out at `A_VR + kb*MAXDIM + m` and B at
+# `B_SP + nb*MAXDIM + k`, so the highest operand row either names is
+#
+#       (MAXDIM/T - 1) * MAXDIM + MAXDIM  ==  MAXDIM*MAXDIM / T
+#
+# and at MAXDIM=64 that is 1024 rows against a 256-entry vreg file. Raising
+# MAXDIM alone therefore produced a build that ASSEMBLED and gave wrong
+# answers, which is exactly the kind of coupling a parameter should not have.
+# The sizes are now that expression, with the env var kept as an override for
+# probing a deliberately-undersized build.
+OPERAND_ROWS = (MAXDIM // T) * MAXDIM              # rows the GEMM layout names
+# ...and a FLOOR, because the GEMM is not the only program the machine runs.
+# `stress_isa.random_program` addresses a fixed 64-row window in each memory
+# (`lo = SPAD_ROWS - 64` when it picks the high window, then `place` offsets
+# within 64 rows) and it does that INDEPENDENTLY of MAXDIM, so a memory
+# smaller than that window cannot hold a fuzz program at all. Sizing purely
+# to `OPERAND_ROWS` gave 16 rows at MAXDIM=8 and 36 at MAXDIM=12, and
+# `chia_agent/param_check.py` -- whose whole job is to prove the design is
+# parametric rather than overfitted to the scored point -- went from
+# `PARAM OK` to "only 0 of 24 random programs could be generated (need 16)"
+# at both. Every GEMM shape stayed bit-exact; what broke was the fuzzer's
+# room, which is the harder failure to notice because it reads as a harness
+# complaint rather than a design change.
+#
+# So the memories are the larger of what the GEMM addresses and what the test
+# programs address. This is still far below the literals it replaced (64 at
+# MAXDIM=16 against 512) and still scales with MAXDIM where it matters.
+TEST_WINDOW = 64                                   # stress_isa's fuzz window
+SPAD_ROWS = int(os.environ.get(
+    "TPU_SPAD", max(TEST_WINDOW, OPERAND_ROWS)))   # each one a packed word
+NVR = int(os.environ.get(
+    "TPU_NVR", max(TEST_WINDOW, OPERAND_ROWS)))    # operand vector registers
+# `AR_C` is MAXDIM rows and `AR_P` another MAXDIM starting at MAXDIM+1, so the
+# GEMM and vector programs need 2*MAXDIM+2; the 128 floor keeps the
+# fixed-address test programs (`isa_dsl.vector_program` reaches row 112) legal
+# at small MAXDIM, where the derived size would be below them.
+NAR = int(os.environ.get(
+    "TPU_NAR", max(128, TEST_WINDOW, 2 * MAXDIM + 8)))
 QD = int(os.environ.get("TPU_QD", 8))              # stream depth
+
+# ---- WHAT BOUNDS MAXDIM, AND AT WHAT VALUE ----
+# Two independent limits, both in the ENCODING rather than in the datapath, and
+# both measured by raising MAXDIM until they fired (`docs/source/designs/benchmarks.rst`):
+#
+#   * an address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so
+#     an operand row must be <= 2047:  MAXDIM*MAXDIM/T <= 2047, i.e. MAXDIM <= 90
+#     at T=4. MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
+#     outside the 0..2047 range".
+#   * a header count is read back through a 15-bit slice, and the largest is
+#     `accu`'s iteration count, MAXDIM^3/T^2 + MAXDIM^2/T for a cubic GEMM, so
+#     MAXDIM <= 76 at T=4. MAXDIM=80 fails in `assemble` with
+#     "header count 33600 does not fit 15 bits".
+#
+# MAXDIM=64 is the largest round value inside both, and is what the design
+# ships at. Neither limit is architectural: widening the fields or the header
+# slices moves them, at the cost of re-measuring the loop bounds Vitis derives
+# from the field widths (see the `nr` note above -- that is why the fields are
+# narrow in the first place).
+assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
+assert OPERAND_ROWS <= (1 << 11), (
+    f"MAXDIM={MAXDIM} at T={T} needs {OPERAND_ROWS} operand rows, past the "
+    f"2047 an 11-bit address field carries")
 
 MAXROWS = 127                                      # `nr` is 8 bits, top bit spare
 NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
@@ -475,7 +542,6 @@ NHDR = 8                       # imem[0:NHDR] is the header, instructions follow
 # number: the sequencer's prefetch is `IMEM_SIZE` words long whatever the
 # program, so every unused slot is startup time -- the same arithmetic as under
 # `wrap_io=True`, which copied the declared length for the same reason.
-_KB = MAXDIM // T
 # With control flow the program is O(nesting), not O(tiles): the looped GEMM is
 # at most 14 instructions (with relu) at every shape, where the unrolled one
 # reaches 32 at 16x16x16. So imem is sized to the longest program shipped (the
@@ -491,9 +557,19 @@ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
 # Scratchpad and vreg layout. Fixed offsets in a fixed memory, sized for the
 # largest supported shape rather than for the shape being run.
-KB_MAX = MAXDIM // T           # column blocks in the widest matrix
-assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
 WPR = MAXDIM // T              # packed words per DRAM row
+# Operand-burst width in packed words per loop iteration. 1 is the shipped
+# design. `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds
+# (`align_value(64)`), capped at one whole DRAM row, because rounding the row
+# span up to a multiple of that never leaves the MAXDIM x MAXDIM operand --
+# the extra words land in `rbA`/`rbB` rows no instruction of the program
+# names. Any integer may be given directly with `TPU_DMA_WORDS`.
+BUS_BYTES = 64
+DMA_WORDS = int(os.environ.get(
+    "TPU_DMA_WORDS",
+    min(WPR, max(1, BUS_BYTES // (VW // 8)))
+    if os.environ.get("TPU_DMA_WIDEN") == "1" else 1))
+assert DMA_WORDS >= 1
 A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)
 B_SP = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
 AR_C = 0                       # the accumulator, up to MAXDIM words
@@ -722,20 +798,40 @@ def tinytpu_isa(
         # One burst per matrix, each covering exactly that matrix's own span.
         # Merging the two into one loop bounded by `max(na, nb)` was measured
         # and moved nothing: the bursts are hidden behind the prefetch.
-        rbA: UInt(VW)[MAXDIM * WPR]
-        rbB: UInt(VW)[MAXDIM * WPR]
-        for ia in range(na * WPR):
-            pa: UInt(VW) = 0
-            with allo.meta_for(T) as e:
-                av: int8 = lA[ia * T + e]
-                pa[8 * e : 8 * (e + 1)] = av
-            rbA[ia] = pa
-        for ic in range(nb * WPR):
-            pb: UInt(VW) = 0
-            with allo.meta_for(T) as e2:
-                bv: int8 = lB[ic * T + e2]
-                pb[8 * e2 : 8 * (e2 + 1)] = bv
-            rbB[ic] = pb
+        #
+        # BURST WIDTH IS PARAMETRIC (`TPU_DMA_WIDEN`, default off). At
+        # DMA_WORDS=1 this is the shipped loop, one packed word an iteration.
+        # Above 1 each iteration reads DMA_WORDS whole words -- up to a
+        # 64-byte beat, which is what `align_value(64)` lets Vitis widen the
+        # port to -- so the burst costs a factor of DMA_WORDS fewer
+        # iterations. Written as a `meta_for` inside a runtime loop, so the
+        # inner copy unrolls and the trip count stays runtime data.
+        #
+        # Kept parametric rather than landed because it is a real trade and
+        # the measurement that would decide it is not the one it was found
+        # with: it was found at `-m_axi_latency 0`, and a change whose whole
+        # benefit is wider DMA bursts is exactly the kind whose advantage can
+        # grow or vanish with memory latency. The grid is in
+        # `docs/source/designs/benchmarks.rst`; the original candidate is
+        # `chia_agent/evidence/isa-run1-20260919/param_burst.diff`.
+        rbA: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
+        rbB: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
+        ga_n: int32 = (na * WPR + (DMA_WORDS - 1)) // DMA_WORDS
+        for ga in range(ga_n):
+            with allo.meta_for(DMA_WORDS) as wa:
+                pa: UInt(VW) = 0
+                with allo.meta_for(T) as e:
+                    av: int8 = lA[(ga * DMA_WORDS + wa) * T + e]
+                    pa[8 * e : 8 * (e + 1)] = av
+                rbA[ga * DMA_WORDS + wa] = pa
+        gb_n: int32 = (nb * WPR + (DMA_WORDS - 1)) // DMA_WORDS
+        for gb in range(gb_n):
+            with allo.meta_for(DMA_WORDS) as wb:
+                pb: UInt(VW) = 0
+                with allo.meta_for(T) as e2:
+                    bv: int8 = lB[(gb * DMA_WORDS + wb) * T + e2]
+                    pb[8 * e2 : 8 * (e2 + 1)] = bv
+                rbB[gb * DMA_WORDS + wb] = pb
 
         f0: int32 = 0
         f1: int32 = 0
@@ -1569,11 +1665,27 @@ def schedule(s):
         false`. It is what holds the flat loop at II=1 (Vitis alone closes it
         at 3), and it is true because `check_program` enforces THE
         ACCUMULATOR DISTANCE CONTRACT on every program `assemble()` accepts.
+        That is an obligation, not a rule: `ar`'s row index is a carried
+        register, so no analysis of this kernel can prove or disprove the
+        claim, and `because=` is where the contract is recorded. Allo's
+        legality rule accepts it for exactly that reason; the only thing on
+        this host that can catch a violation is `TPU_TB=stress` cosim.
     """
     top = s.top_func_name
     s.partition(f"{top}:A", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
-    s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
+    s.dependence(
+        "accu_0:x",
+        "ar",
+        dep_type="inter",
+        dependent=False,
+        because=(
+            f"check_program() rejects any program that reads an ar row within "
+            f"AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing it (THE "
+            f"ACCUMULATOR DISTANCE CONTRACT); assemble() enforces it, the "
+            f"hardware does not, and only TPU_TB=stress cosim can see a breach"
+        ),
+    )
     return s

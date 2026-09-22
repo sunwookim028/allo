@@ -6,7 +6,8 @@
 Covers:
   - analyze_use_def name derivation: SSA sigils ("%") must not leak into the
     "name" attribute or the emitted HLS C++
-  - postprocess_hls_code: it must never mangle the C++ modulo operator
+  - postprocess_hls_code: it strips MLIR SSA %identifiers from generated C++,
+    and it must never mangle the C++ modulo operator
   - resolve_nb_type: mapping HLS ap_int<N>/ap_uint<N> to nanobind-compatible stdint types
   - parse_cpp_function: parsing C++ function signatures including ap_int parameter types
 """
@@ -58,8 +59,26 @@ def test_no_ssa_sigil_in_emitted_hls_code():
 
 
 # ---------------------------------------------------------------------------
-# postprocess_hls_code: must not mangle the C++ modulo operator
+# postprocess_hls_code: %alloc stripping, and the C++ modulo operator
 # ---------------------------------------------------------------------------
+
+
+def test_postprocess_strips_percent_alloc():
+    """MLIR SSA names like %alloc must be stripped to plain identifiers."""
+    hls_code = "int %alloc;\nfloat %alloc1;\n"
+    result = postprocess_hls_code(hls_code, top=None, pragma=False)
+    assert "%alloc" not in result
+    assert "alloc" in result
+    assert "%alloc1" not in result
+    assert "alloc1" in result
+
+
+def test_postprocess_strips_generic_percent_ident():
+    """Any %word pattern should be stripped."""
+    hls_code = "return %result;\n"
+    result = postprocess_hls_code(hls_code, top=None, pragma=False)
+    assert "%" not in result
+    assert "result" in result
 
 
 def test_postprocess_preserves_modulo_operator():
@@ -67,6 +86,23 @@ def test_postprocess_preserves_modulo_operator():
     hls_code = "int y = x % 4;\n"
     result = postprocess_hls_code(hls_code, top=None, pragma=False)
     assert "x % 4" in result
+
+
+def test_postprocess_realistic_mlir_snippet():
+    """Realistic MLIR-emitted snippet: %alloc stripped, C++ modulo preserved."""
+    # Reproduces the exact pattern that caused g++ to fail in test_three_level_systolic_csim
+    hls_code = (
+        "void top(int16_t %alloc[4][4]) {\n"
+        "  int16_t %alloc1 = 0;\n"
+        "  int idx = i % 4;\n"  # C++ modulo — must be preserved
+        "}\n"
+    )
+    result = postprocess_hls_code(hls_code, top=None, pragma=False)
+    assert "%alloc" not in result
+    assert "%alloc1" not in result
+    assert "alloc[4][4]" in result
+    assert "alloc1" in result
+    assert "i % 4" in result  # C++ modulo untouched
 
 
 # ---------------------------------------------------------------------------

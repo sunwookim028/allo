@@ -13,6 +13,7 @@ from .._mlir.ir import (
     Context,
     Location,
     Module,
+    StringAttr,
     UnitAttr,
 )
 from .._mlir.passmanager import PassManager
@@ -56,6 +57,45 @@ from ..utils import (
     get_bitwidth_from_type,
     np_supported_types,
 )
+
+
+PIPELINE_STYLE_PLATFORMS = {"vivado_hls", "vitis_hls", "pynq"}
+
+
+def styled_pipelines(op):
+    """Every loop carrying `s.pipeline(style=)`, as (axis, style)."""
+    for region in op.regions:
+        for block in region.blocks:
+            for child in block.operations:
+                inner = child.operation
+                if "pipeline_style" in inner.attributes:
+                    axis = (
+                        StringAttr(inner.attributes["loop_name"]).value
+                        if "loop_name" in inner.attributes
+                        else inner.name
+                    )
+                    yield axis, StringAttr(inner.attributes["pipeline_style"]).value
+                yield from styled_pipelines(inner)
+
+
+def check_pipeline_style_reaches_emitter(mod, platform):
+    """Only the Vivado/Vitis emitter writes `style=`. A style is chosen to stop
+    an RTL deadlock, so dropping it silently would restore the deadlock the
+    author was fixing; the emitters that ignore it refuse instead."""
+    if platform in PIPELINE_STYLE_PLATFORMS:
+        return
+    styled = list(styled_pipelines(mod.operation))
+    if not styled:
+        return
+    named = ", ".join(f"{axis} (style={style})" for axis, style in styled)
+    raise RuntimeError(
+        f"pipeline: the {platform} emitter does not write `style=`, so the "
+        f"pipeline control style on {named} would be dropped and the RTL would "
+        f"use that tool's default. This is refused rather than dropped because "
+        f"a style is chosen to stop an RTL deadlock that no simulation shows. "
+        f"Build for vitis_hls/vivado_hls/pynq, or drop `style=` if the style is "
+        f"not needed on {platform}."
+    )
 
 
 def _find_catapult_binary():
@@ -290,6 +330,7 @@ class HLSModule:
                 ")"
             )
             pm.run(self.module.operation)
+        check_pipeline_style_reaches_emitter(self.module, platform)
         buf = io.StringIO()
         success = True
         match platform:
