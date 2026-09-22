@@ -1536,7 +1536,7 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    ``ALLO_LIMITS_COSIM=1`` on the same file (one csynth, ten cosims, tens of
    minutes). Family and bisection:
    ``examples/accelerator/tinytpu_vitis/act/rtl_hang.py``; log:
-   ``examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log``.
+   ``dev/records/tinytpu/logs/cosim_act_rtl_hang_bisect.log``.
 
 A legal, bit-exact TinyTPU-isa program of **sixteen instructions** passes every
 check the fork has short of RTL and then does not finish in ``cosim_design``:

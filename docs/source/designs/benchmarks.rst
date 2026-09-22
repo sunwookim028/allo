@@ -1788,7 +1788,8 @@ more at small shapes than large ones.
 **2. The residual steady-state gap, ~5 700 cycles at 64x64x64** (22 123 against
 an ideal 16 384; Gemmini is at 20 375 against the same ideal, so ~4 000 of it
 is not ours specifically). Per the timeline attribution in
-``impact/results/`` and ``chia_agent/evidence/``, the three components are
+``dev/records/tinytpu/impact-results/`` and
+``dev/records/tinytpu/chia-evidence/``, the three components are
 operand staging ahead of the first MAC, the serial DMA before the first
 weight, and the drain. None has been built. The method is
 ``impact/profile.sh``: re-run cosim with ``-enable_dataflow_profiling``, re-run
@@ -1819,7 +1820,7 @@ What would have to change, in order of **measured** value:
    what the program needs.
 #. **Profile at 64x64x64 before touching term 2.** Every existing timeline was
    taken at 16x16x16, where term 1 dominates and term 2 is invisible, so the
-   operand-staging/DMA/drain split in ``impact/results/`` is an estimate made
+   operand-staging/DMA/drain split in ``dev/records/tinytpu/impact-results/`` is an estimate made
    in the wrong regime.
 #. **For T=8, widen the encoding fields.** T=8's deficit does not converge
    because 64x64x64 is still in its ramp (57.8% of peak); reaching steady

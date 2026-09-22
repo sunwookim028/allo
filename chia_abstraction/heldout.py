@@ -390,8 +390,9 @@ def make(out: Path) -> dict:
     tracked = sh(["git", "ls-files"]).split()
     redacted = []
     # EVERY tracked text file, not just source: the leak that survived the
-    # first attempt was in `chia_agent/evidence/*/variants.jsonl` and
-    # `impact/results/*.out`, i.e. in the design loop's own recorded evidence.
+    # first attempt was in `dev/records/tinytpu/chia-evidence/*/variants.jsonl`
+    # and `dev/records/tinytpu/impact-results/*.out`, i.e. in the design loop's
+    # own recorded evidence.
     for rel in tracked:
         if rel in {EMIT, CUSTOMIZE, DESIGN, VHLS_TESTS}:
             continue

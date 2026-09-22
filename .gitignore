@@ -111,5 +111,6 @@ examples/accelerator/tinytpu_vitis/chia_agent/__pycache__/
 # per-evaluation Vitis projects (~110 MB each) and acceptance checkouts
 .chia_scratch/
 # run output (swarm.py / test_harness.py / accept.py write here). What backs a
-# claim is copied, trimmed, into chia_agent/evidence/; raw runs are on tags.
+# claim is copied, trimmed, into dev/records/tinytpu/chia-evidence/; raw runs
+# are on tags.
 chia_runs/

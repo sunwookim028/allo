@@ -19,7 +19,7 @@ import time
 from evaluate import ALL_SHAPES, EDITABLE, PKG, REPO, TARGET_NS
 
 #: The published five-shape cycles per measuring driver (docs/source/designs/
-#: tinytpu_isa.rst, evidence/accept-control-476a70d8/): the cross-check for a
+#: tinytpu_isa.rst, dev/records/tinytpu/chia-evidence/accept-control-476a70d8/): the cross-check for a
 #: design whose blobs are not in `RECORDED`, where a prose-only edit lands.
 #: Keyed by driver because a second driver runs a different PROGRAM on the same
 #: hardware, so its numbers are not this one's measured differently.

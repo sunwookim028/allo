@@ -101,7 +101,7 @@ def refit():
     The two constants are typed in so that `estimate` needs neither numpy nor
     the corpus, and this recovers them so that a typo cannot survive: it is
     called by this module's `__main__`. `PUBLISHED_CYCLES` are Vitis
-    measurements this fork attributes to `logs/cosim_isa_landed_sweep.log` at
+    measurements this fork attributes to `dev/records/tinytpu/logs/cosim_isa_landed_sweep.log` at
     `e24e433b`, not measurements made here."""
     import numpy as np
     from examples.accelerator.tinytpu_vitis.act import baseline
