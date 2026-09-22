@@ -622,8 +622,9 @@ Corrections to This Page's Earlier Numbers
   ``swarm-20260905-063857/`` is a 6-worker **CHIA LLM-agent** search (best
   126,432 -> 31,056 cycles on the ``dram`` hypothesis), which is not a mapspace
   search.
-- "ACT has a mapspace search" -- it has a mapspace *file*. See
-  `Recommendation: ACT as a mapper only`_ above.
+- "ACT has a mapspace search" -- it has a mapspace *file*, ``mapspace.py``, and
+  nothing reaches it. The enumerator this page describes is the rebuilt one, not
+  ACT's.
 - "Our 9 opcodes" listed ``DMA_ST`` as expressible. The machine **refuses** it
   (``check_program`` rejects ``OP_DMA_ST``) and ``isa_dsl`` has no emitter for
   it. There are 10 encodings, 9 executable: 7 data opcodes plus
