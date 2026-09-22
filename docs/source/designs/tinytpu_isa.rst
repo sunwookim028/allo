@@ -717,6 +717,33 @@ returned; the four DSP are the runtime ``row * words_per_row`` multiply on the
 three DMA paths. The LUT delta is inside the 1.5k noise floor two builds of an
 identical netlist showed; the FF delta is not.
 
+And the two field widenings, each against a build of everything else, so that
+what a margin costs is a number rather than an argument:
+
+.. list-table::
+   :header-rows: 1
+
+   * - relaxation
+     - what it costs in BITS
+     - FF
+     - LUT
+     - estimated clock
+   * - ``nr`` 8 -> 10 bits
+     - the instruction word's last two spare bits; the word is now full
+     - +24
+     - +8
+     - 2.431 ns, unchanged
+   * - ``AGU_TERMS`` 3 -> 4
+     - every term narrows 19 -> 16 bits, so a stride falls from 2047 to 255
+     - +89
+     - +231
+     - 2.431 ns, unchanged
+
+Both are far inside the noise floor, which is the useful result: **these are
+encoding decisions, not area decisions.** What a fourth address term really
+costs is the stride range of the other three, and what one more bit of ``nr``
+really cost is that there is now nothing spare in word 0.
+
 Hardware parameters
 -------------------
 
