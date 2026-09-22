@@ -97,3 +97,31 @@ credit limit before its first tool call.
   capacitance, both larger than the effect. Activity annotation removes one of
   three objections. Our SAIFs exist anyway (`saif_capture.py`), so the first
   row of that cost table is already done if macros and P&R ever arrive.
+
+## Cheapest outstanding request: one `report_area -hierarchy`, no re-synthesis
+
+**This needs no synthesis run and no approval slot.** The mapped databases for
+our four designs already exist under `/scratch/users/sk3463/build_*`. What is
+missing is one report off a database that is already there — very likely a
+report that was already generated, since per-instance numbers for
+`T4_MAXDIM64_shipped` and `..._burstwiden` have already been quoted
+(`gmem0/1/2`, `dma_ld_0_1_U0`, `spm_0_U0`, `vru_0_U0`, `accu_0_U0`).
+
+**What we need:** the **PE array** instance line, for
+`T4_MAXDIM16_shipped_baseline` and `T4_MAXDIM64_shipped`. The full
+per-instance table is welcome; the array line is the one that matters.
+Committed under `asic_synthesis/reports/<variant>/`, not messaged.
+
+**Why it is the single most valuable number still missing.** The spatial array
+is **pure logic on both sides** — no SRAM, no memory-technology difference, no
+capacity mismatch. Gemmini's published figure is **116K µm² for 256 PEs at
+22 nm = 453 µm²/PE**. With our array area we get a per-PE comparison that
+survives every objection currently attached to the total-area comparison, and
+it is available *before* their six runs execute.
+
+The remaining node difference (45 nm against 22 nm) is then the only
+uncertainty, and it is one clearly-named factor rather than four compounding
+ones. Our T=4 array has 16 PEs; a per-PE figure also makes the T=4 and T=8
+designs directly comparable to each other, which the totals are not.
+
+Everything else in this file stands unchanged.
