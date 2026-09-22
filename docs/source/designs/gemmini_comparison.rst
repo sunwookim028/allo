@@ -1256,3 +1256,64 @@ sets ``acc_read_full_width = true`` and the generator emits that macro — so th
 committed header came from a leaner config than the one it appears to describe.
 A build that reuses the committed header instead of regenerating it will differ
 from a build that regenerates, for a reason invisible in the Scala.
+
+Two designs, the same shape of loss
+-----------------------------------
+
+On 2026-09-22 the MiniTPU side ran its own Gemmini evaluation, independently and
+against its own interest, and the two results converged on a conclusion neither
+project would have reached alone.
+
+**Both designs lose to Gemmini, and in both cases the loss is not in the array.**
+
+- Ours: the deficit **converges** with shape — 1.27x at 16x16x16 down to
+  **1.09x at 64x64x64** — and the burst-widening candidate prices the remainder
+  exactly, at 720 cycles at 48x48x48 and 960 at 64x64x64, which is 61 % and 55 %
+  of the whole deficit. One identified prologue, not a mystery.
+- Theirs: their general emitter's smallest expressible product takes 690 cycles
+  against a 16x16 int8 Gemmini's 203-286 — but **the same 16x16x16 product
+  hand-scheduled on their machine takes 168 cycles, 1.6x faster than that
+  Gemmini.** Their array beats Gemmini's and their emitter loses to Gemmini's by
+  roughly a factor of four. The loss is entirely in emitted code.
+
+So the honest reading of both evaluations is that **Gemmini's advantage at these
+shapes is its software**, not its datapath: a mature driver and a tiling search
+that has been tuned against real workloads. That is a much more actionable
+conclusion than a microarchitectural one, and it is the direction both projects'
+remaining work should take.
+
+Their steady-state figure, which they are re-running before standing behind it
+(it currently rests on 3 of 16 sweep points): Gemmini converts its array at
+86.4 % of peak against their 53.8 %, i.e. 1.61x more efficient per processing
+element. Ours reaches **74.1 % of peak at 64x64x64** and is still climbing.
+
+A shared hypothesis died in the process
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Both projects had suspected a common mechanism: a single write port serialising
+a step that a second port would relieve. It was set up as a falsifiable test and
+**their half failed.** Banking their vector-register write port at 2 and 4 banks
+changes their emitted GEMM by **zero cycles at every shape** — the deferrals are
+on the *read* port, and a second write port was separately priced at +1.36 %
+area while failing timing, which at a WNS of +0.053 ns is fatal. Relieving it
+would move their ceiling from 61.5 % to 66.7 % and no further, because their
+stream engine sits only 4 cycles behind it.
+
+So the two are cousins rather than the same mechanism, and any case for a
+second issue path on our side has to stand on our own measurement rather than
+on the parallel. Recorded because a hypothesis that both sides liked and that
+one side has now falsified is worth more than one nobody tested.
+
+The capability gap, which is worse for us than the cycle deficit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
+search. We cannot address a matrix that size at all: our operands are a single
+``int8[MAXDIM*MAXDIM]`` region, so the shape has to fit the addressable space
+rather than being tiled into it. Unblocking it needs a runtime base and stride
+on the DMA load and store paths, a fifth loop level, and possibly a fourth
+address term.
+
+This matters more than the 1.09x. A 9 % cycle deficit at a shape both machines
+can run is a tuning result; being unable to express the shapes a real workload
+uses is a capability result, and no amount of cycle-level work closes it.
