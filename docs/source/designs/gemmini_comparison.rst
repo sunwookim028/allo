@@ -980,6 +980,43 @@ can run is a tuning result; being unable to express the shapes a real workload
 uses is a capability result, and no amount of cycle-level work closes it.
 
 
+.. _gemmini-parity:
+
+The parity baseline
+-------------------
+
+A second, named configuration of our design, kept **beside** the shipped one,
+whose purpose is to perform at parity with a matched Gemmini by changes that
+are reasonable rather than contrived. The shipped design is unchanged.
+
+The rules, fixed before any measurement
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Written and committed on branch ``gemmini-parity`` before the first cosim of
+any candidate, so the result cannot be fitted to them afterwards.
+
+- **Parity, defined.** At a shape, ours is at parity when our cosim count is
+  at most Gemmini's median plus its published spread (the ``+/-`` figure on
+  :doc:`benchmarks`, which is the full min-max range over five trials), i.e.
+  ``ours <= median + spread``. **Faster** means ``ours < median``. **Behind**
+  means ``ours > median + spread``, and the report names every such shape.
+- **Same windows, same shapes, same opponent.** Ours is Vitis cosim,
+  ``ap_start`` to ``ap_done``, ``-m_axi_latency 0``, bit-exact, one run per
+  shape (retried once on ``cycles=None``). Gemmini is the matched-array
+  median of five from :doc:`benchmarks`: DIM=4 against T=4 over all ten
+  shapes of that table, DIM=8 against T=8 over all eight of that table, both
+  at MAXDIM=64. No shape is added or dropped after the fact.
+- **A mechanism for every change**, in one sentence, and an integer invariant
+  reported beside every timing (dynamic issues, per-unit work counts, burst
+  iterations) so a changed measurement can be told from a changed machine.
+- **Synthesisable at the same clock.** It must meet the 3.33 ns target with the
+  estimated period reported, and use no FPGA-only structure (no RAM with two
+  write ports) so it also maps to standard cells.
+- **Preference order.** (1) a change to the program the generator emits, on the
+  unchanged netlist; (2) the banked burst widening (``TPU_DMA_WIDEN=1``);
+  (3) anything else, each with its mechanism and its price.
+
+
 Earlier measurements and corrections
 ------------------------------------
 
