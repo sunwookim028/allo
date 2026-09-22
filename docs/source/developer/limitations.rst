@@ -306,6 +306,17 @@ Open
      - ~5 lines (merge the callee's own module globals over the caller's);
        not prototyped
      - `new_subregion_foreign_globals.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py>`__
+   * - :ref:`24 <limitation-24>`
+     - REPRODUCES on two mappings; **NOT reduced** -- four minimal programs all
+       complete
+     - cosim / design
+     - Unknown. RTL cosim sits at ``Inter-Transaction Progress: 0 / 1`` with no
+       deadlock reported, for programs ``isa_ref``, ``check_program``,
+       ``kpn_model``, the dataflow simulator and Vitis csim all accept.
+     - Bounds what a mapper may claim: **encodable is not runnable**, and only
+       cosim tells them apart
+     - unknown
+     - `item24_cosim_stalls_on_in_nest_dma.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item24_cosim_stalls_on_in_nest_dma.py>`__
 
 .. _limitations-closed:
 
@@ -1502,6 +1513,121 @@ separately forbid one ``m_axi`` bundle read by two processes (``200-1013`` /
 - **Measured impact on TinyTPU-isa: 0 cycles.** Every restructure the design
   needed was Allo-legal. The earlier claim that removing ``vru``'s double
   handling needs a second producer on a shared memory **was wrong**.
+
+.. _limitation-24:
+
+24. RTL cosim does not complete for some legal TinyTPU-isa programs, and five checkers cannot tell which
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (2026-09-22)
+
+   REPRODUCES on two row-tiled mappings. **Filed unreduced**: a four-case
+   ladder of minimal programs designed to isolate it all completed, so the
+   trigger is not the structural feature that was suspected. Diagnosis open.
+
+Two mappings produced by :doc:`/extensions/act` for ``gemm.relu`` at 16x16x16 --
+``M2>N4>K4`` and ``N4>M2>K4``, 16 static instructions each -- do not finish RTL
+cosim. What is **measured**, and nothing beyond it:
+
+- RTL simulation sits at ``Inter-Transaction Progress: 0 / 1`` and prints no
+  further progress line;
+- ``xsimk`` holds a full core throughout -- one instance survived killing its
+  parent ``vitis_hls`` and was still at 99% CPU **32 minutes** later;
+- no deadlock is reported, although the design is elaborated with Vitis's
+  ``AESL_deadlock_detect_unit`` instances;
+- the shipped ``N4>K4`` mapping, in the same project with the same settings,
+  completes in about two minutes end to end (synthesis, csim and cosim) and
+  measures 750 cycles.
+
+This page does **not** call it a deadlock. A simulator at 100% CPU proves the
+simulator is alive, not that the design is progressing; what is established is
+non-completion at orders of magnitude over the expected wall time.
+
+Five checkers pass, and two of them share a premise
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 46 27 27
+
+   * - checker
+     - shipped ``N4>K4``
+     - ``N4>M2>K4``
+   * - ``isa_ref.run`` (numpy, the ISA's meaning)
+     - correct
+     - correct
+   * - ``check_program`` / ``assemble``
+     - accepts
+     - accepts
+   * - ``kpn_model.run`` (channel protocol, bounded FIFOs)
+     - runs, minimum depth 1
+     - runs, minimum depth 1
+   * - ``df.build(target="simulator")``
+     - completes, correct
+     - completes, correct
+   * - Vitis **csim**
+     - ``mismatches = 0``
+     - ``mismatches = 0``
+   * - Vitis **cosim** (RTL)
+     - **750 cycles**
+     - **did not complete**
+
+``kpn_model`` and ``assemble``'s own consistency both derive from the header
+``assemble`` writes, so neither can see an error in the header formula itself,
+and their agreement is weaker evidence than it looks. ``isa_ref`` models the
+ISA, not the machine. csim compiles the units' C without their handshakes.
+**Only cosim exercises the streams.**
+
+The reduction that failed, which is the useful part
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The suspicion was that the trigger is a data transfer *inside* the emitted loop
+nest rather than hoisted into a prologue -- the one structural feature the
+failing mappings share and the shipped one lacks. A supporting coverage fact:
+of the 23 programs any named gate runs, **none** issues a ``dma_ld`` after a
+compute, while ``stress_isa.random_program`` produces one in 314 of 400 seeds --
+so the pattern is heavily exercised in the *simulator* and has never reached a
+cosim testbench.
+
+``item24_cosim_stalls_on_in_nest_dma.py`` tests that suspicion with four tiny
+programs at ``rows=4``, each verified by ``isa_ref`` and csim, each cosimmed
+under a hard wall-clock bound. Measured 2026-09-22:
+
+.. code-block:: text
+
+   prologue_only                 4 instr  csim ok  cycles=169
+   dma_after_compute             7 instr  csim ok  cycles=189
+   dma_in_loop_before_compute    6 instr  csim ok  cycles=171
+   dma_in_loop_with_compute      6 instr  csim ok  cycles=186
+
+   ITEM24 NOT REPRODUCED: 0 of 4 cases produced no cosim report
+
+**All four complete**, including a ``dma_ld`` and an ``mm`` inside one loop
+body. So the suspicion is refuted at this scale: a transfer after a compute, a
+transfer inside a loop, and a transfer sharing a loop body with a compute are
+each fine on the RTL. Whatever the trigger is, it needs something the ladder
+does not have -- candidates not yet tried, in rough order of suspicion: **nested
+loops** (the failing mappings are two deep, the ladder one), trip counts above
+2, ``rows`` above 4, an accumulating ``mm`` inside a loop, or simply scale.
+
+That is a negative result, and it is filed rather than discarded because it
+rules out the three cheapest explanations and leaves a ladder someone can
+extend by adding one function.
+
+Why it matters beyond this design
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+It bounds what a mapper may claim. :doc:`/extensions/act` enumerates 1,226 loop
+nests and calls 5 encodable at 16x16x16; **3 are confirmed on the RTL**. An
+independently built mapspace gate on the co-design track proves every survivor
+against ``isa_ref`` and would have counted the same two. So "encodable" is a
+claim about the encoder in both implementations, not a promise of runnability,
+and a search that spends only pure-python budget cannot tell the difference.
+
+Fork-only: the design is fork-only, but nothing here implicates fork code
+specifically -- the cause may be in the design, in Allo's emitted RTL, or in
+Vitis. Priority: **High**, because it is the one gap that makes an otherwise
+cheap search unable to trust its own survivors.
 
 .. _limitation-a:
 

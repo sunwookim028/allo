@@ -594,11 +594,23 @@ mappings are ranked, reported and never chosen, and ``act_compile.py`` prints a
 ``staging`` column plus a warning whenever any of them appear.
 
 This is also the sharpest ``cannot refuse`` gap found in this work, and it is
-not in the ISA: some property of a program with a data transfer *inside* the
-emitted nest, rather than all of them hoisted into a prologue, is not being
-checked by anything that can be run in seconds. Finding it is the highest-value
-next step for this flow, because until it is found the mapspace beyond
-prologue-only staging cannot be trusted, and that is most of it.
+not in the ISA. It is filed as :ref:`item 24 <limitation-24>` of the
+limitations register, **unreduced**: the obvious suspicion -- that the trigger
+is a data transfer *inside* the emitted nest rather than hoisted into a
+prologue -- was tested with a four-case ladder of minimal programs and
+**refuted**. A transfer after a compute (189 cycles), a transfer inside a loop
+(171) and a transfer sharing a loop body with a compute (186) all complete on
+the RTL. So the trigger needs something those do not have, and the candidates
+left are nested loops, longer trip counts, larger ``rows``, an accumulating
+``mm`` inside a loop, or plain scale.
+
+Until it is found, the mapspace beyond prologue-only staging cannot be trusted,
+and that is most of it -- which is the real cost of this item and the reason it
+outranks widening any hardware parameter. One coverage fact worth carrying with
+it: of the 23 programs the named gates run, **none** issues a ``dma_ld`` after a
+compute, while ``stress_isa.random_program`` produces one in 314 of 400 seeds.
+The pattern is heavily exercised in the simulator and had never reached a cosim
+testbench before item 24's ladder put four of them there.
 
 **Five nests are encodable** (the prototype found three) and all five compute
 the spec against ``isa_ref.run`` -- but only three are confirmed on the RTL; see
