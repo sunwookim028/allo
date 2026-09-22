@@ -1197,11 +1197,26 @@ interconnect is a large share of dynamic power.
 
 **Recommendation: do not pursue power for this evaluation.** The paper says
 power is absent, and says this is why. That is a stronger position than an
-indicative number quoted as a measurement, and it is honest about the fact
-that the cheapest credible energy axis — SRAM macros plus P&R — is the same
+indicative number quoted as a measurement.
+
+Stated precisely, because a parallel effort is producing switching-activity
+files and this must not read as an argument against it: there are **three**
+objections to a power number from this flow, and activity annotation removes
+exactly one of them. It removes the default-toggle-rate objection, which is the
+one that makes the current figure unpublishable outright, and it is worth
+having on its own terms. It does not touch the flip-flop-memory artefact or the
+missing interconnect. So an annotated number from this flow would be
+*compromised* rather than *meaningless* — a real improvement, and still not a
+measurement of either design's power.
+
+That is compatible with the methodology commitment in ``dev/paper_outline.md``
+(publish power only if **both** sides are activity-annotated, otherwise report
+none and say why): if only one side is annotated the answer is no on that
+ground alone, and if both are, the answer is still no on these two. The
+cheapest credible energy axis is SRAM macros plus place-and-route — the same
 prerequisite that would replace the area methodology. If the project later
-wants energy, that is the order to do it in: macros first, because they fix
-the area and the power artefact at once.
+wants energy, that is the order to do it in: macros first, because they fix the
+area artefact and the power artefact at once.
 
 Results
 ~~~~~~~
@@ -1259,6 +1274,15 @@ own: ``MAXDIM=16`` is the build the DIM=4 cycle numbers were measured on, and
 ``MAXDIM=64`` is the build whose memory capacity matches. A reader wanting one
 number should take the **logic-only** column, where the difference between them
 is our own ``+64.1 %`` operand-space step and not a property of Gemmini.
+
+That split has a convenient resolution: `The parity baseline`_ is at
+``MAXDIM=64`` on both ``parity-t4`` and ``parity-t8``, so the parity
+configurations are the ones whose local memory matches Gemmini's 12 KiB — to
+19 % at T=4 and to 2 % at T=8 — *and* whose cycles are measured against matched
+Gemmini across 18 points. **The area rows that belong beside the parity cycle
+numbers are the ``MAXDIM=64`` rows, not the baseline.** The ``MAXDIM=16`` row
+stays in the table because the five original cycle counts belong to it, not
+because it is the right area to quote against parity.
 
 The DIM=8 pair is matched on memory to 2 % but **not on operand space**: our
 ``T=8`` build is at ``MAXDIM=64``, a fourfold operand space against the
@@ -1852,7 +1876,7 @@ in the two tables. The 1.33x standard-cell area that T=8 costs over T=4 at the
 same MAXDIM is the price, at no clock penalty.
 
 Two disclosures that belong with these numbers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **The FPGA resource line understates a build.** Operand space is nearly free
   on an FPGA and is not on standard cells: MAXDIM 16 -> 64 costs +64.1 %
@@ -1868,7 +1892,7 @@ Two disclosures that belong with these numbers
 .. _gemmini-parity-order:
 
 The program order that was measured and not used
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The first preference was a change to the emitted program on an unchanged
 netlist, and two were built: ``isa_dsl.gemm_program_interleaved`` (every
