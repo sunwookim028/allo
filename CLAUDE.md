@@ -99,6 +99,15 @@ contract, and no simulator can see a violation -- only the `TPU_TB=stress`
 cosim, which runs `ar_distance_program` at the edge.
 Details: `docs/source/designs/tinytpu_isa.rst` ("Verifying a change").
 
+The **parity baselines** (`parity-t4` / `parity-t8`: MAXDIM=64, banked burst
+widening) are kept beside the shipped design and are measured against matched
+Gemmini by `TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py`. Parity is
+defined before measuring, in `docs/source/designs/gemmini_comparison.rst`
+("The parity baseline"), which also records where they are behind and why.
+`$TPU_PROGRAM` selects the emitted GEMM program order; anything but `shipped`
+must be cosim'd at a shape with `Kt >= QD`, because the simulator, `stress_isa`
+and `kpn_model` all accept orders the RTL deadlocks on.
+
 ## ACT (the mapper/compiler flow on `main`)
 
 `act/` is the target-independent core (pure python, importable without the MLIR

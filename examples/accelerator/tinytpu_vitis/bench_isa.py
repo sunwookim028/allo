@@ -167,7 +167,9 @@ if __name__ == "__main__":
     # unrolled programs must issue the identical dynamic opcode stream.
     for (M, K, N) in shapes:
         for r in (False, True):
-            a = expand(gemm_program(M, K, N, r))
+            # the SHIPPED order is the one the flat form unrolls; another
+            # `TPU_PROGRAM` order is checked below against numpy instead
+            a = expand(gemm_program(M, K, N, r, order="shipped"))
             b = expand(gemm_program_flat(M, K, N, r))
             assert a == b, f"loop/flat dynamic streams differ at {M}x{K}x{N}"
     print(f"  loop == flat dynamic opcode stream at all {len(shapes)} shapes")
