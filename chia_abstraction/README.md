@@ -303,6 +303,76 @@ The probe rung already grades exactly this and needs no change: `expressive`
 requires REFUSING `ports_dual` and ACCEPTING a bit-exact `ports_banked` -- a
 checker, not a declaration.
 
+## RESULT -- Pilot B, iteration 1: an architectural legality rule that discriminates
+
+Run `chia_runs/pilotB-20260922-180708`, ref `03e426f9`, $1.39, 36 turns,
+1207 s for the turn and 1895 s including the harness. **Accepted; rung
+`improved`; objective `expressive`; `newly_expressible:
+['ports:write-port-declaration']`.**
+
+It proposed `s.memory_ports(target, write_ports)` -- **a legality rule, not a
+declaration**. It counts statically visible `affine.store`/`memref.store` to
+the buffer in the innermost loop and refuses when
+`stores > write_ports x banks`, **before touching the IR**, then sets a
+`memory_ports` attribute.
+
+### The probe rung, against both measured ground truths
+
+| site | required | measured |
+| --- | --- | --- |
+| `ports_dual` (1 RAM, 2 write statements) | refused | **refused** |
+| `ports_banked` (2 instances, 1 write each) | accepted, bit-exact under csim | **accepted, `banked_confirmed: true`** |
+
+It declared both calls itself (`s.memory_ports("buf", 1)` at each site) through
+`declare_probe`. Every other rung passed: 294/294 tests with no regressions,
+`bench_isa` ALL EXACT, `stress_isa` 492/492, all design cases bit-exact, 20
+`tests/limits` verdicts unchanged, every resource at ratio 1.000, +0 cycles.
+
+### Did it discover the declaration already existed? **No.**
+
+Its diagnosis, verbatim: *"The machine's physical limitation ... could not be
+expressed in the language (1). Because the language couldn't state the write
+port capacity of an array, it accepted loops that mapped multiple concurrent
+writes to the same bank"*. That first half is **factually wrong** on its own
+tree: `Memory(resource=, storage_type="RAM_1P")` states exactly that, and both
+emitters emit `bind_storage` from it. Checked against the transcript: B's
+reasoning text never mentions `bind_storage`, `storage_type` or `Memory(` --
+the matches in its session are files it read, not conclusions it drew. So it
+reached the right ARTEFACT (a checker) through a half-wrong DIAGNOSIS: the gap
+was **enforcement only**, kind (2), not kind (1)+(2) as it claimed.
+
+### Is `banks x write_ports >= stores` sound enough to ship? **No, and it errs in both directions.**
+
+The agent named one hole itself, unprompted: writes aliasing to the same bank
+(`buf[2*i]` and `buf[2*i+2]` under cyclic 2) would be *"erroneously
+accept[ed]"*. Two more, **measured** here by applying its own primitive:
+
+| case | its verdict | truth |
+| --- | --- | --- |
+| cyclic factor 2 | accepted | correct |
+| **`Partition.Block` factor 2** | **ACCEPTED** | **wrong -- a false accept.** Both stores land in bank 0; the block-partitioned RTL emits **2 write statements per bank instance**, measured by csynth tonight. Its code does `banks *= factor` for `Block` and `Cyclic` alike |
+| **2 stores, loop NOT pipelined** | **refused** | **wrong -- a false refuse.** Sequential stores need one port; the rule never consults `pipeline_ii` |
+
+So it is a heuristic that both admits unsynthesisable designs and rejects legal
+ones, and the false accept is reachable through a standard primitive with
+ordinary arguments. **That gap is worth more than the primitive**: the correct
+rule needs the layout map (the IR already carries the cyclic partition as
+`(d0) -> (d0 mod 2, d0 floordiv 2)`) composed with each store's affine index,
+and the loop's initiation interval -- both present in the IR, neither used.
+
+### Against the pre-registration
+
+Predicted for B: separates the ground truths and is confirmed, **30%**;
+refuses both, 45%; accepts both, 10%; crash or build failure, 15%. **The 30%
+branch happened.** Predicted architectural 90% -- yes, it describes the
+machine's memories. Predicted states-its-premise 60% -- **yes, unprompted and
+specifically.**
+
+**Grade: (1)/(2) architectural legality rule, `expressive`, sound only as a
+heuristic.** It is structurally what `s.dependence` is -- refuse the
+provably-false, accept the unprovable, label the residue -- arrived at without
+being shown that shape for this property.
+
 ## PRE-REGISTRATION -- Pilots A and B, written 2026-09-22 17:19 UTC, BEFORE either ran
 
 Both run on this branch at the commit that adds this section, on ONE tree for
