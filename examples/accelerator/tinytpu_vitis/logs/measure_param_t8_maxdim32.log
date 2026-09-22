@@ -1,0 +1,13 @@
+### TPU_T=8 TPU_MAXDIM=32 bench_isa.py 32 32 32
+TinyTPU-isa: ONE build -- 8x8 array, MAXDIM=32, imem 56; sweeping 1 shape(s)
+  generated == hand-written word-for-word at all 1 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 1 shapes
+  gemm      32x32x32 flat   28 static  SKIP (needs 64 words > imem 56)
+  gemm      32x32x32 loop   13 static ->  28 dynamic  wrong=0/1024
+  gemm.relu 32x32x32 flat   32 static  SKIP (needs 72 words > imem 56)
+  gemm.relu 32x32x32 loop   14 static ->  32 dynamic  wrong=0/1024
+  vadd+relu 32x32x32    7 instrs  wrong=0/256
+  ALL EXACT
+rc=0
+### TPU_T=8 TPU_MAXDIM=32 param_check
+  PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)

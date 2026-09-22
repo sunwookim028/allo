@@ -1,0 +1,30 @@
+##### stress_isa.py at TPU_T=8
+  validator: FAILED
+  STRESS FAIL validator REJECTED vector_program(4,) relu=False: instruction 1 (dma_ld): DRAM rows 2..5, col block 2 outside the 16x16 operand
+  STRESS FAIL validator REJECTED vector_program(8,) relu=False: instruction 1 (dma_ld): DRAM rows 2..9, col block 2 outside the 16x16 operand
+  STRESS FAIL validator REJECTED ar_distance_program(4,) relu=False: instruction 10 (mvout): C rows 0..2, col block 2 outside the 16x16 result
+  STRESS FAIL validator REJECTED ar_distance_program(5,) relu=False: instruction 10 (mvout): C rows 0..3, col block 2 outside the 16x16 result
+  STRESS FAIL validator REJECTED ar_distance_program(8,) relu=False: instruction 10 (mvout): C rows 0..6, col block 2 outside the 16x16 result
+Traceback (most recent call last):
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 444, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 417, in main
+    for tag, prog, A, B, C0, gold, M, N in cases(quick):
+                                           ^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 393, in cases
+    isa_ref.run(prog, A, B, C0), None, None)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/isa_ref.py", line 42, in run
+    check_program(prog)
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/microarch_isa.py", line 1440, in check_program
+    raise ProgramError(f"{where}: DRAM rows {f1}..{f1 + nr - 1}, "
+examples.accelerator.tinytpu_vitis.microarch_isa.ProgramError: instruction 1 (dma_ld): DRAM rows 2..5, col block 2 outside the 16x16 operand
+rc=1
+##### param_check.py at TPU_MAXDIM=8
+  PARAM OK: 69/69 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 21 random programs; 3 seeds skipped as ungeneratable at this MAXDIM)
+##### param_check.py at TPU_MAXDIM=12
+  PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)
+##### param_check.py at TPU_T=8 TPU_MAXDIM=16
+  PARAM FAIL only 15 of 24 random programs could be generated (need 16)
+  PARAM FAILED: 62/63 runs exact at T=8 MAXDIM=16 (8 GEMM shapes x relu x full/corner/boundary, 15 random programs; 9 seeds skipped as ungeneratable at this MAXDIM)

@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 444, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 411, in main
+    failures = validator_controls()
+               ^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/stress_isa.py", line 341, in validator_controls
+    good += [("vector_program", (M,), False, vector_program(M)) for M in (4, 8)]
+                                             ^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/isa_dsl.py", line 334, in vector_program
+    assert 2 * M <= MAXDIM and M % 2 == 0
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

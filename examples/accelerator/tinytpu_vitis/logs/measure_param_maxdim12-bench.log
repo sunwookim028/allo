@@ -1,0 +1,11 @@
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=12, imem 56; sweeping 5 shape(s)
+Traceback (most recent call last):
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/bench_isa.py", line 112, in <module>
+    assert_matches_handwritten(shapes)
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/isa_dsl.py", line 401, in assert_matches_handwritten
+    got = gemm_program(M, K, N, relu)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sk3463/allo-measure/examples/accelerator/tinytpu_vitis/isa_dsl.py", line 285, in gemm_program
+    assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 16x16x8 exceeds the built MAXDIM=12

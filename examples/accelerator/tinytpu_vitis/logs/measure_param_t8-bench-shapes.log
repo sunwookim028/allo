@@ -1,0 +1,28 @@
+### TPU_T=8 bench_isa.py 8 8 8
+TinyTPU-isa: ONE build -- 8x8 array, MAXDIM=16, imem 56; sweeping 1 shape(s)
+  generated == hand-written word-for-word at all 1 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 1 shapes
+  gemm       8x 8x 8 flat    4 static ->   4 dynamic  wrong=0/64
+  gemm       8x 8x 8 loop   10 static ->   4 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 flat    5 static ->   5 dynamic  wrong=0/64
+  gemm.relu  8x 8x 8 loop   11 static ->   5 dynamic  wrong=0/64
+  vadd+relu  8x 8x 8    7 instrs  wrong=0/64
+  ALL EXACT
+### TPU_T=8 bench_isa.py 16 16 8
+  generated == hand-written word-for-word at all 1 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 1 shapes
+  gemm      16x16x 8 flat    6 static ->   6 dynamic  wrong=0/128
+  gemm      16x16x 8 loop   13 static ->   6 dynamic  wrong=0/128
+  gemm.relu 16x16x 8 flat    7 static ->   7 dynamic  wrong=0/128
+  gemm.relu 16x16x 8 loop   14 static ->   7 dynamic  wrong=0/128
+  vadd+relu 16x16x 8    7 instrs  wrong=0/128
+  ALL EXACT
+### TPU_T=8 bench_isa.py 16 16 16
+  generated == hand-written word-for-word at all 1 shapes x {gemm, gemm.relu}
+  loop == flat dynamic opcode stream at all 1 shapes
+  gemm      16x16x16 flat   10 static ->  10 dynamic  wrong=0/256
+  gemm      16x16x16 loop   13 static ->  10 dynamic  wrong=0/256
+  gemm.relu 16x16x16 flat   12 static ->  12 dynamic  wrong=0/256
+  gemm.relu 16x16x16 loop   14 static ->  12 dynamic  wrong=0/256
+  vadd+relu 16x16x16    7 instrs  wrong=0/128
+  ALL EXACT
