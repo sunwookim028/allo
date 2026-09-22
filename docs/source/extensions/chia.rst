@@ -896,3 +896,37 @@ What will not be spent on
   hold every accepted diff with its reports; replay is free.
 - **The semantics-alignment variant.** Stopped; see
   :doc:`/designs/minitpu`.
+
+E5. Held-out rediscovery
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+An extension does not have to be novel to be evidence. If an agent reaches an
+abstraction the fork already has, **without being told it exists**, that is a
+measurable result and a much cheaper one to grade than novelty, because the
+right answer is already in the tree with its tests.
+
+The design: take a fork-local primitive whose history is known -- the worked
+example is ``s.dependence(...)``, which exists because a real defect could not
+be expressed any other way -- remove it from the agent's view along with the
+documentation that names it, and give the agent only the symptom that motivated
+it. Grade on whether the agent arrives at an abstraction with the same power,
+and on what it proposes instead when it does not.
+
+This is the one experiment in this list with a known correct answer, which makes
+it the right place to calibrate how much guidance an agent needs before the
+open-ended attempts in E3 are worth paying for.
+
+Why the design driver's end state matters to all of this
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The target is not one accelerator. It is **a library of parametrized, modular
+TPU IPs that compose into different architectural choices** -- the named class
+being Groq's LPU, OpenAI's Jalapeno, Meta's MTIA and AMD's XDNA -- with TinyTPU
+as something such a library *instantiates* rather than something to extend.
+
+That is what "generalizable across design cases" has to mean here, and it is
+the standard a proposed extension should be judged against: an abstraction that
+makes a second architecture expressible is worth more than one that makes the
+current design faster. It also tells E3 and E5 what to reward. An agent that
+parametrizes an IP block so it can be composed differently has done the thing
+the project wants, even if the immediate design gets no faster.
