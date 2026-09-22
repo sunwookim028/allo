@@ -155,7 +155,7 @@ The corpus
 Twenty-two specs, in three groups.
 
 The first six are the shapes this fork measures -- ``bench_isa.py``'s
-``LATENCY`` set and the 172 / 262 / 418 / 484 / 686 cosim points on
+``LATENCY`` set and the 171 / 261 / 417 / 483 / 685 cosim points on
 :doc:`/designs/tinytpu_isa`. The last five are the ``STEADY`` set that
 ``bench_isa.py`` gains on the ``benchmark-set`` branch, whose accounting is in
 ``docs/source/designs/benchmarks.rst`` there -- cubic 32, 48 and 64 plus

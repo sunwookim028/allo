@@ -58,8 +58,10 @@ cycle counts with exact numerics. The current one, ``chia_agent/`` on ``main``,
 scores by RTL cosim against a frozen reference model.
 
 **One paid run found one real improvement.** Run 1 (2026-09-19) produced a burst
-widening that measures 172 / 262 / 376 / 425 / 627 against the baseline's
-172 / 262 / 418 / 484 / 686 — 160 cycles over five shapes, bit-exact, stress and
+widening that measures 172 / 262 / 376 / 425 / 627 against the then-baseline's
+172 / 262 / 418 / 484 / 686 — that baseline is now 171 / 261 / 417 / 483 / 685,
+for a reason unrelated to this candidate — 160 cycles over five shapes,
+bit-exact, stress and
 RTL stress clean. It is **not landed**, because it costs 2.3x the block RAM, and
 because its benefit is wider DMA bursts measured at zero memory latency, which
 is the setting that flatters it most. Whether it is worth its area is a design
