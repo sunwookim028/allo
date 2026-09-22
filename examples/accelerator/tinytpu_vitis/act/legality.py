@@ -20,9 +20,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from examples.accelerator.tinytpu_vitis import kpn_model  # noqa: E402
 from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     AGU_TERMS, AR_RAW_DIST, IMEM_SIZE, LOOP_DEPTH, MAXDIM, NAR, NVR,
-    OP_MVOUT, SPAD_ROWS, T, ProgramError, _OPNAME, assemble, check_program,
+    OP_MVOUT, SPAD_ROWS, T, ProgramError, assemble, check_program,
     expand,
 )
+from examples.accelerator.tinytpu_vitis.ip.isa import OPCODE_NAMES  # noqa: E402
 from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E402
 from examples.accelerator.tinytpu_vitis.isa_encoding import (  # noqa: E402
     FIELDS, HEADER_TERMS, usable_max,
@@ -211,7 +212,7 @@ def instruction_line(prog, pc):
         if target:
             terms.append(f"f{target - 1}+=iv{(w1 >> (19 * t + 4)) & 0x7}"
                          f"*{(w1 >> (19 * t + 7)) & 0xFFF}")
-    return (f"    {pc:3d}  {_OPNAME.get(op, f'op{op}'):8s} "
+    return (f"    {pc:3d}  {OPCODE_NAMES.get(op, f'op{op}'):8s} "
             f"nr={(w0 >> 54) & 0xFF:3d} "
             f"f={fields}  {' '.join(terms)}")
 
