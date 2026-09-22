@@ -348,7 +348,7 @@ One specification generates the simulator, the hardware, and the compiler
 backend, so a single agent edit moves all three together. The design searched
 here is the fp32 ``examples/accelerator/tinytpu/`` on ``chia-codesign`` -- a
 different machine from TinyTPU-isa, sharing no code with it (see
-:doc:`/extensions/act`, "Two TinyTPUs, Not One").
+:doc:`/extensions/act`, "What ACT Is").
 
 Headline figures, as stated by ``CODESIGN.md``:
 
