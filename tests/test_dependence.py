@@ -166,9 +166,7 @@ def test_a_guarded_access_is_not_a_witness():
 
 def test_a_claim_is_read_back_from_the_ir():
     s = allo.customize(carried_at_four)
-    s.dependence(
-        "i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE
-    )
+    s.dependence("i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE)
     claims = list(recorded_claims(s.module))
     assert len(claims) == 1
     where, _, _, claim = claims[0]
@@ -183,18 +181,14 @@ def test_the_standing_check_survives_a_later_primitive():
     that rewrote the accesses under a surviving claim could not leave it
     standing. `s.pipeline` keeps the claim and changes no access."""
     s = allo.customize(carried_at_four)
-    s.dependence(
-        "i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE
-    )
+    s.dependence("i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE)
     s.pipeline("i")
     assert len(list(recorded_claims(s.module))) == 1
 
 
 def test_the_standing_check_blames_the_primitive_that_broke_the_claim():
     s = allo.customize(carried_at_four)
-    s.dependence(
-        "i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE
-    )
+    s.dependence("i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE)
     where, loop, memref, claim = next(iter(recorded_claims(s.module)))
     with s.module.context:
         with pytest.raises(DependenceError, match=r"after s\.reorder\(\)"):
@@ -208,9 +202,7 @@ def test_a_loop_transformation_drops_the_claim_rather_than_moving_it():
     this tree can currently falsify a standing claim. See the limitations
     register, item 21."""
     s = allo.customize(carried_at_four)
-    s.dependence(
-        "i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE
-    )
+    s.dependence("i", "A", direction="RAW", distance=4, dependent=True, because=BECAUSE)
     s.split("i", 2)
     assert list(recorded_claims(s.module)) == []
     assert "HLS dependence" not in str(s.build(target="vhls"))

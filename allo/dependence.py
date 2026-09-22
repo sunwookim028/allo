@@ -167,9 +167,7 @@ class Linear:
 
 
 def _linear(constant, coefficients):
-    return Linear(
-        constant, tuple(sorted((k, v) for k, v in coefficients.items() if v))
-    )
+    return Linear(constant, tuple(sorted((k, v) for k, v in coefficients.items() if v)))
 
 
 def add(left, right):
@@ -206,7 +204,7 @@ def _integer_value(attribute):
 
 def _induction_variable_term(value, block, loops):
     owner = block.owner
-    if owner.name not in LOOP_OPS or not len(block.arguments):
+    if owner.name not in LOOP_OPS or not block.arguments:
         return None
     if value != block.arguments[0]:
         return None
