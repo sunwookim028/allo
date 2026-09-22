@@ -225,6 +225,42 @@ per-run one. The split between the two tracks is recorded in
 pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
 
+## Two findings worth keeping, beyond the harness
+
+**The design track's one verified win classifies as `trade`, not `win`, and is
+not kept.** Its real numbers -- 8.6% fewer cycles at 16x16x16 for BRAM18K
+42 -> 98, +20% LUT, +40% FF -- fail this objective's resource constraint on
+`tinytpu_isa`. That is a second opinion on the decision the project has been
+circling, derived from first principles rather than from the first opinion, and
+nothing was tuned to produce it (`test_abs_harness.py` phase `h` asserts it).
+Whether it is ultimately the right call is a separate question; that it is
+independent is the point.
+
+The reasoning for **cycles scored, resources constrained** rather than a
+weighted sum is in `objective.py` and is worth repeating here in its honest
+form: **a weighted score needs a price for a BRAM in cycles, and without
+place-and-route there is no defensible number.** A made-up one silently decides
+every trade-off in the search. A constraint needs no exchange rate, composes
+with the other gates, is checkable by a reader ("fewer cycles at no more than
++10% of any resource, on every design case"), and cannot be gamed by letting a
+big win on one design case pay for a regression on another.
+
+**Three measurement failures, all the same disease.** Each was found by
+measuring rather than accepting:
+
+1. `main` has **seven** pre-existing test failures in the fast tier, not the
+   three that were reported to me. An inherited count would have shown four
+   phantom regressions on every candidate.
+2. A hand-recorded baseline showed **eleven regressions on an unmodified
+   tree** -- every one an artifact of the sandbox's read-only checkout, not of
+   any candidate. The fix is to record every baseline from inside the same
+   sandboxed path a candidate takes, not to special-case the eleven.
+3. CHIA's tool server defaults to port 8000, another track held it, the server
+   never bound, **and the LLM call still returned**. The agent spent two
+   iterations with no tools and no error. Silent, plausible, and it consumes
+   budget. General rule, now enforced: **a harness that cannot prove its tools
+   are reachable has no business starting a paid run.**
+
 ## Running two tracks on one host
 
 Measured tonight, all three the hard way:
