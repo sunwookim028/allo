@@ -610,7 +610,7 @@ at no cost, and the array's two counts travel one per chain word instead of
 sharing one.
 
 Tiling, which is the part no field width reaches
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 K=512 wants ``MAXDIM=512``: 65,536 operand rows against the 2,047 an 11-bit
 field carries, 32x short. No widening closes that, and no scratchpad holds the

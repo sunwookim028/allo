@@ -966,7 +966,7 @@ Their steady-state figure, which they are re-running before standing behind it
 element. Ours reaches **74.1 % of peak at 64x64x64** and is still climbing.
 
 The capability gap, which was worse for us than the cycle deficit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
 search. We could not address a matrix that size at all: our operands were a
