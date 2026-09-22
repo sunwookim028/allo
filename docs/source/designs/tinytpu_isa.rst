@@ -573,10 +573,13 @@ Measured by raising each bound until it fires, not by reading the source:
      - where it bites
      - measured
    * - an address field carries 11 usable bits
-     - ``MAXDIM*MAXDIM/T <= 2047`` operand rows
-     - largest ``MAXDIM``: **88** at T=4, **128** at T=8, **176** at T=16
-       (each the largest multiple of T; ``MAXDIM=92`` at T=4 is refused at
-       import with 2116 operand rows)
+     - the GEMM layout names ``MAXDIM*MAXDIM/T`` operand rows and the highest
+       of them must be 2047
+     - largest ``MAXDIM``: **88** at T=4, **128** at T=8, **176** at T=16,
+       each the largest multiple of T that fits. ``MAXDIM=92`` at T=4 is
+       refused at import, with 2116 operand rows; T=8 reaches 128 exactly
+       (2048 rows, 0..2047), so the tall sweep's K=N=128 was never short
+       HERE
    * - ``nr`` carried 7 usable bits
      - rows per instruction **and** a loop's trip count
      - 127. This, not ``MAXDIM``, is what refused the tall sweep
