@@ -1018,8 +1018,10 @@ class Suite:
         design = control.blobs("HEAD")
         want = {f: subprocess.run(["git", "rev-parse", f"HEAD:{PKG}/{f}"], cwd=REPO,
                                   capture_output=True, text=True).stdout.strip()
-                for f in ("microarch_isa.py", "isa_dsl.py")}
-        check("control.design-identity", "the two editable blobs at HEAD", design,
+                for f in EDITABLE}
+        check("control.design-identity",
+              f"the {len(EDITABLE)} editable files' blobs at HEAD",
+              f"{len(design)} blobs, {sum(map(bool, design.values()))} resolved",
               design == want and all(design.values()))
         check("control.genuine-record-usable", "no problems",
               control.unusable(genuine_control(), design, "cosim") or "none",
@@ -1084,23 +1086,40 @@ class Suite:
               f"{moved['status']} delta={moved['delta']['4x4x4']}",
               moved["status"] == "DISAGREES"
               and "DISAGREES" in control.banner(moved))
-        old = ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-               "8f2e9aa9f518ef320cab163adc95e05737c777be")
+        # A design whose blobs ARE recorded: 476a70d8, the two-file design.
+        was = dict(zip(("microarch_isa.py", "isa_dsl.py"),
+                       ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+                        "8f2e9aa9f518ef320cab163adc95e05737c777be")))
         recorded = control.crosscheck(
-            dict(control.RECORDED[("cosim", *old)]),
-            dict(zip(("microarch_isa.py", "isa_dsl.py"), old)), "cosim")
+            dict(control.RECORDED[control.key("cosim", was)]), was, "cosim")
         check("control.crosscheck-recorded-design", "agree, against its own entry",
               f"{recorded['status']} vs {recorded['against'][:40]}",
               recorded["status"] == "agree"
               and recorded["against"].startswith("the control recorded"))
         # Another driver measures another program on the same hardware, so this
-        # driver's numbers are not its cross-check: it has none until measured.
-        other = control.crosscheck(dict(BASELINE_ALL), design, "codesign_cosim")
+        # driver's numbers are not its cross-check: a driver with nothing
+        # published or recorded has none until someone measures it.
+        other = control.crosscheck(dict(BASELINE_ALL), design, "a_new_driver")
         check("control.crosscheck-unrecorded-driver",
-              "UNRECORDED, loud, not silently checked against cosim's numbers",
+              "UNRECORDED, loud, not silently checked against another "
+              "driver's numbers",
               f"{other['status']} recorded={other['recorded']}",
               other["status"] == "UNRECORDED" and other["recorded"] is None
               and "UNRECORDED" in control.banner(other).upper())
+        # And the driver that IS published is checked against its own row: the
+        # co-design driver's 4x4x4 is three lower, which is the mapper's find
+        # and would read as a win if it were compared with cosim's.
+        codesign = control.crosscheck(
+            dict(control.PUBLISHED["codesign_cosim"]), design, "codesign_cosim")
+        check("control.crosscheck-per-driver",
+              "agree with codesign_cosim's own published row, which differs "
+              "from cosim's at 4x4x4",
+              f"{codesign['status']}; 4x4x4 "
+              f"{control.PUBLISHED['codesign_cosim']['4x4x4']} against "
+              f"{control.PUBLISHED['cosim']['4x4x4']}",
+              codesign["status"] == "agree"
+              and (control.PUBLISHED["codesign_cosim"]["4x4x4"]
+                   != control.PUBLISHED["cosim"]["4x4x4"]))
         search = control.crosscheck(dict(BASELINE), design, "cosim")
         check("control.crosscheck-search-shapes",
               "agree over the two scored shapes alone",
