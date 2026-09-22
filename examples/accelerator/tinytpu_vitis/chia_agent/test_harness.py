@@ -13,6 +13,15 @@ Nothing here calls a real model. Two scripted "agents" drive the real harness:
 
 Cases, each with an expected verdict:
 
+  s  static guards (no Ray, no model, ~20 s)  the spec policy passes the shipped
+                                               design and refuses every denied
+                                               dunder; the evaluator's main base
+                                               is derived and its drift check
+                                               bites; the scored configuration
+                                               is pinned; the per-run cap counts
+                                               this run's sessions only, a
+                                               timed-out one included; nothing
+                                               reads `usage` for money
   a  no-op (re-save the unmodified design)   scores exactly 172 / 686 (main @ 476a70d8)
   b  `spad ... = 0` (part of b4be2b10 reverted) bit-exact, scored WORSE
   c  PE partial sum narrowed to int16          passes bench_isa, REJECTED by
@@ -35,7 +44,7 @@ Cases, each with an expected verdict:
 
     conda activate chia_env
     python test_harness.py                       # everything, ~35 min
-    python test_harness.py --phases e,c,g        # cheap subset, ~3 min
+    python test_harness.py --phases s,e,c,g      # cheap subset, ~3 min
     python test_harness.py --phases e,c,d,abf,loop,accept
 
 Writes `<run-dir>/results.json` and exits non-zero if any case failed.
@@ -84,10 +93,19 @@ logging.getLogger("mcp").setLevel(logging.WARNING)
 #: The five benchmark shapes have one definition (`{PKG}/shapes.py`);
 #: `evaluate` loads it by path and this takes the names from there rather than
 #: writing them out a sixth time. The cycles are positional against it.
-from evaluate import ALL_SHAPES  # noqa: E402
+from evaluate import ALL_SHAPES, PARAM_CONFIGS  # noqa: E402
 
-#: The unmodified design (README, accept.py control run).
-BASELINE_ALL = dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686)))
+
+def published_cycles() -> dict:
+    """The unmodified design's five cosim numbers, from reproduce.sh, which
+    checks them on every run; restated here they went stale."""
+    text = (REPO / PKG / "reproduce.sh").read_text()
+    row = re.search(r'^EXPECTED="([^"]+)"', text, re.M).group(1)
+    return {s: int(c) for s, c in (kv.split("=") for kv in row.split())}
+
+
+#: The unmodified design at the scored configuration.
+BASELINE_ALL = published_cycles()
 BASELINE = {s: BASELINE_ALL[s] for s in ("4x4x4", "16x16x16")}
 GATE_TIMEOUT = 240
 
@@ -175,6 +193,16 @@ def mutate(name: str) -> str:
     return text.replace(old, new, 1)
 
 
+def tails(swarm_output: str, worker: Path | None, lines=15) -> str:
+    """The last lines of what the swarm and its worker said, for a failure
+    whose cause is in them."""
+    out = ["-- swarm --", *swarm_output.splitlines()[-lines:]]
+    log = worker / "worker.log" if worker else None
+    if log and log.exists():
+        out += ["-- worker.log --", *log.read_text().splitlines()[-lines:]]
+    return "\n".join(out)
+
+
 def unified(name: str, before: str, after: str) -> str:
     return "".join(difflib.unified_diff(before.splitlines(keepends=True),
                                         after.splitlines(keepends=True),
@@ -223,6 +251,159 @@ def procs_under(path: Path) -> list[str]:
         if needle in args or cwd.startswith(needle):
             hits.append(f"{d.name}: {args[:160]}")
     return hits
+
+
+# -- s: static guards ---------------------------------------------------------
+#: The escape routes the spec policy's dunder rule exists for, each spelled the
+#: way an agent would reach for it.
+DUNDER_ESCAPES = {
+    "type graph": "_s = ().__class__.__bases__[0].__subclasses__()\n",
+    "function globals": "_g = (lambda: 0).__globals__\n",
+    "module namespace": "import numpy as _np\n_d = _np.__dict__\n",
+    "name-based lookup": "import numpy as _np\n_w = _np.__getattribute__('save')\n",
+    "builtins": "_b = (lambda: 0).__builtins__\n",
+    "code object": "_c = (lambda: 0).__code__\n",
+    "method resolution": "_m = int.__mro__\n",
+}
+
+
+def phase_s():
+    """The harness's own guards, checked without Ray or a model."""
+    print("== s: static guards", flush=True)
+    import sqlite3
+    import tempfile
+    import evaluate as ev
+    import spec_policy as sp
+    # The policy passes the shipped design, as the evaluator runs it.
+    for name in ("microarch_isa.py", "isa_dsl.py"):
+        got = sp.policy_violations(name, head(name)) + sp.doc_violations(
+            name, head(name), head(name))
+        check(f"s.policy passes the shipped {name}", "no violations",
+              got or "none", not got)
+    # ...and still refuses every dunder it denies, and each classic escape.
+    base = head("isa_dsl.py")
+    slipped = [d for d in sorted(sp.DENIED_DUNDER_ATTRS)
+               if not any(f"'.{d}'" in p for p in sp.policy_violations(
+                   "isa_dsl.py", base + f"\n_x = (1).{d}\n"))]
+    check("s.policy refuses every denied dunder",
+          f"all {len(sp.DENIED_DUNDER_ATTRS)} refused", slipped or "all refused",
+          not slipped)
+    must = {"__globals__", "__builtins__", "__class__", "__subclasses__", "__mro__",
+            "__code__", "__dict__", "__getattribute__", "__bases__"}
+    check("s.policy denies the escape set", sorted(must),
+          sorted(must - sp.DENIED_DUNDER_ATTRS) or "all denied",
+          must <= sp.DENIED_DUNDER_ATTRS)
+    for label, code in DUNDER_ESCAPES.items():
+        got = sp.policy_violations("isa_dsl.py", base + "\n" + code)
+        check(f"s.policy refuses: {label}", "refused", got[:2], bool(got))
+    ok = sp.policy_violations("isa_dsl.py", base + (
+        "\nclass _E(Exception):\n    def __init__(self, m):\n"
+        "        super().__init__(m)\n        self.n = type(self).__name__\n"))
+    check("s.policy allows ordinary dunders", "super().__init__, __name__ allowed",
+          ok or "allowed", not ok)
+    # The main base is derived, and the drift check it feeds still bites.
+    head_ref = ev.resolve_ref("HEAD")
+    try:
+        mb = ev.main_base(head_ref)
+        same = [r for r in ev.DESIGN_EVALUATOR
+                if ev.git_show(head_ref, r) == ev.git_show(mb, r)]
+        got = f"{mb[:8]}, {len(same)}/{len(ev.DESIGN_EVALUATOR)} identical"
+        good = len(same) == len(ev.DESIGN_EVALUATOR)
+    except ev.Reject as r:
+        got, good = f"Reject({r.stage}): {r.detail[:120]}", False
+    check("s.main-base derived for HEAD", "a merge-base, evaluator identical",
+          got, good)
+    with tempfile.TemporaryDirectory() as tmp:
+        spec = Path(tmp) / "spec"
+        spec.mkdir()
+        for name in ev.EDITABLE:
+            (spec / name).write_text(head(name))
+        old = os.environ.get("CHIA_MAIN_BASE")
+        os.environ["CHIA_MAIN_BASE"] = "476a70d8"
+        try:
+            ev.compose(spec, Path(tmp) / "tree", head_ref)
+            got = "composed"
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:90]}"
+        finally:
+            os.environ.pop("CHIA_MAIN_BASE")
+            if old is not None:
+                os.environ["CHIA_MAIN_BASE"] = old
+        check("s.drift refused", "setup: an evaluator file differs from the base",
+              got, got.startswith("setup:") and "differs from main" in got)
+        # The scored configuration is pinned, and the design honours it.
+        tree = Path(tmp) / "tree2"
+        ev.compose(spec, tree, head_ref)
+        stray = os.environ.get("TPU_MAXDIM")
+        os.environ["TPU_MAXDIM"] = "64"
+        env = ev.env_for(tree)
+        os.environ.pop("TPU_MAXDIM")
+        if stray is not None:
+            os.environ["TPU_MAXDIM"] = stray
+        try:
+            inv = ev.check_invariants(tree, env, None)
+            got = {k: inv[k] for k in ("T", "MAXDIM")}
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:120]}"
+        want = {"T": int(ev.SCORED["TPU_T"]), "MAXDIM": int(ev.SCORED["TPU_MAXDIM"])}
+        check("s.scored configuration pinned", f"env_for sets {ev.SCORED}; "
+              f"check_invariants passes at {want}", got, got == want)
+    # The per-run cap: this run's sessions, a timed-out one found by its title,
+    # and none of a concurrent run's.
+    import loop
+    import spend
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "opencode.db"
+        con = sqlite3.connect(db)
+        con.execute("create table session (id text, title text, time_created int, "
+                    "model text, cost real)")
+        con.execute("create table message (id text, session_id text, "
+                    "time_created int, data text)")
+        rows = [("ses_mine_ok", "chia-run R@1 [tpuA]", 4.00),
+                ("ses_mine_timeout", "chia-run R@1 [tpuA]", 4.46),
+                ("ses_sibling", "chia-run R@1 [tpuB]", 1.00),
+                ("ses_other_track", "chia-run S@1 [tpuA]", 10.17),
+                ("ses_prefix_trap", "chia-run R@10 [tpuA]", 7.00)]
+        for i, (sid, title, usd) in enumerate(rows):
+            con.execute("insert into session values (?,?,?,?,?)",
+                        (sid, title, 1000 + i, "{}", 0))
+            con.execute("insert into message values (?,?,?,?)",
+                        (f"m{i}", sid, 1000 + i,
+                         json.dumps({"role": "assistant", "cost": usd})))
+        con.commit()
+        con.close()
+        saved = spend.DB
+        spend.DB = db
+        try:
+            b = loop.Budget(15.0, 1000, "chia-run R@1", "tpuA")
+            b.note_session("ses_mine_ok")
+            run, mine = b.spent(), b.mine()
+            window = spend.spent_since(1000)["usd"]
+            try:
+                b.largest_call = 6.0
+                b.check("iter3")
+                stopped = "not stopped"
+            except loop.BudgetExhausted as why:
+                stopped = str(why)
+        finally:
+            spend.DB = saved
+    check("s.per-run cap counts this run only",
+          "$9.46 (own two incl. the timed-out one + sibling worker), not the "
+          "account's $26.63", f"run ${run:.2f}, account ${window:.2f}",
+          run == 9.46 and round(window, 2) == 26.63)
+    check("s.per-worker attribution finds a timed-out call",
+          "both of tpuA's sessions, $8.46", mine,
+          set(mine) == {"ses_mine_ok", "ses_mine_timeout"}
+          and round(sum(mine.values()), 2) == 8.46)
+    check("s.cap stops on this run's spend", "stops: $9.46 + $6.00 > $15",
+          stopped[:90], "has spent $9.46" in stopped)
+    # Nothing reads opencode's `usage` (CHIA's cost_usd) as money.
+    readers = [f"{f.name}:{i}" for f in sorted(AGENT_DIR.glob("*.py"))
+               if f.name not in ("fake_model.py", "test_harness.py")
+               for i, line in enumerate(f.read_text().splitlines(), 1)
+               if "cost_usd" in line]
+    check("s.no money from usage", "no module reads cost_usd", readers or "none",
+          not readers)
 
 
 # -- MCP client -------------------------------------------------------------
@@ -495,7 +676,8 @@ class Suite:
         A, spec = self.A, self.specs["tpta"]
         micro = head("microarch_isa.py")
         t_def = 'T = int(os.environ.get("TPU_T", 4))'
-        md_def = 'MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))'
+        md_def = re.search(r'^MAXDIM = int\(os\.environ\.get\("TPU_MAXDIM", \d+\)\)',
+                           micro, re.M).group(0)
         doc = ast.get_docstring(ast.parse(micro), clean=False)
         edits = {
             "literal T": {"path": "microarch_isa.py", "old": t_def, "new": "T = 4"},
@@ -541,12 +723,18 @@ class Suite:
               f"{(v.get('detail') or '')[:80]!r}",
               r.startswith("Replaced") and not v.get("ok")
               and v.get("stage") == "gate:param")
-        # The unmodified design passes it, at both configurations.
+        # The unmodified design passes it, at every configuration the gate
+        # names -- taken from PARAM_CONFIGS, not restated here, because this
+        # check asserted "8 and 12" for a while after a third configuration
+        # (varying T) was added and was no longer checking the whole gate.
         self.reset("tpta")
         v = await A.verdict("run_functional_check")
         param = (v.get("gate") or {}).get("param", {})
-        check("g.unmodified passes gate:param", "ok, PARAM OK at MAXDIM 8 and 12",
-              param, v.get("ok") and len(param) == 2)
+        want = {",".join(f"{k}={v2}" for k, v2 in cfg.items())
+                for cfg in PARAM_CONFIGS}
+        check("g.unmodified passes gate:param",
+              f"ok, PARAM OK at all {len(want)}: {sorted(want)}", param,
+              v.get("ok") and set(param) == want)
         self.reset("tpta")
 
     # d ------------------------------------------------------------------
@@ -624,7 +812,23 @@ class Suite:
         """The real swarm -> loop -> opencode -> MCP path, with a scripted model."""
         print("== loop: swarm.py + opencode + fake model (no LLM)", flush=True)
         from fake_model import FakeModel
-        from spend import spent_since
+        from loop import frozen_is_clean
+        from spend import run_spend
+        # The prerequisites, named here rather than left to be read out of a
+        # worker log. A dirty frozen path makes loop.py refuse before it writes
+        # anything (the reorg-items run died on the absent variants.jsonl that
+        # way); a missing opencode makes every iteration an unscored no-op.
+        dirty = frozen_is_clean()
+        if dirty:
+            check("loop.frozen-paths-clean", "committed (loop.py refuses a dirty "
+                  "frozen path before writing variants.jsonl)", dirty, False)
+            return
+        if not (AGENT_DIR / "node_modules/.bin/opencode").exists():
+            check("loop.opencode-installed",
+                  "node_modules/.bin/opencode (npm ci --prefix chia_agent)",
+                  "missing: this worktree has no opencode, so the loop phase "
+                  "cannot drive the scripted model", False)
+            return
         f, old, new = MUTANTS["spad_zero"]
         f2, old2, new2 = MUTANTS["narrow16"]
         cosim = head("cosim.py")
@@ -668,16 +872,22 @@ class Suite:
         (self.run_dir / "loop-swarm.log").write_text(p.stdout + p.stderr)
         (self.run_dir / "loop-fake-model.json").write_text(
             json.dumps(fake.log, indent=1, default=str))
-        worker = next(d for d in run_dir.iterdir() if d.is_dir())
-        entries = [json.loads(l) for l in (worker / "variants.jsonl").read_text()
-                   .splitlines() if l.strip()]
+        worker = next((d for d in run_dir.iterdir() if d.is_dir()), None)
+        log = worker / "variants.jsonl" if worker else None
+        if log is None or not log.exists():
+            check("loop.ran", "the loop wrote variants.jsonl",
+                  f"swarm exited {p.returncode}, no variants.jsonl under "
+                  f"{run_dir}:\n" + tails(p.stdout + p.stderr, worker), False)
+            return
+        entries = [json.loads(l) for l in log.read_text().splitlines()
+                   if l.strip()]
         by = {(e["kind"], e["iteration"]): e for e in entries}
         print(f"  swarm exited {p.returncode} after {time.time() - t:.0f}s; "
               f"{len(fake.log)} model sessions; fake errors {fake.errors}")
         check("loop.fake-model", "5 scripted sessions consumed, no errors",
               f"{len(fake.log)} sessions, errors={fake.errors}",
               len(fake.log) == 5 and not fake.errors and not fake.scripts)
-        base = by.get(("baseline", 0), {}).get("verdict", {})
+        base = by.get(("baseline", 0), {}).get("verdict") or {}
         check("loop.baseline", f"cycles == {BASELINE}", base.get("cycles"),
               base.get("cycles") == BASELINE)
         # What the agent itself received from score_cycles, mid-turn.
@@ -696,17 +906,17 @@ class Suite:
               f"accepted={e1.get('accepted')} reason={e1.get('reason')}",
               e1.get("accepted") is False and e1.get("reason") == "no diff")
         e2 = by.get(("candidate", 2), {})
-        v2 = e2.get("verdict", {})
+        v2 = e2.get("verdict") or {}   # None when the iteration made no diff
         check("b.spad_zero via loop", "bit-exact, delta > 0, REJECTED (not better)",
               f"ok={v2.get('ok')} {v2.get('cycles')} delta={e2.get('delta_cycles')} "
               f"accepted={e2.get('accepted')}",
               v2.get("ok") and (e2.get("delta_cycles") or 0) > 0
               and e2.get("accepted") is False)
         e3 = by.get(("candidate", 3), {})
+        v3 = e3.get("verdict") or {}
         check("c.narrow16 via loop", "REJECTED at gate:stress (after 1 debug session)",
-              f"stage={e3.get('verdict', {}).get('stage')} accepted={e3.get('accepted')}",
-              e3.get("verdict", {}).get("stage") == "gate:stress"
-              and e3.get("accepted") is False)
+              f"stage={v3.get('stage')} accepted={e3.get('accepted')}",
+              v3.get("stage") == "gate:stress" and e3.get("accepted") is False)
         e4 = by.get(("candidate", 4), {})
         replies = [c.get("result", "")[:40] for c in (fake.log[4]["calls"]
                                                        if len(fake.log) > 4 else [])]
@@ -720,8 +930,13 @@ class Suite:
         check("loop.artifacts", "best.diff empty, summary.json with no best",
               f"best.diff={best!r} best={summary.get('best')}",
               best == "" and summary.get("best") is None)
-        usd = spent_since(t0)["usd"]
-        check("loop.spend", "$0.00", f"${usd:.2f}", usd == 0)
+        # The run's own sessions, found by the title every one of them carries:
+        # the attribution the per-run cap rests on, exercised end to end.
+        tag = json.loads((run_dir / "run.json").read_text())["run_tag"]
+        mine = run_spend(tag + " ", t0)
+        check("loop.spend", "this run's 5 sessions, found by its tag, cost $0.00",
+              f"${mine['usd']:.2f} over {len(mine['sessions'])} session(s)",
+              mine["usd"] == 0 and len(mine["sessions"]) == 5)
         check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
               bool(fake.log) and len(fake.log[0]["tools"]) == 7
@@ -750,7 +965,7 @@ class Suite:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phases", default="e,c,g,d,abf,loop,accept")
+    ap.add_argument("--phases", default="s,e,c,g,d,abf,loop,accept")
     ap.add_argument("--run-dir", type=Path, default=REPO / "chia_runs"
                     / f"harness-test-{time.strftime('%Y%m%d-%H%M%S')}")
     a = ap.parse_args()
@@ -758,9 +973,13 @@ def main() -> int:
     run_dir = a.run_dir.resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     started = time.time()
-    suite = Suite(run_dir)
+    if "s" in phases:
+        phase_s()
+    suite = Suite(run_dir) if set(phases) - {"s"} else None
     try:
         for ph in phases:
+            if ph == "s":
+                continue
             if ph in ("e", "c", "d", "abf", "g"):
                 asyncio.run(getattr(suite, f"phase_{ph}")())
             elif ph in ("loop", "accept"):
@@ -768,7 +987,8 @@ def main() -> int:
             else:
                 raise SystemExit(f"unknown phase {ph}")
     finally:
-        suite.close()
+        if suite:
+            suite.close()
         time.sleep(2)
         left = procs_under(REPO / ".chia_scratch" / run_dir.name)
         check("hygiene.no-orphans-at-exit", "no process under the scratch dir",
