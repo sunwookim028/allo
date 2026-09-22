@@ -270,7 +270,13 @@ def run(args, budget: Budget) -> int:
         # The baseline is the harness's own no-patch measurement, which is
         # already recorded in baseline/ppa.json; the loop reads it rather than
         # re-spending ten minutes on a number it has.
-        base_file = HERE / "baseline" / "ppa.json"
+        # CHIA_BASELINE_DIR, resolved exactly as the evaluator resolves it.
+        # Reading HEAD's baseline while the evaluator scores against the
+        # held-out one would tell the agent a target it cannot reach and then
+        # grade it against a different one. Caught in the first pilot launch,
+        # before any model call completed.
+        base_file = Path(os.environ.get(
+            "CHIA_BASELINE_DIR", HERE / "baseline")) / "ppa.json"
         if not base_file.exists():
             print(f"No PPA baseline at {base_file}. Run:\n  python "
                   f"chia_abstraction/evaluate_abs.py --out DIR "
