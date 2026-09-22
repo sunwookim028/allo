@@ -33,7 +33,7 @@ Environment
 ``LLVM_BUILD_DIR`` is **not** set by the conda environment -- neither
 ``conda activate allo`` nor ``conda run`` sets it (verified 2026-09-17) -- and
 the simulator asserts ``LLVM_BUILD_DIR is not set`` without it. Export it
-explicitly (see :doc:`/developer/pitfalls`).
+explicitly (see ``docs/source/developer/pitfalls.rst``).
 
 
 .. code-block:: bash
@@ -110,7 +110,7 @@ The fix in tree is **not** a ``PATH`` override — it is a compiler-driver flag.
 ``examples/accelerator/tinytpu_vitis/cosim.py`` sets ``LDFLAGS = "-B/usr/bin"`` and
 splices it into the generated Vitis script, pointing the driver at the system
 linker (2.42) while leaving the rest of the Vitis toolchain in place. Same
-story in :doc:`/designs/tinytpu_isa`. Any new Vitis flow needs the
+story in ``docs/source/designs/tinytpu_isa.rst``. Any new Vitis flow needs the
 equivalent.
 
 Python for cosim vs. Python for ``allo``

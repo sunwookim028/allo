@@ -503,7 +503,7 @@ the driver at the system linker (2.42 on the host these results were produced
 on) while leaving the rest of the Vitis toolchain in place. Pass it to
 ``cosim_design -ldflags "-B/usr/bin"`` (and equivalently to any ``csim_design``
 link). Any new Vitis flow on such a host needs the equivalent. Host toolchain
-details are on :doc:`/developer/toolchains`.
+details are on ``dev/toolchains.rst``.
 
 
 Conclusion

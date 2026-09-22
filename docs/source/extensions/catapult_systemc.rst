@@ -56,7 +56,7 @@ free-running-loop fix (``72c70dcb``), so an integration must start from ``System
 ``pe_wire`` / ``pe_stream`` / ``pe_channel`` netlists used by ``examples/systemc_rtlsim/`` survive
 only in its history, at ``0eff4888:agents/noc/rtl/<design>/rtl.v`` (``REPRO.sh`` names the same
 files as ``779e4350^:agents/noc/rtl/{pe_wire,pe_stream,pe_channel}/rtl.v``). Branch layout for all
-remotes is in :doc:`/developer/fork_maintenance`.
+remotes is in ``dev/fork_maintenance.rst``.
 
 ``AlloMemPins``: a dual-port RAM, instantiated once per client
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +99,7 @@ Vitis HLS is the primary backend and has the only end-to-end measured results
 reasoning then was: market niche (automotive/defense, Siemens-adjacent shops); not a standard
 research-community reference tool; Cadence Stratus is the stronger competitor for ASIC research
 citations; CIRCT (MLIR-native, Google/Intel-backed) has the better long-term trajectory. The
-synthesis results it rested on are in :doc:`/records/catapult_decoupled_2x1` (``top_decoupled_2x1``,
+synthesis results it rested on are in ``dev/records/catapult_decoupled_2x1.rst`` (``top_decoupled_2x1``,
 1 MT + 2 CTs: CT latency 295 cycles each, MT 67, 657 sequential, throughput 298 cycles, area scores
 CT0=14991, CT1=14991, MT=16180 at Catapult 2024.2, ``nangate-45nm_beh``, 500 MHz).
 
@@ -128,7 +128,7 @@ CT0=14991, CT1=14991, MT=16180 at Catapult 2024.2, ``nangate-45nm_beh``, 500 MHz
   so is directly relevant to :ref:`limitation-22`'s conclusion that the SystemC path lacks one. It is
   a partial answer: the four ``counted_static`` units carry latencies, while the top and both DMA
   units are ``indeterminate`` with none -- the data-dependent units a delay line actually has to
-  schedule against. (See also :doc:`/developer/fork_maintenance` on whether ``main`` ever tracked
+  schedule against. (See also ``dev/fork_maintenance.rst`` on whether ``main`` ever tracked
   ``externals/circt``.)
 
 What the C++ Path Can and Cannot Express
@@ -308,7 +308,7 @@ A second simulator: Xcelium
 ``CDS_LIC_FILE`` to ``5280@en-license-05.coecis.cornell.edu``, finds ``xrun`` at
 ``/opt/cadence/XCELIUM2403/tools.lnx86/bin/xrun`` (override with ``XRUN``), and resolves Catapult
 library cells from ``$MGC_HOME/pkgs/siflibs``. Xcelium is installed on zhang-21, **not** on
-``ace-01`` (see :doc:`/developer/toolchains`).
+``ace-01`` (see ``dev/toolchains.rst``).
 
 On zhang-21 with Xcelium 24.03 (``710ab138``, 2026-09-18), **all 75 cases in** ``results.txt``
 **reproduce**: ``pe_stream`` and ``pe_channel`` pass all 18 pacings each, ``pe_wire`` fails 8/8 at

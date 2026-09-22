@@ -100,17 +100,6 @@ Allo is an Accelerator Design Language (ADL) and compiler that facilitates the c
    developer/limitations.rst
    developer/dataflow_semantics.rst
    developer/pitfalls.rst
-   developer/toolchains.rst
-   developer/fork_maintenance.rst
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Measurement Records
-
-   records/catapult_decoupled_2x1.rst
-   records/vitis_nb_streams.rst
-   records/hierarchical_regions.rst
 
 
 .. toctree::

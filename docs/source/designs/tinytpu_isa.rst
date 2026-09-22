@@ -620,7 +620,7 @@ section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process design; the
 recorded numbers were produced at 32. ``kpn_model.py`` has been rewritten for the
 row-flattened units and is driven by the assembled header (``ef112868``); every
 shipped program completes in it at FIFO depth **1**. See
-:doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the Vitis install.
+``dev/toolchains.rst`` for ``LLVM_BUILD_DIR`` and the Vitis install.
 
 ``bench_isa.py`` first asserts that the generated program is bit-identical to
 the hand-written one, then that the looped and unrolled programs expand to the

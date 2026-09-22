@@ -30,7 +30,7 @@ Hierarchical Regions: Design Record
    emission, ``s_axilite`` in ``postprocess_hls_code``) describe code that has
    since been **reverted** -- on ``main`` today, bare scalars in ``args=[...]``
    are rejected and ``s_axilite`` is not emitted on the Vitis path (see
-   :doc:`/developer/pitfalls` and :ref:`limitation-23`). Live tracking of the
+   ``docs/source/developer/pitfalls.rst`` and :ref:`limitation-23`). Live tracking of the
    open questions is fork issue #7.
 
 This page preserves the parts of the former

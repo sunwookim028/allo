@@ -42,7 +42,7 @@ ACT Compiler-Backend Flow
    that ``main`` does not). This page is an audit of that work *from the outside*,
    for the purpose of connecting it to this fork's accelerator. It cites ACT; it
    does not republish it. Refer to the upstream repository for the code itself.
-   See also :doc:`/developer/fork_maintenance` for how the lineages relate.
+   See also ``dev/fork_maintenance.rst`` for how the lineages relate.
 
 This page records what exists in ACT, what connecting it to the
 :doc:`/designs/tinytpu_isa` accelerator would take, and which earlier claims
