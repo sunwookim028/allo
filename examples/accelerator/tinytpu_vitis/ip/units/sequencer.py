@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from allo.customize import Partition
 
-from ..compose import unit
+from examples.accelerator.tinytpu_vitis.ip.compose import unit
 
 
 def sequencer_directives(s, ctx):

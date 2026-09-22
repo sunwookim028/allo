@@ -39,11 +39,21 @@ MAXROWS = 127                  # `nr` is 8 bits, top bit spare
 AGU_TERMS = 3                  # address terms per instruction
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
 
-# The names a unit may decode. `isa=()` on a unit is the claim that it decodes
-# nothing, and `Unit.check` enforces it against the body.
-ISA_NAMESPACE = {name: value for name, value in list(globals().items())
-                 if name.startswith(("OP_", "DMA_", "AGU_"))
-                 or name in ("LOOP_DEPTH", "IWORDS", "NHDR", "MAXROWS")}
+# The names a unit may decode, spelled out rather than swept out of the module:
+# `isa=()` on a unit is the claim that it decodes nothing, `Unit.check`
+# enforces it against the body, and a claim is only as good as the list it is
+# checked against.
+ISA_NAMESPACE = {
+    "OP_NOP": OP_NOP, "OP_DMA_LD": OP_DMA_LD, "OP_DMA_ST": OP_DMA_ST,
+    "OP_VLD": OP_VLD, "OP_MM": OP_MM, "OP_VADD": OP_VADD,
+    "OP_VRELU": OP_VRELU, "OP_MVOUT": OP_MVOUT, "OP_LOOP": OP_LOOP,
+    "OP_ENDLOOP": OP_ENDLOOP,
+    "DMA_SRC_B": DMA_SRC_B, "DMA_TO_VR": DMA_TO_VR,
+    "AGU_TERMS": AGU_TERMS, "AGU_F0": AGU_F0, "AGU_F1": AGU_F1,
+    "AGU_F2": AGU_F2, "AGU_F3": AGU_F3,
+    "LOOP_DEPTH": LOOP_DEPTH, "IWORDS": IWORDS, "NHDR": NHDR,
+    "MAXROWS": MAXROWS,
+}
 
 
 def enc_agu(*terms):

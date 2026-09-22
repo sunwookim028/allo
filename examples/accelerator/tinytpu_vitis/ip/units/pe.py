@@ -11,7 +11,7 @@ interval. One flat loop over every wavefront row of every `mm`, so consecutive
 
 from __future__ import annotations
 
-from ..compose import unit
+from examples.accelerator.tinytpu_vitis.ip.compose import unit
 
 
 @unit(

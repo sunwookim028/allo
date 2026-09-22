@@ -22,7 +22,8 @@ ISA), `tinytpu_library.rst` (the decomposition, and what the front end refuses),
 
 import os
 
-from examples.accelerator.tinytpu_vitis.ip import TinyTPU, TpuParams
+from examples.accelerator.tinytpu_vitis.ip.params import TpuParams
+from examples.accelerator.tinytpu_vitis.ip.tinytpu import TinyTPU
 from examples.accelerator.tinytpu_vitis.ip.assembler import (  # noqa: F401
     AR_RAW_DIST, ProgramError)
 from examples.accelerator.tinytpu_vitis.ip.isa import (  # noqa: F401
@@ -36,28 +37,24 @@ from examples.accelerator.tinytpu_vitis.ip.isa import (  # noqa: F401
 # time. With control flow the program is O(nesting), not O(tiles).
 _MAX_STATIC = 24               # longest program shipped, plus headroom
 
-PARAMS = TpuParams(
-    T=int(os.environ.get("TPU_T", 4)),
-    MAXDIM=int(os.environ.get("TPU_MAXDIM", 16)),
-    SPAD_ROWS=int(os.environ.get("TPU_SPAD", 512)),
-    NVR=int(os.environ.get("TPU_NVR", 256)),
-    NAR=int(os.environ.get("TPU_NAR", 128)),
-    QD=int(os.environ.get("TPU_QD", 8)),
-    IMEM_SIZE=int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC)),
-)
+# T and MAXDIM are defined here, at module level, each exactly once and as an
+# environment parameter: one RTL build runs every shape, and the parametricity
+# gate rebuilds the design at other values of them.
+T = int(os.environ.get("TPU_T", 4))
+MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))
+SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))
+NVR = int(os.environ.get("TPU_NVR", 256))
+NAR = int(os.environ.get("TPU_NAR", 128))
+QD = int(os.environ.get("TPU_QD", 8))
+IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
 
+PARAMS = TpuParams(T=T, MAXDIM=MAXDIM, SPAD_ROWS=SPAD_ROWS, NVR=NVR, NAR=NAR,
+                   QD=QD, IMEM_SIZE=IMEM_SIZE)
 TPU = TinyTPU(PARAMS)
 
-T = PARAMS.T
 VW = PARAMS.VW
 AW = PARAMS.AW
-QD = PARAMS.QD
-MAXDIM = PARAMS.MAXDIM
 WPR = PARAMS.WPR
-SPAD_ROWS = PARAMS.SPAD_ROWS
-NVR = PARAMS.NVR
-NAR = PARAMS.NAR
-IMEM_SIZE = PARAMS.IMEM_SIZE
 
 A_VR = TPU.memory_map.A_VR
 B_SP = TPU.memory_map.B_SP

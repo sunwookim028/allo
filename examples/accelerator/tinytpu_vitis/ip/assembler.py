@@ -14,7 +14,7 @@ Both are rejected here. See ``docs/source/designs/tinytpu_isa.rst``.
 
 from collections import namedtuple
 
-from .isa import (AGU_TERMS, LOOP_DEPTH, OPCODE_NAMES, OP_DMA_LD, OP_DMA_ST,
+from examples.accelerator.tinytpu_vitis.ip.isa import (AGU_TERMS, LOOP_DEPTH, OPCODE_NAMES, OP_DMA_LD, OP_DMA_ST,
                   OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
                   OP_VLD, OP_VRELU, NHDR, DMA_SRC_B, DMA_TO_VR)
 

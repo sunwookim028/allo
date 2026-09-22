@@ -11,9 +11,9 @@ is checked against word for word.
 
 from dataclasses import dataclass
 
-from .isa import (AGU_F0, AGU_F2, AGU_F3, MAXROWS, OP_DMA_LD, OP_ENDLOOP,
-                  OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VRELU, DMA_SRC_B,
-                  DMA_TO_VR, enc, enc_agu)
+from examples.accelerator.tinytpu_vitis.ip.isa import (
+    AGU_F0, AGU_F2, AGU_F3, DMA_SRC_B, DMA_TO_VR, MAXROWS, OP_DMA_LD,
+    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VRELU, enc, enc_agu)
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ class GemmPrograms:
         where the `loop`/`endloop` pairs sit, and nothing here checks that they
         do; `isa_dsl.gemm_program` derives them from nesting instead, and ships.
         """
-        T, MAXDIM, m = self.p.T, self.p.MAXDIM, self.m
+        tile, dram_row, m = self.p.T, self.p.MAXDIM, self.m
         Kt, Nt = self._tiles(M, K, N)
         program = []
         ins = lambda word, agu=0: program.append((word, agu))
@@ -66,12 +66,12 @@ class GemmPrograms:
         # --- A: one dma_ld per column block, straight into the vregs ---
         ins(enc(OP_LOOP, nr=Kt))
         ins(enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=0, f3=m.A_VR, nr=M),
-            enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+            enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, dram_row)))
         ins(enc(OP_ENDLOOP))
         # --- B: one per column block, into the scratchpad ---
         ins(enc(OP_LOOP, nr=Nt))
         ins(enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=m.B_SP, nr=K),
-            enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, MAXDIM)))
+            enc_agu((AGU_F2, 0, 1), (AGU_F3, 0, dram_row)))
         ins(enc(OP_ENDLOOP))
 
         # --- the output loop: level 0 is nb, level 1 is kb ---
@@ -79,14 +79,14 @@ class GemmPrograms:
         #   peeled first k-tile: overwrite the accumulator. Weights by
         #   scratchpad address: B_SP + nb*MAXDIM
         ins(enc(OP_MM, f0=m.A_VR, f1=m.AR_C, f2=0, f3=m.B_SP, nr=M),
-            enc_agu((AGU_F3, 0, MAXDIM)))
+            enc_agu((AGU_F3, 0, dram_row)))
         if Kt > 1:
             ins(enc(OP_LOOP, nr=Kt - 1))
             #   f3 needs BOTH tiles: B_SP + nb*MAXDIM + (kb+1)*T
-            ins(enc(OP_MM, f0=m.A_VR + MAXDIM, f1=m.AR_C, f2=1,
-                    f3=m.B_SP + T, nr=M),
-                enc_agu((AGU_F0, 1, MAXDIM), (AGU_F3, 0, MAXDIM),
-                        (AGU_F3, 1, T)))
+            ins(enc(OP_MM, f0=m.A_VR + dram_row, f1=m.AR_C, f2=1,
+                    f3=m.B_SP + tile, nr=M),
+                enc_agu((AGU_F0, 1, dram_row), (AGU_F3, 0, dram_row),
+                        (AGU_F3, 1, tile)))
             ins(enc(OP_ENDLOOP))
         if relu:
             ins(enc(OP_VRELU, f0=m.AR_C, f1=m.AR_C, nr=M))
@@ -99,20 +99,20 @@ class GemmPrograms:
         """The fully unrolled form, kept as the differential reference: every
         instruction carries absolute addresses and there is no control flow, so
         this is what the looped program must reproduce exactly."""
-        T, MAXDIM, m = self.p.T, self.p.MAXDIM, self.m
+        tile, dram_row, m = self.p.T, self.p.MAXDIM, self.m
         Kt, Nt = self._tiles(M, K, N)
         program = []
         for kb in range(Kt):
             program.append((enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=kb,
-                          f3=m.A_VR + kb * MAXDIM, nr=M), 0))
+                          f3=m.A_VR + kb * dram_row, nr=M), 0))
         for nb in range(Nt):
             program.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
-                                f3=m.B_SP + nb * MAXDIM, nr=K), 0))
+                                f3=m.B_SP + nb * dram_row, nr=K), 0))
         for nb in range(Nt):
             for kb in range(Kt):
-                program.append((enc(OP_MM, f0=m.A_VR + kb * MAXDIM, f1=m.AR_C,
+                program.append((enc(OP_MM, f0=m.A_VR + kb * dram_row, f1=m.AR_C,
                                     f2=(1 if kb else 0),
-                                    f3=m.B_SP + nb * MAXDIM + kb * T, nr=M), 0))
+                                    f3=m.B_SP + nb * dram_row + kb * tile, nr=M), 0))
             if relu:
                 program.append((enc(OP_VRELU, f0=m.AR_C, f1=m.AR_C, nr=M), 0))
             program.append((enc(OP_MVOUT, f0=m.AR_C, f1=0, f2=nb, nr=M), 0))
@@ -122,10 +122,10 @@ class GemmPrograms:
         """`relu(2 * (A @ B))` on the first output tile: a program for the
         vector unit itself, so `vadd`/`vrelu` stay exercised now that tiled
         GEMM no longer needs them on its inner loop."""
-        T, m = self.p.T, self.m
+        tile, m = self.p.T, self.m
         return [(w, 0) for w in [
             enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=0, f3=m.A_VR, nr=M),
-            enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=m.B_SP, nr=T),
+            enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=0, f3=m.B_SP, nr=tile),
             enc(OP_MM, f0=m.A_VR, f1=m.AR_C, f2=0, f3=m.B_SP, nr=M),
             enc(OP_MM, f0=m.A_VR, f1=m.AR_P, f2=0, f3=m.B_SP, nr=M),
             enc(OP_VADD, f0=m.AR_C, f1=m.AR_C, f2=m.AR_P, nr=M),

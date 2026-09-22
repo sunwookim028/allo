@@ -54,6 +54,7 @@ sys.path.insert(0, str(AGENT_DIR))
 #: script imports it. It used to exist here as a second copy; a
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
+from design import EDITABLE  # noqa: E402
 from evaluate import ALL_SHAPES, vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
@@ -161,7 +162,7 @@ def main():
             diff = a.diff.read_text()
             touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
                 re.findall(r"^--- a/(\S+)", diff, re.M))
-            if not touched or not touched <= {"microarch_isa.py", "isa_dsl.py"}:
+            if not touched or not touched <= set(EDITABLE):
                 raise SystemExit(f"refusing: diff touches {sorted(touched)}")
             (out / "candidate.diff").write_text(diff)
             rc, o, _ = sh(["git", "apply", f"--directory={PKG}", "-p1",
@@ -174,7 +175,7 @@ def main():
         exec(compile(subprocess.run(
             ["git", "show", f"{ref}:{PKG}/chia_agent/spec_policy.py"], cwd=REPO,
             capture_output=True, check=True).stdout, "spec_policy.py", "exec"), policy)
-        problems = [p for f in ("microarch_isa.py", "isa_dsl.py") for p in
+        problems = [p for f in EDITABLE for p in
                     policy["policy_violations"](f, (wt / PKG / f).read_text())
                     + policy["doc_violations"](f, subprocess.run(
                         ["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
@@ -301,7 +302,7 @@ def main():
             blobs = tuple(subprocess.run(
                 ["git", "rev-parse", f"{ref}:{PKG}/{f}"], cwd=REPO,
                 capture_output=True, text=True).stdout.strip()
-                for f in ("microarch_isa.py", "isa_dsl.py"))
+                for f in EDITABLE)
             base = BASELINES.get(blobs)
         result["baseline"] = base
         if not result["ok"]:

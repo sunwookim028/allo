@@ -10,19 +10,19 @@ run and so never back-pressures. Why, and what it measured, is on
 ``docs/source/designs/tinytpu_isa.rst``.
 """
 
-from .assembler import Assembler
-from .compose import Architecture, Channel, Memory
-from .isa import ISA_NAMESPACE
-from .params import TpuParams
-from .programs import GemmPrograms, MemoryMap
-from .units.accumulator import accu
-from .units.dma_load import dma_ld
-from .units.dma_store import dma_st
-from .units.pe import pe
-from .units.scratchpad import spm
-from .units.sequencer import sequencer
-from .units.vector_regs import vru
-from .units.weight_loader import wld
+from examples.accelerator.tinytpu_vitis.ip.assembler import Assembler
+from examples.accelerator.tinytpu_vitis.ip.compose import Architecture, Channel, Memory
+from examples.accelerator.tinytpu_vitis.ip.isa import ISA_NAMESPACE
+from examples.accelerator.tinytpu_vitis.ip.params import TpuParams
+from examples.accelerator.tinytpu_vitis.ip.programs import GemmPrograms, MemoryMap
+from examples.accelerator.tinytpu_vitis.ip.units.accumulator import accu
+from examples.accelerator.tinytpu_vitis.ip.units.dma_load import dma_ld
+from examples.accelerator.tinytpu_vitis.ip.units.dma_store import dma_st
+from examples.accelerator.tinytpu_vitis.ip.units.pe import pe
+from examples.accelerator.tinytpu_vitis.ip.units.scratchpad import spm
+from examples.accelerator.tinytpu_vitis.ip.units.sequencer import sequencer
+from examples.accelerator.tinytpu_vitis.ip.units.vector_regs import vru
+from examples.accelerator.tinytpu_vitis.ip.units.weight_loader import wld
 
 
 def channels():

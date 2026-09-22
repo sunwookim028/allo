@@ -93,6 +93,9 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
 
+sys.path.insert(0, str(AGENT_DIR))
+from design import EDITABLE, FROZEN_DESIGN  # noqa: E402
+
 #: Frozen files are read from this commit (resolved to a hash per run), i.e.
 #: from what is COMMITTED, never from the working tree. Only a person, in a
 #: commit, can change them.
@@ -116,9 +119,14 @@ DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "shapes.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
+#: The design's own frozen machinery: the composer (which emits the region's
+#: source, and so uses constructs a spec may not contain) and the parameter
+#: set's invariants. `design.py` is the one definition; see
+#: `docs/source/designs/tinytpu_library.rst`.
 FROZEN = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
+    *[f"{PKG}/{rel}" for rel in FROZEN_DESIGN],
     GATE_RUNNER,
     PARAM_CHECK,
 ]
@@ -137,7 +145,6 @@ FROZEN = [
 #: than for a wrong answer. MAXDIM=32 gives ratio 4 and every seed generates.
 PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"},
                  {"TPU_T": "8", "TPU_MAXDIM": "32"}]
-EDITABLE = ("microarch_isa.py", "isa_dsl.py")
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
 CHECKOUT_WATCH = ["allo", "examples/__init__.py", PKG]
@@ -198,7 +205,7 @@ def resolve_ref(ref):
 
 
 def compose(spec_dir: Path, tree: Path, ref: str):
-    """Evaluation tree = frozen files from git + the candidate's two files.
+    """Evaluation tree = frozen files from git + the candidate's writable ones.
 
     Returns {relative path: sha256} for every file in the tree."""
     for rel in DESIGN_EVALUATOR:
@@ -213,18 +220,28 @@ def compose(spec_dir: Path, tree: Path, ref: str):
         dst = tree / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(git_show(ref, rel))
-    for name in EDITABLE:
-        src = spec_dir / name
+    doc_losses = {}
+    for rel in EDITABLE:
+        src = spec_dir / rel
         if not src.is_file():
-            raise Reject("setup", f"spec dir has no {name}")
+            raise Reject("setup", f"spec dir has no {rel}")
         text = src.read_text(encoding="utf-8")
-        problems = policy_violations(name, text) + policy["doc_violations"](
-            name, git_show(ref, f"{PKG}/{name}").decode("utf-8"), text)
+        base = git_show(ref, f"{PKG}/{rel}").decode("utf-8")
+        problems = policy_violations(rel, text) + policy["doc_violations"](
+            rel, base, text)
         if problems:
             raise Reject("policy", "; ".join(problems))
-        (tree / PKG / name).write_text(text, encoding="utf-8")
-    # Anything else in the spec dir is ignored, not merged: only these two
-    # files are the candidate.
+        doc_losses[rel] = policy["doc_loss"](base, text)
+        dst = tree / PKG / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(text, encoding="utf-8")
+    # Per file is not enough once the design is fourteen files: the budget the
+    # guard was written with is a budget for the whole candidate.
+    total = policy["doc_violations_total"](doc_losses)
+    if total:
+        raise Reject("policy", "; ".join(total))
+    # Anything else in the spec dir is ignored, not merged: only the files
+    # `design.EDITABLE` names are the candidate.
     manifest = tree_manifest(tree)
     for f in tree.rglob("*"):
         if f.is_file():

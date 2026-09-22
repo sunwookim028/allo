@@ -12,7 +12,7 @@ makes true. See ``docs/source/designs/tinytpu_isa.rst``."""
 
 from __future__ import annotations
 
-from ..compose import unit
+from examples.accelerator.tinytpu_vitis.ip.compose import unit
 
 
 def accumulator_directives(s, ctx):
