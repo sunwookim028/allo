@@ -85,40 +85,63 @@ of the fixed cost is the design's?""",
 #: change: the refusal counts are facts, the response is the agent's.
 CODESIGN_STRATEGIES = (
     (
-        "acc-predicate",
-        """The binding constraint, measured: 1,150 of the 1,226 enumerated
-nests are refused because `acc` is a STATIC instruction field. With no
-predicate on an induction variable, the k=0 tile has to be a peelable prefix,
-which pins K innermost and unsplit and kills every permutation that moves it.
-Every K-outer order, every split of K, and every nest that interleaves K with
-M or N is on the other side of that one field. What would it take for the
-accumulate/overwrite decision to come from the loop state rather than from the
-instruction word -- in the encoding, in the sequencer, and in the array -- and
-which of the 1,150 does that actually make worth running?""",
-    ),
-    (
-        "agu-width",
-        """AGU_TERMS=3 refuses only 17 nests, but measurement shows it does
-more than refuse: it CHOOSES the data-reuse strategy. An m-tiled nest is
-encodable only if A is re-staged into the operand vregs once per m-tile,
-because keeping A resident across m needs a fourth address term on the
-accumulating `mm`. So the m-tiled survivors pay a repeated A load that a
-4-term AGU would not. The AGU word is 64 bits and three terms currently use
-19 each (target 4, level 3, stride 12); a fourth term has to come out of that
-budget or out of the field widths. What does the mapspace look like with the
-fourth term, and does the reuse it unlocks pay for the decode area?""",
+        "acc-follows-k",
+        """The binding constraint, measured, and stated as a SYMPTOM rather than
+a diagnosis. 1,150 of the 1,226 enumerated nests die because the encoder cannot
+make `acc` follow the k loop, so the k=0 tile has to be a peelable prefix --
+which pins K innermost and unsplit.
+
+What is measured about it, verified in-tree today:
+
+  * `acc` is field `f2`, and `f2` IS an AGU target. One additive AGU term on it
+    gives acc = [0] at Kt=1 and acc = [0, 1] at Kt=2. The Kt=2 form is a
+    genuine no-peel GEMM and is numerically EXACT against `isa_ref`.
+  * It dies at Kt>=3 with `f2=2, must be 0 (overwrite) or 1 (accumulate)`. The
+    term's growth is ADDITIVE and MONOTONE where the k=0 test needs a step.
+    Staticness is not the obstacle; monotonicity is.
+  * A term on `f2` COSTS ONE of the three AGU terms. At Nt>1 the accumulating
+    `mm` then needs four and does not fit at all, so this constraint and
+    `AGU_TERMS` are coupled rather than alternatives.
+  * `isa_ref.run` consumes `expand(prog)`, i.e. the AGU-RESOLVED fields. So
+    whatever resolves the step belongs in the AGU resolution -- the sequencer's
+    kernel, with `expand` kept in lockstep -- and then what reaches a unit is
+    still 0 or 1 and the instruction keeps its architectural meaning. Put it in
+    a unit's decode instead and you have changed what f2=2 means, which the
+    frozen `isa_ref` will reject.
+  * A first-cause histogram overstates the prize. Remove the position check and
+    re-census and 897 of those 1,150 are refused by the OTHER acc-peel branch
+    (K split across two emitted loops) and 274 by the encoder's own m/n
+    interleave limitation, with only 12 becoming expressible. Run
+    `histogram.py --second-cause` yourself. Do not assume a fix here frees
+    1,150 nests.
+
+Find a mechanism. Price it: the decoder and the accumulator's write path are
+real area and the clock must still close at 3.33 ns.""",
     ),
     (
         "open",
-        """You are given the whole refusal histogram at 16x16x16 and no
-preferred answer: 1,150 `acc` as a static field, 54 the encoder's own m/n
-interleave limitation, 17 AGU_TERMS=3, 2 the accumulator RAW distance, 0
-LOOP_DEPTH. The shipped nest is already the best of the 3 survivors, so the
-mapping search alone yields nothing. Decide for yourself which of those is
-worth attacking -- including the possibility that the intrinsic tile itself
-(one `mm` performing rows x TxT) is the thing to widen, or that the right move
-is to spend imem rather than logic. Justify the choice from the histogram
-before you edit anything.""",
+        """You get the whole first-cause histogram at 16x16x16 and no preferred
+answer: 1,150 the encoder cannot make `acc` follow the k loop, 54 the encoder's
+own m/n interleave limitation, 17 `AGU_TERMS=3`, 2 the accumulator RAW
+distance, 0 `LOOP_DEPTH`.
+
+Two things are measured and should stop you wasting iterations:
+
+  * `AGU_TERMS=4` (the 64-bit AGU word repacked to four 16-bit terms) raises
+    encodable nests from 3 to 7 and drives the `agu-terms` refusals to zero --
+    and the mapper's CHOSEN nest does not change, so the RTL runs the same
+    stream and the cycle count does not move while the area does. Widening the
+    address path alone is a cost with no benefit. A 6-frame loop stack alone
+    changes not one number. `IMEM_SIZE` 56 -> 104 changes not one number.
+  * The mapping search alone is worth 3 cycles, at one shape: at 4x4x4 the
+    mapper's program is 24 words against the hand-written 28, with the same
+    four dynamic issues.
+
+So the expressible set is not obviously the binding constraint on this machine,
+and one honest outcome of your iteration is to show that it is not. Decide for
+yourself what to attack -- including the intrinsic tile (one `mm` performs rows
+x TxT), the encoder's own 54 refusals, or something the histogram does not name
+at all -- and justify the choice from the numbers before you edit anything.""",
     ),
 )
 

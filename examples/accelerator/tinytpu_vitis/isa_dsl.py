@@ -66,6 +66,13 @@ author's layout), no scheduling, no peeling. `gemm_program` below peels the
 first k-tile because the *author* decided that carrying `f2=0` on it is how you
 say "overwrite the accumulator" without a predicate -- the generator has no
 opinion about that and could not form one.
+
+That peel is not forced by `f2` being static. `f2` is an AGU target like any
+other field, and one additive term on it expresses acc=[0, 1] over a two-tile k
+loop exactly. What it cannot express is the step the k=0 test needs once the
+loop is longer, because an AGU term grows additively and monotonically: the
+third value is 2, and `check_program` requires f2 in {0, 1}. See
+`Unencodable` below, which is where that refusal is named and counted.
 """
 
 from __future__ import annotations
@@ -382,11 +389,24 @@ def gemm_from_nest(nest, M, K, N, relu=False):
     Every `raise Unencodable` below is a hardware or encoding limit, and the
     mapper counts them by code. Today they are:
 
-      `acc-peel`   `acc` is a STATIC instruction field with no predicate on an
-                   induction variable, so the k=0 tile must be a peelable
-                   prefix -- which pins K innermost and unsplit and kills every
-                   permutation that moves it. This is the binding constraint:
-                   1,150 of 1,226 nests at 16x16x16.
+      `acc-peel`   `acc` cannot be made to follow the k loop, so the k=0
+                   tile must be a peelable prefix -- which pins K innermost and
+                   unsplit and kills every permutation that moves it. This is
+                   the binding constraint: 1,150 of 1,226 nests at 16x16x16.
+                   **Not because the field is static.** `acc` is `f2` and `f2`
+                   IS an AGU target: one additive term on it gives acc=[0] at
+                   Kt=1 and acc=[0,1] at Kt=2 -- a genuine no-peel GEMM, exact
+                   against `isa_ref` -- and dies at Kt>=3, where the term's
+                   third value is 2 and `check_program` requires f2 in {0, 1}.
+                   The obstacle is that an AGU term is ADDITIVE and MONOTONE
+                   where the k=0 test needs a step. It also costs one of the
+                   three AGU terms, so at Nt>1 the accumulating `mm` needs a
+                   fourth and does not fit at all: this constraint and
+                   `AGU_TERMS` are coupled, not alternatives.
+                   Whatever resolves it belongs in the AGU resolution -- the
+                   sequencer, with `expand` in lockstep -- so that what reaches
+                   a unit, and what the frozen `isa_ref` sees, is still 0 or 1
+                   and the instruction keeps its architectural meaning.
       `emitter`    a limit of this function, not of the machine: it re-stages A
                    per m-tile and does not know how to interleave that with an
                    n loop.
@@ -407,8 +427,9 @@ def gemm_from_nest(nest, M, K, N, relu=False):
     if len(ks) > 1:
         raise Unencodable(
             "acc-peel: K is split across two emitted loops, so the k=0 tile is "
-            "not a peelable prefix -- `acc` is a static field and cannot be "
-            "predicated on an induction variable")
+            "not a peelable prefix, and `acc` cannot follow two induction "
+            "variables at once -- an AGU term is additive and monotone where "
+            "the k=0 test needs a step")
     if ks and ks[0] != len(emitted) - 1:
         raise Unencodable(
             f"acc-peel: the emitted order is "

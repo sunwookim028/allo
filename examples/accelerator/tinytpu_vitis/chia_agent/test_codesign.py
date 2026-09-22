@@ -28,6 +28,9 @@ is the part that can silently produce a wrong claim:
   k6  a program that outgrows      REJECTED, and the refusal names IMEM_SIZE.
       IMEM_SIZE                    Nothing is truncated: `assemble` raises, and
                                    the mapper counts the nest unencodable
+  k8  the same check, PRESENT but   REJECTED all the same: `git grep` still hits
+      made vacuous by an            the check, a text-anchored guard still sees
+      unreachable conjunct          it, and only the isa_ref sweep catches it
   k7  the frozen half attacked     a sabotaged mapper in the spec directory is
                                    IGNORED (the evaluator composes it from
                                    git), and accept.py refuses a diff that
@@ -185,6 +188,23 @@ BREAK_SEAM = (
     """        stage_b()
         stage_a([])
 """)
+
+#: k8. The insidious version of k3: the `acc-peel` position check is still
+#: THERE, verbatim -- `raise Unencodable("acc-peel: ...")` and all -- but the
+#: guard has grown a conjunct that is never true, so it refuses nothing. A
+#: reviewer skimming the diff sees the check; `git grep acc-peel` still hits; a
+#: mutation test anchored on the check's text still finds it. Only BEHAVIOUR
+#: distinguishes it from k3, which is why the mapspace gate proves every
+#: survivor against `isa_ref` rather than trusting that a named check exists.
+#: `len(emitted) > LOOP_DEPTH * 4` reads like a depth guard and is unreachable:
+#: `emitted` is at most a handful of loops at MAXDIM=16. Arranged so the
+#: CANONICAL nest stays correct, which keeps the seam check passing and forces
+#: the failure to come from the isa_ref sweep -- that is what separates this
+#: case from k4.
+VACUOUS_ACC_PEEL = (
+    I_DSL,
+    "    if ks and ks[0] != len(emitted) - 1:\n",
+    "    if ks and ks[0] != len(emitted) - 1 and len(emitted) > LOOP_DEPTH * 4:\n")
 
 #: k5. [-4, 4] operands never overflow 16 bits; full-range ones do.
 NARROW16 = (M_ISA, "o: int32 = p + av * wv", "o: int16 = p + av * wv")
@@ -440,7 +460,31 @@ def k7(run, work):
     return ok
 
 
-PHASES = {"k1": k1, "k2": k2, "k3": k3, "k4": k4, "k5": k5, "k6": k6, "k7": k7}
+def k8(run, work):
+    """A peel check that is present, reads plausibly, and refuses nothing."""
+    v = evaluate(spec(run, "vacuous", [VACUOUS_ACC_PEEL]), work / "k8")
+    text = (run / "spec" / "vacuous" / I_DSL).read_text()
+    # The check is still in the file, and still says what it always said.
+    present = ("raise Unencodable(" in text
+               and "acc-peel: the emitted order is" in text)
+    caught = (not v.get("ok") and v.get("stage") == "gate:mapspace"
+              and "WRONG against isa_ref" in v.get("detail", ""))
+    ms = mapspace_of(v)
+    return check("k8 the acc-peel check is present but vacuous",
+                 "the check is STILL IN THE SOURCE and the candidate is "
+                 "REJECTED at gate:mapspace -- detection is behavioural "
+                 "(isa_ref), not textual",
+                 {"check_still_in_source": present, "ok": v.get("ok"),
+                  "stage": v.get("stage"),
+                  "encodable_claimed": {s: d.get("encodable")
+                                        for s, d in ms.items()},
+                  "isa_ref_lines": [l for l in v.get("detail", "").splitlines()
+                                    if "WRONG against isa_ref" in l][:3]},
+                 present and caught)
+
+
+PHASES = {"k1": k1, "k2": k2, "k3": k3, "k4": k4, "k5": k5, "k6": k6, "k7": k7,
+          "k8": k8}
 
 
 def main() -> int:

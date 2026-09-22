@@ -44,11 +44,22 @@ The selection rule, stated
 Among the nests the candidate can encode at a shape, `select()` takes the
 minimum of
 
-    (dynamic instruction issues, static instruction words, nest string)
+    (instruction FETCHES, static instruction words, nest string)
 
-`len(expand(prog))` and `len(assemble(prog))` are both *static* properties of
-the program -- a count of issues and a count of 64-bit words -- not cycle
-estimates, and the nest string only breaks ties so the choice is deterministic.
+Both counts are *static* properties of the program -- a count of fetches and a
+count of 64-bit words -- not cycle estimates, and the nest string only breaks
+ties so the choice is deterministic.
+
+`fetches()` below counts what the sequencer actually fetches, **control flow
+included**. `microarch_isa.expand` deliberately does not: it runs the loops and
+yields only the data issues, because its job is to tell each unit how much work
+it will be sent, and `LOOP`/`ENDLOOP` are sent to no unit. They are still
+fetched and dispatched, so a rule built on `len(expand(prog))` alone
+under-charges a loop-heavy nest by roughly a factor of two and can misrank two
+close candidates. (Measured at all five shapes on the shipped design: charging
+the fetches changes no pick, because the margins are wide -- 59 against 112
+against 214 at 16x16x16. The rule charges them anyway; being right for a reason
+is cheaper than being right by luck.)
 The nest must be encodable at BOTH relu settings (`cosim.py`'s correctness
 testbench runs `gemm.relu`), and it is ranked by the `relu=False` program, which
 is the one the scored testbench runs.
@@ -209,6 +220,41 @@ def describe(nest):
 
 
 # --------------------------------------------------------------- the search --
+def fetches(prog, microarch_isa):
+    """How many instructions the sequencer FETCHES to run `prog`, control flow
+    included -- `expand`'s data issues plus every `LOOP` and `ENDLOOP`.
+
+    `expand` exists to tell each unit its work count and so yields nothing for
+    control flow; a ranking that used it alone would treat a loop as free. This
+    mirrors `_trace`'s walk rather than reusing it, because what is wanted here
+    is the count of fetches and not the resolved operands.
+    """
+    OP_LOOP, OP_ENDLOOP = microarch_isa.OP_LOOP, microarch_isa.OP_ENDLOOP
+    pc, stack, guard, n = 0, [], 0, 0
+    while pc < len(prog):
+        guard += 1
+        if guard > 1 << 22:
+            raise RuntimeError("program does not terminate")
+        w0, _ = prog[pc]
+        op = w0 & 0x3F
+        if op == OP_LOOP:
+            stack.append([pc + 1, 0, (w0 >> 54) & 0xFF])
+            pc += 1
+            n += 1
+        elif op == OP_ENDLOOP:
+            frame = stack[-1]
+            frame[1] += 1
+            n += 1
+            if frame[1] < frame[2]:
+                pc = frame[0]
+            else:
+                stack.pop()
+                pc += 1
+        else:
+            pc += 1
+    return n + len(microarch_isa.expand(prog))
+
+
 def encode(nest, M, K, N, relu, isa_dsl, microarch_isa):
     """The candidate's answer for one nest: a program and its static costs.
 
@@ -219,7 +265,7 @@ def encode(nest, M, K, N, relu, isa_dsl, microarch_isa):
     """
     prog = isa_dsl.gemm_from_nest(nest, M, K, N, relu)
     words = microarch_isa.assemble(prog)          # check_program + IMEM_SIZE
-    return prog, len(microarch_isa.expand(prog)), len(words)
+    return prog, fetches(prog, microarch_isa), len(words)
 
 
 def search(M, K, N, slots=SLOTS):
@@ -267,7 +313,7 @@ def select(M, K, N, slots=SLOTS):
 def report(shapes, slots=SLOTS, out=print):
     """Per shape: the counts, the refusal histogram, and the chosen nest.
 
-    Returns {shape: {total, encodable, refused, chosen, dynamic, words}} --
+    Returns {shape: {total, encodable, refused, chosen, fetches, words}} --
     the co-design signal `evaluate.py` records next to the measured cycles.
     """
     summary = {}
@@ -278,15 +324,15 @@ def report(shapes, slots=SLOTS, out=print):
         for cause, n in found["refused"].items():
             out(f"MAPSPACE {tag}: refused {n:6d}  {cause}")
         for dyn, words, name, _nest, _prog in found["ranked"][:8]:
-            out(f"MAPSPACE {tag}: nest {name:22s} {dyn:5d} dynamic {words:4d} words")
+            out(f"MAPSPACE {tag}: nest {name:22s} {dyn:5d} fetches {words:4d} words")
         if not found["ranked"]:
             out(f"MAPSPACE {tag}: CHOSEN none")
             summary[tag] = {"total": found["total"], "encodable": 0,
                             "refused": found["refused"], "chosen": None}
             continue
         dyn, words, name, _nest, _prog = found["ranked"][0]
-        out(f"MAPSPACE {tag}: CHOSEN {name} ({dyn} dynamic, {words} words)")
+        out(f"MAPSPACE {tag}: CHOSEN {name} ({dyn} fetches, {words} words)")
         summary[tag] = {"total": found["total"], "encodable": found["encodable"],
                         "refused": found["refused"], "chosen": name,
-                        "dynamic": dyn, "words": words}
+                        "fetches": dyn, "words": words}
     return summary

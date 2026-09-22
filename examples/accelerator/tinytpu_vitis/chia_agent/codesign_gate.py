@@ -146,7 +146,7 @@ def main(argv):
                     ok = False
                 checked += 1
         dyn, words, name, _nest, _prog = found["ranked"][0]
-        print(f"MAPSPACE {tag}: CHOSEN {name} ({dyn} dynamic, {words} words, "
+        print(f"MAPSPACE {tag}: CHOSEN {name} ({dyn} fetches, {words} words, "
               f"IMEM_SIZE={IMEM_SIZE})")
         print(f"MAPSPACE {tag}: verified {checked} program(s) against isa_ref "
               f"(top {min(found['encodable'], CHECK_MAX)} of "

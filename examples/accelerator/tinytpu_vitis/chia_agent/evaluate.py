@@ -363,7 +363,7 @@ def lines_with(text, needle):
 _MAP_COUNT = re.compile(r"^MAPSPACE (\S+): (\d+)/(\d+) encodable$", re.M)
 _MAP_REFUSED = re.compile(r"^MAPSPACE (\S+): refused\s+(\d+)\s+(.+?)\s*$", re.M)
 _MAP_CHOSEN = re.compile(
-    r"^MAPSPACE (\S+): CHOSEN (.+?) \((\d+) dynamic, (\d+) words, "
+    r"^MAPSPACE (\S+): CHOSEN (.+?) \((\d+) fetches, (\d+) words, "
     r"IMEM_SIZE=(\d+)\)$", re.M)
 
 
@@ -382,7 +382,7 @@ def parse_mapspace(out):
         shapes.setdefault(tag, {"refused": {}})["refused"][cause] = int(n)
     for tag, name, dyn, words, imem in _MAP_CHOSEN.findall(out):
         shapes.setdefault(tag, {"refused": {}}).update(
-            chosen=name, dynamic=int(dyn), words=int(words), imem_size=int(imem))
+            chosen=name, fetches=int(dyn), words=int(words), imem_size=int(imem))
     return shapes
 
 
@@ -404,7 +404,8 @@ def mapspace_gate(tree, env, work, shapes, verify_now):
             raise Reject("gate:mapspace",
                          f"{s}: {found[s].get('encodable')} encodable nests")
     return {"shapes": found, "seconds": round(sec, 1),
-            "rule": "min(dynamic issues, static words, nest) over the nests this "
+            "rule": "min(instruction fetches incl. LOOP/ENDLOOP, static words, "
+                    "nest) over the nests this "
                     "hardware can encode; exhaustive over the mapspace",
             "vouched": True}
 
