@@ -220,13 +220,21 @@ def run(cmd, cwd, env, timeout, writable=None, ro=None, stdin=None):
 
 
 def boxed(cmd, writable: Path, ro: Path | None = None):
-    """Read-only filesystem, `writable` writable, private /tmp, own PID ns."""
+    """Read-only filesystem, `writable` writable, private /tmp, own PID ns.
+
+    Bind ORDER matters, and it is the reverse of the design-level evaluator's.
+    There the evaluation tree sits INSIDE the work directory, so `--bind work`
+    then `--ro-bind tree` makes the tree read-only within a writable work dir.
+    Here the work directory (`<slot>/.eval`) sits inside the slot, so the
+    read-only bind of the slot has to come FIRST -- otherwise it shadows the
+    writable bind and every gate dies with EROFS on its own work directory.
+    """
     if not BWRAP:
         return list(cmd)
-    extra = ["--ro-bind", str(ro), str(ro)] if ro else []
+    ro_first = ["--ro-bind", str(ro), str(ro)] if ro else []
     return [BWRAP, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-            "--tmpfs", "/tmp", "--tmpfs", "/dev/shm",
-            "--bind", str(writable), str(writable), *extra,
+            "--tmpfs", "/tmp", "--tmpfs", "/dev/shm", *ro_first,
+            "--bind", str(writable), str(writable),
             "--unshare-pid", "--die-with-parent", "--", *cmd]
 
 
