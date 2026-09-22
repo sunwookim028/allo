@@ -177,7 +177,11 @@ COSIM_TIMEOUT = 2400
 TARGET_NS = design_eval.TARGET_NS
 SIMTIME_SLACK = design_eval.SIMTIME_SLACK
 
-BASELINE_DIR = HERE / "baseline"
+#: Where the recorded baselines live. A baseline is only meaningful at the ref
+#: it was measured at, so a run at a different ref -- the held-out rediscovery
+#: experiment, which evaluates at a generated commit -- must not overwrite
+#: HEAD's. That run sets CHIA_BASELINE_DIR.
+BASELINE_DIR = Path(os.environ.get("CHIA_BASELINE_DIR", HERE / "baseline"))
 
 
 class _Done(Exception):

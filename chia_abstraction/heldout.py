@@ -170,6 +170,51 @@ every software simulation stayed exact -- your docstring must say so.
 """
 
 
+#: The four outcomes a held-out run can have, in descending strength. The
+#: grading is against the answer that is already in the tree at
+#: `PREPARED_ANSWER`, so it needs no judgement call about VALUE -- only about
+#: whether two spellings have the same power, which is recorded verbatim.
+OUTCOMES = {
+    "same-abstraction": (
+        "the agent arrived at an abstraction with the same power at the same "
+        "level: a validated schedule primitive that puts a named attribute on "
+        "the loop and an emitter branch that reads it. Novelty is not "
+        "required -- rediscovering what the fork already has, without being "
+        "told it exists, is the result."),
+    "equal-power-different-level": (
+        "an abstraction of equal power somewhere else: an analysis that "
+        "proves the claim, a pass that rewrites the access, an IR attribute "
+        "with a different carrier. This is a SUCCESS and is arguably a better "
+        "one, because the answer in the tree is an unchecked promise and an "
+        "analysis would not be."),
+    "instance-solved-no-abstraction": (
+        "the symptom is gone and nothing reusable was added -- a special case "
+        "in the emitter, a hard-coded name, a heuristic that fires on this "
+        "loop. It passes the gates and it is not what was asked for."),
+    "no-solution": (
+        "no candidate survived. Record WHERE it stopped, by rung: the policy, "
+        "the build, Allo's own suites, the design cases, the resource budget, "
+        "or the PPA. A run that stops at `built` is a different result from "
+        "one that stops at `proposed`."),
+}
+
+#: Graded separately from the outcome, and deliberately so. The answer in the
+#: tree is an UNCHECKED PROMISE: `s.dependence` validates the SHAPE of its
+#: arguments and cannot verify the CLAIM, so a false claim produces wrong RTL
+#: while the Allo simulator and Vitis csim both stay exact. The fork only
+#: learned that after the fact, and encoded it as a contract in the design's
+#: assembler (`AR_RAW_DIST`) plus an RTL-only stress testbench.
+#:
+#: So: did the agent notice? An agent that states what would have to hold for
+#: its abstraction to be sound, and that no software simulation can check it,
+#: has done better than the original commit did.
+SOUNDNESS_NOTED = (
+    "did the agent say that what its abstraction expresses is a PROMISE "
+    "rather than a fact -- that a false claim produces wrong RTL while every "
+    "software simulation stays exact -- and say what would have to hold for "
+    "it to be sound?")
+
+
 def symptom() -> str:
     """The symptom to hand the agent.
 

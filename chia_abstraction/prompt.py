@@ -244,14 +244,19 @@ diagnosis is worse than nothing, because it will pass the gates.
 
 Two specific traps, both measured on this project:
 
-  * A mapping census over this design refused 1,150 of 1,226 candidate loop
-    nests with the reason code `acc-peel`. That was attributed to Allo, twice,
-    and it is NOT an Allo limitation: at the Allo level the predicate is an
-    `scf.if` on `cmpi eq, index_cast(k), 0`, Allo builds it happily, nothing
-    refuses it, and no primitive removes it. The obstacle is ADDITIVE
-    MONOTONICITY IN AN ADDRESS TERM of the design's own instruction encoding.
-    It is case (3). An agent that "fixes" it in the compiler has misdiagnosed
-    it.
+  * A mapping census over this design refused most of 1,226 candidate loop
+    nests with a reason code its author called `acc-peel`. That was attributed
+    to Allo TWICE and was wrong both times, in different ways. It is not an
+    Allo limitation -- at the Allo level the predicate is an `scf.if` on
+    `cmpi eq, index_cast(k), 0`, Allo builds it happily, nothing refuses it and
+    no primitive removes it -- and it is not about the field being STATIC
+    either: the field is a legal address-generator target. The obstacle is
+    ADDITIVE MONOTONICITY IN AN ADDRESS TERM of the design's own instruction
+    encoding. It is case (3). The reason code has since been split in two
+    (`acc-split` and `acc-position`), at which point two independently built
+    enumerators agreed at 897. An agent that "fixes" this in the compiler has
+    misdiagnosed it; an agent that notices the reason code is conflating two
+    things has done what took this project two corrections.
   * Widening that design's address-generation unit raised the count of
     encodable nests from 5 to 7 and DID NOT CHANGE THE NEST THE MAPPER CHOSE.
     Cycles did not move; area did. If you propose an abstraction on the promise
@@ -282,16 +287,33 @@ SECOND design with a different instruction word gets its legal mapping set
 without anyone writing a second mapper. That is what "generalisable across
 design cases" means here.
 
+And the shape of result worth aiming for, because this project has just
+measured one: widening the address generator and relieving the accumulate
+field are COMPLEMENTS, NOT ALTERNATIVES -- at three address terms the
+accumulate field's limit is never reached, because the budget refuses the
+instruction first, so NEITHER change shows anything on its own. An abstraction
+whose value only appears in combination with another change is a real result
+and is easy to miss; if that is what you have, say so and say what the other
+change is.
+
 If you take this on, two facts about the answer key, because a plausible
 summary of it is wrong in a way that looks right:
 
-  * The census must be ALL CAUSES, not first cause. By first cause it is 1,150
-    `acc-peel` / 55 `ar-distance` / 13 `AGU_TERMS` / 3 `LOOP_DEPTH` -- but 930
-    of those nests ALSO violate the RAW-distance contract. A first-cause
-    histogram hides the overlap, and a unification that reproduces only first
-    causes is subtly wrong.
+  * The census must be ALL CAUSES, not first cause. A first-cause histogram
+    hides the overlap between causes, and a unification that reproduces only
+    first causes is subtly wrong in a way that looks right. Reconciled: two
+    independently built enumerators agree at 897 once the conflated reason code
+    is split into `acc-split` and `acc-position`.
   * Sorted by the express/refuse distinction above it is 1,166 EXPRESS against
     55 REFUSE. Most of the refusals are case (2) or (3), not case (1).
+  * ENCODABLE IS NOT RUNNABLE, and this is the trap to avoid. Five nests are
+    encodable by the encoder and the reference model. **Three** are confirmed
+    on RTL. The other two pass the reference model, the program validator, the
+    cycle model, the dataflow simulator AND Vitis csim -- and cosim never
+    completes. So an abstraction graded on "the tool accepted it" will optimise
+    toward mappings the hardware will not run. Grade on the CONFIRMED tier.
+    The same rule applies to anything you propose: a gate that the design
+    passes is not evidence that the hardware runs it.
 
 MEASURED LIMITATIONS WORTH ATTACKING. These are OPEN items from Allo's
 limitations register, each with a GitHub issue on `sunwookim028/allo`. They are

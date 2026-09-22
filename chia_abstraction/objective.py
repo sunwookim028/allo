@@ -140,6 +140,17 @@ def classify(cases: dict, newly_expressible=(), limits_fixed=()) -> dict:
                 REPRODUCES -> FIXED (`limits_fixed`). Correctness must hold
                 everywhere and no case may lose cycles or leave its resource
                 budget, but NO CYCLE GAIN IS REQUIRED. Kept.
+
+                ENCODABLE IS NOT RUNNABLE. A case counts as newly expressible
+                only at the CONFIRMED tier: it must be bit-exact under csim
+                against numpy AND synthesise AND meet the clock -- not merely
+                be accepted by a tool. The co-design track measured why: of
+                five nests its encoder and reference model called encodable,
+                three are confirmed on RTL; the other two pass the reference
+                model, the validator, the cycle model, the dataflow simulator
+                and Vitis csim, and cosim never completes. An objective that
+                rewards the encodable tier steers an agent toward mappings the
+                hardware will not run.
     win         no case lost cycles, no case left its resource budget, and at
                 least one case gained cycles. Kept.
     trade       at least one case gained cycles AND at least one case left its
