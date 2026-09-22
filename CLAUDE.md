@@ -92,7 +92,12 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 `TPU_TB=stress python cosim.py` are the **correctness** gates. Run
 `stress_isa.py` (~10 s) after any change to `microarch_isa.py` or anything
 under `ip/`, and `mutate.py` after any change to the harness or any move of
-anchored code (a mutant's anchor must occur exactly once across the design). `assemble()` rejects programs that
+anchored code (a mutant's anchor must occur exactly once across the design).
+The ISA itself is `isa_spec.json`: `gen_isa.py --write` regenerates
+`isa_encoding.py` and the tables in `tinytpu_isa.rst`, and `gen_isa.py
+--check` (a `reproduce.sh` stage) holds the spec, the design's constants, the
+layout in `ip/isa.py`, the hardware's bit slices in `ip/units/` and the
+reference model to each other. `assemble()` rejects programs that
 read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
 hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
 iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
@@ -100,6 +105,15 @@ iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
 contract, and no simulator can see a violation -- only the `TPU_TB=stress`
 cosim, which runs `ar_distance_program` at the edge.
 Details: `docs/source/designs/tinytpu_isa.rst` ("Verifying a change").
+
+The **parity baselines** (`parity-t4` / `parity-t8`: MAXDIM=64, banked burst
+widening) are kept beside the shipped design and are measured against matched
+Gemmini by `TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py`. Parity is
+defined before measuring, in `docs/source/designs/gemmini_comparison.rst`
+("The parity baseline"), which also records where they are behind and why.
+`$TPU_PROGRAM` selects the emitted GEMM program order; anything but `shipped`
+must be cosim'd at a shape with `Kt >= QD`, because the simulator, `stress_isa`
+and `kpn_model` all accept orders the RTL deadlocks on.
 
 ## ACT (the mapper/compiler flow on `main`)
 

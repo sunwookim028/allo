@@ -24,6 +24,16 @@ from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
     expand,
 )
 from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E402
+from examples.accelerator.tinytpu_vitis.isa_encoding import (  # noqa: E402
+    FIELDS, HEADER_TERMS, usable_max,
+)
+
+# The two encoding ceilings these rules quote, from the generated spec module
+# rather than typed out: what a header count can promise a unit, and what an
+# AGU-resolved operand field can address.
+COUNT_BITS = min(hi - lo for _, (lo, hi), _, _ in HEADER_TERMS)
+COUNT_MAX = usable_max(COUNT_BITS)
+FIELD_MAX = usable_max(dict((n, w) for n, _, w in FIELDS)["f3"]) + 1
 
 
 @dataclass(frozen=True)
@@ -72,11 +82,11 @@ ISA_RULES = (
          "lower the `mvout` row base or row count; if the spec's output does "
          "not reach that far, the extra rows are a clobber, not a rounding."),
     Rule("enc.field_range", "range `enc` admits",
-         "the sequencer writes an AGU-resolved sum back into a 12-bit field, "
-         "so a base plus its terms must stay below 2048",
-         "shrink the stride, the trip count, or the base of the address that "
-         "overflowed; a layout that needs more than 2048 rows of one memory "
-         "cannot be encoded at all."),
+         f"the sequencer writes an AGU-resolved sum back into an operand "
+         f"field, so a base plus its terms must stay below {FIELD_MAX}",
+         f"shrink the stride, the trip count, or the base of the address that "
+         f"overflowed; a layout that needs more than {FIELD_MAX} rows of one "
+         f"memory cannot be encoded at all."),
     Rule("enc.zero_rows", "desynchronises the unit's flat row loop",
          "every unit is one flat loop over rows and fetches an instruction "
          "when its row counter runs out, so a zero-row instruction is fetched "
@@ -129,11 +139,11 @@ ENCODING_RULES = (
          f"at two words per instruction",
          "roll the repeated work into `loop`/`endloop` with AGU terms instead "
          "of unrolling it; that is what the loop stack is for."),
-    Rule("hdr.count_overflow", "does not fit 15 bits",
-         "each per-unit work count in the header is read back through a "
-         "15-bit slice",
-         "split the workload into several programs; one program cannot "
-         "promise a unit more than 32767 work items."),
+    Rule("hdr.count_overflow", f"does not fit {COUNT_BITS - 1} bits",
+         f"each per-unit work count in the header is read back through a "
+         f"{COUNT_BITS}-bit slice",
+         f"split the workload into several programs; one program cannot "
+         f"promise a unit more than {COUNT_MAX} work items."),
     Rule("hdr.array_overflow", "array counts overflow",
          "the array's mm count and mm row count share one header word",
          "split the workload into several programs."),

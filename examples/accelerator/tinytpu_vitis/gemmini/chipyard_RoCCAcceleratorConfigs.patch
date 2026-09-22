@@ -1,8 +1,8 @@
 diff --git a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
-index 7b2de98c..9629e6b5 100644
+index 7b2de98c..6e737903 100644
 --- a/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
 +++ b/generators/chipyard/src/main/scala/config/RoCCAcceleratorConfigs.scala
-@@ -14,6 +14,23 @@ class GemminiRocketConfig extends Config(
+@@ -14,6 +14,41 @@ class GemminiRocketConfig extends Config(
    new chipyard.config.AbstractConfig)
  // DOC include end: GemminiRocketConfig
  
@@ -19,6 +19,24 @@ index 7b2de98c..9629e6b5 100644
 +// TinyTPU-isa built at T=8 (see gemmini.GemminiCustomConfigs.int8Dim8Config).
 +class Int8Dim8GemminiRocketConfig extends Config(
 +  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim8Config) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new chipyard.config.AbstractConfig)
++
++// The same two points with local memory capacity matched to TinyTPU-isa
++// (8 KiB scratchpad, 4 KiB accumulator). These exist only to be elaborated to
++// Verilog for the standard-cell AREA comparison, where both sides synthesise
++// memories as flip-flops; the cycle numbers are measured on the configs above,
++// and the capacity sweep in designs/gemmini_comparison.rst is what says the
++// two agree cycle-for-cycle at every published shape.
++class Int8Dim4AreaGemminiRocketConfig extends Config(
++  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim4AreaConfig) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new chipyard.config.AbstractConfig)
++
++class Int8Dim8AreaGemminiRocketConfig extends Config(
++  new gemmini.GemminiCustomConfig(gemmini.GemminiCustomConfigs.int8Dim8AreaConfig) ++
 +  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
 +  new chipyard.config.WithSystemBusWidth(128) ++
 +  new chipyard.config.AbstractConfig)

@@ -763,13 +763,56 @@ is slower" from "our design is slower at this one size."**
 The capacity asymmetry is cycle-neutral, and this is the finding
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The obvious objection to this comparison is memory capacity: our design has a
-4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator, against
-Gemmini's **256 KiB scratchpad and 64 KiB accumulator** — a 64x and 30x
-asymmetry.
+The obvious objection to this comparison is memory capacity. Gemmini has a
+**256 KiB scratchpad and a 64 KiB accumulator**; ours are smaller by one to
+three orders of magnitude, depending on which of our builds is meant — and the
+distinction matters enough that an earlier revision of this page got it wrong.
 
-Stated precisely, that is **64x the scratchpad and about 30x the
-accumulator**. It does not buy Gemmini a single cycle at any published shape. Re-running
+.. warning::
+
+   **Corrected 2026-09-22.** This section used to say we have "a 4 KiB
+   scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator", and put
+   the asymmetry at 64x and 30x. Those figures are **``MAXDIM=64``**. The
+   memories are derived from ``MAXDIM``, so at the **``MAXDIM=16`` baseline —
+   the build every published cycle count and the published 1,136,598 cell area
+   belong to** — the scratchpad and the vector registers are 64 rows of 32 bits
+   each, **256 bytes apiece**, and the accumulator is 2.0 KiB. Measured out of
+   the shipped RTL, not read off the source:
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 36 16 16 16 16
+
+      * - variant
+        - scratchpad
+        - vregs
+        - accumulator
+        - all RAM modules
+      * - ``T4_MAXDIM16_shipped_baseline``
+        - 0.25 KiB
+        - 0.25 KiB
+        - 2.0 KiB
+        - 3.50 KiB
+      * - ``T4_MAXDIM64_shipped``
+        - 4 KiB
+        - 4 KiB
+        - 2.1 KiB
+        - 18.62 KiB
+      * - ``T8_MAXDIM64``
+        - 4 KiB
+        - 4 KiB
+        - 4.25 KiB
+        - 20.75 KiB
+
+   So the asymmetry against the baseline is **1024x the scratchpad and 32x the
+   accumulator**, not 64x and 30x. The "all RAM modules" column adds the DMA
+   read buffers and the sequencer's small RAMs, which are storage but not
+   operand storage. The cycle-neutrality finding below is unaffected — it is a
+   statement about Gemmini's tiling search, not about our capacities — but the
+   *area* argument in `Area: the axis this page was missing`_ rests on these
+   numbers and uses the corrected ones.
+
+The asymmetry does not buy Gemmini a single cycle at any published shape. Re-running
 ``tiled_matmul_auto``'s own tiling search across capacities at DIM=4 gives the
 ``loop_ws`` call count below; every row is legal under the config's ``require``
 clauses:
@@ -780,16 +823,22 @@ Scratchpad / accumulator    4x4x4   16x16x16   32x32x32   64x64x64   64x32x64
 256 / 64 KB (what we ship)  1       1          1          1          1
 64 / 32 KB (``chipConfig``) 1       1          1          1          1
 32 / 8 KB                   1       1          1          4          4
-8 / 4 KB (~2x ours)         1       1          4          12         12
-4 / 4 KB (~matched to ours) 1       1          4          32         12
+8 / 4 KB (the area build)   1       1          4          12         12
+4 / 4 KB (the floor tested) 1       1          4          32         12
 =========================== ======= ========== ========== ========== =========
 
 Every capacity from 256 KB down to 4 KB issues exactly **one** ``loop_ws`` from
-4x4x4 through 16x16x16, so shrinking Gemmini's memories to match ours would not
-move any of the five published numbers. **The asymmetry is an area and power
-disclosure, not a cycle correction** — which is a far stronger position than
-"we could not match it". The binding limit is always the accumulator's half
-capacity, never the scratchpad.
+4x4x4 through 16x16x16, so shrinking Gemmini's memories would not move any of
+the five published numbers. That is what licenses the 8 / 4 KB elaboration the
+area comparison uses. **The asymmetry is an area disclosure, not a cycle
+correction** — which is a far stronger position than "we could not match it".
+The binding limit is always the accumulator's half capacity, never the
+scratchpad.
+
+(The two lower rows used to be labelled "~2x ours" and "~matched to ours".
+They are neither: against the ``MAXDIM=16`` baseline's 0.5 KiB of operand
+storage, 8 KB is 16x and 4 KB is 8x. Against ``T8_MAXDIM64`` the 8 / 4 KB row
+*is* matched, to 2 %.)
 
 It stops being neutral at exactly 32x32x32, so as shapes grow this argument
 needs restating rather than reusing. Keeping Gemmini's own default capacity is
@@ -824,6 +873,544 @@ hardware — snapshot it, rebuild immediately, and check the ``GEMMINI DIM=`` bo
 banner. And the committed ``roccTests_Makefile.patch`` adds only ``allo_cmp`` to
 the ``tests`` list, **not** ``allo_bare5``, so ``build.sh`` will not build the
 window benchmark; it needs its explicit make target.
+
+Area: the axis this page was missing
+------------------------------------
+
+Until 2026-09-22 this project published standard-cell area for its own design
+at three configurations — 1,136,598 at ``T=4, MAXDIM=16``, 1,865,314 at ``T=4,
+MAXDIM=64``, 2,481,926 at ``T=8, MAXDIM=64`` — and **none for Gemmini**, while
+comparing cycles against Gemmini at a matched array size. A cycle comparison
+with an area column on only one side is not a comparison; it is an
+advertisement. This section is the correction, and the RTL that makes it
+possible is in ``examples/accelerator/tinytpu_vitis/gemmini_rtl/``.
+
+The comparable unit is ``Gemmini``, not the SoC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Chipyard elaborates a whole system-on-chip: a Rocket core, an L1 instruction
+and data cache, an inclusive L2, the system and memory buses, the debug module,
+a bootrom and a DRAM model. Our design has none of it — no host, no cache, no
+core; its program is in DRAM and it starts on ``ap_start``. Synthesising the
+chipyard top would compare a CPU with a matrix unit.
+
+The unit that answers the same question on both sides is Gemmini's own
+accelerator module, ``Gemmini`` (``Controller.scala:45``), whose ports are the
+RoCC command and response interface, one TileLink master for its DMA, and a
+page-table-walker port. Everything the accelerator is made of is inside it:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 40 38
+
+   * - subsystem
+     - Gemmini modules
+     - ours
+   * - spatial array
+     - ``Mesh``, ``Tile``, ``PE``, ``MacUnit``, ``MeshWithDelays``,
+       ``TransposePreloadUnroller``
+     - ``pe``, ``accu``
+   * - scratchpad
+     - ``Scratchpad``, ``ScratchpadBank``, ``mem``/``mem_ext``
+     - ``spad`` and the vector registers
+   * - accumulator
+     - ``AccumulatorMem``, ``TwoPortSyncMem``, ``AccumulatorScale``,
+       ``AccPipe``, ``ScalePipe``
+     - ``ar``
+   * - control
+     - ``ExecuteController``, ``LoadController``, ``StoreController``,
+       ``ReservationStation``, ``LoopMatmul*``
+     - ``sequencer``
+   * - memory interface
+     - ``StreamReader``, ``StreamWriter``, ``BeatMerger``, ``XactTracker``,
+       ``DMACommandTracker``, ``TLBuffer``, ``TLXbar``
+     - ``dma_ld``, ``dma_st``
+
+The boundary is not asserted, it is **computed**: the export takes the
+transitive closure of the module instantiation graph from ``Gemmini`` over the
+elaborated RTL, which gives 138 modules at DIM=4 and 136 at DIM=8 with **no
+undefined module left over**. Anything outside that closure — Rocket and its
+tile, the L1s, the L2's banks and directory, the SoC buses and peripherals, the
+DRAM model and the test harness — is cut, and the closure is checkable by
+anyone who disagrees with a particular cut.
+
+Three things stay in although a GEMM never touches them, and all three make
+Gemmini look **bigger**, which is the direction that does not flatter us:
+the conv pipeline (``LoopConv*``, ``Im2Col``, ``PixelRepeater``,
+``ZeroWriter``), the output-stationary datapath that ``dataflow = BOTH``
+carries, and — the one worth naming in any quote, because it is a real block —
+**an fp32 scaling pipeline**. ``defaultConfig``'s ``mvin_scale_args`` are
+``Float``, so Gemmini's default int8 accelerator instantiates 8 recoded-float
+multiply-adds at DIM=4 and 12 at DIM=8. We have none. Removing any of the three
+would be tuning the opponent, so none is removed; naming them is the honest
+alternative.
+
+**One cut is genuinely ambiguous and is reported both ways.** ``FrontendTLB``
+— Gemmini's private four-entry TLB, with ``DecoupledTLB``, ``DTLB_2``,
+``PMAChecker`` and ``PMPChecker_s6`` — is *inside* the ``Gemmini`` module,
+because Gemmini's DMA issues virtual addresses. Ours takes physical addresses
+over AXI and has no translation at all. Cutting it would mean editing Gemmini's
+RTL, so it is left in and its area is reported separately from DC's
+``report_area -hierarchy``; both the with-TLB and the without-TLB figures
+belong in any quote.
+
+The memory treatment is the whole problem, and the choice made
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Our three published areas are synthesised with ``sram_mode='none'``: the
+scratchpad, vector registers and accumulator become flip-flops, which is why
+~80 % of the cell area is non-combinational. Gemmini's scratchpad is 256 KiB
+and its accumulator 64 KiB. Flip-flopping 320 KiB is **2,621,440 registers**,
+against 200,561 sequential cells in our *entire* ``T=4`` design. The resulting
+number would be a measurement of the memory treatment, not of either design,
+and it would be roughly thirteen times our whole area before a single gate of
+Gemmini's datapath was counted.
+
+Four ways out, and why the fourth is not enough on its own:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - option
+     - what it costs
+   * - flip-flop both, caveat the number
+     - the caveat cannot be read. A 13x ratio that is entirely an artefact of
+       capacity is not improved by a sentence underneath it; readers quote
+       numbers, not footnotes.
+   * - SRAM macros on both sides
+     - the honest ASIC implementation, and **it invalidates our three
+       published figures**, which would all have to be re-run. It also needs
+       macros for every geometry on both sides. Right answer eventually; not
+       an answer today.
+   * - match Gemmini's capacity to ours
+     - changes Gemmini's hardware. Legitimate only if the change is provably
+       cycle-neutral — which, at the published shapes, it is (below).
+   * - report logic area excluding memories
+     - the only figure invariant to all of this, but it deletes the axis the
+       comparison most needs: a design that buys cycles with memory looks free.
+
+**The choice is the third and the fourth together**, and it has to be both:
+the fourth is the headline because it is the only figure invariant to the
+memory treatment, and the third exists so that the full-memory figure beside it
+is not absurd. Gemmini is elaborated at an 8 KiB scratchpad and a 4 KiB
+accumulator — 98,304 bits, 12 KiB total — and each configuration ships two file
+lists from one export, one including the memory arrays and one omitting them so
+``mem``/``mem_0`` elaborate as empty black boxes.
+
+Why 4 KiB of accumulator: it is the smallest capacity inside the envelope the
+cycle-neutrality sweep already covers. 2 KiB is legal under Gemmini's
+``require`` clauses at both array sizes, but a 16x16 int32 tile is 1 KiB and the
+binding limit is the accumulator's *half* capacity, so 2 KiB sits exactly on the
+edge where the tiling search has never been run.
+
+Why 8 KiB of scratchpad needs a correction to this page's own arithmetic.
+Measured out of the shipped RTL — every ``*_RAM_*`` module's depth times its
+width times its hierarchical instance count — our operand and accumulator
+storage is:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - our variant
+     - scratchpad + vregs
+     - accumulator
+     - vs Gemmini's 12 KiB
+   * - ``T4_MAXDIM16_shipped_baseline`` (1,136,598)
+     - 0.5 KiB
+     - 2.0 KiB
+     - Gemmini has **4.8x**
+   * - ``T4_MAXDIM64_shipped`` (1,865,314)
+     - 8.0 KiB
+     - 2.1 KiB
+     - Gemmini has 1.19x
+   * - ``T8_MAXDIM64`` (2,481,926)
+     - 8.0 KiB
+     - 4.25 KiB
+     - **matched to 2 %**
+
+**The "4 KiB scratchpad, 4 KiB of vector registers and a 2.1 KiB accumulator"
+this page quotes elsewhere describes** ``MAXDIM=64``, **not the** ``MAXDIM=16``
+**baseline whose area is published.** At ``MAXDIM=16`` both arrays are 64 rows
+of 32 bits — 256 bytes apiece — because the memories are derived from
+``MAXDIM``. So 8 KiB of Gemmini scratchpad is a near-exact match against
+``T8_MAXDIM64`` and against ``T4_MAXDIM64_shipped``, and it hands Gemmini
+**4.8x our storage** against the MAXDIM=16 baseline the DIM=4 cycle numbers
+belong to. The total including the DMA read buffers and the sequencer's small
+RAMs is 3.50 KiB, 18.62 KiB and 20.75 KiB respectively.
+
+**That asymmetry is why the logic-only figure is the headline and the
+full-memory figure is the secondary**, rather than the other way round. At the
+DIM=8 pair the two agree; at the DIM=4 pair only the logic-only figure is
+defensible without a paragraph of arithmetic attached.
+
+**The capacity change is legitimate only because it is cycle-neutral, and that
+was measured before this section existed.** ``tiled_matmul_auto``'s own tiling
+search issues exactly one ``loop_ws`` at every published shape from 256/64 KB
+down to 4/4 KB, so not one of 161 / 220 / 347 / 391 / 593 moves — see `The
+capacity asymmetry is cycle-neutral, and this is the finding`_. It stops being
+neutral at 32x32x32, so **this section does not extend to the ten-shape sweep
+at MAXDIM=64 without being re-measured**, and an area quote at 64x64x64 would
+need its own capacity argument.
+
+What the choice gives up, stated plainly: the 256 KiB scratchpad is a **real
+capability** that this comparison deliberately removes. The area answers *what
+does the same amount of local memory cost in each design*. It does not answer
+*what does the shipped Gemmini cost*, and it must never be quoted against a
+published Gemmini area, which will have been taken with SRAM macros at full
+capacity and is not the same measurement at all. The logic-only figure is the
+safer of the two to carry, being invariant to both the memory treatment and the
+capacity choice — but only if our side omits its ``*_RAM_*`` modules in exactly
+the same way, which is a second run on our side and not a free comparison.
+
+Frequency is a column, not a footnote
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**A cycle comparison between two designs at different achievable frequencies is
+not a comparison**, and this page has never checked that the two are close. We
+have a Vitis 2.431 ns estimate and a 3.33 ns ASIC constraint that our design
+meets with +0.21 ns of slack; for Gemmini we have **nothing at all**. Until
+that column is filled, every ratio on this page — 1.07-1.24x, 1.09x at 64³ —
+is a statement about cycles that may or may not survive being restated in
+seconds, and a reviewer will open that first.
+
+The six DC runs give it for free: worst slack at the 3.33 ns constraint is
+already in the QoR report, so
+
+.. math::
+
+   F_\text{max} \ge \frac{1}{3.33\,\text{ns} - \text{slack}}
+
+That is a **floor, not Fmax**: DC stops optimising once the constraint is met,
+so a design with comfortable slack is only shown to be *at least* that fast.
+From the runs already done:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 18 22 20
+
+   * - design
+     - worst slack
+     - violating paths
+     - Fmax floor
+   * - TinyTPU-isa ``T=4, MAXDIM=16``
+     - +0.21 ns
+     - 0 setup, 0 hold
+     - >= 320.5 MHz
+   * - TinyTPU-isa ``T=4, MAXDIM=64``
+     - +0.21 ns
+     - 0 setup, 0 hold
+     - >= 320.5 MHz
+   * - TinyTPU-isa ``T=8, MAXDIM=64``
+     - +0.20 ns
+     - 0 setup, 0 hold
+     - >= 319.5 MHz
+   * - Gemmini DIM=4
+     - not yet run
+     - —
+     - unknown
+   * - Gemmini DIM=8
+     - not yet run
+     - —
+     - unknown
+
+All four of our runs closed timing with zero violating setup paths and zero
+hold violations. That is the baseline every Gemmini slack is compared against.
+
+.. admonition:: If Gemmini misses 3.33 ns, this is how it gets written
+   :class: important
+
+   It may. ``defaultConfig`` sets ``tile_latency = 0``, so a tile is
+   combinational through its PE and the mesh path is ``DIM`` MACs deep with no
+   register between them — a path that grows with mesh width, so DIM=8 is the
+   likelier miss. **The synthesis session will report a miss as a miss**, with
+   total negative slack and a violating-path count, and will not loosen the
+   constraint: relaxing it for one side would destroy the only thing making the
+   two areas comparable.
+
+   The sentence to write then is **"Gemmini's RTL was not targeted at this
+   constraint"**, not "Gemmini is slower". Vitis emitted ours *for* 3.33 ns and
+   pipelined it accordingly; Chisel emits Gemmini at no target at all, and
+   Gemmini's own tape-outs pick their own period. A miss is a finding about the
+   **two design flows** — one of which takes a frequency target as an input —
+   and it says nothing about how fast a Gemmini pipelined for 3.33 ns would be.
+   Written the other way it would be a claim this page cannot support.
+
+   This paragraph exists so that sentence is not composed under pressure once
+   the number is in.
+
+If the two sides' slacks at the DIM=4 point differ by more than ~0.3 ns, real
+Fmax needs bisecting — two or three tightened runs per design. That is not
+requested on spec; the floors decide whether it is worth the slot.
+
+Power: declared absent, with the reason
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This project's own stated principle is that informed co-design needs timing
+**and** power across an array of architectures, so power's absence here is a
+real gap in the judge, and it is declared rather than papered over.
+
+**No power number from this flow is publishable, and none will appear in any
+table on this page.** DC's ``report_power`` output is a default-toggle-rate
+estimate with no activity data. An earlier run's 57.1 mW was recorded and has
+already been withdrawn once; it must not travel again, in any row, however
+marked.
+
+What closing the gap would actually take, and why it is not worth doing for
+this evaluation:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 30 44
+
+   * - level
+     - cost
+     - what it still would not tell you
+   * - RTL switching activity
+     - 1-2 days of bring-up: scope a VCD to ``tinytpu_isa`` under xsim and to
+       the ``Gemmini`` instance under Verilator, convert to SAIF, ``read_saif``
+       before compile, plus the DC runs again
+     - the two SAIFs describe **different windows** — ours is ``ap_start`` to
+       ``ap_done``, Gemmini's necessarily includes the Rocket driver and the
+       fences — so average toggle rates are diluted differently and the
+       comparison is not like-for-like even though both numbers are real
+   * - gate-level activity
+     - the above, plus simulating the DC netlist against the NanGate45 Verilog
+       models with the cosim testbench, which is C++ and drives AXI — a real
+       bring-up on our side and a new harness on Gemmini's
+     - still no wire capacitance
+   * - the honest version
+     - SRAM macros instead of flip-flop memories, **and** place-and-route
+     - nothing — but it replaces the area methodology, so every published
+       figure on this page would have to be re-run
+
+The blocker is not effort, it is that under ``sram_mode='none'`` and without
+P&R a power number is dominated by two artefacts larger than the effect being
+measured. First, **clock power into flip-flop arrays**: 98,304 flops of
+Gemmini memory and 200,561 sequential cells of ours are toggled on every edge
+that is not gated, and a real SRAM's dynamic energy per access is nothing like
+a flop array's — the same objection that makes the total-area column fragile,
+except power is *more* sensitive to it, not less. Second, **no interconnect**:
+with no P&R the wire capacitance is a wire-load-model guess, and at 45 nm
+interconnect is a large share of dynamic power.
+
+**Recommendation: do not pursue power for this evaluation.** The paper says
+power is absent, and says this is why. That is a stronger position than an
+indicative number quoted as a measurement.
+
+Stated precisely, because a parallel effort is producing switching-activity
+files and this must not read as an argument against it: there are **three**
+objections to a power number from this flow, and activity annotation removes
+exactly one of them. It removes the default-toggle-rate objection, which is the
+one that makes the current figure unpublishable outright, and it is worth
+having on its own terms. It does not touch the flip-flop-memory artefact or the
+missing interconnect. So an annotated number from this flow would be
+*compromised* rather than *meaningless* — a real improvement, and still not a
+measurement of either design's power.
+
+That is compatible with the methodology commitment in ``dev/paper_outline.md``
+(publish power only if **both** sides are activity-annotated, otherwise report
+none and say why): if only one side is annotated the answer is no on that
+ground alone, and if both are, the answer is still no on these two. The
+cheapest credible energy axis is SRAM macros plus place-and-route — the same
+prerequisite that would replace the area methodology. If the project later
+wants energy, that is the order to do it in: macros first, because they fix the
+area artefact and the power artefact at once.
+
+Results
+~~~~~~~
+
+Pending. No DC run has completed at the time of writing; the ETA is in
+`When this comparison will exist`_. The table below is the shape the answer has
+to take, and **no ratio is quoted until a row has its frequency floor**, for
+the reason above.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 12 14 14 14 18
+
+   * - design
+     - memory
+     - Fmax floor
+     - total area
+     - logic only
+     - less the TLB
+   * - TinyTPU-isa ``T=4, MAXDIM=16``
+     - 3.50 KiB
+     - >= 320.5 MHz
+     - 1,136,598
+     - not yet run
+     - n/a (no TLB)
+   * - TinyTPU-isa ``T=4, MAXDIM=64``
+     - 18.62 KiB
+     - >= 320.5 MHz
+     - 1,865,314
+     - not yet run
+     - n/a
+   * - Gemmini DIM=4, 8/4 KiB
+     - 12.0 KiB
+     - not yet run
+     - not yet run
+     - not yet run
+     - not yet run
+   * - TinyTPU-isa ``T=8, MAXDIM=64``
+     - 20.75 KiB
+     - >= 319.5 MHz
+     - 2,481,926
+     - not yet run
+     - n/a
+   * - Gemmini DIM=8, 8/4 KiB
+     - 12.0 KiB
+     - not yet run
+     - not yet run
+     - not yet run
+     - not yet run
+
+Power is deliberately not a column. See above.
+
+Both of our ``T=4`` rows are there because neither is a clean opponent on its
+own: ``MAXDIM=16`` is the build the DIM=4 cycle numbers were measured on, and
+``MAXDIM=64`` is the build whose memory capacity matches. A reader wanting one
+number should take the **logic-only** column, where the difference between them
+is our own ``+64.1 %`` operand-space step and not a property of Gemmini.
+
+That split has a convenient resolution: `The parity baseline`_ is at
+``MAXDIM=64`` on both ``parity-t4`` and ``parity-t8``, so the parity
+configurations are the ones whose local memory matches Gemmini's 12 KiB — to
+19 % at T=4 and to 2 % at T=8 — *and* whose cycles are measured against matched
+Gemmini across 18 points. **The area rows that belong beside the parity cycle
+numbers are the ``MAXDIM=64`` rows, not the baseline.** The ``MAXDIM=16`` row
+stays in the table because the five original cycle counts belong to it, not
+because it is the right area to quote against parity.
+
+The DIM=8 pair is matched on memory to 2 % but **not on operand space**: our
+``T=8`` build is at ``MAXDIM=64``, a fourfold operand space against the
+``MAXDIM=16`` baseline, and that difference is worth +64.1 % of our own cell
+area on its own. Quoting DIM=8 against DIM=4 across designs without naming both
+changes is the same error this project has already withdrawn once.
+
+Three caveats travel with every number in that table, and none of them is
+optional:
+
+* **Total area is not comparable at DIM=4.** The capacity gap is 4.8x and no
+  legal Gemmini configuration closes it; the logic-only column leads.
+* **The memory-treatment figure is not a comparison.** 2,621,440 registers for
+  stock Gemmini's memories against 200,561 sequential cells in our entire T=4
+  design measures ``sram_mode='none'``, not either design, and must never
+  appear as a ratio.
+* **Logic-only omits the memory interface too, on both sides equally.** With
+  the memory modules out of the file list DC infers nothing for them and their
+  ports become dangling nets, so the figure excludes the port and address logic
+  as well as the array. That is what makes it invariant to the memory
+  treatment, and it is why a logic-only area may only ever be compared against
+  another logic-only area — never against a full one on either side.
+* **Both sides drop the same two things, by the same criterion.** The
+  scratchpad and the accumulator, and nothing else: ``mem_ext``/``mem_0_ext``
+  on Gemmini's side, ``*_spad_RAM_*`` and ``*_ar_RAM_*`` on ours — 98,304 bits
+  against 20,480 at ``MAXDIM=16`` and 100,352 at ``T=8``. DMA buffers and
+  control-path RAMs stay on both sides: ours because Gemmini's DMA buffering
+  lives in ``BeatMerger``/``XactTracker`` as plain registers and stays, and its
+  depth-2 queue RAMs stay. Both lists are generated — ``export_rtl.py
+  --manifests`` and ``export_gemmini_rtl.py`` — because a hand-edited list on
+  one side is exactly the difference that would stop the two being comparable.
+
+When this comparison will exist
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The blocking resource is a Design Compiler slot on zhang-21, which another
+session owns and which is mid-way through this project's own variants. Six
+runs close the table:
+
+=====  =========================================  ==================
+order  run                                        redone if stream depth lands?
+=====  =========================================  ==================
+1      Gemmini DIM=4, logic only                  no
+2      TinyTPU ``T4_MAXDIM16``, logic only        **yes**
+3      Gemmini DIM=4, full                        no
+4      Gemmini DIM=8, logic only                  no
+5      TinyTPU ``T8_MAXDIM64``, logic only        **yes**
+6      Gemmini DIM=8, full                        no
+=====  =========================================  ==================
+
+Historic wall times for our own variants were 37-72 minutes each; the
+logic-only runs are faster, having far fewer cells to map.
+
+**Scheduled 2026-09-22.** Run 1 is in progress; first result within the hour,
+all six within 4-6 hours. The session is taking **1, 3, 4, 6 first** — every
+Gemmini run, all of them immune to the stream-depth change below — and then 2
+and 5, which are ours and are the throw-away candidates.
+
+**Sequencing around the stream-depth change.** The design may adopt a stream
+depth of 8 -> 16, because three legal tiled programs otherwise never complete;
+it costs +9.3 % flip-flops on FPGA and its ASIC price is being measured
+separately. If it lands, our sequential-cell counts move and runs 2 and 5 —
+plus the three already-published TinyTPU areas — need repeating. **Gemmini's
+four runs are untouched by it.** So the decision is: **run now, redo ours
+later**, because four of the six are permanent and the two that are not are the
+cheap ones. Holding the whole batch for a decision that has not been made would
+trade a certain delay for an uncertain saving of two short runs.
+
+.. note::
+
+   **Status 2026-09-22: running.** All six runs are expected within 4-6 hours,
+   the first within the hour. Power is **parked, not cancelled**: no
+   ``report_power`` figure will be quoted from this batch, and a separate
+   effort is producing switching-activity files — which, if they arrive, move
+   the first row of the power table above from "1-2 days of bring-up" to
+   "already done", without touching the two artefacts that are the actual
+   blocker.
+
+   This note is the thing to update as results land.
+
+The handoff
+~~~~~~~~~~~
+
+``gemmini_rtl/DIM4_int8_capmatched/`` and ``gemmini_rtl/DIM8_int8_capmatched/``,
+written by ``export_gemmini_rtl.py``, in the shape ``rtl_handoff/`` already
+uses: flat RTL, ``sv2v_manifest.f`` in dependency order, ``MANIFEST.json``
+naming the top module and carrying the configuration, and a README stating the
+elaborating commit and every cut. The exporter refuses an export whose named
+top module is undefined and one whose resource record is empty — the two guards
+``export_rtl.write_design`` makes, which caught a ``T8_MAXDIM64`` export that
+shipped 223 self-consistent files with no top module in them — plus a third for
+this comparison: an export carrying more than 32 KiB of memory array, which is
+what a stock-capacity elaboration looks like.
+
+Two differences from the Vitis handoff, both measured here:
+
+* **sv2v IS needed**, unlike for Vitis output. "Chisel emits Verilog" is not
+  true of firtool 1.75.0: ``CounterFile``, ``LoopMatmulStC`` and ``RRArbiter``
+  use packed multidimensional arrays (``wire [7:0][6:0]``) and assignment
+  patterns (``'{3'h5, 3'h0, …}``) **outside any** ``ifdef``. Verilator rejects
+  every file list under ``--language 1364-2001`` with 6-7 syntax errors and
+  accepts them all as SystemVerilog, so the files are named ``.sv`` and the
+  flow needs ``normalize_rtl: True`` or ``analyze -format sverilog``.
+* **``SYNTHESIS`` must be defined at read time**, or ``plusarg_reader`` arrives
+  as ``$value$plusargs`` inside an ``initial`` block and 173 ``logic``
+  declarations come back with it.
+
+The top-module check that forced ``normalize_rtl: False`` on our own RTL is
+*not* a problem here: ``module Gemmini(`` carries a trailing comment, not an
+attribute, so the collector's ``^\s*module\s+<top>`` pattern matches.
+
+All four file lists — two configurations, full and logic-only — pass
+``verilator --lint-only -DSYNTHESIS --top-module Gemmini`` with no error, which
+is the cheapest available evidence that the closure is complete before DC sees
+it.
+
+One hazard, again
+~~~~~~~~~~~~~~~~~
+
+Elaborating these two configurations rewrote ``gemmini_params.h`` twice, as
+every elaboration does. The header was restored to the committed ``DIM=4``
+snapshot afterwards and verified by checksum. The exporter does not trust that
+header at all: it reads ``DIM`` back out of the scratchpad's own geometry in
+``.top.mems.conf`` — a bank is ``DIM`` int8 elements wide, an accumulator row is
+``DIM`` int32 — and refuses an export whose RTL does not match the
+configuration it claims. The C benchmark build still depends on the header, so
+the snapshot-and-restore step is still required for anyone re-running cycles.
+
 
 Reproduced, once, independently
 -------------------------------
@@ -978,6 +1565,370 @@ address term.
 This matters more than the 1.09x. A 9 % cycle deficit at a shape both machines
 can run is a tuning result; being unable to express the shapes a real workload
 uses is a capability result, and no amount of cycle-level work closes it.
+
+
+.. _gemmini-parity:
+
+The parity baseline
+-------------------
+
+A second, named configuration of our design, kept **beside** the shipped one,
+whose purpose is to perform at parity with a matched Gemmini by changes that
+are reasonable rather than contrived. The shipped design is unchanged.
+
+The rules, fixed before any measurement
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Written and committed on branch ``gemmini-parity`` before the first cosim of
+any candidate, so the result cannot be fitted to them afterwards.
+
+- **Parity, defined.** At a shape, ours is at parity when our cosim count is
+  at most Gemmini's median plus its published spread (the ``+/-`` figure on
+  :doc:`benchmarks`, which is the full min-max range over five trials), i.e.
+  ``ours <= median + spread``. **Faster** means ``ours < median``. **Behind**
+  means ``ours > median + spread``, and the report names every such shape.
+- **Same windows, same shapes, same opponent.** Ours is Vitis cosim,
+  ``ap_start`` to ``ap_done``, ``-m_axi_latency 0``, bit-exact, one run per
+  shape (retried once on ``cycles=None``). Gemmini is the matched-array
+  median of five from :doc:`benchmarks`: DIM=4 against T=4 over all ten
+  shapes of that table, DIM=8 against T=8 over all eight of that table, both
+  at MAXDIM=64. No shape is added or dropped after the fact.
+- **A mechanism for every change**, in one sentence, and an integer invariant
+  reported beside every timing (dynamic issues, per-unit work counts, burst
+  iterations) so a changed measurement can be told from a changed machine.
+- **Synthesisable at the same clock.** It must meet the 3.33 ns target with the
+  estimated period reported, and use no FPGA-only structure (no RAM with two
+  write ports) so it also maps to standard cells.
+- **Preference order.** (1) a change to the program the generator emits, on the
+  unchanged netlist; (2) the banked burst widening (``TPU_DMA_WIDEN=1``);
+  (3) anything else, each with its mechanism and its price.
+
+The configuration, and one command
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``parity-t4`` and ``parity-t8`` in ``parity_sweep.py``: the shipped design
+with **one** change, the banked burst widening, at the matched array sizes.
+
+.. code-block:: bash
+
+   cd examples/accelerator/tinytpu_vitis
+   TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py      # 10 shapes
+   TPU_PARITY_CONFIG=parity-t8 python parity_sweep.py      #  8 shapes
+
+=========================  ========================================
+``T``                      4 (against Gemmini DIM=4) / 8 (DIM=8)
+``MAXDIM``                 64, both sides
+``DMA_WORDS``              16 (``TPU_DMA_WIDEN=1``), buffers banked
+``TPU_PROGRAM``            ``shipped`` -- the published program order
+``QD``                     8, unchanged
+=========================  ========================================
+
+One csynth per configuration; each (shape) cosim runs in its own copy of that
+one synthesized solution, so every number in a column is the same netlist.
+
+The change, and its mechanism
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**The banked burst widening, and nothing else.** ``dma_ld``'s operand burst
+moves ``DMA_WORDS`` packed words per iteration instead of one, and ``rbA`` /
+``rbB`` are cyclically partitioned by ``DMA_WORDS`` so write ``w`` always lands
+in bank ``w`` and every bank has exactly one writer (``ff7beaf1``).
+
+That is the whole configuration. It is one sentence because the prologue is
+what the measurement says the deficit was: at MAXDIM=64 the burst reads whole
+64-byte DRAM rows, so it costs ``max(M,K) * MAXDIM/T`` iterations however
+narrow the operand actually is -- 1,024 of the 22,123 cycles at 64x64x64 and
+128 of the 424 at T=8 16x16x8 -- and widening divides that by ``DMA_WORDS``.
+
+Two supporting measurements from the same apparatus, both on an unchanged
+netlist, because they were the candidates that did **not** get used:
+
+- **The A and B bursts already overlap.** At MAXDIM=16, growing A's burst span
+  by 48 words costs **+45** cycles and then growing B's by 48 costs **+0**, so
+  the burst is ``max(na, nb)``, not ``na + nb``. That is why merging them was
+  once measured at exactly zero, and it is why widening is the only lever left
+  on the burst.
+- **``dma_ld``'s row loop costs exactly one cycle a row** (collapsing the
+  program's operand blocks to one removed 96 rows and 96 cycles at
+  16x16x16), which is what makes the program-order candidates below worth
+  measuring at all.
+
+Result: T=4 against Gemmini DIM=4
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ours: Vitis cosim, ``ap_start`` to ``ap_done``, ``-m_axi_latency 0``,
+bit-exact, one build. Gemmini: median of five, full min-max spread, from
+:doc:`benchmarks`. ``csynth`` on xcu280 at the 3.33 ns target: **BRAM 100,
+DSP 14, FF 25,026, LUT 33,799, estimated period 2.431 ns** -- the same
+estimated period as the shipped control (BRAM 52, DSP 14, FF 17,488, LUT
+26,554, 2.431 ns), so the widening is bought at +92 % BRAM, +43 % FF and
++27 % LUT and **no clock**.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - shipped
+     - **parity-t4**
+     - Gemmini
+     - ratio
+     - verdict
+   * - 4x4x4
+     - 218
+     - **172**
+     - 208 +/- 25
+     - 0.83x
+     - faster
+   * - 8x8x8
+     - 357
+     - **262**
+     - 324 +/- 36
+     - 0.81x
+     - faster
+   * - 12x12x12
+     - 563
+     - **383**
+     - 458 +/- 17
+     - 0.84x
+     - faster
+   * - 16x16x8
+     - 677
+     - **437**
+     - 527 +/- 44
+     - 0.83x
+     - faster
+   * - 16x16x16
+     - 879
+     - **639**
+     - 691 +/- 44
+     - 0.93x
+     - faster
+   * - 32x32x32
+     - 3 752
+     - **3 272**
+     - 2 977 +/- 34
+     - 1.099x
+     - **behind**
+   * - 32x64x32
+     - 6 824
+     - **5 864**
+     - 5 570 +/- 147
+     - 1.053x
+     - **behind**
+   * - 48x48x48
+     - 10 289
+     - **9 569**
+     - 9 100 +/- 35
+     - 1.052x
+     - **behind**
+   * - 64x32x64
+     - 12 907
+     - **11 947**
+     - 11 175 +/- 18
+     - 1.069x
+     - **behind**
+   * - 64x64x64
+     - 22 123
+     - **21 163**
+     - 20 287 +/- 34
+     - 1.043x
+     - **behind**
+
+Result: T=8 against Gemmini DIM=8
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``csynth``: **BRAM 138, DSP 58, FF 50,004, LUT 74,331, 2.431 ns**, against the
+T=8 control's BRAM 62, DSP 58, FF 43,911, LUT 70,281, 2.431 ns.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - shipped
+     - **parity-t8**
+     - Gemmini
+     - ratio
+     - verdict
+   * - 8x8x8
+     - 285
+     - **231**
+     - 305 +/- 17
+     - 0.76x
+     - faster
+   * - 16x16x8
+     - 424
+     - **312**
+     - 500 +/- 16
+     - 0.62x
+     - faster
+   * - 16x16x16
+     - 493
+     - **381**
+     - 535 +/- 45
+     - 0.71x
+     - faster
+   * - 32x32x32
+     - 1 484
+     - **1 260**
+     - 1 280 +/- 18
+     - 0.98x
+     - faster
+   * - 32x64x32
+     - 2 508
+     - **2 060**
+     - 1 866 +/- 36
+     - 1.104x
+     - **behind**
+   * - 48x48x48
+     - 3 537
+     - **3 201**
+     - 3 028 +/- 35
+     - 1.057x
+     - **behind**
+   * - 64x32x64
+     - 4 523
+     - **4 075**
+     - 3 897 +/- 35
+     - 1.046x
+     - **behind**
+   * - 64x64x64
+     - 7 083
+     - **6 635**
+     - 6 033 +/- 35
+     - 1.100x
+     - **behind**
+
+**Where parity is NOT reached, plainly.** Five shapes at T=4 (32x32x32,
+32x64x32, 48x48x48, 64x32x64, 64x64x64) and four at T=8 (32x64x32, 48x48x48,
+64x32x64, 64x64x64). Every one of them is a steady-state shape, every one is
+**behind by 4.3 % to 10.4 %**, and every one of those margins clears Gemmini's
+spread, so they are real deficits and not noise. Nine of the eighteen matched
+points are faster than Gemmini; none is inside the spread without also being
+faster. The honest summary is **comparable, not parity**: faster wherever the
+shape is small enough to be dominated by fixed cost, and a few per cent behind
+wherever it is not.
+
+Where the cycles go, on our side
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Measured with Vitis's dataflow profiler (``impact/prof_job.py`` then
+``impact/profile.sh``'s steps), not modelled. Every unit's work count is an
+integer the assembler writes into the imem header, so the run/starve/block
+split can be read against it.
+
+**Latency shapes are one pass of everything.** T=8 16x16x8, shipped, 424
+cycles: 47 region start (``s_axilite``), 21 to the first dispatched
+instruction, then ``dma_ld`` runs 196 cycles without a stall -- 128 burst
+iterations and 48 operand rows, exactly its header counts -- ``spm`` waits
+until row 48 arrives at cycle 249, ``vru`` runs its 64 words, ``accu`` runs its
+48 iterations ending at 391, and ``dma_st`` retires 16 rows by 426. **Three
+quarters of that shape is prologue and drain**, which is why widening the
+burst takes it to 312.
+
+**Steady-state shapes are a repeating per-n-tile loop.** T=4 32x32x32,
+parity-t4, 3,272 cycles: ``dma_ld`` finishes all 544 of its work items by
+cycle 632, i.e. the operand path is off the critical path after 19 % of the
+run, and the rest is a loop of ``vru`` running 256 activation words and then
+**blocking 65** while ``accu`` retires that tile -- 321 cycles per 256
+mm rows, 1.25 cycles per row against a roofline of 1.00. The marginal rate
+between 48x48x48 and 64x64x64 is **1.224 cycles per mm row for us against
+Gemmini's 1.181**, which is the 4.3 % at 64x64x64 almost exactly.
+
+**What that 0.224 is, and what is still unattributed.** ``accu`` is one flat
+loop at II=1 over ``mm`` rows *plus* ``mvout`` rows, so the retire pass shares
+the accumulator's single port with the accumulate pass and costs ``1/Kt`` of
+the mm work: 12.5 % at 32x32x32, 8.3 % at 48x48x48, 6.3 % at 64x64x64. Our
+T=4 deficit falls in the same order (9.9 %, 5.2 %, 4.3 %) and this is the
+**explanation of the convergence** the benchmarks page measured -- deeper K
+amortises one retire pass over more accumulate passes. It is not the whole of
+it: the ratio of deficit to ``1/Kt`` is 0.79 / 0.63 / 0.69 rather than 1, and
+at T=8 the correspondence fails outright (32x32x32 has ``Kt=4`` and we are
+*faster* there). **So the retire pass is identified and the remainder is
+not**, and no change has been built against either.
+
+Why we are ahead at the small shapes, and why that stops
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The owner's rule is that a win needs a mechanism or it cannot be defended.
+For every shape where this baseline is ahead, the mechanism is the same one,
+and it is a statement about **fixed cost**, not about the array:
+
+- A latency shape is almost entirely prologue on both machines. Ours is
+  47 cycles of ``s_axilite`` programming, one operand pass and one drain
+  (measured above); Gemmini's window is five ``config`` RoCC instructions, the
+  ``loop_ws`` dispatch, the mesh's own fill and drain, and a closing ``fence``
+  -- of which the configs and fence alone were measured at 44 cycles at DIM=4.
+- Widening the burst removes most of *our* prologue and cannot touch Gemmini's,
+  so the machine with the shorter remaining fixed cost wins, and at these
+  shapes that is now us by 7-38 %.
+- It stops exactly where the marginal rate starts to dominate, because our
+  marginal rate is the worse of the two (1.224 against 1.181 cycles per mm row
+  at T=4). At T=8 the crossover sits one shape later -- 32x32x32 is still a
+  win at 0.98x -- because doubling ``T`` quarters the number of tiles a shape
+  contains, so a given shape stays fixed-cost-dominated for longer.
+
+**The T=8 16x16x8 win, which was previously unexplained**, is the extreme case
+of this: the shape is 2x2x1 tiles, so ``accu`` does 48 iterations of real work
+inside a 424-cycle window, and 312 of those cycles are prologue and drain that
+the widening then halves. It is the shape with the fewest tiles per unit of
+window on either side, which is why its margin (0.62x) is the largest anywhere
+in the two tables. The 1.33x standard-cell area that T=8 costs over T=4 at the
+same MAXDIM is the price, at no clock penalty.
+
+Two disclosures that belong with these numbers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **The FPGA resource line understates a build.** Operand space is nearly free
+  on an FPGA and is not on standard cells: MAXDIM 16 -> 64 costs +64.1 %
+  standard-cell area but only +2.4 % Vitis FF, a factor of about 27. Both
+  parity configurations are at MAXDIM=64, which is the matched setting, but
+  their BRAM and FF figures should not be read as what it would cost to build.
+- **The windows contain different things** and always have: ours starts at
+  ``ap_start`` with the program already in DRAM, Gemmini's is
+  ``rdcycle``-bracketed around five configs, one hardware ``loop_ws`` and a
+  ``fence``, with neither side's host counted. That is the same window pairing
+  every number on this page uses.
+
+.. _gemmini-parity-order:
+
+The program order that was measured and not used
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first preference was a change to the emitted program on an unchanged
+netlist, and two were built: ``isa_dsl.gemm_program_interleaved`` (every
+operand column block loaded just before the first ``mm`` that reads it, so the
+first ``mm`` waits behind ``M + K`` load rows instead of ``Kt*M + Nt*K``) and
+``gemm_program_b_per_tile``. Both have **identical** dynamic issue counts and
+per-unit work counts to the shipped order at every shape, so any cycle
+difference is scheduling.
+
+Measured at MAXDIM=16 on one netlist -- shipped / interleaved / b_per_tile /
+k-outermost -- 172/167/169/169, 262/250/256/252, 418/392/394/418,
+484/466/468/479, 686/636/638/672, all bit-exact. At MAXDIM=64 the interleaved
+order is worth 2 to 50 cycles on the unchanged netlist and 16 to 50 on the
+widened one (T=4 16x16x16: 879 -> 829, and 639 -> 589).
+
+**It is not in the baseline, for two measured reasons.** Its whole mechanism
+is removing a fixed prologue, so at the steady-state shapes where the deficit
+actually is it does nothing -- 32x32x32 measured 3,355 against the shipped
+order's 3,272 on the widened build, i.e. *worse* than simply widening -- and
+at the latency shapes where it does help, the widened baseline is already
+faster than Gemmini. And it **deadlocks in RTL** whenever ``Kt >= QD``: at
+T=4 32x32x32 and above and at T=8 64x64x64 and 32x64x32, cosim runs 30 million
+cycles without progress and Vitis's deadlock detector does not fire. Raising
+``TPU_QD`` to 16 makes the identical program complete (3,355 cycles,
+bit-exact), which is what identifies the cause: a ``dma_ld`` issued *between*
+two ``mm``s is separated from the unit that consumes its rows by ``Kt``
+instructions, the sequencer blocks mid-dispatch on a full depth-``QD`` queue,
+and the consumer waits for a load the sequencer can no longer dispatch.
+
+That the Allo simulator, ``stress_isa.py`` (640/640 exact for both orders) and
+``kpn_model.py``'s bounded-FIFO deadlock model all accept a program the RTL
+hangs on is a **gap in the verification stack**, not just a property of these
+two orders: the KPN model runs the channel protocol at depth ``QD`` and
+reports no deadlock, so it is missing the sequencer's mid-instruction blocking
+across its five output queues. Anyone adding a program order should cosim it
+at a shape with ``Kt >= QD`` before believing any of the three.
 
 
 Earlier measurements and corrections

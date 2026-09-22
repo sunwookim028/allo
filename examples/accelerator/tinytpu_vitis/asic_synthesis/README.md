@@ -24,7 +24,7 @@ identically. It is not an ASIC verdict on any of them.
 | T=4, MAXDIM=16, shipped (`T4_MAXDIM16_shipped_baseline`) | **1,136,598** | 906,098 (79.7%) | 230,501 | 200,561 | **+0.21 ns** | 0 | 37 min |
 | T=4, MAXDIM=64, shipped (`T4_MAXDIM64_shipped`) | **1,865,314** | 1,503,790 (80.6%) | 361,524 | 333,189 | **+0.21 ns** | 0 | 56 min |
 | T=8, MAXDIM=64 (`T8_MAXDIM64`) | **2,481,926** | 1,982,554 (79.9%) | 499,371 | 438,922 | **+0.20 ns** | 0 | 72 min |
-| T=4, MAXDIM=64, burst-widened, banked (`T4_MAXDIM64_burstwiden`) | see below | | | | | | |
+| T=4, MAXDIM=64, burst-widened, **banked** (`T4_MAXDIM64_burstwiden`) | **3,254,024** | 2,628,257 (80.8%) | 625,767 | 581,616 | **+0.21 ns** | 0 | 98 min |
 | *superseded* — an earlier export, before memories were derived from MAXDIM (`superseded_export_T4_MAXDIM16`) | 1,271,692 | 1,016,187 (79.9%) | 255,505 | 224,987 | +0.18 ns | 0 | 47 min |
 
 Every run: identical settings, all close timing at 3.33 ns, all about 80%
@@ -38,6 +38,15 @@ versions.
 | --- | --- | --- |
 | operand space, MAXDIM 16 → 64 | shipped vs shipped, T=4 fixed | **+64.1%** cell area (+65.9% non-comb, +56.9% comb) |
 | array size, T 4 → 8 | MAXDIM=64 fixed | **1.33x** cell area |
+| burst widening | `T4_MAXDIM64_shipped` vs `T4_MAXDIM64_burstwiden`, MAXDIM=64 fixed | **+74.4%** cell area (+74.8% non-comb, +73.1% comb) |
+
+The burst-widening row is the design decision this set exists for. It buys
+−720 cycles at 48³ and −960 at 64³ — 55-61% of the steady-state deficit
+against Gemmini — for **+74.4% cell area here**, against Vitis's +43% FF and
++92% BRAM for the same change. As everywhere in this table, the BRAM axis is
+what cell area renders, so +74.4% is the flip-flop-memory price of the
+widening and not the price a design with SRAM macros would pay. Compare it
+only against `T4_MAXDIM64_shipped`: the pair differs in the widening alone.
 
 **Never quote `T8_MAXDIM64` against the MAXDIM=16 baseline** (2.18x) without
 naming both changes: that ratio is the array doubling *and* the fourfold
@@ -96,6 +105,29 @@ Reports are under `reports/<variant>/`: the QoR and power reports verbatim, an
 area summary (full report is 716 KB, the reference report 4 MB; both stay in the
 build directory), and mflowgen's `synthesis-metrics.json`.
 
+## The Gemmini side of the same flow
+
+`../gemmini_rtl/` holds Gemmini's accelerator — the `Gemmini` module and its
+local memories, with Rocket, the caches, the buses and the DRAM model cut —
+elaborated at DIM=4 and DIM=8, int8/int32, at a memory capacity matched to ours
+so that `sram_mode='none'` means the same thing on both sides. It is for **these
+identical settings**: DC W-2024.09, FreePDK45 `view-standard`, 3.33 ns,
+topographical, flatten effort 3.
+
+Four runs, not two: each directory carries `sv2v_manifest.f` (with memories)
+and `sv2v_manifest_nomem.f` (memory arrays black-boxed). The logic-only figure
+is the headline, because Gemmini's memories and ours are different sizes; our
+own designs need the matching run, omitting their seven `*_RAM_*` modules, for
+the pair to mean anything.
+
+Two differences from the RTL above, both measured: this RTL **is**
+SystemVerilog (firtool emits packed multidimensional arrays outside any
+`ifdef`, so `normalize_rtl: True` or `analyze -format sverilog` is required,
+unlike for Vitis output), and `SYNTHESIS` must be defined at read time. The
+top-module check is not a problem — `module Gemmini(` carries a comment, not an
+attribute. See `../gemmini_rtl/README.md` and
+`docs/source/designs/gemmini_comparison.rst`, "Area".
+
 ## Reproducing
 
 The flow is mflowgen at `~/allo-asic` on zhang-21; `construct-commercial.py`
@@ -147,3 +179,51 @@ used — see below), DC **W-2024.09**, ADK `freepdk-45nm` **view-standard**.
   `git checkout` in `~/allo-asic` (the original `adk.tcl` is a symlink to
   `../pkgs/base/adk.tcl`) and delete the leftover `adk-base.tcl`. `view-standard`
   is unaffected, being unpacked fresh in the build directory.
+
+## Logic-only runs: why the memory stubs exist
+
+Omitting a memory module from the file list does **not** black-box it. DC cannot
+resolve the reference and the flow treats that as fatal:
+
+```
+Warning: Unable to resolve reference 'mem_ext' in 'mem'.  (LINK-5)
+Error: failed to link design Gemmini
+```
+
+`tools/make_stubs.py` copies each omitted module's header verbatim from its own
+source — ports only, comments stripped, no body — and writes `<name>_stub.v`,
+which is appended to the logic-only file list. It refuses if a header cannot be
+found rather than inventing one.
+
+With stubs the memory ports terminate in a zero-area black box instead of
+dangling, so a logic-only figure excludes the array **and the array's own
+interface**, while the logic that drives the memories — address generation,
+enables, write masks — is retained and counted. The same rule must be applied
+on both sides of any logic-only comparison, or the two numbers are not
+measuring the same boundary.
+
+## Where the burst widening's area actually goes
+
+`report_area -hierarchy` on the pair, per top-level instance:
+
+| instance | MAXDIM=64 shipped | banked widened | change |
+| --- | --- | --- | --- |
+| `gmem1_m_axi_U` | 56,605 | 744,092 | **13.1x** |
+| `gmem2_m_axi_U` | 56,580 | 745,280 | **13.2x** |
+| `gmem0_m_axi_U` | 703,513 | 703,151 | — |
+| `dma_ld_0_1_U0` | 376,260 | 388,577 | +3.3% |
+| `spm_0_U0` | 188,053 | 188,299 | — |
+| `vru_0_U0` | 188,017 | 188,046 | — |
+| `accu_0_U0` | 103,857 | 103,837 | — |
+
+**99.1% of the +1,388,710 delta is the two AXI adapters** `gmem1` and `gmem2`
+growing 13x. The scratchpad, the vector registers and the accumulator do not
+move at all, and `dma_ld`'s own buffers account for 0.9%.
+
+So "+74.4% for the widening" is **not** the operand memories getting bigger. It
+is the cost of widening two 32-bit master ports to the same width as `gmem0`:
+the adapters' outstanding-transaction buffering scales with the data width, and
+on the FPGA that buffering is block RAM. The design question this raises is
+narrower and more tractable than "is the widening worth it": whether both
+operand ports need widening, or whether one wide port and a shared buffer would
+buy the same cycles.

@@ -1,0 +1,29 @@
+ 
+****************************************
+Report : area
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 15:12:44 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM64_burstwiden/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Number of ports:                        32537
+Number of nets:                       1111140
+Number of cells:                      1089679
+Number of combinational cells:         502191
+Number of sequential cells:            581616
+Number of macros/black boxes:               0
+Number of buf/inv:                      86611
+Number of references:                     351
+
+Combinational area:             625767.142008
+Buf/Inv area:                    66779.564564
+Noncombinational area:         2628257.061230
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:               3254024.203238

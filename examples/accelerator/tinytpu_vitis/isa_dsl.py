@@ -295,8 +295,19 @@ class Program:
 
 
 # ---------------------------------------------------------------- programs ---
-def gemm_program(M, K, N, relu=False):
-    """Tiled GEMM, generated. The shipped program; `bench_isa.py` asserts it is
+#: Which GEMM program order `gemm_program` emits when the caller names none.
+#: `shipped` is the published program; the others are the parity baseline's
+#: candidates (docs/source/designs/gemmini_comparison.rst, "The parity
+#: baseline"). Every order computes the same result with the same per-unit
+#: work counts on the same netlist -- only the issue ORDER differs.
+GEMM_ORDERS = ("shipped", "interleaved", "b_per_tile")
+
+
+def gemm_program(M, K, N, relu=False, order=None):
+    """Tiled GEMM, generated. `order` (default: `$TPU_PROGRAM`, else
+    `shipped`) selects the program order; see `GEMM_ORDERS`.
+
+    The shipped program; `bench_isa.py` asserts it is
     word-for-word what `microarch_isa.gemm_program_handwritten` emits.
 
     Every decision here is the author's and is visible in the source: A goes
@@ -311,6 +322,13 @@ def gemm_program(M, K, N, relu=False):
     `Ref(B_SP).at(nb, MAXDIM).at(kb, T)` -- reorder the two `with` statements
     and the encoding follows.
     """
+    order = order or os.environ.get("TPU_PROGRAM", "shipped")
+    if order not in GEMM_ORDERS:
+        raise NestError(f"TPU_PROGRAM/order={order!r}; one of {GEMM_ORDERS}")
+    if order == "interleaved":
+        return gemm_program_interleaved(M, K, N, relu)
+    if order == "b_per_tile":
+        return gemm_program_b_per_tile(M, K, N, relu)
     assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
         f"{M}x{K}x{N} exceeds the built MAXDIM={MAXDIM}")
     assert M % T == 0 and K % T == 0 and N % T == 0
@@ -521,6 +539,90 @@ def gemm_from_nest(nest, M, K, N, relu=False):
     return k.emit()
 
 
+def _gemm_checks(M, K, N):
+    assert M <= MAXDIM and K <= MAXDIM and N <= MAXDIM, (
+        f"{M}x{K}x{N} exceeds the built MAXDIM={MAXDIM}")
+    assert M % T == 0 and K % T == 0 and N % T == 0
+    assert M <= MAXROWS and K <= MAXROWS
+    return K // T, N // T
+
+
+def gemm_program_b_per_tile(M, K, N, relu=False):
+    """A parity candidate, the smaller change: A hoisted exactly as shipped,
+    B's column block loaded inside the n loop just before the tile that uses
+    it.
+
+    Mechanism: the first `mm` waits for one B block instead of all `Nt` of
+    them, because `spm` runs its instructions in order and the shipped program
+    puts every B load ahead of every `mm`."""
+    Kt, Nt = _gemm_checks(M, K, N)
+    k = Program(f"b_per_tile gemm{'.relu' if relu else ''} {M}x{K}x{N}")
+    with k.loop(Kt, "kA") as kb:
+        k.dma_ld(src=0, dram_row=0, col_block=Ref().at(kb, 1),
+                 vr=Ref(A_VR).at(kb, MAXDIM), rows=M)
+    with k.loop(Nt, "n") as nb:
+        k.dma_ld(src=1, dram_row=0, col_block=Ref().at(nb, 1),
+                 spad=Ref(B_SP).at(nb, MAXDIM), rows=K)
+        k.mm(A_VR, AR_C, Ref(B_SP).at(nb, MAXDIM), rows=M, acc=False)
+        if Kt > 1:
+            with k.loop(Kt - 1, "k") as kb:
+                k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
+                     Ref(B_SP + T).at(nb, MAXDIM).at(kb, T), rows=M, acc=True)
+        if relu:
+            k.vrelu(AR_C, AR_C, rows=M)
+        k.mvout(AR_C, dram_row=0, col_block=Ref().at(nb, 1), rows=M)
+    return k.emit()
+
+
+def gemm_program_interleaved(M, K, N, relu=False):
+    """A parity candidate: every operand column block is loaded just before the
+    first `mm` that reads it, instead of all of them before the first `mm`.
+
+    Mechanism: `spm` and `vru` each run their instructions in order, so in the
+    shipped program the first `mm` waits behind all `Kt*M + Nt*K` load rows;
+    here it waits behind one B block and one A block (`K + M` rows), and the
+    rest of the loads stream in between `mm`s while the array computes.
+
+    Same vreg and scratchpad layout, same instructions, same per-unit work
+    counts as the shipped program. The first n iteration is peeled because a
+    hardware loop has no predicate: A's blocks are loaded on the first pass
+    over k and not on the others. At most 18 static instructions (with relu),
+    nesting depth 2, at most 3 AGU terms per instruction."""
+    Kt, Nt = _gemm_checks(M, K, N)
+    k = Program(f"interleaved gemm{'.relu' if relu else ''} {M}x{K}x{N}")
+
+    # --- n = 0, peeled: A's blocks are loaded here, one per k-tile ---
+    k.dma_ld(src=1, dram_row=0, col_block=0, spad=B_SP, rows=K)
+    k.dma_ld(src=0, dram_row=0, col_block=0, vr=A_VR, rows=M)
+    k.mm(A_VR, AR_C, B_SP, rows=M, acc=False)
+    if Kt > 1:
+        with k.loop(Kt - 1, "k0") as kb:
+            k.dma_ld(src=0, dram_row=0, col_block=Ref(1).at(kb, 1),
+                     vr=Ref(A_VR + MAXDIM).at(kb, MAXDIM), rows=M)
+            k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
+                 Ref(B_SP + T).at(kb, T), rows=M, acc=True)
+    if relu:
+        k.vrelu(AR_C, AR_C, rows=M)
+    k.mvout(AR_C, dram_row=0, col_block=0, rows=M)
+
+    # --- n = 1 .. Nt-1: A is resident; B's block is loaded per tile ---
+    if Nt > 1:
+        with k.loop(Nt - 1, "n") as nb:
+            k.dma_ld(src=1, dram_row=0, col_block=Ref(1).at(nb, 1),
+                     spad=Ref(B_SP + MAXDIM).at(nb, MAXDIM), rows=K)
+            k.mm(A_VR, AR_C, Ref(B_SP + MAXDIM).at(nb, MAXDIM),
+                 rows=M, acc=False)
+            if Kt > 1:
+                with k.loop(Kt - 1, "k") as kb:
+                    k.mm(Ref(A_VR + MAXDIM).at(kb, MAXDIM), AR_C,
+                         Ref(B_SP + MAXDIM + T).at(nb, MAXDIM).at(kb, T),
+                         rows=M, acc=True)
+            if relu:
+                k.vrelu(AR_C, AR_C, rows=M)
+            k.mvout(AR_C, dram_row=0, col_block=Ref(1).at(nb, 1), rows=M)
+    return k.emit()
+
+
 def vector_program(M=8):
     """Every field a GEMM leaves constant, varied -- a TEST program, not a
     kernel. The shipped GEMM always has `dma_ld`/`mvout` DRAM row 0, one
@@ -648,7 +750,7 @@ def assert_matches_handwritten(shapes):
     for (M, K, N) in shapes:
         for relu in (False, True):
             tag = f"{'gemm.relu' if relu else 'gemm'} {M}x{K}x{N}"
-            got = gemm_program(M, K, N, relu)
+            got = gemm_program(M, K, N, relu, order="shipped")
             ref = gemm_program_handwritten(M, K, N, relu)
             assert len(got) == len(ref), (
                 f"{tag}: generated {len(got)} instructions, hand-written "

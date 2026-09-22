@@ -18,6 +18,9 @@ the objective:
     tinytpu_vitis/bench_isa.py
     tinytpu_vitis/stress_isa.py   (main's correctness gate)
     tinytpu_vitis/isa_ref.py      (the ISA as numpy; stress_isa's reference)
+    tinytpu_vitis/isa_spec.json   (the ISA as data)
+    tinytpu_vitis/isa_encoding.py (generated from it; what isa_ref is built on)
+    tinytpu_vitis/gen_isa.py      (holds the design to the spec)
     tinytpu_vitis/kpn_model.py    (stress_isa's deadlock diagnosis)
     chia_agent/gate_runner.py     (runs each check, vouches for its verdict)
     chia_agent/mapspace.py        (THE MAPPER: its enumerator, its selection
@@ -146,9 +149,14 @@ def main_base(ref: str) -> str:
                           f"CHIA_MAIN_BASE to the main commit this ref is based on")
 
 
+#: `isa_spec.json` is the ISA as data, `isa_encoding.py` is generated from it
+#: and `isa_ref.py` is built on that -- so the reference model names operands
+#: the way the SPEC names them and never sees a bit position the design chose.
+#: All three judge a candidate rather than being one, and `gen_isa.py --check`
+#: is what holds the design to them.
 DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "cosim.py", "bench_isa.py", "stress_isa.py", "isa_ref.py", "kpn_model.py",
-    "shapes.py")]
+    "shapes.py", "isa_spec.json", "isa_encoding.py", "gen_isa.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
 #: The co-design loop's frozen half: the mapper (its enumerator, its selection

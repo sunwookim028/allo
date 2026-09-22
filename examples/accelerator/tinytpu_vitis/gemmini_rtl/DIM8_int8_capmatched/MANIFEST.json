@@ -1,0 +1,91 @@
+{
+  "allo": "e4b9d58f",
+  "chipyard": "e0207441",
+  "chisel_config": "Int8Dim8AreaGemminiRocketConfig",
+  "config": {
+    "accType": "SInt(32.W)",
+    "acc_capacity": "4 KiB in 2 banks (stock: 64 KiB)",
+    "dataflow": "BOTH (weight- and output-stationary; only WS is exercised)",
+    "dma_buswidth / dma_maxbytes": "128 bits / 64 bytes",
+    "inputType": "SInt(8.W)",
+    "meshRows / meshColumns": "8 (DIM = 8)",
+    "sp_capacity": "8 KiB in 4 banks (stock: 256 KiB)",
+    "spatialArrayOutputType": "SInt(20.W)",
+    "tileRows / tileColumns": "1",
+    "tlb_size": "4 entries"
+  },
+  "files": 136,
+  "files_logic_only": 132,
+  "gemmini": "25809f7",
+  "language": "sverilog",
+  "layout": "flat",
+  "manifests": {
+    "full": "sv2v_manifest.f",
+    "logic_only": "sv2v_manifest_nomem.f",
+    "logic_only_alias": "sv2v_manifest_nomem_stubbed.f"
+  },
+  "memory_array_files": [
+    "mem_0_ext.v",
+    "mem_ext.v",
+    "split_mem_0_ext.v",
+    "split_mem_ext.v"
+  ],
+  "memory_stubs": {
+    "mem_0_ext.v": "mem_0_ext_stub.v",
+    "mem_ext.v": "mem_ext_stub.v",
+    "split_mem_0_ext.v": "split_mem_0_ext_stub.v",
+    "split_mem_ext.v": "split_mem_ext_stub.v"
+  },
+  "read_options": [
+    "+define+SYNTHESIS"
+  ],
+  "resources": {
+    "files": 136,
+    "hardware": {
+      "ACC_DIM": 8,
+      "ACC_ROWS": 128,
+      "BANK_NUM": 4,
+      "BANK_ROWS": 256,
+      "DIM": 8
+    },
+    "instances": {
+      "AccumulatorMem": 2,
+      "FrontendTLB": 1,
+      "MacUnit": 64,
+      "MulAddRecFN_e8_s24": 12,
+      "PE": 64,
+      "ScratchpadBank": 4,
+      "Tile": 64
+    },
+    "memories": {
+      "mem_0_ext": {
+        "bits": 32768,
+        "depth": 64,
+        "instances": 2,
+        "ports": "mwrite,read",
+        "width": 256
+      },
+      "mem_ext": {
+        "bits": 65536,
+        "depth": 256,
+        "instances": 4,
+        "ports": "mrw",
+        "width": 64
+      }
+    },
+    "memory_bits": 98304,
+    "modules": 136
+  },
+  "sv2v_required": true,
+  "tlb_modules": [
+    "FrontendTLB",
+    "DecoupledTLB",
+    "DTLB_2",
+    "PMAChecker",
+    "PMPChecker_s6",
+    "OptimizationBarrier_TLBEntryData"
+  ],
+  "top": "Gemmini",
+  "top_defined_in": "Gemmini.sv",
+  "undefined_modules": []
+}
