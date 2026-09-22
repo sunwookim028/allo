@@ -807,101 +807,103 @@ The asymmetries, stated once
 T=4 vs Gemmini DIM=4, both at MAXDIM=64
 ---------------------------------------
 
-Ours: Vitis cosim, bit-exact at every shape. Gemmini: Verilator, two trials
-per shape, best of two, every shape one ``loop_ws``. Peak is 16 MAC/cycle on
-both.
+Ours: Vitis cosim, bit-exact at every shape, deterministic (one run suffices,
+verified). Gemmini: Verilator, **median of five trials**, every shape one
+``loop_ws`` proven at runtime. Peak is 16 MAC/cycle on both.
 
 .. list-table::
    :header-rows: 1
-   :widths: 13 8 12 12 11 11 15
+   :widths: 12 8 10 14 10 10 13 13
 
    * - shape
      - set
      - ours
-     - Gemmini
+     - Gemmini (median)
      - ours % peak
-     - Gemmini % peak
-     - **ours / Gemmini**
+     - Gem % peak
+     - **ours / Gem**
+     - clears spread?
    * - 4x4x4
      - latency
      - 218
-     - 205
+     - 208 +/- 25
      - 1.8%
-     - 2.0%
-     - 1.06x slower
+     - 1.9%
+     - 1.05x
+     - **no (0.4x)**
    * - 8x8x8
      - latency
      - 357
-     - 319
+     - 324 +/- 36
      - 9.0%
-     - 10.0%
-     - 1.12x slower
+     - 9.9%
+     - 1.10x
+     - **no (0.9x)**
    * - 12x12x12
      - latency
      - 563
-     - 455
+     - 458 +/- 17
      - 19.2%
-     - 23.7%
-     - 1.24x slower
+     - 23.6%
+     - 1.23x
+     - yes (6.2x)
    * - 16x16x8
      - latency
      - 677
-     - 522
+     - 527 +/- 44
      - 18.9%
-     - 24.5%
-     - 1.30x slower
+     - 24.3%
+     - 1.28x
+     - yes (3.4x)
    * - 16x16x16
      - both
      - 879
-     - 685
+     - 691 +/- 44
      - 29.1%
-     - 37.4%
-     - 1.28x slower
+     - 37.0%
+     - 1.27x
+     - yes (4.3x)
    * - 32x32x32
      - steady
      - 3 752
-     - 2 995
+     - 2 977 +/- 34
      - 54.6%
-     - 68.4%
-     - 1.25x slower
+     - 68.8%
+     - 1.26x
+     - yes (23x)
    * - 48x48x48
      - steady
      - 10 289
-     - 9 102
+     - 9 100 +/- 35
      - 67.2%
      - 75.9%
-     - 1.13x slower
+     - 1.13x
+     - yes (34x)
    * - 64x64x64
      - steady
      - 22 123
-     - 20 375
+     - 20 287 +/- 34
      - 74.1%
-     - 80.4%
-     - **1.086x slower**
-   * - 64x32x64
-     - steady
-     - 12 907
-     - 11 245
-     - 63.5%
-     - 72.8%
-     - 1.15x slower
-   * - 32x64x32
-     - steady
-     - 6 824
-     - 5 478
-     - 60.0%
-     - 74.8%
-     - 1.25x slower
+     - 80.8%
+     - **1.09x**
+     - yes (54x)
 
-**Answer: we do not beat Gemmini, at any shape in either set. But the deficit
-converges rather than persisting.** On the cubic sweep it goes 1.28x (16) ->
-1.25x (32) -> 1.13x (48) -> **1.086x (64)**, and in fraction-of-peak terms the
-gap closes from 8.3 points at 16x16x16 to 6.3 at 64x64x64. It does not invert.
+(``+/-`` is the full min-max spread over five trials, not a standard error.
+The two non-cubic shapes, 64x32x64 and 32x64x32, were measured at n=2:
+11 245 and 5 478, giving 1.15x and 1.25x.)
+
+**Answer at this array size: we do not beat Gemmini at any shape, but the
+deficit converges rather than persisting.** On the cubic sweep it goes 1.27x
+(16) -> 1.26x (32) -> 1.13x (48) -> **1.09x (64)**, and in fraction-of-peak
+terms the gap closes from 7.9 points at 16x16x16 to 6.7 at 64x64x64. It does
+not invert.
 
 That answers the honest open question directly: the 1.07-1.24x measured at the
 five small shapes was **a statement about pipeline depth and issue overhead,
 not about steady-state efficiency**, and at steady state the deficit shrinks
-to about 9% without disappearing.
+to about 9% without disappearing. Two caveats that belong with it: the two
+smallest shapes do not clear the measurement noise at all, and the answer is
+**different at the other matched array size** (next section).
 
 
 T=8 vs Gemmini DIM=8, both at MAXDIM=64
@@ -1260,89 +1262,103 @@ as if it were.
   the same hardware gives different counts, and the measured spread reaches
   **20 cycles at 16x16x8** against a ~520-cycle total.
 
-Gemmini DIM=4 at MAXDIM=64, per-shape spread (``allo_bare_steady.c``):
+Gemmini DIM=4 at MAXDIM=64, **five trials per shape**
+(``allo_bare_steady.c``, ``BARE``):
 
 .. list-table::
    :header-rows: 1
-   :widths: 14 10 10 12 12 20 22
+   :widths: 13 9 9 9 9 11 11 15
 
    * - shape
-     - trials
-     - spread
+     - n
+     - median
+     - min
+     - max
+     - **spread**
      - % of total
-     - deficit
-     - **deficit / spread**
-     - supportable?
+     - deficit / spread
    * - 4x4x4
-     - 205, 215
-     - 10
-     - 4.9%
-     - 13
-     - 1.3x
-     - **no**
-   * - 8x8x8
-     - 322, 319
-     - 3
-     - 0.9%
-     - 38
-     - 12.7x
-     - yes
-   * - 12x12x12
-     - 458, 455
-     - 3
-     - 0.7%
-     - 108
-     - 36x
-     - yes
-   * - 16x16x8
-     - 542, 522
-     - **20**
-     - 3.8%
-     - 155
-     - 7.8x
-     - yes
-   * - 16x16x16
-     - 687, 685
-     - 2
-     - 0.3%
-     - 194
-     - 97x
-     - yes
-   * - 32x32x32
-     - 2 996, 2 995
-     - 1
-     - 0.03%
-     - 757
-     - 757x
-     - yes
-   * - 48x48x48
-     - 9 103, 9 102
-     - 1
-     - 0.01%
-     - 1 187
-     - 1 187x
-     - yes
-   * - 64x64x64
-     - 20 375, 20 377
-     - 2
-     - 0.01%
-     - 1 748
-     - **874x**
-     - yes
-   * - 64x32x64
-     - 11 245, 11 250
      - 5
-     - 0.04%
-     - 1 662
-     - 332x
-     - yes
-   * - 32x64x32
-     - 5 479, 5 478
-     - 1
-     - 0.02%
-     - 1 346
-     - 1 346x
-     - yes
+     - 208
+     - 208
+     - 233
+     - **25**
+     - **12.0%**
+     - 10 / 25 = **0.4x**
+   * - 8x8x8
+     - 5
+     - 324
+     - 324
+     - 360
+     - **36**
+     - **11.1%**
+     - 33 / 36 = **0.9x**
+   * - 12x12x12
+     - 5
+     - 458
+     - 458
+     - 475
+     - 17
+     - 3.7%
+     - 105 / 17 = 6.2x
+   * - 16x16x8
+     - 5
+     - 527
+     - 517
+     - 561
+     - 44
+     - 8.3%
+     - 150 / 44 = 3.4x
+   * - 16x16x16
+     - 5
+     - 691
+     - 681
+     - 725
+     - 44
+     - 6.4%
+     - 188 / 44 = 4.3x
+   * - 32x32x32
+     - 5
+     - 2 977
+     - 2 977
+     - 3 011
+     - 34
+     - 1.1%
+     - 775 / 34 = 23x
+   * - 48x48x48
+     - 5
+     - 9 100
+     - 9 100
+     - 9 135
+     - 35
+     - 0.4%
+     - 1 189 / 35 = 34x
+   * - 64x64x64
+     - 5
+     - 20 287
+     - 20 287
+     - 20 321
+     - 34
+     - 0.17%
+     - 1 836 / 34 = **54x**
+
+The spread is roughly **constant in absolute terms** (17-44 cycles) rather
+than proportional, which is what a fixed-size cache and coherence effect looks
+like --- so it matters enormously at 4x4x4 and not at all at 64x64x64.
+
+.. warning::
+
+   **Two shapes are inside the noise and must not be quoted as differences.**
+   At 4x4x4 the deficit is 10 cycles against a 25-cycle spread (0.4x) and at
+   8x8x8 it is 33 against 36 (0.9x). Five trials were needed to see this: the
+   two-trial estimates understated the spread at 8x8x8 by 12x (3 against 36).
+   **No single-trial number at 4x4x4 or 8x8x8 should be quoted again by
+   either side.**
+
+   Everything from 12x12x12 up clears the bar, and every steady-state
+   conclusion clears it by one to two orders of magnitude: the 1 836-cycle
+   deficit at 64x64x64 is **54x** its spread, and the -960-cycle burst saving
+   is 28x it.
 
 Consequence, stated once and applied everywhere: **the uncertainty on a
 cross-machine difference is Gemmini's alone**, and a claimed difference
