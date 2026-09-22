@@ -32,6 +32,7 @@ import ray
 from chia.base.ChiaFunction import get
 from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
+import control
 import preflight
 from allo_tool import AlloSpecTool, EDITABLE
 from llm import IsaOpenCodeLLM
@@ -258,8 +259,16 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         print("=" * 72)
         baseline = tool.evaluate(work="harness")
         print(f"  {summarize(baseline)}", flush=True)
+        design = control.blobs("HEAD")
+        cross = (control.crosscheck(baseline["cycles"], design)
+                 if baseline.get("ok") else None)
         _record(log_path, {"iteration": 0, "kind": "baseline", "accepted": True,
-                           "head": head, "verdict": baseline})
+                           "head": head, "design": design, "crosscheck": cross,
+                           "verdict": baseline})
+        if cross:
+            print(f"  cross-check against {cross['against']}: "
+                  f"{cross['status']} {cross['delta']}", flush=True)
+            print(control.banner(cross), end="", flush=True)
         if not baseline.get("ok"):
             print(baseline.get("detail", "")[-3000:])
             return 1
