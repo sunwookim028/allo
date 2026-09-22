@@ -413,6 +413,29 @@ comments and docstrings against the frozen file; rewording is free.</p></li>
 is scrubbed before cosim (<code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0, as Gemmini’s harness), T == 4,
 MAXDIM == 16, the 3.33 ns target, and each shape’s own cosim log and
 simulated time must agree with the reported cycles.</p></li>
+</ol>
+</section>
+<section id="running-two-tracks-on-one-host-ray-stop-is-global">
+<h3>Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global<a class="headerlink" href="#running-two-tracks-on-one-host-ray-stop-is-global" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>``ray stop`` matches Ray processes by name across the entire host</strong>, so it
+kills raylets belonging to every worktree rather than only the one it is run
+from. A track that ends a run or a swarm with it takes down whatever else is
+mid-flight.</p>
+<p>Observed on 2026-09-22: a paid two-worker search lost both workers 10.8 minutes
+in, at $1.69, during their first model call, with <code class="docutils literal notranslate"><span class="pre">raylet.out</span></code> showing
+<code class="docutils literal notranslate"><span class="pre">received</span> <span class="pre">SIGTERM</span></code> and <code class="docutils literal notranslate"><span class="pre">Raylet</span> <span class="pre">graceful</span> <span class="pre">shutdown</span> <span class="pre">triggered</span> <span class="pre">...</span> <span class="pre">reason:</span>
+<span class="pre">EXPECTED_TERMINATION</span></code>. Not memory — 757 GB was free. The GCS survived; the
+raylet did not.</p>
+<p>There is <strong>no per-worktree isolation</strong> for this. Matching is on process name, so
+a private temporary directory or a distinct port does not help. Two options, and
+the choice is operational rather than technical: serialise Ray use across
+tracks, or treat a raylet <code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> as transient and retry, accepting the
+wasted spend.</p>
+<p>The failure direction is at least safe: workers die rather than producing an
+unscored candidate. And a harness that calls <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> unconditionally on
+teardown makes concurrent tracks impossible on one host — prefer stopping only
+your own cluster by address, or simply letting the process exit.</p>
+<ol class="arabic simple" start="9">
 <li><p><strong>Loopback.</strong> The MCP tool servers bind 127.0.0.1 by default; a multi-host
 swarm must opt in with <code class="docutils literal notranslate"><span class="pre">TINYTPU_TOOL_HOST=node</span></code> and bring its own
 authentication.</p></li>
@@ -1249,6 +1272,7 @@ the project wants, even if the immediate design gets no faster.</p>
 <li><a class="reference internal" href="#editable-vs-frozen">Editable vs. frozen</a></li>
 <li><a class="reference internal" href="#the-evaluator">The evaluator</a></li>
 <li><a class="reference internal" href="#guards">Guards</a></li>
+<li><a class="reference internal" href="#running-two-tracks-on-one-host-ray-stop-is-global">Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global</a></li>
 <li><a class="reference internal" href="#running-it">Running it</a></li>
 <li><a class="reference internal" href="#first-paid-run-2026-09-19">First paid run, 2026-09-19</a></li>
 <li><a class="reference internal" href="#earlier-capped-smoke-run-2026-09-19-old-design-old-project">Earlier: capped smoke run, 2026-09-19, old design, old project</a></li>
