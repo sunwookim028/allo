@@ -416,7 +416,17 @@ NR_HI = 54 + NR_BITS
 assert 8 <= NR_BITS <= 10, "`nr` starts at bit 54 of a 64-bit instruction word"
 
 
-AGU_TERMS = 3                  # address terms per instruction
+# Address terms per instruction, and the layout of one term, as build
+# parameters -- `TPU_AGU_TERMS=4` -- because what a fourth term costs is a
+# question with two answers and the first one is in bits. A term is
+# (target 4b, level 3b, stride), the AGU word is 64 bits, and 3 x 19 = 57 fits
+# with 7 to spare while 4 x 19 = 76 does not. So a fourth term is not a spare
+# slot: it is paid for by narrowing every term to 16 bits, which takes the
+# stride from 2047 to 255 -- or by a third instruction word.
+AGU_TERMS = int(os.environ.get("TPU_AGU_TERMS", 3))
+AGU_TERM_BITS = min(19, 64 // AGU_TERMS)
+AGU_STRIDE_BITS = AGU_TERM_BITS - 7            # target 4 bits, level 3 bits
+assert AGU_TERMS * AGU_TERM_BITS <= 64 and AGU_STRIDE_BITS >= 8
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
 
 
@@ -441,8 +451,10 @@ def enc_agu(*terms):
     w = 0
     for i, (target, level, stride) in enumerate(terms):
         assert 0 <= target <= 4 and 0 <= level < LOOP_DEPTH
-        assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"
-        base = 19 * i
+        assert 0 <= stride < (1 << (AGU_STRIDE_BITS - 1)), (
+            f"stride {stride} does not fit the {AGU_STRIDE_BITS - 1} usable "
+            f"bits a term carries at AGU_TERMS={AGU_TERMS}")
+        base = AGU_TERM_BITS * i
         w |= (target << base) | (level << (base + 4)) | (stride << (base + 7))
     return w
 
@@ -817,9 +829,10 @@ def tinytpu_isa(
                 f2: int32 = w0[30:42]
                 f3: int32 = w0[42:54]
                 with allo.meta_for(AGU_TERMS) as _t:
-                    tw: int32 = w1[19 * _t : 19 * _t + 4]
-                    lw: int32 = w1[19 * _t + 4 : 19 * _t + 7]
-                    sw: int32 = w1[19 * _t + 7 : 19 * _t + 19]
+                    tw: int32 = w1[AGU_TERM_BITS * _t : AGU_TERM_BITS * _t + 4]
+                    lw: int32 = w1[AGU_TERM_BITS * _t + 4 : AGU_TERM_BITS * _t + 7]
+                    sw: int32 = w1[AGU_TERM_BITS * _t + 7 :
+                                   AGU_TERM_BITS * _t + AGU_TERM_BITS]
                     d: int32 = iv_now[lw] * sw
                     if tw == AGU_F0:
                         f0 = f0 + d
@@ -1507,10 +1520,10 @@ def _trace(prog):
         else:
             f = [(w0 >> sh) & 0xFFF for sh in (6, 18, 30, 42)]
             for t in range(AGU_TERMS):
-                base = 19 * t
+                base = AGU_TERM_BITS * t
                 tw = (w1 >> base) & 0xF
                 lw = (w1 >> (base + 4)) & 0x7
-                st = (w1 >> (base + 7)) & 0xFFF
+                st = (w1 >> (base + 7)) & ((1 << AGU_STRIDE_BITS) - 1)
                 if tw != 0:
                     f[tw - 1] += iv_now[lw] * st
             yield (pc, tuple(iv_now[:len(stack)]), op, (w0 >> 54) & ((1 << NR_BITS) - 1),
@@ -1589,8 +1602,8 @@ def check_program(prog, dram=None):
                 raise ProgramError(f"{where}: endloop with no open loop")
             depth -= 1
         for t in range(AGU_TERMS):
-            tw = (w1 >> (19 * t)) & 0xF
-            lw = (w1 >> (19 * t + 4)) & 0x7
+            tw = (w1 >> (AGU_TERM_BITS * t)) & 0xF
+            lw = (w1 >> (AGU_TERM_BITS * t + 4)) & 0x7
             if tw == 0:
                 continue
             if op in (OP_LOOP, OP_ENDLOOP, OP_NOP) or tw > 4 or lw >= depth:

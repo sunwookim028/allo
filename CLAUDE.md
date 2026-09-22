@@ -69,8 +69,11 @@ does not build the fork's site; build locally.
 
 `examples/accelerator/tinytpu_vitis/`. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
-checks the published cycle counts (171/261/417/483/685; 252/383/591/667/919
-before `e24e433b`):
+checks the published cycle counts (178/262/416/478/696 at the DEFAULT
+configuration -- no `TPU_MAXDIM` pin, because the DRAM row stride is runtime
+data now and a shape no longer costs more on a bigger build; 171/261/417/483/685
+was the same sweep at MAXDIM=16 with the on-chip operand mirror, and
+252/383/591/667/919 before `e24e433b`):
 
 ```bash
 examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim: ~1 min
@@ -80,7 +83,10 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 (Gemmini's [-4, 4] operands) and miss real bugs; `stress_isa.py` and
 `TPU_TB=stress python cosim.py` are the **correctness** gates. Run
 `stress_isa.py` (~10 s) after any change to `microarch_isa.py`, and
-`mutate.py` after any change to the harness. `assemble()` rejects programs that
+`mutate.py` after any change to the harness. A shape that does not fit
+`MAXDIM` is tiled into it -- `isa_dsl.gemm_tiled(M, K, N)` returns a program
+and the `Dram` geometry it runs against, 14 instructions at every shape up to
+128x768x768; `TPU_TILED=MxKxN python cosim.py` measures one in RTL. `assemble()` rejects programs that
 read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
 hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
 iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim

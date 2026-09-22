@@ -8,7 +8,18 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
-# At TPU_MAXDIM=16 (pinned below), which is where these were measured.
+# At the SHIPPED default, MAXDIM=64, with no knob pinned -- which is new, and
+# is the point of the DMA change that produced these numbers. `dma_ld` used to
+# mirror whole DRAM rows on chip, so a small shape paid for the build it ran
+# on (4x4x4 was 171 at MAXDIM=16 and 218 at MAXDIM=64); it now reads the T
+# bytes an instruction names straight from `m_axi` at a stride the header
+# carries, and the five shapes cost 178 / 262 / 416 / 478 / 696 at MAXDIM=64 --
+# within eleven cycles of the MAXDIM=16 row and better than it at two shapes.
+# So there is nothing left to pin. docs/source/designs/tinytpu_isa.rst,
+# "Shapes that do not fit, and tiling them in".
+#
+# The MAXDIM=16 history below is kept because it is how the previous shift was
+# attributed; those numbers are that configuration's, not this script's.
 #
 # WHY THEY MOVED BY ONE CYCLE, isolated to one variable rather than inferred.
 # They were 172 / 262 / 418 / 484 / 686 while the scratchpad and vreg files
@@ -26,7 +37,7 @@ ROOT=$(cd "$HERE/../../.." && pwd)
 # BRAM 42 -> 40 says two memories left block RAM -- and the shorter operand
 # read path takes one cycle out of the FIXED term, which is why the delta is
 # the same at every shape regardless of work. It is a small improvement.
-EXPECTED="4x4x4=171 8x8x8=261 12x12x12=417 16x16x8=483 16x16x16=685"
+EXPECTED="4x4x4=178 8x8x8=262 12x12x12=416 16x16x8=478 16x16x16=696"
 
 usage() {
     cat <<'EOF'
@@ -48,7 +59,7 @@ Stages, in order:
   3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK;
   4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
      csynth, one cosim per shape -- and compares the cycle counts with the
-     published 171 / 261 / 417 / 483 / 685. Skipped by --no-cosim.
+     published 178 / 262 / 416 / 478 / 696. Skipped by --no-cosim.
 
 WHAT THE DEFAULT SKIPS. Stage 3b is off unless --with-mutants is given.
 bench_isa.py and stress_isa.py both cite mutate.py as the evidence that they
@@ -94,15 +105,10 @@ export PYTHONPATH=$ROOT
 # A knob left in the caller's shell (TPU_SHAPES, TPU_AXI_LATENCY, TPU_TB, ...)
 # would change what is measured. The published numbers are the defaults.
 for v in $(env | grep -o '^TPU_[A-Z_]*' || true); do unset "$v"; done
-# ...with ONE knob set deliberately. The published five are a **MAXDIM=16**
-# measurement, and the shipped default moved to MAXDIM=64 so that shapes which
-# reach steady state can run at all (docs/source/designs/benchmarks.rst).
-# MAXDIM is the DRAM row stride of every operand, so the same shape costs more
-# on a bigger build -- 4x4x4 is 218 cycles at MAXDIM=64 against 171 at 16 --
-# and this script reproduces the published numbers, which means pinning the
-# configuration they were taken on. The MAXDIM=64 sweep is
-# `TPU_SET=all cosim.py`, and its numbers are on the benchmarks page.
-export TPU_MAXDIM=16
+# ...and nothing is pinned any more. MAXDIM used to be the DRAM row stride of
+# every operand, so the same shape cost more on a bigger build and the
+# published numbers had to name the build they were taken on; the stride is
+# runtime data now, so the default configuration IS the published one.
 
 PY=$(command -v python)
 LOGS=$HERE/.scratch          # gitignored

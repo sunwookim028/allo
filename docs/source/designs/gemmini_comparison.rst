@@ -965,19 +965,42 @@ Their steady-state figure, which they are re-running before standing behind it
 86.4 % of peak against their 53.8 %, i.e. 1.61x more efficient per processing
 element. Ours reaches **74.1 % of peak at 64x64x64** and is still climbing.
 
-The capability gap, which is worse for us than the cycle deficit
+The capability gap, which was worse for us than the cycle deficit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Gemmini runs **128x768x768 today**, through `tiled_matmul_auto`'s own tiling
-search. We cannot address a matrix that size at all: our operands are a single
-``int8[MAXDIM*MAXDIM]`` region, so the shape has to fit the addressable space
-rather than being tiled into it. Unblocking it needs a runtime base and stride
-on the DMA load and store paths, a fifth loop level, and possibly a fourth
-address term.
+search. We could not address a matrix that size at all: our operands were a
+single ``int8[MAXDIM*MAXDIM]`` region and ``dma_ld`` mirrored every row it
+named on chip, so the shape had to fit the addressable space rather than being
+tiled into it.
 
-This matters more than the 1.09x. A 9 % cycle deficit at a shape both machines
-can run is a tuning result; being unable to express the shapes a real workload
-uses is a capability result, and no amount of cycle-level work closes it.
+It matters more than the 1.09x, which is why it was closed first. A 9 % cycle
+deficit at a shape both machines can run is a tuning result; being unable to
+express the shapes a real workload uses is a capability result, and no amount
+of cycle-level work closes it.
+
+**128x768x768 now runs bit-exactly** -- 14 static instructions, the same 14 the
+machine runs at 8x8x8 -- on the design's own simulator, and 16x128x16 runs in
+RTL cosim on the same build that runs the published square sweep. The three
+changes it took, and the one that was expected and turned out not to be needed,
+are on :ref:`tinytpu-margins`:
+
+* the DRAM geometry is runtime data (``Dram``, ``imem[7]``), so ``dma_ld`` and
+  ``dma_st`` address ``((row) * words_per_row + col_block) * T`` rather than a
+  compile-time ``MAXDIM`` stride, and the on-chip mirror is gone;
+* ``nr`` spent the instruction word's last two spare bits, which raised both
+  the rows an instruction may name and a loop's trip count from 127 to 511;
+* the header counts became 32-bit slices, and the array's two trip counts got
+  one chain word each instead of sharing one.
+
+The **fifth loop level and the fourth address term were not needed**: the tiled
+nest's worst instruction carries 2 of the 3 address terms and is 3 of the 4
+levels deep, at every shape. What they are needed for is the *better* mapping:
+one that keeps several output column blocks resident, so the A tile is not
+re-read once per column block of C. Our DRAM traffic on the big shape is
+``M*K*N/T``, and that is a consequence of 2 KB of operand vregs against
+Gemmini's 256 KB scratchpad -- a capacity gap, which is a different argument
+from the addressing one and is the honest remaining half of this section.
 
 
 Earlier measurements and corrections

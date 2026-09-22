@@ -311,11 +311,10 @@ An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
 
    word 0, one cell per bit, most significant on the left (``enc()``):
 
-   +--+--------+------------+------------+------------+------------+------+
-   |  |   nr   |     f3     |     f2     |     f1     |     f0     |  op  |
-   |  | 61:54  |   53:42    |   41:30    |   29:18    |   17:6     | 5:0  |
-   +--+--------+------------+------------+------------+------------+------+
-     ^ 63:62 unused
+   +----------+------------+------------+------------+------------+------+
+   |    nr    |     f3     |     f2     |     f1     |     f0     |  op  |
+   |  63:54   |   53:42    |   41:30    |   29:18    |   17:6     | 5:0  |
+   +----------+------------+------------+------------+------------+------+
 
    word 1, up to AGU_TERMS = 3 address terms of 19 bits (``enc_agu()``):
 
@@ -327,6 +326,12 @@ An instruction is **two 64-bit words** (``IWORDS = 2``). The first carries a
 
    one term:   stride [18:7]   level [6:4]   target [3:0]
    resolves to:   field[target] += iv[level] * stride
+
+Word 0 is **full**: 6 + 4*12 + 10 = 64. ``nr`` was 8 bits and bits 63:62 were
+the only spare ones in the design; what they bought is in
+:ref:`tinytpu-margins` below. Word 1 has seven bits spare at three terms and
+none at four, because a fourth term narrows every term to 16 bits
+(``TPU_AGU_TERMS``).
 
 .. list-table:: Opcodes (``microarch_isa.py``)
    :header-rows: 1
@@ -542,6 +547,175 @@ Programs are written against this encoder (by hand, or through ``isa_dsl.py``)
 because the compiler backend that lowers a TOSA matmul into these instructions
 lives only on the ``chia-codesign`` branch; see :doc:`/extensions/act`.
 
+
+.. _tinytpu-margins:
+
+Shapes that do not fit, and tiling them in
+------------------------------------------
+
+Gemmini runs 128x768x768 through ``tiled_matmul_auto``'s own tiling search.
+This design could not address a matrix that size **at all**, and the reason was
+never the datapath: the operands were one ``int8[MAXDIM*MAXDIM]`` region and
+``dma_ld`` opened by copying every DRAM row the program named into an on-chip
+mirror, so a shape had to *fit* the addressable space rather than be tiled into
+it. Every dimension of the gap is now measured, and the shape runs.
+
+What refuses a shape, in order
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Measured by raising each bound until it fires, not by reading the source:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - limit
+     - where it bites
+     - measured
+   * - an address field carries 11 usable bits
+     - ``MAXDIM*MAXDIM/T <= 2047`` operand rows
+     - largest ``MAXDIM``: **88** at T=4, **128** at T=8, **176** at T=16
+       (each the largest multiple of T; ``MAXDIM=92`` at T=4 is refused at
+       import with 2116 operand rows)
+   * - ``nr`` carried 7 usable bits
+     - rows per instruction **and** a loop's trip count
+     - 127. This, not ``MAXDIM``, is what refused the tall sweep
+       K=N=128 at T=8: ``MAXDIM=128`` is legal there, and the B load of
+       K=128 rows is one short
+   * - a header count was read through a 15-bit slice
+     - ``accu`` iterations, ``mm`` rows
+     - 32767. 128x128x128 at T=8 overflows it by exactly one (32768 ``mm``
+       rows)
+   * - the array's two trip counts shared ONE packed chain word
+     - ``T*8`` bits for both
+     - 32767 ``mm`` rows at T=4 however the program is tiled
+
+The first is the only one that is really about addressing. The rest are
+*margins*: fields one bit or one count too narrow, and three of the four have
+now been widened, because the bits were there.
+
+What the two spare bits bought
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Word 0 was 62 of 64 bits used. Widening ``nr`` from 8 to 10 bits (``NR_BITS``,
+a build parameter so the cost can be measured) spends both, raises both
+ceilings it governs from 127 to 511, and fills the word: **any further widening
+must now take bits from another field.** A uniform one-bit widening of the four
+address fields needs four bits and there are none -- ``op`` would have to fall
+from 6 bits to 4, which is below what ten opcodes need under the spare-bit rule,
+so that one costs a third instruction word rather than a rearrangement.
+
+The header counts are 32-bit slices now, which the header words had room for
+at no cost, and the array's two counts travel one per chain word instead of
+sharing one.
+
+Tiling, which is the part no field width reaches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+K=512 wants ``MAXDIM=512``: 65,536 operand rows against the 2,047 an 11-bit
+field carries, 32x short. No widening closes that, and no scratchpad holds the
+operand either. What closes it is that the DRAM geometry became **runtime
+data**:
+
+* ``Dram`` (``microarch_isa.py``) is the geometry one invocation runs against
+  -- rows and columns of each of A, B and C -- and ``assemble`` puts the packed
+  words per DRAM row of each into ``imem[7]``;
+* ``dma_ld`` and ``dma_st`` address DRAM at ``((f1 + r) * wpr + f2) * T + lane``
+  with ``wpr`` from that header, so a program names a tile of a matrix of any
+  size. The on-chip mirror is gone with them: it bounded the problem by BRAM,
+  and it read whole DRAM rows when a tiled GEMM names one column block of each.
+* ``isa_ref.run`` takes the same geometry and **nothing else about it changed**,
+  which is the freeze boundary working as intended: a stride resolved in the
+  address generator leaves every instruction's meaning alone, where the same
+  stride resolved in a unit's decode would have changed what a field value
+  means.
+
+``isa_dsl.gemm_tiled(M, K, N)`` is the mapping, and it is 14 static
+instructions at every shape from 8x8x8 to 128x768x768 -- the same 14 -- because
+the loop nest counts tiles.
+
+The fourth address term and the fifth loop level were not needed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The expectation was that large shapes would need ``AGU_TERMS`` 3 -> 4 and
+``LOOP_DEPTH`` 4 -> 5 along with the runtime stride. Measured on the emitted
+programs, the shipped tiled nest's worst instruction carries **2 of the 3
+address terms** and its nest is **3 of the 4 levels deep**, at 16x128x16, at
+32x512x128 and at 128x768x768 alike. Neither is needed for a shape to be
+*legal*.
+
+They are needed for a shape to be *fast*. The tiled nest holds one output
+column block in the accumulator, so it re-reads the A tile once per column
+block of C -- DRAM traffic ``M*K*N/T``, which is what the 2 KB of operand
+vregs costs. The mapping that amortises it keeps ``nb`` column blocks resident,
+and its B load then needs four terms (the n group, the block within it, the
+k-tile row, and the scratchpad base): ``isa_dsl`` refuses it with
+``code="AGU_TERMS"``. So the fourth term is a **prerequisite for a better
+mapping, not for a legal one**, and the fifth loop level is not a prerequisite
+for either -- that nest is still four levels deep. Where a fifth level does
+become necessary is a trip count past 511, which must then be factored into two
+nested loops.
+
+What it measured
+~~~~~~~~~~~~~~~~
+
+One RTL build, ``T=4``, ``MAXDIM=64``, ``xcu280``, 3.33 ns target. The square
+sweep is the published one; the tiled rows are shapes the square program cannot
+express on this build at all.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - mirror + BRAM (``origin/main``)
+     - per-row ``m_axi``, runtime geometry
+   * - 4x4x4
+     - 218
+     - **178**
+   * - 8x8x8
+     - 357
+     - **262**
+   * - 12x12x12
+     - 563
+     - **416**
+   * - 16x16x8
+     - 677
+     - **478**
+   * - 16x16x16
+     - 879
+     - **696**
+   * - tiled 16x128x16
+     - not expressible (K > MAXDIM)
+     - **4305**
+
+Resources and the estimated clock, same two builds:
+
+.. list-table::
+   :header-rows: 1
+
+   * - build
+     - BRAM
+     - DSP
+     - FF
+     - LUT
+     - estimated clock
+   * - ``origin/main``
+     - 52
+     - 14
+     - 17488
+     - 26554
+     - 2.431 ns
+   * - this one
+     - 44
+     - 18
+     - 20087
+     - 27868
+     - 2.431 ns
+
+The clock does not move. The mirror's two buffers account for the eight BRAM
+returned; the four DSP are the runtime ``row * words_per_row`` multiply on the
+three DMA paths. The LUT delta is inside the 1.5k noise floor two builds of an
+identical netlist showed; the FF delta is not.
 
 Hardware parameters
 -------------------
