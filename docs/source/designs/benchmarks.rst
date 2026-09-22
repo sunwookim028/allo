@@ -340,6 +340,100 @@ Two things to read off this, and they pull in opposite directions:
   steady-state set would need to start where this one ends.
 
 
+.. _benchmarks-msweep:
+
+Does utilisation move with M? Yes --- we amortise
+=================================================
+
+An M-sweep at fixed K=N=64, everything else held, run at both array sizes.
+This answers a question **neither** project had measured, and it was asked
+because MiniTPU's own M-sweep came out **flat**.
+
+.. list-table:: M-sweep, K=N=64, one ``csynth`` per T, every shape bit-exact
+   :header-rows: 1
+   :widths: 8 10 12 12 12 14 16
+
+   * - M
+     - joint?
+     - T=4 cycles
+     - **% of 16**
+     - T=8 cycles
+     - **% of 64**
+     - MACs
+   * - 16
+     - ours alone
+     - 6 891
+     - **59.4%**
+     - 2 539
+     - **40.3%**
+     - 65 536
+   * - 32
+     - **joint**
+     - 11 952
+     - **68.5%**
+     - 4 048
+     - **50.6%**
+     - 131 072
+   * - 64
+     - **joint**
+     - 22 123
+     - **74.1%**
+     - 7 083
+     - **57.8%**
+     - 262 144
+
+**Utilisation rises monotonically with M at both array sizes.** We amortise.
+
+**The mechanism, and it is the predicted one.** The numbers are a straight
+line in M with a single fixed intercept:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - fixed term
+     - marginal, cycles per M row
+     - fixed as % at M=16
+     - at M=64
+   * - T=4
+     - **1 782**
+     - 317.8
+     - 25.9%
+     - 8.1%
+   * - T=8
+     - **1 014**
+     - 94.8
+     - 39.9%
+     - 14.3%
+
+Fitted on M=32 and M=64, the model predicts M=16 to within 24 cycles (T=4)
+and 8 cycles (T=8) --- so the fixed term is paid **once per call**, not once
+per row block, which is exactly what "one program per call with M as an
+internal loop bound" predicts. Tripling M does not triple the fixed cost; it
+divides it.
+
+.. important::
+
+   **What this licenses, and what it does not.** MiniTPU is flat at 33.6%
+   across M=32, 64 and 128, with an identified cause: an emitter issuing one
+   launch per 32 rows, each re-paying the whole fixed term. We are not flat.
+   **So flatness is not a property of how these machines re-enter a launch ---
+   it is specific to that emitter**, and carrying the row-block loop inside
+   the launch would make their structure ours.
+
+   But the comparison is of an **axis, not of shapes**: our sweep is at
+   K=N=64 and theirs at K=N=128, because 128 is past our ceiling
+   (:ref:`benchmarks-workload`) and M=16 is below their 32-row floor. "Does
+   utilisation move with M" is answerable on each machine independently and
+   that is what makes the finding joint; the *numbers* are not comparable
+   across the two columns. Only M ∈ {32, 64} exists on both machines at all,
+   and even there the fixed K and N differ.
+
+   For orientation and not as a comparison, Gemmini over its own M range goes
+   80.7 -> 86.1 -> 95.1% at DIM=4 and 47.3 -> 58.3 -> 79.0% at DIM=16 --- it
+   amortises too, and harder than we do.
+
+
 .. _benchmarks-raising-maxdim:
 
 Raising the build: what a bigger MAXDIM costs
@@ -377,13 +471,13 @@ Found by raising MAXDIM until each fired:
      - how it fails
    * - address field, 11 usable bits
      - :math:`\text{MAXDIM}^2/T \le 2047`
-     - MAXDIM <= 90
+     - MAXDIM <= 88 (90 unrounded; MAXDIM is a multiple of T)
      - MAXDIM=96: ``check_program``, "AGU-resolved f3=2112 is outside the
        0..2047 range"
    * - header count, 15-bit slice
      - :math:`\text{MAXDIM}^3/T^2 + \text{MAXDIM}^2/T \le 32767`
        (``accu``'s iteration count)
-     - MAXDIM <= 76
+     - MAXDIM <= 76 for a cubic shape
      - MAXDIM=80: ``assemble``, "header count 33600 does not fit 15 bits"
 
 **MAXDIM=64 is the largest round value inside both**, and it is asserted at
@@ -548,6 +642,22 @@ work. Verbatim:
    isa_dsl.py                    generated == hand-written, word for word
    kpn_model.py                  KPN OK
    pytest tests/act/             98 passed, 4 skipped
+
+.. note::
+
+   **The first ASIC number, and it describes the current design.** DC on
+   FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
+   (T=4, MAXDIM=16) comes out at **1,136,598** standard-cell area, timing MET
+   at +0.21 ns with zero violating and zero hold paths. That **replaces**
+   1,271,692 from an earlier export of a superseded netlist --- **-10.6%** ---
+   and the reason is the same memory-sizing change that took BRAM 42 -> 40 and
+   one cycle off the fixed term (:ref:`benchmarks-one-cycle`). The design got
+   smaller *and* slightly faster, and area and cycles now describe the same
+   design, which they did not before.
+
+   Read it only against our own variants synthesised identically. A 45 nm
+   cell area has no relationship to a BRAM count, and with memories as
+   registers it says as much about the memory treatment as about the datapath.
 
 ``mutate.py`` is the one that matters most here, because ``bench_isa`` and
 ``stress_isa`` both cite it as the evidence that they catch a broken design,
@@ -1314,7 +1424,8 @@ What the widening costs, at every latency (it does not vary with the knob):
      - 31 396
      - **116**
      - 14
-     - 2.431 ns
+     - 2.431 ns (dual-ported form; see the warning below --- the shipped
+       variant of this experiment is banked)
    * - delta
      - +6 513 (+37%)
      - +4 842 (+18%)
@@ -1326,6 +1437,84 @@ The clock not moving is worth stating: widening the DMA datapath **does not
 lengthen the critical path**, so the comparison is a pure cycles-for-area
 trade and the two columns can be compared in cycles without converting. The
 BRAM more than doubles, which is the real price.
+
+.. warning::
+
+   **The +123% BRAM and an ASIC elaboration failure are the same fact seen
+   from two substrates, and that changes what the decision is.**
+
+   The widened variant does not synthesise to standard cells. DC rejects it in
+   two minutes --- ``ELAB-366: Net 'ram[0][31]' ... driven by more than one
+   source``, across all 32 bits --- because Vitis satisfies the widened loop's
+   ``DMA_WORDS`` writes per iteration by emitting ``rbA`` as a **true
+   dual-write-port RAM**: two ``always @(posedge clk)`` blocks driving one
+   array, while still naming the module ``_1R1W``. Every RAM in all four
+   exported variants was checked and **it is the only two-write-port memory
+   anywhere; it exists only in the widened build.**
+
+   An FPGA block RAM has two independent write ports, so filling both per
+   cycle is free. **Standard cells have no such primitive**, and with memories
+   mapped to registers two unconditioned writers of one array is a genuine
+   multi-driver. DC is right to refuse it, and the synthesis side is right to
+   report it as not synthesisable rather than bodging a flip-flop dual port:
+   that would be a number describing hardware nobody would build.
+
+   So landing the widening is **not** "spend BRAM to buy cycles". It is
+   "**commit to a dual-write-port memory**", which is a different commitment
+   with different consequences for anyone carrying this design to another
+   substrate. The BRAM number alone does not say that, which is why it is
+   written here beside it.
+
+   **Measured, and the widening survives without the primitive.** The buffers
+   are now **cyclically banked by** ``DMA_WORDS``, so write ``w`` always lands
+   in bank ``w`` and every bank has exactly one writer --- the same widening
+   expressed in a way both substrates can build. The result is the strongest
+   of the three possible outcomes:
+
+   .. list-table::
+      :header-rows: 1
+
+      * - build
+        - 48^3
+        - 64^3
+        - rbA write ports
+        - FF
+        - LUT
+        - BRAM
+      * - shipped (``DMA_WORDS=1``)
+        - 10 289
+        - 22 123
+        - 1
+        - 17 488
+        - 26 554
+        - 52
+      * - widened, dual-ported
+        - 9 569
+        - 21 163
+        - **2 (DC rejects)**
+        - 24 001
+        - 31 396
+        - 116
+      * - **widened, banked**
+        - **9 569**
+        - **21 163**
+        - **1**
+        - 25 026
+        - 33 799
+        - **100**
+
+   **Identical cycles, to the cycle.** Banking keeps the entire -720 / -960,
+   so **the gain was the widening and not the second write port** --- the
+   optimisation is real and it is portable. Audited across every RAM module in
+   the build: all seven have one write port, where the rejected export's
+   ``rbA`` had two. The ``ELAB-366`` cause is removed rather than worked
+   around.
+
+   It also costs *less* block RAM than the dual-ported form (+92% over the
+   shipped control rather than +123%), trading that for +43% FF and +27% LUT.
+   So the decision is back on the table on its merits, and what it now reads
+   as is: **-720 / -960 cycles for +43% FF, +27% LUT, +92% BRAM, at an
+   unchanged clock, on a design that synthesises to standard cells.**
 
 (The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
 parametric burst buffers carry ``DMA_WORDS`` words of rounding headroom in
@@ -1636,13 +1825,64 @@ i.e. **M=128, K=768, N=768**. (The fused QKV projection is the same M and K
 with N=2304, three times the work; the MLP is 768->3072->768. The output
 projection is chosen because it is the smallest square one.)
 
-**What our build would need to run it.** Not a bigger MAXDIM: 768 is past both
-encoding ceilings by orders of magnitude (:math:`768^2/4 = 147\,456` operand
-rows against 2047), and M=128 is already past ``MAXROWS`` = 127. The real
-blocker is that the region's operands are declared ``int8[MAXDIM * MAXDIM]``
-and addressed ``row * MAXDIM + col``, so the machine cannot *address* a
-128x768 matrix at all, whatever its on-chip capacity. Three changes, in
-dependency order:
+**Which dimension binds first, and at what value.** "We cannot run
+128x768x768" is true and useless; what a reader needs is the binding dimension
+and its number, because that is what says which field to widen. Derived from
+the encoding rules, not estimated:
+
+.. list-table:: Ceilings, largest legal value (MAXDIM must be a multiple of T)
+   :header-rows: 1
+   :widths: 30 22 16 16 16
+
+   * - limit
+     - what it bounds
+     - T=4
+     - T=8
+     - T=16
+   * - address field, 11 usable bits
+       (:math:`\text{MAXDIM}^2/T \le 2047`)
+     - **MAXDIM**, hence M, K and N together
+     - **88**
+     - **120**
+     - **176**
+   * - ``nr``, 7 usable bits (``MAXROWS``)
+     - any single instruction's row count, so M and K
+     - 127
+     - 127
+     - 127
+   * - header count, 15 usable bits
+     - ``accu`` iterations,
+       :math:`(N/T)(K/T)M + (N/T)M`
+     - shape-dependent
+     - shape-dependent
+     - shape-dependent
+
+So **the address field binds first, through MAXDIM, at 88 (T=4) and 120
+(T=8)** --- and note that ``nr``'s 127 is *not* a function of T, so it becomes
+the wall as soon as the array is wide enough to push MAXDIM past it.
+
+Against the shapes another team proposed, this is precise rather than
+approximate:
+
+* **32 x 512 x 128** (their recommended single shape). K=512 needs
+  MAXDIM >= 512: we are short **5.8x** at T=4 and **4.3x** at T=8 on the
+  address field, **4.0x** on ``nr``, and 4.0x / 1.0x on the header count.
+* **K-sweep at M=32, N=128.** Raising MAXDIM to match K, the first failure is
+  at **K=92** (T=4) and **K=128** (T=8), in both cases the address field;
+  last good K is 88 and 120.
+* **Tall sweep at K=N=128.** Blocked for *every* M, because N=128 alone
+  exceeds the MAXDIM ceiling --- at T=8 by **eight** (120 against 128). And
+  M=128 additionally exceeds ``nr`` by **one** (127 against 128).
+
+Those last two are worth stating as margins rather than as failures: at T=8 we
+miss their tall sweep by 8 in one dimension and by 1 in another.
+
+**What our build would need to run the GPT-2 shape.** Not simply a bigger
+MAXDIM --- 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
+is that the region's operands are declared ``int8[MAXDIM * MAXDIM]`` and
+addressed ``row * MAXDIM + col``, so the machine cannot *address* a 128x768
+matrix at all, whatever its on-chip capacity. Three changes, in dependency
+order:
 
 #. **A runtime base and row stride on** ``dma_ld`` **and** ``mvout``, so a
    MAXDIM=64 on-chip tile is a *window* into a larger DRAM matrix rather than

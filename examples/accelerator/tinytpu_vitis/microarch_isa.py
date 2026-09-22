@@ -518,7 +518,8 @@ QD = int(os.environ.get("TPU_QD", 8))              # stream depth
 #
 #   * an address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so
 #     an operand row must be <= 2047:  MAXDIM*MAXDIM/T <= 2047, i.e. MAXDIM <= 90
-#     at T=4. MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
+#     at T=4 -- and since MAXDIM is a multiple of T the largest legal value is
+#     88 (120 at T=8, 176 at T=16). MAXDIM=96 fails in `check_program` with "AGU-resolved f3=2112 is
 #     outside the 0..2047 range".
 #   * a header count is read back through a 15-bit slice, and the largest is
 #     `accu`'s iteration count, MAXDIM^3/T^2 + MAXDIM^2/T for a cubic GEMM, so
@@ -1676,6 +1677,26 @@ def schedule(s):
     s.partition(f"{top}:B", Partition.Cyclic, dim=2, factor=T)
     s.partition(f"{top}:C", Partition.Cyclic, dim=2, factor=T)
     s.partition("sequencer_0:ib", Partition.Cyclic, dim=1, factor=8)
+    # ---- THE OPERAND BURST BUFFERS, AND WHY THIS PARTITION EXISTS ----
+    # At DMA_WORDS > 1 the burst loop's `meta_for` unrolls to DMA_WORDS writes
+    # of `rbA`/`rbB` per iteration. Left alone, Vitis satisfies that by giving
+    # the array TWO WRITE PORTS -- it emits two `always @(posedge clk)` blocks
+    # driving the same RAM while still naming the module `_1R1W`.
+    #
+    # On an FPGA that is free: a block RAM has two independent write ports.
+    # On standard cells it is not: with memories mapped to registers, two
+    # unconditioned writers of one array is a genuine multi-driver, and DC
+    # rejects it (`ELAB-366: Net 'ram[0][31]' driven by more than one
+    # source`). It was the only two-write-port RAM in any variant.
+    #
+    # Banking says the same thing in a way both substrates can build: write
+    # `w` always lands in bank `w`, so every bank has ONE writer. The widening
+    # is then a property of the loop rather than of a memory primitive that
+    # happens to be free on one target. Whether it survives the change is
+    # measured, not assumed -- see docs/source/designs/benchmarks.rst.
+    if DMA_WORDS > 1:
+        s.partition("dma_ld_0:rbA", Partition.Cyclic, dim=1, factor=DMA_WORDS)
+        s.partition("dma_ld_0:rbB", Partition.Cyclic, dim=1, factor=DMA_WORDS)
     s.dependence(
         "accu_0:x",
         "ar",
