@@ -85,7 +85,12 @@ examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim:
 `TPU_TB=stress python cosim.py` are the **correctness** gates. Run
 `stress_isa.py` (~10 s) after any change to `microarch_isa.py` or anything
 under `ip/`, and `mutate.py` after any change to the harness or any move of
-anchored code (a mutant's anchor must occur exactly once across the design). `assemble()` rejects programs that
+anchored code (a mutant's anchor must occur exactly once across the design).
+The ISA itself is `isa_spec.json`: `gen_isa.py --write` regenerates
+`isa_encoding.py` and the tables in `tinytpu_isa.rst`, and `gen_isa.py
+--check` (a `reproduce.sh` stage) holds the spec, the design's constants, the
+layout in `ip/isa.py`, the hardware's bit slices in `ip/units/` and the
+reference model to each other. `assemble()` rejects programs that
 read `ar`/`vr`/`spad` before writing them (the arrays are not cleared by
 hardware), and programs that read an `ar` row within `AR_RAW_DIST` accu
 iterations of writing it: `accu`'s II=1 rests on an `s.dependence` claim
