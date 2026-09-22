@@ -1193,7 +1193,7 @@ Since the fix recorded in :ref:`limitation-11` the simulator sizes its OpenMP
 team to the section count itself, so ``OMP_NUM_THREADS=8`` runs the 38-process
 design. ``kpn_model.py`` is driven by the assembled header (``ef112868``);
 every shipped program completes in it at FIFO depth **1**. See
-:doc:`/developer/toolchains` for ``LLVM_BUILD_DIR`` and the Vitis install.
+``dev/toolchains.rst`` for ``LLVM_BUILD_DIR`` and the Vitis install.
 Older reproduce instructions, and the thread count the recorded numbers were
 produced at, are in `Earlier measurements and corrections`_.
 

@@ -195,14 +195,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API</span></p>
 <ul>
@@ -259,7 +251,7 @@ free-running-loop fix (<code class="docutils literal notranslate"><span class="p
 <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code> netlists used by <code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/</span></code> survive
 only in its history, at <code class="docutils literal notranslate"><span class="pre">0eff4888:agents/noc/rtl/&lt;design&gt;/rtl.v</span></code> (<code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> names the same
 files as <code class="docutils literal notranslate"><span class="pre">779e4350^:agents/noc/rtl/{pe_wire,pe_stream,pe_channel}/rtl.v</span></code>). Branch layout for all
-remotes is in <a class="reference internal" href="../developer/fork_maintenance.html"><span class="doc">Fork Maintenance and Upstream Merging</span></a>.</p>
+remotes is in <code class="docutils literal notranslate"><span class="pre">dev/fork_maintenance.rst</span></code>.</p>
 <section id="allomempins-a-dual-port-ram-instantiated-once-per-client">
 <h3><code class="docutils literal notranslate"><span class="pre">AlloMemPins</span></code>: a dual-port RAM, instantiated once per client<a class="headerlink" href="#allomempins-a-dual-port-ram-instantiated-once-per-client" title="Link to this heading"><span>¶</span></a></h3>
 <div class="admonition important">
@@ -468,7 +460,7 @@ sorted. The 76 xsim work directories are not kept – they are ~29 MB and regene
 <code class="docutils literal notranslate"><span class="pre">CDS_LIC_FILE</span></code> to <code class="docutils literal notranslate"><span class="pre">5280&#64;en-license-05.coecis.cornell.edu</span></code>, finds <code class="docutils literal notranslate"><span class="pre">xrun</span></code> at
 <code class="docutils literal notranslate"><span class="pre">/opt/cadence/XCELIUM2403/tools.lnx86/bin/xrun</span></code> (override with <code class="docutils literal notranslate"><span class="pre">XRUN</span></code>), and resolves Catapult
 library cells from <code class="docutils literal notranslate"><span class="pre">$MGC_HOME/pkgs/siflibs</span></code>. Xcelium is installed on zhang-21, <strong>not</strong> on
-<code class="docutils literal notranslate"><span class="pre">ace-01</span></code> (see <a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>).</p>
+<code class="docutils literal notranslate"><span class="pre">ace-01</span></code> (see <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>).</p>
 <p>On zhang-21 with Xcelium 24.03 (<code class="docutils literal notranslate"><span class="pre">710ab138</span></code>, 2026-09-18), <strong>all 75 cases in</strong> <code class="docutils literal notranslate"><span class="pre">results.txt</span></code>
 <strong>reproduce</strong>: <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> and <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code> pass all 18 pacings each, <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> fails 8/8 at
 all 18 in 12 cycles (<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">0</span> <span class="pre">0</span> <span class="pre">2</span> <span class="pre">2</span> <span class="pre">10</span> <span class="pre">10</span> <span class="pre">28</span></code>), the lockstep control over <code class="docutils literal notranslate"><span class="pre">ACC_RST_DELAY</span></code> 0..6
@@ -609,7 +601,7 @@ was added and then removed.</p>
 reasoning then was: market niche (automotive/defense, Siemens-adjacent shops); not a standard
 research-community reference tool; Cadence Stratus is the stronger competitor for ASIC research
 citations; CIRCT (MLIR-native, Google/Intel-backed) has the better long-term trajectory. The
-synthesis results it rested on are in <a class="reference internal" href="../records/catapult_decoupled_2x1.html"><span class="doc">Catapult Synthesis Record: top_decoupled_2x1</span></a> (<code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code>,
+synthesis results it rested on are in <code class="docutils literal notranslate"><span class="pre">dev/records/catapult_decoupled_2x1.rst</span></code> (<code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code>,
 1 MT + 2 CTs: CT latency 295 cycles each, MT 67, 657 sequential, throughput 298 cycles, area scores
 CT0=14991, CT1=14991, MT=16180 at Catapult 2024.2, <code class="docutils literal notranslate"><span class="pre">nangate-45nm_beh</span></code>, 500 MHz).</p>
 <p><strong>Reopened 2026-09-18. Both halves of that decision moved:</strong></p>
@@ -637,7 +629,7 @@ per-module scheduling model (determinacy class, latency, per-port bank/factor/la
 so is directly relevant to <a class="reference internal" href="../developer/limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>’s conclusion that the SystemC path lacks one. It is
 a partial answer: the four <code class="docutils literal notranslate"><span class="pre">counted_static</span></code> units carry latencies, while the top and both DMA
 units are <code class="docutils literal notranslate"><span class="pre">indeterminate</span></code> with none – the data-dependent units a delay line actually has to
-schedule against. (See also <a class="reference internal" href="../developer/fork_maintenance.html"><span class="doc">Fork Maintenance and Upstream Merging</span></a> on whether <code class="docutils literal notranslate"><span class="pre">main</span></code> ever tracked
+schedule against. (See also <code class="docutils literal notranslate"><span class="pre">dev/fork_maintenance.rst</span></code> on whether <code class="docutils literal notranslate"><span class="pre">main</span></code> ever tracked
 <code class="docutils literal notranslate"><span class="pre">externals/circt</span></code>.)</p></li>
 </ul>
 </section>

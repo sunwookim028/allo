@@ -195,14 +195,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API</span></p>
 <ul>
@@ -1480,7 +1472,7 @@ a field GEMM never varies. <code class="docutils literal notranslate"><span clas
 team to the section count itself, so <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code> runs the 38-process
 design. <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> is driven by the assembled header (<code class="docutils literal notranslate"><span class="pre">ef112868</span></code>);
 every shipped program completes in it at FIFO depth <strong>1</strong>. See
-<a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a> for <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> and the Vitis install.
+<code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code> for <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> and the Vitis install.
 Older reproduce instructions, and the thread count the recorded numbers were
 produced at, are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> first asserts that the generated program is bit-identical to

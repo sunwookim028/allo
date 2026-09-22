@@ -24,7 +24,7 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Development Environment and Toolchains" href="toolchains.html" />
+    <link rel="next" title="Schedule Primitives" href="../api/index.html" />
     <link rel="prev" title="Dataflow Simulation Semantics: Allo vs HLS CSIM" href="dataflow_semantics.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
@@ -195,14 +195,6 @@
 <li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Dataflow Region Pitfalls</a></li>
-<li class="toctree-l1"><a class="reference internal" href="toolchains.html">Development Environment and Toolchains</a></li>
-<li class="toctree-l1"><a class="reference internal" href="fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API</span></p>
 <ul>
@@ -256,7 +248,7 @@ maps to an AXI-MM pointer (<code class="docutils literal notranslate"><span clas
 <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_df_unit.py::test_region_bare_scalar_arg</span></code> no longer
 exists.</p></li>
 <li><p>The auto-capture → <code class="docutils literal notranslate"><span class="pre">s_axilite</span></code> redesign is still open. It is item 4 of the
-hierarchical-region design record (<a class="reference internal" href="../records/hierarchical_regions.html"><span class="doc">Hierarchical Regions: Design Record</span></a>) and
+hierarchical-region design record (<code class="docutils literal notranslate"><span class="pre">dev/records/hierarchical_regions.rst</span></code>) and
 is tracked in fork issue #7.</p></li>
 </ul>
 </section>
@@ -273,7 +265,7 @@ is a Python/OpenMP interaction issue, not an Allo bug.</p>
 <p>This section used to say the conda <code class="docutils literal notranslate"><span class="pre">allo</span></code> env “already sets <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code>” to
 <code class="docutils literal notranslate"><span class="pre">/work/shared/common/llvm-project-main/build-rhel8</span></code> and must not be overridden.
 <strong>That is false on this host and contradicted</strong> <code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code><strong>, which is right</strong>
-(its environment notes now live in <a class="reference internal" href="toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>).
+(its environment notes now live in <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>).
 Checked directly:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ conda activate allo &amp;&amp; echo "${LLVM_BUILD_DIR:-&lt;unset&gt;}"
 &lt;unset&gt;
@@ -357,7 +349,7 @@ reproducer and a compiler fix, not a rewrite of the kernel to dodge them:</p>
 
             <div class="right">
                 
-                    <a href="toolchains.html"><span>Development Environment and Toolchains</span><span class="icon">&gt;</span></a>
+                    <a href="../api/index.html"><span>Schedule Primitives</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

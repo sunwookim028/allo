@@ -195,14 +195,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/toolchains.html">Development Environment and Toolchains</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../developer/fork_maintenance.html">Fork Maintenance and Upstream Merging</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Measurement Records</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../records/catapult_decoupled_2x1.html">Catapult Synthesis Record: <code class="docutils literal notranslate"><span class="pre">top_decoupled_2x1</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/vitis_nb_streams.html">Vitis HLS Record: Non-Blocking Streams and the Decoupled Mesh</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../records/hierarchical_regions.html">Hierarchical Regions: Design Record</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API</span></p>
 <ul>
@@ -410,7 +402,7 @@ Runs Catapult HLS synthesis to generate RTL. This mode invokes the Catapult tool
 dataflow designs with it. Catapult is installed on one server the project uses,
 <code class="docutils literal notranslate"><span class="pre">zhang-21.ece.cornell.edu</span></code> (RHEL 8.10, glibc 2.28), and all Catapult synthesis runs there. It is
 <strong>not</strong> installed on <code class="docutils literal notranslate"><span class="pre">ace-01</span></code>, the host where most other work in this fork is done (see
-<a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>).</p>
+<code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>).</p>
 <section id="installation">
 <h3>Installation<a class="headerlink" href="#installation" title="Link to this heading"><span>¶</span></a></h3>
 <p>Two versions are installed under <code class="docutils literal notranslate"><span class="pre">/opt/siemens/catapult/</span></code>:</p>
@@ -590,7 +582,7 @@ reference to another:</p>
 <p><strong>FIFO depth inference.</strong> With block synthesis Catapult selects FIFO depth automatically from the
 throughput ratio of producer and consumer. Example: MT throughput 69 cycles, CT throughput 298
 cycles -&gt; ratio 4.3x -&gt; Catapult infers depth=16 to buffer a full burst without stalling. The full
-per-module results for that design are in <a class="reference internal" href="../records/catapult_decoupled_2x1.html"><span class="doc">Catapult Synthesis Record: top_decoupled_2x1</span></a>.</p>
+per-module results for that design are in <code class="docutils literal notranslate"><span class="pre">dev/records/catapult_decoupled_2x1.rst</span></code>.</p>
 </section>
 <section id="reading-the-reports">
 <h3>Reading the Reports<a class="headerlink" href="#reading-the-reports" title="Link to this heading"><span>¶</span></a></h3>
@@ -685,7 +677,7 @@ An earlier revision of these notes said the conda <code class="docutils literal 
 <code class="docutils literal notranslate"><span class="pre">build-rhel8</span></code> and must not be overridden. <strong>That was corrected on 2026-09-18</strong>: neither
 <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">allo</span></code> nor <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">run</span></code> sets <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code>, and the simulator asserts
 <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">set</span></code> without it. Export it yourself, pointing at the build appropriate
-for the host (see <a class="reference internal" href="../developer/pitfalls.html"><span class="doc">Dataflow Region Pitfalls</span></a> and <a class="reference internal" href="../developer/toolchains.html"><span class="doc">Development Environment and Toolchains</span></a>), and build the
+for the host (see <a class="reference internal" href="../developer/pitfalls.html"><span class="doc">Dataflow Region Pitfalls</span></a> and <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>), and build the
 project with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-v</span> <span class="pre">-e</span> <span class="pre">.</span></code>.</p>
 <p>The end-to-end driver the earlier bring-up used, <code class="docutils literal notranslate"><span class="pre">tests/dataflow/catapult_synth_decoupled_2x1.py</span></code>
 (<code class="docutils literal notranslate"><span class="pre">--mode</span> <span class="pre">codegen</span> <span class="pre">|</span> <span class="pre">csyn</span> <span class="pre">|</span> <span class="pre">ppa</span></code>), is not in the tree; it stayed on the deleted
@@ -699,7 +691,7 @@ project with <code class="docutils literal notranslate"><span class="pre">pip</s
 <li><p><strong>The C++ emitter</strong> (this backend: <code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitCatapultHLS.cpp</span></code>,
 <code class="docutils literal notranslate"><span class="pre">allo/backend/catapult.py</span></code>) came from upstream PR #543 (Feb 2026). This fork added
 non-blocking stream support to it (2026-04-14) and the synthesis bring-up recorded in
-<a class="reference internal" href="../records/catapult_decoupled_2x1.html"><span class="doc">Catapult Synthesis Record: top_decoupled_2x1</span></a>. It emits <code class="docutils literal notranslate"><span class="pre">ac_channel</span></code> C++.</p></li>
+<code class="docutils literal notranslate"><span class="pre">dev/records/catapult_decoupled_2x1.rst</span></code>. It emits <code class="docutils literal notranslate"><span class="pre">ac_channel</span></code> C++.</p></li>
 <li><p><strong>The SystemC emitter</strong> lives on a separate fork, <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code>, with a
 different type set – <code class="docutils literal notranslate"><span class="pre">Stream</span></code> / <code class="docutils literal notranslate"><span class="pre">Channel</span></code> / <code class="docutils literal notranslate"><span class="pre">Wire</span></code> over MatchLib Connections. It is
 described in <a class="reference internal" href="../extensions/catapult_systemc.html"><span class="doc">Catapult SystemC Flow and the Wire</span></a>.</p></li>
