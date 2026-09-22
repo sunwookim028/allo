@@ -1179,6 +1179,23 @@ This is the cycle-domain analogue of the synthesis noise floor recorded in
 LUT and 0.046 ns. Both say the same thing: **state the noise before stating the
 difference**, and say which measurement the noise belongs to.
 
+**Verify determinism once per configuration rather than assuming it.** One extra
+run per configuration — not per data point — and confirm the counts are
+identical. The reason is not sampling: it is that a simulator figure which turns
+out *not* to be deterministic would undermine every comparison drawn from it,
+and that is much better discovered in a two-run check than in a disagreement
+with someone else's table hours later. Our cosim has effectively passed this
+already, through the alignment variant's independent re-measurement reproducing
+every number to the cycle, but a new configuration has not.
+
+And the trap on the far side of determinism, which is the more dangerous one: **a
+simulator number can be perfectly reproducible and still wrong about hardware.**
+Ours contains no memory system at all, and MiniTPU's contains a fitted one — the
+92-cycle failure recorded above is exactly this, a confident, repeatable
+simulator that ranked designs backwards against the board. Reproducibility is a
+property of the measurement; agreement with hardware is a separate claim needing
+separate evidence.
+
 Do not mix the two benchmarks' columns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
