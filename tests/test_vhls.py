@@ -861,6 +861,50 @@ def test_dependence_pragma():
             )
 
 
+def test_pipeline_style():
+    """`s.pipeline(..., style=)` adds Vitis's pipeline control style to the
+    pragma; without it the pragma is unchanged, and a bad style is refused."""
+
+    def kernel(A: int32[16], B: int32[16]):
+        for i in range(16):
+            B[i] = A[i] + 1
+        for j in range(16):
+            A[j] = B[j] * 2
+
+    s = allo.customize(kernel)
+    s.pipeline("i", style="flp")
+    s.pipeline("j")
+    code = str(s.build(target="vhls"))
+    assert "#pragma HLS pipeline II=1 style=flp" in code, code
+    assert code.count("style=") == 1, code
+    assert "#pragma HLS pipeline II=1\n" in code, code
+    with pytest.raises(Exception, match="stp/flp/frp"):
+        allo.customize(kernel).pipeline("i", style="fast")
+
+
+def test_pipeline_style_is_refused_where_no_emitter_writes_it():
+    """Only the Vivado/Vitis emitter writes `style=`. A style is set to stop an
+    RTL deadlock, so an emitter that would drop it refuses the build and names
+    the loop, rather than producing RTL with the tool's default style."""
+
+    def kernel(A: int32[16], B: int32[16]):
+        for i in range(16):
+            B[i] = A[i] + 1
+
+    for target in ("catapult", "ihls", "tapa"):
+        s = allo.customize(kernel)
+        s.pipeline("i", style="flp")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(RuntimeError, match=r"i \(style=flp\)"):
+                s.build(target=target, mode="csyn", project=tmpdir)
+
+    # An unstyled pipeline reaches every backend as before.
+    s = allo.customize(kernel)
+    s.pipeline("i")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        s.build(target="catapult", mode="csyn", project=tmpdir)
+
+
 def test_dependence_pragma_rejects_bad_claims():
     def kernel(A: int32[16]):
         for i in range(16):
