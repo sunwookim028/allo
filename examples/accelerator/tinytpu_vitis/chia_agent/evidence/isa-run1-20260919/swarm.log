@@ -1,0 +1,19 @@
+pre-flight OK: this run will charge billing account 01BF39-94AA3F-36BACB (CHIA2026) through project chia2026-tinytpu (#762944961825); model google-vertex/gemini-3.1-pro-preview @ global
+  CHIA spend on 01BF39-94AA3F-36BACB so far $0.00 (1 sessions, opencode's figures); cap $100.00; remaining $100.00; this run's cap $30.00
+launching worker 'front-end'
+launching worker 'tail'
+worker 'front-end' exited with 0
+worker 'tail' exited with 0
+==============================================================================
+Swarm results (all cycle counts are RTL cosim)
+==============================================================================
+  front-end        iter 1: cosim {'16x16x16': 627, '4x4x4': 172} total 799  ACCEPTED  $5.17
+  front-end        iter 2: FAILED at gate:bench_isa  rejected  $0.00
+  tail             iter 1: cosim {'16x16x16': 686, '4x4x4': 172} total 858  rejected  $1.20
+  tail             iter 2: cosim {'16x16x16': 686, '4x4x4': 176} total 862  rejected  $0.00
+
+  baseline {'16x16x16': 686, '4x4x4': 172}
+  best     {'worker': 'front-end', 'iteration': 1, 'total': 799, 'cycles': {'16x16x16': 627, '4x4x4': 172}}
+  spend    $28.54 (371 model messages); wall 99.9 min
+rc=0
+2026-09-19T18:56:12Z

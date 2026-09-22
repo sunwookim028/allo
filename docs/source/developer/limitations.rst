@@ -38,7 +38,7 @@ Each entry keeps its dated corrections and retractions in place rather than
 rewriting them away.
 
 Related feature-gap tracking lives as fork issues and is not restated here:
-combinational wires (fork issue #9), HLS dependence pragma (fork issue #10),
+combinational wires (fork issue #9), HLS <<REDACTED>> (fork issue #10),
 shared mutable memory across kernels (fork issue #11; relates to items 1-2),
 streams as top-level inputs (fork issue #12), and the nested sub-region Stream
 compile-time-constant shape constraint (fork issue #4; item :ref:`H <limitation-h>`). The
@@ -201,7 +201,7 @@ Open
    * - :ref:`21 <limitation-21>`
      - REPRODUCES
      - frontend, emitter
-     - No schedule primitive and no emitter path for ``#pragma HLS dependence``.
+     - No schedule primitive and no emitter path for ``<<REDACTED>>
      - **priced**: 35 cycles at 16x16x16 on the shipped design (5 at 4x4x4); 95
        once the design fixes are in. The pragma form costs 1,744 FF in
        ``accu`` against 17,438 for the reverted rotation.
@@ -461,7 +461,7 @@ Priority annotations below were folded in from the former root ``STATE.md``
 fork-vs-upstream feature map is the pinned fork issue
 https://github.com/sunwookim028/allo/issues/13). Related feature-gap tracking
 lives as fork issues and is
-not restated here: combinational wires (fork issue #9), HLS dependence pragma
+not restated here: combinational wires (fork issue #9), HLS <<REDACTED>>
 (fork issue #10), shared mutable memory across kernels (fork issue #11; relates
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
 nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
@@ -1168,14 +1168,14 @@ compile:
 
 .. _limitation-21:
 
-21. No ``#pragma HLS dependence`` primitive, so a false dependence cannot be asserted away
+21. No ``<<REDACTED>>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. admonition:: Status (re-verified 2026-09-19)
 
    REPRODUCES, and now **priced** (below and :ref:`gemmini-gap-attribution`).
 
-Vitis takes ``#pragma HLS dependence variable=x inter false`` for exactly the case
+Vitis takes ``<<REDACTED>>
 where the scheduler cannot prove two accesses are independent but the author
 can. **Allo emits no dependence pragmas and has no primitive for one** -- the
 only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
@@ -1196,7 +1196,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   with T while the 2.3% does not. The shipped design is back to the nested form
   at II=2.
 - **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
-  ``#pragma HLS dependence variable=ar inter false`` into the emitted
+  ``<<REDACTED>>
   ``kernel.cpp`` (``v_accudep`` on branch ``impact-limits``) measures **35
   cycles** at 16x16x16 on the shipped design (919 -> 884; 5 at 4x4x4), and **95**
   once the design fixes are in (``v_design_dep``). The pragma form costs
@@ -1207,7 +1207,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
 - So the missing primitive is not cosmetic: it is the difference between a
   one-line assertion and a hardware redesign with a real area price.
 - **Priority: Medium-High.** It is the standard HLS escape hatch for II
-  problems and Allo cannot reach it. A ``s.dependence(...)`` primitive alongside
+  problems and Allo cannot reach it. A ``<<REDACTED>>
   the existing ``s.partition(...)`` is the natural shape.
 
 .. _limitation-22:
@@ -1384,7 +1384,7 @@ Not emitted by **any** emitter -- zero hits, not "hard to reach":
 - ``#pragma HLS latency`` (the only ``latency`` hits in ``allo/`` are report
   *parsing*, ``allo/backend/report.py``, ``catapult.py:286``).
 - ``#pragma HLS protocol``.
-- ``#pragma HLS dependence`` -- see :ref:`item 21 <limitation-21>`, where the cost of its absence is
+- ``<<REDACTED>>
   measured; not restated here.
 - ``#pragma HLS resource`` survives only as dead comment
   (``EmitVivadoHLS.cpp:2756``).

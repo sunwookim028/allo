@@ -1,0 +1,65 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -494,6 +494,17 @@
+ KB_MAX = MAXDIM // T           # column blocks in the widest matrix
+ assert MAXDIM % T == 0, "a DRAM row must be a whole number of packed words"
+ WPR = MAXDIM // T              # packed words per DRAM row
++#: Operand-burst width. `align_value(64)` lets Vitis widen the operand ports, so
++#: `dma_ld`'s burst loops move DMA_ROWS whole DRAM rows per iteration -- up to
++#: one 64-byte beat -- instead of one packed word. DMA_ROWS divides MAXDIM, so
++#: rounding a matrix's row span up to a multiple of it never leaves the
++#: MAXDIM x MAXDIM operand; the extra rows land in `rbA`/`rbB` rows no
++#: instruction of that program names. (First found by the CHIA run of
++#: 2026-09-19, as a literal 4-row unroll; -59 cycles at 16x16x16.)
++BUS_BYTES = 64
++DMA_ROWS = max(r for r in range(1, MAXDIM + 1)
++               if MAXDIM % r == 0 and r * MAXDIM <= max(BUS_BYTES, MAXDIM))
++DMA_WORDS = DMA_ROWS * WPR     # packed words per burst iteration
+ A_VR = 0                       # A vregs:  kb * MAXDIM + m  (dma_ld'd direct)
+ B_SP = 0                       # B words:  nb * MAXDIM + k  (mm's weights)
+ AR_C = 0                       # the accumulator, up to MAXDIM words
+@@ -719,23 +730,30 @@
+         na: int32 = sw[0:16]
+         nb: int32 = sw[16:32]
+ 
+-        # One burst per matrix, each covering exactly that matrix's own span.
++        # One burst per matrix, each covering that matrix's own span rounded
++        # up to whole DMA_ROWS groups (DMA_WORDS packed words an iteration).
+         # Merging the two into one loop bounded by `max(na, nb)` was measured
+-        # and moved nothing: the bursts are hidden behind the prefetch.
++        # and moved nothing. At the landed design this burst IS on the
++        # critical path at 16x16x16 (211 cycles before the first MAC), which is
++        # why widening it per iteration pays where merging did not.
+         rbA: UInt(VW)[MAXDIM * WPR]
+         rbB: UInt(VW)[MAXDIM * WPR]
+-        for ia in range(na * WPR):
+-            pa: UInt(VW) = 0
+-            with allo.meta_for(T) as e:
+-                av: int8 = lA[ia * T + e]
+-                pa[8 * e : 8 * (e + 1)] = av
+-            rbA[ia] = pa
+-        for ic in range(nb * WPR):
+-            pb: UInt(VW) = 0
+-            with allo.meta_for(T) as e2:
+-                bv: int8 = lB[ic * T + e2]
+-                pb[8 * e2 : 8 * (e2 + 1)] = bv
+-            rbB[ic] = pb
++        ga_n: int32 = (na + (DMA_ROWS - 1)) // DMA_ROWS
++        for ga in range(ga_n):
++            with allo.meta_for(DMA_WORDS) as wa:
++                pa: UInt(VW) = 0
++                with allo.meta_for(T) as e:
++                    av: int8 = lA[(ga * DMA_WORDS + wa) * T + e]
++                    pa[8 * e : 8 * (e + 1)] = av
++                rbA[ga * DMA_WORDS + wa] = pa
++        gb_n: int32 = (nb + (DMA_ROWS - 1)) // DMA_ROWS
++        for gb in range(gb_n):
++            with allo.meta_for(DMA_WORDS) as wb:
++                pb: UInt(VW) = 0
++                with allo.meta_for(T) as e2:
++                    bv: int8 = lB[(gb * DMA_WORDS + wb) * T + e2]
++                    pb[8 * e2 : 8 * (e2 + 1)] = bv
++                rbB[gb * DMA_WORDS + wb] = pb
+ 
+         f0: int32 = 0
+         f1: int32 = 0

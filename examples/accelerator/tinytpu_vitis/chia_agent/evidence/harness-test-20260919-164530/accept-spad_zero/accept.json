@@ -1,0 +1,78 @@
+{
+ "ref": "ffcfa96d4296a88914a4224886b3d2c6906ae1bb",
+ "diff": "/home/sk3463/allo-chia-isa/chia_runs/harness-test-20260919-164530/spad_zero.diff",
+ "ok": true,
+ "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset",
+ "policy": [],
+ "checkout_status": [
+  "M examples/accelerator/tinytpu_vitis/microarch_isa.py"
+ ],
+ "allo_resolves_to": "/home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-spad_zero-1789837473/allo/__init__.py",
+ "sandbox": true,
+ "bench_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 6.9,
+  "all_exact": true
+ },
+ "stress_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 7.5,
+  "line": [
+   "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)"
+  ]
+ },
+ "cosim": {
+  "4x4x4": {
+   "cycles": 647,
+   "tb": "TB 4x4x4 mismatches = 0 / 16"
+  },
+  "8x8x8": {
+   "cycles": 710,
+   "tb": "TB 8x8x8 mismatches = 0 / 64"
+  },
+  "12x12x12": {
+   "cycles": 832,
+   "tb": "TB 12x12x12 mismatches = 0 / 144"
+  },
+  "16x16x8": {
+   "cycles": 854,
+   "tb": "TB 16x16x8 mismatches = 0 / 128"
+  },
+  "16x16x16": {
+   "cycles": 1056,
+   "tb": "TB 16x16x16 mismatches = 0 / 256"
+  }
+ },
+ "cosim_seconds": 297.1,
+ "estimated_ns": 2.431,
+ "cosim_rtl_stress": {
+  "vouched": true,
+  "ok": true,
+  "shapes": [
+   "4x 4x 4  cycles=647   TB 4x4x4 stress mismatches = 0 over 6 calls",
+   "8x 8x 8  cycles=710   TB 8x8x8 stress mismatches = 0 over 6 calls",
+   "12x12x12  cycles=827   TB 12x12x12 stress mismatches = 0 over 6 calls",
+   "16x16x 8  cycles=827   TB 16x16x8 stress mismatches = 0 over 6 calls",
+   "16x16x16  cycles=827   TB 16x16x16 stress mismatches = 0 over 6 calls"
+  ],
+  "seconds": 300.6
+ },
+ "baseline": {
+  "4x4x4": 172,
+  "8x8x8": 262,
+  "12x12x12": 418,
+  "16x16x8": 484,
+  "16x16x16": 686
+ },
+ "delta": {
+  "4x4x4": 475,
+  "8x8x8": 448,
+  "12x12x12": 414,
+  "16x16x8": 370,
+  "16x16x16": 370
+ },
+ "delta_total": 2077,
+ "claim": "not-better"
+}

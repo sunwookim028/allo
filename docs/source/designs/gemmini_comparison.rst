@@ -139,7 +139,7 @@ Where the deficit comes from: forced by Allo/Vitis vs. our design
    not our result.
 
 Of the **326-cycle deficit at 16x16x16** (919 against Gemmini's 593), **Allo
-forces 35-95 cycles, all of it** :ref:`limitation-21` (no dependence pragma, so
+forces 35-95 cycles, all of it** :ref:`limitation-21` (no <<REDACTED>>, so
 ``accu`` stays at II=2); **Vitis forces nothing measurable**; the rest, about
 80%, is **our design**. With all the changes applied, the measured stack goes
 **919 -> 686** at 16x16x16 and **252 -> 172** at 4x4x4, against Gemmini's 593
@@ -224,7 +224,7 @@ mismatches. Measured by cosim (xsim, ``-m_axi_latency 0``), all bit-exact:
      - 17,438
      - 31,076
    * - ``v_accudep``
-     - accu flat in BRAM + injected ``#pragma HLS dependence variable=ar inter
+     - accu flat in BRAM + injected ``<<REDACTED>>
        false``
      - 247
      - 884

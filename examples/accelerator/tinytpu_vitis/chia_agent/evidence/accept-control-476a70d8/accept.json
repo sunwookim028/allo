@@ -1,0 +1,76 @@
+{
+ "ref": "a08f0603d4a1065d6631f9a3a25993e39ecc9fe4",
+ "diff": null,
+ "ok": true,
+ "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset",
+ "policy": [],
+ "checkout_status": [],
+ "allo_resolves_to": "/home/sk3463/allo-chia-isa/.chia_scratch/accept-accept-control-476a70d8-1789836190/allo/__init__.py",
+ "sandbox": true,
+ "bench_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 5.2,
+  "all_exact": true
+ },
+ "stress_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 7.4,
+  "line": [
+   "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)"
+  ]
+ },
+ "cosim": {
+  "4x4x4": {
+   "cycles": 172,
+   "tb": "TB 4x4x4 mismatches = 0 / 16"
+  },
+  "8x8x8": {
+   "cycles": 262,
+   "tb": "TB 8x8x8 mismatches = 0 / 64"
+  },
+  "12x12x12": {
+   "cycles": 418,
+   "tb": "TB 12x12x12 mismatches = 0 / 144"
+  },
+  "16x16x8": {
+   "cycles": 484,
+   "tb": "TB 16x16x8 mismatches = 0 / 128"
+  },
+  "16x16x16": {
+   "cycles": 686,
+   "tb": "TB 16x16x16 mismatches = 0 / 256"
+  }
+ },
+ "cosim_seconds": 283.7,
+ "estimated_ns": 2.431,
+ "cosim_rtl_stress": {
+  "vouched": true,
+  "ok": true,
+  "shapes": [
+   "4x 4x 4  cycles=172   TB 4x4x4 stress mismatches = 0 over 6 calls",
+   "8x 8x 8  cycles=262   TB 8x8x8 stress mismatches = 0 over 6 calls",
+   "12x12x12  cycles=343   TB 12x12x12 stress mismatches = 0 over 6 calls",
+   "16x16x 8  cycles=343   TB 16x16x8 stress mismatches = 0 over 6 calls",
+   "16x16x16  cycles=343   TB 16x16x16 stress mismatches = 0 over 6 calls"
+  ],
+  "seconds": 293.5
+ },
+ "baseline": {
+  "4x4x4": 172,
+  "8x8x8": 262,
+  "12x12x12": 418,
+  "16x16x8": 484,
+  "16x16x16": 686
+ },
+ "delta": {
+  "4x4x4": 0,
+  "8x8x8": 0,
+  "12x12x12": 0,
+  "16x16x8": 0,
+  "16x16x16": 0
+ },
+ "delta_total": 0,
+ "claim": "not-better"
+}

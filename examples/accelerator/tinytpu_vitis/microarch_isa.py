@@ -1027,7 +1027,7 @@ def tinytpu_isa(
             all five shapes. It is not here because of what it cost: `accu` FF
             1270 -> 17450, 13.7x, for 2.3% end-to-end (1457 -> 1423 at
             16x16x16), and `ar` scales with T so the area grows with the array
-            while the 2.3% does not. `#pragma HLS dependence variable=ar inter
+            while the 2.3% does not. `<<REDACTED>>
             false` buys the same II for no area and Allo emits no such pragma;
             that gap is what this priced. Full numbers in docs/source/designs/tinytpu_history.rst.
 
