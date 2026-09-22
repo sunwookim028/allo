@@ -60,8 +60,8 @@ class GemmPrograms:
         """
         T, MAXDIM, m = self.p.T, self.p.MAXDIM, self.m
         Kt, Nt = self._tiles(M, K, N)
-        p = []
-        ins = lambda w, agu=0: p.append((w, agu))
+        program = []
+        ins = lambda word, agu=0: program.append((word, agu))
 
         # --- A: one dma_ld per column block, straight into the vregs ---
         ins(enc(OP_LOOP, nr=Kt))
@@ -93,7 +93,7 @@ class GemmPrograms:
         ins(enc(OP_MVOUT, f0=m.AR_C, f1=0, f2=0, nr=M),
             enc_agu((AGU_F2, 0, 1)))
         ins(enc(OP_ENDLOOP))
-        return p
+        return program
 
     def flat(self, M, K, N, relu=False):
         """The fully unrolled form, kept as the differential reference: every
@@ -101,22 +101,22 @@ class GemmPrograms:
         this is what the looped program must reproduce exactly."""
         T, MAXDIM, m = self.p.T, self.p.MAXDIM, self.m
         Kt, Nt = self._tiles(M, K, N)
-        p = []
+        program = []
         for kb in range(Kt):
-            p.append((enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=kb,
+            program.append((enc(OP_DMA_LD, f0=DMA_TO_VR, f1=0, f2=kb,
                           f3=m.A_VR + kb * MAXDIM, nr=M), 0))
         for nb in range(Nt):
-            p.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
-                          f3=m.B_SP + nb * MAXDIM, nr=K), 0))
+            program.append((enc(OP_DMA_LD, f0=DMA_SRC_B, f1=0, f2=nb,
+                                f3=m.B_SP + nb * MAXDIM, nr=K), 0))
         for nb in range(Nt):
             for kb in range(Kt):
-                p.append((enc(OP_MM, f0=m.A_VR + kb * MAXDIM, f1=m.AR_C,
-                              f2=(1 if kb else 0),
-                              f3=m.B_SP + nb * MAXDIM + kb * T, nr=M), 0))
+                program.append((enc(OP_MM, f0=m.A_VR + kb * MAXDIM, f1=m.AR_C,
+                                    f2=(1 if kb else 0),
+                                    f3=m.B_SP + nb * MAXDIM + kb * T, nr=M), 0))
             if relu:
-                p.append((enc(OP_VRELU, f0=m.AR_C, f1=m.AR_C, nr=M), 0))
-            p.append((enc(OP_MVOUT, f0=m.AR_C, f1=0, f2=nb, nr=M), 0))
-        return p
+                program.append((enc(OP_VRELU, f0=m.AR_C, f1=m.AR_C, nr=M), 0))
+            program.append((enc(OP_MVOUT, f0=m.AR_C, f1=0, f2=nb, nr=M), 0))
+        return program
 
     def vector(self, M, K, N):
         """`relu(2 * (A @ B))` on the first output tile: a program for the

@@ -18,9 +18,9 @@
     specific language governing permissions and limitations
     under the License.
 
-##############################################
+###############################################
 The Unit Library: Composing a Region from Units
-##############################################
+###############################################
 
 TinyTPU-isa is not written as a design any more. It is written as eight units
 in ``examples/accelerator/tinytpu_vitis/ip/units/``, one per module, and one
@@ -77,9 +77,67 @@ It buys everything that does not need the front end to change:
 * the interface is *declared and checked*, below.
 
 It does not buy positional binding. A unit still names its channels
-(``c_spm``, ``wcol``) rather than receiving them, so two architectures must
-agree on those names, and one unit cannot be instantiated twice in one region
-against different channels. That is the front-end gap, it is `fork issue #13
+(``c_spm``, ``wcol``) rather than receiving them, so three things remain
+impossible:
+
+* two architectures must agree on a channel's *name*, not just its type and
+  direction;
+* one unit cannot be instantiated twice in one region against different
+  channels (a second ``dma_ld`` on a second pair of operand ports, say);
+* a unit cannot be built on its own. ``df.build`` takes a region, and a unit
+  only exists once it has been composed into one, so a unit test is a test of
+  a small architecture rather than of a unit.
+
+.. _tinytpu-library-capture-census:
+
+The census of what is still bound by name
+-----------------------------------------
+
+Every one of the eight units lifted to module level: **no closure remains**.
+What was measured as 29 closure capture edges over 16 stream declarations is
+now 29 *declarations*, each checked against the body it describes. The
+capture surface was, and is, exclusively streams -- no shared array, no
+captured Python value, no captured region parameter -- so this is the whole of
+what the missing port syntax would replace:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 10 76
+
+   * - Unit
+     - Edges
+     - Channels bound by name
+   * - ``sequencer``
+     - 5
+     - out: ``c_dld``, ``c_spm``, ``c_vru``, ``c_acc``, ``c_dst``
+   * - ``dma_ld``
+     - 3
+     - in: ``c_dld``; out: ``dma2sp``, ``dma2vr``
+   * - ``spm``
+     - 4
+     - in: ``c_spm``, ``dma2sp``; out: ``sp2vr``, ``wcol``
+   * - ``vru``
+     - 4
+     - in: ``c_vru``, ``sp2vr``, ``dma2vr``; out: ``acol``
+   * - ``wld``
+     - 3
+     - chain: ``wcol``, ``wrow``; out: ``wq``
+   * - ``pe``
+     - 5
+     - in: ``wq``; chain: ``acol``, ``a_fwd``, ``p_fwd``, ``cw``
+   * - ``accu``
+     - 3
+     - in: ``c_acc``, ``cw``; out: ``ac2sp``
+   * - ``dma_st``
+     - 2
+     - in: ``c_dst``, ``ac2sp``
+
+``dma_st`` is the cheapest unit to give ports to (2) and ``sequencer`` and
+``pe`` the dearest (5). Nothing else stands in the way: the parameters and the
+ISA constants are already passed rather than captured, and the memories are
+already ``args=[...]``.
+
+That is the front-end gap, it is `fork issue #13
 <https://github.com/sunwookim028/allo/issues/13>`_ territory, and it is being
 worked on separately: ``Stream`` has no ``__class_getitem__``, so
 ``Stream[int32, 4]`` in a signature raises ``TypeError``, and behind that
@@ -167,10 +225,23 @@ Instantiating it
    module = df.build(wide.region, target="simulator")
    words = wide.assembler.assemble(wide.programs.looped(16, 16, 16))
 
-Two ``TinyTPU`` objects at different parameter sets coexist in one process:
-nothing is read from a module global. ``microarch_isa.py`` is one such
-instantiation, with its parameters from ``TPU_T`` / ``TPU_MAXDIM`` / ... so
-that the sweeps and the CHIA parametricity gate keep working unchanged.
+Two ``TinyTPU`` objects at different parameter sets coexist in one process,
+holding the **same** ``Unit`` objects -- the reuse property, demonstrated:
+
+.. code-block:: text
+
+   tpu_t4: T=4 MAXDIM=16 VW=32 WPR=4  457 source lines, region=tpu_t4
+      header of a 16x16x16 gemm: [13, 128, 144, 320, 16777232, 320, 64, 1048592]
+   tpu_t8: T=8 MAXDIM=32 VW=64 WPR=4  457 source lines, region=tpu_t8
+      header of a 16x16x16 gemm: [13, 64, 68, 96, 4194308, 96, 32, 1048592]
+   same pe unit object in both: True
+
+Nothing is read from a module global, so the two regions differ only in what
+the architecture bound. ``microarch_isa.py`` is one such instantiation, with
+its parameters from ``TPU_T`` / ``TPU_MAXDIM`` / ..., so the sweeps and the
+CHIA parametricity gate keep working unchanged;
+``chia_agent/param_check.py`` at ``T=8, MAXDIM=32`` reports
+``PARAM OK: 408/408 runs exact``.
 
 The refactor moved no number, and that is checked
 =================================================
@@ -191,9 +262,25 @@ the source name to loads, stores, loops and buffers. Normalizing the
 SSA value names makes the two dumps **identical again**, so the emitted C++
 differs only in identifier spelling.
 
-The measured gates, on this branch: ``bench_isa`` ``ALL EXACT``,
-``stress_isa`` 492/492, and ``mutate.py --no-rtl`` with all 33 functional
-mutants caught, after each step.
+The measured gates, on this branch, after both steps:
+
+.. code-block:: text
+
+   bench_isa      generated == hand-written word-for-word at all 5 shapes
+                  ALL EXACT
+   stress_isa     STRESS OK: 492/492 runs exact
+   act_compile    ACT GATE OK: 12/12 problems, every encodable mapping verified
+   mutate.py      MUTATE OK: all 33 mutants run were caught (--no-rtl),
+                  and ar_claim_false caught by cosim
+   param_check    PARAM OK: 408/408 runs exact at T=8 MAXDIM=32
+   cosim           4x 4x 4   172
+                   8x 8x 8   262
+                  12x12x12   418
+                  16x16x 8   484
+                  16x16x16   686
+                  COSIM OK (testbench=default)
+
+-- the published row, to the cycle.
 
 ``mutate.py`` shadows the design tree
 -------------------------------------

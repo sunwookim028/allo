@@ -9,7 +9,7 @@ region's scope, so a unit cannot be imported into a region the way a Python
 function is imported into a module. This module composes the region's *source*
 instead: a unit is an ordinary module-level function plus an interface
 declaration, and an ``Architecture`` binds that interface -- channels,
-memories, parameters, opcodes -- when it emits the region.
+memories, parameters, ISA names -- when it emits the region.
 
 What the front end refuses, and why this is the shape that works today, is on
 ``docs/source/designs/tinytpu_library.rst``.

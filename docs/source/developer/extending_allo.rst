@@ -353,6 +353,18 @@ separately from the units it wires.
   arrays, 0 captured Python values, 0 captured region parameters. The blocker
   for lifting a kernel is 2 captured streams at best (``dma_st``) and 5 at
   worst (``sequencer``, ``pe``). Nothing else stands in the way.
+* That design has since been decomposed as far as the current syntax allows
+  (:doc:`/designs/tinytpu_library`): all 8 units are module-level functions
+  with no closure, and the parameters and ISA constants are passed rather than
+  captured. It took **composing the region's source** to do it, because a
+  kernel is reached only as a nested ``ast.FunctionDef``. The 29 capture edges
+  did not go away -- they became 29 *declarations*, checked against each
+  body's free names, and they are listed per unit at
+  :ref:`tinytpu-library-capture-census`. That table is the exact scope of what
+  this extension would replace, and the three things still impossible without
+  it: two architectures must agree on a channel's *name*, a unit cannot be
+  instantiated twice against different channels, and a unit cannot be built or
+  tested outside a composed region.
 * Upstream's own suite, independently: ``tests/dataflow/test_1D_systolic.py``,
   ``test_systolic.py``, ``test_tiled_systolic.py``, ``test_packed_systolic.py``
   and ``test_weight_stationary_gemm.py`` are five separate files, each one
