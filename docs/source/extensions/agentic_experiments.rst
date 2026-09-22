@@ -286,6 +286,22 @@ opponent's whole window were accelerator time; and a second-cause census relayed
 by a coordinator who had not derived it, which then failed to reproduce in
 another agent's tree. Every one of them was a real measurement of *something*.
 
+A second, distinct pattern showed up three times in the same night: **a claim
+about what you did, that does not match what is on disk.** An exporter fix that
+was real in the code but against which no export had been re-run; a data file
+reported as carried that no artefact contained; and a branch pushed from a
+detached mid-rebase HEAD because a command used ``;`` where it needed ``&&``,
+leaving the remote ref briefly pointing at the wrong commit. In each case the
+*action* was reported rather than the *artefact* checked, and in each case the
+cost was small only because somebody downstream looked at the tree instead of
+reading the claim.
+
+It is the same disease as the first — a statement travelling without the thing
+that would verify it — but it needs a different check. A derivation answers "how
+do you know this number"; only an inspection of the tree answers "is that
+actually what is there now". The two synthesis sessions caught all three by
+diffing and counting before they ran, which is the cheapest possible form of it.
+
 The countermeasure that worked was not more care. It was that each figure was
 eventually asked to state how it was derived, by someone who needed to act on
 it — and the ones that could not state it were the ones that were wrong. So the
