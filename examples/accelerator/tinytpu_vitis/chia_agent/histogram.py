@@ -59,55 +59,62 @@ ALLO_PYTHON = os.environ.get(
 
 SHAPES = [(4, 4, 4), (8, 8, 8), (12, 12, 12), (16, 16, 8), (16, 16, 16)]
 sys.path.insert(0, str(AGENT_DIR))
+from design import EDITABLE, FROZEN_DESIGN  # noqa: E402
 from evaluate import SCORED  # noqa: E402  -- the configuration the loop scores
 #: Files the mapper's import chain needs, from git.
-NEEDED = ["examples/__init__.py", f"{PKG}/isa_ref.py", f"{PKG}/isa_dsl.py",
-          f"{PKG}/microarch_isa.py", f"{PKG}/chia_agent/mapspace.py"]
+NEEDED = ["examples/__init__.py", f"{PKG}/isa_ref.py",
+          f"{PKG}/chia_agent/mapspace.py",
+          *[f"{PKG}/{rel}" for rel in EDITABLE + FROZEN_DESIGN]]
 
 #: `AGU_TERMS` 3 -> 4. The AGU word is 64 bits and three terms use 19 each
 #: (target 4, level 3, stride 12), so a fourth has to come out of the field
-#: widths: four terms of 16 (target 4, level 3, stride 9, 8 usable). Five exact
-#: edits, one per place the 19 was written as a literal -- the encoder, the
-#: sequencer's Allo kernel, `expand`, and `check_program`.
+#: widths: four terms of 16 (target 4, level 3, stride 9, 8 usable). Since the
+#: decomposition the layout has names (`ip/isa.py`), so this is the two
+#: constants, the stride assertion, and the sequencer: its Allo kernel still
+#: spelled the 19 out, and a unit declares the ISA names it decodes.
 AGU4 = [
-    ("AGU_TERMS = 3                  # address terms per instruction\n",
-     "AGU_TERMS = 4                  # address terms per instruction\n"
-     "#: Bits per AGU term. The word is 64 bits; four terms leave 16 each, so\n"
-     "#: the stride field narrows from 12 bits to 9 (8 usable after the sign\n"
-     "#: bit). Programs at MAXDIM=16 use strides of at most MAXDIM.\n"
-     "AGU_W = 64 // AGU_TERMS        # target 4 bits, level 3, stride AGU_W - 7\n"),
-    ('        assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"\n'
-     "        base = 19 * i\n",
-     '        assert 0 <= stride < (1 << (AGU_W - 8)), f"stride {stride} does not fit"\n'
-     "        base = AGU_W * i\n"),
-    ("                    tw: int32 = w1[19 * _t : 19 * _t + 4]\n"
-     "                    lw: int32 = w1[19 * _t + 4 : 19 * _t + 7]\n"
-     "                    sw: int32 = w1[19 * _t + 7 : 19 * _t + 19]\n",
-     "                    tw: int32 = w1[AGU_W * _t : AGU_W * _t + 4]\n"
-     "                    lw: int32 = w1[AGU_W * _t + 4 : AGU_W * _t + 7]\n"
-     "                    sw: int32 = w1[AGU_W * _t + 7 : AGU_W * _t + AGU_W]\n"),
-    ("                base = 19 * t\n"
-     "                tw = (w1 >> base) & 0xF\n"
-     "                lw = (w1 >> (base + 4)) & 0x7\n"
-     "                st = (w1 >> (base + 7)) & 0xFFF\n",
-     "                base = AGU_W * t\n"
-     "                tw = (w1 >> base) & 0xF\n"
-     "                lw = (w1 >> (base + 4)) & 0x7\n"
-     "                st = (w1 >> (base + 7)) & ((1 << (AGU_W - 7)) - 1)\n"),
-    ("            tw = (w1 >> (19 * t)) & 0xF\n"
-     "            lw = (w1 >> (19 * t + 4)) & 0x7\n",
-     "            tw = (w1 >> (AGU_W * t)) & 0xF\n"
-     "            lw = (w1 >> (AGU_W * t + 4)) & 0x7\n"),
+    ("ip/isa.py",
+     "AGU_TERMS = 3                  # address terms per instruction\n",
+     "AGU_TERMS = 4                  # address terms per instruction\n"),
+    ("ip/isa.py",
+     "#: One AGU term: target, then level, then stride, packed back to back.\n"
+     "AGU_TERM_BITS = 19\n",
+     "#: One AGU term: target, then level, then stride, packed back to back.\n"
+     "#: Four terms leave 16 bits each, so the stride field narrows from 12\n"
+     "#: bits to 9 (8 usable after the sign bit). Programs at MAXDIM=16 use\n"
+     "#: strides of at most MAXDIM.\n"
+     "AGU_TERM_BITS = 16\n"),
+    ("ip/isa.py",
+     '        assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"\n',
+     "        assert 0 <= stride < (1 << (AGU_TERM_BITS - AGU_TARGET_BITS\n"
+     "                                    - AGU_LEVEL_BITS - 1)), (\n"
+     '            f"stride {stride} does not fit")\n'),
+    ("ip/units/sequencer.py",
+     '    isa=("LOOP_DEPTH", "NHDR", "IWORDS", "AGU_TERMS", "AGU_F0", "AGU_F1",\n',
+     '    isa=("LOOP_DEPTH", "NHDR", "IWORDS", "AGU_TERMS", "AGU_TERM_BITS",\n'
+     '         "AGU_F0", "AGU_F1",\n'),
+    ("ip/units/sequencer.py",
+     "                target: int32 = agu_word[19 * term : 19 * term + 4]\n"
+     "                level: int32 = agu_word[19 * term + 4 : 19 * term + 7]\n"
+     "                stride: int32 = agu_word[19 * term + 7 : 19 * term + 19]\n",
+     "                target: int32 = agu_word[AGU_TERM_BITS * term\n"
+     "                                         : AGU_TERM_BITS * term + 4]\n"
+     "                level: int32 = agu_word[AGU_TERM_BITS * term + 4\n"
+     "                                        : AGU_TERM_BITS * term + 7]\n"
+     "                stride: int32 = agu_word[AGU_TERM_BITS * term + 7\n"
+     "                                         : AGU_TERM_BITS * (term + 1)]\n"),
 ]
 #: The loop stack from 4 frames to 6. One constant: every array it sizes
 #: (`lp_start`, `lp_iv`, `lp_trip`, `iv_now`) follows, and the AGU word's
 #: 3-bit level field already reaches 7.
-DEPTH6 = [("LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's "
+DEPTH6 = [("ip/isa.py",
+           "LOOP_DEPTH = 4                 # nesting levels, as MiniTPU's "
            "loop stack\n",
            "LOOP_DEPTH = 6                 # nesting levels, as MiniTPU's "
            "loop stack\n")]
 #: Twice the instruction memory. `IMEM_SIZE = NHDR + IWORDS * _MAX_STATIC`.
-IMEM48 = [("_MAX_STATIC = 24               # longest program shipped, plus "
+IMEM48 = [("microarch_isa.py",
+           "_MAX_STATIC = 24               # longest program shipped, plus "
            "headroom\n",
            "_MAX_STATIC = 48               # longest program shipped, plus "
            "headroom\n")]
@@ -130,16 +137,17 @@ def git_show(path: str) -> bytes:
 
 
 def compose(tree: Path, edits) -> None:
+    """The mapper's import chain from git, with each edit applied to the file
+    it names -- the design is a package, so an edit carries its path."""
     for rel in NEEDED:
         dst = tree / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(git_show(rel))
-    path = tree / PKG / "microarch_isa.py"
-    text = path.read_text()
-    for old, new in edits:
-        assert text.count(old) == 1, f"anchor occurs {text.count(old)} times"
-        text = text.replace(old, new, 1)
-    path.write_text(text)
+    for rel, old, new in edits:
+        path = tree / PKG / rel
+        text = path.read_text()
+        assert text.count(old) == 1, f"{rel}: anchor occurs {text.count(old)} times"
+        path.write_text(text.replace(old, new, 1))
 
 
 #: The encoder's `acc-peel` POSITION check, removed for `--second-cause`. Not a

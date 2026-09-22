@@ -62,6 +62,7 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
 sys.path.insert(0, str(AGENT_DIR))
+from design import EDITABLE  # noqa: E402
 
 ALLO_PYTHON = os.environ.setdefault(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
@@ -69,37 +70,34 @@ os.environ.setdefault("LLVM_BUILD_DIR",
                       "/home/sk3463/llvm-allo-6b09f739/build")
 os.environ.setdefault("OMP_NUM_THREADS", "8")
 
-#: The published design-level baseline, main @ 476a70d8: what `cosim.py` measures
-#: on `isa_dsl.gemm_program`. Kept here as a loud cross-check, NOT as the
-#: co-design control -- the co-design control is measured in the same run (k1
-#: below, and `loop.py`'s iteration 0), because `accept.py`'s `BASELINES` table
-#: is keyed on the git blob of the two spec files and prose-only edits move it.
-PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
-                    "16x16x8": 484, "16x16x16": 686}
+#: The published design-level baseline: what `cosim.py` measures on
+#: `isa_dsl.gemm_program`, read from `control.PUBLISHED` (which reads
+#: reproduce.sh) rather than restated, because restated it went stale. A loud
+#: cross-check, NOT the co-design control: the co-design control is measured
+#: in the same run (k1 below, and `loop.py`'s iteration 0).
+import control  # noqa: E402
+
+PUBLISHED_CYCLES = dict(control.PUBLISHED["cosim"])
 #: The CO-DESIGN baseline: the same hardware, running the best nest the frozen
-#: mapper can encode on it. It is not the published number at every shape, and
-#: the difference is understood:
+#: mapper can encode on it, measured through `codesign_cosim` and published
+#: per driver in `control.py`. It is not the design-level number at every
+#: shape, and the difference is understood:
 #:
-#:   16x16x16  686 == published. The mapper's pick IS the canonical nest, so
-#:             the program under the RTL is `gemm_program` word for word.
-#:   4x4x4     169 vs 172. At this shape N/T = K/T = 1, so the enumerator
-#:             offers a nest with no emitted loops at all, while the
-#:             hand-written program keeps a trip-count-1 `loop`/`endloop` pair
-#:             around the output body. Same 4 dynamic issues, two fewer static
-#:             instructions (24 words against 28), three fewer cycles. It is a
-#:             real mapping-side find and it is bit-exact; it is also the whole
-#:             of what the mapping search alone buys on this hardware.
+#:   16x16x16  the published number. The mapper's pick IS the canonical nest,
+#:             so the program under the RTL is `gemm_program` word for word.
+#:   4x4x4     three cycles fewer. At this shape N/T = K/T = 1, so the
+#:             enumerator offers a nest with no emitted loops at all, while
+#:             the hand-written program keeps a trip-count-1 `loop`/`endloop`
+#:             pair around the output body. Same 4 dynamic issues, two fewer
+#:             static instructions (24 words against 28). It is a real
+#:             mapping-side find, it is bit-exact, and it is the whole of what
+#:             the mapping search alone buys on this hardware.
 #:
-#: Measured 2026-09-22 by this suite (k1) at codesign-loop; bit-exact, csynth
-#: 2.431 ns, BRAM18K 42 / DSP 14 / FF 17481 / LUT 26583.
-#:
-#: All five shapes, measured in one run the same day (272 s of cosim):
-#: 169 / 262 / 418 / 484 / 686. Four of the five ARE the published numbers,
-#: because at 8x8x8, 12x12x12 and 16x16x8 the mapper's pick (`N2>K2 rows=8`,
-#: `N3>K3 rows=12`, `N2>K4 rows=16`) is bit-identical to the canonical nest.
-CODESIGN_CONTROL_ALL = {"4x4x4": 169, "8x8x8": 262, "12x12x12": 418,
-                        "16x16x8": 484, "16x16x16": 686}
-BASELINE_CYCLES = {"4x4x4": 169, "16x16x16": 686}
+#: 8x8x8, 12x12x12 and 16x16x8 are the published numbers because there the
+#: mapper's pick (`N2>K2 rows=8`, `N3>K3 rows=12`, `N2>K4 rows=16`) is
+#: bit-identical to the canonical nest.
+CODESIGN_CONTROL_ALL = dict(control.PUBLISHED["codesign_cosim"])
+BASELINE_CYCLES = {s: CODESIGN_CONTROL_ALL[s] for s in ("4x4x4", "16x16x16")}
 #: The whole refusal histogram at the two scored shapes on the shipped design.
 #: Pinned, not just spot-checked: the point of the loop is that these numbers
 #: move for a stated reason, so an unexplained drift is a failure.
@@ -134,41 +132,10 @@ def replace(text: str, old: str, new: str, tag: str) -> str:
 
 
 # -- the mutants -------------------------------------------------------------
-#: k2. AGU_TERMS 3 -> 4. The AGU word is 64 bits, so a fourth term has to come
-#: out of the field widths: three terms of 19 bits (target 4, level 3, stride
-#: 12) become four of 16 (target 4, level 3, stride 9, i.e. 8 usable). Five
-#: exact edits, in the encoder, the sequencer's Allo kernel, `expand` and
-#: `check_program` -- every place the 19-bit stride was written as a literal.
-AGU4 = [
-    ("AGU_TERMS = 3                  # address terms per instruction\n",
-     "AGU_TERMS = 4                  # address terms per instruction\n"
-     "#: Bits per AGU term. The word is 64 bits; four terms leave 16 each, so\n"
-     "#: the stride field narrows from 12 bits to 9 (8 usable after the sign\n"
-     "#: bit). Programs at MAXDIM=16 use strides of at most MAXDIM.\n"
-     "AGU_W = 64 // AGU_TERMS        # target 4 bits, level 3, stride AGU_W - 7\n"),
-    ('        assert 0 <= stride < (1 << 11), f"stride {stride} does not fit"\n'
-     "        base = 19 * i\n",
-     '        assert 0 <= stride < (1 << (AGU_W - 8)), f"stride {stride} does not fit"\n'
-     "        base = AGU_W * i\n"),
-    ("                    tw: int32 = w1[19 * _t : 19 * _t + 4]\n"
-     "                    lw: int32 = w1[19 * _t + 4 : 19 * _t + 7]\n"
-     "                    sw: int32 = w1[19 * _t + 7 : 19 * _t + 19]\n",
-     "                    tw: int32 = w1[AGU_W * _t : AGU_W * _t + 4]\n"
-     "                    lw: int32 = w1[AGU_W * _t + 4 : AGU_W * _t + 7]\n"
-     "                    sw: int32 = w1[AGU_W * _t + 7 : AGU_W * _t + AGU_W]\n"),
-    ("                base = 19 * t\n"
-     "                tw = (w1 >> base) & 0xF\n"
-     "                lw = (w1 >> (base + 4)) & 0x7\n"
-     "                st = (w1 >> (base + 7)) & 0xFFF\n",
-     "                base = AGU_W * t\n"
-     "                tw = (w1 >> base) & 0xF\n"
-     "                lw = (w1 >> (base + 4)) & 0x7\n"
-     "                st = (w1 >> (base + 7)) & ((1 << (AGU_W - 7)) - 1)\n"),
-    ("            tw = (w1 >> (19 * t)) & 0xF\n"
-     "            lw = (w1 >> (19 * t + 4)) & 0x7\n",
-     "            tw = (w1 >> (AGU_W * t)) & 0xF\n"
-     "            lw = (w1 >> (AGU_W * t + 4)) & 0x7\n"),
-]
+#: k2's edit, and the record's variants, have ONE definition: `histogram.py`,
+#: which is what the record on this page was measured with. Each edit names
+#: the file it applies to, because the design is a package.
+from histogram import AGU4  # noqa: E402
 
 #: k3. The encoder's `acc-peel` position check deleted, so K-outer nests are
 #: called encodable although the emitted program overwrites the accumulator on
@@ -213,8 +180,11 @@ VACUOUS_ACC_PEEL = (
     "    if ks and ks[0] != len(emitted) - 1:\n",
     "    if ks and ks[0] != len(emitted) - 1 and len(emitted) > LOOP_DEPTH * 4:\n")
 
-#: k5. [-4, 4] operands never overflow 16 bits; full-range ones do.
-NARROW16 = (M_ISA, "o: int32 = p + av * wv", "o: int16 = p + av * wv")
+#: k5. [-4, 4] operands never overflow 16 bits; full-range ones do. The PE is
+#: its own unit since the decomposition.
+NARROW16 = ("ip/units/pe.py",
+            "psum: int32 = psum_north + activation16 * weight16",
+            "psum: int16 = psum_north + activation16 * weight16")
 
 #: k6. IMEM_SIZE = NHDR + IWORDS * _MAX_STATIC, so this is 8 + 24 = 32 words,
 #: and the chosen 16x16x16 program needs 34.
@@ -225,23 +195,24 @@ SHRINK_IMEM = (
 
 
 def spec(run: Path, name: str, edits=(), agu4=False) -> Path:
-    """A spec directory: HEAD's two files, with exact edits applied."""
+    """A spec directory: HEAD's writable files, with exact edits applied.
+
+    The design is a package (`design.EDITABLE`), so an edit names its file and
+    the directory mirrors the tree."""
     out = run / "spec" / name
     out.mkdir(parents=True, exist_ok=True)
-    files = {M_ISA: head(M_ISA), I_DSL: head(I_DSL)}
-    if agu4:
-        for old, new in AGU4:
-            files[M_ISA] = replace(files[M_ISA], old, new, f"{name}/agu4")
-    for f, old, new in edits:
+    files = {rel: head(rel) for rel in EDITABLE}
+    for f, old, new in (list(AGU4) if agu4 else []) + list(edits):
         files[f] = replace(files[f], old, new, f"{name}/{f}")
     for f, text in files.items():
+        (out / f).parent.mkdir(parents=True, exist_ok=True)
         (out / f).write_text(text)
     return out
 
 
 def diff_of(spec_dir: Path) -> str:
     chunks = []
-    for f in (M_ISA, I_DSL):
+    for f in EDITABLE:
         before = head(f).splitlines(keepends=True)
         after = (spec_dir / f).read_text().splitlines(keepends=True)
         chunks += difflib.unified_diff(before, after, f"a/{f}", f"b/{f}")

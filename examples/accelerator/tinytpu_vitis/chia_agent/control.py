@@ -32,7 +32,15 @@ def reproduced() -> dict:
 #: design whose blobs are not in `RECORDED`, where a prose-only edit lands.
 #: Keyed by driver because a second driver runs a different PROGRAM on the same
 #: hardware, so its numbers are not this one's measured differently.
-PUBLISHED = {"cosim": reproduced()}
+PUBLISHED = {
+    "cosim": reproduced(),
+    # Through `codesign_cosim`: the same hardware running the best nest the
+    # frozen mapper can encode, measured by a no-diff `accept.py --codesign`
+    # run. Four shapes are the published row because the mapper's pick there
+    # IS the canonical nest; 4x4x4 is three lower because its pick emits 24
+    # instruction words against the hand-written 28.
+    "codesign_cosim": dict(zip(ALL_SHAPES, (0, 0, 0, 0, 0))),
+}
 #: Controls measured by earlier no-diff runs: `key(driver, blobs)` -> cycles.
 #: Cross-check only; a design whose cycles deliberately move gets its entry in
 #: the same commit. The pre-decomposition entries are two-file designs, which

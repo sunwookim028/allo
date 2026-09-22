@@ -849,10 +849,14 @@ class Suite:
         ca, cb = va.get("cycles"), vb.get("cycles")
         check("a.noop", f"ok, cycles == {BASELINE}", f"ok={va.get('ok')} {ca}",
               va.get("ok") and ca == BASELINE, verdict=va)
-        worse = bool(vb.get("ok") and cb and all(cb[s] > BASELINE[s] for s in BASELINE))
-        check("b.spad_zero", "ok (bit-exact at both shapes), every shape WORSE",
-              f"ok={vb.get('ok')} {cb} "
-              f"(delta {({s: cb[s] - BASELINE[s] for s in cb} if cb else None)})",
+        # Worse in total, and better nowhere. Not "worse at every shape": the
+        # zero-fill costs 27 cycles at 4x4x4 and is hidden behind the DMA at
+        # 16x16x16 since the memories are derived from MAXDIM (05169938).
+        delta = {s: cb[s] - BASELINE[s] for s in cb} if cb else {}
+        worse = bool(vb.get("ok") and cb and sum(delta.values()) > 0
+                     and all(d >= 0 for d in delta.values()))
+        check("b.spad_zero", "ok (bit-exact at both shapes), WORSE in total and "
+              "better at no shape", f"ok={vb.get('ok')} {cb} (delta {delta})",
               worse, verdict=vb)
         check("f.server-responsive", "read_spec < 5 s during two cosims",
               f"worst {worst:.2f}s over {took:.0f}s", worst < 5)
