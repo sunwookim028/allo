@@ -81,7 +81,7 @@ def sequencer(
             ib[8 * i + e8] = l_imem[8 * i + e8]
 
     iw: UInt(64) = ib[0]
-    n_instr: int32 = iw[0:16]
+    n_instr: int32 = iw[0:32]
 
     c_dld.put(ib[1])
     c_dld.put(ib[7])
@@ -90,6 +90,7 @@ def sequencer(
     c_vru.put(ib[3])
     c_acc.put(ib[5])
     c_dst.put(ib[6])
+    c_dst.put(ib[7])
 
     lp_start: int32[LOOP_DEPTH] = 0
     lp_iv: int32[LOOP_DEPTH] = 0
@@ -103,7 +104,7 @@ def sequencer(
         w0: UInt(64) = ib[NHDR + pc * IWORDS]
         w1: UInt(64) = ib[NHDR + pc * IWORDS + 1]
         op: int32 = w0[0:6]
-        nr: int32 = w0[54:62]
+        nr: int32 = w0[54:NR_HI]
 
         if op == OP_LOOP:
             lp_start[sp] = pc + 1
@@ -128,9 +129,11 @@ def sequencer(
             f2: int32 = w0[30:42]
             f3: int32 = w0[42:54]
             with allo.meta_for(AGU_TERMS) as _t:
-                tw: int32 = w1[19 * _t : 19 * _t + 4]
-                lw: int32 = w1[19 * _t + 4 : 19 * _t + 7]
-                sw: int32 = w1[19 * _t + 7 : 19 * _t + 19]
+                tw: int32 = w1[AGU_TERM_BITS * _t : AGU_TERM_BITS * _t + 4]
+                lw: int32 = w1[AGU_TERM_BITS * _t + 4 : AGU_TERM_BITS * _t + 7]
+                sw: int32 = w1[
+                    AGU_TERM_BITS * _t + 7 : AGU_TERM_BITS * _t + AGU_TERM_BITS
+                ]
                 d: int32 = iv_now[lw] * sw
                 if tw == AGU_F0:
                     f0 = f0 + d
@@ -158,14 +161,14 @@ def sequencer(
                 c_vru.put(rw)
             if op == OP_MM:
                 ws: UInt(64) = rw
-                ws[54:62] = T + 1
+                ws[54:NR_HI] = T + 1
                 ws[18:30] = nr
                 c_spm.put(ws)
                 c_vru.put(rw)
                 c_acc.put(rw)
             if op == OP_VADD:
                 wv: UInt(64) = rw
-                wv[54:62] = nr * 2
+                wv[54:NR_HI] = nr * 2
                 c_acc.put(wv)
             if op == OP_VRELU:
                 c_acc.put(rw)
@@ -183,8 +186,8 @@ def dma_ld(
     c_dld: Stream[UInt(64), QD],
     dma2sp: Stream[UInt(VW), QD],
     dma2vr: Stream[UInt(VW), QD],
-    lA: int8[MAXDIM * MAXDIM],
-    lB: int8[MAXDIM * MAXDIM],
+    lA: int8[DRAM_WORDS],
+    lB: int8[DRAM_WORDS],
 ):
     """DRAM -> scratchpad or operand vregs. Sole reader of A and B.
 
@@ -193,14 +196,31 @@ def dma_ld(
     body variant tried. Gemmini splits the same way (`LoadController` /
     `StoreController`).
 
-    **Two variable-length bursts, then every instruction runs from BRAM.**
-    A per-row strided read, `lA[(f1 + r) * MAXDIM + f2 * T + e]`, is a
-    separate four-beat AXI transaction per row (`[HLS 214-115] Multiple
-    burst reads of length 4`, `Final II = 4`); a contiguous sweep with a
-    runtime trip count is one real burst. So the unit opens with one burst
-    per operand matrix covering exactly the DRAM rows the program names --
-    `na`/`nb` come from the assembler -- packing T lanes per word as it
-    goes, and each row afterwards is one BRAM read.
+    **One packed word per row, at an address the program computes.** The
+    row is `f1 + r`, the column block is `f2`, and the words per row come
+    from the header, so the address is
+
+        ((f1 + r) * wpr + f2) * T + lane
+
+    with `wpr` runtime data. That last property is the whole of the
+    capability: a matrix no longer has to FIT the addressable space, it is
+    tiled into it, because the program says where each tile is.
+
+    This unit used to open by copying every DRAM row the program named
+    into an on-chip mirror and reading the mirror afterwards -- one
+    contiguous variable-length burst, which Vitis turns into a real AXI
+    transaction, against the per-row strided read here, which it reports
+    as `[HLS 214-115] Multiple burst reads of length T`. The mirror is
+    gone for two reasons, and only the first is about capability:
+
+      * it sized an on-chip buffer to the OPERAND (MAXDIM*MAXDIM/T packed
+        words), so the largest runnable shape was bounded by BRAM and not
+        merely by an address field;
+      * it read whole DRAM rows. A tiled GEMM names ONE column block of
+        each row it touches, so mirroring the row over-fetches by
+        `wpr` -- 192x at K=768, T=4. Even at the published shapes it
+        over-fetched by MAXDIM/shape: 512 mirror iterations at 16x16x16
+        on a MAXDIM=64 build, against 128 rows the program actually reads.
 
     **Where a row goes is the instruction's.** `f0` bit 0 picks the source
     matrix, bit 1 the destination: the scratchpad (`dma2sp`), or the
@@ -210,51 +230,15 @@ def dma_ld(
     scratchpad, where `spm` streams it into the array as weights.
 
     One flat loop over rows, the instruction fetched on the iteration that
-    needs it (the ROW-FLATTENING note above); the burst loops sit outside
-    it on purpose."""
+    needs it (the ROW-FLATTENING note above). The two matrices are read in
+    separate arms of the mux: they are separate `m_axi` bundles, so that
+    is one reader per port rather than the two-readers-on-one-memory trap
+    the flattening note warns about."""
     nw: UInt(64) = c_dld.get()
-    n_row: int32 = nw[0:16]
-    sw: UInt(64) = c_dld.get()  # the DRAM row span of each source matrix
-    na: int32 = sw[0:16]
-    nb: int32 = sw[16:32]
-
-    # One burst per matrix, each covering exactly that matrix's own span.
-    # Merging the two into one loop bounded by `max(na, nb)` was measured
-    # and moved nothing: the bursts are hidden behind the prefetch.
-    #
-    # BURST WIDTH IS PARAMETRIC (`TPU_DMA_WIDEN`, default off). At
-    # DMA_WORDS=1 this is the shipped loop, one packed word an iteration.
-    # Above 1 each iteration reads DMA_WORDS whole words -- up to a
-    # 64-byte beat, which is what `align_value(64)` lets Vitis widen the
-    # port to -- so the burst costs a factor of DMA_WORDS fewer
-    # iterations. Written as a `meta_for` inside a runtime loop, so the
-    # inner copy unrolls and the trip count stays runtime data.
-    #
-    # Kept parametric rather than landed because it is a real trade and
-    # the measurement that would decide it is not the one it was found
-    # with: it was found at `-m_axi_latency 0`, and a change whose whole
-    # benefit is wider DMA bursts is exactly the kind whose advantage can
-    # grow or vanish with memory latency. The grid is in
-    # `docs/source/designs/benchmarks.rst`; the original candidate is
-    # `chia_agent/evidence/isa-run1-20260919/param_burst.diff`.
-    rbA: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
-    rbB: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
-    ga_n: int32 = (na * WPR + (DMA_WORDS - 1)) // DMA_WORDS
-    for ga in range(ga_n):
-        with allo.meta_for(DMA_WORDS) as wa:
-            pa: UInt(VW) = 0
-            with allo.meta_for(T) as e:
-                av: int8 = lA[(ga * DMA_WORDS + wa) * T + e]
-                pa[8 * e : 8 * (e + 1)] = av
-            rbA[ga * DMA_WORDS + wa] = pa
-    gb_n: int32 = (nb * WPR + (DMA_WORDS - 1)) // DMA_WORDS
-    for gb in range(gb_n):
-        with allo.meta_for(DMA_WORDS) as wb:
-            pb: UInt(VW) = 0
-            with allo.meta_for(T) as e2:
-                bv: int8 = lB[(gb * DMA_WORDS + wb) * T + e2]
-                pb[8 * e2 : 8 * (e2 + 1)] = bv
-            rbB[gb * DMA_WORDS + wb] = pb
+    n_row: int32 = nw[0:32]
+    gw: UInt(64) = c_dld.get()  # packed words per DRAM row, per matrix
+    wpr_a: int32 = gw[0:16]
+    wpr_b: int32 = gw[16:32]
 
     f0: int32 = 0
     f1: int32 = 0
@@ -269,13 +253,21 @@ def dma_ld(
             f0 = w0[6:18]
             f1 = w0[18:30]
             f2 = w0[30:42]
-            cnt = w0[54:62]
+            cnt = w0[54:NR_HI]
             r = 0
+        wpr: int32 = wpr_a
+        if (f0 & DMA_SRC_B) != 0:
+            wpr = wpr_b
+        addr: int32 = ((f1 + r) * wpr + f2) * T
         pw: UInt(VW) = 0
         if (f0 & DMA_SRC_B) == 0:
-            pw = rbA[(f1 + r) * WPR + f2]
+            with allo.meta_for(T) as e:
+                av: int8 = lA[addr + e]
+                pw[8 * e : 8 * (e + 1)] = av
         else:
-            pw = rbB[(f1 + r) * WPR + f2]
+            with allo.meta_for(T) as e2:
+                bv: int8 = lB[addr + e2]
+                pw[8 * e2 : 8 * (e2 + 1)] = bv
         if f0 >= DMA_TO_VR:
             dma2vr.put(pw)
         else:
@@ -314,11 +306,21 @@ def spm(
     `sequencer`)."""
     spad: UInt(VW)[SPAD_ROWS]
     nw: UInt(64) = c_spm.get()
-    n_row: int32 = nw[0:16]
+    n_row: int32 = nw[0:32]
     mw: UInt(64) = c_spm.get()
+    # The array's two trip counts, ONE PER CHAIN WORD. They used to share
+    # one packed word, 16 bits each -- and a packed word is T*8 bits, so at
+    # T=4 that capped a program at 32767 wavefront rows however it was
+    # tiled: 128x128x128 needs 131072. A second word down the same chain
+    # costs one cycle here and one hop in each `wld`, and it is the only
+    # place in the design where a count is bounded by T rather than by a
+    # header slice.
     nmo: UInt(VW) = 0
-    nmo[0:32] = mw[0:32]  # mm count | wavefront rows << 16
+    nmo[0:31] = mw[0:31]  # how many `mm`s
     wcol[0].put(nmo)
+    nro: UInt(VW) = 0
+    nro[0:31] = mw[32:63]  # how many wavefront rows in total
+    wcol[0].put(nro)
     op: int32 = 0
     f1: int32 = 0
     f3: int32 = 0
@@ -331,7 +333,7 @@ def spm(
             op = w0[0:6]
             f1 = w0[18:30]
             f3 = w0[42:54]
-            cnt = w0[54:62]
+            cnt = w0[54:NR_HI]
             r = 0
         ra: int32 = f1 + r
         if op == OP_MM:
@@ -375,7 +377,7 @@ def vru(
     ONE `vr` read and ONE `vr` write per iteration, each at a muxed address
     (and the write from a muxed source), holds II=1."""
     nw: UInt(64) = c_vru.get()
-    n_word: int32 = nw[0:16]
+    n_word: int32 = nw[0:32]
     vr: UInt(VW)[NVR]
     op: int32 = 0
     f0: int32 = 0
@@ -389,7 +391,7 @@ def vru(
             op = w0[0:6]
             f0 = w0[6:18]
             f3 = w0[42:54]
-            cnt = w0[54:62]
+            cnt = w0[54:NR_HI]
             r = 0
         if op == OP_MM:
             vv: UInt(VW) = vr[f0 + r]
@@ -433,9 +435,18 @@ def wld(
         nmw = wrow[i, j - 1].get()
     with allo.meta_if(j != T - 1):
         wrow[i, j].put(nmw)
-    nmm: int32 = nmw[0:16]
+    nrw: UInt(VW) = 0
+    with allo.meta_if(j == 0):
+        nrw = wcol[i].get()
+        with allo.meta_if(i != T - 1):
+            wcol[i + 1].put(nrw)
+    with allo.meta_else():
+        nrw = wrow[i, j - 1].get()
+    with allo.meta_if(j != T - 1):
+        wrow[i, j].put(nrw)
+    nmm: int32 = nmw[0:31]
     tq: UInt(32) = 0
-    tq[0:16] = nmw[16:32]  # the PE's own trip count: wavefront rows
+    tq[0:31] = nrw[0:31]  # the PE's own trip count: wavefront rows
     wq[i, j].put(tq)
     for c in range(nmm):
         hdr: UInt(VW) = 0
@@ -483,7 +494,7 @@ def pe(
     adder latencies are pipeline depth, not initiation interval."""
     i, j = df.get_pid()
     tq: UInt(32) = wq[i, j].get()
-    nt: int32 = tq[0:16]
+    nt: int32 = tq[0:31]
     w: int8 = 0
     cnt: int32 = 0
     r: int32 = -1  # advanced at the TOP: see the II note
@@ -566,7 +577,7 @@ def accu(
     docs/source/designs/tinytpu_history.rst)."""
     ar: UInt(AW)[NAR]
     nw: UInt(64) = c_acc.get()
-    n_row: int32 = nw[0:16]
+    n_row: int32 = nw[0:32]
     op: int32 = 0
     f0: int32 = 0
     f1: int32 = 0
@@ -582,7 +593,7 @@ def accu(
             f0 = w0[6:18]
             f1 = w0[18:30]
             f2 = w0[30:42]
-            cnt = w0[54:62]
+            cnt = w0[54:NR_HI]
             r = 0
         rr: int32 = r
         ph: int32 = 0
@@ -648,7 +659,7 @@ def accu(
 def dma_st(
     c_dst: Stream[UInt(64), QD],
     ac2sp: Stream[UInt(VW), QD],
-    lC: int8[MAXDIM * MAXDIM],
+    lC: int8[DRAM_WORDS],
 ):
     """Accumulator -> DRAM. Sole writer of C.
 
@@ -661,7 +672,9 @@ def dma_st(
     are concurrent -- but it decides whether `csim` works, and `csim` is the
     fast functional check."""
     nw: UInt(64) = c_dst.get()
-    n_row: int32 = nw[0:16]
+    n_row: int32 = nw[0:32]
+    gw: UInt(64) = c_dst.get()  # packed words per DRAM row of C
+    wpr_c: int32 = gw[32:48]
     f1: int32 = 0
     f2: int32 = 0
     cnt: int32 = 0
@@ -673,12 +686,13 @@ def dma_st(
             w0: UInt(64) = c_dst.get()
             f1 = w0[18:30]
             f2 = w0[30:42]
-            cnt = w0[54:62]
+            cnt = w0[54:NR_HI]
             r = 0
+        addr: int32 = ((f1 + r) * wpr_c + f2) * T
         qw: UInt(VW) = ac2sp.get()
         with allo.meta_for(T) as e:
             ov: int8 = qw[8 * e : 8 * (e + 1)]
-            lC[(f1 + r) * MAXDIM + f2 * T + e] = ov
+            lC[addr + e] = ov
 
 
 @df.region(
