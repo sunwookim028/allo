@@ -350,6 +350,21 @@ why the surviving claim is *implementation*, and why it is not *nothing*.
 
 ## G3: the decisive test, and it failed
 
+**We removed the step that would have exposed the defect, then built a ladder
+that could not compensate.** The five-place pattern's step 4 is the test, and
+the agent was explicitly told it could not write one — tests are frozen. The
+thing that would have caught this bug is exactly that step. This is an
+indictment of the experimental design, not of the agent, and the next version
+of the experiment turns on it.
+
+**One structural fact made the work simultaneously unrewardable and
+undetectably broken.** Those look like two problems — an objective that
+undervalues new abstractions, and a gate ladder with a hole — and they are one
+problem wearing two hats. It generalises past this harness: **any gate ladder
+that exercises a compiler only through existing designs cannot see a new
+capability, in either direction. It cannot see that it is good and it cannot
+see that it is broken.**
+
 The gate cannot exercise a primitive that nothing calls, so `heldout.py`'s G3
 step applies the primitive **plus a harness-authored call site in the
 candidate's own spelling** — forced by its reversed signature to
