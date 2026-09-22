@@ -176,6 +176,19 @@ because it is where a fair comparison is usually fudged:
 - **Blocks kept although unexercised, all in Gemmini's disfavour**: the conv
   pipeline, the output-stationary datapath, and an fp32 scaling pipeline that
   `defaultConfig` instantiates. Removing any of them is tuning the opponent.
+- **The logic-only exclusion is semantic and identical on both sides**: the
+  operand scratchpad and the accumulator, *and nothing else* — the two arrays a
+  real implementation would build from SRAM macros. Our DMA read buffers stay
+  because Gemmini's DMA buffering stays as plain registers; our sequencer's
+  small queues stay because Gemmini's depth-2 queue RAMs stay. A *structural*
+  rule (drop any module declaring an array-of-reg) was considered and rejected
+  because it would also take Gemmini's queue RAMs, and no depth threshold
+  separates those from ours. **This is the one judgement in the export**, and
+  the paper should say so rather than present the cut as mechanical.
+- **The logic-only figure excludes the memory *interface* as well as the
+  array**, on both sides equally: with the modules out of the file list DC
+  infers nothing for them and the ports become dangling nets. It may therefore
+  only ever be compared against another logic-only figure.
 - **Logic-only is the headline, capacity-matched is the second figure.** Stock
   Gemmini's 320 KiB as flip-flops is 2,621,440 registers against 200,561
   sequential cells in our entire T=4 design; that number measures the memory
@@ -195,13 +208,19 @@ exist**, so they cannot be bent afterwards by whatever comes back:
   closes a real hole: two designs at different achievable frequencies are not
   comparable on cycles at all, and today we have no frequency figure for
   Gemmini whatsoever.
-- **Power is published only if *both* sides are activity-annotated.** An
-  annotated number set beside a default-toggle-rate number is worse than no
-  number. Our side is reachable — SAIF from the cosim run of a workload we
-  already quote cycles for, so power and cycles describe one run. Gemmini's
-  requires driving the same GEMM through its RoCC interface in RTL simulation,
-  and whether that is practical is an open question. **If only one side can be
-  annotated, the paper reports no power comparison and says why.**
+- **Power is absent, and the reason is the flow, not the effort.** The earlier
+  rule here — *publish only if both sides are activity-annotated* — was the
+  right instinct and the wrong diagnosis, and is superseded. Under
+  `sram_mode='none'` and without place-and-route, power is dominated by **clock
+  power into flip-flop arrays** and by **guessed wire capacitance**, both
+  larger than the effect being measured. Activity annotation removes the
+  default-toggle-rate objection and removes neither of the other two, so even a
+  fully annotated number from this flow would be **compromised, not merely
+  imprecise**. The cheapest credible energy axis is SRAM macros plus P&R —
+  which is the same prerequisite that would replace the area methodology
+  wholesale. Recorded as **parked, not cancelled**: activity files are being
+  produced anyway, which moves the first row of that cost table from "1–2 days
+  of bring-up" to "already done".
 
 **Gap.** DC has not run. The channel-depth fix (`QD=16`, which takes three
 non-terminating tiled programs to completion) costs **+9.3% FF** and must
