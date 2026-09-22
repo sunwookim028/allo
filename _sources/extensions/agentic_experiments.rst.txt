@@ -315,9 +315,16 @@ ground tonight, and both were right to.
 model says correct, the program validator accepts, the cycle model runs, the
 dataflow simulator completes and is correct, and Vitis **csim** reports zero
 mismatches — and Vitis **cosim does not complete.** Two row-tiled mappings sat
-at ``Inter-Transaction Progress 0/1`` with the simulator process still at 99 %
-CPU after **32 minutes**, against about two minutes for the shipped mapping. No
-deadlock is *reported*, so it is not called one.
+with the simulator process still at 99 % CPU after **32 minutes**, against about
+two minutes for the shipped mapping. No deadlock is *reported*, so it is not
+called one.
+
+A correction to how this was first described, including here: the
+``Inter-Transaction Progress 0/1`` line is **not a signature of the failure.**
+It is Vitis's first periodic report and it appears in *every* log, passing runs
+included — a completing run prints ``0/1``, then ``1/1``, then finishes. The
+observation is that **the second line never comes.** The number that was being
+quoted as diagnostic locates nothing.
 
 Two consequences, and the second is the uncomfortable one. **An encodable count
 is not a runnable count**: five nests are encodable by the encoder and the
@@ -338,9 +345,22 @@ testbench.
 Four minimal programs, each verified against the reference model and by csim,
 then co-simulated under a hard bound: a prologue-only case, a load after a
 compute, a load in a loop before a compute, and a load sharing a loop body with
-a compute. **All four completed.** The hypothesis is dead; the trigger needs
-something those cases lack — nested loops, larger trip counts, an accumulating
-instruction inside a loop, or simply scale.
+a compute. **All four completed.**
+
+A second track then killed the hypothesis from the opposite direction, which is
+the stronger refutation: **both** non-completing programs stage *every* transfer
+in a prologue, and **both** mappings that issue a load *inside* the output nest
+**complete** (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
+staging-based warning would have passed both failures and flagged two programs
+that run — it is exactly the wrong guard, and it had been shipped once before
+being reverted.
+
+The failure is also **not monotone in size**: halving any of the three tile
+counts makes it complete, and *doubling* the row count also makes it complete.
+The minimal reproduction is 16 instructions — plain int8 GEMM tiling, fully
+unrolled, no epilogue — filed with a test that runs its cheap half in seconds
+without Vitis. No positive characterisation is offered and the diagnosis is left
+open.
 
 Two things worth copying from how that was handled. A `covered / UNCOVERED`
 column had **already been added** to the flow on the strength of the suspicion,

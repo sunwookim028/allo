@@ -468,9 +468,15 @@ ground tonight, and both were right to.</p>
 model says correct, the program validator accepts, the cycle model runs, the
 dataflow simulator completes and is correct, and Vitis <strong>csim</strong> reports zero
 mismatches — and Vitis <strong>cosim does not complete.</strong> Two row-tiled mappings sat
-at <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span> <span class="pre">0/1</span></code> with the simulator process still at 99 %
-CPU after <strong>32 minutes</strong>, against about two minutes for the shipped mapping. No
-deadlock is <em>reported</em>, so it is not called one.</p>
+with the simulator process still at 99 % CPU after <strong>32 minutes</strong>, against about
+two minutes for the shipped mapping. No deadlock is <em>reported</em>, so it is not
+called one.</p>
+<p>A correction to how this was first described, including here: the
+<code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span> <span class="pre">0/1</span></code> line is <strong>not a signature of the failure.</strong>
+It is Vitis’s first periodic report and it appears in <em>every</em> log, passing runs
+included — a completing run prints <code class="docutils literal notranslate"><span class="pre">0/1</span></code>, then <code class="docutils literal notranslate"><span class="pre">1/1</span></code>, then finishes. The
+observation is that <strong>the second line never comes.</strong> The number that was being
+quoted as diagnostic locates nothing.</p>
 <p>Two consequences, and the second is the uncomfortable one. <strong>An encodable count
 is not a runnable count</strong>: five nests are encodable by the encoder and the
 reference model, three are confirmed on RTL, and the smaller number is the one
@@ -488,9 +494,20 @@ testbench.</p>
 <p>Four minimal programs, each verified against the reference model and by csim,
 then co-simulated under a hard bound: a prologue-only case, a load after a
 compute, a load in a loop before a compute, and a load sharing a loop body with
-a compute. <strong>All four completed.</strong> The hypothesis is dead; the trigger needs
-something those cases lack — nested loops, larger trip counts, an accumulating
-instruction inside a loop, or simply scale.</p>
+a compute. <strong>All four completed.</strong></p>
+<p>A second track then killed the hypothesis from the opposite direction, which is
+the stronger refutation: <strong>both</strong> non-completing programs stage <em>every</em> transfer
+in a prologue, and <strong>both</strong> mappings that issue a load <em>inside</em> the output nest
+<strong>complete</strong> (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
+staging-based warning would have passed both failures and flagged two programs
+that run — it is exactly the wrong guard, and it had been shipped once before
+being reverted.</p>
+<p>The failure is also <strong>not monotone in size</strong>: halving any of the three tile
+counts makes it complete, and <em>doubling</em> the row count also makes it complete.
+The minimal reproduction is 16 instructions — plain int8 GEMM tiling, fully
+unrolled, no epilogue — filed with a test that runs its cheap half in seconds
+without Vitis. No positive characterisation is offered and the diagnosis is left
+open.</p>
 <p>Two things worth copying from how that was handled. A <cite>covered / UNCOVERED</cite>
 column had <strong>already been added</strong> to the flow on the strength of the suspicion,
 and it separated the candidates perfectly; it was <strong>reverted</strong> once the
