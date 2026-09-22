@@ -398,7 +398,9 @@ that kernel can prove or disprove the claim; the claim is true only because
 undecidable is already in the tree: ``mutate.py``'s ``ar_claim_false`` mutant
 sets ``AR_RAW_DIST = 1``, and it is the one mutant that passes ``bench_isa``,
 passes ``stress_isa``, passes the legality rule, and is caught by
-``TPU_TB=stress`` cosimulation alone.
+``TPU_TB=stress`` cosimulation alone. The middle claim was checked directly
+rather than assumed: with ``AR_RAW_DIST = 1`` the rule still accepts the claim,
+because the falsehood is in ``assemble()`` and not in the kernel's IR.
 
 ``align_value`` -- an opt-in that admits it is not sufficient
 -------------------------------------------------------------
