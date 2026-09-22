@@ -30,12 +30,16 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
 
-#: The named configurations. `parity` is the baseline this file exists for.
+#: THE NAMED PARITY BASELINES. Kept beside the shipped design, not replacing
+#: it (docs/source/designs/gemmini_comparison.rst, "The parity baseline").
+#: `TPU_PROGRAM` stays `shipped`: the `interleaved` order is measured and it
+#: helps only the latency shapes, where these configurations are already
+#: faster than Gemmini, and it deadlocks in RTL at Kt >= QD (see the page).
 PARITY_CONFIGS = {
     "parity-t4": dict(TPU_T="4", TPU_MAXDIM="64", TPU_DMA_WIDEN="1",
-                      TPU_PROGRAM="interleaved"),
+                      TPU_PROGRAM="shipped"),
     "parity-t8": dict(TPU_T="8", TPU_MAXDIM="64", TPU_DMA_WIDEN="1",
-                      TPU_PROGRAM="interleaved"),
+                      TPU_PROGRAM="shipped"),
 }
 
 #: Matched Gemmini, median of five trials and full min-max spread, from
@@ -133,7 +137,17 @@ def one(base, order, shape):
             open(p, "w", errors="surrogateescape").write(t.replace(base, job))
         open(os.path.join(job, "tb.cpp"), "w").write(
             C.testbench(M, K, N, prog=prog))
-        text = C.vitis(job, C.TCL_COSIM, "cosim.log")
+        # A cosim that hangs (this design can, for a program every functional
+        # model accepts -- see the parity baseline's notes) must not hold a
+        # worker forever; `timeout` kills it and the job reports no number.
+        open(os.path.join(job, "run.tcl"), "w").write(C.TCL_COSIM)
+        with open(os.path.join(job, "cosim.log"), "w") as f:
+            subprocess.call(
+                ["timeout", "-k", "10", os.environ.get("TPU_COSIM_TIMEOUT", "3600"),
+                 "bash", "-lc",
+                 f"source {C.VITIS} && cd {job} && vitis_hls -f run.tcl"],
+                stdout=f, stderr=subprocess.STDOUT)
+        text = open(os.path.join(job, "cosim.log"), errors="replace").read()
         mm = [l.strip() for l in text.splitlines() if "mismatches" in l]
         n = C.cycles(job)
         exact = bool(mm) and re.search(r"mismatches = 0\b", mm[-1]) is not None

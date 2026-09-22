@@ -1016,6 +1016,333 @@ any candidate, so the result cannot be fitted to them afterwards.
   unchanged netlist; (2) the banked burst widening (``TPU_DMA_WIDEN=1``);
   (3) anything else, each with its mechanism and its price.
 
+The configuration, and one command
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``parity-t4`` and ``parity-t8`` in ``parity_sweep.py``: the shipped design
+with **one** change, the banked burst widening, at the matched array sizes.
+
+.. code-block:: bash
+
+   cd examples/accelerator/tinytpu_vitis
+   TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py      # 10 shapes
+   TPU_PARITY_CONFIG=parity-t8 python parity_sweep.py      #  8 shapes
+
+=========================  ========================================
+``T``                      4 (against Gemmini DIM=4) / 8 (DIM=8)
+``MAXDIM``                 64, both sides
+``DMA_WORDS``              16 (``TPU_DMA_WIDEN=1``), buffers banked
+``TPU_PROGRAM``            ``shipped`` -- the published program order
+``QD``                     8, unchanged
+=========================  ========================================
+
+One csynth per configuration; each (shape) cosim runs in its own copy of that
+one synthesized solution, so every number in a column is the same netlist.
+
+The change, and its mechanism
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**The banked burst widening, and nothing else.** ``dma_ld``'s operand burst
+moves ``DMA_WORDS`` packed words per iteration instead of one, and ``rbA`` /
+``rbB`` are cyclically partitioned by ``DMA_WORDS`` so write ``w`` always lands
+in bank ``w`` and every bank has exactly one writer (``ff7beaf1``).
+
+That is the whole configuration. It is one sentence because the prologue is
+what the measurement says the deficit was: at MAXDIM=64 the burst reads whole
+64-byte DRAM rows, so it costs ``max(M,K) * MAXDIM/T`` iterations however
+narrow the operand actually is -- 1,024 of the 22,123 cycles at 64x64x64 and
+128 of the 424 at T=8 16x16x8 -- and widening divides that by ``DMA_WORDS``.
+
+Two supporting measurements from the same apparatus, both on an unchanged
+netlist, because they were the candidates that did **not** get used:
+
+- **The A and B bursts already overlap.** At MAXDIM=16, growing A's burst span
+  by 48 words costs **+45** cycles and then growing B's by 48 costs **+0**, so
+  the burst is ``max(na, nb)``, not ``na + nb``. That is why merging them was
+  once measured at exactly zero, and it is why widening is the only lever left
+  on the burst.
+- **``dma_ld``'s row loop costs exactly one cycle a row** (collapsing the
+  program's operand blocks to one removed 96 rows and 96 cycles at
+  16x16x16), which is what makes the program-order candidates below worth
+  measuring at all.
+
+Result: T=4 against Gemmini DIM=4
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ours: Vitis cosim, ``ap_start`` to ``ap_done``, ``-m_axi_latency 0``,
+bit-exact, one build. Gemmini: median of five, full min-max spread, from
+:doc:`benchmarks`. ``csynth`` on xcu280 at the 3.33 ns target: **BRAM 100,
+DSP 14, FF 25,026, LUT 33,799, estimated period 2.431 ns** -- the same
+estimated period as the shipped control (BRAM 52, DSP 14, FF 17,488, LUT
+26,554, 2.431 ns), so the widening is bought at +92 % BRAM, +43 % FF and
++27 % LUT and **no clock**.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - shipped
+     - **parity-t4**
+     - Gemmini
+     - ratio
+     - verdict
+   * - 4x4x4
+     - 218
+     - **172**
+     - 208 +/- 25
+     - 0.83x
+     - faster
+   * - 8x8x8
+     - 357
+     - **262**
+     - 324 +/- 36
+     - 0.81x
+     - faster
+   * - 12x12x12
+     - 563
+     - **383**
+     - 458 +/- 17
+     - 0.84x
+     - faster
+   * - 16x16x8
+     - 677
+     - **437**
+     - 527 +/- 44
+     - 0.83x
+     - faster
+   * - 16x16x16
+     - 879
+     - **639**
+     - 691 +/- 44
+     - 0.93x
+     - faster
+   * - 32x32x32
+     - 3 752
+     - **3 272**
+     - 2 977 +/- 34
+     - 1.099x
+     - **behind**
+   * - 32x64x32
+     - 6 824
+     - **5 864**
+     - 5 570 +/- 147
+     - 1.053x
+     - **behind**
+   * - 48x48x48
+     - 10 289
+     - **9 569**
+     - 9 100 +/- 35
+     - 1.052x
+     - **behind**
+   * - 64x32x64
+     - 12 907
+     - **11 947**
+     - 11 175 +/- 18
+     - 1.069x
+     - **behind**
+   * - 64x64x64
+     - 22 123
+     - **21 163**
+     - 20 287 +/- 34
+     - 1.043x
+     - **behind**
+
+Result: T=8 against Gemmini DIM=8
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``csynth``: **BRAM 138, DSP 58, FF 50,004, LUT 74,331, 2.431 ns**, against the
+T=8 control's BRAM 62, DSP 58, FF 43,911, LUT 70,281, 2.431 ns.
+
+.. list-table::
+   :header-rows: 1
+
+   * - shape
+     - shipped
+     - **parity-t8**
+     - Gemmini
+     - ratio
+     - verdict
+   * - 8x8x8
+     - 285
+     - **231**
+     - 305 +/- 17
+     - 0.76x
+     - faster
+   * - 16x16x8
+     - 424
+     - **312**
+     - 500 +/- 16
+     - 0.62x
+     - faster
+   * - 16x16x16
+     - 493
+     - **381**
+     - 535 +/- 45
+     - 0.71x
+     - faster
+   * - 32x32x32
+     - 1 484
+     - **1 260**
+     - 1 280 +/- 18
+     - 0.98x
+     - faster
+   * - 32x64x32
+     - 2 508
+     - **2 060**
+     - 1 866 +/- 36
+     - 1.104x
+     - **behind**
+   * - 48x48x48
+     - 3 537
+     - **3 201**
+     - 3 028 +/- 35
+     - 1.057x
+     - **behind**
+   * - 64x32x64
+     - 4 523
+     - **4 075**
+     - 3 897 +/- 35
+     - 1.046x
+     - **behind**
+   * - 64x64x64
+     - 7 083
+     - **6 635**
+     - 6 033 +/- 35
+     - 1.100x
+     - **behind**
+
+**Where parity is NOT reached, plainly.** Five shapes at T=4 (32x32x32,
+32x64x32, 48x48x48, 64x32x64, 64x64x64) and four at T=8 (32x64x32, 48x48x48,
+64x32x64, 64x64x64). Every one of them is a steady-state shape, every one is
+**behind by 4.3 % to 10.4 %**, and every one of those margins clears Gemmini's
+spread, so they are real deficits and not noise. Nine of the eighteen matched
+points are faster than Gemmini; none is inside the spread without also being
+faster. The honest summary is **comparable, not parity**: faster wherever the
+shape is small enough to be dominated by fixed cost, and a few per cent behind
+wherever it is not.
+
+Where the cycles go, on our side
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Measured with Vitis's dataflow profiler (``impact/prof_job.py`` then
+``impact/profile.sh``'s steps), not modelled. Every unit's work count is an
+integer the assembler writes into the imem header, so the run/starve/block
+split can be read against it.
+
+**Latency shapes are one pass of everything.** T=8 16x16x8, shipped, 424
+cycles: 47 region start (``s_axilite``), 21 to the first dispatched
+instruction, then ``dma_ld`` runs 196 cycles without a stall -- 128 burst
+iterations and 48 operand rows, exactly its header counts -- ``spm`` waits
+until row 48 arrives at cycle 249, ``vru`` runs its 64 words, ``accu`` runs its
+48 iterations ending at 391, and ``dma_st`` retires 16 rows by 426. **Three
+quarters of that shape is prologue and drain**, which is why widening the
+burst takes it to 312.
+
+**Steady-state shapes are a repeating per-n-tile loop.** T=4 32x32x32,
+parity-t4, 3,272 cycles: ``dma_ld`` finishes all 544 of its work items by
+cycle 632, i.e. the operand path is off the critical path after 19 % of the
+run, and the rest is a loop of ``vru`` running 256 activation words and then
+**blocking 65** while ``accu`` retires that tile -- 321 cycles per 256
+mm rows, 1.25 cycles per row against a roofline of 1.00. The marginal rate
+between 48x48x48 and 64x64x64 is **1.224 cycles per mm row for us against
+Gemmini's 1.181**, which is the 4.3 % at 64x64x64 almost exactly.
+
+**What that 0.224 is, and what is still unattributed.** ``accu`` is one flat
+loop at II=1 over ``mm`` rows *plus* ``mvout`` rows, so the retire pass shares
+the accumulator's single port with the accumulate pass and costs ``1/Kt`` of
+the mm work: 12.5 % at 32x32x32, 8.3 % at 48x48x48, 6.3 % at 64x64x64. Our
+T=4 deficit falls in the same order (9.9 %, 5.2 %, 4.3 %) and this is the
+**explanation of the convergence** the benchmarks page measured -- deeper K
+amortises one retire pass over more accumulate passes. It is not the whole of
+it: the ratio of deficit to ``1/Kt`` is 0.79 / 0.63 / 0.69 rather than 1, and
+at T=8 the correspondence fails outright (32x32x32 has ``Kt=4`` and we are
+*faster* there). **So the retire pass is identified and the remainder is
+not**, and no change has been built against either.
+
+Why we are ahead at the small shapes, and why that stops
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The owner's rule is that a win needs a mechanism or it cannot be defended.
+For every shape where this baseline is ahead, the mechanism is the same one,
+and it is a statement about **fixed cost**, not about the array:
+
+- A latency shape is almost entirely prologue on both machines. Ours is
+  47 cycles of ``s_axilite`` programming, one operand pass and one drain
+  (measured above); Gemmini's window is five ``config`` RoCC instructions, the
+  ``loop_ws`` dispatch, the mesh's own fill and drain, and a closing ``fence``
+  -- of which the configs and fence alone were measured at 44 cycles at DIM=4.
+- Widening the burst removes most of *our* prologue and cannot touch Gemmini's,
+  so the machine with the shorter remaining fixed cost wins, and at these
+  shapes that is now us by 7-38 %.
+- It stops exactly where the marginal rate starts to dominate, because our
+  marginal rate is the worse of the two (1.224 against 1.181 cycles per mm row
+  at T=4). At T=8 the crossover sits one shape later -- 32x32x32 is still a
+  win at 0.98x -- because doubling ``T`` quarters the number of tiles a shape
+  contains, so a given shape stays fixed-cost-dominated for longer.
+
+**The T=8 16x16x8 win, which was previously unexplained**, is the extreme case
+of this: the shape is 2x2x1 tiles, so ``accu`` does 48 iterations of real work
+inside a 424-cycle window, and 312 of those cycles are prologue and drain that
+the widening then halves. It is the shape with the fewest tiles per unit of
+window on either side, which is why its margin (0.62x) is the largest anywhere
+in the two tables. The 1.33x standard-cell area that T=8 costs over T=4 at the
+same MAXDIM is the price, at no clock penalty.
+
+Two disclosures that belong with these numbers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **The FPGA resource line understates a build.** Operand space is nearly free
+  on an FPGA and is not on standard cells: MAXDIM 16 -> 64 costs +64.1 %
+  standard-cell area but only +2.4 % Vitis FF, a factor of about 27. Both
+  parity configurations are at MAXDIM=64, which is the matched setting, but
+  their BRAM and FF figures should not be read as what it would cost to build.
+- **The windows contain different things** and always have: ours starts at
+  ``ap_start`` with the program already in DRAM, Gemmini's is
+  ``rdcycle``-bracketed around five configs, one hardware ``loop_ws`` and a
+  ``fence``, with neither side's host counted. That is the same window pairing
+  every number on this page uses.
+
+.. _gemmini-parity-order:
+
+The program order that was measured and not used
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first preference was a change to the emitted program on an unchanged
+netlist, and two were built: ``isa_dsl.gemm_program_interleaved`` (every
+operand column block loaded just before the first ``mm`` that reads it, so the
+first ``mm`` waits behind ``M + K`` load rows instead of ``Kt*M + Nt*K``) and
+``gemm_program_b_per_tile``. Both have **identical** dynamic issue counts and
+per-unit work counts to the shipped order at every shape, so any cycle
+difference is scheduling.
+
+Measured at MAXDIM=16 on one netlist -- shipped / interleaved / b_per_tile /
+k-outermost -- 172/167/169/169, 262/250/256/252, 418/392/394/418,
+484/466/468/479, 686/636/638/672, all bit-exact. At MAXDIM=64 the interleaved
+order is worth 2 to 50 cycles on the unchanged netlist and 16 to 50 on the
+widened one (T=4 16x16x16: 879 -> 829, and 639 -> 589).
+
+**It is not in the baseline, for two measured reasons.** Its whole mechanism
+is removing a fixed prologue, so at the steady-state shapes where the deficit
+actually is it does nothing -- 32x32x32 measured 3,355 against the shipped
+order's 3,272 on the widened build, i.e. *worse* than simply widening -- and
+at the latency shapes where it does help, the widened baseline is already
+faster than Gemmini. And it **deadlocks in RTL** whenever ``Kt >= QD``: at
+T=4 32x32x32 and above and at T=8 64x64x64 and 32x64x32, cosim runs 30 million
+cycles without progress and Vitis's deadlock detector does not fire. Raising
+``TPU_QD`` to 16 makes the identical program complete (3,355 cycles,
+bit-exact), which is what identifies the cause: a ``dma_ld`` issued *between*
+two ``mm``s is separated from the unit that consumes its rows by ``Kt``
+instructions, the sequencer blocks mid-dispatch on a full depth-``QD`` queue,
+and the consumer waits for a load the sequencer can no longer dispatch.
+
+That the Allo simulator, ``stress_isa.py`` (640/640 exact for both orders) and
+``kpn_model.py``'s bounded-FIFO deadlock model all accept a program the RTL
+hangs on is a **gap in the verification stack**, not just a property of these
+two orders: the KPN model runs the channel protocol at depth ``QD`` and
+reports no deadlock, so it is missing the sequencer's mid-instruction blocking
+across its five output queues. Anyone adding a program order should cosim it
+at a shape with ``Kt >= QD`` before believing any of the three.
+
 
 Earlier measurements and corrections
 ------------------------------------
