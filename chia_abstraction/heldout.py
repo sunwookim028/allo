@@ -404,11 +404,17 @@ def graft(out: Path, base: str = PREPARED_BASE) -> dict:
         sh(["git", "worktree", "remove", "--force", str(wt)], check=False)
     sh(["git", "worktree", "add", "--detach", str(wt), base_ref])
     # This harness, and the design gates the ladder runs, from HEAD.
+    # NOT the design's own evaluator. `cosim.py`, `bench_isa.py`,
+    # `stress_isa.py`, `isa_ref.py` and `kpn_model.py` stay at `base`, because
+    # they are what that commit's design is measured and verified by, and
+    # mixing HEAD's gate with an older `microarch_isa.py` would be measuring
+    # neither. The run sets CHIA_MAIN_BASE to `base` so the byte-pin still
+    # applies, to that commit instead of to main. Checked: at a4151ca0 all
+    # five exist and `stress_isa.main(argv)` has the shape the runner needs;
+    # only `chia_agent/gate_runner.py` and `param_check.py` are absent, and
+    # those are runners, not gates.
     for path in ("chia_abstraction",
                  "examples/accelerator/tinytpu_vitis/chia_agent",
-                 "examples/accelerator/tinytpu_vitis/stress_isa.py",
-                 "examples/accelerator/tinytpu_vitis/isa_ref.py",
-                 "examples/accelerator/tinytpu_vitis/kpn_model.py",
                  "tests/limits"):
         sh(["git", "checkout", head, "--", path], cwd=wt, check=False)
     # Redact only what the graft brought in.
@@ -446,6 +452,7 @@ def graft(out: Path, base: str = PREPARED_BASE) -> dict:
     sh(["git", "worktree", "remove", "--force", str(wt)], check=False)
     leak = sh(["git", "grep", "-l", "-E", LEAK_RE, ref], check=False)
     r = {"ref": ref, "base": base_ref, "answer_at": PREPARED_ANSWER,
+         "CHIA_MAIN_BASE": base_ref,
          "branch": HELDOUT_BRANCH + "-graft", "grafted": len(grafted),
          "redacted_grafted": redacted,
          "leaks": [l for l in leak.splitlines() if l.strip()],

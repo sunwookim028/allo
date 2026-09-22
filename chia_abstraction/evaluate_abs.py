@@ -124,7 +124,16 @@ import evaluate as design_eval                               # noqa: E402
 FROZEN_REF = os.environ.get("CHIA_FROZEN_REF", "HEAD")
 #: main's commit the design case's own evaluator must be byte-identical to,
 #: exactly as `chia_agent/evaluate.py` pins it. Kept in sync deliberately.
-MAIN_BASE = design_eval.MAIN_BASE
+#: The design's own evaluator (cosim.py, bench_isa.py, stress_isa.py,
+#: isa_ref.py, kpn_model.py) must be byte-identical to this commit, so the loop
+#: cannot drift from how main measures and verifies the design.
+#:
+#: CHIA_MAIN_BASE relaxes it to a DIFFERENT named commit, and only that: the
+#: held-out rediscovery experiment evaluates at a graft of an earlier commit,
+#: where the design's evaluator is legitimately that commit's, not main's. The
+#: guard is not switched off -- the files are still pinned byte-for-byte to a
+#: commit named here -- and which commit is recorded in every verdict.
+MAIN_BASE = os.environ.get("CHIA_MAIN_BASE", design_eval.MAIN_BASE)
 
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
@@ -634,6 +643,7 @@ def main():
     spec = workloads.get(a.workload)
     started = time.time()
     result = {"ok": False, "disposition": a.disposition, "tier": a.tier,
+              "main_base": MAIN_BASE,
               "workload": a.workload, "patch": str(a.patch) if a.patch else None,
               "sandbox": bool(BWRAP), "stages": {}, "hints": [], "skipped": sorted(skip),
               "measurement": "TinyTPU-isa: Vitis HLS 2023.2 csynth + xsim "
