@@ -959,13 +959,13 @@ def gen_doc(spec) -> str:
             "each unit's flat row loop reads its own work count out of "
             "``nr``:", ""]
     out += _table("", ("opcode", "unit", "rewritten to", "why"),
-                  [(f"``{r['opcode']}``", f"``{r['unit']}``",
-                    ", ".join(f"``{k}`` = {v}" for k, v in r["set"].items()),
-                    r["note"]) for r in spec["dispatch"]["rewrites"]])
+                  [(f"``{op}``", f"``{unit}``", f"``nr`` = {what}",
+                    spec["dispatch"]["notes"].get(f"{op}/{unit}", ""))
+                   for op, unit, what in _rewrites(spec)])
     out += ["Which units need a rewrite, and to what, is **derived**: it is "
-            "every unit whose own work count differs from the instruction's "
-            "row count. ``gen_isa.py --check`` recomputes it from the actions "
-            "and holds this table to it.", ""]
+            "every unit the sequencer dispatches to whose own work count "
+            "differs from the instruction's row count. Nothing states it, so "
+            "adding an instruction adds no entry here.", ""]
 
     out += ["Instruction memory header", "^^^^^^^^^^^^^^^^^^^^^^^^^", "",
             f"``imem[0:NHDR]`` (``NHDR = {spec['imem']['header_words']}``) is a "
@@ -1120,6 +1120,36 @@ def gen_doc(spec) -> str:
     # alone. No trailing newline: the splice must be idempotent.
     body = "\n".join(out)
     return re.sub(r"(?<!`)`([^`\n]+)`(?!`)", r"``\1``", body)
+
+
+#: Which unit each sequencer dispatch queue feeds, for the derivations that
+#: need to know what the sequencer can rewrite at all.
+QUEUE_UNITS = ("dma_ld", "spm", "vru", "accu", "dma_st")
+
+
+def _rewrites(spec, nr=3):
+    """Every (opcode, unit, work) whose work count differs from `nr`.
+
+    The sequencer hands such a unit a rewritten copy of the word so its flat
+    row loop reads its own count out of `nr`. DERIVED from the actions: `spm`
+    taking T+1 on an `mm` and `accu` taking 2*nr on a `vadd` are consequences
+    of the ports, not entries in a table."""
+    machine = machine_of(spec)
+    out = []
+    for o in spec["opcodes"]:
+        if not o["actions"]:
+            continue
+        probe = {d["name"]: 0 for d in o["operands"]}
+        probe.update({"nr": nr, "acc": 1, "mode": 0})
+        for unit in machine.instruction(o["name"]).units:
+            if unit not in QUEUE_UNITS:
+                continue
+            steps = machine.work(unit, o["name"], probe)
+            if steps and steps != nr:
+                out.append((o["name"], unit,
+                            f"{steps // nr} * nr" if steps % nr == 0
+                            else f"T + {steps - machine.parameters['T']}"))
+    return out
 
 
 def _work_prose(job):
@@ -1656,6 +1686,32 @@ def _sequencer_dispatch():
     return out
 
 
+def _sequencer_rewrites():
+    """Which units the sequencer hands a rewritten `nr`, and the expression it
+    rewrites it to, read out of the hardware.
+
+    A `<queue>_copy[54:62] = <expr>` in the sequencer's body IS the rewrite;
+    the actions say which ones should be there and what they should say."""
+    path = os.path.join(HERE, "ip", "units", "sequencer.py")
+    with open(path) as f:
+        text = f.read()
+    out, current = {}, None
+    copies = {}
+    for line in text.splitlines():
+        body = line.split("#", 1)[0]
+        m = re.match(r"\s*(?:el)?if op == OP_([A-Z_]+):", body)
+        if m:
+            current = m.group(1).lower()
+            continue
+        m = re.match(r"\s*([a-z_]+)_copy: UInt\(64\) = resolved", body)
+        if m:
+            copies[m.group(1)] = current
+        m = re.match(r"\s*([a-z_]+)_copy\[54:62\] = (.+)$", body)
+        if m and m.group(1) in copies:
+            out[(copies[m.group(1)], m.group(1))] = m.group(2).strip()
+    return out
+
+
 def check_actions(spec, U, E):
     """The action model, and the four things it is held to.
 
@@ -1701,18 +1757,23 @@ def check_actions(spec, U, E):
             steps = machine.work(unit, o["name"], probe)
             if steps and steps != probe["nr"]:
                 derived[(o["name"], unit)] = steps
-    stated = {}
-    for r in spec["dispatch"]["rewrites"]:
-        probe = {"nr": 3, "T": U.T}
-        stated[(r["opcode"], r["unit"])] = int(
-            eval(str(r["set"]["nr"]).replace("the instruction's own nr", "nr"),  # noqa: S307
-                 {"__builtins__": {}}, probe))
-    if derived != stated:
+    hardware = _sequencer_rewrites()
+    if set(derived) != set(hardware):
         fails.append(
-            f"the per-unit rewrites the actions imply, {derived}, are not the "
-            f"ones isa_spec.json's dispatch.rewrites states, {stated}")
-    print(f"  dispatch rewrites: the actions imply exactly the "
-          f"{len(stated)} the spec states "
+            f"the actions imply a rewritten `nr` for "
+            f"{sorted(derived)} and ip/units/sequencer.py rewrites it for "
+            f"{sorted(hardware)}")
+    for key, expression in hardware.items():
+        if key not in derived:
+            continue
+        got = int(eval(expression, {"__builtins__": {}},  # noqa: S307
+                       {"nr": 3, "T": U.T}))
+        if got != derived[key]:
+            fails.append(
+                f"{key[0]}/{key[1]}: the sequencer rewrites nr to "
+                f"{expression!r} = {got}, the actions say {derived[key]}")
+    print(f"  dispatch rewrites: the actions imply {len(derived)}, and "
+          f"ip/units/sequencer.py performs exactly those -- "
           + ", ".join(f"{op}/{unit} -> {n}" for (op, unit), n in
                       sorted(derived.items())))
 

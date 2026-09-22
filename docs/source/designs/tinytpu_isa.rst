@@ -967,14 +967,14 @@ The sequencer hands two units a rewritten copy of the word, so each unit's flat 
      - why
    * - ``mm``
      - ``spm``
-     - ``nr`` = T + 1, ``f1`` = the instruction's own nr
+     - ``nr`` = T + 1
      - One header word plus T weight rows down wcol; f1 carries the array's row count into the header word.
    * - ``vadd``
      - ``accu``
      - ``nr`` = 2 * nr
      - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
 
-Which units need a rewrite, and to what, is **derived**: it is every unit whose own work count differs from the instruction's row count. ``gen_isa.py --check`` recomputes it from the actions and holds this table to it.
+Which units need a rewrite, and to what, is **derived**: it is every unit the sequencer dispatches to whose own work count differs from the instruction's row count. Nothing states it, so adding an instruction adds no entry here.
 
 Instruction memory header
 ^^^^^^^^^^^^^^^^^^^^^^^^^

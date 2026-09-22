@@ -918,27 +918,18 @@
       "deadlocks. Two units get a REWRITTEN copy so their flat row loops can",
       "read their own work count straight out of `nr` -- a row count that",
       "depends on the decoded opcode is a carried dependence and closes a",
-      "flat loop at Final II = 2."
+      "flat loop at Final II = 2.",
+      "",
+      "WHICH units need a rewritten `nr`, and to what, is not stated here any",
+      "more: it is every unit the sequencer dispatches to whose own work count",
+      "differs from the instruction's row count, and that follows from the",
+      "actions and the ports. `notes` keeps only the prose, keyed by",
+      "opcode/unit; adding an instruction adds no entry to either."
     ],
-    "rewrites": [
-      {
-        "opcode": "mm",
-        "unit": "spm",
-        "set": {
-          "nr": "T + 1",
-          "f1": "the instruction's own nr"
-        },
-        "note": "One header word plus T weight rows down wcol; f1 carries the array's row count into the header word."
-      },
-      {
-        "opcode": "vadd",
-        "unit": "accu",
-        "set": {
-          "nr": "2 * nr"
-        },
-        "note": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
-      }
-    ]
+    "notes": {
+      "mm/spm": "One header word plus T weight rows down wcol; f1 carries the array's row count into the header word.",
+      "vadd/accu": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
+    }
   },
   "imem": {
     "_comment": [
