@@ -531,11 +531,93 @@ def phase_parallel(R, work):
            and "slot1" in str((v1.get("stages") or {}).get("assemble", {})))
 
 
+
+
+# -- phase j: the leak detector must prove it looked -------------------------
+#: The general remedy for the failing-open family. A detector that returns
+#: "nothing found" is only evidence if it can be shown to have RUN, so this
+#: phase plants a leak and requires it to be found, requires the finding to
+#: name file:line:text, and requires a broken invocation to RAISE rather than
+#: return empty.
+#:
+#: It exists because this repository's own leak detector failed open: it used
+#: `git grep -E` with a Python regex, `git grep -E` is POSIX ERE and rejects
+#: `(?:...)`, git exited 128, the helper passed check=False, and the crash was
+#: read as "no matches". It reported a clean tree while 14 leaks were present,
+#: one of them in the agent's read path.
+LEAK_KNOWN = ("docs/source/developer/limitations.rst", 41)
+HELDOUT_BASE = "a4151ca0"
+
+
+def phase_leakcheck(R, work):
+    sys.path.insert(0, str(HERE))
+    import heldout
+
+    # 1. The regex that broke the old detector must be accepted by the new one.
+    #    `(?:...)` is the exact construct `git grep -E` rejected.
+    assert "(?:" in heldout.LEAK_RE, heldout.LEAK_RE
+    import re as _re
+    try:
+        _re.compile(heldout.LEAK_RE)
+        compiles = True
+    except _re.error as e:
+        compiles = f"does not compile: {e}"
+    R.case("j the leak pattern compiles under the engine the detector uses",
+           "Python re accepts it (git grep -E does not: that was the bug)",
+           str(compiles), compiles is True)
+
+    # 2. A broken invocation must RAISE, not return empty. A ref that does not
+    #    exist is the cheapest way to make git fail.
+    try:
+        got = heldout.scan_leaks("no-such-ref-deadbeef")
+        outcome, ok = f"returned {got!r} -- FAILED OPEN", False
+    except BaseException as e:                            # noqa: BLE001
+        outcome, ok = f"raised {type(e).__name__}", True
+    R.case("j a broken invocation raises rather than reporting a clean tree",
+           "raises", outcome, ok)
+
+    # 3. It must FIND a leak that is known to be present, and say where.
+    #    This is the one that actually happened: the held-out base's own
+    #    limitations register names the answer.
+    found = heldout.scan_leaks(HELDOUT_BASE)
+    hits = [f for f in found if f.startswith(LEAK_KNOWN[0] + ":")]
+    at_line = [f for f in hits if f.split(":")[1] == str(LEAK_KNOWN[1])]
+    R.case("j it finds the leak that was actually missed",
+           f"{LEAK_KNOWN[0]}:{LEAK_KNOWN[1]} among the findings",
+           (at_line[0][:110] if at_line else
+            f"NOT FOUND ({len(found)} findings, {len(hits)} in that file)"),
+           bool(at_line), {"total_findings": len(found)})
+
+    # 4. Every finding must name file:line:text, not just a file. A bare file
+    #    list cannot be audited, and the old one returned exactly that.
+    shaped = [f for f in found
+              if _re.match(r"^[^:]+:\d+: \S", f)]
+    R.case("j every finding names file:line:text",
+           "all findings well-formed",
+           f"{len(shaped)}/{len(found)} well-formed",
+           len(found) > 0 and len(shaped) == len(found))
+
+    # 5. A planted leak in a file the scan would otherwise pass must be found,
+    #    so that (3) is not passing merely because that one file is special.
+    import subprocess
+    probe = work / "leakprobe"
+    probe.mkdir(parents=True, exist_ok=True)
+    text = "nothing here\n" * 5 + 's.dependence("a", "b")\n' + "more\n"
+    (probe / "planted.py").write_text(text)
+    pat = _re.compile(heldout.LEAK_RE)
+    planted = [f"planted.py:{i}: {l.strip()}"
+               for i, l in enumerate(text.splitlines(), 1) if pat.search(l)]
+    R.case("j a planted leak is matched by the same pattern",
+           "found at line 6", str(planted or "NOT FOUND"),
+           planted == ["planted.py:6: s.dependence(\"a\", \"b\")"])
+
+
 PHASES = {"d": phase_frozen, "f": phase_primitive, "h": phase_objective,
           "i": phase_using, "a": phase_noop, "b": phase_known_good,
-          "c": phase_broken, "e": phase_cpp_fails, "g": phase_parallel}
-FREE = "d,f,h,i"
-ALL = "d,f,h,i,a,e,c,b,g"
+          "c": phase_broken, "e": phase_cpp_fails, "g": phase_parallel,
+          "j": phase_leakcheck}
+FREE = "d,f,h,i,j"
+ALL = "d,f,h,i,j,a,e,c,b,g"
 
 
 def main() -> int:
@@ -563,7 +645,7 @@ def main() -> int:
         try:
             if p == "h":
                 fn(R)
-            elif p in ("d", "f", "i", "g"):
+            elif p in ("d", "f", "i", "g", "j"):
                 fn(R, work)
             else:
                 fn(R, work, a.slot)
