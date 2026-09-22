@@ -606,11 +606,43 @@ Vitis' C simulation of the same testbench prints
 Everything cheaper passes it: ``check_program`` accepts it, ``kpn_model.run``
 reports ``minimum channel depth 1`` and no deadlock, the Allo simulator gives
 bit-exact agreement with ``isa_ref`` on four operand distributions twice over,
-and csim agrees too. ``row_reduce_16x16``, whose program has nearly the same
-shape -- the same single four-row weight ``dma_ld``, the same weight tile
-reused by every ``mm``, the same ``mm`` inside a hardware loop -- completes
-normally at 371 cycles, so the corpus brackets the fault rather than merely
-reporting it.
+and csim agrees too.
+
+``act/relu_hang_repro.py`` brackets it (``logs/cosim_act_relu_hang.log``, one
+csynth and four cosims in this session, ``ACT_COSIM_TIMEOUT=240``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 44
+
+   * - program
+     - cosim
+     -
+   * - the submission, as generated
+     - **hangs** at 109,000 ns
+     - ``mm``, ``vrelu``, ``mvout`` in a loop over the four column blocks
+   * - the same, ``vrelu`` removed
+     - **459 cycles**, 0/256 wrong
+     - one instruction different, and it completes
+   * - the same, loop unrolled
+     - **hangs** at 109,000 ns
+     - so it is not the hardware loop
+   * - ``gemm_relu_16x16x16``
+     - **750 cycles**, 0/256 wrong
+     - ``vrelu`` in a loop is not sufficient on its own
+
+The hang is deterministic: both hanging forms stop at exactly 109,000 ns of
+simulation time. Deleting the single ``vrelu`` from an otherwise identical
+program is the whole difference between 459 cycles and never finishing, and
+unrolling the loop changes nothing, so the hardware loop is not involved. But
+``gemm_relu_16x16x16`` runs the same three opcodes in the same order inside the
+same loop and completes, so ``vrelu`` alone is not the condition either. The
+remaining structural difference between the two -- that the failing program's
+``vrelu`` follows a single non-accumulating ``mm`` while the working one's
+follows a chain of accumulating ones -- is a hypothesis these four runs do not
+test. Naming the blocked process is RTL debugging and belongs to
+:doc:`/designs/tinytpu_isa`, not here; what belongs here is that the judge
+found it, bracketed it in four runs, and did not hang doing so.
 
 This is the reason the judge has an expensive tier at all, and it is a
 concrete instance of what :doc:`/designs/tinytpu_isa` calls cosim's role as a

@@ -1,0 +1,9 @@
+synthesizing once ...
+  relu_looped_relu         9 static,   17 dynamic instructions; critical unit accu at 192 work items; estimate 484 cycles
+  relu_looped_relu       cosim=None   RTL DID NOT COMPLETE within 240s; csim said TB relu_16x16 mismatches = 0 / 256; last RTL progress // RTL Simulation : 0 / 1 [n/a] @ "109000"
+  relu_looped_norelu       8 static,   13 dynamic instructions; critical unit vru at 128 work items; estimate 381 cycles
+  relu_looped_norelu     cosim=459   TB relu_16x16 mismatches = 0 / 256
+  relu_unrolled_relu      16 static,   17 dynamic instructions; critical unit accu at 192 work items; estimate 484 cycles
+  relu_unrolled_relu     cosim=None   RTL DID NOT COMPLETE within 240s; csim said TB relu_16x16 mismatches = 0 / 256; last RTL progress // RTL Simulation : 0 / 1 [n/a] @ "109000"
+  gemm_relu_retry         14 static,   32 dynamic instructions; critical unit accu at 384 work items; estimate 796 cycles
+  gemm_relu_retry        cosim=750   TB gemm_relu_16x16x16 mismatches = 0 / 256
