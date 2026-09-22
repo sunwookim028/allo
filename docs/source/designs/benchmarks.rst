@@ -1052,18 +1052,28 @@ smallest shapes do not clear the measurement noise at all, and the answer is
 T=8 vs Gemmini DIM=8, both at MAXDIM=64
 ---------------------------------------
 
-.. warning::
+.. note::
 
-   **The T=8 cycle column carries an unresolved exposure and is provisional
-   until it is re-measured.** It was taken *before* the parametric
-   ``DMA_WORDS`` refactor landed, which is the same exposure that moved the
-   published MAXDIM=16 row by one cycle (:ref:`benchmarks-one-cycle`). There
-   the cause was the memory sizing, which does **not** change at
-   T=8/MAXDIM=64 --- only ``rbA``/``rbB`` grew by one word, which is what took
-   BRAM 58 -> 62 --- so the expectation is no change. **That is a prediction,
-   not a measurement**, and the re-run is in flight. The number most exposed
-   is the 16x16x8 win, since it is the only shape where this design beats
-   Gemmini on a supportable margin.
+   **The T=8 cycle column was re-measured on current ``main`` and is
+   unchanged.** It had been taken before the parametric ``DMA_WORDS``
+   refactor, which is the exposure that moved the published MAXDIM=16 row by
+   one cycle (:ref:`benchmarks-one-cycle`). Re-run from a fresh ``csynth``:
+
+   .. code-block:: text
+
+      8x8x8     285   (was 285)      16x16x16   493   (was 493)
+      16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
+
+   every one bit-exact and identical. That is consistent with the mechanism
+   rather than merely reassuring: at T=8/MAXDIM=64 the memory *sizes* do not
+   change (``OPERAND_ROWS`` is 512 either way), only ``rbA``/``rbB`` grew by
+   one word --- which is what took BRAM 58 -> 62 and nothing else. **The
+   burst loop is now shown cycle-neutral at ``DMA_WORDS=1`` in three
+   independent configurations**: T=4/MAXDIM=16, T=4/MAXDIM=64 and
+   T=8/MAXDIM=64. That is what licenses the widening being a pure opt-in.
+
+   The entry most exposed was **16x16x8**, the only shape where this design
+   beats Gemmini on a supportable margin, and it returned 424 exactly.
 
 The second matched point, and **it does not agree with the first**, which is
 the whole reason for having two. Peak is 64 MAC/cycle on both sides.
