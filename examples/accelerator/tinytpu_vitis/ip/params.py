@@ -8,12 +8,37 @@ RTL build runs every shape, with M, K and N arriving as instruction fields. An
 architecture passes this namespace to its units; nothing is read from the
 environment or from a module global, so two architectures can instantiate the
 same unit at different sizes in one process.
+
+The memory sizes are DERIVED from T and MAXDIM rather than typed in. They used
+to be three independent literals that happened to be big enough at MAXDIM=16
+and silently were not above it: the shipped GEMM lays A out at
+`A_VR + kb*MAXDIM + m` and B at `B_SP + nb*MAXDIM + k`, so the highest operand
+row either names is `(MAXDIM/T - 1)*MAXDIM + MAXDIM == MAXDIM*MAXDIM/T`, which
+at MAXDIM=64 is 1024 rows against a 256-entry vreg file -- a build that
+assembles and gives wrong answers. `None` on any of them means "derive"; an
+explicit value overrides, which is how a deliberately-undersized build is
+probed.
 """
 
 from dataclasses import dataclass
 
-PARAMETER_NAMES = ("T", "VW", "AW", "QD", "MAXDIM", "WPR",
-                   "SPAD_ROWS", "NVR", "NAR", "IMEM_SIZE")
+PARAMETER_NAMES = ("T", "VW", "AW", "QD", "MAXDIM", "WPR", "OPERAND_ROWS",
+                   "DMA_WORDS", "SPAD_ROWS", "NVR", "NAR", "IMEM_SIZE")
+
+#: The fixed window `stress_isa.random_program` addresses in each memory,
+#: independently of MAXDIM: a memory smaller than this cannot hold a fuzz
+#: program at all, so it is a floor under the derived size. Sizing purely to
+#: `OPERAND_ROWS` gave 16 rows at MAXDIM=8 and took `param_check.py` from
+#: `PARAM OK` to "0 of 24 random programs could be generated".
+TEST_WINDOW = 64
+
+#: Widest beat the operand ports can move once `align_value(64)` is emitted.
+BUS_BYTES = 64
+
+#: An address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so an
+#: operand row must be <= 2047. At T=4 that is MAXDIM <= 90; MAXDIM=96 fails in
+#: `Assembler.check` with "AGU-resolved f3=2112 is outside the 0..2047 range".
+ADDRESS_FIELD_MAX = (1 << 11)
 
 
 @dataclass(frozen=True)
@@ -22,12 +47,13 @@ class TpuParams:
     array is T*T instances and the chains are T and T*T stream arrays."""
 
     T: int = 4                  # SIMD width == array dimension
-    MAXDIM: int = 16            # largest M, K, N supported
-    SPAD_ROWS: int = 512        # scratchpad rows, each one packed word
-    NVR: int = 256              # operand vector registers
-    NAR: int = 128              # accumulator vector registers
+    MAXDIM: int = 64            # largest M, K, N supported
+    SPAD_ROWS: int = None       # scratchpad rows, each one packed word
+    NVR: int = None             # operand vector registers
+    NAR: int = None             # accumulator vector registers
     QD: int = 8                 # stream depth
     IMEM_SIZE: int = 56         # instruction memory words, header included
+    DMA_WORDS: int = 1          # packed words per operand-burst iteration
 
     def __post_init__(self):
         # A packed word must hold the two 16-bit counts the scratchpad sends
@@ -37,6 +63,23 @@ class TpuParams:
             "a DRAM row must be a whole number of packed words")
         assert self.IMEM_SIZE % 8 == 0, (
             "the program prefetch moves 8 words per iteration")
+        assert self.OPERAND_ROWS <= ADDRESS_FIELD_MAX, (
+            f"MAXDIM={self.MAXDIM} at T={self.T} needs {self.OPERAND_ROWS} "
+            f"operand rows, past the {ADDRESS_FIELD_MAX - 1} an 11-bit address "
+            f"field carries")
+        assert self.DMA_WORDS >= 1
+        if self.SPAD_ROWS is None:
+            object.__setattr__(self, "SPAD_ROWS",
+                               max(TEST_WINDOW, self.OPERAND_ROWS))
+        if self.NVR is None:
+            object.__setattr__(self, "NVR", max(TEST_WINDOW, self.OPERAND_ROWS))
+        if self.NAR is None:
+            # `AR_C` is MAXDIM rows and `AR_P` another MAXDIM starting at
+            # MAXDIM+1, so the GEMM and vector programs need 2*MAXDIM+2; the
+            # 128 floor keeps the fixed-address test programs
+            # (`isa_dsl.vector_program` reaches row 112) legal at small MAXDIM.
+            object.__setattr__(self, "NAR",
+                               max(128, TEST_WINDOW, 2 * self.MAXDIM + 8))
 
     @property
     def VW(self) -> int:
@@ -52,6 +95,19 @@ class TpuParams:
     def WPR(self) -> int:
         """Packed words per DRAM row."""
         return self.MAXDIM // self.T
+
+    @property
+    def OPERAND_ROWS(self) -> int:
+        """Rows of a memory the shipped GEMM's operand layout names."""
+        return (self.MAXDIM // self.T) * self.MAXDIM
+
+    @staticmethod
+    def widest_burst(T: int, MAXDIM: int) -> int:
+        """The widest operand burst the 64-byte bus holds, capped at one whole
+        DRAM row: rounding the row span up to a multiple of it never leaves the
+        operand, since the extra words land in burst-buffer rows no instruction
+        names."""
+        return min(MAXDIM // T, max(1, BUS_BYTES // T))
 
     def namespace(self) -> dict:
         return {name: getattr(self, name) for name in PARAMETER_NAMES}

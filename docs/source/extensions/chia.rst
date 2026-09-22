@@ -237,6 +237,32 @@ Mechanical enforcement, not instructions:
 
 Every accepted diff is still read by a person.
 
+Running two tracks on one host: ``ray stop`` is global
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**``ray stop`` matches Ray processes by name across the entire host**, so it
+kills raylets belonging to every worktree rather than only the one it is run
+from. A track that ends a run or a swarm with it takes down whatever else is
+mid-flight.
+
+Observed on 2026-09-22: a paid two-worker search lost both workers 10.8 minutes
+in, at $1.69, during their first model call, with ``raylet.out`` showing
+``received SIGTERM`` and ``Raylet graceful shutdown triggered ... reason:
+EXPECTED_TERMINATION``. Not memory — 757 GB was free. The GCS survived; the
+raylet did not.
+
+There is **no per-worktree isolation** for this. Matching is on process name, so
+a private temporary directory or a distinct port does not help. Two options, and
+the choice is operational rather than technical: serialise Ray use across
+tracks, or treat a raylet ``SIGTERM`` as transient and retry, accepting the
+wasted spend.
+
+The failure direction is at least safe: workers die rather than producing an
+unscored candidate. And a harness that calls ``ray stop`` unconditionally on
+teardown makes concurrent tracks impossible on one host — prefer stopping only
+your own cluster by address, or simply letting the process exit.
+
+
 Running it
 ~~~~~~~~~~
 

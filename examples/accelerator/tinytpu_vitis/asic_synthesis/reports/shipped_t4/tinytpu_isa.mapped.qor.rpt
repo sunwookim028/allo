@@ -1,0 +1,126 @@
+ 
+****************************************
+Report : qor
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Tue Sep 22 00:47:02 2026
+****************************************
+
+
+  Timing Path Group 'FEEDTHROUGH'
+  -----------------------------------
+  Levels of Logic:               8.00
+  Critical Path Length:          0.43
+  Critical Path Slack:           1.23
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+  Timing Path Group 'REGIN'
+  -----------------------------------
+  Levels of Logic:               6.00
+  Critical Path Length:          0.90
+  Critical Path Slack:           0.72
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+  Timing Path Group 'REGOUT'
+  -----------------------------------
+  Levels of Logic:               7.00
+  Critical Path Length:          0.63
+  Critical Path Slack:           2.70
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+  Timing Path Group 'ideal_clock'
+  -----------------------------------
+  Levels of Logic:              62.00
+  Critical Path Length:          3.11
+  Critical Path Slack:           0.18
+  Critical Path Clk Period:      3.33
+  Total Negative Slack:          0.00
+  No. of Violating Paths:        0.00
+  Worst Hold Violation:          0.00
+  Total Hold Violation:          0.00
+  No. of Hold Violations:        0.00
+  -----------------------------------
+
+
+  Cell Count
+  -----------------------------------
+  Hierarchical Cell Count:       2302
+  Hierarchical Port Count:      16962
+  Leaf Cell Count:             430730
+  Buf/Inv Cell Count:           36536
+  Buf Cell Count:               25646
+  Inv Cell Count:               10890
+  CT Buf/Inv Cell Count:            0
+  Combinational Cell Count:    205743
+  Sequential Cell Count:       224987
+  Macro Count:                      0
+  -----------------------------------
+
+
+  Area
+  -----------------------------------
+  Combinational Area:   255505.241336
+  Noncombinational Area:
+                       1016186.729495
+  Buf/Inv Area:          26741.245521
+  Total Buffer Area:         20947.77
+  Total Inverter Area:        5793.48
+  Macro/Black Box Area:      0.000000
+  Net Area:                  0.000000
+  Net XLength        :     6003033.50
+  Net YLength        :     6699802.00
+  -----------------------------------
+  Cell Area:           1271691.970831
+  Design Area:         1271691.970831
+  Net Length        :     12702836.00
+
+
+  Design Rules
+  -----------------------------------
+  Total Number of Nets:        435278
+  Nets With Violations:           439
+  Max Trans Violations:             0
+  Max Cap Violations:             439
+  -----------------------------------
+
+
+  Hostname: zhang-21.ece.cornell.edu
+
+  Compile CPU Statistics
+  -----------------------------------------
+  Resource Sharing:                  185.39
+  Logic Optimization:               1298.25
+  Mapping Optimization:             2021.94
+  -----------------------------------------
+  Overall Compile Time:             7256.93
+  Overall Compile Wall Clock Time:  2405.28
+
+  --------------------------------------------------------------------
+
+  Design  WNS: 0.00  TNS: 0.00  Number of Violating Paths: 0
+
+
+  Design (Hold)  WNS: 0.00  TNS: 0.00  Number of Violating Paths: 0
+
+  --------------------------------------------------------------------
+
+
+1

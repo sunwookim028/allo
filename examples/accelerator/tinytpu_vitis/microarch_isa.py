@@ -13,11 +13,17 @@ which Allo requires, because it reaches a `@df.kernel` only as a nested
 This module is the one build the fork ships and measures: the parameter set,
 read from the environment so a sweep can change it, and the module-level names
 the harness (`bench_isa`, `stress_isa`, `cosim`, `isa_dsl`, `isa_ref`,
-`kpn_model`, `mutate`) imports.
+`kpn_model`, `act_*`, `mutate`) imports.
+
+The memory sizes are DERIVED from T and MAXDIM in `ip/params.py`, not typed in
+here: three independent literals were big enough at MAXDIM=16 and silently were
+not above it. The environment variables remain as overrides, which is how a
+deliberately-undersized build is probed.
 
 Design notes: `docs/source/designs/tinytpu_isa.rst` (the architecture and the
-ISA), `tinytpu_library.rst` (the decomposition, and what the front end refuses),
-`tinytpu_history.rst` (how the numbers were reached).
+ISA), `tinytpu_library.rst` (the decomposition, and what the front end
+refuses), `tinytpu_history.rst` (how the numbers were reached),
+`benchmarks.rst` (what bounds MAXDIM, and at what value).
 """
 
 import os
@@ -41,20 +47,42 @@ _MAX_STATIC = 24               # longest program shipped, plus headroom
 # environment parameter: one RTL build runs every shape, and the parametricity
 # gate rebuilds the design at other values of them.
 T = int(os.environ.get("TPU_T", 4))
-MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))
-SPAD_ROWS = int(os.environ.get("TPU_SPAD", 512))
-NVR = int(os.environ.get("TPU_NVR", 256))
-NAR = int(os.environ.get("TPU_NAR", 128))
-QD = int(os.environ.get("TPU_QD", 8))
-IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC))
+MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))
 
-PARAMS = TpuParams(T=T, MAXDIM=MAXDIM, SPAD_ROWS=SPAD_ROWS, NVR=NVR, NAR=NAR,
-                   QD=QD, IMEM_SIZE=IMEM_SIZE)
+# Operand-burst width in packed words per loop iteration. 1 is the shipped
+# design; `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds, and
+# `TPU_DMA_WORDS` names one directly.
+_WIDEN = TpuParams.widest_burst(T, MAXDIM) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1
+DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", _WIDEN))
+
+
+def _override(name):
+    """An explicit memory size, or None to derive it from T and MAXDIM."""
+    value = os.environ.get(name)
+    return int(value) if value else None
+
+
+PARAMS = TpuParams(
+    T=T,
+    MAXDIM=MAXDIM,
+    SPAD_ROWS=_override("TPU_SPAD"),
+    NVR=_override("TPU_NVR"),
+    NAR=_override("TPU_NAR"),
+    QD=int(os.environ.get("TPU_QD", 8)),
+    IMEM_SIZE=int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC)),
+    DMA_WORDS=DMA_WORDS,
+)
 TPU = TinyTPU(PARAMS)
 
 VW = PARAMS.VW
 AW = PARAMS.AW
 WPR = PARAMS.WPR
+QD = PARAMS.QD
+IMEM_SIZE = PARAMS.IMEM_SIZE
+OPERAND_ROWS = PARAMS.OPERAND_ROWS
+SPAD_ROWS = PARAMS.SPAD_ROWS
+NVR = PARAMS.NVR
+NAR = PARAMS.NAR
 
 A_VR = TPU.memory_map.A_VR
 B_SP = TPU.memory_map.B_SP

@@ -126,7 +126,7 @@ real co-design claim: **neither change demonstrates anything alone**, and the
 first has to be made before the second's constraint can even be measured.
 
 A prediction stated in advance, confirmed to the cycle
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Worth recording separately, because it is the difference between a flow that is
 understood and one that merely works. Before measuring, the co-design track
@@ -310,6 +310,30 @@ any hardware claim has to use. And **two of those four checkers are derived from
 the assembler's own header**, so neither can see an error in the header formula
 itself — agreement among them is weaker evidence than it looks, because they
 share a premise.
+
+**The obvious explanation was tested and refuted.** The suspicion was that the
+trigger is a transfer *inside* the emitted nest rather than hoisted into a
+prologue, and a coverage fact made it look stronger still — of the 23 programs
+the named gates run, **none issues a memory load after a compute**, while the
+random-program generator produces one in **314 of 400 seeds**. So the pattern is
+exercised constantly in the simulator and had never reached a co-simulation
+testbench.
+
+Four minimal programs, each verified against the reference model and by csim,
+then co-simulated under a hard bound: a prologue-only case, a load after a
+compute, a load in a loop before a compute, and a load sharing a loop body with
+a compute. **All four completed.** The hypothesis is dead; the trigger needs
+something those cases lack — nested loops, larger trip counts, an accumulating
+instruction inside a loop, or simply scale.
+
+Two things worth copying from how that was handled. A `covered / UNCOVERED`
+column had **already been added** to the flow on the strength of the suspicion,
+and it separated the candidates perfectly; it was **reverted** once the
+predicate was refuted, on the grounds that shipping a refuted predicate as a
+warning would mislead the very search it exists to guide. And the coverage gap
+survives as a finding in its own right even though it was not the cause: **a
+pattern can be exercised thousands of times in a simulator and never once on
+RTL**, and nothing in the gate list makes that visible.
 
 The general lesson is about verification chains rather than about this design:
 **a stack of cheap checks that all pass is not a substitute for the expensive

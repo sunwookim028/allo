@@ -37,10 +37,58 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     gemm_program, assert_matches_handwritten,
 )
 
-# Re-exported: `kpn_model`, `isa_dsl` and `impact/bench_variant.py` import
-# `bench_isa.SHAPES`. The definition itself is in `shapes.py`, which imports
+# Re-exported: `act_compile`, `kpn_model`, `isa_dsl`, `stress_isa` and
+# `tests/act/test_tinytpu.py` all import `bench_isa.SHAPES` and all mean the
+# canonical five. The definition itself is in `shapes.py`, which imports
 # nothing, so the CHIA harness (a conda env without `allo`) can read it too.
 from examples.accelerator.tinytpu_vitis.shapes import SHAPES  # noqa: E402
+
+# ---- THE TWO BENCHMARK SETS ----
+# They answer different questions and are never mixed into one verdict; the
+# accounting is in `docs/source/designs/benchmarks.rst`.
+#
+#   LATENCY   the five shapes the published 171/261/417/483/685 come from --
+#             `SHAPES` itself, aliased so the two sets read symmetrically.
+#             At 16x16x16 this 4x4 array does 16 tile-matmuls and 256
+#             wavefront rows while a 16x16 array does ONE weight load and one
+#             pass, so the same shape is not the same work and the number is
+#             dominated by the fixed pipeline term. It measures
+#             time-to-first-result, not throughput.
+#   STEADY    shapes big enough to amortise that fixed term, so MACs/cycle
+#             approaches the array's T*T peak and the number characterises
+#             the MACHINE. Cubic 16..64 plus two non-cubic shapes, which
+#             separate the M (wavefront rows) term from the N*K (tile count)
+#             term.
+LATENCY = SHAPES
+STEADY = [(16, 16, 16), (32, 32, 32), (48, 48, 48), (64, 64, 64),
+          (64, 32, 64), (32, 64, 32)]
+
+
+def runnable(shapes):
+    """The subset this build can express: a multiple of T, within MAXDIM."""
+    return [s for s in shapes
+            if all(d % T == 0 and d <= MAXDIM for d in s)]
+
+
+# The set THIS RUN sweeps, and it is deliberately NOT called `SHAPES`.
+# `SHAPES` is re-exported and read POSITIONALLY elsewhere -- `accept.BASELINES`
+# is indexed against `shapes.NAMES`, and `act_compile`/`kpn_model`/`isa_dsl`/
+# `tests/act/test_tinytpu.py` all want the five -- so a knob that changed its
+# value would silently change what those modules measure. An earlier revision
+# of this file did exactly that.
+#
+# `runnable` is applied to BOTH sets: T is a working parameter (T=8 verifies
+# bit-exact), and at T=8 three of the five latency shapes are not multiples of
+# T. The published five survive it unchanged at T=4.
+SWEEP = runnable(LATENCY)
+if os.environ.get("TPU_SET") == "steady":
+    SWEEP = runnable(STEADY)
+elif os.environ.get("TPU_SET") == "all":
+    SWEEP = runnable(LATENCY) + [s for s in runnable(STEADY)
+                                 if s not in LATENCY]
+if os.environ.get("TPU_SHAPES"):        # e.g. TPU_SHAPES=4x4x4,64x64x64
+    SWEEP = [tuple(int(x) for x in t.split("x"))
+             for t in os.environ["TPU_SHAPES"].split(",")]
 
 
 def buffers(seed=0):
@@ -103,7 +151,7 @@ def check_vadd(mod, M, K, N):
 
 
 if __name__ == "__main__":
-    shapes = SHAPES
+    shapes = SWEEP
     if len(sys.argv) == 4:
         shapes = [tuple(int(a) for a in sys.argv[1:4])]
     print(f"TinyTPU-isa: ONE build -- {T}x{T} array, MAXDIM={MAXDIM}, "

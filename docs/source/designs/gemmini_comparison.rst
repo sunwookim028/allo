@@ -27,12 +27,26 @@ distribution. The design under test is :doc:`tinytpu_isa`.
 
 .. important::
 
-   **Result, 2026-09-19: TinyTPU-isa is 1.07-1.24x slower than Gemmini at all
-   five shapes** (``e24e433b``) when both sides are measured over the same
-   window: the accelerator plus its dispatch, with near-zero memory latency on
-   both. Until ``e24e433b`` it was **1.55-1.8x** slower (252 / 383 / 591 / 667
-   / 919 cycles); the step is the gap attribution's measured design stack,
-   landed as the design (:ref:`gemmini-gap-attribution`).
+   **Result, superseded in scope on 2026-09-22 — read both lines.**
+
+   Over the five original shapes at ``MAXDIM=16`` (``e24e433b``), measured on
+   both sides over the same window — the accelerator plus its dispatch, with
+   near-zero memory latency on both — TinyTPU-isa is **1.07-1.24x slower than
+   Gemmini**. That measurement stands and it is what the body of this page
+   analyses. Until ``e24e433b`` it was **1.55-1.8x** slower (252 / 383 / 591 /
+   667 / 919 cycles); the step is the gap attribution's measured design stack
+   (:ref:`gemmini-gap-attribution`).
+
+   Over **ten** shapes at ``MAXDIM=64``, with Gemmini reported as a median of
+   five trials, the deficit **converges**: 1.27x at 16x16x16, 1.26x at 32³,
+   1.13x at 48³ and **1.09x at 64³**, with the design reaching **74.1 % of
+   peak** and still climbing. At the two smallest shapes the difference **does
+   not clear Gemmini's measurement spread** and is not a supportable claim
+   either way. So the 1.07-1.24x range is a statement about pipeline depth at
+   small shapes, not about steady-state efficiency, and a reader wanting "how
+   far behind is this design" should take **1.09x at 64x64x64** — or **1.04x**
+   with the burst-widening candidate, which is not landed and costs +123 %
+   block RAM.
 
    The earlier claim, "faster at all five shapes", compared our
    accelerator-only count with Gemmini's ``tiled_matmul_auto``, and about 395
@@ -955,6 +969,25 @@ generally:
 - **Where both windows are cheap to report, report both.** For Gemmini this
   costs nothing, because the driver-inclusive and accelerator-only figures come
   out of the same run.
+- **Report an integer invariant beside every timing.** Kernel invocations, DMA
+  descriptors, burst iterations, instruction words, ``loop_ws`` calls — some
+  count that cannot drift. A time can always be explained away as noise or a
+  slow clock; an integer cannot, and it distinguishes *a changed measurement*
+  from *a changed machine*.
+
+  The worked example is MiniTPU's, offered against their own interest. A first
+  measurement of an unchanged commit read a **2x regression**, and three things
+  were wrong at once: provisioning had silently reprogrammed the part from a
+  stale firmware directory, replacing the bitstream under the test; the host
+  package was a stale copy missing its committed images, so it rebuilt work per
+  launch; and provisioning had chowned a device node and locked the next user
+  out. **What caught it was the launch count — 216 against 180, eighteen a layer
+  instead of fifteen** — clock-independent, bitstream-independent and integer,
+  pointing straight at the host. The wall-clock number alone would have sent
+  them looking at the RTL.
+
+  Their rule, now ours: read the identity of what you are measuring **after**
+  provisioning, not only before.
 
 This is the same failure mode as the withdrawn claim recorded above: a number
 that is true of the measurement but not of the thing being measured. Two of

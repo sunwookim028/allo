@@ -8,7 +8,20 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
-EXPECTED="4x4x4=172 8x8x8=262 12x12x12=418 16x16x8=484 16x16x16=686"
+# At TPU_MAXDIM=16 (pinned below), which is where these were measured.
+#
+# THESE MOVED BY ONE CYCLE, uniformly, and the cause is measured rather than
+# inferred. They were 172 / 262 / 418 / 484 / 686 while the scratchpad and
+# vreg files were the literals 512 and 256; they are 171 / 261 / 417 / 483 /
+# 685 now that both are DERIVED as MAXDIM^2/T, which is 64 rows each at
+# MAXDIM=16. Rebuilding this configuration with `TPU_SPAD=512 TPU_NVR=256
+# TPU_NAR=128` and nothing else changed returns 172 at 4x4x4, so the cycle is
+# the memory sizing and not the parametric burst loop that landed beside it.
+# A 64-row file is not implemented the way a 512-row one is -- BRAM 42 -> 40
+# says two memories left block RAM -- and a shorter operand read path takes
+# one cycle out of the FIXED term, which is why the delta is the same at
+# every shape regardless of work. It is a (very small) improvement.
+EXPECTED="4x4x4=171 8x8x8=261 12x12x12=417 16x16x8=483 16x16x16=685"
 
 usage() {
     cat <<'EOF'
@@ -30,7 +43,7 @@ Stages, in order:
   3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK;
   4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
      csynth, one cosim per shape -- and compares the cycle counts with the
-     published 172 / 262 / 418 / 484 / 686. Skipped by --no-cosim.
+     published 171 / 261 / 417 / 483 / 685. Skipped by --no-cosim.
 
 WHAT THE DEFAULT SKIPS. Stage 3b is off unless --with-mutants is given.
 bench_isa.py and stress_isa.py both cite mutate.py as the evidence that they
@@ -76,6 +89,15 @@ export PYTHONPATH=$ROOT
 # A knob left in the caller's shell (TPU_SHAPES, TPU_AXI_LATENCY, TPU_TB, ...)
 # would change what is measured. The published numbers are the defaults.
 for v in $(env | grep -o '^TPU_[A-Z_]*' || true); do unset "$v"; done
+# ...with ONE knob set deliberately. The published five are a **MAXDIM=16**
+# measurement, and the shipped default moved to MAXDIM=64 so that shapes which
+# reach steady state can run at all (docs/source/designs/benchmarks.rst).
+# MAXDIM is the DRAM row stride of every operand, so the same shape costs more
+# on a bigger build -- 4x4x4 is 218 cycles at MAXDIM=64 against 171 at 16 --
+# and this script reproduces the published numbers, which means pinning the
+# configuration they were taken on. The MAXDIM=64 sweep is
+# `TPU_SET=all cosim.py`, and its numbers are on the benchmarks page.
+export TPU_MAXDIM=16
 
 PY=$(command -v python)
 LOGS=$HERE/.scratch          # gitignored
@@ -128,7 +150,7 @@ fi
 
 echo "== cosim.py, default testbench (csynth once, then one cosim per shape)"
 "$PY" cosim.py | tee "$LOGS/cosim-reproduce.log"
-# The summary table: "  16x16x16   686", shape fields space-padded.
+# The summary table: "  16x16x16   685", shape fields space-padded.
 got=$(awk '/^  shape +cycles/{t=1; next} t && /^ +[0-9]/ {c=$NF; $NF=""; s=$0;
       gsub(/ /,"",s); printf "%s=%s ", s, c}' "$LOGS/cosim-reproduce.log" | sed 's/ $//')
 echo "   expected: $EXPECTED"

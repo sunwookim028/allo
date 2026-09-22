@@ -21,8 +21,16 @@ def accumulator_directives(s, ctx):
     # store and step n+1's load touch different rows, and closes the loop at
     # II=3. The claim is true only for programs that meet the assembler's
     # accumulator distance contract, which `Assembler.check` enforces.
-    s.dependence(f"{ctx.instance('accu')}:work", "ar", dep_type="inter",
-                 dependent=False)
+    s.dependence(
+        f"{ctx.instance('accu')}:work", "ar", dep_type="inter",
+        dependent=False,
+        because=(
+            f"check_program() rejects any program that reads an ar row within "
+            f"AR_RAW_DIST={ctx.parameters['AR_RAW_DIST']} accu iterations of "
+            f"writing it (THE ACCUMULATOR DISTANCE CONTRACT); assemble() "
+            f"enforces it, the hardware does not, and only TPU_TB=stress cosim "
+            f"can see a breach"),
+    )
 
 
 @unit(

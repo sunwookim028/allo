@@ -41,11 +41,33 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
 
    Headline, as of 2026-09-19 (``e24e433b``): one hardware build runs every
    shape as data, all five benchmark shapes are bit-exact in RTL
-   co-simulation, and the design takes **172 / 262 / 418 / 484 / 686** cycles
+   co-simulation, and the design takes **171 / 261 / 417 / 483 / 685** cycles
    at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
+   .. note::
+
+      **This row moved by one cycle at every shape on 2026-09-22**, from
+      172 / 262 / 418 / 484 / 686 to **171 / 261 / 417 / 483 / 685**, every
+      testbench still bit-exact. It was caught by the design's own reproduction
+      gate reporting ``DIFFERS`` rather than passing, and confirmed by two
+      independent co-simulation runs in separate processes with separate
+      syntheses, which reproduced it exactly.
+
+      A delta that is **uniform across shapes** is a fixed-cost change rather
+      than a per-work one. It arrives with the design edits that came in with
+      the benchmark work — sizing literals replaced by a derived
+      ``OPERAND_ROWS``, two encoding-ceiling assertions, and a test-window fix.
+      **Which of those saves the cycle is not yet identified**, and this note
+      stays until it is; a number whose mechanism nobody can state is a number
+      on probation, however well it reproduces.
+
+      Earlier figures elsewhere on this site quoting the old row describe the
+      design before those edits, not a disagreement.
+
    ``-m_axi_latency 0``). Measured over the same window on both sides, the
-   design is **1.07-1.24x slower** than Gemmini at all five shapes; see
-   :doc:`gemmini_comparison`.
+   design is **1.07-1.24x slower** than Gemmini at these five shapes. Over ten
+   shapes at ``MAXDIM=64`` the deficit **converges to 1.09x at 64x64x64** at
+   **74.1 % of peak**, and the two smallest shapes do not clear Gemmini's
+   measurement spread; see :doc:`gemmini_comparison`.
 
    Until ``e24e433b`` the shipped design took **252 / 383 / 591 / 667 / 919**
    (1.55-1.8x behind Gemmini). The step between the two is the gap
@@ -791,13 +813,31 @@ its accumulator carries no dependence across iterations:
 
 .. code-block:: python
 
-   s.dependence("accu_0:x", "ar", dep_type="inter", dependent=False)
-   # -> #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
+   s.dependence(
+       "accu_0:x", "ar", dep_type="inter", dependent=False,
+       because=f"check_program() rejects any program that reads an ar row "
+               f"within AR_RAW_DIST={AR_RAW_DIST} accu iterations of writing "
+               f"it (THE ACCUMULATOR DISTANCE CONTRACT); assemble() enforces "
+               f"it, the hardware does not, and only TPU_TB=stress cosim can "
+               f"see a breach",
+   )
+   # -> // dependence obligation, checked by no tool: check_program() rejects ...
+   #    #pragma HLS dependence variable=ar inter false   (inside accu's row loop)
 
 ``s.dependence`` is the schedule primitive added for :ref:`limitation-21`
 (``bbea2af0``). Without the claim the flat loop closes at ``Final II = 3``:
 the row index is a carried register, so Vitis cannot prove that iteration n's
 store and iteration n+1's load of ``ar`` touch different rows.
+
+That same carried register is why this claim is an **obligation** and not
+something Allo's legality rule can settle. The rule (``allo/dependence.py``,
+added with the 2026-09-22 update to :ref:`limitation-21`) refuses a claim only
+when it can *prove* a dependence at a distance the claim denies; ``ar[ra]``
+with ``ra`` computed per iteration is not affine in the loop's induction
+variable, so nothing is provable and the claim stands -- which is correct, and
+is the reason the primitive exists. ``because=`` is where the contract below is
+recorded; it is printed above the pragma in ``kernel.cpp`` and listed in
+``s.dependence_obligations``.
 
 **The claim is not true of the hardware on its own**, and the branch that
 priced it (``v_accudep`` / ``v_design_dep``, which injected the pragma into
@@ -1099,3 +1139,62 @@ lacked, which makes it a useful oracle for the class of bug in
 :ref:`limitation-11`. ``csim`` passing is the first functional check of the
 *emitted HLS code* rather than of the Allo simulator's interpretation of the
 design.
+
+Standard-cell synthesis: one number, and what it is not
+-------------------------------------------------------
+
+The shipped configuration has been synthesised to standard cells for the first
+time, on 2026-09-22, on a different host from the one every other figure here
+comes from.
+
+**FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
+flatten effort 3, memories as flip-flops** (``sram_mode='none'``), Synopsys DC
+``W-2024.09``, via mflowgen 0.8.0 at commit ``aee0e5d6``. 47 minutes of wall
+time.
+
+============================== ==========================================
+Total cell area                **1,271,692** FreePDK45 area units
+  non-combinational            1,016,187 — **79.9 %**
+  combinational                255,505, of which 26,741 buffer/inverter
+  macro / black box            0
+Sequential cells               224,987 (2,302 hierarchical cells)
+Timing                         **MET**, worst slack **+0.18 ns**, critical path
+                               3.11 ns of 3.33, 62 logic levels, zero violating
+                               and zero hold violations
+Power                          57.1 mW total, 22 mW leakage — **indicative
+                               only**, default toggle rates with no activity
+                               data; ``gmem0_m_axi`` alone accounts for 45 %
+============================== ==========================================
+
+**Four fifths of the cell area is flip-flops**, which is the predicted result
+rather than a surprising one: the scratchpad, the vector registers and the
+accumulator are block RAM on the FPGA and become registers when the flow is told
+to use no memory macros.
+
+That is the whole interpretive caveat, and it runs in a direction worth naming.
+**This number says more about the memory treatment than about the datapath**, so
+it cannot be compared against any flow that used provided SRAM macros without
+giving that flow the same treatment. It also means a *variant* comparison —
+which is the useful thing this run enables — will **overstate** the area cost of
+any change that buys cycles with more on-chip memory, because memory is being
+priced as registers rather than as macros. The burst-widening candidate, which
+costs +123 % block RAM, is exactly such a change.
+
+What the run gives up, stated plainly: relative cell area only, no place and
+route and therefore no routed timing and no real area, no DRC or LVS, and power
+without activity data. The one thing it does establish beyond relative area is
+that the design **closes timing at 3.33 ns in 45 nm standard cells**, which no
+FPGA figure could have told us.
+
+Two flow defects were found and worked around rather than papered over, and both
+would bite the next person:
+
+- The RTL-collection step rejects a top module whose declaration carries an
+  attribute, because it matches ``^\s*module\s+<name>`` and Vitis emits the
+  ``CORE_GENERATION_INFO`` attribute and the ``module`` keyword on one line.
+  ``sv2v`` itself converted all 146 files without complaint; the failure is
+  downstream of it. Bypassing ``sv2v`` is correct on the merits here anyway —
+  Vitis emits Verilog-2001 — and it keeps the RTL byte-identical.
+- ``view-tiny`` is not usable for this: it has no technology file, no scan
+  cells, and no driving cell, so DC runs and emits unmapped GTECH. Use
+  ``view-standard``.

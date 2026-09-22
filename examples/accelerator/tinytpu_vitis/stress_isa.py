@@ -16,8 +16,10 @@ here re-proves it). This gate runs on the same simulator build and adds:
     mid range whose sums straddle int8, and a DIRECTED boundary case whose
     results are exactly 127, 128, -128, -129, 0, -1, ... so the clip and the
     ReLU are tested at their edges rather than hoped at;
-  * **shapes**: every multiple of T up to MAXDIM in every dimension (64),
-    not the five scored ones, so nothing special-cased to them survives;
+  * **shapes**: every multiple of T up to MAXDIM in every dimension, not the
+    scored ones, so nothing special-cased to them survives -- as a seeded
+    stratified sample once the exhaustive set passes `TPU_STRESS_SHAPES`
+    (4096 shapes at MAXDIM=64), keeping the scored shapes and every extreme;
   * **`C` prefilled with random bytes**, and the WHOLE of `C` compared: the
     result region must be overwritten and everything outside it untouched, so
     a design may not rely on `C` arriving zeroed nor scribble past `M x N`;
@@ -60,10 +62,41 @@ from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
     Program, Ref, gemm_program, vector_program, ar_distance_program,
 )
 from examples.accelerator.tinytpu_vitis import isa_ref, kpn_model  # noqa: E402
+from examples.accelerator.tinytpu_vitis.bench_isa import (  # noqa: E402
+    LATENCY, STEADY, runnable,
+)
 
-from examples.accelerator.tinytpu_vitis.shapes import SHAPES as SCORED  # noqa: E402
-ALL_SHAPES = [s for s in itertools.product(range(T, MAXDIM + 1, T), repeat=3)]
+SCORED = LATENCY + [s for s in runnable(STEADY) if s not in LATENCY]
+# Every multiple of T in every dimension -- the point being that nothing
+# special-cased to the scored shapes survives.
+#
+# **That set is cubic in MAXDIM/T**: 64 shapes at MAXDIM=16 but 4096 at
+# MAXDIM=64, times two relu settings and two operand distributions, and the
+# simulator pass is the expensive one. Above a budget the set becomes a
+# DETERMINISTIC stratified sample instead -- seeded, so a failure reproduces --
+# that always keeps the scored shapes and every extreme (each dimension at its
+# smallest and largest). Set TPU_STRESS_SHAPES=0 for the exhaustive set.
+_EXHAUSTIVE = [s for s in itertools.product(range(T, MAXDIM + 1, T), repeat=3)]
+SHAPE_BUDGET = int(os.environ.get("TPU_STRESS_SHAPES", 96))
+if SHAPE_BUDGET and len(_EXHAUSTIVE) > SHAPE_BUDGET:
+    _ends = (T, MAXDIM)
+    _keep = {s for s in _EXHAUSTIVE if all(d in _ends for d in s)}
+    _keep |= {s for s in SCORED if s in _EXHAUSTIVE}
+    _rest = sorted(set(_EXHAUSTIVE) - _keep)
+    _rng = np.random.default_rng(20260922)
+    _pick = _rng.choice(len(_rest), max(0, SHAPE_BUDGET - len(_keep)),
+                        replace=False)
+    ALL_SHAPES = sorted(_keep | {_rest[i] for i in _pick})
+else:
+    ALL_SHAPES = _EXHAUSTIVE
 MAX_STATIC = (IMEM_SIZE - NHDR) // IWORDS
+# `vector_program`'s M. Written as T and 2T, which is what the literal (4, 8)
+# meant at T=4: the program's third `mm` reads T weight rows out of the region
+# its M-row `dma_ld` filled, so M < T loads nothing into the tail. Dropped
+# entirely on a build the program's fixed addresses do not fit (MAXDIM//T < 4),
+# where `vector_program` refuses to be built at all.
+VECTOR_M = [M for M in (T, 2 * T) if 2 * M <= MAXDIM] if MAXDIM // T >= 4 \
+    and 5 + 2 * T <= MAXDIM else []
 CORNERS = np.array([-128, -127, -1, 0, 1, 126, 127], np.int8)
 CORNER_P = np.array([4, 2, 1, 1, 1, 2, 4], float) / 15
 
@@ -338,7 +371,8 @@ def validator_controls():
     good = [(g.__name__, s, r, g(*s, r)) for s in ALL_SHAPES for r in (False, True)
             for g in (gemm_program, gemm_program_flat, gemm_program_handwritten)]
     good += [("vadd_program", SCORED[-1], False, vadd_program(*SCORED[-1]))]
-    good += [("vector_program", (M,), False, vector_program(M)) for M in (4, 8)]
+    good += [("vector_program", (M,), False, vector_program(M))
+             for M in VECTOR_M]
     good += [("ar_distance_program", (d,), False, ar_distance_program(d))
              for d in (AR_RAW_DIST, AR_RAW_DIST + 1, 2 * AR_RAW_DIST)]
     for name, s, r, prog in good:
@@ -383,7 +417,7 @@ def cases(quick=False):
                 if (M, K, N) in SCORED and dist == "full" and \
                         NHDR + IWORDS * len(flat) <= IMEM_SIZE:
                     yield tag + " flat", flat, A, B, C0, gold, M, N
-    for M in (4, 8):
+    for M in VECTOR_M:
         for dist in ("full", "mid", "small"):
             seed += 1
             A, B = operands(dist, seed)

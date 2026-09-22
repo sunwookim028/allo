@@ -1,8 +1,8 @@
 diff --git a/src/main/scala/gemmini/CustomConfigs.scala b/src/main/scala/gemmini/CustomConfigs.scala
-index 011d7ce..5f7a71b 100644
+index 011d7ce..bede0ed 100644
 --- a/src/main/scala/gemmini/CustomConfigs.scala
 +++ b/src/main/scala/gemmini/CustomConfigs.scala
-@@ -49,6 +49,22 @@ object GemminiCustomConfigs {
+@@ -49,6 +49,41 @@ object GemminiCustomConfigs {
      acc_capacity = CapacityInKilobytes(128),
    )
  
@@ -17,6 +17,25 @@ index 011d7ce..5f7a71b 100644
 +  val int8Dim4Config = defaultConfig.copy(
 +    meshRows = 4,
 +    meshColumns = 4,
++    tileRows = 1,
++    tileColumns = 1,
++    has_training_convs = false,
++  )
++
++  // int8 / int32 on an 8x8 mesh: the SECOND matched point. TinyTPU-isa's
++  // array size T is a build parameter (T=8 verifies bit-exact at MAXDIM=64),
++  // so a matched-array comparison can be made at two sizes instead of one --
++  // which is what separates "our design is slower" from "our design is slower
++  // at this one size". The delta from Gemmini's own defaultConfig is the same
++  // two fields as int8Dim4Config: the mesh, and has_training_convs (conv
++  // hardware neither benchmark touches, absent from the generated header).
++  // Nothing else is touched -- in particular spad_read_delay (4),
++  // tile_latency (0), mesh_output_delay (1), dataflow (BOTH) and the
++  // capacities stay at Gemmini's defaults, because tuning any of them is
++  // tuning the opponent.
++  val int8Dim8Config = defaultConfig.copy(
++    meshRows = 8,
++    meshColumns = 8,
 +    tileRows = 1,
 +    tileColumns = 1,
 +    has_training_convs = false,

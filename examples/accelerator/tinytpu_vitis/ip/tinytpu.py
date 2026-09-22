@@ -10,7 +10,7 @@ run and so never back-pressures. Why, and what it measured, is on
 ``docs/source/designs/tinytpu_isa.rst``.
 """
 
-from examples.accelerator.tinytpu_vitis.ip.assembler import Assembler
+from examples.accelerator.tinytpu_vitis.ip.assembler import AR_RAW_DIST, Assembler
 from examples.accelerator.tinytpu_vitis.ip.compose import Architecture, Channel, Memory
 from examples.accelerator.tinytpu_vitis.ip.isa import ISA_NAMESPACE
 from examples.accelerator.tinytpu_vitis.ip.params import TpuParams
@@ -73,6 +73,9 @@ def architecture(params=None, name="tinytpu_isa"):
     params = params or TpuParams()
     namespace = dict(ISA_NAMESPACE)
     namespace.update(params.namespace())
+    # The accumulator's dependence obligation quotes the distance the assembler
+    # enforces, so the directive needs it even though no unit body reads it.
+    namespace["AR_RAW_DIST"] = AR_RAW_DIST
     return Architecture(name=name, parameters=namespace,
                         memories=memories(), channels=channels(),
                         units=units())

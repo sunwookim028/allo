@@ -22,7 +22,7 @@ def dma_load_directives(s, ctx):
     memories=("A", "B"),
     reads=("c_dld",),
     writes=("dma2sp", "dma2vr"),
-    parameters=("MAXDIM", "WPR", "T", "VW"),
+    parameters=("MAXDIM", "WPR", "T", "VW", "DMA_WORDS"),
     isa=("DMA_SRC_B", "DMA_TO_VR"),
     directives=dma_load_directives,
 )
@@ -39,20 +39,33 @@ def dma_ld(dram_a: int8[MAXDIM * MAXDIM], dram_b: int8[MAXDIM * MAXDIM]):
     # II=4). Merging the two into one loop bounded by max(a_rows, b_rows)
     # halves the burst time and was measured to move nothing -- the bursts are
     # already hidden behind the sequencer's prefetch.
-    a_onchip: UInt(VW)[MAXDIM * WPR]
-    b_onchip: UInt(VW)[MAXDIM * WPR]
-    for a_word in range(a_rows * WPR):
-        packed_a: UInt(VW) = 0
-        with allo.meta_for(T) as a_lane:
-            a_value: int8 = dram_a[a_word * T + a_lane]
-            packed_a[8 * a_lane : 8 * (a_lane + 1)] = a_value
-        a_onchip[a_word] = packed_a
-    for b_word in range(b_rows * WPR):
-        packed_b: UInt(VW) = 0
-        with allo.meta_for(T) as b_lane:
-            b_value: int8 = dram_b[b_word * T + b_lane]
-            packed_b[8 * b_lane : 8 * (b_lane + 1)] = b_value
-        b_onchip[b_word] = packed_b
+    #
+    # The burst WIDTH is a parameter. At DMA_WORDS=1 this is the shipped loop,
+    # one packed word an iteration; above 1 each iteration reads DMA_WORDS
+    # whole words -- up to the 64-byte beat `align_value(64)` lets Vitis widen
+    # the port to -- so the burst costs a factor of DMA_WORDS fewer iterations.
+    # The `meta_for` unrolls inside a runtime loop, so the trip count stays
+    # runtime data. It is parametric rather than landed because it was found at
+    # `-m_axi_latency 0`, and a change whose whole benefit is wider bursts is
+    # exactly the kind whose advantage can grow or vanish with memory latency.
+    a_onchip: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
+    b_onchip: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
+    a_groups: int32 = (a_rows * WPR + (DMA_WORDS - 1)) // DMA_WORDS
+    for a_group in range(a_groups):
+        with allo.meta_for(DMA_WORDS) as a_word:
+            packed_a: UInt(VW) = 0
+            with allo.meta_for(T) as a_lane:
+                a_value: int8 = dram_a[(a_group * DMA_WORDS + a_word) * T + a_lane]
+                packed_a[8 * a_lane : 8 * (a_lane + 1)] = a_value
+            a_onchip[a_group * DMA_WORDS + a_word] = packed_a
+    b_groups: int32 = (b_rows * WPR + (DMA_WORDS - 1)) // DMA_WORDS
+    for b_group in range(b_groups):
+        with allo.meta_for(DMA_WORDS) as b_word:
+            packed_b: UInt(VW) = 0
+            with allo.meta_for(T) as b_lane:
+                b_value: int8 = dram_b[(b_group * DMA_WORDS + b_word) * T + b_lane]
+                packed_b[8 * b_lane : 8 * (b_lane + 1)] = b_value
+            b_onchip[b_group * DMA_WORDS + b_word] = packed_b
 
     route: int32 = 0
     dram_row0: int32 = 0
