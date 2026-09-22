@@ -226,6 +226,83 @@ pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
 
 
+## The aborted first launch: two harness defects a real agent found, for $4.18
+
+The first launch of both pilots produced no gradeable candidate, and is kept
+as evidence rather than deleted. Two defects, both of which made the agent's
+feedback loop inert, and **both invisible to every test in this directory**:
+
+1. `abs_tool._evaluate` launched `evaluate_abs.py` with `sys.executable` --
+   the CHIA environment (py3.10, no numpy, no allo), where it cannot import.
+   **Every** candidate failed at stage `evaluator` and no harness feedback ever
+   reached the agent. True since `design_cases.py` gained module-level imports;
+   the held-out run hit it too, and the `json.loads(dict)` crash hid it.
+2. `list_probes` / `declare_probe` imported `probes.py`, which needs numpy and
+   allo. Both raised in that environment, so **the agent could not declare a
+   probe call** -- Pilot A said exactly that in its final message -- the probe
+   rung was skipped, and `expressive` was unreachable.
+
+**This is the no-caller lesson happening to this harness.** Phase `k` proved
+the probe rung from the EXPERIMENTER's environment and never exercised it
+through the path the AGENT uses, so a capability that nothing exercised the way
+a real user does could not be seen to be broken. Repairs: `probe_meta.py`
+imports nothing and `probes.py` reads its ground truth from it, so the two
+cannot drift; **phase `l` runs the tool surface inside the agent's environment**
+and asserts the evaluator is launched with the allo interpreter.
+
+**$4.18 for two defects a real agent found that this directory's own testing
+could not.** That is the price, and it is worth stating at that price.
+
+### What the aborted Pilot A proposed, and its grade: kind (4), ALREADY EXPRESSIBLE
+
+Recorded as an observation about what an agent reaches for, not as a pilot
+result -- it never received a single harness verdict.
+
+It chose **memory write ports** -- the property seeded measurement M3 points
+straight at, which the pre-registration said in advance would be reported as
+*choosing the most salient seeded measurement, not discovery*. It diagnosed
+kind (1) CANNOT EXPRESS and proposed `s.bind_storage(target, impl, type)`.
+
+**The diagnosis is wrong and the capability already exists.** On the pilot tree:
+`allo/memory.py` defines `Memory(resource=..., storage_type=..., latency=...,
+depth=...)`, used as a type annotation (`b: float32[64,64] @
+Memory(resource="BRAM", storage_type="RAM_2P")`), with
+`VALID_RESOURCE = {BRAM, URAM, LUTRAM, SRL, AUTO}` and storage types spanning
+the port structures -- `RAM_1P`, `RAM_2P`, `RAM_T2P`, `RAM_1WNR`; and both
+`EmitVivadoHLS.cpp:2737` and `EmitTapaHLS.cpp:2179` already emit
+`#pragma HLS bind_storage variable=... type=... impl=...` from it. There is no
+`Schedule.bind_storage`, so the agent's SPELLING was new; the CAPABILITY was
+not. Grade: **(4) already expressible**, misdiagnosed as (1).
+
+So the pre-registration was right twice over: A chose the most salient seeded
+measurement, **and** it chose the thing already expressible.
+
+### And what that makes the real gap -- which is what Pilot B is grading
+
+The port property is already DECLARABLE. What is missing is the **legality
+rule**: nothing checks a design's access pattern against its declaration. A
+design may declare `RAM_1P` and still emit two write statements, and nothing
+refuses it. That is exactly the ground truth here -- `rbA` emitted with two
+write statements while its module was named `_1R1W`, a declaration the
+implementation contradicted, with no checker anywhere.
+
+That is this directory's own *cannot express* versus *cannot refuse*
+distinction landing on the pilot built around it. **Pilot B is NOT retargeted**;
+its prompt is unchanged mid-run and its grade carries the information:
+
+- a way to DECLARE port counts is **kind (4)**, the same as A -- and two
+  independent arms landing on an existing surface is itself a finding about
+  what agents reach for;
+- a CHECKER that refuses a design whose writes contradict its declaration is
+  **kind (1) or (2)**, and is the architectural abstraction that was asked for;
+- and it is recorded separately whether the agent DISCOVERS that the
+  declaration already exists and says "the gap is enforcement, not expression".
+  Diagnosis is the half this project's own engineers got wrong twice.
+
+The probe rung already grades exactly this and needs no change: `expressive`
+requires REFUSING `ports_dual` and ACCEPTING a bit-exact `ports_banked` -- a
+checker, not a declaration.
+
 ## PRE-REGISTRATION -- Pilots A and B, written 2026-09-22 17:19 UTC, BEFORE either ran
 
 Both run on this branch at the commit that adds this section, on ONE tree for
