@@ -524,6 +524,124 @@ shows that constraint is not redundant: it reached for a mechanism unprompted
 and put it at the forbidden site.
 
 
+The result: run 2, against the pre-registration
+===============================================
+
+Run ``codesign-run2-20260922-143234``, harvested from its ``variants.jsonl``,
+``worker.log`` and opencode's database after the fact: two workers x 5
+iterations, $68 budget, ``gemini-3.1-pro-preview``, at ``codesign-loop``
+``d7546a0d``. Baseline, measured by the run's iteration 0 in each worker:
+**169 / 686** cosim cycles (4x4x4 / 16x16x16), 3 of 1,226 nests encodable at
+16x16x16 (1,150 ``acc-peel``, 54 ``emitter``, 17 ``agu-terms``, 2
+``accumulator-raw-distance``), chosen nest ``N4>K4 rows=16``, BRAM18K 42 / DSP
+14 / FF 17,481 / LUT 26,583, 2.431 ns.
+
+**It was stopped after iteration 2 of 5 by a harness defect, not by its
+budget.** Both workers logged ``not starting iter3: spent $52.60 + next call
+~$23.26 would pass the $64.50 cap``. The $52.60 was every message on the
+account in the run's window; the run's own six sessions cost **$47.65**. The
+$23.26 projection was the account-wide spend during an iteration-1 call; the
+run's largest single session cost **$11.06**. Counted by the run's own
+sessions, $47.65 + $11.06 = $58.71 is under the cap, and iteration 3 would have
+started. The per-run cap now sums only the run's own sessions
+(:doc:`/extensions/chia`).
+
+**Every model call in the run timed out.** All six calls (iteration 1, its
+debug session, and iteration 2, in each worker) ran into the 2,400 s limit and
+returned no session id; the loop recorded each as $0.00 and scored what was on
+disk when the call was killed. Nothing below is an agent's finished answer.
+
+The two arms were given different angles and **the same system message**,
+which states the diagnosis: that ``acc`` is ``f2``, that ``f2`` is an AGU
+target, that an AGU term is additive and monotone, that it costs one of the
+three terms, and that a step resolved in the AGU leaves ``isa_ref`` untouched.
+The ``open`` arm's angle also states the ``agu4`` measurement: AGU_TERMS=4
+"raises encodable nests from 3 to 7 and drives the ``agu-terms`` refusals to
+zero -- and the mapper's CHOSEN nest does not change". Neither arm was told a
+mechanism.
+
+``acc-follows-k`` -- the directed arm. Not a search result.
+-----------------------------------------------------------
+
+Its angle was the corrected diagnosis, the interaction grid and the
+AGU-resolution rule.
+
+- **Iteration 1: rejected at** ``gate:bench_isa``. It broke the seam:
+  ``gemm 4x4x4: instruction 1 AGU word differs: generated
+  0x0000000040200085, hand-written 0x0000000040200083``.
+- **Iteration 2: passed every gate.** Encodable **3 -> 8** at 16x16x16; cycles
+  **169 / 686, unchanged**; chosen nest ``N4>K4 rows=16``, unchanged; FF
+  **+113**, LUT **+389**, BRAM and DSP unchanged, 2.431 ns; classified
+  ``regression`` (no cycle moved, area rose). The diff sets AGU_TERMS=4 and
+  LOOP_DEPTH=8, and makes the ``mm`` accumulate field saturate (``f2 | 1``) in
+  the AGU resolution, in both the sequencer and ``expand``.
+
+  **The 1,150 ``acc-peel`` refusals were relabelled, not relieved.** The
+  histogram at iteration 2 reads 8 encodable, 54 ``emitter``, 14
+  ``accumulator-raw-distance`` and **1,150** under a new cause, ``other:
+  Ref.at() takes the induction variable a `with k.loop(...)` y...``. The diff
+  renamed the encoder's two ``acc-peel:`` refusal messages to ``disable is``
+  and ``ignore:`` and routed those two exceptions to a new fallback emitter,
+  which refuses the same 1,150 nests with an error of its own. The +5
+  encodable nests are the ``agu4`` fixture's +4 (below) and one of the six
+  ``loop-depth`` refusals that LOOP_DEPTH=8 relieves.
+
+``open`` -- the unguided arm
+----------------------------
+
+Its angle: the first-cause histogram, the ``agu4`` measurement quoted above,
+and "decide for yourself what to attack".
+
+- **Iteration 1: rejected at** ``gate:mapspace``. It made **17** nests
+  encodable at 16x16x16 (897 ``acc-peel``, 274 ``emitter``, 20
+  ``accumulator-raw-distance``, 18 ``loop-depth``), and **10 of the 17 compute
+  the wrong answer against** ``isa_ref`` -- 20 of the 34 programs checked,
+  both ``relu`` settings of each -- including the nest the mapper would have
+  chosen, ``K4>N4 rows=16``. The reference-model sweep caught every one; the
+  seam check passed.
+- **Iteration 2: passed every gate.** Encodable **3 -> 7**; cycles **169 /
+  686, unchanged**; chosen nest unchanged; FF **+186**, LUT **+703**, BRAM and
+  DSP unchanged, 2.431 ns; ``regression``. Refusals: 1,150 ``acc-peel``, 54
+  ``emitter``, 9 ``accumulator-raw-distance``, and **6** ``loop-depth``, a
+  cause the baseline has none of. The diff sets AGU_TERMS=4 (four
+  16-bit terms) and makes ``f2`` saturate to 0/1 for ``mm`` in the AGU
+  resolution; the encoder is not taught to use the step, so ``acc-peel`` does
+  not move. It also leaves a stray fragment, ``"); raise Exception(str(acc));
+  pass #``, inside a docstring line of ``isa_dsl.py``.
+
+  This histogram is **identical** to ``test_codesign.py``'s k2 fixture,
+  ``AGU4_MAPSPACE`` (7 encodable; 1,150 / 54 / 9 / 6). The arm reproduced
+  the one change its prompt had measured for it. Its saturating step -- a
+  mechanism, which nothing seeded -- is real and sits at the permitted site,
+  but it is not connected to the encoder, so it unlocks nothing.
+
+Against the pre-registration
+----------------------------
+
+The prediction was: most likely a mechanism that reaches only Kt=2, so the
+pick and the cycles do not move; second, a candidate that widens the AGU and
+stops there. **What happened is the second, in both arms**, with a mechanism
+attached that nothing uses: both widened the AGU to four terms, both wrote a
+saturating ``acc`` step in the AGU resolution, neither got the encoder to emit
+it (the directed arm's fallback emitter tries, and fails on every nest),
+neither moved the chosen nest, the cycles did not move, and area rose.
+
+What the run does **not** show: that the loop found the idea. The ``open``
+arm's encodability gain is the measurement its own prompt quoted, to the
+refusal; the directed arm's is the same plus LOOP_DEPTH, and its apparent
+removal of ``acc-peel`` is a renamed error message. The one thing neither
+prompt contained is the saturating step, and both arms reached for it at the
+site the system message described; that is the finding to test next, with the
+``agu4`` fact withheld from the unguided arm.
+
+What it shows about the harness: the refusal histogram's *categories* come
+from exception text in ``isa_dsl.py``, which the candidate edits, so a
+candidate can move nests between categories without relieving them. The
+encodable count cannot be moved that way -- every counted nest, up to
+``CHECK_MAX`` = 48, is checked against ``isa_ref`` -- but a histogram quoted by category needs the count of
+``other:`` causes beside it.
+
+
 Resources, for the pair
 =======================
 
