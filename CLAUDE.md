@@ -26,6 +26,7 @@ Dev notes (not published):
 | Dated measurement records | `dev/records/` |
 | Session report, paper outline, ASIC handoff | `dev/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
+| IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |
 | Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
 | Dated measurement records | `docs/source/records/` |
 

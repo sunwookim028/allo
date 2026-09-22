@@ -14,8 +14,9 @@ from .assembler import Assembler, ProgramError
 from .compose import Architecture, Channel, Memory, Unit, unit
 from .params import TpuParams
 from .programs import GemmPrograms, MemoryMap
+from .reduce import DotTree, ReduceParams
 from .tinytpu import TinyTPU, architecture
 
-__all__ = ["Architecture", "Assembler", "Channel", "GemmPrograms", "Memory",
-           "MemoryMap", "ProgramError", "TinyTPU", "TpuParams", "Unit",
-           "architecture", "unit"]
+__all__ = ["Architecture", "Assembler", "Channel", "DotTree", "GemmPrograms",
+           "Memory", "MemoryMap", "ProgramError", "ReduceParams", "TinyTPU",
+           "TpuParams", "Unit", "architecture", "unit"]
