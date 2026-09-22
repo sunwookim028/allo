@@ -144,9 +144,24 @@ DENIED_ATTRS = frozenset(
         "ag_code",
     }
 )
-#: Dunder attributes are how Python reaches past a module's surface
-#: (`__globals__`, `__subclasses__`, `__dict__`, ...). These two are harmless.
-ALLOWED_DUNDER_ATTRS = frozenset({"__name__", "__doc__"})
+#: Dunder attributes that reach past an object's surface: to a namespace, the
+#: type graph, a function's insides, name-based attribute access, the import
+#: machinery, pickling's callables, or a frame. Why a deny-list and not an
+#: allow-list: docs/source/extensions/chia.rst, "The spec policy's dunder rule".
+DENIED_DUNDER_ATTRS = frozenset({
+    "__dict__", "__globals__", "__builtins__", "__closure__", "__code__",
+    "__defaults__", "__kwdefaults__", "__annotations__",
+    "__class__", "__bases__", "__base__", "__mro__", "__subclasses__",
+    "__objclass__", "__self__", "__func__", "__wrapped__", "__self_class__",
+    "__thisclass__", "__init_subclass__", "__class_getitem__", "__set_name__",
+    "__getattribute__", "__getattr__", "__setattr__", "__delattr__", "__dir__",
+    "__get__", "__set__", "__delete__",
+    "__import__", "__loader__", "__spec__", "__path__", "__file__",
+    "__cached__", "__package__",
+    "__reduce__", "__reduce_ex__", "__getstate__", "__setstate__",
+    "__getnewargs__", "__getnewargs_ex__", "__traceback__", "__context__",
+    "__cause__", "__frame__",
+})
 
 
 #: Read-only, and only under `if __name__ == "__main__":`, which the evaluator
@@ -287,8 +302,7 @@ def policy_violations(name: str, source: str) -> list[str]:
         if isinstance(node, ast.Attribute):
             if node.attr in DENIED_ATTRS:
                 problems.append(f"{name}: uses '.{node.attr}'")
-            if (node.attr.startswith("__") and node.attr.endswith("__")
-                    and node.attr not in ALLOWED_DUNDER_ATTRS):
+            if node.attr in DENIED_DUNDER_ATTRS:
                 problems.append(f"{name}: uses '.{node.attr}'")
     # Module-level context managers and try blocks are how self-rewriting code
     # hides; nothing in a legitimate spec needs either at import time.
