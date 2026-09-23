@@ -276,6 +276,31 @@ figure is **453 µm² per PE** at 22 nm. Our per-instance array area is not in
 the committed reports, so this comparison is one hierarchical area report away
 and is the first thing to extract when the queued runs execute.
 
+**6.2b Two further instances, from an independent design.** The same pattern
+was found in an unrelated FPGA accelerator by its own team, auditing for ASIC
+readiness. It has **~63,632 bits held in LUT shift registers**, 15,616 of them
+deliberately — one module withholds a payload reset specifically so its delay
+line stays a pure shift register. A standard-cell flow has no such primitive,
+so every one of those bits becomes a flip-flop, and none of it is visible in a
+LUT count. It also holds **512 KiB of lookup tables initialised by
+``$readmemh``** across 64 instances, likewise with no standard-cell equivalent.
+Their total on-chip storage is ~1.08 MiB against the ~10 KiB in the variant we
+measured at 79.7% non-combinational area, so our figure is the one they now use
+to predict their own outcome.
+
+This is the same class as the dual-write-port buffer of §6.2 — a primitive that
+is free on one substrate and absent on the other — found independently, in a
+different design, by a different team, and it raises the count of such
+structures to four.
+
+A related correction, also volunteered against its own side's interest: that
+team's per-launch overhead, which we had published as *host software*, is
+mostly **the device reloading its own instruction memory** (~81% of the cost
+removed by reducing launch count), not host work, and is therefore not
+comparable to a software driver figure at all. Instruction supply turns out to
+dominate both machines in different currencies — 60.0% of our silicon area, and
+the majority of their per-launch time.
+
 **6.3 The workload class changes the answer by four to eight times.** On GEMM
 shapes the same optimisation is worth **4.3–7.0%** of runtime; on multi-layer
 models, **25–34%**. A model does not make the problem larger, it makes it

@@ -589,9 +589,21 @@ two windows. Our own figures are Vitis cosim counts from ``ap_start`` to
 
 MiniTPU's owner supplied the symmetric datum, unprompted, and it is the reason
 to state this as a methodological rule rather than as a point in our favour:
-**their per-launch host work is about 132 microseconds with a 44-microsecond
-register-access floor, measured on board .187** — roughly **24,750 cycles at
-187.5 MHz** — and their testbench numbers do not include it either.
+**their per-launch cost outside the fabric is about 143 microseconds**, which
+their testbench numbers do not include either.
+
+.. note::
+
+   **Corrected 2026-09-23, by its own side.** This figure was first given, and
+   first published here, as *host* work — and most of it is not. Decomposed:
+   **30.0 µs is AXI-Lite register latency** at the bus, and **~52 µs plus
+   10.8 µs per KiB is the device reloading its own instruction memory**
+   (112.7 µs for a 5.62 KiB image). Of 46.76 ms saved by cutting launch count,
+   **81% was the device refetching the same image** and only 8.88 ms was host
+   work. It is therefore **not comparable to Gemmini's ~390-cycle software
+   driver at all**: theirs is a driver, this is mostly on-device instruction
+   fetch plus bus latency. The asymmetry is real and still large; *"they have a
+   slow host"* is the wrong lesson.
 
 So the rule for any comparison on this page, and for the benchmark set
 generally:

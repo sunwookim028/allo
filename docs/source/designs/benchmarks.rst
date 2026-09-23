@@ -80,9 +80,11 @@ one verdict, because the questions are not the same question.
    * **Gemmini's** is ``rdcycle`` -> 5 ``config``\ s -> one hardware
      ``loop_ws`` -> ``fence`` -> ``rdcycle``, which **excludes** its ~395-cycle
      Rocket driver.
-   * **MiniTPU's** testbench figures likewise exclude its per-launch host
-     work, about 132 us with a 44 us register-access floor measured on board
-     .187, i.e. roughly 24 750 cycles at 187.5 MHz.
+   * **MiniTPU's** testbench figures likewise exclude their per-launch cost
+     outside the fabric, about 143 us. Corrected 2026-09-23 by its own side:
+     this is **not** host software but ~30 us of AXI-Lite register latency
+     plus the device reloading its own instruction memory, so it is not
+     comparable to a software driver figure.
 
    So: **no machine's host is counted anywhere on this page**, which is the
    consistent choice, and it is stated rather than assumed. What that
@@ -2049,10 +2051,12 @@ Why naming the window mattered
 ------------------------------
 
 That accounting turned out to be worth more than fairness. MiniTPU's
-per-launch host cost was volunteered by its own side so the comparison would
-be honest, and putting ~24 750 cycles beside Gemmini's ~395 of driver is what
-made the number look absurd rather than normal --- both of the subsequent wins
-that doubled their board throughput came out of it. **Naming the window is not
+per-launch cost was volunteered by its own side so the comparison would be
+honest, and putting it beside Gemmini's ~395 of driver is what made the number
+look absurd rather than normal --- both of the subsequent wins that doubled
+their board throughput came out of it. (The same side later corrected what the
+cost *is*: mostly on-device instruction reload, not host software. Naming the
+window found the optimisation; decomposing it found the mechanism.) **Naming the window is not
 only a reporting discipline; it is where the optimisations were hiding.**
 
 .. _benchmarks-one-cycle:
