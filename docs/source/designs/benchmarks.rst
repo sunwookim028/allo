@@ -82,9 +82,10 @@ one verdict, because the questions are not the same question.
      Rocket driver.
    * **MiniTPU's** testbench figures likewise exclude their per-launch cost
      outside the fabric, about 143 us. Corrected 2026-09-23 by its own side:
-     this is **not** host software but ~30 us of AXI-Lite register latency
-     plus the device reloading its own instruction memory, so it is not
-     comparable to a software driver figure.
+     this is **not** one thing -- roughly 30 us on the register path
+     (measured against a no-bus control: 0.4 us of it is the bus, the rest is
+     CPython) plus the device reloading its own instruction memory. Not
+     comparable to a software driver figure, and not removed by a die.
 
    So: **no machine's host is counted anywhere on this page**, which is the
    consistent choice, and it is stated rather than assumed. What that

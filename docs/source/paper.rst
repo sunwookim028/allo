@@ -337,11 +337,18 @@ is free on one substrate and absent on the other — found independently, in a
 different design, by a different team, and it raises the count of such
 structures to four.
 
-A related correction, also volunteered against its own side's interest: that
-team's per-launch overhead, which we had published as *host software*, is
-mostly **the device reloading its own instruction memory** (~81% of the cost
-removed by reducing launch count), not host work, and is therefore not
-comparable to a software driver figure at all. Instruction supply turns out to
+A related figure was corrected twice in one day by its own side, and the
+second correction is the methodologically interesting one. That team's
+per-launch overhead, published by us as *host software*, is mostly **the device
+reloading its own instruction memory** (~81% of the cost removed by reducing
+launch count). The remaining ~30 µs register path was then attributed to bus
+latency — and, measured against a **no-bus control** (identical driver code
+against a plain buffer instead of the mapped device), **the bus is 0.442 µs and
+the rest is the interpreter**. The original error was timing single operations
+with a timer that costs more than the operation, and the tell was that the
+control measured *slower* than the real thing. Each correction made that side's
+position worse, and the second one invalidated a fix they had planned, which
+could not have recovered more than 0.44 µs. Instruction supply turns out to
 dominate both machines in different currencies — 60.0% of our silicon area, and
 the majority of their per-launch time.
 
@@ -398,6 +405,12 @@ reading commit titles rather than contents. We therefore treat a negative
 result as evidence only when the instrument can be shown to have run, on the
 object being claimed — and we report that rule here because it changed which of
 our own results we were willing to keep.
+
+A second rule, from the correction in §6.2b: **attributing a cost requires a
+control that shares everything but the mechanism under test.** A measurement
+can be accurate and still attribute its result to the wrong cause, and the
+error is invisible from inside the measurement. The tell in that case was that
+the control came out slower than the thing it controlled for.
 
 8. Conclusion
 =============
