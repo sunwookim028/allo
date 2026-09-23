@@ -20,7 +20,11 @@ the corrected shape. Separately we evaluate modelling instructions as
 compositions of per-unit *actions*, and report where it pays and what it
 provably cannot check. Measurements from the flow are given throughout as
 evidence that its numbers are decision-grade: they reverse two conclusions that
-cycle-only, single-substrate evaluation had reached.
+cycle-only, single-substrate evaluation had reached. Against Gemmini under an
+identical standard-cell flow, our design is 3.66× larger in logic and **roughly
+35× of that difference is the memory interface alone** — 60.2% of our logic
+against 6.3% of theirs — a structural difference rather than an efficiency gap,
+and one no FPGA measurement had shown.
 
 1. Introduction
 ===============
@@ -234,6 +238,46 @@ spatial array at 11.3%. A third instance: a dual-write-port buffer is free on
 FPGA block RAM and is **rejected outright** by the standard-cell flow, while a
 banked rewrite preserves every cycle.
 
+**6.2c The comparison, measured.** Gemmini DIM=4 and our T=4 MAXDIM=64 are now
+synthesised under an identical flow, with every parameter compared and the
+standard-cell library matched by checksum rather than assumed.
+
+Logic-only, **Gemmini is 382,026 µm² and we are 3.66× that**; full against
+full, 1.88×. But the shape differs more than the size, and the shape is the
+result:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - Gemmini DIM=4
+     - ours (T=4)
+   * - memory-interface / adapter logic
+     - 23,885 µm² (**6.3%**)
+     - 840,160 µm² (**60.2%**)
+   * - non-combinational share of logic
+     - 38.3%
+     - 80.1%
+
+**We are 3.66× larger in logic, and roughly 35× of that difference is in the
+memory interface alone.** Our four AXI masters are 60.2% of our logic; their
+TileLink reader, writer and transaction-tracker path is 6.3% of theirs. This is
+a structural difference rather than an efficiency gap — TileLink at this width
+does not produce this structure — and it is §6.2's finding arriving from the
+comparison rather than from our own hierarchy.
+
+**Two methodological points are now settled on evidence rather than argument.**
+First, the exclusion of our instruction-fetch adapter: **no cells inside the
+Gemmini boundary match instruction fetch at all.** What exists is command queue
+and decode for commands arriving over RoCC, 31,715 µm². The symmetry argument
+holds because the structure is genuinely absent, not because we assumed so.
+Second, the one arguable cut — the DMA's address-translation block, kept in
+because removing it would mean editing their RTL — is **under 1.1% of their
+logic** either way it is counted, so the ambiguity was immaterial.
+
+As with the PE array, DC's flattening leaves these as name-prefix sums rather
+than hierarchy lines, and the committed reports state that limit.
+
 **6.2a What can be compared before the comparison design is synthesised.** Our
 own runs are complete and the comparison design's are not, but two comparisons
 are available now from its *published* figures, and they differ sharply in what
@@ -323,11 +367,14 @@ stated gap in the flow, not a solved problem.
 7. Threats to validity
 ======================
 
-**The area comparison is incomplete.** Our four designs are synthesised; the
-comparison design's RTL is exported, lint-clean and queued, but **not yet
-run**. Every area claim above is about our own designs or is cited from
-published third-party figures at a different node, configuration and scope,
-used only as an order-of-magnitude check.
+**The area comparison covers one design point.** Gemmini DIM=4 and our T=4
+MAXDIM=64 are synthesised under an identical flow; DIM=8 and the
+capacity-matched pair are not run, so no total-area claim is made and the
+result is logic-only. Because DC's flattening dissolves instance hierarchy at
+the effort these runs use, the component figures are **name-prefix sums over
+flattened cells, not hierarchy lines** — the committed reports state this, and
+it is why the memory-interface comparison is given as a share and a ratio
+rather than to the digit.
 
 Area results use flip-flop memories rather than SRAM macros, which inflates
 memory-resident structures; it does not flatter the adapter findings, which are
