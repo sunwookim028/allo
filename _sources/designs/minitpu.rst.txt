@@ -406,13 +406,31 @@ would not quietly omit theirs.
 
 **What that cost actually is — corrected 2026-09-23 by its own side.** It was
 given, and published here, as *host* work. An ASIC-readiness audit decomposed
-it: **30.0 µs of AXI-Lite register latency** at the bus rather than in Python,
-and **~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
+it into **~30 µs on the register path** and **~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
 memory** — 112.7 µs for a 5.62 KiB GEMM image. Of 46.76 ms saved by cutting
 launch count at M=256, **81% was the device refetching the same image into
 IRAM**; host work was 8.88 ms. So it is **not comparable to Gemmini's software
 driver**, and the fix with the largest measured value is a per-program IRAM
 base register letting resident images skip the reload, worth 96.7% of launches.
+
+**Corrected again, 2026-09-23, same day.** The ~30 µs register path was first
+attributed to AXI-Lite bus latency. Measured against a **no-bus control** —
+identical Python driving a plain ``bytearray`` instead of the memory-mapped
+device — **the bus is 0.442 µs and the other ~29 µs is CPython**. A posted
+write costs nothing measurable. This is worse for their side than the version
+it replaces: interconnect latency is inherited and a die would remove it,
+whereas the driver is a choice and a die would not. The structural fix they had
+planned for this path is consequently **rejected** — it cannot recover more
+than 0.44 µs, and its own cache-maintenance write costs more than everything it
+removes.
+
+Two methodology notes from that measurement, both general. **Timing single
+operations was the original error**: one ``perf_counter()`` call costs ~1.7 µs
+on that board's ARM, more than most of what it would time, and the tell was
+that the no-bus control measured *slower* than the real thing. And **a control
+that shares everything but the mechanism under test** is what made the
+attribution legible at all; without it, Python would have gone on being
+recorded as interconnect indefinitely.
 
 The parallel to our own design is worth stating: **instruction supply dominates
 both machines, in different currencies.** It is 60.0% of our silicon area and,

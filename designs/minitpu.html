@@ -627,13 +627,29 @@ It was offered so that a comparison counting Gemmini’s ~390 cycles of driver
 would not quietly omit theirs.</p>
 <p><strong>What that cost actually is — corrected 2026-09-23 by its own side.</strong> It was
 given, and published here, as <em>host</em> work. An ASIC-readiness audit decomposed
-it: <strong>30.0 µs of AXI-Lite register latency</strong> at the bus rather than in Python,
-and <strong>~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
+it into <strong>~30 µs on the register path</strong> and <strong>~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
 memory</strong> — 112.7 µs for a 5.62 KiB GEMM image. Of 46.76 ms saved by cutting
 launch count at M=256, <strong>81% was the device refetching the same image into
 IRAM</strong>; host work was 8.88 ms. So it is <strong>not comparable to Gemmini’s software
 driver</strong>, and the fix with the largest measured value is a per-program IRAM
 base register letting resident images skip the reload, worth 96.7% of launches.</p>
+<p><strong>Corrected again, 2026-09-23, same day.</strong> The ~30 µs register path was first
+attributed to AXI-Lite bus latency. Measured against a <strong>no-bus control</strong> —
+identical Python driving a plain <code class="docutils literal notranslate"><span class="pre">bytearray</span></code> instead of the memory-mapped
+device — <strong>the bus is 0.442 µs and the other ~29 µs is CPython</strong>. A posted
+write costs nothing measurable. This is worse for their side than the version
+it replaces: interconnect latency is inherited and a die would remove it,
+whereas the driver is a choice and a die would not. The structural fix they had
+planned for this path is consequently <strong>rejected</strong> — it cannot recover more
+than 0.44 µs, and its own cache-maintenance write costs more than everything it
+removes.</p>
+<p>Two methodology notes from that measurement, both general. <strong>Timing single
+operations was the original error</strong>: one <code class="docutils literal notranslate"><span class="pre">perf_counter()</span></code> call costs ~1.7 µs
+on that board’s ARM, more than most of what it would time, and the tell was
+that the no-bus control measured <em>slower</em> than the real thing. And <strong>a control
+that shares everything but the mechanism under test</strong> is what made the
+attribution legible at all; without it, Python would have gone on being
+recorded as interconnect indefinitely.</p>
 <p>The parallel to our own design is worth stating: <strong>instruction supply dominates
 both machines, in different currencies.</strong> It is 60.0% of our silicon area and,
 here, the majority of their per-launch time.</p>

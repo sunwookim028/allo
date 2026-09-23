@@ -596,7 +596,9 @@ their testbench numbers do not include either.
 
    **Corrected 2026-09-23, by its own side.** This figure was first given, and
    first published here, as *host* work — and most of it is not. Decomposed:
-   **30.0 µs is AXI-Lite register latency** at the bus, and **~52 µs plus
+   **~30 µs is the register path** -- of which, measured against a no-bus
+   control, only **0.442 µs is the bus and ~29 µs is CPython** -- and **~52 µs
+   plus
    10.8 µs per KiB is the device reloading its own instruction memory**
    (112.7 µs for a 5.62 KiB image). Of 46.76 ms saved by cutting launch count,
    **81% was the device refetching the same image** and only 8.88 ms was host
