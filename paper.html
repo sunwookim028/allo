@@ -232,7 +232,11 @@ the corrected shape. Separately we evaluate modelling instructions as
 compositions of per-unit <em>actions</em>, and report where it pays and what it
 provably cannot check. Measurements from the flow are given throughout as
 evidence that its numbers are decision-grade: they reverse two conclusions that
-cycle-only, single-substrate evaluation had reached.</p>
+cycle-only, single-substrate evaluation had reached. Against Gemmini under an
+identical standard-cell flow, our design is 3.66× larger in logic and <strong>roughly
+35× of that difference is the memory interface alone</strong> — 60.2% of our logic
+against 6.3% of theirs — a structural difference rather than an efficiency gap,
+and one no FPGA measurement had shown.</p>
 <section id="introduction">
 <h2>1. Introduction<a class="headerlink" href="#introduction" title="Link to this heading"><span>¶</span></a></h2>
 <p>Co-design requires a loop, and a loop requires a flow that answers questions
@@ -421,6 +425,46 @@ Gemmini’s published breakdown reports SRAM at 67.1% of accelerator area and th
 spatial array at 11.3%. A third instance: a dual-write-port buffer is free on
 FPGA block RAM and is <strong>rejected outright</strong> by the standard-cell flow, while a
 banked rewrite preserves every cycle.</p>
+<p><strong>6.2c The comparison, measured.</strong> Gemmini DIM=4 and our T=4 MAXDIM=64 are now
+synthesised under an identical flow, with every parameter compared and the
+standard-cell library matched by checksum rather than assumed.</p>
+<p>Logic-only, <strong>Gemmini is 382,026 µm² and we are 3.66× that</strong>; full against
+full, 1.88×. But the shape differs more than the size, and the shape is the
+result:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>Gemmini DIM=4</p></th>
+<th class="head"><p>ours (T=4)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>memory-interface / adapter logic</p></td>
+<td><p>23,885 µm² (<strong>6.3%</strong>)</p></td>
+<td><p>840,160 µm² (<strong>60.2%</strong>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>non-combinational share of logic</p></td>
+<td><p>38.3%</p></td>
+<td><p>80.1%</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>We are 3.66× larger in logic, and roughly 35× of that difference is in the
+memory interface alone.</strong> Our four AXI masters are 60.2% of our logic; their
+TileLink reader, writer and transaction-tracker path is 6.3% of theirs. This is
+a structural difference rather than an efficiency gap — TileLink at this width
+does not produce this structure — and it is §6.2’s finding arriving from the
+comparison rather than from our own hierarchy.</p>
+<p><strong>Two methodological points are now settled on evidence rather than argument.</strong>
+First, the exclusion of our instruction-fetch adapter: <strong>no cells inside the
+Gemmini boundary match instruction fetch at all.</strong> What exists is command queue
+and decode for commands arriving over RoCC, 31,715 µm². The symmetry argument
+holds because the structure is genuinely absent, not because we assumed so.
+Second, the one arguable cut — the DMA’s address-translation block, kept in
+because removing it would mean editing their RTL — is <strong>under 1.1% of their
+logic</strong> either way it is counted, so the ambiguity was immaterial.</p>
+<p>As with the PE array, DC’s flattening leaves these as name-prefix sums rather
+than hierarchy lines, and the committed reports state that limit.</p>
 <p><strong>6.2a What can be compared before the comparison design is synthesised.</strong> Our
 own runs are complete and the comparison design’s are not, but two comparisons
 are available now from its <em>published</em> figures, and they differ sharply in what
@@ -459,6 +503,28 @@ entirely, since the array is pure logic on both sides — Gemmini’s published
 figure is <strong>453 µm² per PE</strong> at 22 nm. Our per-instance array area is not in
 the committed reports, so this comparison is one hierarchical area report away
 and is the first thing to extract when the queued runs execute.</p>
+<p><strong>6.2b Two further instances, from an independent design.</strong> The same pattern
+was found in an unrelated FPGA accelerator by its own team, auditing for ASIC
+readiness. It has <strong>~63,632 bits held in LUT shift registers</strong>, 15,616 of them
+deliberately — one module withholds a payload reset specifically so its delay
+line stays a pure shift register. A standard-cell flow has no such primitive,
+so every one of those bits becomes a flip-flop, and none of it is visible in a
+LUT count. It also holds <strong>512 KiB of lookup tables initialised by
+``$readmemh``</strong> across 64 instances, likewise with no standard-cell equivalent.
+Their total on-chip storage is ~1.08 MiB against the ~10 KiB in the variant we
+measured at 79.7% non-combinational area, so our figure is the one they now use
+to predict their own outcome.</p>
+<p>This is the same class as the dual-write-port buffer of §6.2 — a primitive that
+is free on one substrate and absent on the other — found independently, in a
+different design, by a different team, and it raises the count of such
+structures to four.</p>
+<p>A related correction, also volunteered against its own side’s interest: that
+team’s per-launch overhead, which we had published as <em>host software</em>, is
+mostly <strong>the device reloading its own instruction memory</strong> (~81% of the cost
+removed by reducing launch count), not host work, and is therefore not
+comparable to a software driver figure at all. Instruction supply turns out to
+dominate both machines in different currencies — 60.0% of our silicon area, and
+the majority of their per-launch time.</p>
 <p><strong>6.3 The workload class changes the answer by four to eight times.</strong> On GEMM
 shapes the same optimisation is worth <strong>4.3–7.0%</strong> of runtime; on multi-layer
 models, <strong>25–34%</strong>. A model does not make the problem larger, it makes it
@@ -479,11 +545,14 @@ stated gap in the flow, not a solved problem.</p>
 </section>
 <section id="threats-to-validity">
 <h2>7. Threats to validity<a class="headerlink" href="#threats-to-validity" title="Link to this heading"><span>¶</span></a></h2>
-<p><strong>The area comparison is incomplete.</strong> Our four designs are synthesised; the
-comparison design’s RTL is exported, lint-clean and queued, but <strong>not yet
-run</strong>. Every area claim above is about our own designs or is cited from
-published third-party figures at a different node, configuration and scope,
-used only as an order-of-magnitude check.</p>
+<p><strong>The area comparison covers one design point.</strong> Gemmini DIM=4 and our T=4
+MAXDIM=64 are synthesised under an identical flow; DIM=8 and the
+capacity-matched pair are not run, so no total-area claim is made and the
+result is logic-only. Because DC’s flattening dissolves instance hierarchy at
+the effort these runs use, the component figures are <strong>name-prefix sums over
+flattened cells, not hierarchy lines</strong> — the committed reports state this, and
+it is why the memory-interface comparison is given as a share and a ratio
+rather than to the digit.</p>
 <p>Area results use flip-flop memories rather than SRAM macros, which inflates
 memory-resident structures; it does not flatter the adapter findings, which are
 the ones we rely on. Power is reported nowhere: without macros and

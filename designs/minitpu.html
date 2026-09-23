@@ -621,11 +621,22 @@ instructive thing to come out of comparing two designs, and a method finding
 rather than an architectural one.</p>
 <p>While establishing that a fair comparison must <strong>count every machine’s host or
 none of them</strong> (<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>), MiniTPU’s owner volunteered
-a figure against their own interest: their per-launch host work is about <strong>132
-microseconds with a 44-microsecond register-access floor</strong>, roughly <strong>24,750
-cycles at 187.5 MHz</strong>, none of which their simulator numbers include. It was
-offered so that a comparison counting Gemmini’s ~390 cycles of driver would not
-quietly omit theirs.</p>
+a figure against their own interest: their per-launch cost outside the fabric
+is about <strong>143 microseconds</strong>, none of which their simulator numbers include.
+It was offered so that a comparison counting Gemmini’s ~390 cycles of driver
+would not quietly omit theirs.</p>
+<p><strong>What that cost actually is — corrected 2026-09-23 by its own side.</strong> It was
+given, and published here, as <em>host</em> work. An ASIC-readiness audit decomposed
+it: <strong>30.0 µs of AXI-Lite register latency</strong> at the bus rather than in Python,
+and <strong>~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
+memory</strong> — 112.7 µs for a 5.62 KiB GEMM image. Of 46.76 ms saved by cutting
+launch count at M=256, <strong>81% was the device refetching the same image into
+IRAM</strong>; host work was 8.88 ms. So it is <strong>not comparable to Gemmini’s software
+driver</strong>, and the fix with the largest measured value is a per-program IRAM
+base register letting resident images skip the reload, worth 96.7% of launches.</p>
+<p>The parallel to our own design is worth stating: <strong>instruction supply dominates
+both machines, in different currencies.</strong> It is 60.0% of our silicon area and,
+here, the majority of their per-launch time.</p>
 <p>Stating it next to Gemmini’s ~390 is what made it <strong>absurd rather than
 normal</strong> — two orders of magnitude, for the same job. Within hours, two commits
 on their master attacked exactly that cost, reading a configuration file once

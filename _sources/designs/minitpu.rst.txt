@@ -399,11 +399,24 @@ rather than an architectural one.
 
 While establishing that a fair comparison must **count every machine's host or
 none of them** (:doc:`/designs/gemmini_comparison`), MiniTPU's owner volunteered
-a figure against their own interest: their per-launch host work is about **132
-microseconds with a 44-microsecond register-access floor**, roughly **24,750
-cycles at 187.5 MHz**, none of which their simulator numbers include. It was
-offered so that a comparison counting Gemmini's ~390 cycles of driver would not
-quietly omit theirs.
+a figure against their own interest: their per-launch cost outside the fabric
+is about **143 microseconds**, none of which their simulator numbers include.
+It was offered so that a comparison counting Gemmini's ~390 cycles of driver
+would not quietly omit theirs.
+
+**What that cost actually is — corrected 2026-09-23 by its own side.** It was
+given, and published here, as *host* work. An ASIC-readiness audit decomposed
+it: **30.0 µs of AXI-Lite register latency** at the bus rather than in Python,
+and **~52 µs plus 10.8 µs per KiB for the device to reload its own instruction
+memory** — 112.7 µs for a 5.62 KiB GEMM image. Of 46.76 ms saved by cutting
+launch count at M=256, **81% was the device refetching the same image into
+IRAM**; host work was 8.88 ms. So it is **not comparable to Gemmini's software
+driver**, and the fix with the largest measured value is a per-program IRAM
+base register letting resident images skip the reload, worth 96.7% of launches.
+
+The parallel to our own design is worth stating: **instruction supply dominates
+both machines, in different currencies.** It is 60.0% of our silicon area and,
+here, the majority of their per-launch time.
 
 Stating it next to Gemmini's ~390 is what made it **absurd rather than
 normal** — two orders of magnitude, for the same job. Within hours, two commits

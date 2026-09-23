@@ -798,9 +798,21 @@ two windows. Our own figures are Vitis cosim counts from <code class="docutils l
 <code class="docutils literal notranslate"><span class="pre">ap_done</span></code>, and so contain no host at all.</p>
 <p>MiniTPU’s owner supplied the symmetric datum, unprompted, and it is the reason
 to state this as a methodological rule rather than as a point in our favour:
-<strong>their per-launch host work is about 132 microseconds with a 44-microsecond
-register-access floor, measured on board .187</strong> — roughly <strong>24,750 cycles at
-187.5 MHz</strong> — and their testbench numbers do not include it either.</p>
+<strong>their per-launch cost outside the fabric is about 143 microseconds</strong>, which
+their testbench numbers do not include either.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Corrected 2026-09-23, by its own side.</strong> This figure was first given, and
+first published here, as <em>host</em> work — and most of it is not. Decomposed:
+<strong>30.0 µs is AXI-Lite register latency</strong> at the bus, and <strong>~52 µs plus
+10.8 µs per KiB is the device reloading its own instruction memory</strong>
+(112.7 µs for a 5.62 KiB image). Of 46.76 ms saved by cutting launch count,
+<strong>81% was the device refetching the same image</strong> and only 8.88 ms was host
+work. It is therefore <strong>not comparable to Gemmini’s ~390-cycle software
+driver at all</strong>: theirs is a driver, this is mostly on-device instruction
+fetch plus bus latency. The asymmetry is real and still large; <em>“they have a
+slow host”</em> is the wrong lesson.</p>
+</div>
 <p>So the rule for any comparison on this page, and for the benchmark set
 generally:</p>
 <ul>
