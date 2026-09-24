@@ -31,84 +31,248 @@
     "mlp_tiny": {
       "tier": "confirmed",
       "layers": [
-        {"name": "mlp_tiny_l0", "module": "fc1", "shape": [4, 16, 16], "relu": true},
-        {"name": "mlp_tiny_l1", "module": "fc2", "shape": [4, 16, 16], "relu": false}
+        {
+          "name": "mlp_tiny_l0",
+          "module": "fc1",
+          "shape": [
+            4,
+            16,
+            16
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_tiny_l1",
+          "module": "fc2",
+          "shape": [
+            4,
+            16,
+            16
+          ],
+          "relu": false
+        }
       ],
       "refusals": [],
       "measured": [
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
-          "per_layer": {"mlp_tiny_l0": 584, "mlp_tiny_l1": 566},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 1,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_tiny_l0": 584,
+            "mlp_tiny_l1": 566
+          },
           "total": 1150
         },
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
-          "per_layer": {"mlp_tiny_l0": 443, "mlp_tiny_l1": 420},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 16,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_tiny_l0": 443,
+            "mlp_tiny_l1": 420
+          },
           "total": 863
         }
       ],
       "quoted_in": [
-        ["docs/source/designs/workload_suite.rst", "**1 150**"],
-        ["docs/source/designs/workload_suite.rst", "- 863"]
+        [
+          "docs/source/designs/workload_suite.rst",
+          "**1 150**"
+        ],
+        [
+          "docs/source/designs/workload_suite.rst",
+          "- 863"
+        ]
       ]
     },
     "mlp_deep": {
       "tier": "confirmed",
       "layers": [
-        {"name": "mlp_deep_l0", "module": "fc1", "shape": [4, 16, 16], "relu": true},
-        {"name": "mlp_deep_l1", "module": "fc2", "shape": [4, 16, 16], "relu": true},
-        {"name": "mlp_deep_l2", "module": "fc3", "shape": [4, 16, 12], "relu": true},
-        {"name": "mlp_deep_l3", "module": "fc4", "shape": [4, 12, 8], "relu": false}
+        {
+          "name": "mlp_deep_l0",
+          "module": "fc1",
+          "shape": [
+            4,
+            16,
+            16
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_deep_l1",
+          "module": "fc2",
+          "shape": [
+            4,
+            16,
+            16
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_deep_l2",
+          "module": "fc3",
+          "shape": [
+            4,
+            16,
+            12
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_deep_l3",
+          "module": "fc4",
+          "shape": [
+            4,
+            12,
+            8
+          ],
+          "relu": false
+        }
       ],
       "refusals": [],
       "measured": [
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
-          "per_layer": {"mlp_deep_l0": 584, "mlp_deep_l1": 584,
-                        "mlp_deep_l2": 542, "mlp_deep_l3": 407},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 1,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_deep_l0": 584,
+            "mlp_deep_l1": 584,
+            "mlp_deep_l2": 542,
+            "mlp_deep_l3": 407
+          },
           "total": 2117
         },
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
-          "per_layer": {"mlp_deep_l0": 443, "mlp_deep_l1": 443,
-                        "mlp_deep_l2": 378, "mlp_deep_l3": 270},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 16,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_deep_l0": 443,
+            "mlp_deep_l1": 443,
+            "mlp_deep_l2": 378,
+            "mlp_deep_l3": 270
+          },
           "total": 1534
         }
       ],
       "quoted_in": [
-        ["docs/source/designs/workload_suite.rst", "**2 117**"],
-        ["docs/source/designs/workload_suite.rst", "- 1 534"]
+        [
+          "docs/source/designs/workload_suite.rst",
+          "**2 117**"
+        ],
+        [
+          "docs/source/designs/workload_suite.rst",
+          "- 1 534"
+        ]
       ]
     },
     "mlp_small": {
       "tier": "confirmed",
       "layers": [
-        {"name": "mlp_small_l0", "module": "fc1", "shape": [8, 32, 32], "relu": true},
-        {"name": "mlp_small_l1", "module": "fc2", "shape": [8, 32, 16], "relu": false}
+        {
+          "name": "mlp_small_l0",
+          "module": "fc1",
+          "shape": [
+            8,
+            32,
+            32
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_small_l1",
+          "module": "fc2",
+          "shape": [
+            8,
+            32,
+            16
+          ],
+          "relu": false
+        }
       ],
       "refusals": [],
       "measured": [
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
-          "per_layer": {"mlp_small_l0": 1636, "mlp_small_l1": 1145},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 1,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_small_l0": 1636,
+            "mlp_small_l1": 1145
+          },
           "total": 2781
         },
         {
-          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
-          "per_layer": {"mlp_small_l0": 1156, "mlp_small_l1": 665},
+          "config": {
+            "T": 4,
+            "MAXDIM": 64,
+            "QD": 16,
+            "DMA_WORDS": 16,
+            "m_axi_latency": 0
+          },
+          "per_layer": {
+            "mlp_small_l0": 1156,
+            "mlp_small_l1": 665
+          },
           "total": 1821
         }
       ],
       "quoted_in": [
-        ["docs/source/designs/workload_suite.rst", "**2 781**"],
-        ["docs/source/designs/workload_suite.rst", "- 1 821"]
+        [
+          "docs/source/designs/workload_suite.rst",
+          "**2 781**"
+        ],
+        [
+          "docs/source/designs/workload_suite.rst",
+          "- 1 821"
+        ]
       ]
     },
     "mlp_wide": {
       "tier": "correct",
       "layers": [
-        {"name": "mlp_wide_l0", "module": "fc1", "shape": [64, 64, 64], "relu": true},
-        {"name": "mlp_wide_l1", "module": "fc2", "shape": [64, 64, 64], "relu": false}
+        {
+          "name": "mlp_wide_l0",
+          "module": "fc1",
+          "shape": [
+            64,
+            64,
+            64
+          ],
+          "relu": true
+        },
+        {
+          "name": "mlp_wide_l1",
+          "module": "fc2",
+          "shape": [
+            64,
+            64,
+            64
+          ],
+          "relu": false
+        }
       ],
       "refusals": [],
       "measured": [],
@@ -126,6 +290,10 @@
         "model prices at 22 000). QD=16 is what made mlp_tiny, mlp_deep and",
         "mlp_small measurable at all; it does not make mlp_wide complete, so",
         "Kt >= QD is not the whole rule.",
+        "Re-checked 2026-09-24 on a fresh csynth of T=4 MAXDIM=64 QD=16",
+        "DMA_WORDS=1: mlp_wide_l0 still does not complete inside 600 s, csim",
+        "exact at 0 / 4096, last RTL progress @ 109000 ps, no second report.",
+        "",
         "",
         "This entry is not a skip. gate.py asserts the ABSENCE of a measurement:",
         "if an RTL number for mlp_wide is ever added here without moving the",
@@ -141,11 +309,26 @@
         "silently started approximating a bias would fail here."
       ],
       "layers": [
-        {"name": "mlp_bias_l0", "module": "fc2", "shape": [4, 16, 16], "relu": false}
+        {
+          "name": "mlp_bias_l0",
+          "module": "fc2",
+          "shape": [
+            4,
+            16,
+            16
+          ],
+          "relu": false
+        }
       ],
       "refusals": [
-        {"where": "fc1", "why_contains": "nn.Linear with bias"},
-        {"where": "sigmoid", "why_contains": "is not an int8 GEMM or a fused ReLU"}
+        {
+          "where": "fc1",
+          "why_contains": "nn.Linear with bias"
+        },
+        {
+          "where": "sigmoid",
+          "why_contains": "is not an int8 GEMM or a fused ReLU"
+        }
       ],
       "measured": []
     }
