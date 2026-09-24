@@ -31,6 +31,16 @@ using namespace allo;
 // used for determine whether to generate C++ default types or ac_(u)int
 static bool BIT_FLAG = false;
 
+// Set by getCatapultTypeName() when it meets a type it cannot spell; turned
+// into an MLIR error (not a SIGABRT) by emitCatapultHLS().
+static std::string CATAPULT_UNSUPPORTED_TYPE;
+
+std::string mlir::allo::takeCatapultUnsupportedType() {
+  std::string res = CATAPULT_UNSUPPORTED_TYPE;
+  CATAPULT_UNSUPPORTED_TYPE.clear();
+  return res;
+}
+
 llvm::SmallString<16> mlir::allo::getCatapultTypeName(Type valType) {
   if (auto arrayType = llvm::dyn_cast<ShapedType>(valType))
     valType = arrayType.getElementType();
@@ -38,7 +48,16 @@ llvm::SmallString<16> mlir::allo::getCatapultTypeName(Type valType) {
   // Handle float types.
   // nangate-45nm_beh does not support native IEEE-754 float arithmetic.
   // Use ac_ieee_float<binary32> (from ac_std_float.h) for synthesizable f32.
-  if (llvm::isa<Float16Type>(valType))
+  if (llvm::isa<BFloat16Type>(valType))
+    // ac_std_float.h (shipped with Catapult, $MGC_HOME/shared/include) provides
+    // a real bfloat16: ac::bfloat16 is ac_std_float<16, 8>. Its *arithmetic*
+    // rounding mode is AC_TRN_ZERO by default; the generated header redefines
+    // AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE to AC_RND_CONV so that add/mul round
+    // to nearest-even like arith.addf/mulf do. Its float->bf16 CONSTRUCTOR
+    // hard-codes AC_TRN_ZERO and cannot be overridden -- see
+    // docs/source/developer/limitations.rst.
+    return SmallString<16>("ac::bfloat16");
+  else if (llvm::isa<Float16Type>(valType))
     return SmallString<16>("half");
   else if (llvm::isa<Float32Type>(valType))
     return SmallString<16>("ac_ieee_float<binary32>");
@@ -98,8 +117,18 @@ llvm::SmallString<16> mlir::allo::getCatapultTypeName(Type valType) {
         std::string(getCatapultTypeName(streamType.getBaseType()).c_str()) +
         " >");
 
-  else
-    assert(1 == 0 && "Got unsupported type.");
+  else {
+    // Never abort: an assert(1 == 0) here is a SIGABRT that kills the calling
+    // process, so a user cannot tell "type unsupported" from "emitter crashed".
+    // Record the type instead and let emitCatapultHLS() raise a failure.
+    if (CATAPULT_UNSUPPORTED_TYPE.empty()) {
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      valType.print(ss);
+      CATAPULT_UNSUPPORTED_TYPE = ss.str();
+    }
+    return SmallString<16>("/*UNSUPPORTED-TYPE*/");
+  }
 
   return SmallString<16>();
 }
@@ -613,6 +642,12 @@ void CatapultModuleEmitter::emitModule(ModuleOp module) {
 //
 //===----------------------------------------------------------------------===//
 #include <algorithm>
+// ac::bfloat16's operators otherwise round toward zero (AC_TRN_ZERO); MLIR's
+// arith.addf/mulf on bf16 round to nearest-even, so line the two up. Must
+// precede ac_std_float.h, which reads the macro.
+#ifndef AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE
+#define AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV
+#endif
 #include <ac_int.h>
 #include <ac_fixed.h>
 #include <ac_channel.h>
@@ -672,7 +707,13 @@ using namespace std;
 
 LogicalResult allo::emitCatapultHLS(ModuleOp module, llvm::raw_ostream &os) {
   AlloEmitterState state(os);
+  takeCatapultUnsupportedType();
   CatapultModuleEmitter(state).emitModule(module);
+  if (std::string bad = takeCatapultUnsupportedType(); !bad.empty()) {
+    module.emitError("Catapult HLS emitter has no C++ spelling for type '")
+        << bad << "'.";
+    return failure();
+  }
   return failure(state.encounteredError);
 }
 

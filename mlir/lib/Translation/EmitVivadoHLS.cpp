@@ -32,12 +32,40 @@ using namespace allo;
 // used for determine whether to generate C++ default types or ap_(u)int
 static bool BIT_FLAG = false;
 
+// Set by getTypeName() when it meets a type it cannot spell. The emitter used
+// to `assert(1 == 0)` here, which is a SIGABRT that kills the host process --
+// a Python caller got a dead interpreter instead of a diagnosis. Instead we
+// record the type, emit a marker into the output (so the C++ is obviously
+// broken rather than silently wrong), and let emitVivadoHLSWithFlag() turn it
+// into an MLIR error, i.e. a catchable failure.
+static std::string VHLS_UNSUPPORTED_TYPE;
+
+static SmallString<16> reportUnsupportedType(Type valType) {
+  if (VHLS_UNSUPPORTED_TYPE.empty()) {
+    std::string buf;
+    llvm::raw_string_ostream ss(buf);
+    valType.print(ss);
+    VHLS_UNSUPPORTED_TYPE = ss.str();
+  }
+  return SmallString<16>("/*UNSUPPORTED-TYPE*/");
+}
+
 static SmallString<16> getTypeName(Type valType) {
   if (auto arrayType = llvm::dyn_cast<ShapedType>(valType))
     valType = arrayType.getElementType();
 
   // Handle float types.
-  if (llvm::isa<Float16Type>(valType))
+  if (llvm::isa<BFloat16Type>(valType))
+    // Vitis HLS 2023.2 has no bfloat16 type at all: there is no `hls::bfloat16`
+    // or `ap_bfloat16` anywhere in the installation, clang rejects `__bf16`,
+    // and `ap_float<16, 8>` -- which is numerically a bf16 and csim-exact --
+    // segfaults csynth in CDFG construction ("Unknown intrinsic op
+    // [_ssdm_op_FloatingPoint_Mul.i16.i16.i16]"), as does ap_float at every
+    // other width including <32, 8>. So we ship our own: a 16-bit storage type
+    // that widens to float for arithmetic and rounds back (round-to-nearest-
+    // even, matching arith.truncf). Definition in ALLO_BF16_SHIM below.
+    return SmallString<16>("allo_bfloat16");
+  else if (llvm::isa<Float16Type>(valType))
     // Page 222:
     // https://www.amd.com/content/dam/xilinx/support/documents/sw_manuals/xilinx2020_2/ug902-vivado-high-level-synthesis.pdf
     return SmallString<16>("half");
@@ -112,7 +140,7 @@ static SmallString<16> getTypeName(Type valType) {
   }
 
   else
-    assert(1 == 0 && "Got unsupported type.");
+    return reportUnsupportedType(valType);
 
   return SmallString<16>();
 }
@@ -3503,6 +3531,82 @@ void allo::hls::VhlsModuleEmitter::emitHostFunction(func::FuncOp func) {
   os << "\n";
 }
 
+
+static const char *ALLO_BF16_SHIM = R"XXX(
+//===----------------------------------------------------------------------===//
+// bfloat16 for Vitis/Vivado HLS.
+//
+// Vitis HLS 2023.2 ships no bfloat16 type (no hls::bfloat16, no ap_bfloat16,
+// no __bf16), and its arbitrary-precision ap_float<16, 8> crashes csynth. This
+// struct stores the 16 bf16 bits and performs arithmetic by widening to float
+// -- which is exact for a bf16 product or sum -- and rounding the result back
+// with round-to-nearest-even, so each operation rounds exactly once, as
+// arith.mulf/addf on bf16 do. Synthesis therefore infers 32-bit float
+// operators; the win over `float` is storage and bandwidth, not the multiplier.
+//===----------------------------------------------------------------------===//
+struct allo_bfloat16 {
+  // Raw uint16_t, not ap_uint<16>, and a trivial default constructor: the
+  // emitter implements arith.bitcast with `union { allo_bfloat16; uint16_t; }`,
+  // and a union member whose default constructor is non-trivial deletes the
+  // union's own default constructor.
+  uint16_t __b;
+
+  static uint16_t __allo_bf16_round(float f) {
+    union { float f; uint32_t u; } __c;
+    __c.f = f;
+    uint32_t u = __c.u;
+    // Quiet any NaN rather than letting the round below turn it into an inf.
+    if (((u >> 23) & 0xFF) == 0xFF && (u & 0x007FFFFF))
+      return (uint16_t)((u >> 16) | 0x0040);
+    uint32_t r = u + 0x00007FFF + ((u >> 16) & 1); // round-to-nearest-even
+    return (uint16_t)(r >> 16);
+  }
+  static float __allo_bf16_widen(uint16_t b) {
+    union { float f; uint32_t u; } __c;
+    __c.u = ((uint32_t)b) << 16;
+    return __c.f;
+  }
+
+  allo_bfloat16() = default;
+  allo_bfloat16(float f) : __b(__allo_bf16_round(f)) {}
+  allo_bfloat16(double d) : __b(__allo_bf16_round((float)d)) {}
+  allo_bfloat16(int i) : __b(__allo_bf16_round((float)i)) {}
+  operator float() const { return __allo_bf16_widen(__b); }
+
+  allo_bfloat16 &operator+=(float o) { __b = __allo_bf16_round(__allo_bf16_widen(__b) + o); return *this; }
+  allo_bfloat16 &operator-=(float o) { __b = __allo_bf16_round(__allo_bf16_widen(__b) - o); return *this; }
+  allo_bfloat16 &operator*=(float o) { __b = __allo_bf16_round(__allo_bf16_widen(__b) * o); return *this; }
+  allo_bfloat16 &operator/=(float o) { __b = __allo_bf16_round(__allo_bf16_widen(__b) / o); return *this; }
+};
+)XXX";
+
+/// True if `t`, or the element/base type it wraps, is bf16.
+static bool typeUsesBFloat16(Type t) {
+  if (auto shaped = llvm::dyn_cast<ShapedType>(t))
+    return typeUsesBFloat16(shaped.getElementType());
+  if (auto stream = llvm::dyn_cast<StreamType>(t))
+    return typeUsesBFloat16(stream.getBaseType());
+  return llvm::isa<BFloat16Type>(t);
+}
+
+/// True if any value anywhere in `module` has a bf16 (element) type. Used to
+/// decide whether the generated header needs the bf16 shim, so that designs
+/// that do not use bf16 keep byte-identical output.
+static bool moduleUsesBFloat16(ModuleOp module) {
+  bool found = false;
+  module.walk([&](Operation *op) {
+    for (auto res : op->getResults())
+      found |= typeUsesBFloat16(res.getType());
+    for (auto opd : op->getOperands())
+      found |= typeUsesBFloat16(opd.getType());
+    for (auto &region : op->getRegions())
+      for (auto &block : region.getBlocks())
+        for (auto arg : block.getArguments())
+          found |= typeUsesBFloat16(arg.getType());
+  });
+  return found;
+}
+
 /// Top-level MLIR module emitter.
 void allo::hls::VhlsModuleEmitter::emitModule(ModuleOp module) {
   std::string device_header = R"XXX(
@@ -3522,6 +3626,9 @@ void allo::hls::VhlsModuleEmitter::emitModule(ModuleOp module) {
 #include <stdint.h>
 using namespace std;
 )XXX";
+
+  if (moduleUsesBFloat16(module))
+    device_header += ALLO_BF16_SHIM;
 
   std::string host_header = R"XXX(
 //===------------------------------------------------------------*- C++ -*-===//
@@ -3669,7 +3776,14 @@ LogicalResult allo::emitVivadoHLSWithFlag(ModuleOp module,
                                           bool linearize_pointers) {
   AlloEmitterState state(os);
   state.linearize_pointers = linearize_pointers;
+  VHLS_UNSUPPORTED_TYPE.clear();
   hls::VhlsModuleEmitter(state).emitModule(module);
+  if (!VHLS_UNSUPPORTED_TYPE.empty()) {
+    module.emitError("Vitis/Vivado HLS emitter has no C++ spelling for type '")
+        << VHLS_UNSUPPORTED_TYPE << "'.";
+    VHLS_UNSUPPORTED_TYPE.clear();
+    return failure();
+  }
   return failure(state.encounteredError);
 }
 

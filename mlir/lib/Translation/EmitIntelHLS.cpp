@@ -26,6 +26,10 @@ using namespace allo;
 // Utils
 //===----------------------------------------------------------------------===//
 
+// Set when getTypeName() meets a type it cannot spell; turned into an MLIR
+// error by emitIntelHLS() rather than a null-deref or a silent empty type.
+static std::string INTEL_UNSUPPORTED_TYPE;
+
 static SmallString<16> getTypeName(Value val) {
   // Handle memref, tensor, and vector types.
   bool BIT_FLAG = false;
@@ -81,8 +85,20 @@ static SmallString<16> getTypeName(Value val) {
     return SmallString<16>(
         "ac_ufixed<" + std::to_string(ufixedType.getWidth()) + ", " +
         std::to_string(ufixedType.getWidth() - ufixedType.getFrac()) + ">");
-  else
-    val.getDefiningOp()->emitError("has unsupported type.");
+  else {
+    // `val` may be a block argument, in which case getDefiningOp() is null and
+    // the old `->emitError(...)` segfaulted. Record the type and let
+    // emitIntelHLS() raise the error. (bf16 is deliberately not implemented
+    // here -- this backend is not part of the bf16 work; it only stops lying
+    // about what went wrong.)
+    if (INTEL_UNSUPPORTED_TYPE.empty()) {
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      valType.print(ss);
+      INTEL_UNSUPPORTED_TYPE = ss.str();
+    }
+    return SmallString<16>("/*UNSUPPORTED-TYPE*/");
+  }
 
   return SmallString<16>();
 }
@@ -1114,7 +1130,14 @@ int main() {
 
 LogicalResult allo::emitIntelHLS(ModuleOp module, llvm::raw_ostream &os) {
   AlloEmitterState state(os);
+  INTEL_UNSUPPORTED_TYPE.clear();
   hls::IntelModuleEmitter(state).emitModule(module);
+  if (!INTEL_UNSUPPORTED_TYPE.empty()) {
+    module.emitError("Intel HLS emitter has no C++ spelling for type '")
+        << INTEL_UNSUPPORTED_TYPE << "'.";
+    INTEL_UNSUPPORTED_TYPE.clear();
+    return failure();
+  }
   return failure(state.encounteredError);
 }
 

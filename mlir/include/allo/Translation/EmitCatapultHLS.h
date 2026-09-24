@@ -19,6 +19,12 @@ namespace allo {
 // both flows use Catapult-native types instead of Xilinx ap_int/ap_fixed.
 llvm::SmallString<16> getCatapultTypeName(Type valType);
 
+// If getCatapultTypeName() met a type it cannot spell since the last call,
+// returns its printed form and clears the record; otherwise returns "". The
+// emitter entry points turn a non-empty result into an MLIR error. (It used to
+// assert(1 == 0), i.e. SIGABRT the host process.)
+std::string takeCatapultUnsupportedType();
+
 // Catapult ModuleEmitter: emits plain C++ / Algorithmic-C for Catapult HLS.
 // Exposed in the header (rather than hidden in the .cpp) so downstream emitters
 // can reuse the C++ compute codegen -- e.g. EmitCatapultHLS2 wraps these plain

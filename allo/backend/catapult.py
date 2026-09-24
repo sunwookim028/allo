@@ -50,7 +50,8 @@ dtype_size_map = {
 }
 
 ctype_map = {
-    "bf16": "std::bfloat16_t",
+    # ac::bfloat16 comes from ac_std_float.h, which kernel.h includes.
+    "bf16": "ac::bfloat16",
     "f32": "float",
     "f64": "double",
     "i8": "int8_t",

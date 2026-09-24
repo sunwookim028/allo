@@ -30,6 +30,22 @@ using namespace allo;
 
 // used for determine whether to generate C++ default types or ap_(u)int
 static bool BIT_FLAG = false;
+// Set when the type map meets a type it cannot spell. The emitter used to
+// abort() here, which kills the calling process; record it instead and turn it
+// into an MLIR error at the entry point. Adding a type to this backend is out
+// of scope -- the point is that "unsupported" is now a message, not a crash.
+static std::string TAPA_UNSUPPORTED_TYPE;
+
+static SmallString<16> reportTapaUnsupportedType(Type valType) {
+  if (TAPA_UNSUPPORTED_TYPE.empty()) {
+    std::string buf;
+    llvm::raw_string_ostream ss(buf);
+    valType.print(ss);
+    TAPA_UNSUPPORTED_TYPE = ss.str();
+  }
+  return SmallString<16>("/*UNSUPPORTED-TYPE*/");
+}
+
 
 // TODO: overload
 static SmallString<16> getTypeName(Type valType) {
@@ -91,7 +107,7 @@ static SmallString<16> getTypeName(Type valType) {
         "tapa::stream< " +
         std::string(getTypeName(streamType.getBaseType()).c_str()) + " >");
   else
-    assert(1 == 0 && "Got unsupported type.");
+    return reportTapaUnsupportedType(valType);
 
   return SmallString<16>();
 }
@@ -2614,7 +2630,14 @@ using namespace std;
 
 LogicalResult allo::emitTapaHLS(ModuleOp module, llvm::raw_ostream &os) {
   AlloEmitterState state(os);
+  TAPA_UNSUPPORTED_TYPE.clear();
   hls::TapaModuleEmitter(state).emitModule(module);
+  if (!TAPA_UNSUPPORTED_TYPE.empty()) {
+    module.emitError("TAPA HLS emitter has no C++ spelling for type '")
+        << TAPA_UNSUPPORTED_TYPE << "'.";
+    TAPA_UNSUPPORTED_TYPE.clear();
+    return failure();
+  }
   return failure(state.encounteredError);
 }
 

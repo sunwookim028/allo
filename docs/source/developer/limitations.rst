@@ -315,6 +315,23 @@ Open
        not prototyped
      - `new_subregion_foreign_globals.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py>`__
 
+   * - :ref:`I <limitation-i>`
+     - PARTLY FIXED (fork-only) -- bf16 emits and is bit-exact on Vitis; three
+       residual divergences below
+     - emitter
+     - ``bf16`` had no branch in any ``getTypeName``; every emitter fell through
+       to ``assert(1 == 0 && "Got unsupported type.")`` -- a SIGABRT, not an
+       exception. Vitis HLS 2023.2 has no bf16 type to point at, so the emitter
+       now ships an ``allo_bfloat16`` shim; Catapult and SystemC use
+       ``ac::bfloat16``.
+     - unblocks the BF16 MiniTPU model, which could not be emitted at all.
+       On Vitis a bf16 MAC still costs a **full fp32** multiplier (3 DSP) and
+       adder -- the win is storage and bandwidth, not arithmetic
+     - landed (emitters + ``infer.py`` bitcast); Catapult synthesis untested
+       (no licence on this host)
+     - ``tests/dataflow/test_bf16_hls.py``,
+       ``tests/test_vhls.py::test_unsupported_type_is_a_diagnostic_not_an_abort``
+
 .. _limitations-closed:
 
 Fixed or closed
@@ -2007,3 +2024,119 @@ trips the separate re-parse ``IndentationError`` of upstream issue #588.
 
 Fix: merge the callee's own module globals over the caller's when building a
 sub-region -- about five lines, not yet prototyped.
+
+
+.. _limitation-i:
+
+I. ``bf16`` ran in the simulator and aborted every HLS emitter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found and fixed 2026-09-24. ``bfloat16`` worked end to end in the dataflow
+simulator -- as a ``Stream`` element type and as an arithmetic type -- and
+killed the process in every C++ emitter: ``EmitVivadoHLS.cpp:115``,
+``EmitCatapultHLS.cpp:102`` and ``EmitTapaHLS.cpp:94`` all reached
+``assert(1 == 0 && "Got unsupported type.")``, which is ``abort()``. A Python
+caller did not get an exception; the interpreter died, so "this type is not
+supported" was indistinguishable from "the emitter crashed". That failure mode
+was the worst part of the gap and is now gone everywhere, including in the
+backends that still do not support bf16.
+
+**What C++ type a bf16 becomes, and why.** This was the open question; the
+answer differs per toolchain and neither guess from the documentation survived
+contact with the installation.
+
+* **Vitis HLS 2023.2: nothing native exists.** ``grep -ri bfloat`` over
+  ``/opt/xilinx/Vitis_HLS/2023.2/include`` returns **no hits at all** -- there
+  is no ``hls::bfloat16`` and no ``ap_bfloat16``. ``__bf16`` is rejected by its
+  clang (``ERROR: [HLS 207-3801] unknown type name '__bf16'``). The one
+  arbitrary-precision float it does ship, ``ap_float<W, E>`` from
+  ``ap_float.h``, accepts ``ap_float<16, 8>`` and is **csim-exact** -- but
+  ``csynth_design`` **segfaults** on it, in CDFG construction, after
+  ``WARNING: [SYN 201-506] Unknown intrinsic op
+  [_ssdm_op_FloatingPoint_Mul.i16.i16.i16]``. The crash is not bf16-specific:
+  ``ap_float<16, 5>`` and even ``ap_float<32, 8>`` segfault csynth the same
+  way, so ``ap_float`` is unsynthesizable in this release at any width.
+  (``std::bfloat16_t``, which the Python type maps used to name, needs
+  ``-std=c++23`` and ``<stdfloat>``; these flows compile at c++11/c++17.)
+
+  So the Vivado/Vitis emitter **defines its own**: ``struct allo_bfloat16``,
+  emitted into the generated header, and only when the module actually uses
+  bf16, so non-bf16 designs keep byte-identical output. It stores a raw
+  ``uint16_t`` (not ``ap_uint<16>``: the emitter implements ``arith.bitcast``
+  with a ``union``, and a union member with a non-trivial default constructor
+  deletes the union's own), widens to ``float`` for arithmetic -- exact for a
+  bf16 product or sum -- and rounds back with round-to-nearest-even, so each
+  operation rounds exactly once, as ``arith.mulf``/``arith.addf`` on bf16 do.
+
+* **Catapult: ``ac::bfloat16``** from ``ac_std_float.h``, which Catapult ships
+  in ``$MGC_HOME/shared/include`` and the generated header already included.
+  It compiles at ``-std=c++11`` and works inside ``ac_channel``.
+
+* **SystemC: ``ac::bfloat16`` as well**, and it was *cheaper* to support there
+  than f32 was. The SystemC emitter shares ``getCatapultTypeName``, so the type
+  came for free; what each float type additionally needs there is a set of
+  shims -- raw-bit access for ``arith.bitcast`` and memory ports
+  (``data_ac_int()`` / ``set_data()``, which ``ac::bfloat16`` has), text input
+  for the testbench, and ``sc_trace`` -- plus a Connections ``Wrapped<>``
+  payload specialization. bf16 needs **no** ``Wrapped<>``:
+  ``ac_marshaller.h`` already has
+  ``AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16, 16)``, where ``ac_ieee_float`` has
+  none and this fork had to write one by hand for f32
+  (``EmitSystemC.cpp``, ``ALLO_IEEE_FLOAT_MARSHALL_DEF``). So a bf16
+  ``Stream`` lowers to ``Connections::In/Out/Combinational/Fifo<
+  ac::bfloat16 >`` with nothing hand-written behind it. Untested against a real
+  Catapult/MatchLib install -- there is no licence on this host.
+
+**Residual divergences -- the part that is still a trap.**
+
+1. **On Vitis, bf16 arithmetic is fp32 arithmetic.** Synthesis of an
+   Allo-emitted 8x8 bf16 GEMM (xcu280, 3.33 ns) instantiates
+   ``fmul_32ns_32ns_32_4_max_dsp`` (3 DSP each) and
+   ``fadd_32ns_32ns_32_7_full_dsp`` (2 DSP each) -- the same operators a
+   ``float`` design gets. A 16-element bf16 MAC costs 3 DSP / 243 FF / 338 LUT
+   for the adder and 3 DSP / 143 FF / 78 LUT for the multiplier, identical to
+   the ``float`` version of the same kernel, at the same II. What bf16 *does*
+   buy on this toolchain is storage: 34 vs 62 BRAM_18K and 6629 vs 10822 FF
+   over the whole MAC kernel. Any area model that assumes a bf16 multiplier is
+   cheaper than an fp32 one is wrong here. A genuinely narrow bf16 multiplier
+   would have to be written out field-by-field in the shim.
+
+2. **Catapult's float-to-bf16 conversion truncates.**
+   ``ac::bfloat16``'s *operators* default to ``AC_TRN_ZERO``; the generated
+   header now sets ``AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE`` to ``AC_RND_CONV``
+   before including ``ac_std_float.h``, which makes add/sub/mul/div round to
+   nearest-even and agree with MLIR. Its ``float`` **constructor**, however,
+   hard-codes ``AC_TRN_ZERO`` (``ac_std_float.h``,
+   ``convert<width,e_width,AC_TRN_ZERO>()``) and is not overridable, so an
+   ``arith.truncf`` from f32 to bf16 in Catapult output truncates where the
+   simulator rounds. Constants are unaffected (a bf16-valued literal converts
+   exactly under any mode). Fixing it means emitting an explicit
+   ``convert<16,8,AC_RND_CONV>()`` for that cast rather than a plain
+   assignment.
+
+3. **intel, tapa and xls still do not support bf16** -- deliberately not
+   implemented. They now name the type and the backend in an MLIR error and
+   return failure instead of aborting. (``EmitIntelHLS.cpp`` additionally used
+   to call ``val.getDefiningOp()->emitError(...)``, which null-derefs for a
+   block argument.)
+
+**Separately fixed: an int-to-float bitcast could never produce a bf16.**
+``infer.py`` derived the result type of ``x.bitcast()`` from the source
+bitwidth alone, so 16 bits meant ``float16`` -- a bf16 could be packed into a
+``UInt(16)`` but never unpacked. ``bitcast`` now takes an optional target type,
+``u.bitcast(bfloat16)``, checked against the source width;
+``builder.py:2903`` already passed ``node.dtype`` through and needed no change.
+The no-argument form is unchanged.
+
+.. note::
+
+   A numbered item recording the *same* blocker from the MiniTPU side (the BF16
+   design that could not be taken to hardware) was in flight while this was
+   written. It was not on ``origin/main`` at ``e3f289aa``; if it lands, merge it
+   into this entry rather than keeping two.
+
+**Evidence.** An Allo-emitted 8x8 bf16 GEMM is **bit-exact** against the
+simulator under both ``g++`` and Vitis ``csim_design`` (64/64 elements), and
+``csynth_design`` completes: 396 cycles, 10 DSP, 2044 FF, 4325 LUT, estimated
+Fmax 393.55 MHz. Catapult output is checked at the text level only; there is
+no Catapult licence on this host.

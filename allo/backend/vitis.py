@@ -53,7 +53,10 @@ dtype_size_map = {
 }
 
 ctype_map = {
-    "bf16": "std::bfloat16_t",
+    # Vitis HLS has no bfloat16; the emitted kernel.h defines allo_bfloat16
+    # (see mlir/lib/Translation/EmitVivadoHLS.cpp). std::bfloat16_t, which
+    # used to be here, needs -std=c++23 and never compiled in this flow.
+    "bf16": "allo_bfloat16",
     "f16": "half",
     "f32": "float",
     "f64": "double",
