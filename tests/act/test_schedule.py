@@ -5,7 +5,7 @@
 
 ACT's `epoch.schedule` is an order-*preserving* greedy ASAP pass, so its
 guarantee is pointwise minimality over the feasible set, not invariance under
-reordering the stream. `act.schedule.run` is held to the same claims, against
+reordering the stream. `allo.act.schedule.run` is held to the same claims, against
 two solvers that do not share its algorithm: a least-fixpoint iteration and,
 for the smallest cases, brute force over every start vector.
 """

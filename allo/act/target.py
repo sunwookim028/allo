@@ -37,5 +37,5 @@ def get(name):
     if name not in TARGETS:
         raise KeyError(
             f"no target {name!r}; registered: {sorted(TARGETS)}. Register one "
-            f"with act.target.register()")
+            f"with allo.act.target.register()")
     return TARGETS[name]

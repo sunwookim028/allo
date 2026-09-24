@@ -67,7 +67,7 @@ class Workload:
             if op not in POINTWISE:
                 raise SpecError(
                     f"{self.name}: unknown epilogue op {op!r}; add it to "
-                    f"act.workload.POINTWISE and to the target's op table")
+                    f"allo.act.workload.POINTWISE and to the target's op table")
 
     @property
     def free(self):

@@ -1,7 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""TinyTPU-isa as an `act.machine.Machine`: the units `assemble()` promises."""
+"""TinyTPU-isa as an `allo.act.machine.Machine`: the units `assemble()` promises."""
 
 import os
 import sys

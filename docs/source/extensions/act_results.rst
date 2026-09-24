@@ -65,9 +65,9 @@ cost model and a lowering, and it stops where ACT's interesting work begins.
 When the bindings for the chia lineage can be built, the matcher is the piece to
 revisit first -- not the mapper.
 
-What is kept from ACT, deliberately: the interface. ``act.nest.Loop`` carries
+What is kept from ACT, deliberately: the interface. ``allo.act.nest.Loop`` carries
 ACT's four field names in ACT's order, so a real ``mapping.Mapping.loops`` can
-be handed to ``act.search`` unchanged, and ``Priced.cost`` is ACT's
+be handed to ``allo.act.search`` unchanged, and ``Priced.cost`` is ACT's
 ``(makespan, emits)`` lexicographic pair.
 
 
@@ -223,7 +223,7 @@ the **pointwise minimum** over every assignment satisfying (a) non-negativity,
 (b) ``start_dst >= finish_src`` for each derived dependence, and (c)
 ``start_later >= start_earlier + issue_earlier`` for consecutive epochs on one
 unit. That is the proposition ``tests/act/test_schedule.py`` holds
-``act.schedule.run`` to, against two solvers that do not share its algorithm: a
+``allo.act.schedule.run`` to, against two solvers that do not share its algorithm: a
 least-fixpoint iteration over the constraint system, and brute force over every
 start vector for the smallest cases.
 
