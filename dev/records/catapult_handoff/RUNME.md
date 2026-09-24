@@ -1,5 +1,9 @@
 # Catapult synthesis handoff — `pc_int32_systemc`
 
+> Other handoffs in this directory: `ppa_mac16/` (power, `mode="ppa"`, not yet
+> run), and the completed runs `zhang21_run_2026-09-24/` (this one) and
+> `zhang21_power_2026-09-24/` (power by hand).
+
 Emitted on ace-01 (no Catapult, no licence) on 2026-09-24 from `main` @ `a622c9ea`,
 by `df.build(top, target="systemc", mode="csyn", project=...)`. Everything Catapult
 consumes is committed here; **no `allo` import is needed on the licence host.**
@@ -29,7 +33,7 @@ may live anywhere.
 ## Commands, in order
 
 ```bash
-export MGC_HOME=/opt/siemens/catapult/2024.2
+export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home   # the /Mgc_home component matters
 export PATH=$MGC_HOME/bin:$PATH
 export MGLS_LICENSE_FILE=1717@en-license-05.coecis.cornell.edu   # nothing pre-sets this
 unset LD_PRELOAD

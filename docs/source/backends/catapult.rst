@@ -236,7 +236,7 @@ Use the environment module if it is available, and set the path by hand otherwis
    module load mentor-Catapult_synthesis_10.5a
 
    # Option B: manual path, if the module is not installed
-   export MGC_HOME=/opt/siemens/catapult/2024.2
+   export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home   # on zhang-21; the /Mgc_home component is part of the root
    export PATH=$MGC_HOME/bin:$PATH
 
    catapult -version
@@ -432,35 +432,148 @@ multiplexers) and ``LOGIC`` (control logic).
 
 PPA Analysis
 ------------
-Besides ``csim`` and ``csyn``, the Catapult target accepts ``mode="ppa"``. It runs the same
-synthesis flow as ``csyn`` and then extracts metrics from the reports:
+``mode="ppa"`` runs the ``csyn`` flow and then the two steps that produce power --
+``go switching`` (simulate the C++ testbench against the pre-power RTL, convert the VCD to SAIF)
+and ``flow run /PowerAnalysis/report_pre_pwropt_Verilog`` (annotate that SAIF, write
+``power.rpt``) -- and prints latency, area and **measured** power. It needs a C++ testbench that
+SCVerify can drive and an Xcelium install; with no testbench there is no activity and therefore no
+power, and the build fails at ``build()`` rather than reporting zeros.
+
+Quick start
+~~~~~~~~~~~
+
+.. code-block:: bash
+
+   export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home
+   export PATH=$MGC_HOME/bin:$PATH
+   export MGLS_LICENSE_FILE=1717@en-license-05.coecis.cornell.edu   # Catapult + PowerPro
+   export CDS_LIC_FILE=...                                          # Xcelium, for the switching sim
+   export NC_ROOT=/opt/cadence/XCELIUM2403                          # or configs={"ncsim_root": ...}
 
 .. code-block:: python
 
    s = allo.customize(top)
-   # s.partition(...), s.pipeline(...)
-   mod = s.build(target="catapult", mode="ppa", project="my_ppa_project")
-   stats = mod()   # runs synthesis, prints a metrics table, returns a dict
-   print(stats)
+   mod = s.build(
+       target="catapult",
+       mode="ppa",
+       project="my_ppa_project",
+       configs={
+           "testbench": "tb.cpp",       # REQUIRED: CCS_MAIN + CCS_DESIGN(top)(...)
+           "clock_period": 5.0,         # ns
+           "library": "nangate-45nm_beh",
+       },
+   )
+   stats = mod()   # runs synthesis + switching + power, prints a table, returns a dict
 
-``stats`` contains ``Latency (cycles)`` (``Max Latency`` from ``cycle.rpt``), ``Area``
-(``Total Area`` from ``area.rpt``, unit depends on the technology library) and ``Power`` (from
-``power.rpt`` or ``power_summary.rpt`` if present; ``N/A`` otherwise), all read from
-``<project>/Catapult/<top>.v1/``. It also carries a ``hierarchical`` entry: a per-module area
-(and, where reported, power) breakdown parsed from ``area.rpt``, so that per-PE and interconnect
-cost can be separated. That breakdown needs a hierarchical design; Catapult preserves the hierarchy
-in the generated RTL unless it is fully flattened.
+Roughly 80 s for a 16-tap MAC on zhang-21. The table it prints carries latency, area, total /
+dynamic / static power, the SAIF annotation coverage, a per-instance power breakdown, and the
+caveat below.
 
-Technology library selection is by ``configs={"device": ...}``: anything containing ``45nm`` or
-``nangate`` selects ``nangate-45nm_beh`` (the default), anything containing ``sky130`` selects
-``sky130``, and any other string is passed to ``solution library add`` unchanged.
+The testbench
+~~~~~~~~~~~~~
+**A design with no C++ testbench gets no power number.** ``go switching`` measures activity by
+simulating; with nothing driving the design the report is zeros or a default-toggle guess -- a
+power figure that is wrong in the safe-looking direction. ``mode="ppa"`` therefore refuses to run
+without ``configs["testbench"]``.
 
-.. note::
+The file is ordinary Catapult SCVerify C++: ``CCS_MAIN(...)`` calling ``CCS_DESIGN(<top>)(...)``
+over representative stimulus. The worked example is
+``dev/records/catapult_handoff/zhang21_power_2026-09-24/mac_tb.cpp`` (200 transactions):
 
-   The mode, the parsed report fields and the library selection above were checked against
-   ``allo/backend/catapult.py`` and ``allo/backend/hls.py`` in this tree; no ``ppa`` run is recorded
-   here. Note also that ``codegen_tcl`` defaults ``frequency`` to **100** MHz when it is not given,
-   not the 300 MHz stated under `Configuration Options`_.
+.. code-block:: cpp
+
+   #include <ac_int.h>
+   #include <mc_scverify.h>
+   void mac(ac_int<8,true> a[16], ac_int<8,true> b[16], ac_int<24,true> &out);
+   CCS_MAIN(int argc, char **argv) {
+     ac_int<8,true> a[16], b[16]; ac_int<24,true> o; int errs = 0;
+     for (int t = 0; t < 200; ++t) { /* stimulus */ CCS_DESIGN(mac)(a, b, o); }
+     CCS_RETURN(errs != 0);
+   }
+
+The SystemC flow's emitted ``kernel.cpp`` does **not** count: its testbench is an ``sc_main``,
+which SCVerify does not drive. A SystemC design needs a separate SCVerify testbench for ppa; use
+``mode="csyn"`` for area and latency only.
+
+Reference
+~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Key
+     - Meaning
+   * - ``configs["testbench"]``
+     - **Required.** Path to the SCVerify C++ testbench. Copied next to ``kernel.cpp`` and added
+       with ``-exclude true`` (compiled for verification, never synthesized).
+   * - ``configs["ncsim_root"]``
+     - Xcelium install root (the directory holding ``bin/xrun``). Falls back to ``$NC_ROOT``,
+       ``$XCELIUM_HOME``, ``$CDS_INST_DIR``, then ``xrun`` on ``PATH``. No default path is
+       compiled in; the build fails if none resolves.
+   * - ``configs["switching_activity_type"]``
+     - ``saif`` by default. Catapult's own default, FSDB, needs Verdi (``$NOVAS_INST_DIR``).
+   * - ``configs["use_ccs_block"]``
+     - ``False``. Set it only when your own sources mark the DUT with the ``CCS_BLOCK()`` macro;
+       Allo emits ``#pragma hls_design top``, which SCVerify handles without it.
+   * - ``CDS_LIC_FILE``
+     - Environment, not configuration: Xcelium's licence. Unset produces a warning, not an error
+       (a site may keep the licence in the default ``~/cds.lic``).
+   * - PowerPro licence
+     - Nothing to acquire. ``PProBase``, ``PProAnalysis``, ``PProCGopt``, ``PProWriteRTL`` and
+       ``PProPAWorker`` check out from the same server as Catapult itself with nothing extra set.
+
+The simulator is Xcelium, not Questa. Catapult defaults to QuestaSim, and pointing it at an
+install without ``vsim`` is how a power step "succeeds" having simulated nothing -- the emitted tcl
+therefore sets ``/SCVerify/USE_QUESTASIM false``, ``/SCVerify/USE_NCSIM true`` and
+``/NCSim/NC_ROOT <resolved root>``. Host-specific paths (that root, the licence files) are resolved
+from configuration and environment at ``build()``, never hardcoded, so the tcl is specific to the
+host that generated it while the backend is not.
+
+``stats`` keys: ``Latency (cycles)`` (from ``cycle.rpt``), ``Area``
+(``TOTAL AREA (After Assignment)`` from ``rtl.rpt`` -- this flow writes no ``area.rpt``), ``Power``,
+``Power dynamic``, ``Power static``, ``Power clock net`` (all µW, from ``power.rpt``),
+``SAIF annotated``, ``hierarchical`` (per-instance power) and ``caveat``. All reports are under
+``<project>/Catapult/<top>.v1/``.
+
+How to read the power number
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every figure this mode reports carries, and needs, this caveat: the activity is **SAIF from
+simulation**, with 100 % of primary inputs and flop outputs annotated and activity propagated to
+internal nets by PowerPro (not simulated). It is therefore **workload-specific -- only as
+representative as the testbench** -- and **pre-layout**: a wireload model, PowerPro's clock-tree
+model, no place-and-route parasitics. A power figure without that attached is not usable evidence.
+
+Limits and known failures
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* No testbench, no power: ``build()`` raises. This is the intended behaviour.
+* No Xcelium root resolvable: ``build()`` raises rather than emitting a tcl that silently runs no
+  simulation.
+* Zero dynamic power, a missing ``power.rpt``, or 0 % SAIF annotation after a run: ``mod()`` raises
+  instead of printing a zero.
+* ``synth_top`` (synthesizing a submodule) is untested with ppa: SCVerify wraps the design top, so
+  a testbench must drive that submodule directly. The one attempt on record --
+  ``stream_boundary``'s ``compute_0`` -- produced no activity.
+* Technology library selection is by ``configs={"library": ...}`` (``device`` is still accepted);
+  see `Configuration Options`_. ``codegen_tcl`` defaults ``frequency`` to **100** MHz when neither
+  ``clock_period`` nor ``frequency`` is given.
+
+Results and history
+~~~~~~~~~~~~~~~~~~~
+The one measured power run is ``dev/records/catapult_handoff/zhang21_power_2026-09-24/`` (zhang-21,
+Catapult 2024.2/1130128 with PowerPro, nangate45 ``typical`` 1.1 V, 5 ns clock): a 16-tap int8 MAC
+driven by 200 transactions, **248.47 µW total -- 229.67 dynamic, 18.80 static**. The control with
+every input zero gives 83.80 µW dynamic, with combinational power falling 147.96 → 15.03 µW while
+the clock network stays at 19.93 µW. The number tracks activity, which is what makes it a
+measurement rather than a default-toggle estimate.
+
+That run was made by hand, because ``mode="ppa"`` did not work: it emitted the ``csyn`` tcl (stopping
+at ``go extract``, so no power step ever ran), and its parser looked for a ``Total Power:`` string
+that PowerPro's report does not contain, so it would have printed ``N/A`` even for a successful run.
+Both are fixed here, and the parser is tested against that committed report. **Not yet verified:**
+no ``mode="ppa"`` run has been executed end to end -- the emitted tcl reproduces the measured
+sequence step for step, but ``ace-01`` has no Catapult licence. The run that would verify it is
+prepared in ``dev/records/catapult_handoff/ppa_mac16/`` (project, testbench, commands, and a
+``check_ppa.py`` that is the success criterion), for the licence host to execute.
 
 **RTL-to-GDSII with OpenROAD.** For physical PPA, the synthesizable RTL at
 ``<project>/Catapult/<top>.v1/rtl.v`` can be passed to

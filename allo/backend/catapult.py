@@ -1,6 +1,9 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+import re
+
 import numpy as np
 from .utils import format_str
 from ..ir.transform import find_func_in_module
@@ -231,6 +234,105 @@ def resolve_library(configs):
     )
 
 
+# The caveat that must travel with every number this flow reports. A power figure
+# without it is not usable evidence: it says what was measured and how.
+PPA_ACTIVITY_CAVEAT = (
+    "Power is measured from SAIF switching activity produced by simulating the C++ "
+    "testbench against the pre-power RTL (100% of primary inputs and flop outputs "
+    "annotated; internal nets propagated by PowerPro, not simulated). It is therefore "
+    "WORKLOAD-SPECIFIC -- only as representative as that testbench -- and PRE-LAYOUT: "
+    "a wireload model, PowerPro's clock-tree model, no place-and-route parasitics."
+)
+
+
+def resolve_ncsim_root(configs=None):
+    """Locate the Xcelium install that SCVerify drives for the switching simulation.
+
+    NOT hardcoded to any site. `go switching` needs an event simulator, and the ONE
+    measured working configuration drives Xcelium (`/SCVerify/USE_NCSIM true` +
+    `/NCSim/NC_ROOT <root>`). Catapult's own default is QuestaSim, and pointing it at
+    an install with no `vsim` is how a power step "succeeds" having simulated nothing
+    -- so the root has to be a real directory before we emit a tcl that claims one.
+
+    Resolution order (first hit wins):
+      1. configs["ncsim_root"]
+      2. $NC_ROOT / $XCELIUM_HOME / $CDS_INST_DIR
+      3. the parent of the directory holding `xrun` on PATH
+    Raises ValueError when nothing resolves, rather than emitting a default path that
+    only exists on one host.
+    """
+    import shutil
+
+    configs = configs or {}
+    cand = configs.get("ncsim_root")
+    if cand:
+        # An EXPLICIT root is taken as given even when it does not exist here: the
+        # project is often generated on a machine without the tools (ace-01) and run
+        # on the licence host (zhang-21), and refusing would make that handoff
+        # impossible. Discovery below still insists on a real directory.
+        if not os.path.isdir(cand):
+            print(
+                f"[warn] configs['ncsim_root']={cand!r} is not a directory on this "
+                f"host. Emitting it anyway -- it must exist wherever run.tcl runs."
+            )
+        return cand
+    for var in ("NC_ROOT", "XCELIUM_HOME", "CDS_INST_DIR"):
+        cand = os.environ.get(var)
+        if cand and os.path.isdir(cand):
+            return cand
+    xrun = shutil.which("xrun")
+    if xrun:
+        return os.path.dirname(os.path.dirname(os.path.realpath(xrun)))
+    raise ValueError(
+        "mode=\"ppa\" runs an RTL simulation to get switching activity, and no "
+        "Xcelium install was found. Set configs={'ncsim_root': '<xcelium root>'} or "
+        "export NC_ROOT / XCELIUM_HOME (the directory containing bin/xrun), or put "
+        "xrun on PATH. Xcelium also needs its licence: export CDS_LIC_FILE.\n"
+        "Catapult's default simulator is QuestaSim; this flow does not use it because "
+        "the one configuration measured end to end (dev/records/catapult_handoff/"
+        "zhang21_power_2026-09-24/) drives Xcelium, and a Questa install without "
+        "`vsim` silently simulates nothing and yields a power number of zero."
+    )
+
+
+def resolve_ppa_testbench(configs):
+    """Return the C++ testbench file `mode="ppa"` will hand to SCVerify.
+
+    THE constraint of this flow: a design with no testbench SCVerify can drive
+    produces no activity, and PowerPro then reports zeros or a default-toggle guess --
+    a wrong power number in the safe-looking direction. So this raises instead of
+    letting the flow run.
+
+    The testbench is a plain C++ file with `CCS_MAIN(...)` that calls
+    `CCS_DESIGN(<top>)(...)` with representative stimulus; it is added to the solution
+    with `-exclude true` so it is compiled for verification but never synthesized.
+    """
+    tb = configs.get("testbench")
+    if not tb:
+        raise ValueError(
+            "mode=\"ppa\" needs a C++ testbench that SCVerify can drive.\n"
+            "Power here is MEASURED from switching activity: `go switching` simulates "
+            "the testbench against the pre-power RTL and converts the VCD to SAIF. "
+            "With no testbench nothing is simulated, and PowerPro reports zeros or a "
+            "default-toggle estimate -- a wrong number that looks safe. Failing here "
+            "is deliberate.\n"
+            "Pass configs={'testbench': '/path/to/tb.cpp'}: a file with CCS_MAIN(...) "
+            "calling CCS_DESIGN(<top>)(...) over representative stimulus. The worked "
+            "example is dev/records/catapult_handoff/zhang21_power_2026-09-24/"
+            "mac_tb.cpp (200 transactions, 248.47 uW).\n"
+            "NOTE the SystemC flow's emitted kernel.cpp does NOT count: its testbench "
+            "is an sc_main, which SCVerify does not drive. Use mode=\"csyn\" if you "
+            "want area and latency only."
+        )
+    tb = os.path.abspath(os.path.expanduser(tb))
+    if not os.path.isfile(tb):
+        raise ValueError(
+            f"configs['testbench']={tb!r} does not exist. mode=\"ppa\" needs the "
+            f"C++ SCVerify testbench file itself, not a directory or a target name."
+        )
+    return tb
+
+
 def codegen_tcl(top, configs):
     """Generate TCL script for Catapult HLS synthesis.
 
@@ -306,6 +408,34 @@ flow package option set /SCVerify/USE_MSIM false
 flow package option set /SCVerify/USE_VCS false
 """
 
+    # PPA: the power half of "PPA" is a MEASUREMENT, and these four lines are what
+    # make it one. Every one of them was needed for the single run that produced real
+    # numbers (dev/records/catapult_handoff/zhang21_power_2026-09-24/):
+    #   * SCVerify + USE_NCSIM: `go switching` needs an event simulator to run the C++
+    #     testbench against the pre-power RTL. Catapult defaults to QuestaSim; when
+    #     that install has no `vsim` the step "succeeds" having simulated NOTHING, and
+    #     the power report comes back all zeros. Hence an explicit, verified NC_ROOT.
+    #   * SWITCHING_ACTIVITY_TYPE saif: the default is FSDB, which needs Verdi
+    #     ($NOVAS_INST_DIR). SAIF goes through vcd2saif, which ships with the tools.
+    # NC_ROOT is resolved from configs/env HERE, so the emitted tcl is host-specific
+    # by construction while the backend hardcodes no site's paths.
+    if mode == "ppa":
+        ncsim_root = resolve_ncsim_root(configs)
+        activity = configs.get("switching_activity_type", "saif")
+        out_str += f"""flow package require /SCVerify
+flow package option set /SCVerify/USE_QUESTASIM false
+flow package option set /SCVerify/USE_NCSIM true
+flow package require /NCSim
+flow package option set /NCSim/NC_ROOT {ncsim_root}
+flow package require /LowPower
+flow package option set /LowPower/SWITCHING_ACTIVITY_TYPE {activity}
+"""
+        # USE_CCS_BLOCK is for designs marked with the CCS_BLOCK() macro. Allo emits
+        # `#pragma hls_design top` instead, which SCVerify handles without it, so this
+        # stays off unless the caller's own sources use the macro.
+        if configs.get("use_ccs_block", False):
+            out_str += "flow package option set /SCVerify/USE_CCS_BLOCK true\n"
+
     out_str += """
 # Add source files
 solution file add "$sfd/kernel.cpp" -type C++
@@ -315,6 +445,14 @@ solution file add "$sfd/kernel.cpp" -type C++
     # kernel.cpp with its own sc_main testbench, so it has NO separate host.cpp.
     if mode == "csim" and platform != "systemc":
         out_str += 'solution file add "$sfd/host.cpp" -type C++ -exclude true\n'
+
+    # The SCVerify testbench for ppa. `-exclude true` = compiled for verification,
+    # never synthesized. resolve_ppa_testbench raises when it is missing, so this is
+    # the point at which a design with no testbench fails -- at build(), before any
+    # licence is taken and long before a zero lands in a report.
+    if mode == "ppa":
+        tb_name = os.path.basename(resolve_ppa_testbench(configs))
+        out_str += f'solution file add "$sfd/{tb_name}" -type C++ -exclude true\n'
 
     # synth_top: synthesize a SUBMODULE instead of the whole region.
     #
@@ -414,8 +552,177 @@ go assembly
 """
         out_str += "go extract\n"
 
+    # csyn stops at `go extract`. Power needs two more steps, and mode="ppa" used to
+    # emit neither -- which is why it was documented as producing power and produced
+    # none. `go switching` runs SCVerify (testbench vs pre-power RTL) and writes
+    # <sol>/switching_v/test.saif; report_pre_pwropt_Verilog annotates that SAIF onto
+    # the netlist and writes <sol>/power.rpt.
+    if mode == "ppa":
+        out_str += """
+# Power: annotate simulated activity, then report
+directive set USE_MODES {test}
+directive set /USE_MODES/test/PWR_CLOCK_MODE {{clk default}}
+directive set /USE_MODES/test/PWR_OPT_WEIGHT 1.0
+go switching
+flow run /PowerAnalysis/report_pre_pwropt_Verilog
+"""
+
     out_str += "\nexit\n"
     return out_str
+
+
+_PWR_ROW = re.compile(
+    r"^(\s+)(Static|Dynamic|Total)((?:\s+-?[\d.]+){5})\s*$"
+)
+_PWR_COLS = ("memory", "register", "combinational", "clock_network", "total")
+
+
+def parse_power_report(power_rpt):
+    """Parse Catapult/PowerPro's ``power.rpt`` (the real table format).
+
+    The previous parser looked for ``Total Power:``. NO SUCH STRING EXISTS in the
+    report PowerPro writes, so `mode="ppa"` printed ``N/A`` even after a successful
+    power run. The real shape (see
+    dev/records/catapult_handoff/zhang21_power_2026-09-24/power.rpt) is::
+
+        Switching Activity (Percent Asserted)
+          Use Mode                Flop Outputs User Nets
+          ----------------------- ------------ ---------
+          pre_pwropt_test_Verilog       100.00    100.00
+
+        Power Report (uW)
+                                     Memory Register Combinational Clock Network  Total
+          pre_pwropt_test_Verilog
+            Static                     0.00     4.42         14.27          0.10  18.80
+            Dynamic                    0.00    61.78        147.96         19.93 229.67
+            Total                      0.00    66.20        162.23         20.03 248.47
+
+            mac_core_inst
+              Static                   ...
+
+    The first (least-indented) block is the whole design; deeper ones are instances.
+    All figures are microwatts.
+
+    Returns ``None`` when the file does not exist or contains no power table, else::
+
+        {"use_mode": str, "unit": "uW",
+         "static"/"dynamic"/"total": {memory, register, combinational,
+                                      clock_network, total},
+         "annotation": {"flop_outputs_pct": float, "user_nets_pct": float},
+         "instances": {name: {"static": f, "dynamic": f, "total": f}}}
+    """
+    if not os.path.exists(power_rpt):
+        return None
+    with open(power_rpt, "r") as f:
+        text = f.read()
+
+    head, _, body = text.partition("Power Report")
+    if not body:
+        return None
+    # drop the rest of the "Power Report (uW)" title line, else "(uW)" reads as a block
+    body = body.split("\n", 1)[1] if "\n" in body else ""
+    body = body.split("End of Report")[0]
+
+    res = {"unit": "uW", "use_mode": None, "instances": {}, "annotation": {}}
+    design = {}
+    blocks = {}          # name -> {"Static": [...], ...}
+    order = []
+    current = None
+    base_indent = None
+    for line in body.splitlines():
+        m = _PWR_ROW.match(line)
+        if m:
+            if current is None:
+                continue
+            vals = [float(x) for x in m.group(3).split()]
+            blocks[current][m.group(2)] = dict(zip(_PWR_COLS, vals))
+            continue
+        stripped = line.strip()
+        if not stripped or set(stripped) <= set("- "):
+            continue
+        # The column header, not a block name.
+        if "Memory" in line and "Combinational" in line:
+            continue
+        indent = len(line) - len(line.lstrip())
+        if base_indent is None:
+            base_indent = indent
+        if indent < base_indent:
+            continue
+        current = stripped
+        blocks.setdefault(current, {})
+        order.append((indent, current))
+
+    if not order:
+        return None
+    top_indent, top_name = order[0]
+    res["use_mode"] = top_name
+    design = blocks.get(top_name, {})
+    for key in ("Static", "Dynamic", "Total"):
+        if key in design:
+            res[key.lower()] = design[key]
+    if "total" not in res:
+        return None
+    for indent, name in order[1:]:
+        if indent <= top_indent:
+            continue
+        rows = blocks.get(name, {})
+        res["instances"][name] = {
+            k.lower(): v["total"] for k, v in rows.items() if "total" in v
+        }
+
+    # Annotation coverage: how much of the netlist the SAIF actually pinned down.
+    # 100/100 is what a real simulation gives; anything less (or a missing row) means
+    # the number leans on propagation or defaults.
+    m = re.search(
+        r"Switching Activity.*?^\s*"
+        + re.escape(top_name)
+        + r"\s+([\d.]+)\s+([\d.]+)\s*$",
+        head + "Power Report",
+        re.S | re.M,
+    )
+    if m:
+        res["annotation"] = {
+            "flop_outputs_pct": float(m.group(1)),
+            "user_nets_pct": float(m.group(2)),
+        }
+    return res
+
+
+def assert_power_measured(sol_dir):
+    """Return the parsed power report, or raise saying exactly what went wrong.
+
+    A silent zero here is worse than a crash: it is a power number that is wrong in
+    the safe-looking direction. So every way the flow can "succeed" without measuring
+    anything -- no report, no table, no switching activity -- is turned into a loud
+    failure that names the likely cause.
+    """
+    power_rpt = os.path.join(sol_dir, "power.rpt")
+    pwr = parse_power_report(power_rpt)
+    if pwr is None:
+        raise RuntimeError(
+            f"ppa: no usable power report at {power_rpt}. The flow ran but produced "
+            f"no power table. Check the Catapult log for the `go switching` step: if "
+            f"SCVerify could not launch the simulator (Catapult defaults to QuestaSim "
+            f"and reports `No rule to make target .../modelsim.ini`), nothing was "
+            f"simulated. Xcelium needs NC_ROOT (configs['ncsim_root']) and a licence "
+            f"in CDS_LIC_FILE."
+        )
+    dyn = pwr.get("dynamic", {}).get("total", 0.0)
+    if not dyn:
+        raise RuntimeError(
+            f"ppa: {power_rpt} reports ZERO dynamic power, which means the switching "
+            f"simulation produced no activity -- the testbench did not drive the "
+            f"design, or the SAIF was empty. The number is not a measurement; "
+            f"refusing to report it."
+        )
+    ann = pwr.get("annotation", {})
+    if ann and min(ann.values()) <= 0.0:
+        raise RuntimeError(
+            f"ppa: {power_rpt} shows 0% switching-activity annotation "
+            f"({ann}); the SAIF annotated nothing, so the figures are default-toggle "
+            f"estimates, not a measurement."
+        )
+    return pwr
 
 
 def parse_catapult_report(project_path, top):
@@ -433,8 +740,6 @@ def parse_catapult_report(project_path, top):
     dict
         Parsed metrics (Area, Latency, Power).
     """
-    import os
-    import re
 
     sol_dir = os.path.join(project_path, "Catapult", f"{top}.v1")
 
@@ -461,6 +766,19 @@ def parse_catapult_report(project_path, top):
             lats = [int(x) for x in re.findall(r"/run\s+\d+\s+(\d+)\s+\d+", content)]
             if lats:
                 res["Latency (cycles)"] = str(max(lats))
+            else:
+                # Function-flow cycle.rpt: one "Design Total:" row, columns
+                #   <ops> <latency> <throughput> <reset length> <II>
+                # A NEGATIVE latency is not a parse failure and not an error: a
+                # free-running SC_THREAD has no first-output latency, and Catapult
+                # writes -1. Say so rather than hiding it behind "N/A".
+                m = re.search(r"Design Total:\s+\d+\s+(-?\d+)\s+(-?\d+)", content)
+                if m:
+                    lat = int(m.group(1))
+                    res["Latency (cycles)"] = (
+                        str(lat) if lat >= 0 else f"{lat} (free-running)"
+                    )
+                    res["Throughput (II)"] = m.group(2)
 
     # --- Area from area.rpt (function backend) or rtl.rpt (SystemC flow) ---
     area_rpt = os.path.join(sol_dir, "area.rpt")
@@ -479,16 +797,21 @@ def parse_catapult_report(project_path, top):
             if m:
                 res["Area"] = m.group(1)
 
-    # --- Power from power.rpt or summary ---
-    for power_fname in ("power.rpt", "power_summary.rpt"):
-        power_rpt = os.path.join(sol_dir, power_fname)
-        if os.path.exists(power_rpt):
-            with open(power_rpt, "r") as f:
-                pwr_content = f.read()
-            m = re.search(r"Total Power\s*:\s*([\d\.]+\s*\w+)", pwr_content)
-            if m:
-                res["Power"] = m.group(1)
-            break
+    # --- Power from power.rpt (PowerPro's table; see parse_power_report) ---
+    pwr = parse_power_report(os.path.join(sol_dir, "power.rpt"))
+    if pwr is not None:
+        unit = pwr["unit"]
+        res["Power"] = f"{pwr['total']['total']:.2f} {unit}"
+        res["Power dynamic"] = f"{pwr['dynamic']['total']:.2f} {unit}"
+        res["Power static"] = f"{pwr['static']['total']:.2f} {unit}"
+        res["Power clock net"] = f"{pwr['total']['clock_network']:.2f} {unit}"
+        ann = pwr.get("annotation")
+        if ann:
+            res["SAIF annotated"] = (
+                f"{ann['flop_outputs_pct']:.0f}% flops / "
+                f"{ann['user_nets_pct']:.0f}% nets"
+            )
+        res["_power"] = pwr
 
     return res
 
@@ -517,14 +840,37 @@ def parse_catapult_hierarchical_report(project_path, top):
           "summary": str,   # human-readable table
         }
     """
-    import os
-    import re
-
     sol_dir = os.path.join(project_path, "Catapult", f"{top}.v1")
     area_rpt = os.path.join(sol_dir, "area.rpt")
 
     result = {"top": {}, "modules": {}, "summary": "No area.rpt found."}
     if not os.path.exists(area_rpt):
+        # Catapult writes no area.rpt in this flow -- area lives in rtl.rpt, which has
+        # no per-module rows. power.rpt DOES carry a per-instance breakdown, so when a
+        # ppa run produced one, report that instead of an empty table.
+        pwr = parse_power_report(os.path.join(sol_dir, "power.rpt"))
+        if pwr is None:
+            return result
+        unit = pwr["unit"]
+        lines = [
+            f"Per-instance power ({unit}) -- {pwr['use_mode']}",
+            "=" * 64,
+            f"{'Instance':<40} {'Total':>10} {'Dynamic':>10}",
+            "-" * 64,
+            f"{'[TOP] ' + top:<40} {pwr['total']['total']:>10.2f} "
+            f"{pwr['dynamic']['total']:>10.2f}",
+        ]
+        for name, vals in pwr["instances"].items():
+            lines.append(
+                f"  {name:<38} {vals.get('total', float('nan')):>10.2f} "
+                f"{vals.get('dynamic', float('nan')):>10.2f}"
+            )
+        lines += ["-" * 64, PPA_ACTIVITY_CAVEAT]
+        result["modules"] = {
+            k: {"power": v.get("total")} for k, v in pwr["instances"].items()
+        }
+        result["top"] = {"power": pwr["total"]["total"]}
+        result["summary"] = "\n".join(lines)
         return result
 
     with open(area_rpt, "r") as f:

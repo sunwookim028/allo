@@ -470,5 +470,103 @@ def test_catapult_csynth_with_unroll():
         print("test_catapult_csynth_with_unroll passed!")
 
 
+# =============================================================================
+# mode="ppa": the power flow (no Catapult installation required)
+# =============================================================================
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+POWER_RPT = os.path.join(
+    REPO, "dev/records/catapult_handoff/zhang21_power_2026-09-24/power.rpt"
+)
+
+
+def _mac16():
+    def mac16(a: int8[16], b: int8[16]) -> int32:
+        acc: int32 = 0
+        for i in range(16):
+            acc += a[i] * b[i]
+        return acc
+
+    return allo.customize(mac16)
+
+
+def test_ppa_requires_a_testbench():
+    """No testbench, no activity, no power: this must fail at build(), loudly."""
+    s = _mac16()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError, match="testbench"):
+            s.build(target="catapult", mode="ppa", project=tmpdir)
+
+
+def test_ppa_tcl_runs_the_power_steps():
+    """The emitted tcl must reproduce the measured working sequence."""
+    s = _mac16()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tb = os.path.join(tmpdir, "tb.cpp")
+        with open(tb, "w", encoding="utf-8") as f:
+            f.write("// tb\n")
+        prj = os.path.join(tmpdir, "prj")
+        s.build(
+            target="catapult",
+            mode="ppa",
+            project=prj,
+            configs={"testbench": tb, "ncsim_root": tmpdir, "clock_period": 5.0},
+        )
+        tcl = open(os.path.join(prj, "run.tcl"), encoding="utf-8").read()
+        for line in (
+            "flow package option set /SCVerify/USE_NCSIM true",
+            f"flow package option set /NCSim/NC_ROOT {tmpdir}",
+            "flow package option set /LowPower/SWITCHING_ACTIVITY_TYPE saif",
+            'solution file add "$sfd/tb.cpp" -type C++ -exclude true',
+            "go extract",
+            "go switching",
+            "flow run /PowerAnalysis/report_pre_pwropt_Verilog",
+        ):
+            assert line in tcl, line
+        # the testbench is copied next to kernel.cpp, where run.tcl looks for it
+        assert os.path.exists(os.path.join(prj, "tb.cpp"))
+        # csyn must be unchanged: no power steps
+        prj2 = os.path.join(tmpdir, "prj2")
+        s.build(target="catapult", mode="csyn", project=prj2)
+        assert "go switching" not in open(
+            os.path.join(prj2, "run.tcl"), encoding="utf-8"
+        ).read()
+
+
+def test_parse_real_power_report():
+    """Parse the report a real PowerPro run wrote (not an invented format)."""
+    from allo.backend.catapult import parse_power_report
+
+    pwr = parse_power_report(POWER_RPT)
+    assert pwr["use_mode"] == "pre_pwropt_test_Verilog"
+    assert pwr["total"]["total"] == 248.47
+    assert pwr["dynamic"]["total"] == 229.67
+    assert pwr["static"]["total"] == 18.80
+    assert pwr["total"]["clock_network"] == 20.03
+    assert pwr["annotation"]["flop_outputs_pct"] == 100.0
+    assert pwr["instances"]["mac_core_inst"]["total"] == 247.87
+
+
+def test_zero_power_is_not_a_result():
+    """A report with no activity must raise, not print a zero."""
+    import re as _re
+    from allo.backend.catapult import assert_power_measured
+
+    text = open(POWER_RPT, encoding="utf-8").read()
+    zeroed = _re.sub(
+        r"(Dynamic)((?:\s+[\d.]+){5})",
+        lambda m: m.group(1) + "     0.00     0.00          0.00          0.00   0.00",
+        text,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "power.rpt"), "w", encoding="utf-8") as f:
+            f.write(zeroed)
+        with pytest.raises(RuntimeError, match="ZERO dynamic power"):
+            assert_power_measured(tmpdir)
+        os.remove(os.path.join(tmpdir, "power.rpt"))
+        with pytest.raises(RuntimeError, match="no usable power report"):
+            assert_power_measured(tmpdir)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

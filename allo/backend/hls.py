@@ -41,6 +41,9 @@ from .catapult import (
     codegen_host as codegen_host_catapult,
     parse_catapult_report,
     parse_catapult_hierarchical_report,
+    resolve_ppa_testbench,
+    assert_power_measured,
+    PPA_ACTIVITY_CAVEAT,
 )
 from .ip import IPModule
 from .report import parse_xml
@@ -397,6 +400,7 @@ class HLSModule:
             base_configs = DEFAULT_CONFIG.copy()
         base_configs.update(user_configs)
         configs = base_configs
+        self.configs = configs
         self.num_output_args = configs.get("num_output_args", None)
         if self.mode is not None:
             configs["mode"] = self.mode
@@ -510,6 +514,15 @@ class HLSModule:
                 # top. Catapult-only: these are Catapult directives.
                 if platform in {"catapult", "systemc"}:
                     write_ip_directives(self.ext_libs, project, top_func_name)
+                # ppa's tcl adds "$sfd/<tb>"; put the caller's testbench there. The
+                # resolve_ call raises when there is none -- at build(), which is the
+                # point of it: no testbench means no switching activity, and a power
+                # run with no activity reports zeros that look like a measurement.
+                if platform in {"catapult", "systemc"} and mode == "ppa":
+                    import shutil as _shutil
+
+                    _tb = resolve_ppa_testbench(configs)
+                    _shutil.copy(_tb, os.path.join(project, os.path.basename(_tb)))
                 with open(f"{project}/run.tcl", "w", encoding="utf-8") as outfile:
                     if platform in {"catapult", "systemc"}:
                         outfile.write(codegen_tcl_catapult(top_func_name, configs))
@@ -1420,6 +1433,19 @@ class HLSModule:
             if self.mode in {"csyn", "ppa"}:
                 catapult_cmd = _find_catapult_binary()
 
+                # ppa's switching step runs Xcelium, which needs its own licence.
+                # A WARNING, not a check: a site may hold the licence in the default
+                # ~/cds.lic instead. (The PowerPro features themselves -- PProBase,
+                # PProAnalysis, PProCGopt, PProWriteRTL, PProPAWorker -- check out
+                # from the ordinary Catapult licence server with nothing extra set,
+                # so there is deliberately no licence check for them.)
+                if self.mode == "ppa" and not os.environ.get("CDS_LIC_FILE"):
+                    print(
+                        "[warn] CDS_LIC_FILE is not set. The ppa switching step runs "
+                        "Xcelium; if its licence is not found the simulation will not "
+                        "run and the power report will be empty."
+                    )
+
                 # For systemc, synthesize from a BUILD SUBDIR, not self.project where
                 # kernel.cpp lives: when Catapult's cwd contains the source, matchlib
                 # Connections In/Out ports degrade to raw sc_signals (CIN-124 on in.rdy)
@@ -1464,19 +1490,31 @@ class HLSModule:
                     print(
                         f"[{time.strftime('%H:%M:%S', time.gmtime())}] Extracting PPA metrics..."
                     )
-                    stats = parse_catapult_report(rpt_dir, self.top_func_name)
+                    # The solution directory is named after the SYNTHESIZED top, which
+                    # `synth_top` can move off the region top.
+                    sol_top = self.configs.get("synth_top") or self.top_func_name
+                    # Raises when the run produced no power table, zero dynamic power,
+                    # or 0% SAIF annotation -- each of which used to print "N/A" or a
+                    # zero and look like a result.
+                    assert_power_measured(
+                        os.path.join(rpt_dir, "Catapult", f"{sol_top}.v1")
+                    )
+                    stats = parse_catapult_report(rpt_dir, sol_top)
+                    stats.pop("_power", None)
                     print("| Metric              | Value                |")
                     print("|---------------------|----------------------|")
                     for k, v in stats.items():
                         print(f"| {k:<20} | {v:<20} |")
 
-                    # Hierarchical breakdown: per-PE and interconnect
-                    hier = parse_catapult_hierarchical_report(
-                        rpt_dir, self.top_func_name
-                    )
+                    # Hierarchical breakdown: per-instance power (area.rpt is not
+                    # written by this flow; area is the rtl.rpt total above).
+                    hier = parse_catapult_hierarchical_report(rpt_dir, sol_top)
                     print()
                     print(hier["summary"])
+                    print()
+                    print(PPA_ACTIVITY_CAVEAT)
                     stats["hierarchical"] = hier
+                    stats["caveat"] = PPA_ACTIVITY_CAVEAT
                     return stats
                 return
             raise RuntimeError(
