@@ -360,7 +360,8 @@ def status(run_dir: Path) -> None:
     if not spend["usd"]:
         recorded = (json.loads(done.read_text()).get("spend", {}).get("usd")
                     if done.exists() else None)
-        print("         no session carries that tag"
+        print("         no session carries that tag (no model call, a run "
+              "older than the titling, or sessions since gone)"
               + (f"; summary.json recorded ${recorded:.2f}" if recorded else "")
               + ". `python3 spend.py report <repo>` attributes by time window.")
     print(f"  the full question: python3 -c \"import json;r=json.load("

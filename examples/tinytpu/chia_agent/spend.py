@@ -151,8 +151,9 @@ def of_run(run_dir: Path) -> dict:
         summary = run_dir / "summary.json"
         recorded = (json.loads(summary.read_text()).get("spend", {}).get("usd")
                     if summary.exists() else None)
-        out["note"] = ("no session carries this tag -- the run predates the "
-                       "titling, or its sessions are gone. "
+        out["note"] = ("no session carries this tag -- no model call was "
+                       "made, the run predates the titling, or its sessions "
+                       "are gone. "
                        + (f"summary.json recorded ${recorded}. "
                           if recorded is not None else "")
                        + "`spend.py report <repo>` attributes by time window "
