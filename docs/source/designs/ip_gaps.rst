@@ -456,6 +456,58 @@ TinyTPU that Design Compiler has already accepted.
    not multiplier-shaped, and wants fabric. Both designs land at **zero DSP**,
    independently.
 
+The tree as Actions, and the two things the Action layer could not say
+----------------------------------------------------------------------
+
+``tests/ip/test_reduce_actions.py`` describes this unit as a ``Machine`` in
+the Action layer (``allo/actions.py``, branch ``unit-actions``), built from
+``ReduceParams`` rather than from an example's invented widths, with the two
+output depths set to what ``reduce_latency_probe.py`` measured. It is the
+second machine that layer asked for, and it was asked for precisely because
+only one -- TinyTPU -- had ever exercised it.
+
+The answer is a **qualified yes**. Everything structural survives the trip:
+which units the opcode reaches, the leaf order and the refusal of a mapping
+that is not a permutation, both output depths as measured, and the
+reassociation obligation together with its dependence on the arithmetic
+(discharged under exact integer addition, left open under rounding). Three
+things do not survive, and none of them is a property of this unit:
+
+#. **Latency is charged as occupancy.** ``Machine.work`` is documented as the
+   per-unit work count an instruction-memory header carries. For
+   ``reduce_tree`` it returns 80 where the hardware does 16: the model places
+   each Action at ``max(ready of its args) + at`` and takes the unit's per-row
+   cost to be the *span* of that placement, so the measured ``at=2`` is paid
+   once per row instead of once per stream. There is no way to state what the
+   probe measured -- latency 2, one word retired per cycle -- because the
+   model draws no distinction between a **latency** and an **initiation
+   interval** on an Action. ``Unit.ii`` cannot stand in for it: ``ii`` is the
+   interval between the unit's own steps, so buying the right work count with
+   ``ii=5`` would mean declaring something false. ``dot_feed`` and
+   ``dot_sink``, whose Actions carry no ``at=``, model correctly -- which is
+   why TinyTPU, described throughout without ``at=``, never surfaced this.
+
+#. **One fold read at two taps cannot be said.** The root and the group tap
+   are one fold with two taps off it; the model has only ``compute`` Actions,
+   so the pair is written twice and the single reassociation is reported as
+   two obligations. The direction is right and the multiplicity is the
+   model's.
+
+#. **A lane width has to hang on addressed state.** A lane map is checked
+   against a lane *count*, which the model reads off the action's ``state``.
+   MiniTPU's fold reads a vector register file, so its width is a property of
+   addressed state; this operand arrives on a **channel**, and a channel is
+   not a state. The composition is refused -- *"lane map without a width ...
+   None declares no lane count"* -- until the packed word is declared as a
+   one-row, ``RED_LANES``-wide state. That is a fair reading of a FIFO word
+   and it is still the model meeting a dataflow unit half way; the repair the
+   error message suggests names a thing this unit does not have.
+
+The first of the three is the consequential one, and it is the reason the
+Action hypothesis should not yet be promoted to the default: a work count
+that is wrong by 5x on the first unit whose latencies were actually measured
+is not a number a header can carry.
+
 .. _ip-gaps-compose:
 
 What ``compose.py`` did not need
