@@ -414,6 +414,18 @@ def resolve_ref(ref):
     return out.stdout.strip()
 
 
+def frozen_paths(ref) -> list[str]:
+    """Every file composed into the tree from git: the literal seed plus the
+    entry points' import closure, minus what the candidate supplies.
+
+    A function and not a constant: it costs a git read per file, and
+    `evaluate` is imported in every sandboxed gate process.
+    """
+    editable = {f"{PKG}/{rel}" for rel in EDITABLE}
+    return [rel for rel in sorted(set(FROZEN_LITERAL) | set(import_closure(ref)))
+            if rel not in editable]
+
+
 def compose(spec_dir: Path, tree: Path, ref: str):
     """Evaluation tree = frozen files from git + the candidate's two files.
 
@@ -431,11 +443,7 @@ def compose(spec_dir: Path, tree: Path, ref: str):
     # transitively, minus what the candidate supplies. Derived from the ref so
     # that a file moving in the repository cannot silently drop out of the
     # tree -- which is how the workload runner shipped without `act_target`.
-    editable = {f"{PKG}/{rel}" for rel in EDITABLE}
-    frozen = [rel for rel in
-              sorted(set(FROZEN_LITERAL) | set(import_closure(ref)))
-              if rel not in editable]
-    for rel in frozen:
+    for rel in frozen_paths(ref):
         dst = tree / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(git_show(ref, rel))

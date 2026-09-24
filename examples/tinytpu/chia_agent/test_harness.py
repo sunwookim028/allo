@@ -710,7 +710,7 @@ class Suite:
         if work.exists():
             shutil.rmtree(work)
         tree = work / "tree"
-        for rel in ev.FROZEN:
+        for rel in ev.frozen_paths("HEAD"):
             (tree / rel).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel).write_bytes(ev.git_show("HEAD", rel))
         write_design(tree / PKG, "narrow16", FORGE_VERDICT)
