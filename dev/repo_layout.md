@@ -48,6 +48,9 @@ So:
 allo/
   backend/systemc.py      the SystemC emitter, beside catapult.py
                           (with mlir/lib/Translation/EmitSystemC.cpp)
+  backend/asic.py         the AAAH-facing half: emits the architectural
+                          manifest that PD planning consumes. DOES NOT EXIST
+                          YET -- see 'two PD flows' below
   act/                    the mapping compiler: spec schema, validation,
                           mapping search, the tiered judge
                           -- precedent is allo/autoscheduler/, not backend/
@@ -82,7 +85,51 @@ flows and the gates; it spends real money; it has its own guards and sandbox.
 Putting it inside `allo/` would imply that importing Allo imports an agent
 harness. It is the one component that genuinely earns a new root.
 
-**The PD flow goes under `scripts/` because it is infrastructure, not
+**There are two PD flows, not one, and they sit on opposite sides of the
+question.** This was established by reading the flow's own node library rather
+than inferring from its name.
+
+- **The flat flow** — the one every number we have came from — consumes exactly
+  a directory of Verilog plus `sv2v_manifest.f`, entered at the design
+  collector. Nothing Allo-level. **Infrastructure: `scripts/asic/`.**
+- **AAAH** ("Allo-Aided ASIC Harness") consumes Allo-level architecture, and
+  **not through files**. Its compilation node loads an Allo design and *calls*
+  `build(project, target, mode, configs)` with
+  `configs["asic_manifest"] = {...}` — Allo is asked to **emit an architectural
+  manifest as part of compilation**. Downstream planners then read
+  `semantic_id`, `macro_class_id`, `members`, `pe_instances`, `rtl_ports` and
+  `rtl_module` maps, `stream_bundles` with per-stream width, direction and
+  endpoints, `pid` with x/y, `anchor_kernel`, `control_pins`, `protocol`. Macro
+  planning selects RTL-equivalence classes by *semantic identity* and validates
+  ports by ordinal position, because equivalent generated modules use different
+  port names; physical-intent placement lays macros on a grid from PID row and
+  column deltas, weighting edges by **pre-HLS stream bit width**. None of that
+  survives in emitted Verilog. **This is a backend: `allo/backend/asic.py`,
+  beside `catapult.py`.**
+
+Do not force one answer onto both. The flat flow is infrastructure and the
+AAAH-facing half is a backend, and they can coexist.
+
+**The blocking gap: our Allo does not emit that manifest.** `asic_manifest`
+appears nowhere in our `allo/`. The interface is satisfied by a different
+lineage of Allo, which is why the TinyTPU path was routed *around* the
+compilation node in the first place. So adopting AAAH is not a directory move —
+**it needs the manifest emitter implemented here**, and until it exists those
+nodes cannot run against our designs at all.
+
+We are unusually well placed to write it. `ip/compose.py` already holds an
+`Architecture` of units, channels and memories, with per-channel widths and
+explicit endpoints — which is most of what the manifest asks for. The emitter
+is largely a serialisation of a structure we already build, not a new analysis.
+
+**And there is a ceiling worth stating before anyone promises too much.** Even
+with a perfect manifest, DC at the flattening effort these runs use dissolves
+the boundaries again unless synthesis is told to preserve them — and changing
+that is exactly what would make new runs non-comparable with the four we have.
+**The manifest buys planning and attribution, not automatically a
+hierarchy-preserving netlist.**
+
+**The flat flow goes under `scripts/` because it is infrastructure, not
 compilation.** It consumes RTL that Allo already emitted and runs external EDA
 tools; nothing imports it. `scripts/` is where upstream keeps exactly this kind
 of thing, and `act-test-recipe.sh` shows the fork has used it that way already.
@@ -152,3 +199,12 @@ reproduces — with history moved to the results page.
   treatment (merge with history, or import as a subtree) are not yet known here.
 - Whether MiniTPU is imported or referenced. It lives in another engineer's
   tree today and is read-only from this side.
+
+## Known defect to fix during the move
+
+`asic_synthesis/construct-commercial.py` resolves its node library and ADK at
+`examples/accelerator/{nodes,adks}/`, which do not exist in this repository, so
+it **cannot run from a clean checkout today**. Wherever the vendored nodes
+land, that path has to match. Note also that the construct graph and
+`make_stubs.py` were committed by a different session than the one that
+produced the reports; attribute them accordingly when moving.
