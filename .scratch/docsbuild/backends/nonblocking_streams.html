@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Non-Blocking Stream Operations &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="AMD MLIR-AIE (AI Engine)" href="aie/index.html" />
+    <link rel="prev" title="Multi-Threaded Simulator (CPU)" href="simulator.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="non-blocking-stream-operations">
+<h1>Non-Blocking Stream Operations<a class="headerlink" href="#non-blocking-stream-operations" title="Link to this heading"><span>¶</span></a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Status:</strong> implemented on the fork’s <code class="docutils literal notranslate"><span class="pre">main</span></code> (<code class="docutils literal notranslate"><span class="pre">sunwookim028/allo</span></code>). This is a
+fork-local feature: it is not upstream (<code class="docutils literal notranslate"><span class="pre">cornell-zhang/allo</span></code>) yet and is pending a
+decision on whether to submit it as an upstream PR. Tracked in fork issue #5 (fork-local
+preserve list) and fork issue #13 (fork-vs-upstream feature map). The former
+<code class="docutils literal notranslate"><span class="pre">feature/mesh-accelerator</span></code> branch that carried the initial implementation was deleted
+2026-07-15 after the code landed on <code class="docutils literal notranslate"><span class="pre">main</span></code>.</p>
+</div>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"><span>¶</span></a></h2>
+<p>Allo’s dataflow programming model connects kernels via typed FIFO streams (<code class="docutils literal notranslate"><span class="pre">Stream[T,</span> <span class="pre">depth]</span></code>).
+By default streams are <strong>blocking</strong>: <code class="docutils literal notranslate"><span class="pre">put()</span></code> stalls the producer when the FIFO is full, and
+<code class="docutils literal notranslate"><span class="pre">get()</span></code> stalls the consumer when it is empty.</p>
+<p>Non-blocking operations expose the FIFO’s full/empty status and return a success flag instead
+of blocking, enabling:</p>
+<ul class="simple">
+<li><p><strong>Valid-ready handshake</strong> protocols (AXI-S, NoC credit-based flow control)</p></li>
+<li><p><strong>Arbitration</strong> — a single kernel polling <em>multiple</em> request channels without deadlocking</p></li>
+<li><p><strong>Decoupled memory/compute tiles</strong> with explicit message-passing control</p></li>
+</ul>
+</section>
+<section id="new-api">
+<h2>New API<a class="headerlink" href="#new-api" title="Link to this heading"><span>¶</span></a></h2>
+<p>Four methods were added to the <code class="docutils literal notranslate"><span class="pre">Stream</span></code> type (<code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code>, lines 349–360):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># allo/ir/types.py (fork main)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Stream</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">put</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span> <span class="o">...</span>          <span class="c1"># blocking write (existing)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>       <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span> <span class="o">...</span>     <span class="c1"># blocking read  (existing)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_put</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">int1</span><span class="p">:</span>  <span class="c1"># non-blocking write; returns 1 on success</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_get</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>  <span class="o">-&gt;</span> <span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">int1</span><span class="p">):</span>  <span class="c1"># non-blocking read; returns (data, success)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">empty</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>    <span class="o">-&gt;</span> <span class="n">int1</span><span class="p">:</span>       <span class="c1"># True when FIFO has no items</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">full</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>     <span class="o">-&gt;</span> <span class="n">int1</span><span class="p">:</span>       <span class="c1"># True when FIFO is at capacity</span>
+</pre></div>
+</div>
+<p>Typical usage pattern (spin-until-success):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Producer: spin until FIFO accepts the token</span>
+<span class="n">sent</span><span class="p">:</span> <span class="n">int1</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">while</span> <span class="n">sent</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">sent</span> <span class="o">=</span> <span class="n">req_valid</span><span class="p">[</span><span class="n">ct_id</span><span class="p">]</span><span class="o">.</span><span class="n">try_put</span><span class="p">(</span><span class="n">MSG_WRITE</span><span class="p">)</span>
+
+<span class="c1"># Consumer: poll before committing to a read</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">req_valid</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
+    <span class="n">msg_type</span><span class="p">,</span> <span class="n">has_req</span> <span class="o">=</span> <span class="n">req_valid</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span><span class="o">.</span><span class="n">try_get</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="why-non-blocking-is-necessary-for-arbitration">
+<h2>Why Non-Blocking Is Necessary for Arbitration<a class="headerlink" href="#why-non-blocking-is-necessary-for-arbitration" title="Link to this heading"><span>¶</span></a></h2>
+<p>Consider a <strong>many-to-one</strong> topology: two Memory Tiles (MT0, MT1) share one Compute Tile (CT).
+With <em>blocking</em> <code class="docutils literal notranslate"><span class="pre">get()</span></code>, if CT blocks waiting for MT0 while MT1 sends first, the system
+deadlocks permanently.</p>
+<p>Non-blocking polling resolves this:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">while</span> <span class="n">served</span> <span class="o">&lt;</span> <span class="n">N_MTS</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">req_from_mt</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
+        <span class="n">msg</span><span class="p">,</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">req_from_mt</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">try_get</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ok</span><span class="p">:</span> <span class="n">handle</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">req_from_mt</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
+        <span class="n">msg</span><span class="p">,</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">req_from_mt</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">try_get</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ok</span><span class="p">:</span> <span class="n">handle</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="working-examples">
+<h2>Working Examples<a class="headerlink" href="#working-examples" title="Link to this heading"><span>¶</span></a></h2>
+<p>All examples live in the <code class="docutils literal notranslate"><span class="pre">tests/dataflow/</span></code> directory on the fork’s <code class="docutils literal notranslate"><span class="pre">main</span></code>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>File</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_nb_simple.py</span></code></p></td>
+<td><p>Unit tests for <code class="docutils literal notranslate"><span class="pre">try_put</span></code> / <code class="docutils literal notranslate"><span class="pre">try_get</span></code> / <code class="docutils literal notranslate"><span class="pre">empty</span></code> / <code class="docutils literal notranslate"><span class="pre">full</span></code> with the Allo simulator.
+Six self-contained test cases, each exercising one primitive. <strong>Start here.</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_decoupled_mesh.py</span></code></p></td>
+<td><p>End-to-end message-passing tests: 1-CT single-handshake protocol and 2×1 decoupled mesh.
+Demonstrates the full valid-ready handshake pattern.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_ir.py</span></code></p></td>
+<td><p>IR-level checks — verifies that the four new MLIR ops are emitted correctly.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_sim.py</span></code></p></td>
+<td><p>Simulator-level round-trip tests (producer → consumer via <code class="docutils literal notranslate"><span class="pre">try_put</span></code> / <code class="docutils literal notranslate"><span class="pre">try_get</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_hls.py</span></code></p></td>
+<td><p>HLS codegen checks — verifies <code class="docutils literal notranslate"><span class="pre">nb_write()</span></code> / <code class="docutils literal notranslate"><span class="pre">nb_read()</span></code> / <code class="docutils literal notranslate"><span class="pre">.empty()</span></code> appear in the
+emitted Vivado HLS C++. (Its <code class="docutils literal notranslate"><span class="pre">test_tapa_stream_nb</span></code> case is marked
+<code class="docutils literal notranslate"><span class="pre">xfail(strict=True)</span></code>: TAPA non-blocking support was removed, so that
+build raises <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code>. See <em>Layer 4b</em> below.)</p></td>
+</tr>
+</tbody>
+</table>
+<section id="running-the-simulator-tests">
+<h3>Running the Simulator Tests<a class="headerlink" href="#running-the-simulator-tests" title="Link to this heading"><span>¶</span></a></h3>
+<p>No HLS tool required:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_stream_nb_simple.py<span class="w">     </span>-v
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_decoupled_mesh.py<span class="w">       </span>-v
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_stream_ops_sim.py<span class="w">       </span>-v
+</pre></div>
+</div>
+</section>
+<section id="running-the-hls-codegen-tests">
+<h3>Running the HLS Codegen Tests<a class="headerlink" href="#running-the-hls-codegen-tests" title="Link to this heading"><span>¶</span></a></h3>
+<p>Requires Vitis HLS (<code class="docutils literal notranslate"><span class="pre">brg-zhang-xcel</span></code> server):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_stream_ops_hls.py<span class="w">       </span>-v
+</pre></div>
+</div>
+</section>
+</section>
+<section id="implementation-internals">
+<h2>Implementation Internals<a class="headerlink" href="#implementation-internals" title="Link to this heading"><span>¶</span></a></h2>
+<p>The implementation touches four layers of the compiler stack.</p>
+<section id="layer-1-python-frontend-allo-ir-types-py">
+<h3>Layer 1 — Python frontend (<code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code>)<a class="headerlink" href="#layer-1-python-frontend-allo-ir-types-py" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Stream.try_put</span></code> / <code class="docutils literal notranslate"><span class="pre">try_get</span></code> / <code class="docutils literal notranslate"><span class="pre">empty</span></code> / <code class="docutils literal notranslate"><span class="pre">full</span></code> are stub methods that serve as
+syntactic targets for the AST builder. They have no runtime Python logic; the builder
+intercepts them and emits MLIR operations instead.</p>
+<p><strong>Location:</strong> <code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code>, lines 349–360 (fork <code class="docutils literal notranslate"><span class="pre">main</span></code>).</p>
+</section>
+<section id="layer-2-mlir-operations-mlir-include-allo-dialect-alloops-td">
+<h3>Layer 2 — MLIR operations (<code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Dialect/AlloOps.td</span></code>)<a class="headerlink" href="#layer-2-mlir-operations-mlir-include-allo-dialect-alloops-td" title="Link to this heading"><span>¶</span></a></h3>
+<p>Two new operations were added to the Allo MLIR dialect:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">allo.stream_try_put</span></code></dt><dd><p>Takes <code class="docutils literal notranslate"><span class="pre">(stream,</span> <span class="pre">indices,</span> <span class="pre">data)</span></code>; returns <code class="docutils literal notranslate"><span class="pre">i1</span></code> success flag.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">allo.stream_try_get</span></code></dt><dd><p>Takes <code class="docutils literal notranslate"><span class="pre">(stream,</span> <span class="pre">indices)</span></code>; returns <code class="docutils literal notranslate"><span class="pre">(data,</span> <span class="pre">i1</span> <span class="pre">success_flag)</span></code> — a two-result op.</p>
+</dd>
+</dl>
+<p>These are defined in <code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Dialect/AlloOps.td</span></code> and the generated Python
+bindings appear in
+<code class="docutils literal notranslate"><span class="pre">mlir/build/include/allo/Bindings/dialects/_allo_ops_gen.py</span></code>
+(<code class="docutils literal notranslate"><span class="pre">StreamTryPutOp</span></code>, <code class="docutils literal notranslate"><span class="pre">StreamTryGetOp</span></code>, lines 2287–2378).</p>
+</section>
+<section id="layer-3-ast-builder-allo-ir-builder-py">
+<h3>Layer 3 — AST builder (<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>)<a class="headerlink" href="#layer-3-ast-builder-allo-ir-builder-py" title="Link to this heading"><span>¶</span></a></h3>
+<p>The builder’s <code class="docutils literal notranslate"><span class="pre">visit_Call</span></code> handler was extended to recognise the four new method names
+on <code class="docutils literal notranslate"><span class="pre">Stream</span></code> objects and emit the corresponding MLIR ops:</p>
+<p><strong>Location:</strong> <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>, lines 2622–2676 (fork <code class="docutils literal notranslate"><span class="pre">main</span></code>).</p>
+<p>Key lowering details:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">try_put</span></code> emits <code class="docutils literal notranslate"><span class="pre">allo.stream_try_put</span></code>; the <code class="docutils literal notranslate"><span class="pre">i1</span></code> result is unpacked as the return value.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">try_get</span></code> emits <code class="docutils literal notranslate"><span class="pre">allo.stream_try_get</span></code>; the two results <code class="docutils literal notranslate"><span class="pre">(data,</span> <span class="pre">success)</span></code> are tuple-bound
+and unpacked at the call site via Python destructuring (<code class="docutils literal notranslate"><span class="pre">val,</span> <span class="pre">ok</span> <span class="pre">=</span> <span class="pre">stream.try_get()</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">empty</span></code> / <code class="docutils literal notranslate"><span class="pre">full</span></code> are lowered to <code class="docutils literal notranslate"><span class="pre">allo.stream_try_get</span></code> / <code class="docutils literal notranslate"><span class="pre">allo.stream_try_put</span></code> with a
+<em>probe-only</em> mode (no data consumed/produced).</p></li>
+</ul>
+</section>
+<section id="layer-4a-simulator-backend-allo-backend-simulator-py">
+<h3>Layer 4a — Simulator backend (<code class="docutils literal notranslate"><span class="pre">allo/backend/simulator.py</span></code>)<a class="headerlink" href="#layer-4a-simulator-backend-allo-backend-simulator-py" title="Link to this heading"><span>¶</span></a></h3>
+<p>The OpenMP-threaded simulator was extended to:</p>
+<ol class="arabic simple">
+<li><p><strong>Interpret</strong> <code class="docutils literal notranslate"><span class="pre">StreamTryPutOp</span></code> and <code class="docutils literal notranslate"><span class="pre">StreamTryGetOp</span></code> by inspecting the head/tail pointers
+of the shared FIFO without blocking.</p></li>
+<li><p><strong>Flush</strong> shared pointers with <code class="docutils literal notranslate"><span class="pre">openmp_d.FlushOp</span></code> before and after every non-blocking
+access to prevent stale cache lines across OpenMP threads.</p></li>
+<li><p><strong>Recurse</strong> <code class="docutils literal notranslate"><span class="pre">_process_function_streams</span></code> into nested kernel calls (fixing a pre-existing
+deadlock for hierarchical dataflow regions).</p></li>
+</ol>
+</section>
+<section id="layer-4b-hls-backends">
+<h3>Layer 4b — HLS backends<a class="headerlink" href="#layer-4b-hls-backends" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Vivado HLS</strong> (<code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitVivadoHLS.cpp</span></code>):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// try_put → hls::stream::write_nb()</span>
+<span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">streamName</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">".write_nb("</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">dataArg</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">")"</span><span class="p">;</span>
+
+<span class="c1">// try_get → hls::stream::read_nb()</span>
+<span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">streamName</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">".read_nb("</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">dataArg</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">")"</span><span class="p">;</span>
+
+<span class="c1">// empty / full → hls::stream::empty() / full()</span>
+<span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">streamName</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">".empty()"</span><span class="p">;</span>
+</pre></div>
+</div>
+<p><strong>TAPA</strong>: not supported. The TAPA overrides (<code class="docutils literal notranslate"><span class="pre">try_write</span></code> / <code class="docutils literal notranslate"><span class="pre">try_read</span></code>) were
+removed in 2026-07 — TAPA is not used in the mesh flow and the dead codepath was a
+maintenance burden (see <a class="reference internal" href="../extensions/catapult_systemc.html"><span class="doc">Catapult SystemC Flow and the Wire</span></a>). The hooks in
+<code class="docutils literal notranslate"><span class="pre">EmitBaseHLS.h</span></code> have empty default bodies, but they are never reached: the op
+falls through to <code class="docutils literal notranslate"><span class="pre">visitUnhandledOp</span></code> and the emitter reports “can’t be correctly
+emitted”, so a non-blocking op built for <code class="docutils literal notranslate"><span class="pre">target=&quot;tapa&quot;</span></code> <strong>fails the build</strong>
+with <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">Failed</span> <span class="pre">to</span> <span class="pre">emit</span> <span class="pre">HLS</span> <span class="pre">code</span></code>. Note the message it prints blames
+<code class="docutils literal notranslate"><span class="pre">wrap_io</span></code>, which is unrelated to the actual cause. Use the Vitis HLS target for
+non-blocking streams.</p>
+<p><strong>Catapult HLS</strong> (<code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitCatapultHLS.cpp</span></code>):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// try_put → blocking ac_channel::write(); try_get → blocking ac_channel::read()</span>
+<span class="c1">// nb_write / nb_read inside a spin-while loop segfault Catapult's go compile</span>
+<span class="c1">// (LOOP-19), so the non-blocking ops are emitted as blocking calls and the</span>
+<span class="c1">// success flag is hard-coded to true.</span>
+<span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">streamName</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">".write("</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">dataArg</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">")"</span><span class="p">;</span>
+
+<span class="c1">// empty → !ac_channel::available(1)  (ac_channel has no .empty() in the</span>
+<span class="c1">// synthesizable subset, EDG CIN-59)</span>
+<span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"!"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">streamName</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">".available(1)"</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="hls-synthesis-cost-vitis-hls-u280-estimated">
+<h2>HLS Synthesis Cost (Vitis HLS, U280, estimated)<a class="headerlink" href="#hls-synthesis-cost-vitis-hls-u280-estimated" title="Link to this heading"><span>¶</span></a></h2>
+<p>Based on synthesis experiments in <code class="docutils literal notranslate"><span class="pre">tests/dataflow/hls_synth_streams.py</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Design</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>II</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Blocking stream (FIFO depth 2)</p></td>
+<td><p>1,417</p></td>
+<td><p>248</p></td>
+<td><p>7</p></td>
+</tr>
+<tr class="row-odd"><td><p>Non-blocking stream (try_put/try_get)</p></td>
+<td><p>1,457 (+2.8%)</p></td>
+<td><p>260 (+4.8%)</p></td>
+<td><p>7</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The FF and II figures in this table are labelled estimated and disagree with
+the measured record. The primary record,
+<code class="docutils literal notranslate"><span class="pre">dev/records/vitis_nb_streams.rst</span></code> (Vitis HLS 2023.2, U280, 2026-03-08),
+measured the same two designs at LUT 1417 / 1457 but <strong>FF 1325 / 1369</strong>, and
+reported pipeline II 7 for the blocking design and <code class="docutils literal notranslate"><span class="pre">undef</span></code> (statically
+unbounded spin-wait) for the non-blocking one. Where the two disagree, use
+the record.</p>
+</div>
+<p>Non-blocking operations add only ~O(1) LUTs per stream (one comparator + branch).
+The success bit propagation is the main scheduling concern in HLS — keep it in control
+logic, not on the datapath critical path.</p>
+</section>
+<section id="files-modified-pr-scope">
+<h2>Files Modified (PR Scope)<a class="headerlink" href="#files-modified-pr-scope" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 55.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>File</p></th>
+<th class="head"><p>Change</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code></p></td>
+<td><p>Add <code class="docutils literal notranslate"><span class="pre">try_put</span></code>, <code class="docutils literal notranslate"><span class="pre">try_get</span></code>, <code class="docutils literal notranslate"><span class="pre">empty</span></code>, <code class="docutils literal notranslate"><span class="pre">full</span></code> stubs to <code class="docutils literal notranslate"><span class="pre">Stream</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code></p></td>
+<td><p>Lower the four new methods to MLIR ops in <code class="docutils literal notranslate"><span class="pre">visit_Call</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code></p></td>
+<td><p>Type-inference rules for <code class="docutils literal notranslate"><span class="pre">StreamTryPutOp</span></code> / <code class="docutils literal notranslate"><span class="pre">StreamTryGetOp</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Dialect/AlloOps.td</span></code></p></td>
+<td><p>Define <code class="docutils literal notranslate"><span class="pre">allo.stream_try_put</span></code> and <code class="docutils literal notranslate"><span class="pre">allo.stream_try_get</span></code> ops</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Translation/EmitBaseHLS.h</span></code></p></td>
+<td><p>Declare virtual emitter hooks for non-blocking ops</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitVivadoHLS.cpp</span></code></p></td>
+<td><p>Vivado HLS: emit <code class="docutils literal notranslate"><span class="pre">write_nb</span></code> / <code class="docutils literal notranslate"><span class="pre">read_nb</span></code> / <code class="docutils literal notranslate"><span class="pre">empty</span></code> / <code class="docutils literal notranslate"><span class="pre">full</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitTapaHLS.cpp</span></code></p></td>
+<td><p>TAPA: <code class="docutils literal notranslate"><span class="pre">try_write</span></code> / <code class="docutils literal notranslate"><span class="pre">try_read</span></code> were added here and <strong>later removed</strong> (2026-07)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">allo/backend/simulator.py</span></code></p></td>
+<td><p>Interpret non-blocking ops; OMP flush; recursive kernel injection</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_nb_simple.py</span></code></p></td>
+<td><p>Simulator unit tests (3 test cases)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_decoupled_mesh.py</span></code></p></td>
+<td><p>End-to-end 1-CT and 2×1 mesh tests</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_ir.py</span></code></p></td>
+<td><p>MLIR op emission tests</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_sim.py</span></code></p></td>
+<td><p>Simulator round-trip tests</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ops_hls.py</span></code></p></td>
+<td><p>HLS codegen string-match tests</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../dive/dataflow.html"><span class="doc">Dataflow Programming</span></a> — Dataflow programming model overview</p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Non-Blocking Stream Operations</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#new-api">New API</a></li>
+<li><a class="reference internal" href="#why-non-blocking-is-necessary-for-arbitration">Why Non-Blocking Is Necessary for Arbitration</a></li>
+<li><a class="reference internal" href="#working-examples">Working Examples</a><ul>
+<li><a class="reference internal" href="#running-the-simulator-tests">Running the Simulator Tests</a></li>
+<li><a class="reference internal" href="#running-the-hls-codegen-tests">Running the HLS Codegen Tests</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#implementation-internals">Implementation Internals</a><ul>
+<li><a class="reference internal" href="#layer-1-python-frontend-allo-ir-types-py">Layer 1 — Python frontend (<code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code>)</a></li>
+<li><a class="reference internal" href="#layer-2-mlir-operations-mlir-include-allo-dialect-alloops-td">Layer 2 — MLIR operations (<code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Dialect/AlloOps.td</span></code>)</a></li>
+<li><a class="reference internal" href="#layer-3-ast-builder-allo-ir-builder-py">Layer 3 — AST builder (<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>)</a></li>
+<li><a class="reference internal" href="#layer-4a-simulator-backend-allo-backend-simulator-py">Layer 4a — Simulator backend (<code class="docutils literal notranslate"><span class="pre">allo/backend/simulator.py</span></code>)</a></li>
+<li><a class="reference internal" href="#layer-4b-hls-backends">Layer 4b — HLS backends</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hls-synthesis-cost-vitis-hls-u280-estimated">HLS Synthesis Cost (Vitis HLS, U280, estimated)</a></li>
+<li><a class="reference internal" href="#files-modified-pr-scope">Files Modified (PR Scope)</a></li>
+<li><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="simulator.html">
+                    <span class="icon">&lt;</span><span>Multi-Threaded Simulator (CPU)</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="aie/index.html"><span>AMD MLIR-AIE (AI Engine)</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

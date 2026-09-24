@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Stream Ports: a Unit with an Interface &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Allo Limitations Register" href="limitations.html" />
+    <link rel="prev" title="Extending Allo’s Abstractions" href="extending_allo.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="stream-ports-a-unit-with-an-interface">
+<span id="stream-ports"></span><h1>Stream Ports: a Unit with an Interface<a class="headerlink" href="#stream-ports-a-unit-with-an-interface" title="Link to this heading"><span>¶</span></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> in <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py</span></code>, the rules in <code class="docutils literal notranslate"><span class="pre">allo/netlist.py</span></code>, the
+instantiation in <code class="docutils literal notranslate"><span class="pre">allo/ir/units.py</span></code>. This is gap 1 of
+<a class="reference internal" href="extending_allo.html#extending-allo-gaps"><span class="std std-ref">The open gaps, ranked</span></a>, landed.</p>
+<section id="what-it-is">
+<h2>What it is<a class="headerlink" href="#what-it-is" title="Link to this heading"><span>¶</span></a></h2>
+<p>A <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> nested in a <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> reaches its streams by lexical
+name. Its interface is therefore not a property of the kernel: it is derived,
+by whole-region analysis, from the region the kernel happens to sit in. A
+<code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> names its streams in its own signature instead:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@df</span><span class="o">.</span><span class="n">unit</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">src</span><span class="p">:</span> <span class="n">Stream</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">dst</span><span class="p">:</span> <span class="n">Stream</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">4</span><span class="p">]):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="n">dst</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">get</span><span class="p">()</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and a region instantiates it, wiring ports to streams of its own choosing:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@df</span><span class="o">.</span><span class="n">region</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">two</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="n">N</span><span class="p">],</span> <span class="n">B</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="n">N</span><span class="p">]):</span>
+    <span class="n">a</span><span class="p">:</span> <span class="n">Stream</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="n">b</span><span class="p">:</span> <span class="n">Stream</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="n">c</span><span class="p">:</span> <span class="n">Stream</span><span class="p">[</span><span class="n">int32</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="n">produce</span><span class="p">(</span><span class="n">dst</span><span class="o">=</span><span class="n">a</span><span class="p">,</span> <span class="n">mem</span><span class="o">=</span><span class="n">A</span><span class="p">)</span>
+    <span class="n">first</span>  <span class="o">=</span> <span class="n">increment</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">a</span><span class="p">,</span> <span class="n">dst</span><span class="o">=</span><span class="n">b</span><span class="p">)</span>      <span class="c1"># the same unit,</span>
+    <span class="n">second</span> <span class="o">=</span> <span class="n">increment</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">b</span><span class="p">,</span> <span class="n">dst</span><span class="o">=</span><span class="n">c</span><span class="p">)</span>      <span class="c1"># twice, on different streams</span>
+    <span class="n">consume</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">mem</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>An instance may be named (<code class="docutils literal notranslate"><span class="pre">first</span> <span class="pre">=</span> <span class="pre">...</span></code>) or left anonymous, and its ports may
+be passed positionally or by keyword. The nested <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> form is
+untouched and still works, including in the same region as instances; this is
+an addition, not a replacement.</p>
+<section id="what-it-makes-possible">
+<h3>What it makes possible<a class="headerlink" href="#what-it-makes-possible" title="Link to this heading"><span>¶</span></a></h3>
+<p>Three things the composition on <code class="docutils literal notranslate"><span class="pre">design-modular</span></code> named as impossible:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 56.0%" />
+<col style="width: 44.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Was impossible</p></th>
+<th class="head"><p>Now</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Two architectures must agree on a channel’s <strong>name</strong>.</p></td>
+<td><p><strong>Fixed.</strong> A port’s name is the unit’s; the channel’s is the region’s,
+and nothing requires them to match. TinyTPU-isa’s 16 channels are wired
+under 16 different names in <code class="docutils literal notranslate"><span class="pre">units_isa.py</span></code>, and a test asserts that
+<em>no</em> port name equals the channel it is bound to.</p></td>
+</tr>
+<tr class="row-odd"><td><p>A unit <strong>cannot be instantiated twice</strong> against different channels.</p></td>
+<td><p><strong>Fixed.</strong> Each instantiation is a separate <code class="docutils literal notranslate"><span class="pre">func.func</span></code>.
+<code class="docutils literal notranslate"><span class="pre">test_a_unit_is_instantiated_twice_against_different_streams</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>A unit cannot be <strong>built or tested outside a composed region</strong>.</p></td>
+<td><p><strong>Not fixed</strong>, and it is a separate change – see <a class="reference internal" href="#what-it-does-not-do">What it does not do</a>.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="how-it-works-and-why-there-was-no-ir-change">
+<h2>How it works, and why there was no IR change<a class="headerlink" href="#how-it-works-and-why-there-was-no-ir-change" title="Link to this heading"><span>¶</span></a></h2>
+<p>The destination was already there. <code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code> takes the
+<code class="docutils literal notranslate"><span class="pre">allo.stream_construct</span></code> ops a kernel body holds, hoists them into that
+function’s arguments, and records each one’s direction in <code class="docutils literal notranslate"><span class="pre">stypes</span></code>;
+<code class="docutils literal notranslate"><span class="pre">_build_top</span></code> then constructs the streams once in the region and wires the
+kernels by <code class="docutils literal notranslate"><span class="pre">call</span></code>. Allo’s IR has always been a netlist over ported units.</p>
+<p>That pass keys a kernel’s stream to the <strong>name attribute</strong> on the construct op
+it hoists. So a port is, exactly, <em>a construct op carrying the channel’s name
+bound to the unit’s parameter name</em>. <code class="docutils literal notranslate"><span class="pre">bind_ports</span></code> (<code class="docutils literal notranslate"><span class="pre">allo/ir/units.py</span></code>) is
+those two lines, and everything downstream is unchanged.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>One of the two blockers the gap analysis located did not need fixing.</strong>
+<code class="docutils literal notranslate"><span class="pre">Stream.__class_getitem__</span></code> did – a parameter annotation is <em>evaluated</em>,
+so <code class="docutils literal notranslate"><span class="pre">Stream[int32,</span> <span class="pre">4]</span></code> had to denote a type and not merely parse
+(<code class="docutils literal notranslate"><span class="pre">allo/ir/types.py</span></code>). The second, <code class="docutils literal notranslate"><span class="pre">ctx.get_symbol(new_name).clone(...)</span></code>
+at six sites in <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>, was predicated on a port becoming a
+block argument in the frontend. It does not: it becomes a construct op that
+the <em>existing</em> pass turns into a block argument, so those six lines are
+untouched and the risk they represented was never taken. The prediction was
+right about the mechanism and wrong about which end of it to change.</p>
+</div>
+<p>An instantiation is expanded into the nested kernel the frontend already
+builds, at <code class="docutils literal notranslate"><span class="pre">TypeInferer.visit_FunctionDef</span></code> time, before any IR exists. The
+unit’s body is spliced with its <strong>own</strong> module namespace, captured at the
+<code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> that defined it, so a unit resolves its names where it was
+written and not where it is instantiated.</p>
+</section>
+<section id="the-legality-rules">
+<h2>The legality rules<a class="headerlink" href="#the-legality-rules" title="Link to this heading"><span>¶</span></a></h2>
+<p>Every rule below is decided from the signatures and the netlist alone, before
+any IR is built. Each refuses and transforms nothing. Each names the site and
+the repair, and each has a refused example <em>and</em> an accepted example in
+<code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ports.py</span></code>.</p>
+<p>Checked at the <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code>, so a broken interface never reaches a region:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26.0%" />
+<col style="width: 46.0%" />
+<col style="width: 28.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Rule</p></th>
+<th class="head"><p>Legal if and only if</p></th>
+<th class="head"><p>Refuses</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">direction-single-valued</span></code></p></td>
+<td><p>a <strong>scalar</strong> port is used for <code class="docutils literal notranslate"><span class="pre">get</span></code>/<code class="docutils literal notranslate"><span class="pre">try_get</span></code>/<code class="docutils literal notranslate"><span class="pre">empty</span></code> only, or
+for <code class="docutils literal notranslate"><span class="pre">put</span></code>/<code class="docutils literal notranslate"><span class="pre">try_put</span></code>/<code class="docutils literal notranslate"><span class="pre">full</span></code> only.</p></td>
+<td><p>one port both read and written.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dangling-port</span></code></p></td>
+<td><p>every declared port is used at least once.</p></td>
+<td><p>a port in the signature that the body ignores – which would leave the
+channel with a missing endpoint and no diagnostic.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">port-arity</span></code></p></td>
+<td><p>a port declared with an array shape is subscripted, and one declared
+without is not.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ch.put(x)</span></code> on <code class="docutils literal notranslate"><span class="pre">Stream[T,</span> <span class="pre">d][N]</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">unresolved-port</span></code></p></td>
+<td><p>an annotation naming <code class="docutils literal notranslate"><span class="pre">Stream</span></code> resolves to one in the unit’s own
+module.</p></td>
+<td><p>a port whose element type or depth is only defined where it is
+<em>instantiated</em> – the dependency ports exist to remove.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Checked at the <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> that wires them:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 42.0%" />
+<col style="width: 28.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Rule</p></th>
+<th class="head"><p>Legal if and only if</p></th>
+<th class="head"><p>Refuses</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">wiring-arity</span></code></p></td>
+<td><p>every parameter of the unit is wired exactly once, and every name
+passed is a parameter of the unit.</p></td>
+<td><p>a forgotten port; a typo’d keyword.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">wiring-type</span></code></p></td>
+<td><p>the port and the channel agree on element type, element shape, depth
+and array shape.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Stream[int32,</span> <span class="pre">8]</span></code> wired to a depth-4 channel.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">single-producer-single-consumer</span></code></p></td>
+<td><p>each <strong>scalar</strong> channel has exactly one writing endpoint and exactly
+one reading endpoint, counting ports and any lexically nested kernel
+that touches it.</p></td>
+<td><p>a second reader, whether it is another instance or a nested
+<code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">unconnected-stream</span></code></p></td>
+<td><p>every declared stream has a writer and a reader.</p></td>
+<td><p>a declaration nothing wires.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">zero-capacity-cycle</span></code></p></td>
+<td><p>no cycle of the wiring graph consists entirely of depth-0 streams.</p></td>
+<td><p>a rendezvous loop that cannot hold a token. Feedback itself is legal
+and must be: it is normal in dataflow.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The decision procedure for the last one is exact and linear, not a cycle
+enumeration: depths are non-negative, so a cycle has total depth 0 <strong>iff</strong>
+every edge on it has depth 0, and it is enough to ask whether the subgraph of
+depth-0 edges has a cycle at all.</p>
+<section id="the-obligation-which-is-not-a-rule">
+<h3>The obligation, which is not a rule<a class="headerlink" href="#the-obligation-which-is-not-a-rule" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Deadlock-freedom is not decided here, and is not implied.</strong> It needs per-unit
+production and consumption rates, and a netlist carries none. Following
+<a class="reference internal" href="extending_allo.html#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a>, the undecidable half ships as
+a declared obligation rather than as a silence:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@df</span><span class="o">.</span><span class="n">region</span><span class="p">(</span><span class="n">deadlock_free_because</span><span class="o">=</span><span class="s2">"one token in flight, one slot each way"</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">loop</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="n">N</span><span class="p">],</span> <span class="n">B</span><span class="p">:</span> <span class="n">int32</span><span class="p">[</span><span class="n">N</span><span class="p">]):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>A region whose netlist carries feedback and declares no premise <strong>warns</strong>
+(<code class="docutils literal notranslate"><span class="pre">allo.netlist.UndeclaredPremise</span></code>) at the definition, saying that the
+netlist rules passed and that nothing has checked that the loops drain. The
+premise is recorded as <code class="docutils literal notranslate"><span class="pre">allo.netlist.netlist_of(region).obligation</span></code> and is
+checked by nothing. A region with no feedback leaves no obligation at all, so
+the default constrains nothing and says nothing.</p>
+<p>Two honest limits on the cycle analysis, both conservative:</p>
+<ul class="simple">
+<li><p>An <strong>array channel</strong> is a chain: a unit reads <code class="docutils literal notranslate"><span class="pre">ch[i]</span></code> and writes
+<code class="docutils literal notranslate"><span class="pre">ch[i</span> <span class="pre">+</span> <span class="pre">1]</span></code>, the index is a runtime value, and nothing static can tell the
+two streams apart. Such a port is <code class="docutils literal notranslate"><span class="pre">io</span></code> – the direction the IR already
+carries for it – it is <strong>exempt from single-producer-single-consumer</strong>, and
+it makes its instance look like a self-loop to the cycle analysis. So a
+design with chains will be asked for a premise even when every chain is
+acyclic. That is over-reporting, in the safe direction, and the premise
+<code class="docutils literal notranslate"><span class="pre">units_isa.py</span></code> declares says exactly this.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">zero-capacity-cycle</span></code> inherits the same over-approximation, so it would
+refuse a depth-0 chain that is in fact acyclic. Depth-0 chains are not
+useful, and no design in this tree has one.</p></li>
+</ul>
+</section>
+</section>
+<section id="the-demonstration">
+<h2>The demonstration<a class="headerlink" href="#the-demonstration" title="Link to this heading"><span>¶</span></a></h2>
+<p>Toy first, real design second.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_stream_ports.py<span class="w"> </span>-q<span class="w">           </span><span class="c1"># 18 tests, ~3 s</span>
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/dataflow/test_stream_ports_tinytpu.py<span class="w"> </span>-q<span class="w">   </span><span class="c1"># 4 tests, ~10 s</span>
+python<span class="w"> </span>examples/accelerator/tinytpu_vitis/lift_units.py<span class="w">           </span><span class="c1"># regenerate units_isa.py</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_stream_ports.py</span></code> holds one unit instantiated twice
+against different streams, the <em>same</em> units composed into a second topology
+unedited, a port bound to a channel whose name resembles nothing in the unit,
+an array-port chain replicated with <code class="docutils literal notranslate"><span class="pre">mapping=</span></code>, a mixed region where a unit
+instance and a nested <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> share one stream, and one refused and one
+accepted example of every rule above.</p>
+<p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/units_isa.py</span></code> is the real test bed, and
+it is <strong>generated</strong> by <code class="docutils literal notranslate"><span class="pre">lift_units.py</span></code> from <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> rather than
+hand-copied, so “the bodies are unchanged” is a property of the process and not
+a claim:
+<strong>TinyTPU-isa’s eight kernel bodies, unchanged, at module level</strong>, each
+declaring the streams it used to capture. The counts are the census on
+<code class="docutils literal notranslate"><span class="pre">design-modular</span></code> exactly – sequencer 5, dma_ld 3, spm 4, vru 4, wld 3, pe 5,
+accu 3, dma_st 2, <strong>29 ports over 16 channels</strong> – and the architecture wires
+every one of them under a name the design does not use. Both regions run the
+same programs at 4x4x4, 8x8x8 and 16x16x16, gemm and gemm.relu, and agree
+element for element.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> is still the design. <code class="docutils literal notranslate"><span class="pre">units_isa.py</span></code> is generated from
+it and held against it; nothing in the shipped accelerator, its schedule or
+its cycle counts changed, and <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span> <span class="pre">--no-cosim</span></code> reports
+<code class="docutils literal notranslate"><span class="pre">ALL</span> <span class="pre">EXACT</span></code> / <code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK</span></code> as before. The ported architecture is evidence
+that the extension expresses what the design does, not a replacement for it.</p>
+</div>
+</section>
+<section id="what-it-does-not-do">
+<h2>What it does not do<a class="headerlink" href="#what-it-does-not-do" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>A unit still cannot be built alone, and that is a separate change.</strong>
+<code class="docutils literal notranslate"><span class="pre">df.build</span></code> takes a region, and a unit with unconnected ports is not a
+program: to run one you need stimulus on every input port and a drain on every
+output port, and how many tokens to supply is written in the unit’s <em>body</em>
+(its loop trip counts), not in its type. So a standalone <code class="docutils literal notranslate"><span class="pre">df.build(unit)</span></code>
+would have to either synthesize drivers from a per-port token count the caller
+supplies, or infer rates – and inferring rates is the same missing analysis
+that makes deadlock-freedom an obligation. What ports <em>do</em> buy today is that a
+unit’s interface is inspectable and checked without a region
+(<code class="docutils literal notranslate"><span class="pre">unit.__allo_unit__.ports</span></code>), and that its test harness is a three-line
+region rather than a copy of the architecture.</p>
+<p><strong>Value parameters are still bound by name.</strong> A unit’s memref parameters are
+wired through the existing <code class="docutils literal notranslate"><span class="pre">args=[...]</span></code> path, which resolves region-scope
+names. The parameter name itself is now the unit’s own – the conflict
+assertion in <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code> is relaxed for a unit instance, because a
+unit’s parameters legitimately shadow – but the <em>binding</em> is still a name
+lookup in the region, not a port.</p>
+<p><strong>A unit cannot be parametrized at the instantiation site.</strong> <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> takes
+<code class="docutils literal notranslate"><span class="pre">mapping=</span></code>, and the unit’s sizes come from its own module. Two instances at
+two different <code class="docutils literal notranslate"><span class="pre">T</span></code> need two modules, or the source-level composition
+<code class="docutils literal notranslate"><span class="pre">design-modular</span></code> built. Joining stream ports to
+<code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_hierachical.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">inner[P0,</span> <span class="pre">P1]</span></code> type parameters is
+the obvious next step and was not attempted here.</p>
+<section id="a-fix-that-fell-out">
+<h3>A fix that fell out<a class="headerlink" href="#a-fix-that-fell-out" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">get_global_vars</span></code> seeded a region’s namespace from
+<code class="docutils literal notranslate"><span class="pre">functools.wraps</span></code>-wrapper’s <code class="docutils literal notranslate"><span class="pre">__globals__</span></code>, which is <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py</span></code>’s
+module dict, not the module the region was written in. Everything worked only
+because the <em>caller’s</em> module usually happened to have the same names in scope
+– <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> imports <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>, so building TinyTPU-isa from
+it resolved <code class="docutils literal notranslate"><span class="pre">Stream[UInt(VW),</span> <span class="pre">QD][T]</span></code> correctly; building it from a pytest
+fixture did not. <code class="docutils literal notranslate"><span class="pre">allo/ir/utils.py</span></code> now unwraps before reading
+<code class="docutils literal notranslate"><span class="pre">__globals__</span></code>. This is a pre-existing defect, found by the ports work and
+fixed with it.</p>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Stream Ports: a Unit with an Interface</a><ul>
+<li><a class="reference internal" href="#what-it-is">What it is</a><ul>
+<li><a class="reference internal" href="#what-it-makes-possible">What it makes possible</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#how-it-works-and-why-there-was-no-ir-change">How it works, and why there was no IR change</a></li>
+<li><a class="reference internal" href="#the-legality-rules">The legality rules</a><ul>
+<li><a class="reference internal" href="#the-obligation-which-is-not-a-rule">The obligation, which is not a rule</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-demonstration">The demonstration</a></li>
+<li><a class="reference internal" href="#what-it-does-not-do">What it does not do</a><ul>
+<li><a class="reference internal" href="#a-fix-that-fell-out">A fix that fell out</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="extending_allo.html">
+                    <span class="icon">&lt;</span><span>Extending Allo’s Abstractions</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="limitations.html"><span>Allo Limitations Register</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

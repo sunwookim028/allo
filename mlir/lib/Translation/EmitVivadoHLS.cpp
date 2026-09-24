@@ -1804,9 +1804,22 @@ void allo::hls::VhlsModuleEmitter::emitSubView(memref::SubViewOp op) {
     emitError(op, "memref.subview requires a statically shaped source.");
     return;
   }
-  // Contiguity: every stride must be 1, and every dimension after the first sliced one
-  // must span the whole source dimension. Otherwise the slice is not a flat run of
-  // elements and a pointer cannot represent it.
+  // Contiguity: every stride must be 1, and the slice must be ONE flat run of
+  // elements, since that is all a pointer can represent.
+  //
+  // With unit strides that holds exactly when the slice has a single "partial"
+  // dimension p: every dimension before p is pinned to one element, and every
+  // dimension after p spans its source dimension in full.
+  //
+  //   A_fifo[Mt][Nt+1][K] sliced as A_fifo[i, j]  ->  sizes 1, 1, K  contiguous
+  //   A[8][8]             sliced as A[0:2, 0:4]   ->  sizes 2, 4     NOT
+  //
+  // The check as it arrived on choonsik1/SystemC-emitter tested only i >= 1
+  // against the source shape, i.e. it allowed p == 0 alone. That rejects the
+  // row slice above -- which is the shape allo/library/systolic.py hands every
+  // PE (`A_fifo[i, j]`), so `target="vitis_hls"` could not emit the systolic
+  // library at all (tests/pytorch/test_linear.py::test_int8_linear). Widening
+  // it to any p keeps every slice the narrow rule accepted.
   for (auto stride : op.getMixedStrides()) {
     auto attr = llvm::dyn_cast_or_null<Attribute>(stride);
     if (!attr || llvm::cast<IntegerAttr>(attr).getInt() != 1) {
@@ -1816,9 +1829,25 @@ void allo::hls::VhlsModuleEmitter::emitSubView(memref::SubViewOp op) {
   }
   auto sizes = op.getMixedSizes();
   auto srcShape = srcType.getShape();
-  for (unsigned i = 1; i < sizes.size(); ++i) {
-    auto attr = llvm::dyn_cast_or_null<Attribute>(sizes[i]);
-    if (!attr || llvm::cast<IntegerAttr>(attr).getInt() != srcShape[i]) {
+  auto constSize = [](OpFoldResult v) -> std::optional<int64_t> {
+    if (auto attr = llvm::dyn_cast_or_null<Attribute>(v))
+      return llvm::cast<IntegerAttr>(attr).getInt();
+    return std::nullopt;
+  };
+  unsigned partial = 0;
+  while (partial < sizes.size()) {
+    auto sz = constSize(sizes[partial]);
+    if (!sz) {
+      emitError(op, "only a statically sized memref.subview is supported.");
+      return;
+    }
+    if (*sz != 1)
+      break;
+    ++partial;
+  }
+  for (unsigned i = partial + 1; i < sizes.size(); ++i) {
+    auto sz = constSize(sizes[i]);
+    if (!sz || *sz != srcShape[i]) {
       emitError(op, "only a contiguous memref.subview is supported.");
       return;
     }
