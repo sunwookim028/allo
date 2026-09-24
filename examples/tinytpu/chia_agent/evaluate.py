@@ -202,10 +202,14 @@ CODESIGN = [f"{PKG}/chia_agent/{f}" for f in
 #: them -- see `import_closure`.
 ENTRY_POINTS = [*DESIGN_EVALUATOR, AREA_PROXY, *WORKLOAD_SUITE, GATE_RUNNER,
                 PARAM_CHECK, *CODESIGN]
-#: First-party roots: a module under one of these is OURS, so it must be in
-#: the tree. Anything else (numpy, torch, allo) comes from the environment the
-#: gate runs in and is not the candidate's to influence.
-FIRST_PARTY = ("examples", "act")
+#: First-party MODULE PREFIXES: a module under one of these is measurement
+#: apparatus, so it must be in the tree. Dotted prefixes and not top-level
+#: directories, because `act` -- the mapper -- moved from `act/` to
+#: `allo/act/` while this was being written, and because the rest of `allo`
+#: is the compiler: it comes from the environment the gate runs in, and
+#: `CHECKOUT_WATCH` guards it against tampering instead of composing it.
+#: Everything else (numpy, torch) is the environment's too.
+FIRST_PARTY = ("examples", "act", "allo.act")
 FROZEN_LITERAL = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
@@ -350,7 +354,8 @@ def _imported_modules(src: bytes, rel: str) -> set[str]:
             out.add(mod)
             # `from pkg import submodule` names a module, not an attribute.
             out.update(f"{mod}.{a.name}" if mod else a.name for a in node.names)
-    return {m for m in out if m and m.split(".")[0] in FIRST_PARTY}
+    return {m for m in out if m and any(
+        m == pre or m.startswith(pre + ".") for pre in FIRST_PARTY)}
 
 
 def _walk_imports(entries, exists, read):
@@ -414,6 +419,19 @@ def resolve_ref(ref):
     return out.stdout.strip()
 
 
+def unresolved_in_tree(tree: Path) -> list[str]:
+    """First-party modules the tree imports and does not contain.
+
+    `allo.*` is expected not to be there: it resolves from the checkout and is
+    frozen by `CHECKOUT_WATCH` instead of by composition (`_from_checkout`).
+    """
+    _, unresolved = _walk_imports(
+        [rel for rel in ENTRY_POINTS if (tree / rel).is_file()],
+        lambda r: (tree / r).is_file(), lambda r: (tree / r).read_bytes())
+    return [m for m in unresolved
+            if not (m == "allo" or m.startswith("allo."))]
+
+
 def frozen_paths(ref) -> list[str]:
     """Every file composed into the tree from git: the literal seed plus the
     entry points' import closure, minus what the candidate supplies.
@@ -423,7 +441,36 @@ def frozen_paths(ref) -> list[str]:
     """
     editable = {f"{PKG}/{rel}" for rel in EDITABLE}
     return [rel for rel in sorted(set(FROZEN_LITERAL) | set(import_closure(ref)))
-            if rel not in editable]
+            if rel not in editable and not _from_checkout(rel)]
+
+
+#: Measurement apparatus that lives inside the `allo` package -- the ACT
+#: mapper, since `act/` moved to `allo/act/`. It is NOT composed into the
+#: tree, because it cannot win import resolution there: `allo` is a regular
+#: package with an `__init__.py` in the checkout, so `allo.act` always comes
+#: from the checkout and a tree copy would sit unread. Synthesising an
+#: `allo/__init__.py` into the tree would make the evaluation diverge from a
+#: clean reproduction, and the tree's `allo` has no compiler in it anyway.
+#: It is frozen by the OTHER mechanism instead: `CHECKOUT_WATCH` hashes it
+#: before and after every gate, and `loop.FROZEN_PATHS` refuses to start a
+#: search while it is dirty. `closure_cover` is what checks that every module
+#: the evaluation imports is under one mechanism or the other.
+def _from_checkout(rel: str) -> bool:
+    return rel.startswith("allo/")
+
+
+def closure_cover(ref) -> dict:
+    """How each file of the closure is frozen: composed, or watched."""
+    composed, watched, uncovered = [], [], []
+    for rel in import_closure(ref):
+        if f"{PKG}/{rel.removeprefix(PKG + '/')}" in {f"{PKG}/{e}" for e in EDITABLE}:
+            continue                       # the candidate supplies it
+        if _from_checkout(rel):
+            (watched if any(rel == w or rel.startswith(w + "/")
+                            for w in CHECKOUT_WATCH) else uncovered).append(rel)
+        else:
+            composed.append(rel)
+    return {"composed": composed, "watched": watched, "uncovered": uncovered}
 
 
 def compose(spec_dir: Path, tree: Path, ref: str):
@@ -481,9 +528,7 @@ def compose(spec_dir: Path, tree: Path, ref: str):
     # to BE here. A tree that reaches outside itself has an input nobody
     # audited, which is the whole reason the files come from git. This also
     # catches a candidate that adds an import of something not frozen.
-    _, dangling = _walk_imports(
-        [rel for rel in ENTRY_POINTS if (tree / rel).is_file()],
-        lambda r: (tree / r).is_file(), lambda r: (tree / r).read_bytes())
+    dangling = unresolved_in_tree(tree)
     if dangling:
         raise Reject("setup", "the evaluation tree is not closed under its "
                               f"imports; cannot resolve {dangling}")

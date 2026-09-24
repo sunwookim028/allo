@@ -62,6 +62,10 @@ LLVM_BUILD_DIR = os.environ.get(
 #: Paths whose working-tree copy must equal HEAD before a search starts. The
 #: evaluator reads them from git anyway; this makes a dirty tree loud.
 FROZEN_PATHS = [
+    # The ACT mapper is measurement apparatus and is NOT composed into the
+    # evaluation tree (it resolves from the checkout, `evaluate._from_checkout`),
+    # so a dirty copy of it would be the one that runs.
+    "allo/act",
     "examples/tinytpu/cosim.py",
     "examples/tinytpu/bench_isa.py",
     "examples/tinytpu/stress_isa.py",

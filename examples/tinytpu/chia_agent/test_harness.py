@@ -385,9 +385,7 @@ def phase_s():
             dst.write_bytes(ev.git_show("HEAD", f"{ev.PKG}/{rel}"))
         tree = closure_tmp / "tree"
         ev.compose(spec, tree, "HEAD")      # raises Reject if not closed
-        _, unresolved = ev._walk_imports(
-            [rel for rel in ev.ENTRY_POINTS if (tree / rel).is_file()],
-            lambda r: (tree / r).is_file(), lambda r: (tree / r).read_bytes())
+        unresolved = ev.unresolved_in_tree(tree)
         note = (sorted(unresolved) or
                 f"closed, {len(list(tree.rglob('*.py')))} modules")
     except ev.Reject as exc:
@@ -397,6 +395,16 @@ def phase_s():
     check("s.composed tree is closed under its imports",
           "every first-party module the evaluation reaches is IN the tree",
           note, not unresolved)
+    #    And nothing the evaluation imports may fall outside BOTH mechanisms:
+    #    composed into the tree from git, or (for `allo.act`, which resolves
+    #    from the checkout and cannot be shadowed by a tree copy) hashed by
+    #    CHECKOUT_WATCH before and after every gate.
+    cover = ev.closure_cover("HEAD")
+    check("s.every imported module is frozen by one mechanism or the other",
+          "nothing uncovered",
+          (cover["uncovered"] or
+           f"{len(cover['composed'])} composed, {len(cover['watched'])} watched"),
+          not cover["uncovered"])
     # 2. Every tracked quotation of the published five-shape row must equal
     #    what `reproduce.sh` prints. Four copies in `swarm.py` did not, so
     #    every worker a run launched was handed a baseline the design had not
