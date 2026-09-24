@@ -376,7 +376,7 @@ and bills the project in the request URL. ``preflight.py`` runs before any
 worker or model call in ``swarm.py``, ``loop.py`` and ``smoke.py``, and refuses
 unless the project bills ``CHIA_BILLING_ACCOUNT``, Vertex AI is enabled,
 ``--budget-usd`` is given, and CHIA's cumulative spend so far plus this run's cap
-fits **``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)**; it prints the account,
+fits **``CHIA_TOTAL_CAP_USD`` ($500 in chia.env, and the committed default in ``preflight.py``)**; it prints the account,
 project, spend so far, remaining and the run's cap. Cumulative spend is
 opencode's own database, attributed to CHIA2026 by the cutover time recorded
 in ``billing.json`` (opencode stores no GCP project with a session). These are

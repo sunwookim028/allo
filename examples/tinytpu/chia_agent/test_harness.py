@@ -41,7 +41,7 @@ Cases, each with an expected verdict:
 
     conda activate chia_env
     python test_harness.py                       # everything, ~45 min
-    python test_harness.py --phases control,e,c,g   # cheap subset, ~3 min
+    python test_harness.py --phases s,control,e,c,g   # cheap subset, ~3 min
     python test_harness.py --phases e,c,d,abf,loop,accept
 
 Writes `<run-dir>/results.json` and exits non-zero if any case failed.
@@ -91,10 +91,12 @@ logging.getLogger("mcp").setLevel(logging.WARNING)
 #: `evaluate` loads it by path and this takes the names from there rather than
 #: writing them out a sixth time. The cycles are positional against it.
 import control  # noqa: E402
+from design import EDITABLE, IMPORTABLE_MODULES  # noqa: E402
 from evaluate import ALL_SHAPES, PARAM_CONFIGS  # noqa: E402
 
-#: The unmodified design (README, accept.py control run).
-BASELINE_ALL = dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686)))
+#: The unmodified design at the scored configuration: reproduce.sh's row, via
+#: `control.PUBLISHED` (restated here as a literal, it went stale).
+BASELINE_ALL = dict(control.PUBLISHED["cosim"])
 BASELINE = {s: BASELINE_ALL[s] for s in ("4x4x4", "16x16x16")}
 GATE_TIMEOUT = 240
 
@@ -109,26 +111,33 @@ def genuine_control(**changes) -> dict:
         source="measured in this run from git at HEAD, before the candidate "
                "diff was applied"), **changes}
 
-#: (file, old, new): exact, unique replacements on the HEAD design.
+#: (file, old, new): exact, unique replacements on the HEAD design. The paths
+#: are the ones `design.EDITABLE` names -- the hardware is a unit library now
+#: (`docs/source/designs/tinytpu_library.rst`), so a mutant names the unit it
+#: breaks rather than one big file, which is also what makes each one readable.
 MUTANTS = {
     # b: the zero-fill of spad that b4be2b10 removed. At HEAD the DMA burst is
     # II=1, so the 514-cycle memset is no longer hidden behind it.
-    "spad_zero": ("microarch_isa.py", "        spad: UInt(VW)[SPAD_ROWS]\n",
-                  "        spad: UInt(VW)[SPAD_ROWS] = 0\n"),
+    "spad_zero": ("ip/units/scratchpad.py", "    spad: UInt(VW)[SPAD_ROWS]\n",
+                  "    spad: UInt(VW)[SPAD_ROWS] = 0\n"),
     # c: [-4, 4] operands never overflow 16 bits at K <= 16; full-range ones do.
-    "narrow16": ("microarch_isa.py", "o: int32 = p + av * wv",
-                 "o: int16 = p + av * wv"),
+    "narrow16": ("ip/units/pe.py",
+                 "psum: int32 = psum_north + activation16 * weight16",
+                 "psum: int16 = psum_north + activation16 * weight16"),
     # g: specialised to the scored MAXDIM: identical at MAXDIM=16, wrong at 8/12.
     # Passes the static policy (T/MAXDIM themselves stay parameters).
-    "wpr_literal": ("microarch_isa.py",
-                    "WPR = MAXDIM // T              # packed words per DRAM row\n",
-                    "WPR = 4                        # packed words per DRAM row\n"),
+    "wpr_literal": ("ip/units/dma_load.py",
+                    "packed = a_onchip[(dram_row0 + row) * WPR + col_block]",
+                    "packed = a_onchip[(dram_row0 + row) * 4 + col_block]"),
     # d: mvout never reaches dma_st, so accu blocks on a full ac2sp.
-    "deadlock": ("microarch_isa.py",
-                 "                    c_acc.put(rw)\n                    c_dst.put(rw)\n",
-                 "                    c_acc.put(rw)\n"),
+    "deadlock": ("ip/units/sequencer.py",
+                 "                c_acc.put(resolved)\n                c_dst.put(resolved)\n",
+                 "                c_acc.put(resolved)\n"),
 }
-ANCHOR = "import allo.dataflow as df\n"
+#: A line that exists in `microarch_isa.py` and runs at import, for the cases
+#: that inject an attack after it: the module's first import, so a payload
+#: placed after it runs before the design is built.
+ANCHOR = "import os\n"
 #: Prints both gates' verdict lines and exits 0 during the candidate's import
 #: in any gate process (they put the tree root first on sys.path).
 FORGE_VERDICT = (
@@ -191,6 +200,25 @@ def mutate(name: str) -> str:
     text = head(f)
     assert text.count(old) == 1, name
     return text.replace(old, new, 1)
+
+
+def write_design(dest, mutant: str | None = None, attack: str = "") -> None:
+    """Write every writable file from HEAD into `dest`.
+
+    With `mutant`, that one file carries its mutation; with `attack`, the
+    payload is injected after ANCHOR in `microarch_isa.py`. The two used to be
+    one file and composed with a single `replace`; the hardware lives in
+    `ip/units/` now, so a functional mutant and an import-time attack land in
+    different files and the whole design has to be written out.
+    """
+    for rel in EDITABLE:
+        text = mutate(mutant) if mutant and MUTANTS[mutant][0] == rel else head(rel)
+        if attack and rel == "microarch_isa.py":
+            assert text.count(ANCHOR) == 1, "ANCHOR is not unique"
+            text = text.replace(ANCHOR, ANCHOR + attack, 1)
+        target = Path(dest) / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
 
 
 def tails(swarm_output: str, worker: Path | None, lines=15) -> str:
@@ -305,6 +333,190 @@ async def while_polling(clients, coro, every=5.0):
     return task.result(), worst
 
 
+# -- s: static guards ---------------------------------------------------------
+#: The escape routes the spec policy's dunder rule exists for, each spelled the
+#: way an agent would reach for it.
+DUNDER_ESCAPES = {
+    "type graph": "_s = ().__class__.__bases__[0].__subclasses__()\n",
+    "function globals": "_g = (lambda: 0).__globals__\n",
+    "module namespace": "import numpy as _np\n_d = _np.__dict__\n",
+    "name-based lookup": "import numpy as _np\n_w = _np.__getattribute__('save')\n",
+    "builtins": "_b = (lambda: 0).__builtins__\n",
+    "code object": "_c = (lambda: 0).__code__\n",
+    "method resolution": "_m = int.__mro__\n",
+}
+#: Files of the shipped design that do NOT pass the spec policy as committed.
+#: `isa_dsl.py:106` calls `super().__init__` in an exception subclass and the
+#: policy denies every dunder outside {__name__, __doc__}. The allow-list is
+#: deliberately NOT widened (a human decision, dev/roadmap.md E.2); instead the
+#: evaluator and accept.py charge a file's violations to the candidate only
+#: when the candidate CHANGED that file. This set is the standing exception,
+#: named so that it cannot grow unnoticed.
+PREEXISTING_POLICY_FAILURES = {"isa_dsl.py"}
+
+
+def phase_s():
+    """The harness's own guards, checked without Ray or a model."""
+    print("== s: static guards", flush=True)
+    import shutil
+    import sqlite3
+    import tempfile
+    import evaluate as ev
+    import spec_policy as sp
+    # The policy passes the shipped design, as the evaluator runs it -- except
+    # for the standing exception, which must be exactly the recorded set.
+    failing = {rel for rel in EDITABLE if sp.policy_violations(rel, head(rel))}
+    check("s.policy passes the shipped design",
+          f"every file but {sorted(PREEXISTING_POLICY_FAILURES)}",
+          sorted(failing) or "all pass", failing == PREEXISTING_POLICY_FAILURES)
+    # ...and still refuses each classic escape.
+    base = head("ip/units/pe.py")
+    for label, code in DUNDER_ESCAPES.items():
+        got = sp.policy_violations("pe.py", base + "\n" + code)
+        check(f"s.policy refuses: {label}", "refused", got[:2], bool(got))
+    # The policy's import allow-list and the design definition must agree. The
+    # policy keeps a literal (a candidate must not be able to widen it by
+    # editing design.py's neighbours), so nothing but a test holds them equal.
+    check("s.policy allows exactly the design's modules",
+          f"{len(IMPORTABLE_MODULES)} modules",
+          sorted(set(sp.ALLOWED_EXAMPLES) ^ set(IMPORTABLE_MODULES)) or "equal",
+          set(sp.ALLOWED_EXAMPLES) == set(IMPORTABLE_MODULES))
+    # The documentation budget is the candidate's, not each file's.
+    over = {rel: 2 for rel in EDITABLE}
+    check("s.documentation budget is the whole candidate's",
+          f"{len(EDITABLE)} files losing 2 lines each is refused; one is not",
+          [sp.doc_violations_total(over)[:1],
+           sp.doc_violations_total({EDITABLE[0]: 2})],
+          bool(sp.doc_violations_total(over))
+          and not sp.doc_violations_total({EDITABLE[0]: 2}))
+    # The main base is derived, and the drift check it feeds still bites.
+    head_ref = ev.resolve_ref("HEAD")
+    try:
+        mb = ev.main_base(head_ref)
+        same = [r for r in ev.DESIGN_EVALUATOR
+                if ev.git_show(head_ref, r) == ev.git_show(mb, r)]
+        got = f"{mb[:8]}, {len(same)}/{len(ev.DESIGN_EVALUATOR)} identical"
+        good = len(same) == len(ev.DESIGN_EVALUATOR)
+    except ev.Reject as r:
+        got, good = f"Reject({r.stage}): {r.detail[:120]}", False
+    check("s.main-base derived for HEAD", "a merge-base, evaluator identical",
+          got, good)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        spec = tmp / "spec"
+        spec.mkdir()
+        write_design(spec)
+        old = os.environ.get("CHIA_MAIN_BASE")
+        os.environ["CHIA_MAIN_BASE"] = "476a70d8"
+        try:
+            ev.compose(spec, tmp / "tree", head_ref)
+            got = "composed"
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:90]}"
+        finally:
+            os.environ.pop("CHIA_MAIN_BASE", None)
+            if old is not None:
+                os.environ["CHIA_MAIN_BASE"] = old
+        check("s.drift refused", "setup: an evaluator file differs from the base",
+              got, got.startswith("setup:")
+              and ("differs from main" in got or "cannot read frozen" in got))
+        # An UNTOUCHED file's pre-existing violation is not the candidate's.
+        try:
+            ev.compose(spec, tmp / "tree_ok", head_ref)
+            got = "composed"
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:120]}"
+        check("s.untouched file's violation is not charged",
+              f"composes although {sorted(PREEXISTING_POLICY_FAILURES)} would "
+              f"fail the policy", got, got == "composed")
+        # ...but the same violation IS charged once the candidate edits it.
+        spec2 = tmp / "spec2"
+        shutil.copytree(spec, spec2)
+        (spec2 / "isa_dsl.py").write_text(
+            head("isa_dsl.py").replace("import os\n", "import os\n# edited\n", 1))
+        try:
+            ev.compose(spec2, tmp / "tree_edited", head_ref)
+            got = "composed"
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:90]}"
+        check("s.edited file is held to the policy",
+              "policy: the violation in the file the candidate touched",
+              got, got.startswith("policy:"))
+        # The scored configuration is pinned, and the design honours it.
+        tree = tmp / "tree2"
+        ev.compose(spec, tree, head_ref)
+        stray = os.environ.get("TPU_MAXDIM")
+        os.environ["TPU_MAXDIM"] = "64"
+        env = ev.env_for(tree)
+        os.environ.pop("TPU_MAXDIM", None)
+        if stray is not None:
+            os.environ["TPU_MAXDIM"] = stray
+        try:
+            inv = ev.check_invariants(tree, env, None)
+            got = {k: inv[k] for k in ("T", "MAXDIM")}
+        except ev.Reject as r:
+            got = f"{r.stage}: {r.detail[:160]}"
+        want = {"T": int(ev.SCORED["TPU_T"]), "MAXDIM": int(ev.SCORED["TPU_MAXDIM"])}
+        check("s.scored configuration pinned", f"env_for sets {ev.SCORED}; "
+              f"check_invariants passes at {want}", got, got == want)
+    # The per-run cap: this run's sessions, a timed-out one found by its title,
+    # and none of a concurrent run's.
+    import loop
+    import spend
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "opencode.db"
+        con = sqlite3.connect(db)
+        con.execute("create table session (id text, title text, time_created int, "
+                    "model text, cost real)")
+        con.execute("create table message (id text, session_id text, "
+                    "time_created int, data text)")
+        rows = [("ses_mine_ok", "chia-run R@1 [tpuA]", 4.00),
+                ("ses_mine_timeout", "chia-run R@1 [tpuA]", 4.46),
+                ("ses_sibling", "chia-run R@1 [tpuB]", 1.00),
+                ("ses_other_track", "chia-run S@1 [tpuA]", 10.17),
+                ("ses_prefix_trap", "chia-run R@10 [tpuA]", 7.00)]
+        for i, (sid, title, usd) in enumerate(rows):
+            con.execute("insert into session values (?,?,?,?,?)",
+                        (sid, title, 1000 + i, "{}", 0))
+            con.execute("insert into message values (?,?,?,?)",
+                        (f"m{i}", sid, 1000 + i,
+                         json.dumps({"role": "assistant", "cost": usd})))
+        con.commit()
+        con.close()
+        saved = spend.DB
+        spend.DB = db
+        try:
+            b = loop.Budget(15.0, 1000, "chia-run R@1", "tpuA")
+            b.note_session("ses_mine_ok")
+            run, mine = b.spent(), b.mine()
+            window = spend.spent_since(1000)["usd"]
+            try:
+                b.largest_call = 6.0
+                b.check("iter3")
+                stopped = "not stopped"
+            except loop.BudgetExhausted as why:
+                stopped = str(why)
+        finally:
+            spend.DB = saved
+    check("s.per-run cap counts this run only",
+          "$9.46 (own two incl. the timed-out one + sibling worker), not the "
+          "account's $26.63", f"run ${run:.2f}, account ${window:.2f}",
+          run == 9.46 and round(window, 2) == 26.63)
+    check("s.per-worker attribution finds a timed-out call",
+          "both of tpuA's sessions, $8.46", mine,
+          set(mine) == {"ses_mine_ok", "ses_mine_timeout"}
+          and round(sum(mine.values()), 2) == 8.46)
+    check("s.cap stops on this run's spend", "stops: $9.46 + $6.00 > $15",
+          stopped[:90], "has spent $9.46" in stopped)
+    # Nothing reads opencode's `usage` (CHIA's cost_usd) as money.
+    readers = [f"{f.name}:{i}" for f in sorted(AGENT_DIR.glob("*.py"))
+               if f.name not in ("fake_model.py", "test_harness.py")
+               for i, line in enumerate(f.read_text().splitlines(), 1)
+               if "cost_usd" in line]
+    check("s.no money from usage", "no module reads cost_usd", readers or "none",
+          not readers)
+
+
 # -- phases -------------------------------------------------------------------
 class Suite:
     def __init__(self, run_dir: Path):
@@ -330,8 +542,7 @@ class Suite:
         self.A, self.B = Client(self.tools["tpta"]), Client(self.tools["tptb"])
 
     def reset(self, name: str):
-        for f in ("microarch_isa.py", "isa_dsl.py"):
-            (self.specs[name] / f).write_text(head(f))
+        write_design(self.specs[name])
 
     def spec(self, name: str, f="microarch_isa.py") -> str:
         return (self.specs[name] / f).read_text()
@@ -397,8 +608,7 @@ class Suite:
 
         # Second layer: files that reach the spec dir WITHOUT the edit tools
         # must still be refused by the evaluator, which re-runs the policy.
-        (spec / "microarch_isa.py").write_text(micro.replace(
-            ANCHOR, ANCHOR + IMPORT_ATTACKS["import cosim"], 1))
+        write_design(spec, attack=IMPORT_ATTACKS["import cosim"])
         v = await A.verdict("run_functional_check")
         check("e.on-disk import cosim -> evaluator", "ok=false at stage policy",
               f"ok={v.get('ok')} stage={v.get('stage')}",
@@ -409,15 +619,13 @@ class Suite:
         for label in ("numpy.savetxt over stress_isa.py",
                       "ndarray.tofile over stress_isa.py",
                       "SystemExit forged verdict"):
-            (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
-                ANCHOR, ANCHOR + IMPORT_ATTACKS[label], 1))
+            write_design(spec, "narrow16", IMPORT_ATTACKS[label])
             v = await A.verdict("run_functional_check")
             check(f"e.on-disk narrow16 + {label} -> evaluator", "ok=false",
                   f"ok={v.get('ok')} stage={v.get('stage')}", not v.get("ok"),
                   detail=v.get("detail", "")[-600:])
         # Past the static policy: a monkeypatch through a method's `self`.
-        (spec / "microarch_isa.py").write_text(mutate("narrow16").replace(
-            ANCHOR, ANCHOR + METHOD_SELF_PATCH, 1))
+        write_design(spec, "narrow16", METHOD_SELF_PATCH)
         from spec_policy import policy_violations
         missed = not policy_violations("microarch_isa.py", self.spec("tpta"))
         v = await A.verdict("run_functional_check")
@@ -453,11 +661,10 @@ class Suite:
         if work.exists():
             shutil.rmtree(work)
         tree = work / "tree"
-        for rel in ev.FROZEN + [f"{PKG}/isa_dsl.py"]:
+        for rel in ev.FROZEN:
             (tree / rel).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel).write_bytes(ev.git_show("HEAD", rel))
-        (tree / PKG / "microarch_isa.py").write_text(mutate("narrow16").replace(
-            ANCHOR, ANCHOR + FORGE_VERDICT, 1))
+        write_design(tree / PKG, "narrow16", FORGE_VERDICT)
         env = ev.env_for(tree)
         rc, out, _ = ev.run([ALLO_PYTHON, str(tree / PKG / "stress_isa.py")], tree, env,
                             GATE_TIMEOUT, work, tree)
@@ -531,7 +738,8 @@ class Suite:
         A, spec = self.A, self.specs["tpta"]
         micro = head("microarch_isa.py")
         t_def = 'T = int(os.environ.get("TPU_T", 4))'
-        md_def = 'MAXDIM = int(os.environ.get("TPU_MAXDIM", 16))'
+        md_def = re.search(r'^MAXDIM = int\(os\.environ\.get\("TPU_MAXDIM", \d+\)\)',
+                           micro, re.M).group(0)
         doc = ast.get_docstring(ast.parse(micro), clean=False)
         edits = {
             "literal T": {"path": "microarch_isa.py", "old": t_def, "new": "T = 4"},
@@ -563,8 +771,8 @@ class Suite:
         # A documentation EDIT (same length, reworded) is allowed.
         self.reset("tpta")
         r = await A.call("replace_text", timeout=60, path="microarch_isa.py",
-                         old="the machine both were aiming at",
-                         new="the machine both of them were aiming at")
+                         old="the shipped instantiation of the `ip` unit library",
+                         new="the shipped instantiation of the `ip` unit library today")
         check("g.edit: docstring reworded", "Replaced (edits are fine)", r[:60],
               r.startswith("Replaced"))
         # Past the static policy: a unit specialised to MAXDIM=16.
@@ -625,7 +833,7 @@ class Suite:
         f, old, new = MUTANTS["spad_zero"]
         r2 = await self.B.call("replace_text", timeout=60, path=f, old=old, new=new)
         assert r.startswith("Replaced") and r2.startswith("Replaced"), (r, r2)
-        diff = unified("microarch_isa.py", head("microarch_isa.py"), self.spec("tptb"))
+        diff = unified(f, head(f), self.spec("tptb", f))
         (self.run_dir / "spad_zero.diff").write_text(diff)
 
         # f1: two evaluations on ONE tool must serialise on its work dir.
@@ -646,10 +854,14 @@ class Suite:
         ca, cb = va.get("cycles"), vb.get("cycles")
         check("a.noop", f"ok, cycles == {BASELINE}", f"ok={va.get('ok')} {ca}",
               va.get("ok") and ca == BASELINE, verdict=va)
-        worse = bool(vb.get("ok") and cb and all(cb[s] > BASELINE[s] for s in BASELINE))
-        check("b.spad_zero", "ok (bit-exact at both shapes), every shape WORSE",
-              f"ok={vb.get('ok')} {cb} "
-              f"(delta {({s: cb[s] - BASELINE[s] for s in cb} if cb else None)})",
+        # Worse in total, and better nowhere. Not "worse at every shape": the
+        # zero-fill costs cycles at 4x4x4 and can be hidden behind the DMA at
+        # 16x16x16 now that the memories are derived from MAXDIM.
+        delta = {s: cb[s] - BASELINE[s] for s in cb} if cb else {}
+        worse = bool(vb.get("ok") and cb and sum(delta.values()) > 0
+                     and all(d >= 0 for d in delta.values()))
+        check("b.spad_zero", "ok (bit-exact at both shapes), WORSE in total and "
+              "better at no shape", f"ok={vb.get('ok')} {cb} (delta {delta})",
               worse, verdict=vb)
         check("f.server-responsive", "read_spec < 5 s during two cosims",
               f"worst {worst:.2f}s over {took:.0f}s", worst < 5)
@@ -666,12 +878,19 @@ class Suite:
         """The real swarm -> loop -> opencode -> MCP path, with a scripted model."""
         print("== loop: swarm.py + opencode + fake model (no LLM)", flush=True)
         from fake_model import FakeModel
-        from spend import spent_since
-        # The prerequisite, named here rather than left to be read out of a
-        # worker log: without it CHIA's OpenCodeLLM fails per iteration with
-        # "[Errno 2] No such file or directory: 'opencode'", every iteration
-        # makes no edit, and the phase's own failures all say something else.
-        # A fresh worktree does not have it: node_modules/ is gitignored.
+        from loop import frozen_is_clean
+        from spend import run_spend
+        # The prerequisites, named here rather than left to be read out of a
+        # worker log. A dirty frozen path makes loop.py refuse before it writes
+        # anything; a missing opencode makes every iteration an unscored no-op
+        # (CHIA's OpenCodeLLM fails per iteration with "[Errno 2] No such file
+        # or directory: 'opencode'"), and a fresh worktree does not have it
+        # because node_modules/ is gitignored.
+        dirty = frozen_is_clean()
+        if dirty:
+            check("loop.frozen-paths-clean", "committed (loop.py refuses a dirty "
+                  "frozen path before writing variants.jsonl)", dirty, False)
+            return
         if not (AGENT_DIR / "node_modules/.bin/opencode").exists():
             check("loop.opencode-installed",
                   "node_modules/.bin/opencode (npm ci --prefix chia_agent)",
@@ -784,16 +1003,15 @@ class Suite:
         check("loop.artifacts", "best.diff empty, summary.json with no best",
               f"best.diff={best!r} best={summary.get('best')}",
               best == "" and summary.get("best") is None)
-        # This run's own cost, from what the loop recorded per model call.
-        # `spent_since` is a TIME WINDOW over opencode's global database, so a
-        # concurrent CHIA run on the same host lands in it -- conservative for
-        # a spend cap, and not the question here.
-        mine = sum(c.get("cost_usd", 0) for e in entries
-                   for c in e.get("llm_calls") or [])
-        usd = spent_since(t0)["usd"]
-        check("loop.spend", "this run's own model calls cost $0.00",
-              f"${mine:.2f} (opencode's DB window, every run on this host: "
-              f"${usd:.2f})", mine == 0)
+        # The run's own sessions, found by the title every one of them
+        # carries: the attribution the per-run cap rests on, exercised end to
+        # end. A time window over the whole account is NOT this, and using one
+        # is how run 2 was killed after 2 of its 5 iterations.
+        tag = json.loads((run_dir / "run.json").read_text())["run_tag"]
+        mine = run_spend(tag + " ", t0)
+        check("loop.spend", "the run's own sessions, found by its tag, cost $0.00",
+              f"${mine['usd']:.2f} over {len(mine['sessions'])} session(s)",
+              mine["usd"] == 0 and len(mine["sessions"]) > 0)
         check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
               bool(fake.log) and len(fake.log[0]["tools"]) == 7
@@ -809,7 +1027,7 @@ class Suite:
         design = control.blobs("HEAD")
         want = {f: subprocess.run(["git", "rev-parse", f"HEAD:{PKG}/{f}"], cwd=REPO,
                                   capture_output=True, text=True).stdout.strip()
-                for f in ("microarch_isa.py", "isa_dsl.py")}
+                for f in EDITABLE}
         check("control.design-identity", "the two editable blobs at HEAD", design,
               design == want and all(design.values()))
         check("control.genuine-record-usable", "no problems",
@@ -868,25 +1086,31 @@ class Suite:
         check("control.crosscheck-agrees", "agree, against the published numbers",
               f"{agree['status']} vs {agree['against'][:40]}",
               agree["status"] == "agree" and not control.banner(agree))
-        moved = control.crosscheck(dict(BASELINE_ALL, **{"4x4x4": 171}), design,
-                                   "cosim")
+        moved = control.crosscheck(
+            dict(BASELINE_ALL, **{"4x4x4": BASELINE_ALL["4x4x4"] + 1}), design,
+            "cosim")
         check("control.crosscheck-disagrees-loudly", "DISAGREES, with a banner",
               f"{moved['status']} delta={moved['delta']['4x4x4']}",
               moved["status"] == "DISAGREES"
               and "DISAGREES" in control.banner(moved))
-        recorded = control.crosscheck(dict(BASELINE_ALL), dict(zip(
-            ("microarch_isa.py", "isa_dsl.py"),
-            ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-             "8f2e9aa9f518ef320cab163adc95e05737c777be"))), "cosim")
+        # A design whose blobs ARE recorded: 476a70d8, the two-file design.
+        was = dict(zip(("microarch_isa.py", "isa_dsl.py"),
+                       ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+                        "8f2e9aa9f518ef320cab163adc95e05737c777be")))
+        recorded = control.crosscheck(
+            dict(control.RECORDED[control.key("cosim", was)]), was, "cosim")
         check("control.crosscheck-recorded-design", "agree, against its own entry",
               f"{recorded['status']} vs {recorded['against'][:40]}",
               recorded["status"] == "agree"
               and recorded["against"].startswith("the control recorded"))
         # Another driver measures another program on the same hardware, so this
         # driver's numbers are not its cross-check: it has none until measured.
-        other = control.crosscheck(dict(BASELINE_ALL), design, "codesign_cosim")
+        # A driver with nothing published or recorded has no cross-check
+        # until someone measures it -- it is not silently given another's.
+        other = control.crosscheck(dict(BASELINE_ALL), design, "a_new_driver")
         check("control.crosscheck-unrecorded-driver",
-              "UNRECORDED, loud, not silently checked against cosim's numbers",
+              "UNRECORDED, loud, not silently checked against another "
+              "driver's numbers",
               f"{other['status']} recorded={other['recorded']}",
               other["status"] == "UNRECORDED" and other["recorded"] is None
               and "UNRECORDED" in control.banner(other).upper())
@@ -938,7 +1162,7 @@ class Suite:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phases", default="control,e,c,g,d,abf,loop,accept")
+    ap.add_argument("--phases", default="s,control,e,c,g,d,abf,loop,accept")
     ap.add_argument("--run-dir", type=Path, default=REPO / "chia_runs"
                     / f"harness-test-{time.strftime('%Y%m%d-%H%M%S')}")
     a = ap.parse_args()
@@ -949,7 +1173,9 @@ def main() -> int:
     suite = Suite(run_dir)
     try:
         for ph in phases:
-            if ph in ("e", "c", "d", "abf", "g"):
+            if ph == "s":
+                phase_s()
+            elif ph in ("e", "c", "d", "abf", "g"):
                 asyncio.run(getattr(suite, f"phase_{ph}")())
             elif ph in ("control", "loop", "accept"):
                 getattr(suite, f"phase_{ph}")()

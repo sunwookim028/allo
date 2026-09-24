@@ -10,7 +10,7 @@ reads, a file-existence check, and arithmetic. It refuses unless
   (b) `aiplatform.googleapis.com` is enabled on that project, and
   (c) a positive, finite spend cap has been given for the run, and
   (d) CHIA's cumulative spend on CHIA2026 so far plus this run's cap stays
-      within `CHIA_TOTAL_CAP_USD` ($100 unless chia.env says otherwise). The
+      within `CHIA_TOTAL_CAP_USD` ($500 unless chia.env says otherwise). The
       cumulative figure is opencode's own record, attributed to CHIA2026 by
       the cutover time in `billing.json` -- see `spend.py` for why by time,
 
@@ -53,7 +53,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 #: CHIA2026, the account created for this work (2026-09-19).
 DEFAULT_BILLING_ACCOUNT = "01BF39-94AA3F-36BACB"
 #: Cumulative cap across every CHIA run on CHIA2026; chia.env can raise it.
-DEFAULT_TOTAL_CAP_USD = 100.0
+#: Raised from $100 to $500 on 2026-09-24 on the owner's authorisation, for the
+#: end-to-end run of the repaired loop. Spend to that point was $103.52
+#: (opencode's figures, 26 sessions since the cutover), so the old ceiling was
+#: already passed and no run could start. The ceiling lives here, in the
+#: committed configuration, rather than only in the gitignored chia.env, so a
+#: fresh checkout does not silently get a different one.
+DEFAULT_TOTAL_CAP_USD = 500.0
 GCLOUD_TIMEOUT = 60
 
 

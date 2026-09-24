@@ -66,7 +66,10 @@ REFERENCE = {
     "vitis.py": "allo/backend/vitis.py",
     "passes.py": "allo/passes.py",
     "EmitVivadoHLS.cpp": "mlir/lib/Translation/EmitVivadoHLS.cpp",
-    "EmitBaseHLS.h": "mlir/lib/Translation/EmitBaseHLS.h",
+    # The header is under include/, not lib/; lib/ has only the .cpp. It read
+    # `mlir/lib/Translation/EmitBaseHLS.h`, which has never existed, so the
+    # agent got "cannot read" for one of the four emitter sources.
+    "EmitBaseHLS.h": "mlir/include/allo/Translation/EmitBaseHLS.h",
     "EmitCatapultHLS.cpp": "mlir/lib/Translation/EmitCatapultHLS.cpp",
     "Utils.cpp": "mlir/lib/Support/Utils.cpp",
     "test_vhls.py": "tests/test_vhls.py",

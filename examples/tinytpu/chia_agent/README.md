@@ -200,7 +200,7 @@ set to the CHIA project anyway, for any client that does send it.
 call). It refuses to start unless the project bills `CHIA_BILLING_ACCOUNT`
 (CHIA2026) with billing enabled, `aiplatform.googleapis.com` is enabled, a
 per-run cap (`--budget-usd`, now required) is given, and CHIA's cumulative
-spend on CHIA2026 plus that cap fits **`CHIA_TOTAL_CAP_USD` ($100 in
+spend on CHIA2026 plus that cap fits **`CHIA_TOTAL_CAP_USD` ($500 in
 chia.env)**. It prints the account, project, spend so far, remaining, and this
 run's cap. The scripted test model on loopback skips the cloud checks (it
 cannot reach Vertex); nothing else does.
