@@ -10,12 +10,23 @@ streams declared as ports. It is generated rather than hand-copied so that
 (`TPU.architecture.source()`, built from the `ip/` units) and only writes a
 new signature for it.
 
-    python examples/tinytpu/lift_units.py
+    python examples/tinytpu/lift_units.py            # rewrite units_isa.py
+    python examples/tinytpu/lift_units.py --check    # committed == generated?
+
+`--check` is the enforcement behind the "GENERATED -- do not edit" header, and
+it exists because that header had nothing behind it: `units_isa.py` had
+silently lost a whole opcode arm (`vaddrelu`) that `ip/units/sequencer.py`
+grew, and the one test that reads the file never issued that opcode. A
+convention with no check is a convention that has already drifted.
+
+The output is `black`-formatted here rather than by hand, so the bytes the
+check compares are the bytes the generator produces.
 
 `microarch_isa.py` and the `ip/` library remain the design. See
 `docs/source/developer/stream_ports.rst`.
 """
 
+import argparse
 import ast
 import os
 import sys
@@ -142,8 +153,17 @@ def emit(channels, lifted, parameters):
     return "\n".join(out) + "\n"
 
 
-def main():
-    from examples.tinytpu.microarch_isa import TPU
+def formatted(source: str) -> str:
+    """`black` applied in process, so generating and checking cannot disagree
+    about formatting the way a separate CLI step can."""
+    import black  # noqa: PLC0415  -- only this one call needs it
+
+    return black.format_str(source, mode=black.Mode())
+
+
+def generate():
+    """`(text, lifted, channels)` -- what `units_isa.py` should contain."""
+    from examples.tinytpu.microarch_isa import TPU  # noqa: PLC0415
 
     text = TPU.architecture.source()
     region = next(
@@ -152,16 +172,54 @@ def main():
         if isinstance(node, ast.FunctionDef) and node.name == REGION
     )
     channels, lifted = kernels_of(region, text)
-    with open(TARGET, "w", encoding="utf-8") as handle:
-        handle.write(emit(channels, lifted, TPU.architecture.parameters))
+    return formatted(emit(channels, lifted, TPU.architecture.parameters)), lifted, channels
+
+
+def report(lifted, channels):
     print(f"{TARGET}: {len(lifted)} units, {len(channels)} channels")
     for statement, mapping, values, ports, _ in lifted:
         print(
             f"  {statement.name:10s} mapping={mapping:8s} "
             f"{len(ports)} ports {ports} values={values}"
         )
-    print("  run `black` on the result, then the test in tests/dataflow/")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true",
+                        help="compare the committed file with the generated "
+                             "one and exit 1 on any difference")
+    args = parser.parse_args(argv)
+    text, lifted, channels = generate()
+    if not args.check:
+        with open(TARGET, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        report(lifted, channels)
+        print("  now run tests/dataflow/test_stream_ports_tinytpu.py")
+        return 0
+    try:
+        with open(TARGET, encoding="utf-8") as handle:
+            committed = handle.read()
+    except OSError as error:
+        print(f"UNITS STALE: cannot read {TARGET}: {error}")
+        return 1
+    if committed != text:
+        import difflib  # noqa: PLC0415  -- only this branch needs it
+
+        diff = list(difflib.unified_diff(
+            committed.splitlines(True), text.splitlines(True),
+            "committed units_isa.py", "generated from ip/", n=2))
+        print("".join(diff[:80]), end="")
+        if len(diff) > 80:
+            print(f"  ... {len(diff) - 80} more diff lines")
+        print(f"\nUNITS STALE: {TARGET} is not what the design composes to. "
+              f"It is generated -- run `python {os.path.relpath(__file__)}` "
+              f"rather than editing it.")
+        return 1
+    report(lifted, channels)
+    print("  UNITS OK: units_isa.py is byte-identical to what ip/ composes to")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -21,8 +21,8 @@ The split is the point of the decomposition
   run 1 (the front-end rewrite and the operand burst) landed inside what is
   now `ip/units/dma_load.py` and `ip/units/sequencer.py`; a version of this
   list that stopped at `microarch_isa.py` would have taken the loop's
-  demonstrated capability away, because `microarch_isa.py` is now a 102-line
-  instantiation with no hardware in it.
+  demonstrated capability away, because `microarch_isa.py` is now a hundred
+  lines of instantiation with no hardware in it.
 * **FROZEN_DESIGN** is the machinery a candidate may not reach: `params.py`
   (which owns the parameter set's invariants, `T >= 4` and `MAXDIM % T == 0`),
   the package `__init__` files, and the reduce IP (`reduce.py`,

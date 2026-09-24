@@ -52,15 +52,11 @@ class Channel:
     lane_bits: str = ""
 
     def __post_init__(self):
-        """A packed word says how many lanes it carries and how wide one is;
-        its bit width is DERIVED from the pair.
-
-        A lane count is what a reduction's leaf order is checked against, and
-        until it was here the only thing that had one was addressed state --
-        so a packed FIFO word had to be declared a one-row memory to be
-        checkable at all (``docs/source/designs/ip_gaps.rst``). Deriving the
-        width rather than declaring it beside the lane count is the whole
-        difference between one declaration and two that can disagree.
+        """A packed word declares how many lanes it carries and how wide one
+        is; its bit width is DERIVED from the pair, so there is one
+        declaration instead of two that can disagree. The lane count is what a
+        reduction's leaf order is checked against
+        (``docs/source/designs/ip_gaps.rst``).
         """
         if self.lanes and self.lane_bits:
             derived = f"UInt({self.lanes} * {self.lane_bits})"
@@ -107,9 +103,10 @@ class Unit:
 
     ``legality`` is the unit's own condition on the parameter set it is being
     instantiated at, run at composition time. ``Unit.check`` answers *which
-    names a unit may use*; nothing answered *which values it works at*, so a
-    unit sized past what its arithmetic is exact for composed, built and gave
-    wrong answers -- see ``docs/source/designs/ip_gaps.rst``.
+    names a unit may use*, which is a different question from *which values it
+    works at*: without ``legality`` a unit sized past what its arithmetic is
+    exact for composes, builds and gives wrong answers
+    (``docs/source/designs/ip_gaps.rst``).
 
     ``instances`` is the emitted ``mapping=``, as expressions over the
     architecture's parameters (``("T", "T")`` for a T x T array). ``memories``
@@ -168,11 +165,10 @@ class Unit:
         declares itself (``ar: UInt(AW)[NAR]``); the rest are the region
         arguments the unit was given, named positionally by ``memories``.
 
-        This is the same AST the declaration is CHECKED against in
-        ``free_names``, asked a second question. It is here rather than in a
-        consumer because a unit's memory is a structural fact of the unit,
-        and the point of this module is that a structural fact is stated
-        once."""
+        The same AST ``free_names`` checks the declaration against, asked a
+        second question. It lives here rather than in a consumer because a
+        unit's memory is a structural fact of the unit, and this module exists
+        so that a structural fact is stated once."""
         tree = ast.parse(self.source()).body[0]
         parameters = [a.arg for a in tree.args.args]
         bound = dict(zip(parameters, self.memories))

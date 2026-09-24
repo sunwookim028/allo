@@ -27,8 +27,9 @@ from examples.tinytpu.microarch_isa import (  # noqa: E402
     assemble,
     MAXDIM,
     IMEM_SIZE,
+    T,
 )
-from examples.tinytpu.isa_dsl import gemm_program  # noqa: E402
+from examples.tinytpu.isa_dsl import Program, gemm_program  # noqa: E402
 from examples.tinytpu.units_isa import (  # noqa: E402
     tinytpu_ports,
 )
@@ -47,6 +48,45 @@ PORTS = {
     "accu": 3,
     "dma_st": 2,
 }
+
+
+#: `vaddrelu` is the one opcode no GEMM program issues, so nothing here
+#: reached the sequencer's dispatch arm for it -- which is how `units_isa.py`
+#: came to be missing that arm entirely with every test still green.
+#: `lift_units.py --check` is the other half of that repair.
+VECTOR_M = 2 * T
+
+
+def fused_program(fused: bool):
+    """`relu(a @ W1 + b @ W2)` written two ways: as `vadd` then `vrelu`, and
+    as the single fused `vaddrelu`. The two must agree bit for bit, and the
+    fused one is the only program in this file that issues `OP_VADDRELU`.
+
+    Region bases are derived, not typed in, for the reason
+    `isa_dsl.vector_program` gives: they only have to be distinct, non-zero and
+    in range, and `STRIDE` is the widest region one instruction here touches.
+    """
+    M = VECTOR_M
+    stride = max(M, 2 * T)
+    sp_a, sp_w = 1, 1 + stride
+    vr_1, vr_2 = 1, 1 + stride
+    ar_1, ar_2, ar_3, ar_4 = (1 + i * stride for i in range(4))
+    k = Program(f"fused {M}" if fused else f"two-step {M}")
+    k.dma_ld(src=0, dram_row=3, col_block=1, spad=sp_a, rows=M)
+    k.dma_ld(src=1, dram_row=2, col_block=2, vr=vr_2, rows=M)
+    k.dma_ld(src=1, dram_row=5, col_block=3, spad=sp_w, rows=2 * T)
+    k.vld(vr_1, sp_a, rows=M)
+    k.mm(vr_1, ar_1, sp_w, rows=M)
+    k.mm(vr_2, ar_2, sp_w + T, rows=M)
+    if fused:
+        k.vaddrelu(ar_3, ar_1, ar_2, rows=M)
+        out = ar_3
+    else:
+        k.vadd(ar_3, ar_1, ar_2, rows=M)
+        k.vrelu(ar_4, ar_3, rows=M)
+        out = ar_4
+    k.mvout(out, dram_row=0, col_block=0, rows=M)
+    return k.emit()
 
 
 def operands():
@@ -122,6 +162,32 @@ def test_the_ported_architecture_agrees_with_the_design(ported, design):
                 gemm_program if (M, K, N) == (16, 16, 16) else gemm_program_flat
             )(M, K, N, relu)
             np.testing.assert_array_equal(run(ported, program), run(design, program))
+
+
+@pytest.mark.skipif(MAXDIM // T < 4 or 5 + 2 * T > MAXDIM or 2 * VECTOR_M > MAXDIM,
+                    reason="the fused vector program's fixed shape needs a "
+                           "larger MAXDIM at this T")
+def test_the_fused_vaddrelu_arm_is_reached_and_agrees_with_the_two_step(
+        ported, design):
+    """The only test here that issues `OP_VADDRELU`.
+
+    It fails if the sequencer's dispatch arm for the opcode is missing from
+    the lifted units -- which it silently was, because every other program in
+    this file is a GEMM and no GEMM issues it.
+    """
+    fused, two_step = fused_program(True), fused_program(False)
+    expected = run(design, two_step)
+    np.testing.assert_array_equal(run(design, fused), expected)
+    np.testing.assert_array_equal(run(ported, fused), expected)
+    np.testing.assert_array_equal(run(ported, two_step), expected)
+
+
+def test_units_isa_is_what_the_ip_library_composes_to():
+    """`units_isa.py` says GENERATED -- do not edit. This is what makes that
+    true; without it the file drifted and no test could see it."""
+    from examples.tinytpu.lift_units import main as lift_main  # noqa: PLC0415
+
+    assert lift_main(["--check"]) == 0
 
 
 if __name__ == "__main__":

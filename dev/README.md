@@ -8,6 +8,10 @@ page table for what belongs here versus in `docs/source/`, and why.
 
 - `toolchains.rst` -- this host's paths, licences and env setup.
 - `fork_maintenance.rst` -- branch layout and the upstream-merge procedure.
+- `records/tinytpu/measured_negatives.rst` -- the register of changes that
+  were **tried and moved nothing**, each with the site in the source that
+  points back at it. Read it before "optimising" the DMA loop, the `wrap_io`
+  build, the RTL export layout or the reduction tree.
 - `records/` -- dated measurement records (`*.rst`) and the raw evidence
   behind TinyTPU-isa's published numbers (`records/tinytpu/`): csynth/cosim
   logs, gap-attribution results, and the CHIA harness's run evidence. Read

@@ -202,8 +202,7 @@ definition of the fourteen editable paths. The repair is validated by
 behaviour — in the paid run, four of six candidates touched files that were
 not editable at all before it.
 
-**Remaining:** `chia_runs/` still lives at the repository root (§C item 5), and
-the objective is known to be partial (the burst widening is worth zero on the
+**Remaining:** the objective is known to be partial (the burst widening is worth zero on the
 model suite at the scored configuration), which is another track's work.
 
 ---

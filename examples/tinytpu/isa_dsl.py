@@ -650,14 +650,15 @@ def vector_program(M=8):
     no `dma_ld` had written -- `check_program` caught it, but as a confusing
     rejection of a shipped test program rather than as a configuration limit:
 
-      * `M >= T`, because the `dma_ld` at spad 40 loads M rows and the third
+      * `M >= T`, because the weight `dma_ld` loads M rows and the third
         `mm` reads T weight rows from that same region. With M < T the tail is
         unwritten.
       * `MAXDIM // T >= 4`, because it names column block 3 to vary a field
         the GEMM leaves at 0. That is the constraint behind "T=8 needs
         MAXDIM >= 32".
       * room in DRAM for `dram_row=5` plus its `2 * T` rows, and in `ar` for
-        the fixed region names (80 .. 80 + M).
+        the four derived regions, whose top row is `ar_4 + M` (see STRIDE
+        below).
     """
     assert M % 2 == 0 and 2 * M <= MAXDIM
     assert M >= T, (

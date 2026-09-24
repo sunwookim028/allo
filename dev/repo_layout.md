@@ -354,3 +354,79 @@ configuration keys present and equal on both sides. Missing is `cannot pair`.
 The first run found that no model-level cycle count is pairable with any
 committed area (the exports predate `QD` being recorded) and that
 `T8_MAXDIM64`'s area is orphaned by its own re-export.
+
+## Audited 2026-09-24: what the reorganisation did NOT catch
+
+Checked file by file against the target above, after the moves landed. The
+three that did land are verified done: the design rename, the SystemC split
+(designs in `examples/systemc/`, harness in `tests/systemc/`, logs in
+`dev/records/systemc/`), and the four PD tools into
+`allo/backend/asic/tools/`. `chia_runs/` is gone from the root.
+
+What has not moved, worst first:
+
+1. **CHIA is still inside a design, and it is in two places.**
+   `examples/tinytpu/chia_agent/` is the loop the doc allots the root `chia/`,
+   and `chia_abstraction/` at the root is a second CHIA code body. Neither is
+   at `chia/`. `chia_abstraction/evidence*` and `baseline*` are records;
+   `chia_abstraction/test_abs_harness.py` and
+   `examples/tinytpu/chia_agent/test_{harness,codesign}.py` are tests.
+2. **ACT's generic core is an unjustified new root.** `act/` holds
+   `machine.py`, `mapspace.py`, `nest.py`, `schedule.py`, `search.py`,
+   `target.py`, `workload*.py`; the doc says `allo/act/`, on the
+   `allo/autoscheduler/` precedent, and `allo/act/` does not exist. The
+   TinyTPU binding (`examples/tinytpu/act_*.py`, `act/corpus/`) correctly
+   stays with the design, but `examples/tinytpu/act/{judge,spec,legality,
+   submission,calibrate,cycles,correctness,measure,variants,baseline}.py` is
+   the validation layer and the tiered judge, which is not design-specific.
+3. **`examples/tinytpu/` is mostly not a design.** Of 33 top-level files about
+   six are. Harnesses and gates (`bench_isa.py`, `stress_isa.py`, `cosim.py`,
+   `isa_ref.py`, `kpn_model.py`, `mutate.py`, `mutate_actions.py`,
+   `e2e_gate.sh`, `reproduce_codesign.sh`, `workloads/gate.py`,
+   `act/rules_test.py`, `act/rtl_hang.py`) belong in `tests/`; measurement
+   sweeps (`csynth_sweep.py`, `latency_grid.py`, `parity_sweep.py`,
+   `reduce_csynth.py`, `reduce_latency_probe.py`, `impact/`) are tooling; and
+   `export_rtl.py`, `export_gemmini_rtl.py`, `saif_capture.py` and
+   `reduce_asic.py` are PD-flow stages the doc already names
+   (`allo/backend/asic/`, since that is where the flow actually landed -- the
+   doc's `scripts/asic/export.py` is now stale).
+4. **Generated output and raw dumps sit in `examples/`.**
+   `examples/tinytpu/rtl_handoff/` and `gemmini_rtl/` are exporter output;
+   `csynth_reports/` is 21 raw Vitis `.rpt` files of the same class as
+   `dev/records/tinytpu/logs/csynth_isa_*.rpt`; `impact/probe_shared/` is half
+   of an experiment whose other half is already in
+   `dev/records/tinytpu/impact-results/`. `examples/eva/generated/` is emitted
+   SystemC, which `examples/systemc/README.md` already rules on ("output, not
+   source"); three of its files are byte-identical to the archived copies in
+   `dev/records/systemc/`.
+5. **`agents/`, `devtools/` and `playground/` have no slot at all.** `agents/`
+   is two live Allo designs plus a dated working note (its designs ->
+   `examples/`, the note -> `dev/`); `devtools/` is twelve standalone
+   introspection scripts whose own README says nothing imports them, which is
+   the `scripts/` case; `playground/` is two scripts nothing references.
+6. **A Quick start is inside a design.**
+   `examples/tinytpu/asic_synthesis/README.md` is 313 lines of flow quick
+   start and results -- the page this file has already said is owed.
+   `asic_synthesis/reports/` is also at the path the target spells
+   `examples/tinytpu/asic/reports/`.
+7. **Two working notes are on the published site.**
+   `docs/source/extensions/chia_results.rst` §"The Planned Experiments" is a
+   budget allocation for the next sessions ("$300 is authorised ... about $500
+   remains"), and `docs/source/designs/minitpu.rst` is a distillation keyed to
+   another engineer's home directory on this host. `design_space.rst` is a
+   weaker case of the same.
+8. **The published site sends readers into `dev/`.** `dev/toolchains.rst` is
+   cited as the environment reference by seven pages; the directive figures on
+   `backends/catapult.rst` live only in
+   `dev/systemc/noc/FINDINGS_wire_channel.md`;
+   `designs/gemmini_comparison.rst` rests a methodology claim on
+   `dev/paper_outline.md`; and `examples/systemc/README.md` sends readers to
+   three `dev/systemc/*.md` files as the backend guide. Either those move on
+   to the site or the pages stop depending on them.
+   `dev/systemc/dataflow_links_examples.py` is two runnable designs in `dev/`.
+
+Two things that look wrong and are not: a design's construct graph stays with
+the design (it names that design's top module), and `act/mapspace.py` versus
+`chia_agent/mapspace.py` are deliberately separate -- `docs/source/extensions/
+codesign.rst` says the co-design loop reuses ACT's interface and none of its
+code.

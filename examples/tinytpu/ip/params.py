@@ -38,8 +38,9 @@ BUS_BYTES = 64
 #: An address field carries 11 usable bits (`enc`'s spare-sign-bit rule), so the
 #: highest operand address is 2047 and the layout may name 2048 rows. At T=4
 #: that is MAXDIM <= 88 (90.5 unrounded, and MAXDIM is a multiple of T), at T=8
-#: 128; MAXDIM=96 at T=4 fails in `Assembler.check` with "AGU-resolved f3=2112
-#: is outside the 0..2047 range". isa_spec.json computes both.
+#: 128. Past that, `TpuParams.__post_init__` refuses the parameter set at
+#: construction -- MAXDIM=96 at T=4 needs 2304 operand rows -- so no assembler
+#: is ever built. isa_spec.json computes both ceilings.
 ADDRESS_FIELD_MAX = (1 << 11)
 
 
@@ -77,9 +78,11 @@ class TpuParams:
             object.__setattr__(self, "NVR", max(TEST_WINDOW, self.OPERAND_ROWS))
         if self.NAR is None:
             # `AR_C` is MAXDIM rows and `AR_P` another MAXDIM starting at
-            # MAXDIM+1, so the GEMM and vector programs need 2*MAXDIM+2; the
-            # 128 floor keeps the fixed-address test programs
-            # (`isa_dsl.vector_program` reaches row 112) legal at small MAXDIM.
+            # MAXDIM+1, so the GEMM and vector programs need 2*MAXDIM+2. The
+            # 128 floor is headroom for the test programs whose accumulator
+            # rows are typed in rather than derived -- today only
+            # `isa_dsl.ar_distance_program`, whose highest base is 60 -- so a
+            # small-MAXDIM build still runs them.
             object.__setattr__(self, "NAR",
                                max(128, TEST_WINDOW, 2 * self.MAXDIM + 8))
 

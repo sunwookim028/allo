@@ -42,18 +42,17 @@ AGU_TERMS = 3                  # address terms per instruction
 AGU_F0, AGU_F1, AGU_F2, AGU_F3 = 1, 2, 3, 4   # term targets (0 = unused)
 
 # ---- THE LAYOUT, ONCE ----
-# Every site that takes an instruction apart reads these: `enc`/`enc_agu`
-# below, `Assembler.trace`'s decoder, and `sequencer`'s bit slices, which name
-# them because a `@df.kernel` resolves a slice bound from the architecture's
-# namespace like any other name. Before the design was split, the shifts
-# appeared once because there was one file; naming them is how they still
-# appear once now that there are three.
+# The two Python sites that take an instruction apart read these: `enc` /
+# `enc_agu` below, and `Assembler.trace`'s decoder. `sequencer`'s slices are
+# written out as literals instead, because Allo cannot infer a slice's width
+# from symbolic bounds and a symbolic bound widens the slice to i32
+# (`gen_isa.py`).
 #
-# `isa-spec` generates this layout from `isa_spec.json` and checks the encoder,
-# `expand`, the header and the emitted HLS slices against it. That check is the
-# guarantee these names do not provide: one definition stops the three sites
-# DRIFTING, it does not prove any of them matches an ISA written down
-# independently.
+# `gen_isa.py` generates this layout from `isa_spec.json`, and `--check` holds
+# the encoder, `expand`, the header, the sequencer's literal slices and the
+# emitted HLS to it. That check is the guarantee these names do not provide:
+# one definition stops the sites DRIFTING, it does not prove any of them
+# matches an ISA written down independently.
 OP_LO, OP_HI = 0, 6
 F0_LO, F0_HI = 6, 18
 F1_LO, F1_HI = 18, 30

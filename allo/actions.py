@@ -19,9 +19,9 @@ What an accepted composition still rests on comes back as an
 predicate the model cannot settle, a program contract no composition can
 enforce. See ``docs/source/developer/actions.rst``.
 
-Nothing here knows about any particular machine. ``examples/accelerator/
-tinytpu_vitis`` builds a :class:`Machine` out of its ISA spec; the doc page
-builds a second one, with an adder-tree reduction unit, out of nothing at all.
+Nothing here knows about any particular machine. ``examples/tinytpu`` builds a
+:class:`Machine` out of its ISA spec; the doc page builds a second one, with an
+adder-tree reduction unit, out of nothing at all.
 """
 
 from dataclasses import dataclass, field, replace
@@ -1223,10 +1223,10 @@ def projection(architecture, machine, aggregate=None):
     implies, every one it does not, and every one the architecture implies
     that the machine has not got.
 
-    This is the measurement E1 asked for, and it is also the check: where the
-    two models DO agree, a disagreement is drift and this reports it, so the
-    second declaration stops being independent even where it cannot be
-    removed.
+    This is both the measurement of how much of a hand-written machine the
+    composed architecture already replaces, and the check on it: where the two
+    models DO agree, a disagreement is drift and this reports it, so the second
+    declaration stops being independent even where it cannot be removed.
 
     ``{unit: {"derived": [...], "only_declared": [...],
     "only_derived": [...], "grain": str or None}}``

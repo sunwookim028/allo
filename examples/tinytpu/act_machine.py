@@ -97,7 +97,7 @@ def is_control(prog):
     The sequencer fetches these and the units never see them, so `expand` drops
     them -- but the loop stack is what holds the sequencer at `SEQUENCER_II`, so
     a cost model that does not charge them undercharges a deep nest. The walk
-    mirrors `microarch_isa._trace`'s control flow and nothing else; the AGU
+    mirrors `ip/assembler.py`'s `Assembler.trace` control flow and nothing else; the AGU
     resolution stays there, and the data fetches are paired with `expand`.
     """
     pc, stack = 0, []

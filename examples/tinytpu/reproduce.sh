@@ -54,7 +54,9 @@ Stages, in order:
      `import allo` resolve to this checkout;
   1b. gen_isa.py --check -- the ISA spec's conformance check: every generated
      artefact byte-identical to isa_spec.json, and the design and the
-     reference model held to it; must print ISA OK;
+     reference model held to it; must print ISA OK. Then lift_units.py
+     --check, the same question for units_isa.py, which is generated from the
+     `ip/` units; must print UNITS OK;
   2. bench_isa.py -- the published functional sweep, must print ALL EXACT;
   3. stress_isa.py -- the correctness gate, must print STRESS OK;
   3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK, then
@@ -149,6 +151,10 @@ esac
 cd "$HERE"
 echo "== gen_isa.py --check (the ISA spec and both its consumers)"
 out=$("$PY" gen_isa.py --check | tail -1); echo "$out"; grep -q "ISA OK" <<<"$out"
+# The other generated file. Its header says "do not edit" and, until this line
+# existed, nothing enforced that: it had lost a whole opcode arm in silence.
+echo "== lift_units.py --check (units_isa.py against what ip/ composes to)"
+out=$("$PY" lift_units.py --check | tail -1); echo "$out"; grep -q "UNITS OK" <<<"$out"
 echo "== bench_isa.py (published functional setup)"
 out=$("$PY" bench_isa.py | tail -1); echo "$out"; grep -q "ALL EXACT" <<<"$out"
 echo "== stress_isa.py (correctness gate)"

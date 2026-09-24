@@ -70,7 +70,7 @@ def check_parameters():
         if v < lo or (hi is not None and v > hi):
             raise ValueError(f"{name}={v} outside the spec range {lo}..{hi}")
     if not (T >= 4):
-        raise ValueError("T >= 4: a packed operand word must hold the two 16-bit counts vru sends down wcol")
+        raise ValueError("T >= 4: a packed operand word must hold the two 16-bit counts spm sends down wcol")
     if not (MAXDIM % T == 0):
         raise ValueError("MAXDIM % T == 0: a DRAM row must be a whole number of packed words")
     if not (OPERAND_ROWS <= 2048):

@@ -96,14 +96,10 @@ def compile_order(files, top=None):
 
 
 #: Files Vitis emits beside the RTL that are DATA, not compile units: memory
-#: initialisation contents. They must travel with the design but must not go
-#: in the manifest, or the Verilog parser will choke on them. Today the only
-#: one is a four-line `.dat` for the sequencer's LOOP_DEPTH-deep `iv_now` RAM,
-#: and no emitted module references it (verified: no `$readmemh` anywhere in
-#: the export), so it is inert for a synthesis-only flow -- but it is copied
-#: rather than dropped, because "inert today" is not a property to rely on
-#: silently. An earlier version of this function filtered on `.v`/`.sv` and
-#: lost it.
+#: initialisation contents. They must travel with the design but must NOT go in
+#: the manifest, or the Verilog parser chokes on them. Filtering on `.v`/`.sv`
+#: drops them instead of copying them, which is the bug this constant exists to
+#: prevent.
 AUX_EXT = (".dat", ".mif", ".mem", ".hex", ".coe")
 
 
@@ -111,30 +107,17 @@ class ExportError(Exception):
     """An export that would have shipped something unsynthesisable."""
 
 
-#: **The operand scratchpad and the accumulator** -- the two arrays a real
-#: implementation would build out of SRAM macros. Dropping these modules from a
-#: file list leaves their instantiations as empty black boxes, so DC reports the
-#: design's LOGIC area with the memory treatment taken out of it. That figure is
-#: the only one that survives `sram_mode='none'`, and it is the one the Gemmini
-#: comparison leads with.
+#: The scratchpad and the accumulator, which the logic-only export drops so DC
+#: reports area with the memory treatment taken out. The criterion is semantic
+#: and the SAME on both sides -- drop those two, keep everything else --
+#: because a difference here is exactly what would stop the two sides being
+#: comparable; `docs/source/designs/gemmini_results.rst` states it in full and
+#: `export_gemmini_rtl.py` applies it to Gemmini. The regex is per-toolchain
+#: only because the module NAMES are.
 #:
-#: **The criterion is semantic, not syntactic, and it is the same criterion on
-#: both sides**: drop the scratchpad and the accumulator, keep everything else.
-#: `export_gemmini_rtl.py` drops `mem_ext`/`mem_0_ext` (with their `split_*`
-#: halves), which ARE Gemmini's scratchpad and accumulator and nothing else.
-#: Here that is `spad` -- one module, instantiated twice, for the scratchpad and
-#: the vector registers -- and `ar`. Everything else stays on BOTH sides: our
-#: `rbA` DMA read buffers stay because Gemmini's DMA buffering lives in
-#: `BeatMerger`/`XactTracker` as plain registers and stays; our sequencer's
-#: `ib`/`iv_now`/`lp_start`/`lp_trip` stay because Gemmini's control-path RAMs
-#: (`ram_2x147` and friends) stay.
-#:
-#: The regex is per-toolchain because the NAMES are per-toolchain -- Vitis
-#: writes `<unit>_<array>_RAM_AUTO_1R1W`, firtool writes `mem_ext` -- but what
-#: it selects is the same two arrays. A structural rule (any module declaring
-#: an array-of-reg) was rejected: it would also take Gemmini's depth-2 queue
-#: RAMs, which are flops in any implementation, and no depth threshold
-#: separates those from our depth-4 `lp_trip`.
+#: MEASURED NEGATIVE: a structural rule -- any module declaring an array of
+#: `reg` -- was tried and rejected. Entry 4 of
+#: dev/records/tinytpu/measured_negatives.rst.
 MEM_ARRAY = re.compile(r"_(spad|ar)_RAM_")
 
 #: Bits each dropped module holds, for the record that makes the two sides
@@ -143,16 +126,11 @@ _MEM_GEOM = (re.compile(r"parameter\s+AddressRange\s*=\s*(\d+)"),
              re.compile(r"parameter\s+DataWidth\s*=\s*(\d+)"))
 
 
-#: The layout, stated once because it was briefly in doubt: **flat**. Every
-#: variant directory holds `sv2v_manifest.f`, `MANIFEST.json`, `README.md` and
-#: the `.v` files side by side, with NO `rtl/` subdirectory, and the manifest
-#: entries are bare filenames that resolve relative to the manifest's own
-#: directory. All three variants have always been this shape; the only
-#: inconsistency was against a separate, now-deleted `asic/shipped_t4` export
-#: that put files under `rtl/` while still listing them bare -- two
-#: conventions that do not compose. Flat is kept because it is what is
-#: deployed and what the synthesis sessions are running against; moving it
-#: while runs are queued would buy nothing.
+#: The layout: **flat**. Every variant directory holds `sv2v_manifest.f`,
+#: `MANIFEST.json`, `README.md` and the `.v` files side by side, with no `rtl/`
+#: subdirectory, and the manifest entries are bare filenames resolving against
+#: the manifest's own directory. Do not re-lay it out while synthesis runs are
+#: queued: entry 5 of dev/records/tinytpu/measured_negatives.rst.
 RTL_SUBDIR = ""
 
 

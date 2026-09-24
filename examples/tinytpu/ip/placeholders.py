@@ -4,10 +4,10 @@
 """NOT IMPLEMENTED. Declarations for capabilities this library does not have.
 
 **Nothing here builds, and nothing here is instantiated by any architecture.**
-Every name in this module raises ``NotImplemented`` when it is used. A
-placeholder that lies about being implemented is worse than none, so these are
-declarations and legality conditions only -- an interface written down, with
-the one thing that would make it real stated beside it.
+Every ``Gap`` in this module raises ``NotBuilt`` if it is called or used as a
+unit. A placeholder that lies about being implemented is worse than none, so
+these are declarations and legality conditions only -- an interface written
+down, with the one thing that would make it real stated beside it.
 
 The gap each one stands for, the evidence that we cannot do it today and the
 ranking are in ``docs/source/designs/ip_gaps.rst``. ``tests/ip/test_ip_gaps.py``
@@ -205,7 +205,7 @@ ASIC_LEGAL_MEMORY = Gap(
               "asic_synthesis/README.md records DC refusing exactly that "
               "shape with ELAB-366 after Vitis emitted a true dual-write-port "
               "RAM still named _1R1W"),
-    real_when=("the audit in reduce_csynth.py --audit runs over every "
+    real_when=("reduce_csynth.py's audit runs over every "
                "configuration rather than over the one it synthesises, and "
                "Unit.check can see a body's array write sites -- the AST is "
                "already parsed for free_names, so this is the cheapest "

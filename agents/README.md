@@ -56,5 +56,5 @@ parameters must be annotated — an unannotated parameter silently changes how t
 lowers. The experiments that established this no longer run, and they never wrote their
 results down, so this line is the surviving record.
 
-See [`../notes/STATE.md`](../notes/STATE.md) for where this sits relative to the rest of
-the work.
+See [`../dev/SESSION_REPORT.md`](../dev/SESSION_REPORT.md) for where this sits relative
+to the rest of the work.

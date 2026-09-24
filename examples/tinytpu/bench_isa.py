@@ -37,7 +37,7 @@ from examples.tinytpu.isa_dsl import (  # noqa: E402
     gemm_program, assert_matches_handwritten,
 )
 
-# Re-exported: `act_compile`, `kpn_model`, `isa_dsl`, `stress_isa` and
+# Re-exported: `act_compile`, `kpn_model`, `isa_dsl` and
 # `tests/act/test_tinytpu.py` all import `bench_isa.SHAPES` and all mean the
 # canonical five. The definition itself is in `shapes.py`, which imports
 # nothing, so the CHIA harness (a conda env without `allo`) can read it too.
@@ -70,16 +70,14 @@ def runnable(shapes):
             if all(d % T == 0 and d <= MAXDIM for d in s)]
 
 
-# The set THIS RUN sweeps, and it is deliberately NOT called `SHAPES`.
-# `SHAPES` is re-exported and read POSITIONALLY elsewhere -- `accept.BASELINES`
-# is indexed against `shapes.NAMES`, and `act_compile`/`kpn_model`/`isa_dsl`/
-# `tests/act/test_tinytpu.py` all want the five -- so a knob that changed its
-# value would silently change what those modules measure. An earlier revision
-# of this file did exactly that.
+# The set THIS RUN sweeps. Deliberately NOT called `SHAPES`: that name is
+# re-exported and read POSITIONALLY elsewhere (the harness's baselines are
+# keyed on `shapes.NAMES`), so a knob that changed its value would silently
+# change what those modules measure.
 #
-# `runnable` is applied to BOTH sets: T is a working parameter (T=8 verifies
-# bit-exact), and at T=8 three of the five latency shapes are not multiples of
-# T. The published five survive it unchanged at T=4.
+# `runnable` is applied to BOTH sets, because T is a working parameter: at T=8
+# three of the five latency shapes are not multiples of T. The published five
+# survive it unchanged at T=4.
 SWEEP = runnable(LATENCY)
 if os.environ.get("TPU_SET") == "steady":
     SWEEP = runnable(STEADY)

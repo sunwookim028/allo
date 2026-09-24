@@ -63,6 +63,7 @@ OP_MM = TPU.architecture.parameters["OP_MM"]
 OP_MVOUT = TPU.architecture.parameters["OP_MVOUT"]
 OP_NOP = TPU.architecture.parameters["OP_NOP"]
 OP_VADD = TPU.architecture.parameters["OP_VADD"]
+OP_VADDRELU = TPU.architecture.parameters["OP_VADDRELU"]
 OP_VLD = TPU.architecture.parameters["OP_VLD"]
 OP_VRELU = TPU.architecture.parameters["OP_VRELU"]
 QD = TPU.architecture.parameters["QD"]
@@ -181,6 +182,11 @@ def sequencer(
                 c_acc.put(accu_copy)
             if op == OP_VRELU:
                 c_acc.put(resolved)
+            if op == OP_VADDRELU:
+                # Two sources, so two `accu` steps a row, as for `vadd`.
+                fused_copy: UInt(64) = resolved
+                fused_copy[54:62] = nr * 2
+                c_acc.put(fused_copy)
             if op == OP_MVOUT:
                 c_acc.put(resolved)
                 c_dst.put(resolved)
@@ -205,34 +211,20 @@ def dma_ld(
     b_rows: int32 = span_word[16:32]
 
     # One variable-length burst per matrix, covering exactly the DRAM rows the
-    # program names. Merging the two into one loop bounded by
-    # max(a_rows, b_rows) halves the burst time and was measured to move
-    # nothing -- the bursts are already hidden behind the sequencer's prefetch.
+    # program names, staged on chip. TWO MEASURED NEGATIVES guard this loop,
+    # both in dev/records/tinytpu/measured_negatives.rst -- read them before
+    # changing it:
+    #   1. merging the two bursts into one bounded by max(a_rows, b_rows)
+    #      halves the burst time and moves NO cycles;
+    #   2. the "strided costs 4x" case for staging here at all is stale. A
+    #      flat per-row `m_axi` loop now closes at II=1, so the mirror is
+    #      defended on amortising a re-read, never on burst shape.
     #
-    # THE "STRIDED COSTS 4x" JUSTIFICATION FOR STAGING IS STALE, and it is the
-    # reason this mirror exists. It was measured before `align_value(64)` and
-    # `-m_axi_max_widen_bitwidth 512` were in the build; with them gmem1/gmem2
-    # are 32 bits -- exactly one packed word at T=4 -- so a row read is one
-    # beat, Vitis emits NO `[HLS 214-115]` note for the operand ports at all
-    # (the only one left is gmem0, the 512-bit instruction port), and a flat
-    # per-row `m_axi` loop closes at `Final II = 1, Depth = 17`. Measured on
-    # `dma_ld_0_1_Pipeline_VITIS_LOOP_645_1` of a T=4 MAXDIM=16 QD=16 build
-    # on 2026-09-24, and independently in docs/source/backends/vitis.rst
-    # ("two burst loops from II=4 to II=1").
-    #
-    # So the mirror must be defended on what it still buys -- amortising
-    # re-read of a row the program names more than once -- not on burst shape.
-    # dev/records/tinytpu/big_shapes_settlement.rst has the cycle cost of
-    # removing it: +6 / 0 / -2 / -6 / +10 on the published five.
-    #
-    # The burst WIDTH is a parameter. At DMA_WORDS=1 this is the shipped loop,
-    # one packed word an iteration; above 1 each iteration reads DMA_WORDS
-    # whole words -- up to the 64-byte beat `align_value(64)` lets Vitis widen
-    # the port to -- so the burst costs a factor of DMA_WORDS fewer iterations.
-    # The `meta_for` unrolls inside a runtime loop, so the trip count stays
-    # runtime data. It is parametric rather than landed because it was found at
-    # `-m_axi_latency 0`, and a change whose whole benefit is wider bursts is
-    # exactly the kind whose advantage can grow or vanish with memory latency.
+    # DMA_WORDS is the burst width in packed words an iteration; 1 is the
+    # shipped loop, and the `meta_for` unrolls inside a runtime loop so the
+    # trip count stays runtime data. It stays a parameter rather than landing
+    # because it was found at `-m_axi_latency 0`, and a change whose whole
+    # benefit is wider bursts can grow or vanish with memory latency.
     a_onchip: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
     b_onchip: UInt(VW)[MAXDIM * WPR + DMA_WORDS]
     a_groups: int32 = (a_rows * WPR + (DMA_WORDS - 1)) // DMA_WORDS
@@ -497,7 +489,12 @@ def accu(
             step = 0
         row: int32 = step
         phase: int32 = 0
+        two_source: int32 = 0
         if op == OP_VADD:
+            two_source = 1
+        if op == OP_VADDRELU:
+            two_source = 1
+        if two_source == 1:
             row = step >> 1
             phase = step - (row << 1)
         read_row: int32 = f1 + row
@@ -506,7 +503,7 @@ def accu(
             write_row = f1 + row
         if op == OP_MVOUT:
             read_row = f0 + row
-        if op == OP_VADD:
+        if two_source == 1:
             if phase == 1:
                 read_row = f2 + row
         read_word: UInt(AW) = ar[read_row]
@@ -532,6 +529,18 @@ def accu(
                     second: int32 = read_word[32 * add_lane : 32 * (add_lane + 1)]
                     added: int32 = first + second
                     write_word[32 * add_lane : 32 * (add_lane + 1)] = added
+        elif op == OP_VADDRELU:
+            if phase == 0:
+                vadd_first = read_word
+                do_write = 0
+            else:
+                with allo.meta_for(T) as fuse_lane:
+                    held: int32 = vadd_first[32 * fuse_lane : 32 * (fuse_lane + 1)]
+                    arriving: int32 = read_word[32 * fuse_lane : 32 * (fuse_lane + 1)]
+                    fused: int32 = held + arriving
+                    if fused < 0:
+                        fused = 0
+                    write_word[32 * fuse_lane : 32 * (fuse_lane + 1)] = fused
         elif op == OP_VRELU:
             with allo.meta_for(T) as relu_lane:
                 before: int32 = read_word[32 * relu_lane : 32 * (relu_lane + 1)]

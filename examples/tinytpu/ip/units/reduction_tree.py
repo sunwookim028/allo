@@ -6,67 +6,52 @@
 The alternative to the systolic chain. ``pe`` reduces a column by handing its
 partial sum south through ``p_fwd``, so the reduction is ``T`` deep in units
 and its topology is the unit graph; this unit reduces the same lanes in
-``log2(RED_LANES)`` levels inside ONE unit, so the topology is the unit and an
-architecture chooses between them by choosing which unit it instantiates.
+``log2(RED_LANES)`` levels inside ONE unit, so the topology is the unit -- and
+an architecture chooses between them by choosing which unit it instantiates.
 
 **Rounding is a property of the two ends, not of the levels.** The interior is
 integer adders at one declared width, so the tree reassociates but does not
-round: quantise into ``RED_IN`` once, sum exactly, narrow at the consumer
-once. MiniTPU's tree instead rounds at every one of its six levels, and its
-owner costed this form at roughly -6,400 LUT and half the latency and kept
-theirs only because their references were already matched against it -- ours
-are not frozen, so this is the default and the per-level-rounding form is the
-variant (``docs/source/designs/ip_gaps.rst``, "The tree we did not build").
+round: quantise into ``RED_IN`` once, sum exactly, narrow at the consumer once.
+Instantiate it at a rounding type and that stops being true at every level.
 
-Five things are declared rather than implied, because a tree that does not
-declare them disagrees with another correct tree in the last bits and nobody
-can see why (MiniTPU's owner, who has built one -- see
-``docs/source/designs/ip_gaps.rst``):
+**Two outputs at two depths of one structure**: ``red_group`` is taken from the
+subtree roots partway up, ``red_full`` from the root -- one pass, two answers.
+Allo expresses the dataflow of two depths (two ``put`` calls in one body); it
+does not express the two *latencies*, which is a gap-table row.
 
-``RED_LANES``      the width. A power of two; ``RED_DEPTH = log2(RED_LANES)``
-                   is derived, never declared, so the two cannot disagree.
-``RED_IN``         the lane type, and ``RED_IN_BITS`` its width.
-``RED_ACC``        the type every node of the tree carries, and
-                   ``RED_ACC_BITS`` its width. The SAME width at every level:
-                   there is no widening down the tree, so an accumulator
-                   narrower than ``RED_IN_BITS + RED_DEPTH`` reassociates AND
-                   rounds, and ``legality`` refuses it.
+The parameters, because a tree that does not declare them disagrees with
+another correct tree in the last bits and nobody can see why:
+
+``RED_LANES``      the width. A power of two.
+``RED_IN``         the lane type; ``RED_IN_BITS`` is its width.
+``RED_ACC``        the type EVERY node of the tree carries, at the SAME width
+                   at every level: there is no widening down the tree.
 ``RED_GROUPS``     the leaf mapping. Input lane ``g + s * RED_GROUPS`` lands at
-                   leaf ``g * RED_GROUP_SIZE + s``, so each of the
-                   ``RED_GROUPS`` groups owns one contiguous subtree. At
-                   ``RED_GROUPS == RED_LANES`` each group is one lane and the
-                   leaves are read in lane order.
-``RED_TAP_LEVEL``  which adder level the tap comes off, and ``RED_TAP_BASE``
-                   where that level's nodes sit. Both derived from the two
-                   above, never chosen beside them.
+                   leaf ``g * RED_GROUP_SIZE + s``, so each group owns one
+                   contiguous subtree.
+``RED_TAP_LEVEL``  which adder level ``red_group`` comes off, with
+                   ``RED_TAP_BASE`` where that level's nodes sit.
 
-**Two outputs at two depths of one structure**: ``red_group`` is taken from
-the subtree roots partway up and ``red_full`` from the root. One pass, two
-answers -- which is why MiniTPU's ISA has a full reduce and a lane reduce at
-different latencies, and why the tap is worth four wires: they synthesised the
-separate lane-reduce network first and it cost 19,198 LUT against the tree's
-own 20,216, nearly doubling the reduction hardware. Allo expresses the
-dataflow of two depths (two ``put``s in one body); it does not express the two
-*latencies*, which is a gap-table row.
+``RED_DEPTH``, ``RED_GROUP_SIZE``, ``RED_TAP_LEVEL`` and ``RED_TAP_BASE`` are
+DERIVED from the ones above them, never declared beside them, and
+``reduction_tree_legality`` refuses a set that disagrees. That check lives with
+the parameters rather than in a testbench on purpose: on MiniTPU exactly one
+assertion ties the tap to the booked writeback and it is in a testbench, so
+changing the geometry moves the tap and a sequencer broadcasts a stale mid-tree
+value with nothing faulting. In a *parametrized* unit that is the likeliest way
+to ship a wrong design.
 
-``legality`` is where ``RED_TAP_BASE`` is tied to ``RED_LANES`` and
-``RED_GROUPS``. On MiniTPU exactly one assertion ties the tap to the booked
-writeback and it lives in a testbench, so changing the geometry moves the tap
-and a sequencer broadcasts a stale mid-tree value with nothing faulting. In a
-*parametrized* unit that is the likeliest way to ship a wrong design, so the
-relation lives with the parameters here.
+Two things of MiniTPU's this unit deliberately does **not** inherit: an unreset
+datapath (a 1024-sink reset net avoided, safe only because the valid and op
+pipelines are reset -- an invariant written down nowhere), and the toggling
+every cycle regardless of ``valid`` that follows from it. Here the tree is
+inside the work loop, so it runs ``n_word`` times and not once more; on the
+ASIC flow that difference is power.
 
-Exact only under ``legality``: integer adds at ``RED_ACC_BITS`` do not round,
-so with a wide enough accumulator the leaf order does not change the result
-and ``RED_GROUPS`` is purely about where the tap lands. Instantiate this at a
-rounding type and that stops being true at every one of ``RED_DEPTH`` levels.
-
-Two things of MiniTPU's this unit deliberately does **not** inherit: their
-datapath is unreset (a 1024-sink reset net avoided, safe only because the
-valid and op pipelines are reset -- an invariant written down nowhere), and it
-therefore toggles every cycle regardless of ``valid``. Here the tree is inside
-the work loop, so it runs ``n_word`` times and not once more; on the ASIC flow
-that difference is power.
+Why this form rather than MiniTPU's per-level rounding, with their own costing
+of both, is entry 7 of ``dev/records/tinytpu/measured_negatives.rst``; the full
+comparison is ``docs/source/designs/ip_gaps.rst`` ("The tree we did not
+build").
 """
 
 from __future__ import annotations

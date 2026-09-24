@@ -267,8 +267,8 @@ class Assembler:
             imem[2] spm     rows               imem[6] dma_st rows
             imem[3] vru     words              imem[7] A rows | B rows << 16
 
-        These are WORK counts, not instruction counts, with the two per-unit
-        adjustments the flattened bodies make: `spm` charges an `mm` T + 1
+        These are WORK counts, not instruction counts, with the three
+        per-unit adjustments the flattened bodies make: `spm` charges an `mm` T + 1
         iterations whatever its own row count, `accu` charges a `vadd` two
         steps per row, and a `dma_ld` goes to `spm` or to `vru` by its
         destination bit, never both.

@@ -18,6 +18,9 @@ the page, not to a new `.md` file. The fork-only pages:
 | SystemC emitter, `Wire`/`Channel` links, EVA | `docs/source/backends/systemc.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
+| TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
+| IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |
+| Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
 
 Dev notes (not published):
 
@@ -25,13 +28,10 @@ Dev notes (not published):
 | --- | --- |
 | Toolchains on this host, env, golden tests | `dev/toolchains.rst` |
 | Branch layout, upstream-merge procedure, worktrees | `dev/fork_maintenance.rst` |
-| Dated measurement records | `dev/records/` |
+| Dated measurement records, and measured negatives | `dev/records/` |
+| Target layout for designs, flows and the core package | `dev/repo_layout.md` |
 | SystemC emitter author's own notes (merged as-is) | `dev/systemc/` |
 | Session report, paper outline, ASIC handoff | `dev/` |
-| TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
-| IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |
-| Catapult SystemC flow, CHIA, ACT | `docs/source/extensions/` |
-| Dated measurement records | `docs/source/records/` |
 
 ## Quick pitfalls
 

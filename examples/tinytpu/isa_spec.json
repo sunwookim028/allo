@@ -1316,7 +1316,7 @@
       "max": null,
       "role": "SIMD width, and the array dimension: the array is T*T processing elements",
       "constraints": [
-        "T >= 4, so a packed operand word has room for the two 16-bit counts vru sends down wcol.",
+        "T >= 4, so a packed operand word has room for the two 16-bit counts spm sends down wcol.",
         "MAXDIM % T == 0, so a DRAM row is a whole number of packed words.",
         "AR_RAW_DIST <= T."
       ],
@@ -1507,7 +1507,7 @@
   "assertions": [
     {
       "expr": "T >= 4",
-      "why": "a packed operand word must hold the two 16-bit counts vru sends down wcol"
+      "why": "a packed operand word must hold the two 16-bit counts spm sends down wcol"
     },
     {
       "expr": "MAXDIM % T == 0",

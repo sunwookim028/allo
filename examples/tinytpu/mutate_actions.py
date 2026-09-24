@@ -91,20 +91,11 @@ MUTANTS = [
     ("mm_weights_one_short", "spm puts T words down wcol for an mm, not T + 1",
      lambda s: _action(s, "mm", 1).__setitem__("count", "T"),
      "spec_check"),
-    # NOT CAUGHT, and it used to be. This mutant was a `spec_check` catch
-    # while `Machine.work` charged a row's DEPENDENCY SPAN as its occupancy: a
-    # single-issue ALU pushed `vaddrelu`'s rectify into a third cycle and the
-    # work count went to 3 a row against the sequencer's 2. That catch was an
-    # artefact. A pipelined unit retires a row every `max(resource)` cycles,
-    # and `accu` reads `ar` twice a row through one port, so the accumulator's
-    # read port binds at 2 a row whether the ALU chains one lane op or two --
-    # the rectify of row r and the add of row r+1 use alternate cycles and fit
-    # a single-issue ALU exactly. Correcting the cost model
-    # (docs/source/developer/actions.rst) therefore LOST a catch, and the loss
-    # is the honest result: the ALU's width is the one hardware fact
-    # `vaddrelu` rests on that no work count can see. It is measurable against
-    # synthesis and nowhere else, which is why the port carries it and why
-    # this row now says so.
+    # NOT CAUGHT, and it used to be: correcting the Action cost model removed
+    # this catch, because the old catch was an artefact. The ALU's width is
+    # the one hardware fact `vaddrelu` rests on that no work count can see --
+    # measurable against synthesis and nowhere else. Entry 6 of
+    # dev/records/tinytpu/measured_negatives.rst has the reasoning.
     ("accu_alu_narrowed", "accu's ALU chains one lane op a step, not two -- "
                           "no work count can see it; only synthesis can",
      lambda s: _port(s, "accu", "alu").__setitem__("physical", 1),

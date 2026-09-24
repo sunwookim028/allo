@@ -1035,7 +1035,7 @@ Parameters
 
 Cross-parameter constraints, asserted by ``isa_encoding.check_parameters()``:
 
-* ``T >= 4`` -- a packed operand word must hold the two 16-bit counts vru sends down wcol
+* ``T >= 4`` -- a packed operand word must hold the two 16-bit counts spm sends down wcol
 * ``MAXDIM % T == 0`` -- a DRAM row must be a whole number of packed words
 * ``OPERAND_ROWS <= 2048`` -- an address field carries 11 usable bits, and the layout numbers its rows 0 .. OPERAND_ROWS-1, so the highest address must be <= 2047
 * ``AR_RAW_DIST <= T`` -- a T-row GEMM must satisfy the accumulator distance contract

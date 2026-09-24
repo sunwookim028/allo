@@ -191,8 +191,8 @@ def test_a_reassociating_fold_leaves_an_obligation_under_rounding():
 
 
 def test_the_structure_is_the_composed_regions_and_not_a_second_copy():
-    """E1's positive half, on the architecture where the two models' grain
-    agrees. Every unit, every channel-carrying port, every memory port and
+    """The positive half of the claim, on the architecture where the two
+    models' grain agrees. Every unit, every channel-carrying port, every memory port and
     every state of this machine is `structure(architecture())`; the only
     ports declared in `ip/reduce.py` are the two COMPUTE ports, which are
     arithmetic and which no structural declaration carries."""

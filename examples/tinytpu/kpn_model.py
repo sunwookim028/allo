@@ -5,7 +5,7 @@
 DEADLOCK REPORTING -- which the Allo simulator does not provide.
 
 Each unit is a generator yielding `('get', ch)` (and receiving the token) or
-`('put', ch, token)`, written to mirror its `df.kernel` in `microarch_isa.py`
+`('put', ch, token)`, written to mirror its unit body under `ip/units/`
 statement for statement on the channel side: the same header reads, the same
 flat row loops fetching an instruction when the row counter runs out, the same
 `spm` header word plus T weight words per `mm`, the same weight loaders and

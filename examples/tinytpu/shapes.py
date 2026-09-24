@@ -3,11 +3,16 @@
 
 """The five benchmark shapes, in order. The ONE definition.
 
-Every consumer imports this: `bench_isa`, `stress_isa`, `cosim`,
-`impact/bench_variant.py`, and -- through `chia_agent/evaluate.py`, which loads
-this file by path -- `accept.py` and `test_harness.py`. It existed in seven
-copies, and the order is load-bearing (the published cycle counts, the cosim
-summary table and `accept.BASELINES` are all read positionally against it).
+Every consumer imports this: `bench_isa`, `cosim`, `impact/bench_variant.py`,
+and -- through `chia_agent/evaluate.py`, which loads this file by path --
+`accept.py` and `test_harness.py`. It existed in seven copies.
+
+THE ORDER IS LOAD-BEARING, and the consumers that make it so are the four
+`dict(zip(ALL_SHAPES, (...)))` rows of `chia_agent/control.py`, whose tuples of
+cycle counts are positional against `evaluate.ALL_SHAPES`. Reorder `SHAPES` and
+each of those silently attributes the wrong cycle count to the wrong shape.
+(The published tables and `test_harness.BASELINE_ALL` are keyed by the "MxKxN"
+strings, so they survive a reorder; these four do not.)
 
 This module imports NOTHING, deliberately: the CHIA harness runs in a conda
 env without `allo`, so it cannot import any module that pulls the compiler in.

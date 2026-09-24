@@ -201,8 +201,8 @@ def machine(params=None, arithmetic=EXACT, leaves=None, name=None):
     * the contract the accumulator width rests on.
 
     Every one of those is a fact about behaviour, and every fact about
-    structure comes from the architecture. That is the whole of E1's positive
-    half, on the architecture where the two models' grain agrees.
+    structure comes from the architecture -- which is the positive half of the
+    claim, on the architecture where the two models' grain agrees.
     """
     p = params or ReduceParams()
     arch = architecture(p, name or "dot_tree")

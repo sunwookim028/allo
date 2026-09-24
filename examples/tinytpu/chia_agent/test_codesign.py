@@ -72,8 +72,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "8")
 #: The published design-level baseline, main @ 476a70d8: what `cosim.py` measures
 #: on `isa_dsl.gemm_program`. Kept here as a loud cross-check, NOT as the
 #: co-design control -- the co-design control is measured in the same run (k1
-#: below, and `loop.py`'s iteration 0), because `accept.py`'s `BASELINES` table
-#: is keyed on the git blob of the two spec files and prose-only edits move it.
+#: below, and `loop.py`'s iteration 0), because `control.RECORDED` is keyed on
+#: the git blobs of the editable design files and a prose-only edit moves them.
 PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
                     "16x16x8": 484, "16x16x16": 686}
 #: The CO-DESIGN baseline: the same hardware, running the best nest the frozen
