@@ -1,0 +1,8 @@
+# RTLDIR=$S/guard_experiment/<dir>, run_mulacc_xrun.sh
+xr_pe_channel                                                RESULT: PASS  pe_channel
+xr_pe_channelBREAK_DATA                                      RESULT: FAIL  pe_channelBREAK_DATA  (8/8 wrong)
+xr_pe_streamCONNECTIONS_FIFO                                 RESULT: PASS  pe_streamCONNECTIONS_FIFO
+xr_pe_streamCONNECTIONS_FIFO_BREAK_DATA                      RESULT: FAIL  pe_streamCONNECTIONS_FIFO_BREAK_DATA  (8/8 wrong)
+xr_pe_wire                                                   RESULT: FAIL  pe_wire  (8/8 wrong)
+xr_pe_wireLOCKSTEP_ACC_RST_DELAY=3                           xmelab: *E,CUVHNF (tests/systemc/rtlsim/tb_mulacc.v,87|60): Hierarchical name component lookup failed at 'tb.u_mul.mul_0_run_inst.v8_and_cse'.
+xr_pe_wireLOCKSTEP_ACC_RST_DELAY=3_BREAK_DATA                xmelab: *E,CUVHNF (tests/systemc/rtlsim/tb_mulacc.v,87|60): Hierarchical name component lookup failed at 'tb.u_mul.mul_0_run_inst.v8_and_cse'.
