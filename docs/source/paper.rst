@@ -410,10 +410,68 @@ period, a higher effort or a retarget would absorb, and a synthesis-stage
 estimate is a floor rather than an achieved frequency. The miss is stated and
 the inference refused.
 
-**The clean pair is still two runs away.** Our 1,396,966 against their 524,402
-is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
-single-variable comparison. The pair that answers the question is our
-T=8/MAXDIM=64 at QD=16 against this run, and both remain queued.
+**6.2f The matched pair, and where the difference goes.** Eleven runs under one
+flow — DC W-2024.09, FreePDK45, 3.33 ns, topographical, flatten effort 3 —
+give the comparison this section was built for. Our T=8/MAXDIM=64 at QD=16
+against Gemmini DIM=8, **logic-only, capacities matched to 2%, same library,
+same clock, same exclusion rule, both closing timing**:
+
+    2,272,572 µm²  against  524,402 µm²  —  **4.33×**
+
+**And it is not compute.** Hierarchical attribution of our logic:
+
+.. list-table::
+   :header-rows: 1
+
+   * - component
+     - µm²
+     - share of our logic
+   * - instruction-fetch adapter
+     - 697,974
+     - **30.7%**
+   * - DMA load unit
+     - 372,150
+     - 16.4%
+   * - two operand adapters
+     - 102,105 + 102,101
+     - 9.0%
+   * - output adapter
+     - 27,334
+     - 1.2%
+   * - sequencer
+     - 33,516
+     - 1.5%
+   * - **the 64-PE array**
+     - ≈ 84,700
+     - **≈ 3.7%**
+
+**The four memory-interface adapters are 40.9% of our logic, 57.3% with the DMA
+unit; the array that does the arithmetic is under 4%.** Gemmini's entire
+reader/writer/transaction path is 23,885 µm² — **6.3%** of its logic. So the
+4.33× is memory-interface mass that TileLink at this width does not produce,
+measured at matched capacity with both sides' cycles taken from the RTL that
+was synthesised. It is §6.2's finding at a second design point, and this time
+it is the headline rather than an inference.
+
+**Why the logic-only pair and not the full one, as a measurement rather than an
+argument.** The stubbed arrays are **19.8% of our full figure and 53.9% of
+theirs** — their design is far more memory-dominated once memories become
+flip-flops, so the full-design ratio of **2.49×** understates the logic
+difference by an amount that is purely an artefact of the memory treatment.
+Together with §6.2e's *same change, two ways*, that is the whole case for
+quoting logic-only, and neither half of it is an opinion about which component
+matters.
+
+**Two numbers deliberately not claimed**, because each would mix two compiler
+commits:
+
+- **+62.7% for T=4 to T=8 logic-only.** It compares a QD=16 export against a
+  QD=8 one, so it *bounds* the cost of doubling T rather than measuring it. A
+  clean figure needs both variants emitted from one commit.
+- **+14.2% between the two T=8 full runs as the price of channel depth.** Same
+  defect, and it bounds from above — while the FPGA reports **+0.9% flip-flops**
+  for that same pair, which is the third instance of the FPGA resource table
+  understating what standard cells charge.
 
 **Two methodological points are now settled on evidence rather than argument.**
 First, the exclusion of our instruction-fetch adapter: **no cells inside the
