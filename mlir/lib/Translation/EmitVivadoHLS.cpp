@@ -1727,7 +1727,11 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
 
     unsigned elementIdx = 0;
     for (auto element : denseAttr.getValues<Attribute>()) {
-      if (type.isF32()) {
+      // Any float NARROWER than f64 -- f32, but also f16 and bf16, whose
+      // spellings (`half`, `allo_bfloat16`) both construct from a float and
+      // round-trip a widened value exactly. Testing isF32() alone sent f16 and
+      // bf16 initializers to the "unsupported element type" arm below.
+      if (llvm::isa<FloatType>(type) && !type.isF64()) {
         auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
         emitFloatArrayElement(value);
@@ -2541,7 +2545,11 @@ void allo::hls::VhlsModuleEmitter::emitConstant(arith::ConstantOp op) {
 
     unsigned elementIdx = 0;
     for (auto element : denseAttr.getValues<Attribute>()) {
-      if (type.isF32()) {
+      // Any float NARROWER than f64 -- f32, but also f16 and bf16, whose
+      // spellings (`half`, `allo_bfloat16`) both construct from a float and
+      // round-trip a widened value exactly. Testing isF32() alone sent f16 and
+      // bf16 initializers to the "unsupported element type" arm below.
+      if (llvm::isa<FloatType>(type) && !type.isF64()) {
         auto value =
             llvm::dyn_cast<FloatAttr>(element).getValue().convertToFloat();
         emitFloatArrayElement(value);
@@ -3455,7 +3463,8 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
 
       unsigned elementIdx = 0;
       for (auto element : denseAttr.getValues<Attribute>()) {
-        if (type.isF32()) {
+        // See emitGlobal: any float narrower than f64, not just f32.
+        if (llvm::isa<FloatType>(type) && !type.isF64()) {
           auto value =
               llvm::cast<FloatAttr>(element).getValue().convertToFloat();
           emitFloatArrayElement(value);
