@@ -1,0 +1,794 @@
+//  Catapult Ultra Synthesis 2024.2/1130128 (Production Release) Mon Aug 26 21:59:12 PDT 2024
+//  
+//          Copyright (c) Siemens EDA, 1996-2024, All Rights Reserved.
+//                        UNPUBLISHED, LICENSED SOFTWARE.
+//             CONFIDENTIAL AND PROPRIETARY INFORMATION WHICH IS THE
+//                   PROPERTY OF SIEMENS EDA OR ITS LICENSORS.
+//  
+//  Running on Linux sk3463@zhang-21.ece.cornell.edu:2042041 4.18.0-553.126.1.el8_10.x86_64 x86_64 aol
+//  
+//  Package information: SIFLIBS v27.2_0.0, HLS_PKGS v27.2_0.0, 
+//                       SIF_TOOLKITS v27.2_0.0, SIF_XILINX v27.2_0.0, 
+//                       SIF_ALTERA v27.2_0.0, CCS_LIBS v27.2_0.0, 
+//                       CDS_PPRO v2024.1_3, CDS_DesignChecker v2024.2, 
+//                       CDS_OASYS v21.1_3.1, CDS_PSR v24.1_0.20, 
+//                       DesignPad v2.78_1.0, DesignAnalyzer 2024.2/1129066
+//  
+# Connected to license server 1717@en-license-05.coecis.cornell.edu (LIC-13)
+# Catapult product license successfully checked out, elapsed time 00:01 (LIC-14)
+dofile ./run_xc.tcl
+# > options set Input/CppStandard c++11
+# c++11
+# > project new
+# > flow package require /SCVerify
+# 10.4
+# > flow package option set /SCVerify/USE_QUESTASIM false
+# false
+# > flow package option set /SCVerify/USE_NCSIM true
+# true
+# > flow package require /NCSim
+# 8.2
+# > flow package option set /NCSim/NC_ROOT /opt/cadence/XCELIUM2403
+# /opt/cadence/XCELIUM2403
+# > flow package require /LowPower
+# 99
+# > flow package option set /LowPower/SWITCHING_ACTIVITY_TYPE saif
+# saif
+# > flow package option set /SCVerify/USE_CCS_BLOCK true
+# true
+# > solution file add ./mac.cpp
+# /INPUTFILES/1
+# > solution file add ./mac_tb.cpp -exclude true
+# /INPUTFILES/2
+# > go compile
+# Info: Starting transformation 'analyze' on solution 'solution.v1' (SOL-8)
+# Creating project directory 'Catapult/'. (PRJ-1)
+# Moving session transcript to file "catapult.log"
+# Front End called with arguments: -- mac.cpp (CIN-69)
+# Edison Design Group C++/C Front End - Version 6.6 (CIN-1)
+# $PROJECT_HOME/mac.cpp(3): Pragma 'hls_design<top>' detected on routine 'mac' (CIN-6)
+# Source file analysis completed (CIN-68)
+# Info: Completed transformation 'analyze' on solution 'solution.v1': elapsed time 1.54 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Starting transformation 'compile' on solution 'mac.v1' (SOL-8)
+# Generating synthesis internal form... (CIN-3)
+# $PROJECT_HOME/mac.cpp(4): Found top design routine 'mac' specified by directive (CIN-52)
+# $PROJECT_HOME/mac.cpp(4): Synthesizing routine 'mac' (CIN-13)
+# $PROJECT_HOME/mac.cpp(4): Inlining routine 'mac' (CIN-14)
+# $PROJECT_HOME/mac.cpp(4): Optimizing block '/mac' ... (CIN-4)
+# $PROJECT_HOME/mac.cpp(4): INOUT port 'a' is only used as an input. (OPT-10)
+# $PROJECT_HOME/mac.cpp(4): INOUT port 'b' is only used as an input. (OPT-10)
+# $PROJECT_HOME/mac.cpp(4): INOUT port 'out' is only used as an output. (OPT-11)
+# $PROJECT_HOME/mac.cpp(6): Loop '/mac/core/for' iterated at most 16 times. (LOOP-2)
+# Design 'mac' was read (SOL-1)
+# Makefile for Original Design + Testbench written to file './scverify/Verify_orig_cxx_osci.mk'
+# Info: CDesignChecker Shell script written to 'Catapult/mac.v1/CDesignChecker/design_checker.sh'
+# Info: Completed transformation 'compile' on solution 'mac.v1': elapsed time 1.07 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'compile': Total ops = 12, Real ops = 3, Vars = 5 (SOL-21)
+# > solution library add nangate-45nm_beh
+# > directive set -CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# /CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# > go assembly
+# Info: Starting transformation 'libraries' on solution 'mac.v1' (SOL-8)
+# Info: Please set ComponentLibs/TechLibSearchPath to enable flows that use downstream synthesis tools (LIB-220)
+# Reading component library '$MGC_HOME/pkgs/siflibs/mgc_busdefs.lib' [mgc_busdefs]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/stdops.lib' [STDOPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/fpops.lib' [FPOPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_dw_ops.lib' [CCS_DW_OPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_ioport.lib' [ccs_ioport]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/mgc_ioport.lib' [mgc_ioport]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/cds_assert/assert_ops.lib' [ASSERT_OPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/cds_assert/assert_mods.lib' [assert_mods]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_connections.lib' [ccs_connections]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/nangate/nangate-45nm_beh.lib' [nangate-45nm_beh]... (LIB-49)
+# Warning: Component library 'nangate-45nm_beh' created with a newer version of Catapult Library Builder, 2025.1/1129627 > 2024.2/1130128 (LIB-83)
+# Info: Completed transformation 'libraries' on solution 'mac.v1': elapsed time 0.36 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'libraries': Total ops = 12, Real ops = 3, Vars = 5 (SOL-21)
+# Info: Starting transformation 'assembly' on solution 'mac.v1' (SOL-8)
+# Info: Completed transformation 'assembly' on solution 'mac.v1': elapsed time 0.07 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'assembly': Total ops = 13, Real ops = 4, Vars = 7 (SOL-21)
+# > go extract
+# Info: Starting transformation 'loops' on solution 'mac.v1' (SOL-8)
+# $PROJECT_HOME/mac.cpp(6): Loop '/mac/core/for' is left rolled. (LOOP-4)
+# $PROJECT_HOME/mac.cpp(4): Loop '/mac/core/main' is left rolled. (LOOP-4)
+# Info: Completed transformation 'loops' on solution 'mac.v1': elapsed time 0.05 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'loops': Total ops = 19, Real ops = 4, Vars = 10 (SOL-21)
+# Info: Starting transformation 'memories' on solution 'mac.v1' (SOL-8)
+# $PROJECT_HOME/mac.cpp(4): I/O-Port Resource '/mac/a:rsc' (from var: a) mapped to 'ccs_ioport.ccs_in' (size: 128). (MEM-2)
+# $PROJECT_HOME/mac.cpp(4): I/O-Port Resource '/mac/b:rsc' (from var: b) mapped to 'ccs_ioport.ccs_in' (size: 128). (MEM-2)
+# $PROJECT_HOME/mac.cpp(4): I/O-Port Resource '/mac/out:rsc' (from var: out) mapped to 'ccs_ioport.ccs_out' (size: 24). (MEM-2)
+# Info: Completed transformation 'memories' on solution 'mac.v1': elapsed time 0.05 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'memories': Total ops = 21, Real ops = 4, Vars = 10 (SOL-21)
+# Info: Starting transformation 'cluster' on solution 'mac.v1' (SOL-8)
+# Info: Completed transformation 'cluster' on solution 'mac.v1': elapsed time 0.01 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'cluster': Total ops = 21, Real ops = 4, Vars = 10 (SOL-21)
+# Info: Starting transformation 'architect' on solution 'mac.v1' (SOL-8)
+# Design 'mac' contains '6' real operations. (SOL-11)
+# Warning: Extrapolation detected. Script 'Catapult/mac.v1/adjust_char_library.tcl' generated. (LIB-142)
+# Info: Completed transformation 'architect' on solution 'mac.v1': elapsed time 0.07 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'architect': Total ops = 59, Real ops = 6, Vars = 14 (SOL-21)
+# Info: Starting transformation 'allocate' on solution 'mac.v1' (SOL-8)
+# Performing concurrent resource allocation and scheduling on '/mac/core' (CRAAS-1)
+# Info: Select qualified components for data operations ... (CRAAS-3)
+# Info: Apply resource constraints on data operations ... (CRAAS-4)
+# $PROJECT_HOME/mac.cpp(6): Prescheduled LOOP '/mac/core/for' (1 c-steps) (SCHD-7)
+# $PROJECT_HOME/mac.cpp(4): Prescheduled LOOP '/mac/core/main' (2 c-steps) (SCHD-7)
+# $PROJECT_HOME/mac.cpp(4): Prescheduled LOOP '/mac/core/core:rlp' (0 c-steps) (SCHD-7)
+# $PROJECT_HOME/mac.cpp(4): Prescheduled SEQUENTIAL '/mac/core' (total length 18 c-steps) (SCHD-8)
+# Info: $PROJECT_HOME/mac.cpp(4): Initial schedule of SEQUENTIAL '/mac/core': Latency = 16, Area (Datapath, Register, Total) = 2066.06, 185.14, 2251.20 (CRAAS-11)
+# At least one feasible schedule exists. (CRAAS-9)
+# Info: $PROJECT_HOME/mac.cpp(4): Final schedule of SEQUENTIAL '/mac/core': Latency = 16, Area (Datapath, Register, Total) = 681.90, 185.14, 867.04 (CRAAS-12)
+# Resource allocation and scheduling done. (CRAAS-2)
+# Netlist written to file 'schedule.gnt' (NET-4)
+# Info: Completed transformation 'allocate' on solution 'mac.v1': elapsed time 0.08 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'allocate': Total ops = 59, Real ops = 6, Vars = 14 (SOL-21)
+# Info: Starting transformation 'schedule' on solution 'mac.v1' (SOL-8)
+# Performing concurrent resource allocation and scheduling on '/mac/core' (CRAAS-1)
+# Global signal 'a:rsc.dat' added to design 'mac' for component 'a:rsci' (LIB-3)
+# Global signal 'b:rsc.dat' added to design 'mac' for component 'b:rsci' (LIB-3)
+# Global signal 'out:rsc.dat' added to design 'mac' for component 'out:rsci' (LIB-3)
+# Global signal 'a.triosy.lz' added to design 'mac' for component 'a.triosy:obj' (LIB-3)
+# Global signal 'b.triosy.lz' added to design 'mac' for component 'b.triosy:obj' (LIB-3)
+# Global signal 'out.triosy.lz' added to design 'mac' for component 'out.triosy:obj' (LIB-3)
+# Report written to file 'cycle.rpt'
+# Info: Completed transformation 'schedule' on solution 'mac.v1': elapsed time 0.98 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'schedule': Total ops = 92, Real ops = 6, Vars = 28 (SOL-21)
+# Info: Starting transformation 'dpfsm' on solution 'mac.v1' (SOL-8)
+# Performing FSM extraction... (FSM-1)
+# Info: Completed transformation 'dpfsm' on solution 'mac.v1': elapsed time 0.08 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'dpfsm': Total ops = 89, Real ops = 16, Vars = 31 (SOL-21)
+# Info: Starting transformation 'instance' on solution 'mac.v1' (SOL-8)
+# Netlist written to file 'schematic.nlv' (NET-4)
+# Info: Completed transformation 'instance' on solution 'mac.v1': elapsed time 0.12 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'instance': Total ops = 83, Real ops = 14, Vars = 77 (SOL-21)
+# Info: Starting transformation 'extract' on solution 'mac.v1' (SOL-8)
+# Report written to file 'rtl.rpt'
+# Generating scverify_top.cpp
+# Generating SCVerify ccs_wrapper_mac.vhdl
+# Netlist written to file 'rtl.vhdl' (NET-4)
+# generate concat
+# order file name is: rtl.vhdl_order.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/mgc_io_sync_v2.vhd
+# Add dependent file: ./rtl.vhdl
+# Finished writing concatenated file: Catapult/mac.v1/concat_rtl.vhdl
+# order file name is: rtl.vhdl_order_sim.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/mgc_io_sync_v2.vhd
+# Add dependent file: ./rtl.vhdl
+# Finished writing concatenated simulation file: Catapult/mac.v1/concat_sim_rtl.vhdl
+# Generating SCVerify testbench files
+# Makefile for RTL VHDL output 'rtl.vhdl' vs Untimed C++ written to file './scverify/Verify_rtl_vhdl_ncsim.mk'
+# Makefile for Concat RTL VHDL output 'concat_sim_rtl.vhdl' vs Untimed C++ written to file './scverify/Verify_concat_sim_rtl_vhdl_ncsim.mk'
+# Generating SCVerify ccs_wrapper_mac.v
+# Netlist written to file 'rtl.v' (NET-4)
+# generate concat
+# order file name is: rtl.v_order.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/mgc_io_sync_v2.v
+# Add dependent file: ./rtl.v
+# Finished writing concatenated file: Catapult/mac.v1/concat_rtl.v
+# order file name is: rtl.v_order_sim.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/mgc_io_sync_v2.v
+# Add dependent file: ./rtl.v
+# Finished writing concatenated simulation file: Catapult/mac.v1/concat_sim_rtl.v
+# Makefile for RTL Verilog output 'rtl.v' vs Untimed C++ written to file './scverify/Verify_rtl_v_ncsim.mk'
+# Makefile for Concat RTL Verilog output 'concat_sim_rtl.v' vs Untimed C++ written to file './scverify/Verify_concat_sim_rtl_v_ncsim.mk'
+# Info: Completed transformation 'extract' on solution 'mac.v1': elapsed time 2.71 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'extract': Total ops = 83, Real ops = 14, Vars = 31 (SOL-21)
+# > directive set USE_MODES {test}
+# /USE_MODES test
+# > directive set /USE_MODES/test/PWR_CLOCK_MODE {{clk default}}
+# /USE_MODES/test/PWR_CLOCK_MODE {{clk default}}
+# > directive set /USE_MODES/test/PWR_OPT_WEIGHT 1.0
+# /USE_MODES/test/PWR_OPT_WEIGHT 1.0
+# > go switching
+# Info: Starting transformation 'prototyping' on solution 'mac.v1' (SOL-8)
+# Info: Completed transformation 'prototyping' on solution 'mac.v1': elapsed time 0.02 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'prototyping': Total ops = 83, Real ops = 14, Vars = 31 (SOL-21)
+# Info: Starting transformation 'switching' on solution 'mac.v1' (SOL-8)
+# Generating scverify_top_prepwr.cpp
+# Generating SCVerify ccs_wrapper_mac.vhdl
+# Netlist written to file 'prepwr_mac.vhdl' (NET-4)
+# Makefile for prepwr VHDL output 'prepwr_mac.vhdl' vs Untimed C++ written to file './scverify/Verify_prepwr_mac_vhdl_ncsim.mk'
+# Warning: No PWR_TB_CONFIG value is set by User hence INVOKE_ARGS value will be used for Mode: test
+flow run /SCVerify/launch_make scverify/Verify_prepwr_mac_vhdl_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_vhdl/test.saif CCS_VCD_TIMES= {}
+# Making './scverify/Verify_prepwr_mac_vhdl_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_vhdl/test.saif CCS_VCD_TIMES= {}'
+# Make utility invoked from 'Catapult/mac.v1'
+#     /opt/siemens/catapult/2024.2/Mgc_home/bin/make -f ./scverify/Verify_prepwr_mac_vhdl_ncsim.mk INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_vhdl/test.saif CCS_VCD_TIMES= build < "/dev/null" (BASIC-15)
+# /opt/siemens/catapult/2024.2/Mgc_home/shared/include/mkfiles/ccs_ncsim.mk:308: Warning: Applying the gcc option for the C++11 language standard
+# ============================================
+# Creating simulation directory 'scverify/prepwr_mac_vhdl_ncsim'
+# mkdir -p scverify/prepwr_mac_vhdl_ncsim
+# echo "include /opt/cadence/XCELIUM2403/tools/inca/files/cds.lib" >scverify/prepwr_mac_vhdl_ncsim/cds.lib
+# echo "define work worklib" >scverify/prepwr_mac_vhdl_ncsim/hdl.var
+# mkdir -p scverify/prepwr_mac_vhdl_ncsim/mgc_hls
+# echo "define mgc_hls ./mgc_hls" >>scverify/prepwr_mac_vhdl_ncsim/cds.lib
+# mkdir -p scverify/prepwr_mac_vhdl_ncsim/work
+# echo "define work ./work" >>scverify/prepwr_mac_vhdl_ncsim/cds.lib
+# ============================================
+# Compiling VHDL file: prepwr_mac_ccs_in_v1.vhd
+# xmvhdl -work mgc_hls -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var -v93 -linedebug prepwr_mac_ccs_in_v1.vhd
+# xmvhdl(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling VHDL file: prepwr_mac_ccs_out_v1.vhd
+# xmvhdl -work mgc_hls -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var -v93 -linedebug prepwr_mac_ccs_out_v1.vhd
+# xmvhdl(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling VHDL file: prepwr_mac_mgc_io_sync_v2.vhd
+# xmvhdl -work mgc_hls -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var -v93 -linedebug prepwr_mac_mgc_io_sync_v2.vhd
+# xmvhdl(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling VHDL file: prepwr_mac.vhdl
+# xmvhdl -work work -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var -v93 -linedebug prepwr_mac.vhdl
+# xmvhdl(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling VHDL file: scverify/ccs_wrapper_mac.vhdl
+# xmvhdl -work work -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var -v93 -linedebug scverify/ccs_wrapper_mac.vhdl
+# xmvhdl(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling C++ file: ../../mac.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mac.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADLO
+# CK_DETECTION -std=gnu++11 " ../../mac.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mac.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADLOCK
+# _DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  ../../mac.cpp
+# ============================================
+# Compiling C++ file: ../../mac_tb.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mac_tb.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEA
+# DLOCK_DETECTION -std=gnu++11 " ../../mac_tb.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mac_tb.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADL
+# OCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  ../../mac_tb.cpp
+# ============================================
+# Compiling C++ file: scverify/mc_testbench.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mc_testbench.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY
+#  -DDEADLOCK_DETECTION -std=gnu++11 " scverify/mc_testbench.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_vhdl_ncsim/mc_testbench.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -
+# DDEADLOCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  scverify/mc_testbench.cpp
+# ============================================
+# Compiling C++ file: scverify/scverify_top_prepwr.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar scverify/prepwr_mac_vhdl_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_vhdl_ncsim/scverify_top_prepwr.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPU
+# TS_ONLY -DDEADLOCK_DETECTION -std=gnu++11 " scverify/scverify_top_prepwr.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_vhdl_ncsim/scverify_top_prepwr.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VHDL  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS
+# _ONLY -DDEADLOCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  scverify/scverify_top_prepwr.cpp
+# ============================================
+# Linking executable
+# /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ scverify/prepwr_mac_vhdl_ncsim/mac.cpp.cxxts.o scverify/prepwr_mac_vhdl_ncsim/mac_tb.cpp.cxxts.o scverify/prepwr_mac_vhdl_ncsim/mc_testbench.cpp.cxxts.o scverify/prepwr_mac_vhdl_ncsim/scverify_top_prepwr.cpp.cxxts.o -Wl,-G  -shared   -L/opt/cadence/XCELIUM2403/tools/lib/64bit -L/opt/cadence/XCELIUM2403/tools/tbsc/lib/64bit -L/opt/cadence/XCELIUM2403/tools/tbsc/lib/64bit/gnu -ltbsc -lscv -L/opt/cadence/XCELIUM2403/tools/systemc/lib/64bit/gnu -lsystemc_sh -lxmscCoSim_sh -lxmscCoroutines_sh -lxmsctlm2_sh   -o scverify/prepwr_mac_vhdl_ncsim/libscverify_top.so
+# ============================================
+# Elaborating design
+# cd ../..; xmelab +tb_rc_dir+./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim +tb_run_dir+. +tb_trans_record -access +R  -log ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/ncelab.log  -work work  -cdslib ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/hdl.var -loadsc ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/libscverify_top.so  scverify_top
+# xmelab(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# 
+# Info: CCS_CLK_CTOR: Clock 'clk' - Using default clock period '5 ns'
+# ============================================
+# Creating NCSim TCL file 'scverify/prepwr_mac_vhdl_ncsim/scverify_ncsim_gui.tcl' from 'scverify/ccs_wave_signals.dat'
+# /opt/siemens/catapult/2024.2/Mgc_home/bin/tclsh8.5 /opt/siemens/catapult/2024.2/Mgc_home/pkgs/sif/userware/En_na/flows/app_ncsim.flo create_ncsim_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat scverify/prepwr_mac_vhdl_ncsim/scverify_ncsim_gui.tcl ./Catapult/mac.v1/.dut_inst_info.tcl  0
+# app_ncsim.flo - Executing command 'create_ncsim_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat scverify/prepwr_mac_vhdl_ncsim/scverify_ncsim_gui.tcl ./Catapult/mac.v1/.dut_inst_info.tcl 0'...
+# Wrote NCSim waveform creation script to 'scverify/prepwr_mac_vhdl_ncsim/scverify_ncsim_gui.tcl'
+#     /opt/siemens/catapult/2024.2/Mgc_home/bin/make -f ./scverify/Verify_prepwr_mac_vhdl_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_vhdl/test.saif CCS_VCD_TIMES= (BASIC-14)
+# Warning: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/mkfiles/ccs_ncsim.mk:308: Warning: Applying the gcc option for the C++11 language standard
+# ============================================
+# Simulating design entity: scverify_top to produce Switching Activity File: Catapult/mac.v1/switching_vhdl/test.saif
+# cd ../..; xmsim   -log ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/sim.log  +tb_rc_dir+./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim +tb_run_dir+. +tb_trans_record -input ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/scverify_ncsim_gui.tcl  -cdslib ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/cds.lib -hdlvar ./Catapult/mac.v1/scverify/prepwr_mac_vhdl_ncsim/hdl.var scverify_top
+# xmsim(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# 
+# The SystemC(r) Code included in this Product is Copyright  1996 - 2016 by all Contributors.  All rights reserved.
+# 
+# The SystemC Code included in this Product has been modified by Cadence Design Systems, Inc. and CoWare, Inc. All such modifications are Copyright (c) 2004-2016 Cadence Design Systems, Inc. and Copyright (c) 2004 CoWare, Inc.  All Rights Reserved.
+# 
+# SystemC(r) is a registered trademark of Accellera Systems Initiative, Inc. in the United States and other countries and is used with permission.
+# 
+# 
+# Info: CCS_CLK_CTOR: Clock 'clk' - Using default clock period '5 ns'
+# Disabling STALL_FLAG toggling
+# xcelium> # Source static function file
+# xcelium> global env
+# xcelium> # Source the common TCL file (that also reads the wave database file)
+# xcelium> source $env(MGC_HOME)/pkgs/sif/userware/En_na/flows/ncsim_funcs.tcl
+# xcelium> read_ccs_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat
+# Reading SCVerify waveform database './Catapult/mac.v1/scverify/ccs_wave_signals.dat'
+# xcelium> setup_vcd_file ./Catapult/mac.v1/.dut_inst_info.tcl
+# DUT Instance Path = scverify_top.rtl.dut_inst
+# Preparing to write SAIF file Catapult/mac.v1/switching_vhdl/test.saif...
+# SDI2 Transaction Recording API Version 24.03-s005
+# 
+# Info: TRANSACTION_RECORDING_BEGUN: file = Catapult/mac.v1/switching_vhdl/test.saif.shm
+# xcelium> 
+# xcelium> populate_wave_window
+# xcelium> 
+# xcelium> if { ("0" != {}) && [file exists "0"] } {
+# >    source "0"
+# > }
+# xcelium> # If not running in GUI mode, run the entire simulation
+# xcelium> if { ![gui_is_active] } {
+# >    do_simulation_run
+# > }
+# Turning VCD on
+# run
+# SCVerify intercepting C++ function 'mac' for RTL block 'mac'
+# 
+# Info: HW reset: TLS_rst active @ 0 s
+# MAC TB errors=0
+# Info: Execution of user-supplied C++ testbench 'main()' has completed @ 17737500 ps with exit code = 0
+# 
+# Info: Collecting data completed
+#    captured 200 values of a
+#    captured 200 values of b
+#    captured 200 values of out
+# 
+# Info: scverify_top.user_tb: Simulation completed
+# 
+# Checking results
+# 'out'
+#    capture count        = 200
+#    comparison count     = 200
+#    ignore count         = 0
+#    error count          = 0
+#    stuck in dut fifo    = 0
+#    stuck in golden fifo = 0
+# 
+# 
+# Info: scverify_top.user_tb: Simulation PASSED @ 18008500 ps
+# 
+# 
+# SC simulation stopped by user.
+# 
+# SystemC : SystemC stopped at time 18008500
+# 
+# Info: scverify_top.Monitor: runs with constant clock period 5 ns
+# 
+# Info: scverify_top.Monitor: Throughput: 1 transaction per 90 ns
+# 
+# Info: scverify_top.Monitor: Latency: 90 ns
+# Turning VCD off and flushing
+# Using simvisdbutil to convert SHM to VCD
+# Using vcd2saif to convert VCD to SAIF
+# VCD to SAIF translator version E-2010.12-SP5 Synopsys, Inc.
+# direct mapping all VCD instances
+# processing header of VCD file: Catapult/mac.v1/switching_vhdl/test.saif.vcd
+# processing value changes of VCD file: Catapult/mac.v1/switching_vhdl/test.saif.vcd
+# generating backward SAIF file: Catapult/mac.v1/switching_vhdl/test.saif
+# xcelium> exit
+# Info: SCVerify complete for use mode test
+# Generating SCVerify ccs_wrapper_mac.v
+# Netlist written to file 'prepwr_mac.v' (NET-4)
+# Makefile for prepwr Verilog output 'prepwr_mac.v' vs Untimed C++ written to file './scverify/Verify_prepwr_mac_v_ncsim.mk'
+# Warning: No PWR_TB_CONFIG value is set by User hence INVOKE_ARGS value will be used for Mode: test
+flow run /SCVerify/launch_make scverify/Verify_prepwr_mac_v_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_v/test.saif CCS_VCD_TIMES= {}
+# Making './scverify/Verify_prepwr_mac_v_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_v/test.saif CCS_VCD_TIMES= {}'
+# Make utility invoked from 'Catapult/mac.v1'
+#     /opt/siemens/catapult/2024.2/Mgc_home/bin/make -f ./scverify/Verify_prepwr_mac_v_ncsim.mk INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_v/test.saif CCS_VCD_TIMES= build < "/dev/null" (BASIC-15)
+# /opt/siemens/catapult/2024.2/Mgc_home/shared/include/mkfiles/ccs_ncsim.mk:308: Warning: Applying the gcc option for the C++11 language standard
+# ============================================
+# Creating simulation directory 'scverify/prepwr_mac_v_ncsim'
+# mkdir -p scverify/prepwr_mac_v_ncsim
+# echo "include /opt/cadence/XCELIUM2403/tools/inca/files/cds.lib" >scverify/prepwr_mac_v_ncsim/cds.lib
+# echo "define work worklib" >scverify/prepwr_mac_v_ncsim/hdl.var
+# mkdir -p scverify/prepwr_mac_v_ncsim/work
+# echo "define work ./work" >>scverify/prepwr_mac_v_ncsim/cds.lib
+# ============================================
+# Compiling Verilog file: prepwr_mac_ccs_in_v1.v
+# xmvlog -work work -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var -linedebug    prepwr_mac_ccs_in_v1.v
+# xmvlog(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling Verilog file: prepwr_mac_ccs_out_v1.v
+# xmvlog -work work -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var -linedebug    prepwr_mac_ccs_out_v1.v
+# xmvlog(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling Verilog file: prepwr_mac_mgc_io_sync_v2.v
+# xmvlog -work work -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var -linedebug    prepwr_mac_mgc_io_sync_v2.v
+# xmvlog(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling Verilog file: prepwr_mac.v
+# xmvlog -work work -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var -linedebug    prepwr_mac.v
+# xmvlog(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling Verilog file: scverify/ccs_wrapper_mac.v
+# xmvlog -work work -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var -linedebug    scverify/ccs_wrapper_mac.v
+# xmvlog(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# ============================================
+# Compiling C++ file: ../../mac.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_v_ncsim/mac.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADLOCK_DET
+# ECTION -std=gnu++11 " ../../mac.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_v_ncsim/mac.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADLOCK
+# _DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  ../../mac.cpp
+# ============================================
+# Compiling C++ file: ../../mac_tb.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_v_ncsim/mac_tb.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADLOCK_
+# DETECTION -std=gnu++11 " ../../mac_tb.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_v_ncsim/mac_tb.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEADL
+# OCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  ../../mac_tb.cpp
+# ============================================
+# Compiling C++ file: scverify/mc_testbench.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_v_ncsim/mc_testbench.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -DDEA
+# DLOCK_DETECTION -std=gnu++11 " scverify/mc_testbench.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_v_ncsim/mc_testbench.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONLY -
+# DDEADLOCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  scverify/mc_testbench.cpp
+# ============================================
+# Compiling C++ file: scverify/scverify_top_prepwr.cpp
+# xmsc  -COMPILER /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -cdslib scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar scverify/prepwr_mac_v_ncsim/hdl.var  -CFLAGS " -fPIC -o scverify/prepwr_mac_v_ncsim/scverify_top_prepwr.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS_ONL
+# Y -DDEADLOCK_DETECTION -std=gnu++11 " scverify/scverify_top_prepwr.cpp
+# xmsc(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# xmsc: /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -fPIC -o scverify/prepwr_mac_v_ncsim/scverify_top_prepwr.cpp.cxxts.o -I./scverify -I. -I../.. -I./scverify -I. -I../.. -I/opt/cadence/XCELIUM2403/tools/systemc/include -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -I/opt/siemens/catapult/2024.2/Mgc_home/shared/include -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/src -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs -I/opt/siemens/catapult/2024.2/Mgc_home/pkgs/hls_pkgs/mgc_comps_src -DNCSC -DXMSC -c -x c++ -Wall -Wno-unknown-pragmas -Wno-deprecated -DCCS_SCVERIFY_USE_CCS_BLOCK -DCCS_DUT_RTL -DCCS_DUT_POWER -DCCS_DUT_VERILOG  -DCCS_SCVERIFY -DSC_INCLUDE_DYNAMIC_PROCESSES -DSC_USE_STD_STRING -DTOP_HDL_ENTITY=mac -DCCS_DESIGN_FUNC_mac -DCCS_DESIGN_TOP_mac -DCCS_MISMATCHED_OUTPUTS
+# _ONLY -DDEADLOCK_DETECTION -std=gnu++11  -DNCSC -DCADENCE  -DLNX86 -D_GLIBCXX_USE_CXX11_ABI=1 -I/opt/cadence/XCELIUM2403/tools/systemc/include_pch/64bit  -I/opt/cadence/XCELIUM2403/tools/systemc/include/tlm2 -I/opt/cadence/XCELIUM2403/tools/systemc/include/cci -I/opt/cadence/XCELIUM2403/tools/tbsc/include -I/opt/cadence/XCELIUM2403/tools/vic/include -c -Wall  scverify/scverify_top_prepwr.cpp
+# Info: Running transformation 'switching' on solution 'mac.v1': elapsed time 1.11 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-15)
+# ============================================
+# Linking executable
+# /opt/cadence/XCELIUM2403/tools/cdsgcc/gcc/install/bin/g++ scverify/prepwr_mac_v_ncsim/mac.cpp.cxxts.o scverify/prepwr_mac_v_ncsim/mac_tb.cpp.cxxts.o scverify/prepwr_mac_v_ncsim/mc_testbench.cpp.cxxts.o scverify/prepwr_mac_v_ncsim/scverify_top_prepwr.cpp.cxxts.o -Wl,-G  -shared   -L/opt/cadence/XCELIUM2403/tools/lib/64bit -L/opt/cadence/XCELIUM2403/tools/tbsc/lib/64bit -L/opt/cadence/XCELIUM2403/tools/tbsc/lib/64bit/gnu -ltbsc -lscv -L/opt/cadence/XCELIUM2403/tools/systemc/lib/64bit/gnu -lsystemc_sh -lxmscCoSim_sh -lxmscCoroutines_sh -lxmsctlm2_sh   -o scverify/prepwr_mac_v_ncsim/libscverify_top.so
+# ============================================
+# Elaborating design
+# cd ../..; xmelab +tb_rc_dir+./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim +tb_run_dir+. +tb_trans_record -access +R  -log ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/ncelab.log  -work work  -cdslib ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/hdl.var -loadsc ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/libscverify_top.so  scverify_top
+# xmelab(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# 
+# Info: CCS_CLK_CTOR: Clock 'clk' - Using default clock period '5 ns'
+# ============================================
+# Creating NCSim TCL file 'scverify/prepwr_mac_v_ncsim/scverify_ncsim_gui.tcl' from 'scverify/ccs_wave_signals.dat'
+# /opt/siemens/catapult/2024.2/Mgc_home/bin/tclsh8.5 /opt/siemens/catapult/2024.2/Mgc_home/pkgs/sif/userware/En_na/flows/app_ncsim.flo create_ncsim_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat scverify/prepwr_mac_v_ncsim/scverify_ncsim_gui.tcl ./Catapult/mac.v1/.dut_inst_info.tcl  0
+# app_ncsim.flo - Executing command 'create_ncsim_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat scverify/prepwr_mac_v_ncsim/scverify_ncsim_gui.tcl ./Catapult/mac.v1/.dut_inst_info.tcl 0'...
+# Wrote NCSim waveform creation script to 'scverify/prepwr_mac_v_ncsim/scverify_ncsim_gui.tcl'
+#     /opt/siemens/catapult/2024.2/Mgc_home/bin/make -f ./scverify/Verify_prepwr_mac_v_ncsim.mk sim INVOKE_ARGS= CCS_VCD_FILE=Catapult/mac.v1/switching_v/test.saif CCS_VCD_TIMES= (BASIC-14)
+# Warning: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/mkfiles/ccs_ncsim.mk:308: Warning: Applying the gcc option for the C++11 language standard
+# ============================================
+# Simulating design entity: scverify_top to produce Switching Activity File: Catapult/mac.v1/switching_v/test.saif
+# cd ../..; xmsim   -log ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/sim.log  +tb_rc_dir+./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim +tb_run_dir+. +tb_trans_record -input ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/scverify_ncsim_gui.tcl  -cdslib ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/cds.lib -hdlvar ./Catapult/mac.v1/scverify/prepwr_mac_v_ncsim/hdl.var scverify_top
+# xmsim(64): 24.03-s005: (c) Copyright 1995-2024 Cadence Design Systems, Inc.
+# 
+# The SystemC(r) Code included in this Product is Copyright  1996 - 2016 by all Contributors.  All rights reserved.
+# 
+# The SystemC Code included in this Product has been modified by Cadence Design Systems, Inc. and CoWare, Inc. All such modifications are Copyright (c) 2004-2016 Cadence Design Systems, Inc. and Copyright (c) 2004 CoWare, Inc.  All Rights Reserved.
+# 
+# SystemC(r) is a registered trademark of Accellera Systems Initiative, Inc. in the United States and other countries and is used with permission.
+# 
+# 
+# Info: CCS_CLK_CTOR: Clock 'clk' - Using default clock period '5 ns'
+# Disabling STALL_FLAG toggling
+# xcelium> # Source static function file
+# xcelium> global env
+# xcelium> # Source the common TCL file (that also reads the wave database file)
+# xcelium> source $env(MGC_HOME)/pkgs/sif/userware/En_na/flows/ncsim_funcs.tcl
+# xcelium> read_ccs_wave ./Catapult/mac.v1/scverify/ccs_wave_signals.dat
+# Reading SCVerify waveform database './Catapult/mac.v1/scverify/ccs_wave_signals.dat'
+# xcelium> setup_vcd_file ./Catapult/mac.v1/.dut_inst_info.tcl
+# DUT Instance Path = scverify_top.rtl.dut_inst
+# Preparing to write SAIF file Catapult/mac.v1/switching_v/test.saif...
+# SDI2 Transaction Recording API Version 24.03-s005
+# 
+# Info: TRANSACTION_RECORDING_BEGUN: file = Catapult/mac.v1/switching_v/test.saif.shm
+# xcelium> 
+# xcelium> populate_wave_window
+# xcelium> 
+# xcelium> if { ("0" != {}) && [file exists "0"] } {
+# >    source "0"
+# > }
+# xcelium> # If not running in GUI mode, run the entire simulation
+# xcelium> if { ![gui_is_active] } {
+# >    do_simulation_run
+# > }
+# Turning VCD on
+# run
+# SCVerify intercepting C++ function 'mac' for RTL block 'mac'
+# 
+# Info: HW reset: TLS_rst active @ 0 s
+# MAC TB errors=0
+# Info: Execution of user-supplied C++ testbench 'main()' has completed @ 17737500 ps with exit code = 0
+# 
+# Info: Collecting data completed
+#    captured 200 values of a
+#    captured 200 values of b
+#    captured 200 values of out
+# 
+# Info: scverify_top.user_tb: Simulation completed
+# 
+# Checking results
+# 'out'
+#    capture count        = 200
+#    comparison count     = 200
+#    ignore count         = 0
+#    error count          = 0
+#    stuck in dut fifo    = 0
+#    stuck in golden fifo = 0
+# 
+# 
+# Info: scverify_top.user_tb: Simulation PASSED @ 18008500 ps
+# 
+# 
+# SC simulation stopped by user.
+# 
+# SystemC : SystemC stopped at time 18008500
+# 
+# Info: scverify_top.Monitor: runs with constant clock period 5 ns
+# 
+# Info: scverify_top.Monitor: Throughput: 1 transaction per 90 ns
+# 
+# Info: scverify_top.Monitor: Latency: 90 ns
+# Turning VCD off and flushing
+# Using simvisdbutil to convert SHM to VCD
+# Using vcd2saif to convert VCD to SAIF
+# VCD to SAIF translator version E-2010.12-SP5 Synopsys, Inc.
+# direct mapping all VCD instances
+# processing header of VCD file: Catapult/mac.v1/switching_v/test.saif.vcd
+# processing value changes of VCD file: Catapult/mac.v1/switching_v/test.saif.vcd
+# generating backward SAIF file: Catapult/mac.v1/switching_v/test.saif
+# xcelium> exit
+# Info: SCVerify complete for use mode test
+# Info: Completed transformation 'switching' on solution 'mac.v1': elapsed time 1.21 seconds, memory usage 1282724kB, peak memory usage 1282724kB (SOL-9)
+# Info: Design complexity at end of 'switching': Total ops = 83, Real ops = 14, Vars = 31 (SOL-21)
+# > flow run /PowerAnalysis/report_pre_pwropt_Verilog
+# Warning: No PWR_TB_CONFIG value is set by User hence INVOKE_ARGS value will be used for Mode: test
+# Setting the currently running product to PowerPro Analyzer. (APP-SCP)
+#      License file:  1717@en-license-05.coecis.cornell.edu
+#      Checked out license features:PProBase PProAnalysis PProCGopt PProWriteRTL PProPAWorker
+# Warning: Cannot setup the path to the Questa tool for this PowerPro release. To setup the path, add the Questa directory parallel to the PowerPro release directory or set its path in the 'PPRO_QUESTA_HOME' environment variable, and try again. (PPRO-GSNF)
+# Warning: Cannot setup the path to the Visualizer tool for this PowerPro release because it will not invoke the Visualizer GUI in the 'show_analyzer' command. To setup the path, add the Visualizer directory parallel to the PowerPro release directory or set its path in the 'PPRO_VISUALIZER_HOME' environment variable, and try again. (PPRO-GSNF)
+# -1
+# 
+# Setting the operating condition 'typical' from the library 'NangateOpenCellLibrary' as the active 'operating_condition' for the design. Specifying the values for process as '1', temperature as '25' and voltage as '1.1'. Use the 'set_operating_condition' command to explicitly specify the default operating condition. (PPRO-SOC)
+# Library "/opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/nangate/nangate45nm_nldm.lib" read successfully. (CDBL-LRS)
+# PowerPro process is using 62 MB, peak 98 MB, and 1 seconds [+7MB, +27MB, +1s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# Info: Reading file './prepwr_mac_ccs_in_v1.v' into library 'work'
+# Please refer to calypto_pre_pwropt_v_test/build_design.log for a comprehensive list of messages and warnings issued in build_design. These may provide hints for debugging issues (if any) related to performance, potential out of bound accesses etc. (UI-BDLM)
+# 
+#                   (Subsequent repetitions of this message will be suppressed.
+#                    Use 'enable_msg UI-BDLM' to show all repetitions.)
+# 
+# Reading design files into the 'work' design library. (CPT-RDF)
+# PowerPro process is using 100 MB, peak 104 MB, and 1 seconds [+38MB, +6MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# Info: Reading file './prepwr_mac_ccs_out_v1.v' into library 'work'
+# Reading design files into the 'work' design library. (CPT-RDF)
+# PowerPro process is using 100 MB, peak 104 MB, and 1 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# Info: Reading file './prepwr_mac_mgc_io_sync_v2.v' into library 'work'
+# Reading design files into the 'work' design library. (CPT-RDF)
+# PowerPro process is using 100 MB, peak 104 MB, and 1 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# Info: Reading file './prepwr_mac.v' into library 'work'
+# Reading design files into the 'work' design library. (CPT-RDF)
+# PowerPro process is using 100 MB, peak 105 MB, and 1 seconds [+0MB, +1MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# Linking the 'work' design library. (CPT-LDF)
+# RTL design files dump enabled. (CPT-RDFD)
+# PowerPro process is using 80 MB, peak 106 MB, and 1 seconds [-22MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# PowerPro process is using 80 MB, peak 106 MB, and 1 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# 1
+# 
+# Synthesizing the 'work' design library. (CPT-STN)
+# Setting 'mac' as the top module of the 'work' design library. (CDB-STH)
+# Finished synthesizing the 'work' design library. (CPT-FBD)
+# PowerPro process is using 79 MB, peak 106 MB, and 1 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# 
+# Setting the operating condition 'typical' from the library 'NangateOpenCellLibrary' as the active 'operating_condition' for the design. Specifying the values for process as '1', temperature as '25' and voltage as '1.1'. Use the 'set_operating_condition' command to explicitly specify the default operating condition. (PPRO-SOC)
+# Storing constraint for command 'set_wire_load_mode', to be applied later in the flow. (PPRO-WLCS)
+# Storing constraint for command 'set_wire_load_model', to be applied later in the flow. (PPRO-WLCS)
+# Created a clock with name 'clk' on port 'clk'. (STA-SCCOP)
+# Info: Top RTL instance path 'scverify_top/rtl/dut_inst' determined from reading SAIF file (Type1)
+# Catapult/mac.v1
+# Summary for Automatic CGIC Find And Replacement. (CDB-ACR)
+#                   --------------------------------------------------------------
+#                  No. of Pos_edge CGIC Patterns Identified          :        0        
+#                  No. of Neg_edge CGIC Patterns Identified          :        0        
+#                  Total no. of CGIC Patterns Identified             :        0        
+#                  No. of Successfully Replaced CGIC Patterns with Calypto CGIC are:        0        
+#                  No. of Dissolved Hiers are                        :        0        
+#                  No. of Replaced CGIC Patterns(which are not separate hier):        0        
+#                   --------------------------------------------------------------
+# Reading SAIF File : "Catapult/mac.v1/switching_v/test.saif". (PA-PRSF)
+# Start instance in Saif file : scverify_top.rtl.dut_inst. Start design instance : Top Level Module (PA-PSSIN)
+#  (PA-RSS)
+#                   ------------------------------------------------------------
+#                   Total Primary Inputs/Inouts            : 258 (100%)
+#                   Asserted Primary Inputs/Inouts         : 258 (100%)
+#                   ------------------------------------------------------------
+#                   Total Flop Outputs                     : 55 (100%)
+#                   Asserted Flop Outputs                  : 55 (100%)
+#                   Asserted Flop Clock Ports              : 55 (100%)
+#                   Total CGIC Output Ports                : 0 (0%)
+#                   Asserted CGIC Output Ports             : 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Memories                         : 0 (0%)
+#                   Memories With All Inputs Asserted      : 0 (0%)
+#                   Memories With All Outputs Asserted     : 0 (0%)
+#                   Memories With All Clock Ports Asserted : 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Data Path Operators                    : 2 (100%)
+#                   Total Data Path Operators with Any Input User Net : 2 (100%)
+#                   Data Path Operators With All Inputs Asserted : 2 (100%)
+#                   Total Data Path Operators with Any Output User Net: 2 (100%)
+#                   Data Path Operators With All Outputs Asserted: 2 (100%)
+#                   ------------------------------------------------------------
+#                   Total IO Pad Cells                    : 0 (0%)
+#                   IO Pad Cells With All Inputs Asserted : 0 (0%)
+#                   IO Pad Cells With All Outputs Asserted: 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Nets                             : 494 (100%)
+#                   User Nets                              : 351 (71.05%)
+#                   Asserted User Nets                     : 351 (100%)
+#                   ------------------------------------------------------------
+# 
+# Clock tree fanout is set to 16. (PPRO-CCTFV)
+# Clock tree final_buffer_fanout is set to 32. (PPRO-CCTFV)
+# Clock tree root_buffer_fanout is set to 8. (PPRO-CCTFV)
+# Clock tree buffer is set to CLKBUF_X3. (PPRO-CCTFV)
+# Clock tree final_buffer is set to CLKBUF_X3. (PPRO-CCTFV)
+# Clock tree root_buffer is set to CLKBUF_X3. (PPRO-CCTFV)
+# Clock tree configuration is saved for power analysis. (PPRO-CTC)
+# 2024.1_3
+# 
+# Info: Report Power PPRO VERSION '2024.1_3'
+# Prototyping 'mac'. (PPRO-SGO)
+# PowerPro process is using 89 MB, peak 122 MB, and 1 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:07 2026 (UI-STATS)
+# Setting wireload_mode to top, previously it was none. (PPRO-SWLM)
+# Flops marked with the dont-optimize constraint: 0(0.00%) (PPRO-FWDO)
+# Signals marked with the stability dont-use constraint: 0(0.00%) Signals marked with the observability dont-use constraint: 0(0.00%) (PPRO-SWDU)
+# Total "0" 2-Flop synchronizers found in design. (SCHEME-TSF)
+#  (PA-SAAS)
+#                   ------------------------------------------------------------
+#                   Total Primary (Final) Inputs/Inouts            : 258 (100%)
+#                   Asserted Primary (Final) Inputs/Inouts         : 258 (100%)
+#                   ------------------------------------------------------------
+#                   Total Flop Outputs                     : 55 (100%)
+#                   Asserted (Final) Flop Outputs                  : 55 (100%)
+#                   Asserted (Final) Flop Clock Ports              : 55 (100%)
+#                   Total CGIC Output Ports                : 0 (0%)
+#                   Asserted (Final) CGIC Output Ports             : 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Memories                         : 0 (0%)
+#                   Memories (Final) With All Inputs Asserted      : 0 (0%)
+#                   Memories (Final) With All Outputs Asserted     : 0 (0%)
+#                   Memories (Final) With All Clock Ports Asserted : 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Data Path Operators                    : 2 (100%)
+#                   Total Data Path Operators with Any Input User Net : 2 (100%)
+#                   Data Path Operators (Final) With All Inputs Asserted : 2 (100%)
+#                   Total Data Path Operators with Any Output User Net: 2 (100%)
+#                   Data Path Operators (Final) With All Outputs Asserted: 2 (100%)
+#                   ------------------------------------------------------------
+#                   Total IO Pad Cells                    : 0 (0%)
+#                   IO Pad Cells (Final) With All Inputs Asserted : 0 (0%)
+#                   IO Pad Cells (Final) With All Outputs Asserted: 0 (0%)
+#                   ------------------------------------------------------------
+#                   Total Nets                             : 468 (100%)
+#                   User Nets                              : 372 (79.49%)
+#                   Asserted (Final) User Nets                     : 372 (100%)
+#                   ------------------------------------------------------------
+# 
+# Finished prototyping. (PPRO-EGO)
+# Design statistics after prototyping are as follows: (PPRO-GSF)
+# 
+#  (PPRO-PST)
+#                   --------------------------------------------------------------
+#                   Total Flops (including Tech Latches)             :     55         
+#                   Total Flops                                      :     55(100%)   
+#                   Total Data Latches                               :      0(0.00%)  
+#                   Always ON Flops                                  :     31(56.36%) 
+#                   Enabled Flops                                    :     24(43.64%) 
+#                       Combinational Enabled Flops                  :     24(43.64%) 
+#                       CGIC Enabled Flops                           :      0(0.00%)  
+#                       Both Combinational and CGIC Enabled Flops    :      0(0.00%)  
+#                   Clock Gating Efficiency                          :        41.19%   
+#                   --------------------------------------------------------------
+# 
+# Total number of dead flops are: 0. (PPRO-NODF)
+# Warning: Total number of flops with efficiency in the range of [90.00% - 94.99%]: 24(43.64%). (PPRO-SCEF)
+# Warning: Total number of flops with efficiency in the range of [95.00% - 98.99%]: 0(0%). (PPRO-SCEF)
+# Warning: Total number of flops with efficiency in the range of [99.00% - 99.99%]: 0(0%). (PPRO-SCEF)
+# Warning: Total number of flops with efficiency 100%: 0(0%). (PPRO-SFEFC)
+# Design characteristics can be viewed from: 'Catapult/mac.v1/calypto_pre_pwropt_v_test/characteristics.log' (PPRO-GDSF)
+# Information about register arrays, gray boxes, data latches and dead flops can be viewed from: 'Catapult/mac.v1/calypto_pre_pwropt_v_test/detail_characteristics.log' (PPRO-GDC)
+# { Stage PROTO_SEQ_POWER START_RUNTIME } { Stats 'PowerPro process is using 102 MB, peak 122 MB, and 2 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:08 2026' } (PPRO-SSSIA)
+# Starting memory, register and sequential power computation. (PA-ISPC)
+# Number of clock-gated flip-flops during power estimation : 24 (43.64%) (OPT-ENGF)
+# Finished memory, register and sequential power computation. (PA-SPCD)
+# { Stage PROTO_SEQ_POWER END_RUNTIME } { Stats 'PowerPro process is using 103 MB, peak 122 MB, and 2 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:08 2026' } (PPRO-SSSIA)
+# PowerPro process is using 103 MB, peak 122 MB, and 2 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:08 2026 (UI-STATS)
+# 
+# Writing verification script 'Catapult/mac.v1/calypto_pre_pwropt_v_test/self_verify/self_verify_script.tcl'. (PPRO-WSSB)
+# The debugging information for the stage "prototype_design" has been written to the "Catapult/mac.v1/calypto_pre_pwropt_v_test/opt_technician.log" file. To see hints for debugging your setup at respective stages, refer the log file. (PPRO-OTRD)
+# PowerPro process is using 104 MB, peak 122 MB, and 2 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:09 2026 (UI-STATS)
+# 
+# Starting memory, register and sequential power computation. (PA-ISPC)
+# Scaling factors for cell leakage power in the .lib file are missing or have a '0' value. Leakage power numbers will be used as-is. (PA-NLSF)
+# 
+#                   (Subsequent repetitions of this message will be suppressed.
+#                    Use 'enable_msg PA-NLSF' to show all repetitions.)
+# 
+# Finished clock tree synthesis for 'mac'. (PPRO-CTSF)
+# Finished memory, register and sequential power computation. (PA-SPCD)
+# Starting combinational power computation. (PA-ICPC)
+# Finished combinational power computation. (PA-CPCD)
+# Generating power summary report. (PPRO-PES)
+# +-----------------------------------------------------------------------------------+
+# |                                                                                   |
+# | Generated by PowerPro-2024.1_3/1120889  (Jul 18 2024)  linux64  P2407181612       |
+# | on Thu Sep 24 12:55:09 2026.                                                      |
+# |                                                                                   |
+# | This document may be used and distributed without restriction provided that       |
+# | this copyright statement is not removed from the file and that any derivative     |
+# | work contains this copyright notice.                                              |
+# |                                                                                   |
+# +-----------------------------------------------------------------------------------+
+# 
+# Library(s) Used:
+#   NangateOpenCellLibrary
+# 
+# 
+# Operating Conditions    : typical
+# Wireload Mode           : top
+#   ---------------------------------------------------------------------------------------------------------------------------
+#   Design                    | Target Libraries        | Voltage | Wireload Model  | Library for Wireload | VTH Distribution 
+#   ---------------------------------------------------------------------------------------------------------------------------
+#   mac                         All                       1.1       1K_hvratio_1_4    NangateOpenCellLibrary                                                    
+#   mac_core_inst.mac_mac_core  All                       1.1       1K_hvratio_1_4    NangateOpenCellLibrary                                                    
+# 
+#   ---------------------------------------------------------------------------------------------------------------------------
+# 
+# Global Operating Voltage = 1.1
+# Power-specific unit information:
+#   Voltage Units         = 1V
+#   Capacitance Units     = 1ff
+#   Time Units            = 1ns
+#   Switching Power Units = 1uW
+#   Dynamic Power Units   = 1uW
+#   Leakage Power Units   = 1uW
+# 
+# Scaling Factor :
+#   N/A
+# 
+# 
+# Power Group Description: 
+#   ----------------------------------------------------------------------------------------------------
+#   Power Group           |  Description
+#   ----------------------------------------------------------------------------------------------------
+#   io_pad                |  Specifies power consumption for all input-output pads in the design.
+#   memory                |  Specifies power consumption for all identified memory objects.
+#   black_box             |  Specifies power consumption for all black box objects.
+#   register              |  Specifies power consumption for all flop and data latch objects.
+#   combinational         |  Specifies power consumption for all combinational gate objects which
+#                         |  are not part of clock network.
+#   sequential            |  Specifies power consumption for all CGIC and clock network latch objects 
+#                         |  (only if global pa_clock_network_include_cgics is set as 0).
+#   clock_network         |  Specifies power consumption for all objects which are part of clock 
+#                         |  network. CGIC and latch power is excluded if global pa_clock_network_include_cgics 
+#                         |  is set as 0.
+#   total                 |  Specifies the total power of the design.
+#   ----------------------------------------------------------------------------------------------------
+# 
+# Power Summary Report
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Power Group    Count          Leakage Power(uW)     Internal Power(uW)    Switching Power(uW)   Total Power(uW)       Percentage(%)  
+# -------------------------------------------------------------------------------------------------------------------------------------
+# io_pad         0              0                     0                     0                     0                     0%             
+# memory         0              0                     0                     0                     0                     0%             
+# black_box      0              0                     0                     0                     0                     0%             
+# register       55             4.20606               47.729                1.11248               53.0475               52.36%         
+# combinational  485            13.2037               2.81387               12.2193               28.2368               27.87%         
+# sequential     0              0                     0                     0                     0                     0%             
+# clock_network  3              0.105572              5.154                 14.7708               20.0304               19.77%         
+# total          543            17.5153               55.6968               28.1026               101.315               100%           
+# 
+# PowerPro process is using 105 MB, peak 122 MB, and 2 seconds [+0MB, +0MB, +0s] @ Thu Sep 24 12:55:09 2026 (UI-STATS)
+# 
+# report_hierarchical_power_rek:
+# '' -- 101.31
+#   'mac_core_inst' -- 100.91
+#     'mac_core_inst.mac_core_core_fsm_inst' -- 4.04
+#     'mac_core_inst.out_triosy_obj' -- 0.00
+#     'mac_core_inst.b_triosy_obj' -- 0.00
+#     'mac_core_inst.a_triosy_obj' -- 0.00
+#     'mac_core_inst.out_rsci' -- 0.00
+#     'mac_core_inst.b_rsci' -- 0.00
+#     'mac_core_inst.a_rsci' -- 0.00
+# Report written to file 'Catapult/mac.v1/power.rpt'
+# > exit
