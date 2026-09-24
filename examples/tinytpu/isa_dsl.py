@@ -87,7 +87,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 from examples.tinytpu.microarch_isa import (  # noqa: E402
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
     OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
-    OP_VRELU, enc, enc_agu,
+    OP_VADDRELU, OP_VRELU, enc, enc_agu,
     A_VR, AR_C, B_SP, DMA_SRC_B, DMA_TO_VR, MAXDIM, MAXROWS, T,
     SPAD_ROWS, NVR, NAR,
 )
@@ -238,6 +238,10 @@ class Program:
 
     def vrelu(self, ar_d, ar_s, rows):
         self._ins(OP_VRELU, ar_d, ar_s, nr=rows)
+
+    def vaddrelu(self, ar_d, ar_s1, ar_s2, rows):
+        """`vadd` then `vrelu`, in one pass of the accumulator."""
+        self._ins(OP_VADDRELU, ar_d, ar_s1, ar_s2, nr=rows)
 
     def mvout(self, ar, dram_row=0, col_block=0, rows=0):
         """Accumulator -> DRAM, clipped to int8 on the way."""

@@ -10,6 +10,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | Extending Allo's abstractions: the standard, ranked gaps, `Encoding` | `docs/source/developer/extending_allo.rst` |
 | `@df.unit` stream ports, the netlist rules, the deadlock obligation | `docs/source/developer/stream_ports.rst` |
 | Allo limitations register (items 1-24, A-H), repros in `tests/limits/` | `docs/source/developer/limitations.rst` |
+| Actions: an instruction as composed unit effects, and what `compose` implies | `docs/source/developer/actions.rst` |
 | Simulator vs csim vs cosim semantics | `docs/source/developer/dataflow_semantics.rst` |
 | `@df.region()` pitfalls | `docs/source/developer/pitfalls.rst` |
 | Vitis: `align_value`, cosim, binutils fix | `docs/source/backends/vitis.rst` |

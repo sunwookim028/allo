@@ -26,13 +26,13 @@ from examples.tinytpu.microarch_isa import (  # noqa: E402
 from examples.tinytpu.ip.isa import OPCODE_NAMES  # noqa: E402
 from examples.tinytpu.act import spec as spec_mod  # noqa: E402
 from examples.tinytpu.isa_encoding import (  # noqa: E402
-    FIELDS, HEADER_TERMS, usable_max,
+    FIELDS, HEADER_WORK, usable_max,
 )
 
 # The two encoding ceilings these rules quote, from the generated spec module
 # rather than typed out: what a header count can promise a unit, and what an
 # AGU-resolved operand field can address.
-COUNT_BITS = min(hi - lo for _, (lo, hi), _, _ in HEADER_TERMS)
+COUNT_BITS = min(hi - lo for _, (lo, hi), _, _ in HEADER_WORK)
 COUNT_MAX = usable_max(COUNT_BITS)
 FIELD_MAX = usable_max(dict((n, w) for n, _, w in FIELDS)["f3"]) + 1
 

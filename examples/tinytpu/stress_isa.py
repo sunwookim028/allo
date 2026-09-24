@@ -252,7 +252,7 @@ def random_program(seed):
         if s1 is None:
             return False
         d = place("ar", n)
-        if op == "vadd":
+        if op in ("vadd", "vaddrelu"):
             reads = [(r, t) for i in range(n)
                      for r, t in ((s1 + i, 2 * i), (s2 + i, 2 * i + 1))]
             writes, n_it = [(d + i, 2 * i + 1) for i in range(n)], 2 * n
@@ -270,6 +270,8 @@ def random_program(seed):
             return False
         if op == "vadd":
             k.vadd(d, s1, s2, rows=n)
+        elif op == "vaddrelu":
+            k.vaddrelu(d, s1, s2, rows=n)
         else:
             k.vrelu(d, s1, rows=n)
         accu_commit(writes, n_it)
@@ -303,7 +305,7 @@ def random_program(seed):
     while not mm():
         dma_ld()
     ops = [dma_ld, vld, mm, lambda: vec("vadd"), lambda: vec("vrelu"),
-           mvout, mvout_loop]
+           lambda: vec("vaddrelu"), mvout, mvout_loop]
     budget = ri(8, MAX_STATIC - 4)
     while len(k.words) < budget:
         ops[int(rng.integers(0, len(ops)))]()
