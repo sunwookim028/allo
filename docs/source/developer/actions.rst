@@ -177,6 +177,21 @@ The distinction also repairs a refusal: ``Unit(elastic=False)`` used to be
 refused when a row's *latency* exceeded its ``ii``, which is exactly what a
 pipelined unit is. It is now refused when its *rate* does.
 
+**And it cost a catch, which is the more interesting half.**
+``mutate_actions.py`` declares ``accu``'s ALU one lane operation a step
+instead of two -- the single hardware fact ``vaddrelu`` rests on -- and
+``gen_isa.py --check`` used to catch it: a single-issue ALU pushed the
+rectify into a third cycle and the work count went to 3 a row against the
+sequencer's 2. That catch was an **artefact of the defect**. A pipelined unit
+retires a row every ``max(resource)`` cycles, and ``accu`` reads ``ar`` twice
+a row through one port, so the read port binds at 2 a row either way: the
+rectify of row *r* and the add of row *r+1* take alternate cycles and fit a
+single-issue ALU exactly. Correcting the cost model therefore **lost** a
+static catch and gained nothing back, and the mutant table now says so in its
+own row rather than quietly dropping to fourteen. A checker that is
+conservative in the wrong place catches more than it is entitled to, and some
+of what it catches it has no right to.
+
 A lane count belongs to the channel
 ===================================
 
@@ -220,13 +235,15 @@ more than one ``into``, each with its own ``at``; it has not been made.
 **Six wrong declarations out of fifteen are invisible to every static
 check.** ``mutate_actions.py`` breaks one action of one instruction in a
 sandbox copy of the spec and asks which level notices: 5 are refused by the
-rule when the machine is built, 4 move a work count and are caught by
-``gen_isa.py --check``, and **6 are caught only by running a program on the
+rule when the machine is built, 3 move a work count and are caught by
+``gen_isa.py --check``, **6 are caught only by running a program on the
 hardware** -- a source declared as the other source, a subtract for an add, a
 fused instruction without its rectify, an accumulate read that loses its
 predicate, a load that ignores its column block, a store to the wrong DRAM
-row. The model verifies composition, not arithmetic, and the port projection
-added here does not change that split: none of the six touches a port.
+row -- and **one is caught by nothing static at all** (the ALU's width,
+above). The model verifies composition, not arithmetic, and the port
+projection added here does not change that split: none of the six touches a
+port. The split was 5 / 4 / 6 before the cost model was corrected.
 
 **A derived port is one read and one write port.** ``structure()`` gives
 every array a single read and a single write port, and a fully partitioned

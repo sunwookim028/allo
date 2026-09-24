@@ -91,9 +91,24 @@ MUTANTS = [
     ("mm_weights_one_short", "spm puts T words down wcol for an mm, not T + 1",
      lambda s: _action(s, "mm", 1).__setitem__("count", "T"),
      "spec_check"),
-    ("accu_alu_narrowed", "accu's ALU chains one lane op a step, not two",
+    # NOT CAUGHT, and it used to be. This mutant was a `spec_check` catch
+    # while `Machine.work` charged a row's DEPENDENCY SPAN as its occupancy: a
+    # single-issue ALU pushed `vaddrelu`'s rectify into a third cycle and the
+    # work count went to 3 a row against the sequencer's 2. That catch was an
+    # artefact. A pipelined unit retires a row every `max(resource)` cycles,
+    # and `accu` reads `ar` twice a row through one port, so the accumulator's
+    # read port binds at 2 a row whether the ALU chains one lane op or two --
+    # the rectify of row r and the add of row r+1 use alternate cycles and fit
+    # a single-issue ALU exactly. Correcting the cost model
+    # (docs/source/developer/actions.rst) therefore LOST a catch, and the loss
+    # is the honest result: the ALU's width is the one hardware fact
+    # `vaddrelu` rests on that no work count can see. It is measurable against
+    # synthesis and nowhere else, which is why the port carries it and why
+    # this row now says so.
+    ("accu_alu_narrowed", "accu's ALU chains one lane op a step, not two -- "
+                          "no work count can see it; only synthesis can",
      lambda s: _port(s, "accu", "alu").__setitem__("physical", 1),
-     "spec_check"),
+     None),
     ("ar_dual_ported", "the accumulator file and its port both read twice a cycle",
      lambda s: (next(m for m in s["memories"] if m["name"] == "ar")
                 .__setitem__("read_ports", 2),
@@ -197,7 +212,9 @@ def main(argv):
     rows, bad = [], 0
     for name, what, mutate, expect in table:
         got, log = verdict(name, mutate, quick)
-        if name == "none":
+        if expect is None:
+            # The control, and any mutant nothing static can catch. A hole
+            # that is named is a result; a hole that is discovered is a bug.
             ok = got in ("NOT CAUGHT", "not caught (stress not run)")
         else:
             ok = (got == expect) or (quick and expect == "stress"
@@ -216,8 +233,10 @@ def main(argv):
         print(f"\n  MUTATE ACTIONS FAILED: {bad} mutant(s) not caught by the "
               f"level that should catch them")
         return 1
-    print(f"\n  MUTATE ACTIONS OK: {len(rows) - 1} wrong declarations, each "
-          f"caught by the level the table predicts"
+    blind = sum(1 for r in rows if r[0] != "none" and r[2].startswith("NOT"))
+    print(f"\n  MUTATE ACTIONS OK: {len(rows) - 1} wrong declarations, "
+          f"{len(rows) - 1 - blind} caught by the level the table predicts "
+          f"and {blind} that no static level can catch, named as such"
           + (" (stress level skipped)" if quick else ""))
     return 0
 
