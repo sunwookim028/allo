@@ -19,7 +19,7 @@ cycle-accurate RTL sim."**
 
 Evidence this matters: the existing NB ops (`try_get/try_put`) are *lowered* but not
 *faithful* — same program + same input gave **23 distinct outcomes in 30 runs** because the
-OS scheduler, not the design, decides ordering (`examples/nb_nondeterminism.py`).
+OS scheduler, not the design, decides ordering (`examples/systemc/demos/nb_nondeterminism.py`).
 
 ---
 
@@ -163,7 +163,7 @@ functional stand-in that yields identical data — true same-cycle timing is Sta
 
 - **Ground truth = the SystemC/Catapult RTL cosim path** (already emits wire/channel). Each
   sim stage validated against RTL cosim numbers on the same design.
-- **Determinism regression:** `examples/nb_nondeterminism.py` must collapse 23→1 outcome at
+- **Determinism regression:** `examples/systemc/demos/nb_nondeterminism.py` must collapse 23→1 outcome at
   Stage 2 — promote it to a CI test.
 - **Keep green:** `tests/dataflow/test_stream_ops_sim.py`, `test_stream_nb_simple.py`,
   `test_stream_nb_scalar.py`, `test_nested_subregion_streams.py`, plus the golden

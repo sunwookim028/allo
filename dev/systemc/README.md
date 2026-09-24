@@ -1,4 +1,4 @@
-# notes/
+# dev/systemc/
 
 Working documentation for this checkout. Four live documents; everything else is either
 next to the code it describes, or in `archive/`.
@@ -15,8 +15,8 @@ next to the code it describes, or in `archive/`.
 Documentation that lives next to its code, deliberately:
 
 - `mlir/lib/Translation/EmitSystemC.md` — the layered emitter walkthrough
-- `docs/SYSTEMC_BACKEND.md` — user-facing backend docs
-- `docs/DATAFLOW_LINKS.md` — link types, with a runnable companion
+- `dev/systemc/SYSTEMC_BACKEND.md` — user-facing backend docs
+- `dev/systemc/DATAFLOW_LINKS.md` — link types, with a runnable companion
 - `examples/systemc/VERDICTS.md` — per-example SystemC outcomes
 
 Two things live **outside this repo**:

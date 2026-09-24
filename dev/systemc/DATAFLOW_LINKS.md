@@ -30,7 +30,7 @@ Both `Stream` and `Channel` are *ordered* links (blocking `put`/`get`), so this 
 deterministic and verifies bit-exact. A `Wire` is deliberately **not** used here; 
 see "Using a `Wire` safely" below for one idiom that works.
 
-(Runnable version: `docs/dataflow_links_examples.py` — contains this design and the
+(Runnable version: `dev/systemc/dataflow_links_examples.py` — contains this design and the
 `Wire`-sideband design below, with a `main()` that builds and checks both.)
 
 ---
@@ -100,7 +100,7 @@ while ok == 0:                 # consumer: retry until something arrives
     val, ok = S.try_get()
 ```
 
-(Runnable: `examples/nb_stream_rtl.py`, `examples/nb_nondeterminism.py`.)
+(Runnable: `examples/systemc/demos/nb_stream_rtl.py`, `examples/systemc/demos/nb_nondeterminism.py`.)
 
 ### ⚠️ Always consume the `ok` flag
 
@@ -114,7 +114,7 @@ non-blocking bug.
 
 With non-blocking access, arrival order under contention is genuinely non-deterministic (two
 producers racing for one consumer). Checkers over such designs must compare **order-tolerantly**
-(multiset / per-flow order), not positionally. See `examples/nb_nondeterminism.py`.
+(multiset / per-flow order), not positionally. See `examples/systemc/demos/nb_nondeterminism.py`.
 
 ---
 
@@ -142,7 +142,7 @@ Index the array to pick a link (`S[0].try_put(...)`). Arrays work for `Wire` and
 
 For how each link lowers to SystemC (Wire→`sc_signal`, Channel→`Connections::Combinational` or
 `_dat`/`_vld`, Stream→`Connections::Fifo`/`AlloFifoC`), and the RTL-level caveats, see
-`docs/SYSTEMC_BACKEND.md`.
+`dev/systemc/SYSTEMC_BACKEND.md`.
 
 ---
 
@@ -183,8 +183,8 @@ def proc(c: int32[N]):
 before pushing — so the value is current **by construction**. Swap either pair of
 lines and the design is racy; nothing in the type system enforces this.
 
-(Full runnable comparison: `docs/dataflow_links_examples.py`; the underlying analysis of why a
-standalone `Wire` reads garbage is in `docs/noc/FINDINGS_wire_channel.md`.)
+(Full runnable comparison: `dev/systemc/dataflow_links_examples.py`; the underlying analysis of why a
+standalone `Wire` reads garbage is in `dev/systemc/noc/FINDINGS_wire_channel.md`.)
 
 ---
 

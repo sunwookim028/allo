@@ -179,7 +179,7 @@ top"; overriding LLVM_BUILD_DIR to `build/` → GLIBC abort). Force `PYTHONPATH=
   direction), [[simulator-combinational-wire-design]].
 - Deep reference: the rest of THIS file (DAM-lite design; current-sim analysis; paper
   analysis incl. OmniSim/DAM). Profiling harness + findings: `simulator_profiling/`.
-- Notes: `notes/PITFALLS_DATAFLOW_REGION.md`, `STATE.md`, `BRANCHES.md`.
+- Notes: `dev/systemc/PITFALLS_DATAFLOW_REGION.md`, `STATE.md`, `BRANCHES.md`.
 
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -212,8 +212,8 @@ extending Allo's dataflow simulator.
 ## Working context
 
 - Branch: `wire`
-- Related notes/memory:
-  - `notes/PITFALLS_DATAFLOW_REGION.md`
+- Related dev/systemc/memory:
+  - `dev/systemc/PITFALLS_DATAFLOW_REGION.md`
   - combinational-wire design + wire/channel dataflow types (auto-memory)
   - nb-streams file map (auto-memory)
 

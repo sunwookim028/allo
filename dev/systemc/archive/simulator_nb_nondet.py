@@ -9,7 +9,7 @@
 # simulator cannot run a mesh. Its per-PE clocks diverge (a router body charging ~270
 # cycles/pass against a collector's ~2), so `try_get` never sees the producer's timestamps
 # and packets sit in the FIFO, correctly written and forever unread -- no deadlock, no
-# error, zero delivered. See notes/SIMULATOR.md section 3.2. This snapshot has no barrier,
+# error, zero delivered. See dev/systemc/SIMULATOR.md section 3.2. This snapshot has no barrier,
 # so it runs meshes. The price is in the name: non-blocking is NON-DETERMINISTIC here
 # (23 distinct outcomes in 30 runs on nb_nondeterminism.py).
 #
@@ -17,7 +17,7 @@
 # (`from ..backend.llvm import ...`) only resolve inside the allo package. To use it:
 #
 #     cp allo/backend/simulator.py /tmp/simulator_timed.py.bak      # keep the real one
-#     cp notes/archive/simulator_nb_nondet.py allo/backend/simulator.py
+#     cp dev/systemc/archive/simulator_nb_nondet.py allo/backend/simulator.py
 #     ... run the mesh ...
 #     cp /tmp/simulator_timed.py.bak allo/backend/simulator.py      # put it back
 #

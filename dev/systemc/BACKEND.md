@@ -6,8 +6,8 @@ Merged 2026-08-12 from `BACKEND_CHANGES.md` (landed changes) and
 
 Deeper references live next to the code they describe and are **not** duplicated here:
 - `mlir/lib/Translation/EmitSystemC.md` — the layered emitter walkthrough
-- `docs/SYSTEMC_BACKEND.md` — user-facing backend documentation
-- `notes/CATAPULT_QUICKSTART.md` — the run recipe
+- `dev/systemc/SYSTEMC_BACKEND.md` — user-facing backend documentation
+- `dev/systemc/CATAPULT_QUICKSTART.md` — the run recipe
 
 ---
 

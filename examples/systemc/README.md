@@ -60,6 +60,6 @@ failures categorized by root cause.
 
 ## See also
 
-- [`../../docs/SYSTEMC_BACKEND.md`](../../docs/SYSTEMC_BACKEND.md) — the backend guide
-- [`../../docs/DATAFLOW_LINKS.md`](../../docs/DATAFLOW_LINKS.md) — link types
+- [`../../dev/systemc/SYSTEMC_BACKEND.md`](../../dev/systemc/SYSTEMC_BACKEND.md) — the backend guide
+- [`../../dev/systemc/DATAFLOW_LINKS.md`](../../dev/systemc/DATAFLOW_LINKS.md) — link types
 - [`../../notes/ALLO_GOTCHAS.md`](../../notes/ALLO_GOTCHAS.md) — read before writing Allo code

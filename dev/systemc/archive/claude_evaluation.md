@@ -111,7 +111,7 @@ write-up, not quietly omitted):
 
 ### Track B — EVA
 
-- `examples/systemc/eva_example/` — reproducible rtprime example, in-repo.
+- `examples/eva/` — reproducible rtprime example, in-repo.
 - 1×1 **functional cosim PASS bit-exact** (systolic passthrough, numpy golden).
 - **8×8 emits** (139,981-line `kernel.cpp`, 1152 AlloFifo, 192 kernel instances) and **g++
   csim compiles clean**. 8×8 Catapult csynth was launched, outcome unknown — check

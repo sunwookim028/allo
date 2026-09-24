@@ -46,7 +46,7 @@ git checkout 779e435^ -- agents/noc     # all 53 files
 ```
 
 **One duplicate** — `eva_sb_syscredit_rtprime.py`, byte-identical (1,785 lines, 88 KB) to
-`examples/systemc/eva_example/eva_sb_syscredit_rtprime.py`. That directory is the maintained
+`examples/eva/eva_sb_syscredit_rtprime.py`. That directory is the maintained
 home: it has the build and cosim drivers, workloads and a README.
 
 The generator that would consume `INTERCONNECT.md` was never built.

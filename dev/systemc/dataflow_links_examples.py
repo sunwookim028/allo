@@ -1,7 +1,7 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Runnable companion to docs/DATAFLOW_LINKS.md.
+Runnable companion to dev/systemc/DATAFLOW_LINKS.md.
 
 Two self-contained dataflow designs, each with a golden check:
 
@@ -18,9 +18,9 @@ Usage:
     conda activate allo
     export OMP_NUM_THREADS=8
 
-    python docs/dataflow_links_examples.py            # csim both (default)
-    python docs/dataflow_links_examples.py link       # csim design 1 only
-    python docs/dataflow_links_examples.py wire        # csim design 2 only
+    python dev/systemc/dataflow_links_examples.py            # csim both (default)
+    python dev/systemc/dataflow_links_examples.py link       # csim design 1 only
+    python dev/systemc/dataflow_links_examples.py wire        # csim design 2 only
 
 csim uses the SystemC backend (g++ host simulation). The JIT "simulator" target has
 no Wire support, so design 2 is verified via csim.
@@ -79,7 +79,7 @@ def run_link_types(prj):
 #    carries a derived tag. The FIFO push/get is the barrier that keeps the wire aligned.
 #      gen:  side.put(tg)   THEN  link.put(d)      -> drive wire FIRST, then push
 #      proc: d = link.get() THEN  tg = side.get()  -> block on FIFO, THEN read wire
-#    Swap either pair and it is racy. (docs/noc/FINDINGS_wire_channel.md has the analysis.)
+#    Swap either pair and it is racy. (dev/systemc/noc/FINDINGS_wire_channel.md has the analysis.)
 # =====================================================================================
 DW = 16   # payload width (buffered)
 TW = 8    # tag width (derived metadata, needed only at the same instant)

@@ -22,7 +22,7 @@ Standalone usage (dump / simulate):
 
 `csim` additionally needs a SystemC library to link against. Catapult ships one, but its
 libsystemc wants a newer libstdc++ than the system one -- without the second line here the
-build succeeds and then dies at run time with GLIBCXX_3.4.26 (see notes/ALLO_GOTCHAS.md):
+build succeeds and then dies at run time with GLIBCXX_3.4.26 (see dev/systemc/ALLO_GOTCHAS.md):
 
     export SYSTEMC_HOME=$MGC_HOME/shared
     export ALLO_CXX_EXTRA="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
