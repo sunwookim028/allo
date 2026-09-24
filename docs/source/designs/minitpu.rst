@@ -474,9 +474,13 @@ baseline for every performance claim.
 
 Measured, by cosim, at the five benchmark shapes: **216 / 408 / 809 / 933 /
 1521** cycles with zero mismatches, against the shipped design's 172 / 262 /
-418 / 484 / 686 as it then stood (that row is 171 / 261 / 417 / 483 / 685
-since 2026-09-22, which does not move the ratio) — **1.26x to 2.22x the
-cycles**. At ``T=8`` the variant measures
+418 / 484 / 686 as it then stood — **1.26x to 2.22x the cycles**. (The shipped
+row has moved twice since: to 171 / 261 / 417 / 483 / 685 on 2026-09-22, and
+to 175 / 265 / 421 / 482 / 674 on 2026-09-24 when ``QD=16`` became the
+default. The ratio above is against the row as it stood, and both sides of it
+were measured at ``QD=8``; re-stating it would mean re-measuring the variant
+too, which has not been done. The conclusion does not turn on it — the track
+was stopped by the clock, not the cycles.) At ``T=8`` the variant measures
 302 / 474 / 699, also exact. Functional gates pass throughout: bench ``ALL
 EXACT``, stress 487/487, 34 crafted bad programs rejected against 390 generated
 programs accepted, and 42 mutants caught (41 by the functional gates, one only

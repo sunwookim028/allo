@@ -654,7 +654,10 @@ work. Verbatim:
 
 .. note::
 
-   **The first ASIC number, and it describes the current design.** DC on
+   **The first ASIC number.** It described the design as shipped when it was
+   taken, and now describes the design at ``QD=8``: the run predates
+   ``QD=16``, and the depth change adds sequential cells that a DC run has not
+   yet priced (:ref:`limitation-24-price`). DC on
    FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
    (T=4, MAXDIM=16) comes out at **1,136,598** standard-cell area, timing MET
    at +0.21 ns with zero violating and zero hold paths. That **replaces**
@@ -689,7 +692,7 @@ claim, which no simulator can see) needs a cosim of its own and was not run.
      - 16
      - ALL EXACT (5 shapes)
      - STRESS OK 492/492, 64 shapes, 18 bad programs rejected
-     - published 171/261/417/483/685
+     - published 175/265/421/482/674
    * - 4
      - 64
      - 16
@@ -709,8 +712,19 @@ claim, which no simulator can see) needs a cosim of its own and was not run.
      - STRESS OK 630/630, 96 shapes
      - bit-exact, 8 shapes (T=8 table)
 
-The published MAXDIM=16 row was 172/262/418/484/686 before this work; see
-`Earlier measurements and corrections`_.
+The published MAXDIM=16 row was 172/262/418/484/686 before this work, and
+171/261/417/483/685 from then until ``QD=16`` became the default on
+2026-09-24; see `Earlier measurements and corrections`_ for both moves.
+
+.. warning::
+
+   **Every cycle number on this page other than that one cell was measured at
+   the previous channel depth, ``QD=8``.** That includes the MAXDIM=64 sweep,
+   the steady-state table, the T=8 columns and every Gemmini comparison. The
+   ``QD=16`` default (``63ee6ec7``) moves the five-shape row by
+   +4 / +4 / +4 / -1 / -11 and moves the MAXDIM=64 five the same way, but the
+   sweep has **not** been re-run, so **no deficit or ratio on this page should
+   be restated until it is**. See :ref:`benchmarks-qd16`.
 
 .. warning::
 
@@ -2023,17 +2037,20 @@ config patches for both matched points are committed at
 
 .. note::
 
-   **The published 171/261/417/483/685 are a MAXDIM=16 measurement**, and the
+   **The published 175/265/421/482/674 are a MAXDIM=16 measurement**, and the
    shipped default is now 64, so ``reproduce.sh`` pins ``TPU_MAXDIM=16``
    explicitly --- it exists to reproduce those numbers and would otherwise
-   measure 218/357/563/677/879 and report a difference that is the stride
+   measure 222/361/567/676/868 and report a difference that is the stride
    change, not a regression.
 
-   **That row itself moved by one cycle when this work landed**, uniformly at
-   all five shapes: 172/262/418/484/686 became 171/261/417/483/685. See
-   :ref:`benchmarks-one-cycle`. Both sets are on this page and neither
-   supersedes the other: the MAXDIM=16 five are the latency benchmark's
-   provenance, the MAXDIM=64 sweep is the matched comparison.
+   **That row has moved twice.** It went from 172/262/418/484/686 to
+   171/261/417/483/685 when this work landed, uniformly at all five shapes
+   (:ref:`benchmarks-one-cycle`), and from there to the current row when
+   ``QD=16`` became the default on 2026-09-24, by +4/+4/+4/-1/-11
+   (:ref:`benchmarks-qd16`). The MAXDIM=64 figures throughout this page are
+   the ``QD=8`` sweep and have not been re-run. Both sets are on this page and
+   neither supersedes the other: the MAXDIM=16 five are the latency
+   benchmark's provenance, the MAXDIM=64 sweep is the matched comparison.
 
 .. seealso::
 
@@ -2047,6 +2064,52 @@ Earlier measurements and corrections
 
 Moved out of the sections above: superseded figures, readings that were
 withdrawn, and the accounts of how particular numbers moved.
+
+.. _benchmarks-qd16:
+
+2026-09-24: the channel depth moved the row, and not uniformly
+--------------------------------------------------------------
+
+``63ee6ec7`` made ``QD=16`` the default channel depth. The reason is
+correctness, not speed: three legal tiled programs never complete in cosim at
+depth 8, and all ten of that family complete bit-exact at 16
+(:ref:`limitation-24-qd`). Measured at ``TPU_MAXDIM=16`` with everything else
+unset, cosim ``COSIM OK``:
+
+.. code-block:: text
+
+   was: 4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+   now: 4x4x4=175  8x8x8=265  12x12x12=421  16x16x8=482  16x16x16=674
+   d:        +4         +4           +4           -1            -11
+
+**The lumpiness is the result, not noise.** The one-cycle move recorded below
+was uniform across shapes, which is what identified it as a fixed-cost change.
+This one is not uniform, so it is not a fixed cost: the three smallest shapes
+pay the pipeline skew of deeper FIFOs, and the two largest **get faster**,
+because a deeper queue lets the sequencer run further ahead of the units it
+dispatches to. Depth buys completion and throughput where the queues bind, and
+charges four cycles where they do not.
+
+The same deltas reproduce independently at ``TPU_MAXDIM=64`` ---
+218/357/563/677/879 becomes 222/361/567/676/868, +4/+4/+4/-1/-11 again --- so
+the effect belongs to the depth and not to one stride. ``stress_isa`` is
+640/640 exact at the new default.
+
+**Two prices, and neither should be absorbed into the cycle row.** On FPGA it
+costs **+9.3 % flip-flops** at the shipped ``T=4``/``MAXDIM=64`` (+9.5 % at
+the ``MAXDIM=16`` the five shapes are measured on), with BRAM, DSP and the
+2.431 ns estimated period unchanged. **The ASIC price is unmeasured** --- what
+exists is a count from the RTL priced at this design's own measured area per
+sequential cell, not a DC run. Both are accounted for in
+:ref:`limitation-24-price`.
+
+**What this invalidates until it is re-measured.** The Gemmini parity sweep on
+this page and on :doc:`gemmini_comparison` was measured at ``QD=8``. The
+deltas above move two of the five shapes in our favour and three against, and
+the MAXDIM=64 five move the same way, but the sweep has not been re-run, so
+**every deficit and ratio stated against Gemmini describes the previous
+default**. They are left in place as the last measured comparison and must not
+be restated for the shipped design until the sweep is re-run at ``QD=16``.
 
 Why naming the window mattered
 ------------------------------

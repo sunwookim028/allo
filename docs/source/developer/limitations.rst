@@ -1521,11 +1521,17 @@ strengthened, since the interface pragma set is one line narrower than claimed.
 24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (2026-09-22)
+.. admonition:: Status (2026-09-24): FIXED in the shipped design
 
-   REPRODUCES at the shipped ``QD=8``, and **DIAGNOSED as a channel-depth
-   threshold**: the same ten programs, same tree, same toolchain, all complete
-   at ``TPU_QD=16`` (:ref:`limitation-24-qd`). Cheap half:
+   **DIAGNOSED as a channel-depth threshold** on 2026-09-22 -- the same ten
+   programs, same tree, same toolchain, all complete at ``TPU_QD=16``
+   (:ref:`limitation-24-qd`) -- and **landed**: ``QD=16`` is the default in
+   ``microarch_isa.py`` as of ``63ee6ec7`` (2026-09-24), which moved the
+   published row to **175 / 265 / 421 / 482 / 674**
+   (:ref:`limitation-24-price`). The item still reproduces at ``TPU_QD=8``,
+   which is now an override rather than the shipped configuration, and the
+   *predicate* -- which programs need which depth -- remains open, so this is
+   a cure and not a characterisation. Cheap half:
    ``python tests/limits/item24_cosim_hang.py`` (seconds, no Vitis). RTL half:
    ``ALLO_LIMITS_COSIM=1`` on the same file (one csynth, ten cosims, tens of
    minutes). Family and bisection:
@@ -1759,13 +1765,15 @@ What ``QD=16`` costs the shipped design
 Raising the depth is a change to the **shipped** design, which the reproduce
 gate pins at five numbers, so it is measured in the same paired form: one
 tree, ``TPU_MAXDIM=16``, everything else unset, ``QD=8`` and then ``QD=16``.
+The right-hand column is the **published row since** ``63ee6ec7``; the
+left-hand one is what was published before it.
 
 .. list-table::
    :header-rows: 1
 
    * - shape
-     - ``QD=8`` (published)
-     - ``QD=16``
+     - ``QD=8`` (published until 2026-09-24)
+     - ``QD=16`` (**published now**)
      - delta
    * - 4x4x4
      - 171
@@ -1792,8 +1800,12 @@ tree, ``TPU_MAXDIM=16``, everything else unset, ``QD=8`` and then ``QD=16``.
 three smallest shapes pay the pipeline skew of deeper FIFOs (+4 each, the same
 +4 the item-24 family paid), and the two largest **get faster**, because a
 deeper queue lets the sequencer run further ahead of the units it dispatches
-to. The QD=8 column reproduces the published ``171 / 261 / 417 / 483 / 685``
-exactly, which is the control.
+to. The QD=8 column reproduces the then-published
+``171 / 261 / 417 / 483 / 685`` exactly, which is the control; the QD=16
+column is the row ``reproduce.sh`` checks today. The same deltas reproduce
+independently at ``TPU_MAXDIM=64``: 218 / 357 / 563 / 677 / 879 becomes
+**222 / 361 / 567 / 676 / 868**, +4 / +4 / +4 / -1 / -11 again, so the
+lumpiness is a property of the depth and not of one stride.
 
 Correctness at ``QD=16`` is unchanged: ``stress_isa.py`` prints **STRESS OK:
 492/492**, and the RTL gate (``TPU_TB=stress``) is 0 wrong over six calls at
@@ -1913,12 +1925,13 @@ FPGA number is control overhead with the storage free in SRLs, the ASIC number
 is the storage itself. At QD=32 the ASIC cost doubles again (+33,280 flops,
 linear) where the FPGA adds only a further 1,080 FF.
 
-The recommendation
-^^^^^^^^^^^^^^^^^^
+The decision, and what landing it left open
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Raise the default to ``QD=16``.** A design that does not complete on legal
-programs is worse than one four cycles slower, and every reason to hesitate
-was checked rather than assumed:
+**Landed: ``QD=16`` is the default** (``63ee6ec7``, 2026-09-24), and the
+published row is now ``175 / 265 / 421 / 482 / 674``. A design that does not
+complete on legal programs is worse than one four cycles slower, and every
+reason to hesitate was checked rather than assumed:
 
 - the five-shape row moves by +4 / +4 / +4 / -1 / -11, and **no margin against
   Gemmini flips**: at these shapes the design is behind Gemmini at QD=8 and
@@ -1936,6 +1949,19 @@ The one honest caveat is that this **buys termination with area**, and it buys
 it for a hazard whose predicate is still open. Nobody should read "depth is
 the cure" as "depth is free at any depth": the FPGA ladder is sub-linear only
 because of SRL16, and the ASIC cost is linear.
+
+**What landing it did not settle**, and what must not be quietly absorbed:
+
+- **The ASIC price is still unmeasured.** The +16,640 flip-flops above are a
+  count from the RTL priced at this design's own measured area per sequential
+  cell, not a DC run, and the T=8 ASIC export was taken from the ``QD=8``
+  RTL. Both need redoing against the shipped netlist.
+- **The Gemmini parity sweep was measured at ``QD=8``.** Every deficit and
+  ratio on :doc:`/designs/gemmini_comparison` and
+  :doc:`/designs/benchmarks` therefore describes the previous default. The
+  pre-landing check above says no margin *flips*, which is why landing was
+  safe; it is not a re-measurement, and **no comparison should be restated
+  until the sweep is re-run at ``QD=16``**.
 
 .. admonition:: 2026-09-22: a channel depth flips it, and the program is a
    shipped mapping

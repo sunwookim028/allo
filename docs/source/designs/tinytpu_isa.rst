@@ -39,32 +39,46 @@ mesh-matched comparison against Gemmini is on :doc:`gemmini_comparison`.
 
 .. note::
 
-   Headline, as of 2026-09-22 (``05169938``): one hardware build runs every
+   Headline, as of 2026-09-24 (``63ee6ec7``): one hardware build runs every
    shape as data, all five benchmark shapes are bit-exact in RTL
-   co-simulation, and the design takes **171 / 261 / 417 / 483 / 685** cycles
+   co-simulation, and the design takes **175 / 265 / 421 / 482 / 674** cycles
    at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis ``cosim``,
    ``-m_axi_latency 0``).
 
    **Those five are a ``T=4``, ``TPU_MAXDIM=16`` measurement**, which is the
    configuration ``reproduce.sh`` pins. The shipped default is ``MAXDIM=64``,
    and ``MAXDIM`` is the DRAM row stride of every operand, so the same shape
-   costs more on the bigger build -- 4x4x4 is 218 cycles at ``MAXDIM=64``
-   against 171 at 16. The ``MAXDIM=64`` sweep, and every shape large enough to
+   costs more on the bigger build -- 4x4x4 is 222 cycles at ``MAXDIM=64``
+   against 175 at 16. The ``MAXDIM=64`` sweep, and every shape large enough to
    reach steady state, are on :doc:`benchmarks`.
 
-   Measured over the same window on both sides, the design is
+   Measured over the same window on both sides, the design was
    **1.07-1.24x slower** than Gemmini at these five shapes. Over ten shapes at
-   ``MAXDIM=64`` the deficit **converges to 1.09x at 64x64x64** at
-   **74.1 % of peak**, and the two smallest shapes do not clear Gemmini's
-   measurement spread; see :doc:`gemmini_comparison`.
+   ``MAXDIM=64`` the deficit **converged to 1.09x at 64x64x64** at
+   **74.1 % of peak**, and the two smallest shapes did not clear Gemmini's
+   measurement spread; see :doc:`gemmini_comparison`. **Those figures were
+   measured at the previous channel depth** (``QD=8``), against the row that
+   ended on 2026-09-24, and the sweep has **not** been re-run at ``QD=16``, so
+   they are the last measured comparison and not a statement about the shipped
+   design. Nothing should be restated from them until the sweep is re-run;
+   what was checked before landing is that no margin *flips*
+   (:ref:`limitation-24-price`), which is a check and not a measurement.
 
    Until ``e24e433b`` (2026-09-19) the shipped design took
    **252 / 383 / 591 / 667 / 919** (1.55-1.8x behind Gemmini). The step
    between the two is the gap attribution's measured design stack, landed as
    the design (:ref:`tinytpu-isa-landing`, :ref:`gemmini-gap-attribution`).
-   The published row was **172 / 262 / 418 / 484 / 686** until 2026-09-22;
-   what moved it by one cycle at every shape, and the measurement that
-   isolated the cause, are in `Earlier measurements and corrections`_.
+   The published row was **172 / 262 / 418 / 484 / 686** until 2026-09-22 and
+   **171 / 261 / 417 / 483 / 685** from then until 2026-09-24; what moved it
+   by one cycle at every shape, and what the channel depth then did to it, are
+   in `Earlier measurements and corrections`_.
+
+   **The price of the current row** is **+9.3 % flip-flops** on FPGA at the
+   shipped ``T=4``/``MAXDIM=64`` (+9.5 % at the ``MAXDIM=16`` the five shapes
+   are measured on), with BRAM, DSP and the 2.431 ns estimated period all
+   unchanged. **The ASIC price is unmeasured**: what is recorded is a count
+   from the RTL priced at this design's own area per sequential cell, not a DC
+   run (:ref:`limitation-24-price`).
 
 
 Architecture
@@ -1165,7 +1179,7 @@ Files in ``examples/accelerator/tinytpu_vitis/``:
 
    # One command, from a clean checkout: builds this checkout's MLIR bindings,
    # runs bench_isa + stress_isa, then the default cosim, and checks the five
-   # cycle counts against 171 / 261 / 417 / 483 / 685 at the TPU_MAXDIM=16 it
+   # cycle counts against 175 / 265 / 421 / 482 / 674 at the TPU_MAXDIM=16 it
    # pins. Exits nonzero otherwise.
    examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
    examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
@@ -1328,7 +1342,10 @@ five published shapes and so the most representative activity:
      - 87 MB
 
 Both cycle counts are byte-identical to the ones their own cosim measured, so
-the instrumentation moved nothing. The window is wider than the cycle count
+the instrumentation moved nothing. **Both captures predate ``QD=16``**, which
+is why the ``T4_MAXDIM16`` row reads 685 rather than the 674 the same
+configuration takes today; the activity has not been re-captured against the
+shipped RTL. The window is wider than the cycle count
 because it spans the ``s_axi_control`` programming around the kernel as well:
 42 clocks of it at ``T4``, 42 at ``T8``. Activity is 4 990 787 transitions at
 ``T4`` and 5 552 502 at ``T8``, 94% and 95% of it inside the DUT's submodules
@@ -1490,7 +1507,7 @@ Verifying a change
 
 From a clean checkout, one command builds the checkout's own bindings, runs the
 functional gates, runs cosim, and checks the published cycle counts
-(171 / 261 / 417 / 483 / 685, at the ``TPU_MAXDIM=16`` it pins), exiting
+(175 / 265 / 421 / 482 / 674, at the ``TPU_MAXDIM=16`` it pins), exiting
 nonzero if any step fails or any number differs:
 
 .. code-block:: bash
@@ -1710,20 +1727,26 @@ Results
 Cycle counts
 ~~~~~~~~~~~~
 
-**Current row, 2026-09-22 (``05169938``), ``T=4``, ``TPU_MAXDIM=16``,
-``-m_axi_latency 0``:**
+**Current row, 2026-09-24 (``63ee6ec7``), ``T=4``, ``TPU_MAXDIM=16``,
+``-m_axi_latency 0``, channel depth ``QD=16``:**
 
 .. code-block:: text
 
-   4x4x4  171    8x8x8  261    12x12x12  417    16x16x8  483    16x16x16  685
+   4x4x4  175    8x8x8  265    12x12x12  421    16x16x8  482    16x16x16  674
 
 That is what ``reproduce.sh`` checks. The ``MAXDIM=64`` sweep, which is the
 shipped default and the one that reaches steady state, is on
-:doc:`benchmarks`.
+:doc:`benchmarks` -- at ``QD=16`` it opens 222 / 361 / 567 / 676 / 868 at
+these five shapes, the same +4 / +4 / +4 / -1 / -11 deltas.
 
-The table below is the **``e24e433b`` measurement**, which is one cycle higher
-at every shape: the derived memory sizing that landed afterwards takes one
-cycle out of the fixed term (`Earlier measurements and corrections`_). Every
+The row reached this from 171 / 261 / 417 / 483 / 685, which is what it was
+between 2026-09-22 and 2026-09-24, and 172 / 262 / 418 / 484 / 686 before
+that; both moves are in `Earlier measurements and corrections`_.
+
+The table below is the **``e24e433b`` measurement**, taken before either move:
+the derived memory sizing that landed afterwards took one cycle out of the
+fixed term at every shape, and the channel depth then moved it again by
++4 / +4 / +4 / -1 / -11 (`Earlier measurements and corrections`_). Every
 other column -- instruction counts, mismatches, the pre-landing comparison --
 is unaffected. Measured by Vitis ``cosim`` (xsim), one build,
 ``-m_axi_latency 0`` (``logs/cosim_isa_landed_sweep.log``), against the
@@ -2070,6 +2093,37 @@ Earlier measurements and corrections
 Superseded figures, withdrawn claims, and the accounts of how particular
 numbers moved. Nothing here is the current state; the design's own history,
 at greater length, is on :doc:`tinytpu_history`.
+
+.. _tinytpu-isa-qd16:
+
+The channel depth moved the row again, 2026-09-24
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``63ee6ec7`` made ``QD=16`` the default channel depth, because three legal
+tiled programs never complete at depth 8 and all ten of that family complete
+bit-exact at 16 (:ref:`limitation-24-qd`). The published row moved from
+171 / 261 / 417 / 483 / 685 to **175 / 265 / 421 / 482 / 674**.
+
+**The delta is lumpy, and that is the finding**: +4 / +4 / +4 / **-1** /
+**-11**. A uniform delta would have been a fixed-cost change, as the
+2026-09-22 move below was. This one is not. The three smallest shapes pay the
+pipeline skew of deeper FIFOs; the two largest **get faster**, because a
+deeper queue lets the sequencer run further ahead of the units it dispatches
+to. So the depth buys completion *and* throughput where the queues are the
+constraint, and charges four cycles where they are not.
+
+The same deltas reproduce independently at ``TPU_MAXDIM=64``:
+218 / 357 / 563 / 677 / 879 becomes 222 / 361 / 567 / 676 / 868. Correctness
+is unchanged -- ``stress_isa`` is 640/640 exact at the new default -- and
+cosim reports ``COSIM OK``.
+
+**What it costs, and what is not yet known.** The FPGA price is **+9.3 %
+flip-flops** at the shipped ``T=4``/``MAXDIM=64`` (+9.5 % at ``MAXDIM=16``),
+with BRAM, DSP and the 2.431 ns estimated period unchanged. **The ASIC price
+is unmeasured**: the figure on record is a count from the RTL priced at this
+design's own area per sequential cell, not a DC run. And **the Gemmini parity
+sweep was measured at ``QD=8``**, so the deficit has to be re-measured before
+any comparison is restated. The full accounting is :ref:`limitation-24-price`.
 
 The published row moved by one cycle, 2026-09-22
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
