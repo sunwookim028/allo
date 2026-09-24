@@ -11,7 +11,10 @@ page table for what belongs here versus in `docs/source/`, and why.
 - `records/` -- dated measurement records (`*.rst`) and the raw evidence
   behind TinyTPU-isa's published numbers (`records/tinytpu/`): csynth/cosim
   logs, gap-attribution results, and the CHIA harness's run evidence. Read
-  once, by us; never re-run, never asserted.
+  once, by us; never re-run, never asserted. `records/systemc/` is the same
+  for the SystemC backend -- `VERDICTS.md`, the full `reports/` logs, the
+  RTL cross-check's `results.txt` and reference xsim runs, and the archived
+  emitter output the Catapult scripts in `tests/systemc/` read.
 - `repo_layout.md` -- the target layout for designs, flows and the core
   package, and what is wrong with today's.
 - `systemc/` -- the working notes that arrived with the SystemC emitter, from

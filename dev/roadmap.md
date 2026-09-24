@@ -73,8 +73,12 @@ Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
    every blob that ever existed under that path across the imported history is
    one of those seven, so the payload was stripped from history rather than
    deleted in a later commit.
-4. **`examples/systemc_rtlsim/` → `examples/systemc/`** — it is a harness, not
-   a design.
+4. **`examples/systemc_rtlsim/` split by kind** — **Done 2026-09-24.** Neither
+   SystemC directory was a design directory. The Allo designs (including
+   `pe_split.py`) are now `examples/systemc/`; the testbenches, shims and run
+   scripts are `tests/systemc/` (with the cross-check under
+   `tests/systemc/rtlsim/`); the logs and archived emitter output are
+   `dev/records/systemc/`.
 5. `chia_runs/` leaves the repository root.
 
 **Blocked until the agents working inside `examples/tinytpu/` finish** — the re-measure, the T8 re-export and the `ip-gap` verification all

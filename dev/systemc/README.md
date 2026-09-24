@@ -32,7 +32,7 @@ Documentation that lives next to its code, deliberately:
 - `mlir/lib/Translation/EmitSystemC.md` — the layered emitter walkthrough
 - `dev/systemc/SYSTEMC_BACKEND.md` — user-facing backend docs
 - `dev/systemc/DATAFLOW_LINKS.md` — link types, with a runnable companion
-- `examples/systemc/VERDICTS.md` — per-example SystemC outcomes
+- `dev/records/systemc/VERDICTS.md` — per-example SystemC outcomes
 
 Two things live **outside this repo**:
 

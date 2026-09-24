@@ -2,8 +2,9 @@
 """
 csynth a dataflow region with the Catapult BUILD-SUBDIR workaround.
 
-    python csyn_subdir.py <module> <region> [project_dir]
-    e.g. python csyn_subdir.py router_rvn_chan router_rvn_c
+    python tests/systemc/csyn_subdir.py <module> <region> [project_dir]
+    (<module> is a design module name in examples/systemc/)
+    e.g. python tests/systemc/csyn_subdir.py pc_channel pc_channel
 
 WHY THIS EXISTS
 ---------------
@@ -32,16 +33,33 @@ import importlib
 
 import allo.dataflow as df
 
+def _repo_root(start):
+    """The repository root, found by searching UPWARD for a marker.
+
+    Never count levels: a relative path that encodes tree shape is a latent
+    break in a repository being reorganised (dev/roadmap.md).
+    """
+    d = os.path.abspath(start)
+    while True:
+        if os.path.exists(os.path.join(d, "pyproject.toml")) and \
+           os.path.isdir(os.path.join(d, "allo")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise RuntimeError(f"no repository root above {start}")
+        d = parent
 
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
     mod_name, region_name = sys.argv[1], sys.argv[2]
     here = os.path.dirname(os.path.abspath(__file__))
+    # This script is validation; the designs it synthesizes are in examples/.
+    designs = os.path.join(_repo_root(here), "examples", "systemc")
     prj = sys.argv[3] if len(sys.argv) > 3 else os.path.join(
         here, "csyn_out", f"{mod_name}_subdir")
 
-    sys.path.insert(0, here)
+    sys.path.insert(0, os.path.abspath(designs))
     region = getattr(importlib.import_module(mod_name), region_name)
 
     os.makedirs(prj, exist_ok=True)

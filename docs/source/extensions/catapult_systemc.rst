@@ -55,7 +55,7 @@ needs a non-handshaked fixed-latency edge, and Allo's ``Stream`` cannot express 
 The fork is to be integrated rather than only read. ``SystemC-emitter`` is its most complete
 branch. ``systemc-ip-integration`` lacks the RAM-pin memory interface (``b92077f5``) and the
 free-running-loop fix (``72c70dcb``), so an integration must start from ``SystemC-emitter``. The
-``pe_wire`` / ``pe_stream`` / ``pe_channel`` netlists used by ``examples/systemc_rtlsim/`` survive
+``pe_wire`` / ``pe_stream`` / ``pe_channel`` netlists used by ``tests/systemc/rtlsim/`` survive
 only in its history, at ``0eff4888:agents/noc/rtl/<design>/rtl.v`` (``REPRO.sh`` names the same
 files as ``779e4350^:agents/noc/rtl/{pe_wire,pe_stream,pe_channel}/rtl.v``). Branch layout for all
 remotes is in ``dev/fork_maintenance.rst``.
@@ -144,7 +144,7 @@ The TAPA emitter's non-blocking overrides, added and then removed, are recorded 
 
 The Wire Investigation: Simulating Catapult's Netlists
 ------------------------------------------------------
-``examples/systemc_rtlsim/`` is the apparatus behind :ref:`limitation-22`. It took
+``tests/systemc/rtlsim/`` is the apparatus behind :ref:`limitation-22`. It took
 reverse-engineering the netlists' internal signal names (e.g. ``tb.u_mul.mul_0_run_inst.v8_and_cse``)
 to build, so it is kept rather than rebuilt.
 
@@ -232,20 +232,21 @@ Running it
 Needs Vivado's xsim on ``PATH`` (``/opt/xilinx/Vivado/2023.2/settings64.sh``) and the netlists,
 which are **not** in this repository -- they are Catapult output from the
 ``choonsik1/SystemC-emitter`` fork, and ``REPRO.sh`` documents where they came from. The scripts
-look for them under ``../noc/rtl/<design>/rtl.v`` relative to ``examples/systemc_rtlsim/`` (the
+look for them under ``../noc/rtl/<design>/rtl.v`` relative to ``tests/systemc/rtlsim/`` (the
 Xcelium runner takes ``RTLDIR`` to override). ``mgc_shim.v`` supplies the Mentor primitives the
 netlists instantiate. No SystemC is needed; each case takes about 6 s.
 
 .. code-block:: bash
 
-   cd examples/systemc_rtlsim
+   cd tests/systemc/rtlsim
    ./run.sh <design>     # one design, tb_top.v testbench
    ./run_mulacc.sh <pe_wire|pe_stream|pe_channel> [-d MACRO[=VAL] ...]
    ./REPRO.sh            # the whole matrix: boundaries, pacing sweep, lockstep control, faults
 
-Both runners print one ``RESULT: PASS|FAIL <tag>`` line per run; ``results.txt`` is that output,
-sorted. The 76 xsim work directories are not kept -- they are ~29 MB and regenerable, and the
-``RESULT:`` lines are the evidence.
+Both runners print one ``RESULT: PASS|FAIL <tag>`` line per run;
+``dev/records/systemc/rtlsim/results.txt`` is that output, sorted. The 76 xsim work
+directories are not kept -- they are ~29 MB and regenerable, and the ``RESULT:`` lines
+are the evidence.
 
 A second simulator: Xcelium
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,14 +257,15 @@ A second simulator: Xcelium
 library cells from ``$MGC_HOME/pkgs/siflibs``. Xcelium is installed on zhang-21, **not** on
 ``ace-01`` (see ``dev/toolchains.rst``).
 
-On zhang-21 with Xcelium 24.03 (``710ab138``, 2026-09-18), **all 75 cases in** ``results.txt``
-**reproduce**: ``pe_stream`` and ``pe_channel`` pass all 18 pacings each, ``pe_wire`` fails 8/8 at
+On zhang-21 with Xcelium 24.03 (``710ab138``, 2026-09-18), **all 75 cases in**
+``dev/records/systemc/rtlsim/results.txt`` **reproduce**: ``pe_stream`` and ``pe_channel``
+pass all 18 pacings each, ``pe_wire`` fails 8/8 at
 all 18 in 12 cycles (``0 0 0 2 2 10 10 28``), the lockstep control over ``ACC_RST_DELAY`` 0..6
 gives ``F F F P P F F``, and all four fault injections go red. The full ``REPRO.sh`` takes 23 s.
 
 Reference xsim runs
 ~~~~~~~~~~~~~~~~~~~
-``examples/systemc_rtlsim/ref_xsim/`` keeps two runs of the **same** ``pe_wire`` **netlist** so
+``dev/records/systemc/rtlsim/ref_xsim/`` keeps two runs of the **same** ``pe_wire`` **netlist** so
 that a run on a different simulator can be compared against a known-good and a known-bad result
 rather than against a claim. Trimmed to the logs (``xsim.dir``, ~350 KB per run, is dropped) with
 absolute scratch paths rewritten to ``<RUNDIR>``. Produced by ``run_mulacc.sh`` under xsim v2023.2
@@ -311,7 +313,7 @@ Is it the free-running-loop rewrite? No
 rewrote its outermost loop to ``while (1)`` **under** ``__SYNTHESIS__`` -- precisely a bug that
 leaves a design correct in csim and wrong in RTL. The netlists above are from ``0eff4888``
 (2026-08-01), 19 days older. But ``72c70dcb``'s guard requires *a load from a memory port inside
-the loop body*, and ``acc`` is declared ``args=[]`` (``pe_split.py``, kept in the directory), so
+the loop body*, and ``acc`` is declared ``args=[]`` (``examples/systemc/pe_split.py``), so
 the guard structurally cannot fire for it, while its unused ``i`` does trigger the rewrite. ``mul``
 is rewritten too, but it reads Streams, whose handshake makes a free-running loop harmless. The
 proposed fix was to extend the guard so that a ``get()`` from a ``Wire`` or ``Channel`` in the loop
@@ -356,7 +358,7 @@ Replaying from the committed netlists (no Allo build needed):
 
 .. code-block:: bash
 
-   cd examples/systemc_rtlsim
+   cd tests/systemc/rtlsim
    RTLDIR=$PWD/guard_experiment/rtl_guard ./run_mulacc_xrun.sh pe_wire
    RTLDIR=$PWD/guard_experiment/rtl_base  ./run_mulacc_xrun.sh pe_wire
    RTLDIR=$PWD/guard_experiment/rtl_guard ./run_mulacc_xrun.sh pe_stream -d CONNECTIONS_FIFO
@@ -376,7 +378,7 @@ Regenerating the netlists:
    netlist lands in ``Catapult/<design>.v1/rtl.v``.
 
 The exploration branch that asked this question, ``sc-wire-guard``, is deleted; its answer is
-recorded here and in ``examples/systemc_rtlsim/guard_experiment/``.
+recorded here and in ``tests/systemc/rtlsim/guard_experiment/``.
 
 Earlier measurements and corrections
 ------------------------------------

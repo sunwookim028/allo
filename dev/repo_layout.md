@@ -150,9 +150,14 @@ on designs, or is it a design?*
 
 - `examples/systemc_rtlsim/` is **not a design**. It is a cross-check harness
   (`mgc_shim.v`, `ref_xsim/`, `run_mulacc.sh`, `REPRO.sh`) validating SystemC
-  output against RTL simulation. It belongs with the emitter's own example
-  material, as `examples/systemc/`, matching where the upstream-of-this-work
-  repository already keeps it.
+  output against RTL simulation. *First draft said: move it beside
+  `examples/systemc/`. That was wrong for the same reason — `examples/systemc/`
+  was **also** not a design directory.* Applying the test to both (2026-09-24):
+  the Allo designs stay in `examples/systemc/`, the harness and testbenches
+  become `tests/systemc/` (cross-check under `tests/systemc/rtlsim/`), and the
+  logs, verdicts and archived emitter output become `dev/records/systemc/`. The
+  one design that was buried in the harness directory, `pe_split.py`, moved up
+  to `examples/systemc/`.
 - `rtl_export/` was a bad name for something that is not a separate tool.
   `export_rtl.py` packages a configuration's Verilog *for the ASIC handoff* —
   its own docstring says so. It is a stage of the PD flow:

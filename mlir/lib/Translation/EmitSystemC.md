@@ -120,12 +120,12 @@ This transform only fires when it is safe (see Part III §2).
 # functional
 df.build(design, target="systemc", mode="csim",  project="out/csim")(inputs...)
 # synthesis (area/Fmax) — exclude the testbench harness from the top:
-ALLO_DESIGN_TOP=<kernel>_0 python csyn_subdir.py <module> <region> <abs-project-dir>
+ALLO_DESIGN_TOP=<kernel>_0 python tests/systemc/csyn_subdir.py <module> <region> <abs-project-dir>
 # RTL cosim — uses the full region as top, needs a build SUBDIR (not the source dir)
 df.build(design, target="systemc", mode="cosim", project="out/cosim")(inputs...)
 ```
 Catapult In/Out ports degrade to raw signals if you run synthesis in the source dir instead
-of a build subdir (SCHD‑30); `csyn_subdir.py` and `mode="cosim"` handle this.
+of a build subdir (SCHD‑30); `tests/systemc/csyn_subdir.py` and `mode="cosim"` handle this.
 
 ---
 

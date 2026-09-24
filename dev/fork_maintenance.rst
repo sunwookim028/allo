@@ -107,7 +107,7 @@ SystemC/Catapult emitter, which is to be integrated rather than only read.
 the RAM-pin memory interface (``b92077f5``) and the free-running-loop fix
 (``72c70dcb``), so an integration must start from ``SystemC-emitter``. The
 ``pe_wire``/``pe_stream``/``pe_channel`` netlists used by
-``examples/systemc_rtlsim/`` survive only in its history, at
+``tests/systemc/rtlsim/`` survive only in its history, at
 ``0eff4888:agents/noc/rtl/<design>/rtl.v``.
 
 Tags, in place of branches that were retired because their history is reachable
@@ -132,7 +132,7 @@ Where work lands
 - Name the branch after the question it answers, and list live ones in the
   table above while they exist. For example, ``sc-wire-guard`` asked whether
   extending the free-running-loop guard fixes ``pe_wire``. The answer was no;
-  it is recorded in ``examples/systemc_rtlsim/guard_experiment/`` and in
+  it is recorded in ``tests/systemc/rtlsim/guard_experiment/`` and in
   ``docs/source/extensions/catapult_systemc.rst``, and the branch is deleted.
 
 ``chia-codesign`` is a different codebase, not a feature branch
