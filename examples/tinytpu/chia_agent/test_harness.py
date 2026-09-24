@@ -1133,8 +1133,14 @@ class Suite:
         print("== accept: accept.py on (b)", flush=True)
         diff = self.run_dir / "spad_zero.diff"
         if not diff.exists():
-            diff.write_text(unified("microarch_isa.py", head("microarch_isa.py"),
-                                    mutate("spad_zero")))
+            # The mutant's OWN file. This said `microarch_isa.py` while
+            # `mutate("spad_zero")` returned the mutated `ip/units/scratchpad.py`,
+            # so running this phase on its own (rather than after `abf`, which
+            # writes the diff) produced a diff that replaced one file's contents
+            # with another's -- and accept.py refused it at the spec policy,
+            # correctly, for reasons that said nothing about the real bug.
+            f = MUTANTS["spad_zero"][0]
+            diff.write_text(unified(f, head(f), mutate("spad_zero")))
         out = self.run_dir / "accept-spad_zero"
         p = subprocess.run([ALLO_PYTHON, str(AGENT_DIR / "accept.py"), "--diff",
                             str(diff), "--out", str(out)], cwd=AGENT_DIR,
