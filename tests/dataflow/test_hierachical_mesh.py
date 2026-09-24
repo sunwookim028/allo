@@ -5,6 +5,9 @@ import allo
 from allo.ir.types import int32, float32, Stream, Stateful
 import allo.dataflow as df
 import numpy as np
+import pytest
+
+from allo.backend.hls import is_available
 
 # Dimensions and Capacities
 TILE_M = 2  # Spatial dimensions (M = N = K = 2)
@@ -782,8 +785,19 @@ def call_mod_2x2(mod, ctrl_val, tile_id_val, d_addr_val, inval, outval, size_val
     s = np.array([size_val], dtype=np.int32)
     mod(c, t, d, inval, s, outval)
 
+@pytest.mark.skipif(
+    not is_available("vitis_hls"),
+    reason="csim needs vitis_hls on PATH; source settings64.sh to run this",
+)
 def test_2x2():
-    """2x2 mesh test: 4 compute tiles, 2 memory tiles."""
+    """2x2 mesh test: 4 compute tiles, 2 memory tiles.
+
+    Unlike its sibling ``test_2x1``, which builds for the simulator, this one
+    builds for ``vitis_hls`` and so needs the tool. It carried no availability
+    guard, so it failed on every shell that had not sourced ``settings64.sh``
+    -- after codegen had already completed, which made it read as a codegen
+    regression in every gate run it appeared in.
+    """
     print("Building top_2x2 (2x2 mesh)...", flush=True)
     mod = df.build(top_2x2, target="vitis_hls", mode="csim", project="test_2x2.prj")
     print("Build complete!", flush=True)
