@@ -20,6 +20,7 @@ from .._mlir.ir import (
 from .._mlir.passmanager import PassManager
 
 from .config import DEFAULT_CONFIG, PART_NUMBER
+from . import asic_manifest
 from .vitis import (
     codegen_host,
     postprocess_hls_code,
@@ -871,6 +872,9 @@ class HLSModule:
                 process.wait()
                 if process.returncode != 0:
                     raise RuntimeError("Failed to synthesize the design")
+                # The RTL now exists, so the architectural manifest can be
+                # joined to it. No-op unless `configs["asic_manifest"]` asked.
+                asic_manifest.emit_final(self.project, self.configs, "vitis")
                 return
             # Use Makefile (sw_emu, hw_emu, hw)
             assert "XDEVICE" in os.environ, "Please set XDEVICE in your environment"
