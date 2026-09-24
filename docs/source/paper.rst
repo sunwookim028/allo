@@ -377,11 +377,22 @@ stated gap in the flow, not a solved problem.
 **The area comparison covers one design point.** Gemmini DIM=4 and our T=4
 MAXDIM=64 are synthesised under an identical flow; DIM=8 and the
 capacity-matched pair are not run, so no total-area claim is made and the
-result is logic-only. Because DC's flattening dissolves instance hierarchy at
-the effort these runs use, the component figures are **name-prefix sums over
-flattened cells, not hierarchy lines** — the committed reports state this, and
-it is why the memory-interface comparison is given as a share and a ratio
-rather than to the digit.
+result is logic-only. DC's auto-ungrouping dissolves instance hierarchy at the
+effort these runs use, and no reporting option recovers it — recovering it
+requires changing synthesis, which would break comparability with every run
+already done. The component figures are therefore **sums over a name-based
+selection of flattened leaf cells**.
+
+That method was validated rather than assumed. For a block whose boundary
+*did* survive, the hierarchy line reports 705,486.0 and summing the 230,892
+flattened leaf cells beneath it gives **705,485.998** — identical to the digit.
+So the arithmetic is exact and the only uncertainty is **selection**: whether a
+cell named for one unit belongs to it, and whether logic merged across a
+boundary was renamed away. On our side the selection is clean (every matched
+cell accounted for, and the per-unit distribution reproducing across two
+independent designs to the digit); on the comparison design it rests on the
+generator's naming surviving flattening, which is the weaker of the two and is
+stated as such.
 
 Area results use flip-flop memories rather than SRAM macros, which inflates
 memory-resident structures; it does not flatter the adapter findings, which are
