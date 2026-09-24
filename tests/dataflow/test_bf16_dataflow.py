@@ -18,6 +18,7 @@ nothing else in the tree pins down:
 See ``docs/source/developer/limitations.rst``.
 """
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -147,43 +148,68 @@ _EMIT_SRC = textwrap.dedent(
 )
 
 
+def _repo_root():
+    """Upward search for pyproject.toml, the file that defines the root."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        if os.path.exists(os.path.join(d, "pyproject.toml")) and os.path.isdir(
+            os.path.join(d, "allo")
+        ):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise RuntimeError("not inside an allo checkout")
+        d = parent
+
+
 def _emit(ty, target, tmp_path):
     # A file, not ``python -c``: Allo traces a region with inspect.getsource.
     src = tmp_path / f"emit_{ty}.py"
     src.write_text(_EMIT_SRC.format(ty=ty))
+    # The subprocess must import THIS checkout. Without this it resolves `allo`
+    # through the editable install, which points at whatever checkout was
+    # installed last -- so these arms silently measured a different tree, and
+    # went red or green for reasons unrelated to the code under test.
+    env = dict(os.environ)
+    env["PYTHONPATH"] = (
+        _repo_root() + os.pathsep + env["PYTHONPATH"]
+        if env.get("PYTHONPATH")
+        else _repo_root()
+    )
     return subprocess.run(
         [sys.executable, str(src), target, str(tmp_path / f"{ty}.prj")],
         capture_output=True,
         text=True,
         timeout=600,
+        env=env,
     )
 
 
 @pytest.mark.parametrize("target", ["vitis_hls", "catapult", "systemc"])
-def test_float16_emits_but_bfloat16_aborts(target, tmp_path):
-    """The control emits; bf16 aborts the process.
+def test_both_half_precision_types_emit(target, tmp_path):
+    """Both ``float16`` and ``bfloat16`` emit on all three targets.
 
-    This is a characterisation test, not a wish: it fails the day an emitter
-    learns ``bf16``, which is the day to delete it and emit the MiniTPU model.
+    This replaces a characterisation test that asserted the opposite. That
+    test said in its own docstring that it should be deleted the day an
+    emitter learned ``bf16``; ``6c46d28f`` was that day, so it is inverted
+    here rather than removed -- the arms it exercised are still the arms
+    worth exercising, and a deleted test leaves no record that the two types
+    are meant to behave alike.
 
-    "Emits" means the emitter wrote a ``kernel.cpp``. On Catapult that is now
-    a weaker claim than "compiles": the emit gate compiles what was written,
-    and f16 emits a bare ``half``, which no ac_types header defines -- a
-    separate defect in ``getCatapultTypeName``, which the gate is what made
-    visible. The control arm therefore accepts "emitted, then rejected by the
-    gate"; it is still the emitter that is being asked about.
+    The two are distinct MLIR types, so ``bf16`` never matched the
+    ``Float16Type`` case; that is why it fell through to an abort rather than
+    emitting the wrong thing. Keeping both arms means a future emitter cannot
+    fix one and silently regress the other.
     """
-    ok = _emit("float16", target, tmp_path)
-    assert (
-        "EMITTED" in ok.stdout
-    ), f"float16 should emit on {target}: {ok.stderr[-800:]}"
-
-    bad = _emit("bfloat16", target, tmp_path)
-    assert "EMITTED" not in bad.stdout
-    assert bad.returncode != 0, f"bf16 unexpectedly emitted on {target}"
-    assert (
-        "Got unsupported type" in bad.stderr or bad.returncode < 0
-    ), f"bf16 failed on {target} for an unexpected reason: {bad.stderr[-800:]}"
+    for dtype in ("float16", "bfloat16"):
+        out = _emit(dtype, target, tmp_path)
+        assert "EMITTED" in out.stdout, (
+            f"{dtype} should emit on {target}: {out.stderr[-800:]}"
+        )
+        assert out.returncode == 0, (
+            f"{dtype} emitted but exited {out.returncode} on {target}: "
+            f"{out.stderr[-800:]}"
+        )
 
 
 if __name__ == "__main__":

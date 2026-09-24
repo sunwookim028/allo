@@ -58,7 +58,10 @@ llvm::SmallString<16> mlir::allo::getCatapultTypeName(Type valType) {
     // docs/source/developer/limitations.rst.
     return SmallString<16>("ac::bfloat16");
   else if (llvm::isa<Float16Type>(valType))
-    return SmallString<16>("half");
+    // `half` is a Vitis spelling that no ac_types header defines; the emit
+    // gate is what made this visible. ac_ieee_float<binary16> is the
+    // counterpart of the binary32 case below.
+    return SmallString<16>("ac_ieee_float<binary16>");
   else if (llvm::isa<Float32Type>(valType))
     return SmallString<16>("ac_ieee_float<binary32>");
   else if (llvm::isa<Float64Type>(valType))
