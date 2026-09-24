@@ -207,7 +207,7 @@ The evaluator
   See :ref:`chia-objective` for why each term is there and what it replaced.
 
   1. ``model`` -- RTL cosim cycles for ``mlp_tiny`` and ``mlp_deep``, the two
-     workload-suite models whose every layer fits the scored ``MAXDIM``=16
+     workload-suite models whose every layer fits the scored ``MAXDIM=16``
      build, one csynth shared by all six layers. **The primary.**
   2. ``gemm`` -- RTL cosim cycles at 4x4x4 and 16x16x16, unchanged. **The
      control**, kept so that a change which helps models and hurts GEMM shapes
@@ -266,7 +266,7 @@ It reports itself as an estimate everywhere, and it states its error:
 - **0.33 % mean / 0.91 % worst** in-sample over the seven committed TinyTPU DC
   runs, **0.62 % / 1.39 %** leave-one-out;
 - its channel census reproduces, **to the bit**, a hand count taken off the
-  emitted RTL's instance list (16,640 bits of queue at ``QD``=8, 33,280 at 16);
+  emitted RTL's instance list (16,640 bits of queue at ``QD=8``, 33,280 at 16);
 - ``python examples/tinytpu/chia_agent/area_proxy.py --selfcheck`` re-derives
   every one of those numbers from the committed reports and fails if any moved.
 
