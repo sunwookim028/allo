@@ -528,9 +528,14 @@ commits:
   QD=8 one, so it *bounds* the cost of doubling T rather than measuring it. A
   clean figure needs both variants emitted from one commit.
 - **+14.2% between the two T=8 full runs as the price of channel depth.** Same
-  defect, and it bounds from above — while the FPGA reports **+0.9% flip-flops**
-  for that same pair, which is the third instance of the FPGA resource table
-  understating what standard cells charge.
+  defect, and it bounds from above. An earlier version of this paragraph set it
+  against **+0.9% flip-flops** on the FPGA and called the gap a third instance
+  of the resource table understating silicon. That inference was wrong: the
+  same pair cannot be confounded for area and authoritative for the comparison,
+  and the run's own report says it must not be quoted as the depth cost. The
+  figures that *are* comparable, at the scored design point, are **+9.5%
+  flip-flops on FPGA against +6.6% cell area** — so at that point the FPGA
+  table does not understate, and the claim is withdrawn rather than repaired.
 
 **Two methodological points are now settled on evidence rather than argument.**
 First, the exclusion of our instruction-fetch adapter: **no cells inside the
