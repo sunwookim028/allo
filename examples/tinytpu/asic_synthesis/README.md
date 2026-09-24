@@ -292,3 +292,22 @@ on the FPGA that buffering is block RAM. The design question this raises is
 narrower and more tractable than "is the widening worth it": whether both
 operand ports need widening, or whether one wide port and a shared buffer would
 buy the same cycles.
+
+## Figures
+
+The three figures on `docs/source/paper.rst` are generated from these reports,
+never drawn:
+
+```bash
+python docs/figures/gemmini_figures.py            # rewrites docs/source/_static/figures/*.svg
+python docs/figures/gemmini_figures.py --print    # the numbers and their sources, no drawing
+```
+
+It reads `area_summary.rpt`, `results.json`, `tinytpu_isa.mapped.area.hier.rpt`,
+`pe_array_area.rpt` and `OPEN_QUESTIONS.rpt` here, and the cycle tables in
+`docs/source/designs/benchmarks.rst` -- which it cross-checks against the
+independent copy in `examples/tinytpu/parity_sweep.py` and **refuses to draw**
+if the two disagree. Re-run it after any new DC run, in the same pass as
+`extract_results.py`, so a corrected report and the picture of it never
+disagree. It also fails if a second run starts missing timing, because the
+figures say only one does.
