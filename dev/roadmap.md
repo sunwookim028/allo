@@ -66,7 +66,13 @@ Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
 2. **`examples/accelerator/tinytpu_vitis/` → `examples/tinytpu/`** — one
    rename, references updated, gates re-run. **Done 2026-09-24.**
 3. **`allo/backend/asic/`** — both entry points: AAAH as the Allo-facing mode,
-   the flat flow as the control mode, kept permanently.
+   the flat flow as the control mode, kept permanently. **Done** (`fdb262cc`):
+   the four tools live in `allo/backend/asic/tools/`, each taking the design as
+   a required argument; reports stay with the design. The ADK directories were
+   verified **configuration only** -- seven files, 28 KB, no library data, and
+   every blob that ever existed under that path across the imported history is
+   one of those seven, so the payload was stripped from history rather than
+   deleted in a later commit.
 4. **`examples/systemc_rtlsim/` → `examples/systemc/`** — it is a harness, not
    a design.
 5. `chia_runs/` leaves the repository root.
@@ -153,6 +159,13 @@ Recorded because each cost real work today.
   allo` still worked from inside a checkout and failed everywhere else, so it
   surfaced only when an agent ran a docs build from its own worktree. Removing
   a worktree is not free if anything outside git references it.
+- **The session scratchpad is shared between concurrent agents.** Two agents
+  writing `reproduce.sh` output to the same scratchpad path truncated one
+  another's log mid-cosim; the verdict survived only because the summary block
+  happened to be contiguous at its own offset. An agent that reads a truncated
+  log sees a run that did not finish, or worse a run that appears to have
+  finished differently. Give every agent a distinct path, and prefer a
+  worktree-local file to a shared scratch directory.
 - **Never resolve a repository root by counting levels.** Search upward for a
   marker, or take the path as an argument. Hit three times in two days: a
   construct script counting three `dirname`s landed on `examples/` rather than
