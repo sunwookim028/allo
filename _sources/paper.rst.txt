@@ -21,10 +21,12 @@ compositions of per-unit *actions*, and report where it pays and what it
 provably cannot check. Measurements from the flow are given throughout as
 evidence that its numbers are decision-grade: they reverse two conclusions that
 cycle-only, single-substrate evaluation had reached. Against Gemmini under an
-identical standard-cell flow, our design is 3.66× larger in logic and **roughly
-35× of that difference is the memory interface alone** — 60.2% of our logic
-against 6.3% of theirs — a structural difference rather than an efficiency gap,
-and one no FPGA measurement had shown.
+identical standard-cell flow, at matched array size and matched memory
+capacity, our design is **4.33× larger in logic** — and the arithmetic array is
+**under 4%** of that logic while the memory-interface adapters are **40.9%**,
+against 6.3% for the comparison design's entire equivalent path. A structural
+difference rather than an efficiency gap, and one no FPGA measurement had
+shown.
 
 1. Introduction
 ===============
