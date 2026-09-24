@@ -149,11 +149,21 @@ def expected_library_md5(reports):
     return out
 
 
+def _show(path):
+    """A path as a reader would type it: relative inside the checkout, else absolute."""
+    rel = os.path.relpath(path, REPO)
+    return path if rel.startswith(os.pardir) else rel
+
+
 def check_library(reports, build):
     expected = expected_library_md5(reports)
     if not expected:
+        # Paste-able: the reports directory is an argument now, so a hint that
+        # omits it sends the reader to an argparse error instead of a fix.
         missing("no stdcells_db_md5 in any settings snapshot",
-                "run extract_results.py --capture-settings for a completed run")
+                f"python {_show(HERE)}/extract_results.py "
+                f"--reports {_show(reports)} "
+                "--capture-settings VARIANT=<build-dir>, for a completed run")
         return
     if len(expected) > 1:
         # Worth stopping for: two published runs did not use the same library.
@@ -230,8 +240,8 @@ def main():
               "Nothing was started.")
         return 1
 
-    tools = os.path.relpath(HERE, REPO)
-    rel_reports = os.path.relpath(reports, REPO)
+    tools = _show(HERE)
+    rel_reports = _show(reports)
     print(f"""
 Prerequisites present. The sequence, for {args.variant}:
 
