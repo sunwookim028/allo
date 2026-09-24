@@ -46,9 +46,16 @@ def construct():
     'sram_mode': 'none',
   }
 
+  # The vendored flow: allo/backend/asic/{nodes,adks} at the repository root.
   this_dir = os.path.dirname(os.path.abspath(__file__))
-  asic_dir = os.path.dirname(os.path.dirname(this_dir))
+  repo = os.path.dirname(os.path.dirname(os.path.dirname(this_dir)))
+  asic_dir = os.environ.get('ALLO_ASIC_FLOW',
+                            os.path.join(repo, 'allo', 'backend', 'asic'))
   nodes_dir = os.path.join(asic_dir, 'nodes')
+  if not os.path.isdir(nodes_dir):
+    raise SystemExit(
+      f'no node library at {nodes_dir}. Set ALLO_ASIC_FLOW to a checkout of it, '
+      'or run tools/preflight.py to see what is missing.')
 
   graph.sys_path.append(os.path.join(asic_dir, 'adks'))
   graph.set_adk(adk_name)
