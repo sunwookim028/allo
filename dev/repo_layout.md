@@ -396,11 +396,28 @@ What has not moved, worst first:
    **A root named `act` was also three tools' marker for "this is a checkout".**
    `tests/act/test_gates_negative.py`, `examples/tinytpu/workloads/gate.py` and
    `examples/tinytpu/e2e_gate.sh` each searched upward for a directory named
-   `act` beside `allo/`. All three now look for `examples/tinytpu`. The first
-   two failed loudly and were caught the same hour; `e2e_gate.sh` is not in the
-   required gate set, so it failed only when someone ran it, with an error
-   message naming the *other* marker in its condition. **A marker directory is
-   a reference like any other, and it does not show up in a grep for imports.**
+   `act` beside `allo/`. The first two failed loudly at collection and were
+   caught the same hour, and now look for `examples/tinytpu`. **`e2e_gate.sh`
+   is not in the required gate set**, so it failed only when someone ran it,
+   and then with an error message naming the *other* marker in its condition;
+   it was fixed independently by a second session (`1aab5930`) and looks for
+   `allo/act`. **A marker directory is a reference like any other, and it does
+   not show up in a grep for imports or for the moved path.**
+
+   **The markers across this repository do not agree, which is worth an
+   owner's decision rather than a drive-by sweep.** Four spellings are in use:
+   `pyproject.toml` + `allo/` (`tests/systemc/csyn_subdir.py`,
+   `tests/systemc/rtlsim/guard_experiment/emit.py`,
+   `scripts/devtools/{print_ast,dump_stream_backends}.py`,
+   `scripts/devtools/cosim_sweep.sh`), `allo/backend/asic/nodes`
+   (`allo/backend/asic/tools/*`), `allo/backend/asic/nodes` + `allo/act`
+   (`e2e_gate.sh`), and `examples/tinytpu` + `allo/frontend` or
+   + `allo/backend/asic` (`workloads/gate.py`, `test_gates_negative.py`).
+   Every directory-shaped marker is a hostage to the next reorganisation --
+   `allo/act` is keyed on the directory that has just demonstrated it moves --
+   whereas `pyproject.toml` is a file that defines the project root and is not
+   going anywhere. Standardising on it is a five-file change across two tools'
+   owners, so it is recorded here rather than done unasked.
 
    The
    TinyTPU binding (`examples/tinytpu/act_*.py`, `act/corpus/`) correctly
