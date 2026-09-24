@@ -1,0 +1,70 @@
+{
+  "area": {
+    "buf_inv": 28326.073796,
+    "combinational": 349404.303614,
+    "macro_black_box": 0.0,
+    "noncombinational": 641533.724706,
+    "total_cell": 990938.02832
+  },
+  "counts": {
+    "buf_inv_cells": 42793,
+    "cells": 420352,
+    "combinational_cells": 264174,
+    "macros": 0,
+    "nets": 475160,
+    "ports": 56355,
+    "references": 12641,
+    "sequential_cells": 143364
+  },
+  "run": {
+    "finished_at": "2026-09-22T20:38:05Z",
+    "returncode": 0,
+    "started_at": "2026-09-22T19:36:30Z",
+    "status": "passed",
+    "wall_seconds": 3695.0
+  },
+  "settings": {
+    "build_dir": "/scratch/users/sk3463/build_gemmini_DIM4_full",
+    "constrained_clock": {
+      "period_ns": 3.33,
+      "port": "clock"
+    },
+    "parameters": {
+      "clock_period": "3.33",
+      "design_name": "Gemmini",
+      "flatten_effort": "3",
+      "gate_clock": "true",
+      "high_effort_area_opt": "false",
+      "nthreads": "16",
+      "topographical": "true",
+      "uniquify_with_design_name": "false",
+      "write_svsim_wrapper": "false"
+    },
+    "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+  },
+  "timing": {
+    "counts": {
+      "combinational_cell_count": 264174,
+      "leaf_cell_count": 407538,
+      "macro_count": 0,
+      "sequential_cell_count": 143364
+    },
+    "hold": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "path_group_slacks": [
+      0.08,
+      1.49,
+      0.0
+    ],
+    "setup": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "worst_path_group_slack": 0.0
+  },
+  "variant": "gemmini_DIM4_full"
+}

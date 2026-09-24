@@ -1,0 +1,71 @@
+{
+  "area": {
+    "buf_inv": 66779.564564,
+    "combinational": 625767.142008,
+    "macro_black_box": 0.0,
+    "noncombinational": 2628257.06123,
+    "total_cell": 3254024.203238
+  },
+  "counts": {
+    "buf_inv_cells": 86611,
+    "cells": 1089679,
+    "combinational_cells": 502191,
+    "macros": 0,
+    "nets": 1111140,
+    "ports": 32537,
+    "references": 351,
+    "sequential_cells": 581616
+  },
+  "run": {
+    "finished_at": "2026-09-22T19:15:20Z",
+    "returncode": 0,
+    "started_at": "2026-09-22T17:36:45Z",
+    "status": "passed",
+    "wall_seconds": 5915.0
+  },
+  "settings": {
+    "build_dir": "/scratch/users/sk3463/build_T4_MAXDIM64_burstwiden",
+    "constrained_clock": {
+      "period_ns": 3.33,
+      "port": "ap_clk"
+    },
+    "parameters": {
+      "clock_period": "3.33",
+      "design_name": "tinytpu_isa",
+      "flatten_effort": "3",
+      "gate_clock": "true",
+      "high_effort_area_opt": "false",
+      "nthreads": "16",
+      "topographical": "true",
+      "uniquify_with_design_name": "false",
+      "write_svsim_wrapper": "false"
+    },
+    "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+  },
+  "timing": {
+    "counts": {
+      "combinational_cell_count": 502191,
+      "leaf_cell_count": 1083807,
+      "macro_count": 0,
+      "sequential_cell_count": 581616
+    },
+    "hold": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "path_group_slacks": [
+      1.22,
+      0.82,
+      2.59,
+      0.21
+    ],
+    "setup": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "worst_path_group_slack": 0.21
+  },
+  "variant": "T4_MAXDIM64_burstwiden"
+}

@@ -1,0 +1,71 @@
+{
+  "area": {
+    "buf_inv": 51496.535112,
+    "combinational": 499371.386185,
+    "macro_black_box": 0.0,
+    "noncombinational": 1982554.320761,
+    "total_cell": 2481925.706946
+  },
+  "counts": {
+    "buf_inv_cells": 71585,
+    "cells": 853171,
+    "combinational_cells": 408352,
+    "macros": 0,
+    "nets": 877804,
+    "ports": 28704,
+    "references": 1211,
+    "sequential_cells": 438922
+  },
+  "run": {
+    "finished_at": "2026-09-22T15:50:41Z",
+    "returncode": 0,
+    "started_at": "2026-09-22T14:38:54Z",
+    "status": "passed",
+    "wall_seconds": 4307.0
+  },
+  "settings": {
+    "build_dir": "/scratch/users/sk3463/builds/tinytpu-t8",
+    "constrained_clock": {
+      "period_ns": 3.33,
+      "port": "ap_clk"
+    },
+    "parameters": {
+      "clock_period": "3.33",
+      "design_name": "tinytpu_isa",
+      "flatten_effort": "3",
+      "gate_clock": "true",
+      "high_effort_area_opt": "false",
+      "nthreads": "16",
+      "topographical": "true",
+      "uniquify_with_design_name": "false",
+      "write_svsim_wrapper": "false"
+    },
+    "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+  },
+  "timing": {
+    "counts": {
+      "combinational_cell_count": 408352,
+      "leaf_cell_count": 847274,
+      "macro_count": 0,
+      "sequential_cell_count": 438922
+    },
+    "hold": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "path_group_slacks": [
+      1.1,
+      0.63,
+      2.37,
+      0.2
+    ],
+    "setup": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "worst_path_group_slack": 0.2
+  },
+  "variant": "T8_MAXDIM64"
+}

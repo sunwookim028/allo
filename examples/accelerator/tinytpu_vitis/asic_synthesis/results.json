@@ -1,0 +1,60 @@
+{
+  "runs": {
+    "T4_MAXDIM16_shipped_baseline": {
+      "noncombinational": 906097.845393,
+      "total_cell_area": 1136598.554098,
+      "violating_paths": 0,
+      "wall_seconds": 2216.0,
+      "worst_path_group_slack": 0.21
+    },
+    "T4_MAXDIM64_burstwiden": {
+      "noncombinational": 2628257.06123,
+      "total_cell_area": 3254024.203238,
+      "violating_paths": 0,
+      "wall_seconds": 5915.0,
+      "worst_path_group_slack": 0.21
+    },
+    "T4_MAXDIM64_shipped": {
+      "noncombinational": 1503789.716306,
+      "total_cell_area": 1865313.782218,
+      "violating_paths": 0,
+      "wall_seconds": 3397.0,
+      "worst_path_group_slack": 0.21
+    },
+    "T4_MAXDIM64_shipped_logiconly": {
+      "noncombinational": 1119108.24392,
+      "total_cell_area": 1396965.997746,
+      "violating_paths": 0,
+      "wall_seconds": 2517.0,
+      "worst_path_group_slack": 0.21
+    },
+    "T8_MAXDIM64": {
+      "noncombinational": 1982554.320761,
+      "total_cell_area": 2481925.706946,
+      "violating_paths": 0,
+      "wall_seconds": 4307.0,
+      "worst_path_group_slack": 0.2
+    },
+    "gemmini_DIM4_full": {
+      "noncombinational": 641533.724706,
+      "total_cell_area": 990938.02832,
+      "violating_paths": 0,
+      "wall_seconds": 3695.0,
+      "worst_path_group_slack": 0.0
+    },
+    "gemmini_DIM4_logiconly": {
+      "noncombinational": 146285.630774,
+      "total_cell_area": 382026.004187,
+      "violating_paths": 0,
+      "wall_seconds": 1771.0,
+      "worst_path_group_slack": 0.0
+    },
+    "superseded_export_T4_MAXDIM16": {
+      "noncombinational": 1016186.729495,
+      "total_cell_area": 1271691.970831,
+      "violating_paths": 0,
+      "wall_seconds": 2824.0,
+      "worst_path_group_slack": 0.18
+    }
+  }
+}

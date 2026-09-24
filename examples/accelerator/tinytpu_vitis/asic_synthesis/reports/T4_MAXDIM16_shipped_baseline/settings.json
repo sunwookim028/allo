@@ -1,0 +1,19 @@
+{
+  "build_dir": "/scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline",
+  "constrained_clock": {
+    "period_ns": 3.33,
+    "port": "ap_clk"
+  },
+  "parameters": {
+    "clock_period": "3.33",
+    "design_name": "tinytpu_isa",
+    "flatten_effort": "3",
+    "gate_clock": "true",
+    "high_effort_area_opt": "false",
+    "nthreads": "16",
+    "topographical": "true",
+    "uniquify_with_design_name": "false",
+    "write_svsim_wrapper": "false"
+  },
+  "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+}

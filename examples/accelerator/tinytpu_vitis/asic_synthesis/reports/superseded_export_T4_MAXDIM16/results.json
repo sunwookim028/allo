@@ -1,0 +1,52 @@
+{
+  "area": {
+    "buf_inv": 26741.245521,
+    "combinational": 255505.241336,
+    "macro_black_box": 0.0,
+    "noncombinational": 1016186.729495,
+    "total_cell": 1271691.970831
+  },
+  "counts": {
+    "buf_inv_cells": 36536,
+    "cells": 434225,
+    "combinational_cells": 205743,
+    "macros": 0,
+    "nets": 448035,
+    "ports": 19210,
+    "references": 351,
+    "sequential_cells": 224987
+  },
+  "run": {
+    "finished_at": "2026-09-22T04:48:49Z",
+    "returncode": 0,
+    "started_at": "2026-09-22T04:01:45Z",
+    "status": "passed",
+    "wall_seconds": 2824.0
+  },
+  "timing": {
+    "counts": {
+      "combinational_cell_count": 205743,
+      "leaf_cell_count": 430730,
+      "macro_count": 0,
+      "sequential_cell_count": 224987
+    },
+    "hold": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "path_group_slacks": [
+      1.23,
+      0.72,
+      2.7,
+      0.18
+    ],
+    "setup": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "worst_path_group_slack": 0.18
+  },
+  "variant": "superseded_export_T4_MAXDIM16"
+}
