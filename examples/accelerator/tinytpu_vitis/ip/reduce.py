@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 from allo.ir.types import int16, int32
 
-from examples.accelerator.tinytpu_vitis.ip.compose import (
+from allo.compose import (
     Architecture, Channel, Memory, unit)
 from examples.accelerator.tinytpu_vitis.ip.units.reduction_tree import reduce_tree
 

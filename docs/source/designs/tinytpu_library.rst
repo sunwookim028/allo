@@ -53,7 +53,7 @@ it was pasted into happens to have declared, under whatever names. This is the
 mechanism behind "the design is a monolith": it is not that the units were
 tangled, it is that a unit had nothing to declare.
 
-``ip/compose.py`` works with that rather than against it: it composes the
+``allo/compose.py`` works with that rather than against it: it composes the
 region's **source**. A unit is an ordinary module-level function; an
 ``Architecture`` emits a ``@df.region()`` that nests all of them, declares the
 channels above them, and binds every free name in their bodies from its own
@@ -252,7 +252,7 @@ is where the parametrization lands:
    * - ``ip/isa.py``
      - The instruction encoding: opcodes, field layout, ``enc``, ``enc_agu``.
        ``ISA_NAMESPACE`` is what a unit's ``isa=`` declaration draws from.
-   * - ``ip/compose.py``
+   * - ``allo/compose.py``
      - ``Channel``, ``Memory``, ``Unit``, ``Architecture``: the composition
        itself, with no knowledge of TinyTPU.
    * - ``ip/units/*.py``

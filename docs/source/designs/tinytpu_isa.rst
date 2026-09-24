@@ -26,7 +26,7 @@ TinyTPU-isa (``examples/accelerator/tinytpu_vitis/``) is an int8
 instruction-programmable tiled-GEMM accelerator written in grid Allo
 (``@df.region`` / ``@df.kernel``) and taken through the Vitis HLS dataflow path to
 **RTL co-simulation**. Each of its units is a module of its own under
-``ip/units/``, composed into a region by ``ip/compose.py``; that decomposition
+``ip/units/``, composed into a region by ``allo/compose.py``; that decomposition
 is :doc:`tinytpu_library`, and ``microarch_isa.py`` is the instantiation the
 numbers on this page were measured on. It is the machine the project's requirements name: an ISA,
 a vector unit, a SIMD scratchpad, vector registers streaming to the array's

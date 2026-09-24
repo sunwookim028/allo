@@ -22,7 +22,7 @@ import pytest
 
 import allo.dataflow as df
 from examples.accelerator.tinytpu_vitis.ip import placeholders
-from examples.accelerator.tinytpu_vitis.ip.compose import (
+from allo.compose import (
     Architecture, Channel, Memory, Unit, unit)
 
 

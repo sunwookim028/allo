@@ -6,7 +6,7 @@
 The hardware is no longer here. Each of the eight units is a module of its own
 under `ip/units/`, declaring the channels, memories, parameters and ISA names
 it needs and closing over nothing; `ip/tinytpu.py` wires them into an
-architecture, and `ip/compose.py` emits the `@df.region()` that nests them --
+architecture, and `allo/compose.py` emits the `@df.region()` that nests them --
 which Allo requires, because it reaches a `@df.kernel` only as a nested
 `ast.FunctionDef` inside its region.
 

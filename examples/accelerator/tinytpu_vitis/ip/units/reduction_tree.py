@@ -73,7 +73,7 @@ from __future__ import annotations
 
 from allo.customize import Partition
 
-from examples.accelerator.tinytpu_vitis.ip.compose import unit
+from allo.compose import unit
 
 
 def reduction_tree_legality(p):

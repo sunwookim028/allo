@@ -12,7 +12,7 @@ declaration, and an ``Architecture`` binds that interface -- channels,
 memories, parameters, ISA names -- when it emits the region.
 
 What the front end refuses, and why this is the shape that works today, is on
-``docs/source/designs/tinytpu_library.rst``.
+``docs/source/designs/tinytpu_library.rst``, which uses it.
 """
 
 from __future__ import annotations

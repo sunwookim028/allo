@@ -11,7 +11,7 @@ run and so never back-pressures. Why, and what it measured, is on
 """
 
 from examples.accelerator.tinytpu_vitis.ip.assembler import AR_RAW_DIST, Assembler
-from examples.accelerator.tinytpu_vitis.ip.compose import Architecture, Channel, Memory
+from allo.compose import Architecture, Channel, Memory
 from examples.accelerator.tinytpu_vitis.ip.isa import ISA_NAMESPACE
 from examples.accelerator.tinytpu_vitis.ip.params import TpuParams
 from examples.accelerator.tinytpu_vitis.ip.programs import GemmPrograms, MemoryMap

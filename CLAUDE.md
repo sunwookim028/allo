@@ -78,7 +78,7 @@ does not build the fork's site; build locally.
 
 `examples/accelerator/tinytpu_vitis/`. The hardware is the unit library under
 `ip/` (eight units in `ip/units/`, wired by `ip/tinytpu.py`, composed into one
-region by `ip/compose.py`); `microarch_isa.py` is only the shipped parameter
+region by `allo/compose.py`); `microarch_isa.py` is only the shipped parameter
 set and the names the harness imports. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
 checks the published cycle counts (175/265/421/482/674 since `63ee6ec7` made
