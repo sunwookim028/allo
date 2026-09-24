@@ -1779,6 +1779,52 @@ because of SRL16, and the ASIC cost is linear.
   anything that cosims a program which may not finish should do the same.
 
 
+.. _limitation-25:
+
+25. ``bfloat16`` runs in the simulator and aborts the process in every HLS emitter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. admonition:: Status (2026-09-24): OPEN, simulator-only
+
+   ``bfloat16`` is a complete arithmetic type in the dataflow simulator -- as a
+   ``Stream`` element, as an operand, widened to ``float32`` and rounded back --
+   and it has no emission path at all. ``EmitVivadoHLS.cpp:115``,
+   ``EmitCatapultHLS.cpp:102`` and ``EmitSystemC.cpp`` each fall through their
+   ``getTypeName`` chain to ``assert(1 == 0 && "Got unsupported type.")``, which
+   is a **SIGABRT**, not a catchable exception: the process dumps core with an
+   LLVM crash banner and no diagnostic naming the type. Repro:
+   ``python -m pytest tests/dataflow/test_bf16_dataflow.py`` (15 s, no Vitis) --
+   ``float16`` emits on all three targets, ``bfloat16`` dumps core on all three.
+
+This is the trap the guidance on extensions is meant to catch: a design can be
+built, run and validated end to end in the simulator and then be impossible to
+emit, with the failure arriving as a core dump rather than as an error.
+``examples/minitpu`` is exactly that design -- MiniTPU is a BF16 machine, so its
+model is simulator-only today.
+
+What emission needs:
+
+- A ``BFloat16Type`` case in each of the three ``getTypeName`` functions, ahead
+  of the ``Float16Type`` case (they are distinct MLIR types; ``bf16`` does not
+  match ``Float16Type``, which is why it falls through).
+- **The C++ spelling is genuinely unknown.** ``ap_bfloat16`` and
+  ``hls::bfloat16`` are the plausible Vitis names and neither has been tried
+  here; Catapult's ``ac_std_float.h`` offers ``ac_std_float<16, 8>``, which has
+  BF16's field layout but has not been tried either. SystemC has no BF16 type
+  at all, so the emitter would need a 16-bit container plus conversion, which
+  is a design decision and not a type-table entry.
+- Whatever spelling is chosen, ``bf16`` arithmetic must round the same way the
+  simulator does, or a model that validates in simulation will not validate in
+  cosim. That is a second piece of work, not a consequence of the first.
+
+Adjacent, and separate: the ``int -> float`` bitcast rule at
+``allo/ir/infer.py:1195-1207`` derives its result type from the bit count alone,
+so 16 bits always gives ``float16`` and a 16-bit lane can never be bitcast to
+``bfloat16``. A 24-bit float accumulator can still be emulated -- through the
+32-bit bitcast pair, as ``examples/minitpu/microarch.py`` does -- but a bf16
+bitcast cannot be spelled.
+
+
 Surfaced by the 2026-09-19 re-verification and impact analysis
 ---------------------------------------------------------------
 

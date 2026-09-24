@@ -34,6 +34,13 @@ findings outlive the tree. Everything was read-only. Distilled from two rescued
 scratchpad reports; *(verified)* means re-checked against ``~/core/minitpu`` on
 2026-09-18.
 
+An Allo model of this machine's compute core lives at ``examples/minitpu``
+(``python examples/minitpu/run.py``). It is component-for-component with the
+RTL and says nothing about cycles. Its README lists both where the model
+diverges from the machine and, separately, where **this page** disagreed with
+the source. Reading the RTL for that model found nine such places; each is
+corrected below and marked **CORRECTED 2026-09-24**.
+
 1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2)
 --------------------------------------------------------------
 
@@ -199,10 +206,14 @@ role ``NUM_SUBLANES`` plays in addressing -- see the VMEM correction below.
 |               | Their arithmetic semantics are documented by them at                             |
 |               | ``core/minitpu/docs/ARITHMETIC.md``, which is the source of record.              |
 +---------------+----------------------------------------------------------------------------------+
-| Accumulator   | **24-bit float** per PE (sign + 8 exp + 15 frac, ``MXU_ACC_W``), not fixed point |
+| Accumulator   | **24-bit float** per PE (sign + 8 exp + 15 frac, ``MXU_ACC_W``), not fixed       |
+|               | point. Subnormals are **enabled** here; both multipliers flush them and          |
+|               | neither adder does (``ARITHMETIC.md`` §5) — CORRECTED 2026-09-24                 |
 +---------------+----------------------------------------------------------------------------------+
-| Bundle        | **128-bit VLIW**: slots V / M / MEM / S / C, shared immediate, **7-bit DELAY**   |
-|               | (``DELAY_W = 7``, ``sequencer_pkg.sv:23``) *(verified)*. MEM's two kinds, LDST   |
+| Bundle        | **128-bit VLIW**: slots V / M / MEM / S / C, shared immediate,                   |
+|               | **7-bit DELAY** (``DELAY_W = 7``,                                                |
+|               | ``src/core/sequencer/sequencer_pkg.sv:33`` — CORRECTED 2026-09-24; there         |
+|               | is no ``src/pkg/sequencer_pkg.sv``). MEM's two kinds, LDST                       |
 |               | (``vld``/``vst``) and DESC (``vmemld``/``vmemst``), cannot share a bundle        |
 +---------------+----------------------------------------------------------------------------------+
 | Hazards       | **none in hardware.** Fetch stalls only for DELAY, matrix-busy, halt-drain; VREG |
@@ -241,6 +252,14 @@ role ``NUM_SUBLANES`` plays in addressing -- see the VMEM correction below.
    their tree is the record: the depth to quote is whatever
    ``MINITPU_MXU_OUTPUT_FIFO_DEPTH`` is at the commit being discussed.
 
+   **CORRECTED 2026-09-24, on the unit as well as the number.** The depth
+   counts **result rows**, not entries: ``mxu.sv:114-117`` keeps 64 rows as
+   ``OUTPUT_GROUP_ENTRIES = 16`` entries of ``OUTPUT_GROUP_W = 64`` bits, each
+   entry a group of ``NUM_SUBLANES = 4`` BF16 results, with an elaboration
+   ``$error`` on non-divisibility. The rule a schedule needs is four rows per
+   ``vmatpush``, so at most 16 pushes outstanding (``asm.py:933-955``).
+   "32/lane" was wrong in the number and in the unit.
+
 The bundle's fixed bit layout, from ``sequencer_pkg.sv``'s
 ``encoded_bundle_t``, which is declared MSB first so that the struct *is* the
 layout (cells not to scale; ``BUNDLE_WIDTH = 128``, of which 113 bits carry a
@@ -258,7 +277,11 @@ slot):
 payload, or a descriptor's displacement -- and **exactly one slot may claim it
 per bundle**; ``encode_bundle`` fails the build if two do, because the losers
 would silently read the winner's constant. ``DELAY_W = 7`` holds issue 0..127
-cycles, sized so one field covers the MXU's 82-cycle result latency.
+cycles, sized so one field covers the MXU's result latency. (That latency is
+**85**, not the 82 this page carried — CORRECTED 2026-09-24: 82 survives only
+in a stale comment at ``sequencer_pkg.sv:32``, against 85 in
+``docs/isa_latency.json`` and ``docs/ISA_AND_INTERFACES.md:57``. ``DELAY_W = 7``
+covers either.)
 
 Why BF16: accumulator width was chosen first from the LUT/DSP budget, and an
 8-bit-exponent format is what fits it — "there is no FP32 state anywhere in this
@@ -278,7 +301,21 @@ URAM array** — one compute port, one DMA port, whole words only — with **no
 arbiter and no interlock**; its own comment: "same-word collisions across the
 two ports are undefined, as on the FPGA" *(verified)*. No banking, no conflict
 cost model, nothing to model as a conditional latency. Do not build against the
-banked model.
+banked model. VMEM is 4096 words of 128 B — 512 KiB — one word being exactly
+one VREG (``vpu_pkg.sv:88-92``).
+
+.. admonition:: CORRECTED 2026-09-24 — the banking is real, it is just not in VMEM
+
+   This section reads as though "4 banks per lane" were a fiction. The phrase
+   is in the live tree: ``NUM_SUBLANES = 4`` is commented "== banks per lane"
+   (``vpu_pkg.sv:45``), and the **vector register file** really is four banks —
+   ``vpu_vreg_stripe.sv:73-87`` instantiates ``NUM_SUBLANES`` copies of
+   ``vpu_regfile``, each 256 bits wide and 32 deep, because every lane of a
+   sublane shares the broadcast VREG address. What the rescued report got
+   wrong is *which structure* is banked and what it costs: the VREG banks are
+   not a conflict source (one address, all four banks, per access), and VMEM —
+   the thing it built a ``gcd(stride,4)`` latency model on — is flat. Keep the
+   conclusion; drop the implication that nothing in this machine is banked.
 
 4. Measured performance, and the bound that is not a measurement
 ----------------------------------------------------------------
@@ -295,28 +332,86 @@ re-measured over 20 points with **maximum residual 0**:
 The fit this page carried before the ``vmatpop`` occupancy correction
 (``72c8b78``) is kept in `Earlier measurements and corrections`_.
 
-The **matrix step is 52 cycles**, and the bottleneck is the **write port of the
-3R1W vector-register file** — port C is shared by store and matrix — **not the
-array** (from MiniTPU's owner).
+The **matrix step is 52 cycles**, and the bottleneck is a port of the **3R1W
+vector-register file** — port C, shared by store and matrix — **not the array**
+(from MiniTPU's owner).
 
-- **19.0 % of peak is the MEASURED figure** at the margin.
-- **36.4 % of peak is a BOUND**, set by the matrix controller not overlapping a
-  push with a pop.
-- **Never present the bound as a measurement.** That error was made once already
-  and corrected.
+.. admonition:: CORRECTED 2026-09-24 — port C is a READ port, not the write port
 
-A 16×16×16 matmul takes **168 cycles**, capped by the serialized matrix-command
-FSM (push and pop share one controller). (*Originally from the rescued
-comparison work and not stated in either surviving source doc; MiniTPU's owner
-now reports the same 168 for the 16×16 GEMM Verilator workload, so it is
-corroborated.*)
+   This paragraph said "the write port … port C". Port C is one of the three
+   **read** ports (``raddr_c``, ``vpu_regfile.sv:16-27``); its two readers are
+   the store path's data read and the matrix stream engine, and
+   ``vpu.sv:429-431`` is a fixed-priority mux the matrix wins, with no
+   interlock and no stall. The **single write port** is a different structure:
+   an OR-mux over six sources (``vpu.sv:289-305``) whose only guard is a
+   ``$onehot0`` simulation assertion. Both are real contention points and a
+   cost model needs both — ``tools/gemm_cycle_model.py``'s ``step_bounds()``
+   books the write port separately from the stream engine.
 
-The rest of the gap is result latency — 82 cycles from ``vmatpush`` to first
+- **19.0 % of peak is the MEASURED marginal efficiency**, from their own RTL
+  sweep, and it does not move with size.
+- **36.4 % of peak is also a MEASUREMENT, of a different quantity** --
+  whole-model utilisation, arithmetic performed over array peak, on
+  ``gpt2-124m.prefill.offline.b1t256``: 1,104 launches, 1.315 s wall,
+  194.67 tok/s, 34.91 GFLOP/s against a 96.0 GFLOP/s array peak, PL busy
+  92.8 %, a **board measurement at 187.498 MHz**, five repetitions, wall
+  spread 0.15-0.79 %. It says nothing about controllers.
+
+.. admonition:: CORRECTED 2026-09-24 -- 36.4 % is a measurement, not a bound
+
+   This page, and :doc:`/designs/gemmini_results`, presented 36.4 % as a
+   structural **ceiling** set by "the matrix controller not overlapping a push
+   with a pop". It is nothing of the kind. Per MiniTPU's owner it is the
+   utilisation of one workload, and the neighbouring rows of the same table
+   read **36.1 %, 34.7 % and 32.6 %** at other shapes -- a workload figure
+   moves with the workload; a structural ceiling does not. The supposed
+   mechanism does not exist either: push and pop run on separate engines (see
+   below). **Do not quote 36.4 % as a bound, a ceiling or a limit.** The
+   warning that used to sit here -- "never present the bound as a
+   measurement" -- was exactly backwards.
+
+A 16×16×16 matmul takes **168 cycles** (*originally from the rescued comparison
+work and not stated in either surviving source doc; MiniTPU's owner now reports
+the same 168 for the 16×16 GEMM Verilator workload, so it is corroborated*).
+
+.. admonition:: CORRECTED 2026-09-24 — push and pop do NOT share one controller
+
+   This sentence attributed the 168 to "the serialized matrix-command FSM (push
+   and pop share one controller)". The live RTL has **two** engines.
+   ``vmatload`` and ``vmatpush`` share ``mxu_stream_engine`` — one three-state
+   FSM, one VREG read port C, one input FIFO — so *those two* can never
+   overlap. ``vmatpop`` runs on its own ``mxu_pop_engine``, concurrently:
+   ``mxu_matrix_ctrl.sv:6-7`` reads "They share no resource, so a pop runs
+   while a load or push streams". ``mxu_matrix_ctrl`` holds no FSM of its own;
+   it is a container plus a busy reduction.
+
+   **The 36.4 % bound above was derived from the one-controller reading, so it
+   should be restated against the two-engine machine before it is quoted
+   again.** Relatedly, ``matrix_busy`` is a naming trap: ``vpu.sv:195`` assigns
+   it ``matrix_command_blocked`` — "this bundle's M command found its engine
+   busy", a schedule-violation flag — and the genuinely-busy signal is dropped
+   (``vpu.sv:433-434``). It stalls nothing.
+
+The rest of the gap is result latency — 85 cycles from ``vmatpush`` to first
 result — and it **cannot be hidden by reordering**: loading the next weights
-early corrupts the tile in flight, because weight-commit reaches every PE on one
-cycle (``mxu_pe.sv``). Recovering it needs hardware (hold commit until the array
-drains, or a second weight bank); splitting the matrix controller alone was
+early corrupts the tile in flight. Splitting the matrix controller alone was
 measured and gains nothing.
+
+.. admonition:: CORRECTED 2026-09-24 — the commit is skewed, and the second bank exists
+
+   Two errors in the sentence this replaces. (a) Weight commit does **not**
+   reach every PE on one cycle. It enters the west edge per row skewed by
+   ``row * MXU_PE_LATENCY`` (``mxu.sv:230``) and then walks east one PE per
+   cycle, so PE ``(r, c)`` commits at ``r*4 + c``; the span is
+   ``WEIGHT_SWITCH_SPAN = (DIM-1)*PE_LATENCY + (DIM-1) = 75`` (``mxu.sv:60``),
+   and the switch is armed not by the load ending but by the *next* activation
+   (``tile_starts``, ``mxu.sv:170``). (b) A second weight bank is not hardware
+   still to be built — it is already there. ``MXU_WEIGHT_BANKS = 2``
+   (``vpu_pkg.sv:108``), with an elaboration ``$error`` if it is ever not 2,
+   because the bank pointers are literal toggles. The 75-cycle rule *is* the
+   two-bank contract: a ``vmatload`` refills the bank of the load two before
+   it, and issuing it sooner overwrites weights a PE has not switched to —
+   wrong results, no fault (``mxu.sv:246-262``, ``asm.py:1313-1330``).
 
 **Board-validated** means exactly three bring-up kernels: ``halt`` 4 cy,
 ``vreg`` 12 cy, ``scalar`` 8 cy. **Nothing else on this page is a board cycle
@@ -360,9 +455,15 @@ exactly it; doubling VREG count needs 5 bits that do not exist.
 --------------------------------------------------
 
 - The stale **7.255 W** README figure (shipped: 8.255 W) — since fixed.
-- ``src/core/mxu/mxu_adapter.sv`` **is dead code**: listed in ``core.f`` and ``vpu.f``,
-  instantiated nowhere in ``src/`` or ``tb/`` *(verified, still present)*.
-  **CORRECTION**: the rescued report treats the MXU adapter path as live.
+- ``src/core/mxu/mxu_adapter.sv`` was reported outward as **dead code**: listed
+  in ``core.f`` and ``vpu.f``, instantiated nowhere. **CORRECTED 2026-09-24:
+  the file does not exist.** ``grep -rn mxu_adapter`` over ``src/``, ``tb/``,
+  the ``.f`` filelists and the build scripts returns nothing, and there is no
+  such file anywhere under ``~/core``. The MXU/VPU boundary shims are
+  ``mxu_serializer`` / ``mxu_deserializer``, both pass-through wires in one
+  file (``mxu_serializer.sv:14,27-28``). The rescued report treating the MXU
+  adapter path as live is wrong twice over: the path is not live, and the file
+  is gone.
 - A stale ``matrix_busy_o`` doc comment.
 
 7. Where the two source trees disagree
@@ -380,8 +481,10 @@ VMEM        4 banks/lane + conflict model   **flat dual-port URAM, no arbiter**
 =========== =============================== ====================================
 
 Both agree on: 16×16 BF16 array, 24-bit accumulator, 128-bit bundle, no
-interlocks, 24-bundle loop buffer, 32-entry MXU output FIFO, 82-cycle
-push→result latency.
+interlocks, 24-bundle loop buffer — and on two figures they both get wrong, a
+32-entry MXU output FIFO and an 82-cycle push→result latency. **CORRECTED
+2026-09-24: 64 result rows per lane, and 85 cycles**; see §3 and §4. Two
+reports agreeing is not verification when both descend from one reading.
 
 Consequence: **the rescued report's 8-stage TinyTPU scaling plan rests on the
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.**

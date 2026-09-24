@@ -256,23 +256,43 @@ For contrast, the MiniTPU target's marginal efficiency is **flat at 19.0%** and
 does not move with size. Measured on its own RTL over a 12x sweep of output
 column tiles (``[32,192]@[192,16 / 64 / 192]``: 2,455 / 8,524 / 24,708 cycles for
 98,304 / 393,216 / 1,179,648 useful MACs), it is 48.6 MAC/cycle = 19.0% at both
-steps, to three digits. Two distinctions matter, and an earlier revision got the
-first one wrong:
+steps, to three digits. Three distinctions matter, and earlier revisions got the
+first two wrong:
 
-- **19.0% is the measured marginal; 36.4% is a bound.** One
-  ``mxu_matrix_ctrl`` FSM cannot hold a ``vmatpush`` and a ``vmatpop`` at once,
-  which permits 4 output rows per 11 cycles = 93.1 MAC/cycle = 36.4% of its 256
-  peak. The emitter delivers 48.6 of those 93.1 -- **52% of the bound** -- so
-  roughly half the distance to peak is the FSM and the other half is elsewhere
-  in the schedule and is, as of this writing, unattributed. Quoting 36.4% as the
-  machine's marginal conflates a bound with a measurement.
-- **Flat versus rising is the real difference, not the number.** Our 37.0% and
-  its 36.4% looked like the same quantity and are not: ours rises 26.9% ->
-  52.9% and would keep climbing, theirs sits at 19.0% and does not move.
+- **19.0% is the measured marginal.** It is theirs, from their RTL, and it is
+  the figure to compare a marginal against.
+- **36.4% is a different measurement, not a bound.** See the correction below.
+- **Flat versus rising is the real difference, not the number.** Ours rises
+  26.9% -> 52.9% and would keep climbing; their marginal sits at 19.0% and does
+  not move.
 
-A ceiling and an overhead are different objects. Ours is an overhead: a fixed
-charge the sweep is paying off. Theirs is a ceiling: no amount of amortisation
-reaches past it without changing the emitter.
+.. admonition:: CORRECTED 2026-09-24 -- 36.4% is a measurement of another quantity
+
+   This section said one ``mxu_matrix_ctrl`` FSM "cannot hold a ``vmatpush``
+   and a ``vmatpop`` at once", giving 4 output rows per 11 cycles = 93.1
+   MAC/cycle = 36.4% of peak as a **bound**, and then priced our emitter at
+   "52% of the bound". **Both halves are wrong.**
+
+   The mechanism does not exist. ``vmatload`` and ``vmatpush`` share
+   ``mxu_stream_engine``; ``vmatpop`` runs on its own ``mxu_pop_engine``, and
+   ``mxu_matrix_ctrl.sv:6-7`` states "They share no resource, so a pop runs
+   while a load or push streams". ``mxu_matrix_ctrl`` holds no FSM at all.
+
+   And 36.4% is a measurement, of **whole-model utilisation** -- arithmetic
+   performed over array peak -- not a marginal and not a ceiling. Per
+   MiniTPU's owner: ``gpt2-124m.prefill.offline.b1t256``: 1,104 launches, 1.315 s wall,
+   194.67 tok/s, 34.91 GFLOP/s against a 96.0 GFLOP/s array peak, PL busy
+   92.8 %, a **board measurement at 187.498 MHz**, five repetitions, wall
+   spread 0.15-0.79 %.
+   Neighbouring rows of the same table read 36.1%, 34.7% and 32.6% at other
+   shapes.
+
+   So 19.0% (a marginal, from an RTL sweep) and 36.4% (whole-model utilisation
+   on one board workload) are not two readings of one quantity and must not be
+   divided by one another. **The "52% of the bound" attribution is withdrawn**:
+   how much of the distance to peak is structural is, on this evidence,
+   unknown. Read from ``~/core/minitpu`` on 2026-09-24 and confirmed by
+   MiniTPU's owner.
 
 An earlier analysis of this page read Gemmini's marginal efficiency off a
 two-point difference and put it at "essentially 100% of peak"; that reading was
