@@ -45,10 +45,10 @@ set -uo pipefail
 # levels up from $0: that has broken four times here, and the tree has been
 # reorganised under these files.
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-while [ ! -d "$ROOT/allo/backend/asic/nodes" ] || [ ! -d "$ROOT/act" ]; do
+while [ ! -d "$ROOT/allo/backend/asic/nodes" ] || [ ! -d "$ROOT/allo/act" ]; do
     parent=$(dirname "$ROOT")
     if [ "$parent" = "$ROOT" ]; then
-        echo "not inside an allo checkout (no allo/backend/asic/nodes above $(dirname "${BASH_SOURCE[0]}"))" >&2
+        echo "not inside an allo checkout (no allo/backend/asic/nodes and allo/act above $(dirname "${BASH_SOURCE[0]}"))" >&2
         exit 1
     fi
     ROOT=$parent
