@@ -23,7 +23,7 @@ import numpy as np
 #: re-imports both modules under several environments and compares.
 T = int(os.environ.get("TPU_T", 4))   # SIMD width, and the array dimension: the array is T*T processing elements
 MAXDIM = int(os.environ.get("TPU_MAXDIM", 64))   # largest M, K, N supported by one build
-QD = int(os.environ.get("TPU_QD", 8))   # stream depth on every point-to-point channel
+QD = int(os.environ.get("TPU_QD", 16))   # stream depth on every point-to-point channel
 
 VW = T * 8   # packed operand word: T operand lanes
 AW = T * 32   # packed accumulator word: T accumulator lanes

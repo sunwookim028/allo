@@ -1145,7 +1145,7 @@
     {
       "name": "QD",
       "env": "TPU_QD",
-      "default": 8,
+      "default": 16,
       "min": 2,
       "max": null,
       "role": "stream depth on every point-to-point channel",

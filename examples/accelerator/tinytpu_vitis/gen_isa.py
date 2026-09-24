@@ -608,7 +608,7 @@ def _bit_layout(spec):
         w1.append(("", f"{top}:{nterms * tbits}"))
     for i in range(nterms - 1, -1, -1):
         w1.append((f"term {i}", f"{tbits * (i + 1) - 1}:{tbits * i}"))
-    out = ["Bit layout", "^^^^^^^^^^", "",
+    out = ["Bit layout", "~~~~~~~~~~", "",
            f"Most significant on the left. ``enc()`` builds word 0 and "
            f"``enc_agu()`` word 1; both are generated from the field table "
            f"below, so neither picture can go stale.", "",
@@ -668,7 +668,7 @@ def gen_doc(spec) -> str:
                   [(f"``{c['path']}``", c["held"], c["note"])
                    for c in spec["consumers"] if "path" in c])
 
-    out += ["Instruction word", "^^^^^^^^^^^^^^^^", "",
+    out += ["Instruction word", "~~~~~~~~~~~~~~~~", "",
             f"An instruction is **{iw['words_per_instruction']} "
             f"{iw['word_bits']}-bit words** (``IWORDS``). Word 0 carries the "
             f"opcode and five fields; word 1 carries up to "
@@ -695,7 +695,7 @@ def gen_doc(spec) -> str:
                         + (f"``{t['field']}``" if t["field"] else "unused")
                         for t in agu["targets"]) + ".", ""]
 
-    out += ["Opcodes", "^^^^^^^", ""]
+    out += ["Opcodes", "~~~~~~~", ""]
     rows = []
     for o in spec["opcodes"]:
         if o["operands"]:
@@ -712,7 +712,7 @@ def gen_doc(spec) -> str:
     out += _table("Opcodes", ("constant", "value", "name", "operand fields",
                               "``nr``", "units"), rows)
 
-    out += ["Derived properties", "^^^^^^^^^^^^^^^^^^", "",
+    out += ["Derived properties", "~~~~~~~~~~~~~~~~~~", "",
             "Facts that **follow** from the tables above rather than being "
             "written in them. ``gen_isa.py --check`` recomputes each one from "
             "the spec and then confirms the design behaves that way, so they "
@@ -730,7 +730,7 @@ def gen_doc(spec) -> str:
         if d.get("note"):
             out += [f"   {d['note']}", ""]
 
-    out += ["Per-unit rewrites", "^^^^^^^^^^^^^^^^^", "",
+    out += ["Per-unit rewrites", "~~~~~~~~~~~~~~~~~", "",
             "The sequencer hands two units a rewritten copy of the word, so "
             "each unit's flat row loop reads its own work count out of "
             "``nr``:", ""]
@@ -739,7 +739,7 @@ def gen_doc(spec) -> str:
                     ", ".join(f"``{k}`` = {v}" for k, v in r["set"].items()),
                     r["note"]) for r in spec["dispatch"]["rewrites"]])
 
-    out += ["Instruction memory header", "^^^^^^^^^^^^^^^^^^^^^^^^^", "",
+    out += ["Instruction memory header", "~~~~~~~~~~~~~~~~~~~~~~~~~", "",
             f"``imem[0:NHDR]`` (``NHDR = {spec['imem']['header_words']}``) is a "
             f"header of per-unit **work** counts; instructions follow, two "
             f"words each. Each count is read back through a "
@@ -756,7 +756,7 @@ def gen_doc(spec) -> str:
     out += _table("Header words", ("word", "bits", "name", "count", "consumer"),
                   hrows)
 
-    out += ["Memory map", "^^^^^^^^^^", ""]
+    out += ["Memory map", "~~~~~~~~~~", ""]
     out += _table("Memories", ("memory", "owner", "depth", "row width",
                                "written by", "read by", "cleared at start"),
                   [(f"``{m['name']}``", _lit(m["owner"]),
@@ -768,7 +768,7 @@ def gen_doc(spec) -> str:
     out += ["No on-chip memory is cleared by the hardware, so every read of "
             "one is the program's obligation; see the contracts below.", ""]
 
-    out += ["Contracts", "^^^^^^^^^", ""]
+    out += ["Contracts", "~~~~~~~~~", ""]
     wbr = spec["contracts"]["write_before_read"]
     out += ["**Write before read.**", ""]
     out += [f"* {r}" for r in wbr["rules"]] + [""]
@@ -781,7 +781,7 @@ def gen_doc(spec) -> str:
             + f". Enforced by {ard['enforced_by']}. Exercised at its edge by "
               f"{ard['exercised_at_its_edge_by']}.", ""]
 
-    out += ["Parameters", "^^^^^^^^^^", ""]
+    out += ["Parameters", "~~~~~~~~~~", ""]
     out += _table("Build parameters",
                   ("constant", "environment variable", "default", "legal range",
                    "role"),
@@ -800,7 +800,7 @@ def gen_doc(spec) -> str:
     out += [""]
 
     mc = spec["maxdim_ceilings"]
-    out += ["What bounds ``MAXDIM``", "^^^^^^^^^^^^^^^^^^^^^^", "",
+    out += ["What bounds ``MAXDIM``", "~~~~~~~~~~~~~~~~~~~~~~", "",
             "Two ceilings, both in the **encoding** rather than the datapath. "
             "They answer different questions, so neither is a correction of "
             "the other, and which one binds depends on the program and on "
@@ -819,7 +819,7 @@ def gen_doc(spec) -> str:
                    for c in mc["ceilings"]])
     out += [mc["note"], ""]
 
-    out += ["Numerics", "^^^^^^^^", ""]
+    out += ["Numerics", "~~~~~~~~", ""]
     nm = spec["numerics"]
     out += [f"Active configuration: **{nm['active']}**. A configuration states "
             f"what happens to *values*, not only how wide they are, so that a "

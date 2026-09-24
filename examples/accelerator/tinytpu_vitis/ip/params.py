@@ -53,7 +53,7 @@ class TpuParams:
     SPAD_ROWS: int = None       # scratchpad rows, each one packed word
     NVR: int = None             # operand vector registers
     NAR: int = None             # accumulator vector registers
-    QD: int = 8                 # stream depth
+    QD: int = 16                # stream depth (16 since item 24: depth 8 deadlocks legal programs)
     IMEM_SIZE: int = 56         # instruction memory words, header included
     DMA_WORDS: int = 1          # packed words per operand-burst iteration
 

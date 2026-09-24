@@ -806,7 +806,7 @@ Parameters
      - instruction memory depth in 64-bit words
    * - ``QD``
      - ``TPU_QD``
-     - 8
+     - 16
      - 2 .. unbounded
      - stream depth on every point-to-point channel
    * - ``DMA_WORDS``
