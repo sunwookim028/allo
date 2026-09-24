@@ -7,12 +7,19 @@ price table, not Google's invoice. The invoice (and the remaining credit on
 CHIA2026) is read in the Cloud Console, Billing -> CHIA2026; gcloud and the
 Billing API do not expose the credit balance.
 
-Two questions, two functions:
+Three questions, three functions:
 
-* `spent_since(t0)` -- this run. Sums messages created since the run started:
-  the global figure a per-run cap needs, counting every worker at once and a
-  turn still in flight as soon as opencode writes it. Over-counts if something
-  else on this account uses opencode at the same time -- the safe direction.
+* `run_spend(prefix, t0)` -- this run, for the per-run cap. Sums the messages
+  of the sessions titled with the run's tag (`loop.py` passes `--title` to
+  opencode, so a call that timed out -- which returns no session id and
+  reports `usage` of $0 while being billed -- is still found) plus any session
+  id the run saw returned. A turn in flight counts as soon as opencode writes
+  it, and every worker of the run shares the prefix.
+* `spent_since(t0)` -- every message on the account since t0. Context only,
+  never a cap: with two tracks running it counts the other track's spend and
+  stops the wrong run (measured: a counter read $15.82 against a $15 cap, of
+  which $4.46 was the run's own; run 2 was stopped after 2 of 5 iterations
+  this way).
 * `chia2026_spend()` -- cumulative, for the cap across runs
   (`CHIA_TOTAL_CAP_USD`). **Attribution is by cutover time**, recorded in
   the tracked `billing.json`: every `google-vertex` session created at or after
@@ -75,6 +82,37 @@ def spent_since(t0_ms: int, t1_ms: int | None = None) -> dict:
         out["output"] += tok.get("output", 0) or 0
         out["cache_read"] += (tok.get("cache") or {}).get("read", 0) or 0
     out["usd"] = round(out["usd"], 4)
+    return out
+
+
+def run_spend(prefix: str, t0_ms: int, session_ids=()) -> dict:
+    """USD per session for this run: sessions created since t0 whose title
+    starts with `prefix`, and the named `session_ids`."""
+    out = {"usd": 0.0, "messages": 0, "sessions": {}}
+    if not DB.exists():
+        return out
+    ids = sorted({str(s) for s in session_ids if s})
+    con = _connect()
+    try:
+        titled = [r[0] for r in con.execute(
+            "select id from session where time_created >= ? "
+            "and substr(title, 1, ?) = ?", (t0_ms, len(prefix), prefix))]
+        wanted = sorted(set(titled) | set(ids))
+        rows = con.execute(
+            f"select session_id, data from message where session_id in "
+            f"({','.join('?' * len(wanted))})", wanted).fetchall() if wanted else []
+    finally:
+        con.close()
+    for sid in wanted:
+        out["sessions"][sid] = 0.0
+    for sid, data in rows:
+        d = json.loads(data)
+        if d.get("role") != "assistant":
+            continue
+        out["sessions"][sid] += d.get("cost", 0) or 0
+        out["messages"] += 1
+    out["sessions"] = {k: round(v, 4) for k, v in out["sessions"].items()}
+    out["usd"] = round(sum(out["sessions"].values()), 4)
     return out
 
 
@@ -210,7 +248,7 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["report"]:
         print(report(Path(sys.argv[2]) if len(sys.argv) > 2
                      else Path(__file__).resolve().parents[3],
-                     float(os.environ.get("CHIA_TOTAL_CAP_USD", "100"))))
+                     float(os.environ.get("CHIA_TOTAL_CAP_USD", "500"))))
     elif sys.argv[1:2] == ["chia2026"]:
         r = chia2026_spend()
         r.pop("rows")
