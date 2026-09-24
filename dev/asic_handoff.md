@@ -183,3 +183,27 @@ substitute and is correctly labelled as a different kind of number.
 near-duplicate runs caught tonight by checking disk before launching. Two
 sessions with the same tools and the same repository will converge on the same
 work unless one of them looks first.
+
+## `TPU_TILED=32x512x128` does not complete at the shipped depth (2026-09-24)
+
+A cosim of that shape ran for **29 hours with 28 seconds of CPU**, last
+reporting `RTL Simulation : 0 / 1` at 5.1 ms of simulated time — simulation
+time advancing, nothing retiring. Killed by PID, owner confirmed.
+
+This is **another instance of limitations item 24**, at a much larger shape
+than the ten-program family the item was filed for, and it has a consequence
+for the merge train: the `big-shapes` branch is held pending a measurement of
+`TPU_TILED=32x512x128`, and **that measurement was blocked by the very
+deadlock `QD=16` was shown to clear**. Re-run it at `QD=16` before concluding
+anything about that branch's mixed-sign `EXPECTED` row.
+
+It also adds a data point the item's open predicate has to survive: the failing
+set now spans a family of small tiled programs *and* a single very large one,
+while the shipped GEMM issues 272 instructions to one unit at the same depth
+and completes. Program size still does not predict membership.
+
+**Operational note.** This was invisible from inside the session that started
+it — the shell was blocked on the simulator, so nothing reported. It was found
+by another session's fleet-wide process sweep. A run that can deadlock needs a
+timeout at the launcher, not only a gate at the end; `ACT_COSIM_TIMEOUT` exists
+and this launcher did not use it.
