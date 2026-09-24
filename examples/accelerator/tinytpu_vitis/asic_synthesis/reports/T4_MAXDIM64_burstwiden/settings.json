@@ -5,15 +5,42 @@
     "port": "ap_clk"
   },
   "parameters": {
+    "adk": "freepdk-45nm",
+    "adk_view": "view-standard",
     "clock_period": "3.33",
+    "clock_port": "ap_clk",
+    "clock_uncertainty": "0.0",
     "design_name": "tinytpu_isa",
+    "design_path": "/work/shared/users/phd/sk3463/projects/allo-main/examples/accelerator/tinytpu_vitis/rtl_handoff/T4_MAXDIM64_burstwiden",
     "flatten_effort": "3",
     "gate_clock": "true",
     "high_effort_area_opt": "false",
+    "input_delay_fraction": "0.5",
+    "manifest": "/work/shared/users/phd/sk3463/projects/allo-main/examples/accelerator/tinytpu_vitis/rtl_handoff/T4_MAXDIM64_burstwiden/sv2v_manifest.f",
+    "max_fanout": "20",
+    "max_transition_fraction": "0.25",
+    "normalize_rtl": "false",
     "nthreads": "16",
+    "output_delay_fraction": "0.0",
+    "sram_mode": "none",
+    "sv2v_defines": "TARGET_ASIC=1",
+    "top_module": "tinytpu_isa",
     "topographical": "true",
     "uniquify_with_design_name": "false",
     "write_svsim_wrapper": "false"
+  },
+  "rtl": {
+    "allo_commit": "f189659713b9323ecf70bba87993ec0c5e12443e",
+    "config": {
+      "TPU_DMA_WIDEN": "1",
+      "TPU_MAXDIM": "64",
+      "TPU_T": "4"
+    },
+    "dir": "/work/shared/users/phd/sk3463/projects/allo-main/examples/accelerator/tinytpu_vitis/rtl_handoff/T4_MAXDIM64_burstwiden",
+    "files": 146,
+    "manifest": "sv2v_manifest.f",
+    "manifest_md5": "07985a4ddc50d0e76df5165f2cd8f230",
+    "top": "tinytpu_isa"
   },
   "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
 }

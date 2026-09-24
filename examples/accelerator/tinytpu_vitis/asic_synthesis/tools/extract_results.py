@@ -29,6 +29,7 @@ which is what CI should run.
 """
 
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -137,9 +138,14 @@ def capture_settings(build_dir):
               "max_transition_fraction", "clock_uncertainty",
               "uniquify_with_design_name", "write_svsim_wrapper", "adk",
               "adk_view", "sv2v_defines", "manifest", "design_path")
+    # The synthesis step's own configure.yml, then every other step's, because
+    # the RTL path and manifest are set on the collector rather than on DC.
     params = {}
-    cfg = os.path.join(step, "configure.yml")
-    if os.path.isfile(cfg):
+    others = sorted(glob.glob(os.path.join(os.path.dirname(step), "*",
+                                           "configure.yml")))
+    for cfg in [os.path.join(step, "configure.yml")] + others:
+        if not os.path.isfile(cfg):
+            continue
         with open(cfg, errors="replace") as fh:
             for line in fh:
                 hit = re.match(r"\s*([a-z_0-9]+):\s*(\S.*?)\s*$", line)
@@ -161,6 +167,40 @@ def capture_settings(build_dir):
                     out["constrained_clock"] = {"port": hit.group(1),
                                                 "period_ns": float(hit.group(2))}
                     break
+
+    # The RTL this run consumed, as data rather than as a directory name. Every
+    # mis-dated figure in this project has been prose -- a README asserting old
+    # cycles, an area row placed beside cycles from other RTL -- so the export's
+    # own parameters and measured cycles are recorded here, and a checker can
+    # refuse a figure whose QD disagrees with the cycles beside it.
+    design_path = params.get("design_path", "")
+    manifest = params.get("manifest", "")
+    rtl_dir = design_path if os.path.isdir(design_path) else os.path.dirname(manifest)
+    if os.path.isdir(rtl_dir):
+        rtl = {"dir": rtl_dir, "manifest": os.path.basename(manifest) or None}
+        if os.path.isfile(manifest):
+            with open(manifest, "rb") as fh:
+                rtl["manifest_md5"] = hashlib.md5(fh.read()).hexdigest()
+        mf = os.path.join(rtl_dir, "MANIFEST.json")
+        if os.path.isfile(mf):
+            with open(mf) as fh:
+                m = json.load(fh)
+            for key in ("params", "config", "cycles", "files", "memory_bits",
+                        "stress_isa", "top"):
+                if key in m:
+                    rtl[key] = m[key]
+            if "params" not in rtl and "config" not in rtl:
+                rtl["params_source"] = "MANIFEST.json carries neither"
+        else:
+            rtl["params_source"] = "no MANIFEST.json in the RTL directory"
+        readme = os.path.join(rtl_dir, "README.md")
+        if os.path.isfile(readme):
+            with open(readme, errors="replace") as fh:
+                hit = re.search(r"Emitted from allo commit `([0-9a-f]{7,40})`",
+                                fh.read())
+            if hit:
+                rtl["allo_commit"] = hit.group(1)
+        out["rtl"] = rtl
 
     db = os.path.join(step, "inputs", "adk", "stdcells.db")
     if os.path.isfile(db):
@@ -273,7 +313,24 @@ def main():
         else:
             with open(path, "w") as fh:
                 fh.write(text)
+        rtl = res.get("settings", {}).get("rtl", {})
+        design = dict(rtl.get("config") or {})
+        design.update(rtl.get("params") or {})
+        # Exports have used both TPU_T and T; normalise so the index is uniform.
+        # An export predating the QD parameter simply has no QD here, which is
+        # what dates it -- the absence is the signal, so it is not filled in.
+        picked = {}
+        for key in ("T", "MAXDIM", "QD"):
+            for name in (key, f"TPU_{key}"):
+                if name in design:
+                    picked[key] = design[name]
+                    break
         index[variant] = {
+            # The design parameters travel with the area, so a figure can never
+            # be quoted beside cycles from a different configuration unnoticed.
+            "design_params": picked or None,
+            "allo_commit": rtl.get("allo_commit"),
+            "manifest": rtl.get("manifest"),
             "total_cell_area": res["area"].get("total_cell"),
             "noncombinational": res["area"].get("noncombinational"),
             "worst_path_group_slack":
