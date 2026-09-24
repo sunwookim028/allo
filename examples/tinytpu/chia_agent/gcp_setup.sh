@@ -59,7 +59,8 @@ else
 fi
 PROJECT="${GOOGLE_CLOUD_PROJECT:-}"
 ACCOUNT="${CHIA_BILLING_ACCOUNT:-01BF39-94AA3F-36BACB}"
-CAP="${CHIA_TOTAL_CAP_USD:-100}"
+# The committed default, as preflight.DEFAULT_TOTAL_CAP_USD and spend.py.
+CAP="${CHIA_TOTAL_CAP_USD:-500}"
 if [ -z "$PROJECT" ]; then
   echo "FAIL: GOOGLE_CLOUD_PROJECT is not set (copy chia.env.example to chia.env)" >&2
   exit 1

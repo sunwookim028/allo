@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 
 import preflight
-from spend import run_spend, spent_since
+from spend import of_run, run_spend, spent_since
 
 DEFAULT_CALL_USD = 3.5  # as loop.py
 
@@ -290,7 +290,62 @@ def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dic
           f"{spend['messages']} model messages (the whole account in the same "
           f"window: ${window['usd']:.2f}); wall {summary['wall_seconds'] / 60:.1f} min")
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
+    #: The same figure again, standalone and self-describing, so that reading
+    #: what a run cost needs neither this summary's schema nor the run's tag.
+    (run_dir / "spend.json").write_text(json.dumps(of_run(run_dir), indent=1))
     return summary
+
+
+def status(run_dir: Path) -> None:
+    """What this run is, was asked, and has reached -- from its directory
+    alone. Safe on a finished, a live, or an abandoned run; reads nothing but
+    `run.json`, the workers' logs and opencode's DB."""
+    run_dir = run_dir.resolve()
+    run = json.loads((run_dir / "run.json").read_text())
+    done = run_dir / "summary.json"
+    alive = subprocess.run(["pgrep", "-f", f"--log-dir {run_dir}"],
+                           capture_output=True, text=True).stdout.split()
+    print(f"run      {run_dir}")
+    print(f"  tag    {run['run_tag']}")
+    print(f"  began  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(run['t0_ms'] / 1000))}"
+          f"  ({(time.time() - run['t0_ms'] / 1000) / 60:.1f} min ago)")
+    print(f"  head   {run['head']}   model {run['model']}")
+    print(f"  plan   {len(run['workers'])} worker(s) x {run['iterations']} "
+          f"iteration(s), cap ${run['budget_usd']:.2f}"
+          + ("  [CO-DESIGN]" if run.get("codesign") else ""))
+    print(f"  state  " + ("FINISHED (summary.json written)" if done.exists()
+                          else f"RUNNING ({len(alive)} worker process(es))"
+                          if alive else
+                          "STOPPED with no summary.json -- interrupted or "
+                          "killed. There is no resume; see 'Abandoning a run' "
+                          "in README.md"))
+    for worker in run["workers"]:
+        entries = read_variants(run_dir / worker)
+        cands = [e for e in entries if e["kind"] == "candidate"]
+        graded = [e for e in cands if (e.get("verdict") or {}).get("ok")]
+        last = entries[-1]["iteration"] if entries else 0
+        print(f"\n  {worker}: iteration {last} of {run['iterations']}, "
+              f"{len(cands)} candidate(s), {len(graded)} graded, "
+              f"{sum(1 for e in cands if e['accepted'])} accepted")
+        print(f"    asked: {run['strategies'][worker].strip().splitlines()[0]}")
+        for e in cands:
+            v = e.get("verdict") or {}
+            print(f"    iter {e['iteration']}: "
+                  + (f"cosim {v['cycles']} total {v['total_cycles']}"
+                     if v.get("ok") else f"FAILED at {v.get('stage')}" if v
+                     else f"not scored ({e.get('reason')})")
+                  + ("  ACCEPTED" if e["accepted"] else "  rejected"))
+        log = run_dir / worker / "worker.log"
+        if log.exists() and not done.exists():
+            tail = log.read_text(errors="replace").splitlines()[-1:]
+            print(f"    log tail: {tail[0][:100] if tail else '(empty)'}")
+    spend = run_spend(run["run_tag"] + " ", run["t0_ms"])
+    print(f"\n  spend  ${spend['usd']:.2f} of ${run['budget_usd']:.2f} over "
+          f"{len(spend['sessions'])} session(s), {spend['messages']} model "
+          f"messages -- from opencode's DB, never the `usage` field")
+    print(f"  the full question: python3 -c \"import json;r=json.load("
+          f"open('{run_dir}/run.json'));print(r['task_template'].format("
+          f"angle=r['strategies']['{run['workers'][0]}']))\"")
 
 
 def kill(procs, opencode_too=False):
@@ -310,10 +365,15 @@ def kill(procs, opencode_too=False):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--status", type=Path, metavar="RUN_DIR",
+                        help="report what that run is, was asked and has "
+                             "reached, then exit. Starts nothing, spends "
+                             "nothing.")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--iterations", type=int, default=3)
     # Required: no run starts without an explicit per-run spend cap.
-    parser.add_argument("--budget-usd", type=float, required=True)
+    # (Enforced below, not by argparse, so --status needs no budget.)
+    parser.add_argument("--budget-usd", type=float)
     parser.add_argument("--run-dir", type=Path, default=REPO_ROOT / "chia_runs"
                         / f"isa-{time.strftime('%Y%m%d-%H%M%S')}")
     parser.add_argument("--stagger", type=float, default=60.0)
@@ -323,7 +383,24 @@ def main() -> None:
                              "exhaustively, and the best nest each candidate can "
                              "encode is what gets cosimmed")
     args = parser.parse_args()
+    if args.status:
+        status(args.status)
+        raise SystemExit(0)
+    if args.budget_usd is None:
+        parser.error("--budget-usd is required: no run starts without an "
+                     "explicit per-run spend cap")
     run_dir = args.run_dir.resolve()
+    # A run directory is written once and never resumed. Re-using one
+    # overwrites run.json -- and with it the tag that attributes this run's
+    # spend -- truncates worker.log, appends a second run's iterations to
+    # variants.jsonl, and leaves the previous run's edited spec in place, so
+    # the "baseline" measured is that design rather than HEAD's.
+    if (run_dir / "run.json").exists():
+        raise SystemExit(
+            f"refusing to re-use {run_dir}: it already holds a run.json.\n"
+            f"  There is no resume. Inspect it with\n"
+            f"    python swarm.py --status {run_dir}\n"
+            f"  and start a fresh --run-dir, or delete this one.")
     run_dir.mkdir(parents=True, exist_ok=True)
     strategies = list(CODESIGN_STRATEGIES if args.codesign
                       else STRATEGIES)[: args.workers]
@@ -376,7 +453,10 @@ def main() -> None:
         for worker, p in procs:
             print(f"worker '{worker}' exited with {p.wait()}", flush=True)
     finally:
-        kill(procs)
+        # opencode_too: on Ctrl-C or an exception as much as on the hard cap.
+        # opencode is a grandchild outside the loops' process groups and keeps
+        # spending after its driver dies.
+        kill(procs, opencode_too=True)
     summary = report(run_dir, [w for w, _ in strategies], t0_ms, started)
     summary["hard_cap_hit"] = capped
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))

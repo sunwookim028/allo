@@ -47,6 +47,7 @@ import sqlite3
 import time
 from pathlib import Path
 
+DEFAULT_TOTAL_CAP_USD = 500.0   # as preflight.DEFAULT_TOTAL_CAP_USD
 DB = Path(os.environ.get(
     "OPENCODE_DB", Path.home() / ".local/share/opencode/opencode.db"))
 BILLING = Path(__file__).resolve().parent / "billing.json"
@@ -114,6 +115,30 @@ def run_spend(prefix: str, t0_ms: int, session_ids=()) -> dict:
     out["sessions"] = {k: round(v, 4) for k, v in out["sessions"].items()}
     out["usd"] = round(sum(out["sessions"].values()), 4)
     return out
+
+
+def of_run(run_dir: Path) -> dict:
+    """What a run cost, from `<run>/run.json` alone: no memory of the session
+    that started it, and never the `usage` field (which reports $0.00 for a
+    call that timed out and was billed in full -- every large call of run 3 did
+    exactly that, so the run read $0.00 on `usage` and $20.72 here)."""
+    run = json.loads((Path(run_dir) / "run.json").read_text())
+    spend = run_spend(run["run_tag"] + " ", run["t0_ms"])
+    cumulative = chia2026_spend()
+    cumulative.pop("rows", None)
+    cap = float(os.environ.get("CHIA_TOTAL_CAP_USD", DEFAULT_TOTAL_CAP_USD))
+    return {"run_dir": str(Path(run_dir).resolve()),
+            "run_tag": run["run_tag"], "t0_ms": run["t0_ms"],
+            "source": "opencode's own database (spend.run_spend), "
+                      "NEVER the `usage` field",
+            "run_usd": spend["usd"],
+            "run_sessions": len(spend["sessions"]),
+            "per_session_usd": spend["sessions"],
+            "model_messages": spend["messages"],
+            "per_run_cap_usd": run.get("budget_usd"),
+            "cumulative_chia2026_usd_after": cumulative["usd"],
+            "cumulative_sessions_after": cumulative["sessions"],
+            "total_cap_usd": cap}
 
 
 def billing() -> dict:
@@ -248,7 +273,10 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["report"]:
         print(report(Path(sys.argv[2]) if len(sys.argv) > 2
                      else Path(__file__).resolve().parents[3],
-                     float(os.environ.get("CHIA_TOTAL_CAP_USD", "500"))))
+                     float(os.environ.get("CHIA_TOTAL_CAP_USD",
+                                          DEFAULT_TOTAL_CAP_USD))))
+    elif sys.argv[1:2] == ["run"]:
+        print(json.dumps(of_run(Path(sys.argv[2])), indent=1))
     elif sys.argv[1:2] == ["chia2026"]:
         r = chia2026_spend()
         r.pop("rows")
