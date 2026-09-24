@@ -1087,7 +1087,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
    induction variable is unused) made ``acc`` run unthrottled, and that
    ``72c70dcb``'s guard missed it because ``acc`` has no memory port. The guard was
    extended to any loop body containing a ``WireGetOp`` (``guard_experiment/`` under
-   ``tests/systemc/rtlsim/``), ``examples/systemc/dot_product_four_links.py`` was re-emitted from
+   ``tests/systemc/rtlsim/``), ``tests/systemc/dot_product_four_links.py`` was re-emitted from
    ``choonsik1/allo:SystemC-emitter`` with and without it, synthesised with Catapult
    2024.2, and simulated under Xcelium 24.03:
 

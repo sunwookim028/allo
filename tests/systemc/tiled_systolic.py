@@ -6,7 +6,7 @@
 # target="systemc" — it exercises, together:
 #   - a mapping=[P0,P1] GRID of PEs (feeders / body / drains via meta_if),
 #   - 2-D random-access boundary arrays A, B (reads) and C (writes) -> internal
-#     memory ports (2x AlloMem + 1x AlloMemW), and
+#     memory ports (3x AlloMemPins), and
 #   - int accumulation that widens past 64 bits (the ap_int<65> GEMM accumulator).
 #
 # NOTE: this works with Mt=Nt=1 (each boundary array is touched by exactly ONE
@@ -65,8 +65,13 @@ if __name__ == "__main__":
     code = df.build(top, target="systemc").hls_code
     open("tiled_systolic.cpp", "w").write(code)
     print("wrote tiled_systolic.cpp")
-    assert code.count("AlloMem<") == 2 and code.count("AlloMemW<") == 1
-    print("A,B -> 2x AlloMem (read ports), C -> AlloMemW (write port)")
+    # Memory boundaries are RAM PINS now (AlloMemPins + _radr/_re/_q and
+    # _wadr/_d/_we), not the old packed-request AlloMem/AlloMemW over
+    # Connections -- the same change `mem_port_reverse.py` and
+    # `mem_port_scatter.py` already record. Three arrays, three instances.
+    assert code.count("AlloMemPins<") == 3, code.count("AlloMemPins<")
+    assert "_rd(" in code and "_wr(" in code
+    print("A,B,C -> 3x AlloMemPins, with modulario _rd()/_wr() in the bodies")
 
     if os.environ.get("MGC_HOME"):
         A = np.random.randint(0, 10, (M, K)).astype(np.int32)

@@ -100,7 +100,7 @@ while ok == 0:                 # consumer: retry until something arrives
     val, ok = S.try_get()
 ```
 
-(Runnable: `examples/systemc/demos/nb_stream_rtl.py`, `examples/systemc/demos/nb_producer_consumer.py`.)
+(Runnable: `tests/systemc/demos/nb_stream_rtl.py`, `tests/systemc/demos/nb_producer_consumer.py`.)
 
 ### ⚠️ Always consume the `ok` flag
 
@@ -114,7 +114,7 @@ non-blocking bug.
 
 With non-blocking access, arrival order under contention is genuinely non-deterministic (two
 producers racing for one consumer). Checkers over such designs must compare **order-tolerantly**
-(multiset / per-flow order), not positionally. See `examples/systemc/demos/nb_producer_consumer.py`.
+(multiset / per-flow order), not positionally. See `tests/systemc/demos/nb_producer_consumer.py`.
 
 ---
 

@@ -44,7 +44,7 @@ Emission runs anywhere the ``allo`` env runs:
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
 
-   cd examples/systemc
+   cd tests/systemc
    python pc_channel.py systemc      # print the generated SystemC
    python pc_channel.py mlir         # the MLIR it was emitted from
 
@@ -209,14 +209,13 @@ Where things live
      - the ``systemc`` platform: modes, the csim runner, the ``Wire``/``Channel`` guard
    * - ``allo/backend/catapult.py``
      - the TCL generator both Catapult flows share
-   * - ``examples/systemc/``
-     - the designs, in Allo, and nothing else
    * - ``examples/eva/``
      - the EVA design and its emitted project
    * - ``tests/systemc/``
-     - what acts on those designs: RTL cosim testbenches, the Catapult ``csyn``
-       driver, and ``rtlsim/`` — this fork's SystemC-vs-RTL cross-check harness
-       (:ref:`limitation-22`)
+     - the emitter demonstrations, in Allo, with ``test_emit.py`` collecting the
+       claim each one makes about the emitted text; plus what acts on them: RTL
+       cosim testbenches, the Catapult ``csyn`` driver, and ``rtlsim/`` — this
+       fork's SystemC-vs-RTL cross-check harness (:ref:`limitation-22`)
    * - ``dev/records/systemc/``
      - what was measured: ``VERDICTS.md``, ``reports/``, and the archived emitter output
    * - ``tests/dataflow/test_systemc_backend.py``

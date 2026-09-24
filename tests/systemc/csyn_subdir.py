@@ -3,7 +3,7 @@
 csynth a dataflow region with the Catapult BUILD-SUBDIR workaround.
 
     python tests/systemc/csyn_subdir.py <module> <region> [project_dir]
-    (<module> is a design module name in examples/systemc/)
+    (<module> is a design module name in tests/systemc/)
     e.g. python tests/systemc/csyn_subdir.py pc_channel pc_channel
 
 WHY THIS EXISTS

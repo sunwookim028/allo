@@ -1,6 +1,6 @@
 # Print a compact AST of one function in a Python file.
 # Usage:  python print_ast.py <file.py> [function_name]
-#   e.g.  python print_ast.py ../examples/systemc/demos/stream_producer_consumer.py top
+#   e.g.  python print_ast.py ../tests/systemc/demos/stream_producer_consumer.py top
 # Pure stdlib — no allo / conda env needed.
 import ast
 import os

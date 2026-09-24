@@ -1,7 +1,7 @@
 # SystemC backend — measurement records
 
 Dated records of what was measured, kept out of the published Sphinx site. Nothing here
-is a design or a test; it is evidence. The designs are in `examples/systemc/`, the
+is a design or a test; it is evidence. The designs are in `tests/systemc/`, the
 harness that produced these is in `tests/systemc/`.
 
 | Path | What |
@@ -10,11 +10,11 @@ harness that produced these is in `tests/systemc/`.
 | `reports/` | the full logs behind those verdicts — cosim sweeps, per-design golden checks, EVA emit/compile/cosim, the `static tb` regression, the `sim(timing)` reference-crash investigation. `reports/README.md` is the index. |
 | `rtlsim/results.txt` | the verdict matrix from `tests/systemc/rtlsim/REPRO.sh` |
 | `rtlsim/ref_xsim/` | two `xsim` runs of the **same** `pe_wire` netlist, one PASS and one FAIL, kept so the divergence can be diffed |
-| `generated/` | emitted SystemC kept for reference: what the emitter produced for five of the `examples/systemc/` designs. Output, not source — regenerate by running the matching `.py`. `tests/systemc/synth_*.tcl` read `stream_boundary.cpp` from here. |
+| `generated/` | emitted SystemC kept for reference: what the emitter produced for five of the `tests/systemc/` designs. Output, not source — regenerate by running the matching `.py`. `tests/systemc/synth_*.tcl` read `stream_boundary.cpp` from here. |
 
 These files were written by their runs and are **not** edited afterwards. Read them as
 history: `VERDICTS.md` and `reports/README.md` were accurate when the runs happened, and
-the paths they mention (`scratchpad/harness.py`, `examples/systemc/reports/`) are the
+the paths they mention (`scratchpad/harness.py`, `tests/systemc/reports/`) are the
 paths of that time, not of today.
 
 ## They no longer match the current emitter (checked 2026-09-24)
@@ -71,7 +71,7 @@ build with `target="vitis_hls"` returns the Vitis C++ that was seen. All three
 hops work.
 
 What was actually broken is the example. `cea8274a` (2026-08-10, a docs wording
-pass) changed `examples/systemc/stream_boundary.py` from `target="systemc"` to
+pass) changed `tests/systemc/stream_boundary.py` from `target="systemc"` to
 `target="vitis_hls"` — both the emit and the csim — while leaving the
 `assert "SC_MODULE(compute_0)" in code` that only a SystemC emission can satisfy.
 So the script asked for Vitis and then asserted SystemC, and running it produced

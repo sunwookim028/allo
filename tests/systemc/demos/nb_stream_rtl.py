@@ -9,13 +9,13 @@ Producer writes 4 values into a depth-4 FIFO with a non-blocking try_put
 
 Usage:
     # 1. quick numeric check in the in-process simulator
-    python examples/systemc/demos/nb_stream_rtl.py sim
+    python tests/systemc/demos/nb_stream_rtl.py sim
 
     # 2. inspect the generated Vitis HLS C++ (no tools needed)
-    python examples/systemc/demos/nb_stream_rtl.py codegen
+    python tests/systemc/demos/nb_stream_rtl.py codegen
 
     # 3. run Vitis HLS C-synthesis -> RTL (Verilog) under nb_stream.prj
-    python examples/systemc/demos/nb_stream_rtl.py csyn
+    python tests/systemc/demos/nb_stream_rtl.py csyn
 """
 import sys
 import numpy as np

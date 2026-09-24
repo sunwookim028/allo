@@ -2,7 +2,7 @@
 #   run:  catapult -shell -f synth_source.tcl   (from anywhere)
 # The generated SystemC it reads is an archived emitter output, kept under
 # dev/records/systemc/generated/; regenerate it with
-#   python examples/systemc/stream_boundary.py
+#   python tests/systemc/stream_boundary.py
 options set Input/CppStandard c++11
 solution new -state initial
 # The repository root, found by searching UPWARD for a marker -- never by

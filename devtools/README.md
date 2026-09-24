@@ -14,7 +14,7 @@ export PYTHONPATH=/home/zsm9/allo_sup    # else the import grabs the installed a
 ## Pipeline introspection
 
 Print what the compiler produces at each stage, so you can see exactly where a design stops
-looking the way you expect. Most default to `examples/systemc/demos/stream_producer_consumer.py`.
+looking the way you expect. Most default to `tests/systemc/demos/stream_producer_consumer.py`.
 
 | Script | Prints |
 |---|---|

@@ -8,7 +8,7 @@ Full write-up, including what each result means:
 `docs/source/extensions/catapult_systemc.rst`
 (https://sunwookim028.github.io/allo/extensions/catapult_systemc.html).
 
-The design under test is [`examples/systemc/dot_product_four_links.py`](../../../examples/systemc/dot_product_four_links.py)
+The design under test is [`tests/systemc/dot_product_four_links.py`](../dot_product_four_links.py)
 — one running dot product expressed four ways, differing only at the `mul → acc`
 boundary. The recorded results are in
 [`dev/records/systemc/rtlsim/`](../../../dev/records/systemc/rtlsim/):

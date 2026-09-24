@@ -135,3 +135,11 @@ tests/dataflow/*/
 # Internal binary documents. Kept on disk, never committed: large, unreviewable in a
 # diff, and this fork's remote is a public GitHub fork.
 *.docx
+
+# SystemC the demonstrations in tests/systemc/ emit beside themselves when run
+# standalone, plus the Catapult project dirs csyn_subdir.py builds. Output, not
+# source: the archived copies are in dev/records/systemc/generated/.
+tests/systemc/*.cpp
+tests/systemc/demos/*.cpp
+tests/systemc/csim_out/
+tests/systemc/csyn_out/

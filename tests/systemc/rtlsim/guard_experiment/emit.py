@@ -12,7 +12,7 @@ while not (os.path.exists(os.path.join(_D, "pyproject.toml"))
     _D = _P
 sys.path.insert(0, os.path.join(_D, "examples", "systemc"))
 import allo.dataflow as df
-import dot_product_four_links as pe_split  # examples/systemc/dot_product_four_links.py
+import dot_product_four_links as pe_split  # tests/systemc/dot_product_four_links.py
 
 out = os.path.abspath(sys.argv[1])
 for v in sys.argv[2:] or ["wire", "stream", "channel"]:
