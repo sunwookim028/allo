@@ -25,7 +25,7 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="TinyTPU-isa: Design History" href="tinytpu_history.html" />
+    <link rel="next" title="The Workload Suite: PyTorch MLPs on TinyTPU" href="workload_suite.html" />
     <link rel="prev" title="TinyTPU-isa vs Gemmini: A Matched Comparison" href="gemmini_comparison.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
@@ -178,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -916,7 +917,10 @@ pytest tests/act/             98 passed, 4 skipped
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p><strong>The first ASIC number, and it describes the current design.</strong> DC on
+<p><strong>The first ASIC number.</strong> It described the design as shipped when it was
+taken, and now describes the design at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>: the run predates
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, and the depth change adds sequential cells that a DC run has not
+yet priced (<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>). DC on
 FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
 (T=4, MAXDIM=16) comes out at <strong>1,136,598</strong> standard-cell area, timing MET
 at +0.21 ns with zero violating and zero hold paths. That <strong>replaces</strong>
@@ -958,7 +962,7 @@ claim, which no simulator can see) needs a cosim of its own and was not run.</p>
 <td><p>16</p></td>
 <td><p>ALL EXACT (5 shapes)</p></td>
 <td><p>STRESS OK 492/492, 64 shapes, 18 bad programs rejected</p></td>
-<td><p>published 171/261/417/483/685</p></td>
+<td><p>published 175/265/421/482/674</p></td>
 </tr>
 <tr class="row-odd"><td><p>4</p></td>
 <td><p>64</p></td>
@@ -983,8 +987,19 @@ claim, which no simulator can see) needs a cosim of its own and was not run.</p>
 </tr>
 </tbody>
 </table>
-<p>The published MAXDIM=16 row was 172/262/418/484/686 before this work; see
-<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<p>The published MAXDIM=16 row was 172/262/418/484/686 before this work, and
+171/261/417/483/685 from then until <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on
+2026-09-24; see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a> for both moves.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Every cycle number on this page other than that one cell was measured at
+the previous channel depth, ``QD=8``.</strong> That includes the MAXDIM=64 sweep,
+the steady-state table, the T=8 columns and every Gemmini comparison. The
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> default (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>) moves the five-shape row by
++4 / +4 / +4 / -1 / -11 and moves the MAXDIM=64 five the same way, but the
+sweep has <strong>not</strong> been re-run, so <strong>no deficit or ratio on this page should
+be restated until it is</strong>. See <a class="reference internal" href="#benchmarks-qd16"><span class="std std-ref">2026-09-24: the channel depth moved the row, and not uniformly</span></a>.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>The sampled shape set is a WEAKENING of the stress gate at large MAXDIM,
@@ -2394,16 +2409,19 @@ config patches for both matched points are committed at
 <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/gemmini/</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p><strong>The published 171/261/417/483/685 are a MAXDIM=16 measurement</strong>, and the
+<p><strong>The published 175/265/421/482/674 are a MAXDIM=16 measurement</strong>, and the
 shipped default is now 64, so <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> pins <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>
 explicitly — it exists to reproduce those numbers and would otherwise
-measure 218/357/563/677/879 and report a difference that is the stride
+measure 222/361/567/676/868 and report a difference that is the stride
 change, not a regression.</p>
-<p><strong>That row itself moved by one cycle when this work landed</strong>, uniformly at
-all five shapes: 172/262/418/484/686 became 171/261/417/483/685. See
-<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>. Both sets are on this page and neither
-supersedes the other: the MAXDIM=16 five are the latency benchmark’s
-provenance, the MAXDIM=64 sweep is the matched comparison.</p>
+<p><strong>That row has moved twice.</strong> It went from 172/262/418/484/686 to
+171/261/417/483/685 when this work landed, uniformly at all five shapes
+(<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>), and from there to the current row when
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on 2026-09-24, by +4/+4/+4/-1/-11
+(<a class="reference internal" href="#benchmarks-qd16"><span class="std std-ref">2026-09-24: the channel depth moved the row, and not uniformly</span></a>). The MAXDIM=64 figures throughout this page are
+the <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> sweep and have not been re-run. Both sets are on this page and
+neither supersedes the other: the MAXDIM=16 five are the latency
+benchmark’s provenance, the MAXDIM=64 sweep is the matched comparison.</p>
 </div>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
@@ -2416,6 +2434,44 @@ latency-set comparison at MAXDIM=16 and the gap attribution,
 <h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
 <p>Moved out of the sections above: superseded figures, readings that were
 withdrawn, and the accounts of how particular numbers moved.</p>
+<section id="the-channel-depth-moved-the-row-and-not-uniformly">
+<span id="benchmarks-qd16"></span><h3>2026-09-24: the channel depth moved the row, and not uniformly<a class="headerlink" href="#the-channel-depth-moved-the-row-and-not-uniformly" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> made <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> the default channel depth. The reason is
+correctness, not speed: three legal tiled programs never complete in cosim at
+depth 8, and all ten of that family complete bit-exact at 16
+(<a class="reference internal" href="../developer/limitations.html#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). Measured at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code> with everything else
+unset, cosim <code class="docutils literal notranslate"><span class="pre">COSIM</span> <span class="pre">OK</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>was: 4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+now: 4x4x4=175  8x8x8=265  12x12x12=421  16x16x8=482  16x16x16=674
+d:        +4         +4           +4           -1            -11
+</pre></div>
+</div>
+<p><strong>The lumpiness is the result, not noise.</strong> The one-cycle move recorded below
+was uniform across shapes, which is what identified it as a fixed-cost change.
+This one is not uniform, so it is not a fixed cost: the three smallest shapes
+pay the pipeline skew of deeper FIFOs, and the two largest <strong>get faster</strong>,
+because a deeper queue lets the sequencer run further ahead of the units it
+dispatches to. Depth buys completion and throughput where the queues bind, and
+charges four cycles where they do not.</p>
+<p>The same deltas reproduce independently at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code> —
+218/357/563/677/879 becomes 222/361/567/676/868, +4/+4/+4/-1/-11 again — so
+the effect belongs to the depth and not to one stride. <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> is
+640/640 exact at the new default.</p>
+<p><strong>Two prices, and neither should be absorbed into the cycle row.</strong> On FPGA it
+costs <strong>+9.3 % flip-flops</strong> at the shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at
+the <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> the five shapes are measured on), with BRAM, DSP and the
+2.431 ns estimated period unchanged. <strong>The ASIC price is unmeasured</strong> — what
+exists is a count from the RTL priced at this design’s own measured area per
+sequential cell, not a DC run. Both are accounted for in
+<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>.</p>
+<p><strong>What this invalidates until it is re-measured.</strong> The Gemmini parity sweep on
+this page and on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> was measured at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>. The
+deltas above move two of the five shapes in our favour and three against, and
+the MAXDIM=64 five move the same way, but the sweep has not been re-run, so
+<strong>every deficit and ratio stated against Gemmini describes the previous
+default</strong>. They are left in place as the last measured comparison and must not
+be restated for the shipped design until the sweep is re-run at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>.</p>
+</section>
 <section id="why-naming-the-window-mattered">
 <h3>Why naming the window mattered<a class="headerlink" href="#why-naming-the-window-mattered" title="Link to this heading"><span>¶</span></a></h3>
 <p>That accounting turned out to be worth more than fairness. MiniTPU’s
@@ -2571,6 +2627,7 @@ the five-trial measurement shows the precaution was one shape too strong.</p>
 <li><a class="reference internal" href="#the-workload-set-a-gpt-2-projection-placeholder">The workload set: a GPT-2 projection (placeholder)</a></li>
 <li><a class="reference internal" href="#reproducing">Reproducing</a></li>
 <li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#the-channel-depth-moved-the-row-and-not-uniformly">2026-09-24: the channel depth moved the row, and not uniformly</a></li>
 <li><a class="reference internal" href="#why-naming-the-window-mattered">Why naming the window mattered</a></li>
 <li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-and-why">The published row moved by one cycle, and why</a></li>
 <li><a class="reference internal" href="#the-t-8-column-re-measured">The T=8 column, re-measured</a></li>
@@ -2598,7 +2655,7 @@ the five-trial measurement shows the precaution was one shape too strong.</p>
 
             <div class="right">
                 
-                    <a href="tinytpu_history.html"><span>TinyTPU-isa: Design History</span><span class="icon">&gt;</span></a>
+                    <a href="workload_suite.html"><span>The Workload Suite: PyTorch MLPs on TinyTPU</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

@@ -177,6 +177,7 @@
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -686,9 +687,13 @@ shipped design (<a class="reference internal" href="tinytpu_isa.html"><span clas
 baseline for every performance claim.</p>
 <p>Measured, by cosim, at the five benchmark shapes: <strong>216 / 408 / 809 / 933 /
 1521</strong> cycles with zero mismatches, against the shipped design’s 172 / 262 /
-418 / 484 / 686 as it then stood (that row is 171 / 261 / 417 / 483 / 685
-since 2026-09-22, which does not move the ratio) — <strong>1.26x to 2.22x the
-cycles</strong>. At <code class="docutils literal notranslate"><span class="pre">T=8</span></code> the variant measures
+418 / 484 / 686 as it then stood — <strong>1.26x to 2.22x the cycles</strong>. (The shipped
+row has moved twice since: to 171 / 261 / 417 / 483 / 685 on 2026-09-22, and
+to 175 / 265 / 421 / 482 / 674 on 2026-09-24 when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the
+default. The ratio above is against the row as it stood, and both sides of it
+were measured at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>; re-stating it would mean re-measuring the variant
+too, which has not been done. The conclusion does not turn on it — the track
+was stopped by the clock, not the cycles.) At <code class="docutils literal notranslate"><span class="pre">T=8</span></code> the variant measures
 302 / 474 / 699, also exact. Functional gates pass throughout: bench <code class="docutils literal notranslate"><span class="pre">ALL</span>
 <span class="pre">EXACT</span></code>, stress 487/487, 34 crafted bad programs rejected against 390 generated
 programs accepted, and 42 mutants caught (41 by the functional gates, one only

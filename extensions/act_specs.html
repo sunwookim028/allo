@@ -177,6 +177,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -343,7 +344,7 @@ That rule is what lets <code class="docutils literal notranslate"><span class="p
 <h2>The corpus<a class="headerlink" href="#the-corpus" title="Link to this heading"><span>¶</span></a></h2>
 <p>Twenty-two specs, in three groups.</p>
 <p>The first six are the shapes this fork measures – <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>’s
-<code class="docutils literal notranslate"><span class="pre">LATENCY</span></code> set and the 171 / 261 / 417 / 483 / 685 cosim points on
+<code class="docutils literal notranslate"><span class="pre">LATENCY</span></code> set and the 175 / 265 / 421 / 482 / 674 cosim points on
 <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>. The last five are the <code class="docutils literal notranslate"><span class="pre">STEADY</span></code> set that
 <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> gains on the <code class="docutils literal notranslate"><span class="pre">benchmark-set</span></code> branch, whose accounting is in
 <code class="docutils literal notranslate"><span class="pre">docs/source/designs/benchmarks.rst</span></code> there – cubic 32, 48 and 64 plus

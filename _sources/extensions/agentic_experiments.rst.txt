@@ -61,8 +61,9 @@ scores by RTL cosim against a frozen reference model.
 
 **One paid run found one real improvement.** Run 1 (2026-09-19) produced a burst
 widening that measures 172 / 262 / 376 / 425 / 627 against the then-baseline's
-172 / 262 / 418 / 484 / 686 — that baseline is now 171 / 261 / 417 / 483 / 685,
-for a reason unrelated to this candidate — 160 cycles over five shapes,
+172 / 262 / 418 / 484 / 686 — that baseline has since moved twice, to
+171 / 261 / 417 / 483 / 685 and then to 175 / 265 / 421 / 482 / 674, for
+reasons unrelated to this candidate — 160 cycles over five shapes,
 bit-exact, stress and
 RTL stress clean. It is **not landed**, because it costs 2.3x the block RAM, and
 because its benefit is wider DMA bursts measured at zero memory latency, which

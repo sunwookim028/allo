@@ -177,6 +177,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -523,7 +524,9 @@ differs only in identifier spelling.</p>
 – MAXDIM to 64, the memory sizes derived rather than typed in, two
 encoding-ceiling assertions, a parametric operand-burst width, a <code class="docutils literal notranslate"><span class="pre">because=</span></code>
 obligation on the dependence claim – and the published row moved with it, to
-171 / 261 / 417 / 483 / 685. The branch was merged and the design
+171 / 261 / 417 / 483 / 685 (it has moved once more since, to
+175 / 265 / 421 / 482 / 674, when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on
+2026-09-24). The branch was merged and the design
 re-decomposed rather than the old shape reapplied, and the comparison that
 matters is now against <code class="docutils literal notranslate"><span class="pre">main</span></code>: the MLIR the composed region emits is
 <strong>identical to the MLIR main’s monolithic design emits</strong>, 4325 lines, under

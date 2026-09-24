@@ -177,6 +177,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -975,8 +976,10 @@ it does not measure.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce <strong>172 / 262 / 418 / 484 / 686</strong> exactly, all five,
 so the harness is the one those figures came from. (That was the published row
 when this was measured. It moved to <strong>171 / 261 / 417 / 483 / 685</strong> on
-2026-09-22 when the memory sizing became derived; the reproduction above is of
-the design as it then stood, and is not a disagreement.) The
+2026-09-22 when the memory sizing became derived, and to
+<strong>175 / 265 / 421 / 482 / 674</strong> on 2026-09-24 when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the
+default channel depth; the reproduction above is of the design as it then
+stood, and is not a disagreement.) The
 <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> row settles what they are: <strong>plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because
 <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default.
 <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 750, and 750 - 686 = <strong>64</strong>, exactly the four

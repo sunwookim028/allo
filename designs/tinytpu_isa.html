@@ -177,6 +177,7 @@
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -232,29 +233,42 @@ readings of those numbers are on <a class="reference internal" href="tinytpu_his
 mesh-matched comparison against Gemmini is on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Headline, as of 2026-09-22 (<code class="docutils literal notranslate"><span class="pre">05169938</span></code>): one hardware build runs every
+<p>Headline, as of 2026-09-24 (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>): one hardware build runs every
 shape as data, all five benchmark shapes are bit-exact in RTL
-co-simulation, and the design takes <strong>171 / 261 / 417 / 483 / 685</strong> cycles
+co-simulation, and the design takes <strong>175 / 265 / 421 / 482 / 674</strong> cycles
 at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code>,
 <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>).</p>
 <p><strong>Those five are a ``T=4``, ``TPU_MAXDIM=16`` measurement</strong>, which is the
 configuration <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> pins. The shipped default is <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>,
 and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> is the DRAM row stride of every operand, so the same shape
-costs more on the bigger build – 4x4x4 is 218 cycles at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>
-against 171 at 16. The <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> sweep, and every shape large enough to
+costs more on the bigger build – 4x4x4 is 222 cycles at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>
+against 175 at 16. The <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> sweep, and every shape large enough to
 reach steady state, are on <a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>.</p>
-<p>Measured over the same window on both sides, the design is
+<p>Measured over the same window on both sides, the design was
 <strong>1.07-1.24x slower</strong> than Gemmini at these five shapes. Over ten shapes at
-<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the deficit <strong>converges to 1.09x at 64x64x64</strong> at
-<strong>74.1 % of peak</strong>, and the two smallest shapes do not clear Gemmini’s
-measurement spread; see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
+<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the deficit <strong>converged to 1.09x at 64x64x64</strong> at
+<strong>74.1 % of peak</strong>, and the two smallest shapes did not clear Gemmini’s
+measurement spread; see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>. <strong>Those figures were
+measured at the previous channel depth</strong> (<code class="docutils literal notranslate"><span class="pre">QD=8</span></code>), against the row that
+ended on 2026-09-24, and the sweep has <strong>not</strong> been re-run at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, so
+they are the last measured comparison and not a statement about the shipped
+design. Nothing should be restated from them until the sweep is re-run;
+what was checked before landing is that no margin <em>flips</em>
+(<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>), which is a check and not a measurement.</p>
 <p>Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (2026-09-19) the shipped design took
 <strong>252 / 383 / 591 / 667 / 919</strong> (1.55-1.8x behind Gemmini). The step
 between the two is the gap attribution’s measured design stack, landed as
 the design (<a class="reference internal" href="#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>, <a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).
-The published row was <strong>172 / 262 / 418 / 484 / 686</strong> until 2026-09-22;
-what moved it by one cycle at every shape, and the measurement that
-isolated the cause, are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+The published row was <strong>172 / 262 / 418 / 484 / 686</strong> until 2026-09-22 and
+<strong>171 / 261 / 417 / 483 / 685</strong> from then until 2026-09-24; what moved it
+by one cycle at every shape, and what the channel depth then did to it, are
+in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<p><strong>The price of the current row</strong> is <strong>+9.3 % flip-flops</strong> on FPGA at the
+shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at the <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> the five shapes
+are measured on), with BRAM, DSP and the 2.431 ns estimated period all
+unchanged. <strong>The ASIC price is unmeasured</strong>: what is recorded is a count
+from the RTL priced at this design’s own area per sequential cell, not a DC
+run (<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>).</p>
 </div>
 <section id="architecture">
 <h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"><span>¶</span></a></h2>
@@ -1448,7 +1462,7 @@ probe, and the RTL probe of the accumulator’s dependence claim
 </table>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># One command, from a clean checkout: builds this checkout's MLIR bindings,</span>
 <span class="c1"># runs bench_isa + stress_isa, then the default cosim, and checks the five</span>
-<span class="c1"># cycle counts against 171 / 261 / 417 / 483 / 685 at the TPU_MAXDIM=16 it</span>
+<span class="c1"># cycle counts against 175 / 265 / 421 / 482 / 674 at the TPU_MAXDIM=16 it</span>
 <span class="c1"># pins. Exits nonzero otherwise.</span>
 examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w">            </span><span class="c1"># ~6 min, incl. a fresh mlir build</span>
 examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w"> </span>--no-cosim<span class="w"> </span><span class="c1"># functional, ~1 min</span>
@@ -1618,7 +1632,10 @@ five published shapes and so the most representative activity:</p>
 </tbody>
 </table>
 <p>Both cycle counts are byte-identical to the ones their own cosim measured, so
-the instrumentation moved nothing. The window is wider than the cycle count
+the instrumentation moved nothing. <strong>Both captures predate ``QD=16``</strong>, which
+is why the <code class="docutils literal notranslate"><span class="pre">T4_MAXDIM16</span></code> row reads 685 rather than the 674 the same
+configuration takes today; the activity has not been re-captured against the
+shipped RTL. The window is wider than the cycle count
 because it spans the <code class="docutils literal notranslate"><span class="pre">s_axi_control</span></code> programming around the kernel as well:
 42 clocks of it at <code class="docutils literal notranslate"><span class="pre">T4</span></code>, 42 at <code class="docutils literal notranslate"><span class="pre">T8</span></code>. Activity is 4 990 787 transitions at
 <code class="docutils literal notranslate"><span class="pre">T4</span></code> and 5 552 502 at <code class="docutils literal notranslate"><span class="pre">T8</span></code>, 94% and 95% of it inside the DUT’s submodules
@@ -1762,7 +1779,7 @@ design was renumbered in its own oracle.</p>
 <h3>Verifying a change<a class="headerlink" href="#verifying-a-change" title="Link to this heading"><span>¶</span></a></h3>
 <p>From a clean checkout, one command builds the checkout’s own bindings, runs the
 functional gates, runs cosim, and checks the published cycle counts
-(171 / 261 / 417 / 483 / 685, at the <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code> it pins), exiting
+(175 / 265 / 421 / 482 / 674, at the <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code> it pins), exiting
 nonzero if any step fails or any number differs:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w">              </span><span class="c1"># everything, with cosim</span>
 examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w"> </span>--no-cosim<span class="w">   </span><span class="c1"># functional only, ~1 min</span>
@@ -1974,17 +1991,22 @@ distance of 4 itself rather than rely on the schedule; it was not measured.</p>
 <h2>Results<a class="headerlink" href="#results" title="Link to this heading"><span>¶</span></a></h2>
 <section id="cycle-counts">
 <h3>Cycle counts<a class="headerlink" href="#cycle-counts" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Current row, 2026-09-22 (``05169938``), ``T=4``, ``TPU_MAXDIM=16``,
-``-m_axi_latency 0``:</strong></p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>4x4x4  171    8x8x8  261    12x12x12  417    16x16x8  483    16x16x16  685
+<p><strong>Current row, 2026-09-24 (``63ee6ec7``), ``T=4``, ``TPU_MAXDIM=16``,
+``-m_axi_latency 0``, channel depth ``QD=16``:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>4x4x4  175    8x8x8  265    12x12x12  421    16x16x8  482    16x16x16  674
 </pre></div>
 </div>
 <p>That is what <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> checks. The <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> sweep, which is the
 shipped default and the one that reaches steady state, is on
-<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>.</p>
-<p>The table below is the <strong>``e24e433b`` measurement</strong>, which is one cycle higher
-at every shape: the derived memory sizing that landed afterwards takes one
-cycle out of the fixed term (<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>). Every
+<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a> – at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> it opens 222 / 361 / 567 / 676 / 868 at
+these five shapes, the same +4 / +4 / +4 / -1 / -11 deltas.</p>
+<p>The row reached this from 171 / 261 / 417 / 483 / 685, which is what it was
+between 2026-09-22 and 2026-09-24, and 172 / 262 / 418 / 484 / 686 before
+that; both moves are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<p>The table below is the <strong>``e24e433b`` measurement</strong>, taken before either move:
+the derived memory sizing that landed afterwards took one cycle out of the
+fixed term at every shape, and the channel depth then moved it again by
++4 / +4 / +4 / -1 / -11 (<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>). Every
 other column – instruction counts, mismatches, the pre-landing comparison –
 is unaffected. Measured by Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code> (xsim), one build,
 <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code> (<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code>), against the
@@ -2358,6 +2380,31 @@ cells, and no driving cell, so DC runs and emits unmapped GTECH. Use
 <p>Superseded figures, withdrawn claims, and the accounts of how particular
 numbers moved. Nothing here is the current state; the design’s own history,
 at greater length, is on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>.</p>
+<section id="the-channel-depth-moved-the-row-again-2026-09-24">
+<span id="tinytpu-isa-qd16"></span><h3>The channel depth moved the row again, 2026-09-24<a class="headerlink" href="#the-channel-depth-moved-the-row-again-2026-09-24" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> made <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> the default channel depth, because three legal
+tiled programs never complete at depth 8 and all ten of that family complete
+bit-exact at 16 (<a class="reference internal" href="../developer/limitations.html#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). The published row moved from
+171 / 261 / 417 / 483 / 685 to <strong>175 / 265 / 421 / 482 / 674</strong>.</p>
+<p><strong>The delta is lumpy, and that is the finding</strong>: +4 / +4 / +4 / <strong>-1</strong> /
+<strong>-11</strong>. A uniform delta would have been a fixed-cost change, as the
+2026-09-22 move below was. This one is not. The three smallest shapes pay the
+pipeline skew of deeper FIFOs; the two largest <strong>get faster</strong>, because a
+deeper queue lets the sequencer run further ahead of the units it dispatches
+to. So the depth buys completion <em>and</em> throughput where the queues are the
+constraint, and charges four cycles where they are not.</p>
+<p>The same deltas reproduce independently at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>:
+218 / 357 / 563 / 677 / 879 becomes 222 / 361 / 567 / 676 / 868. Correctness
+is unchanged – <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> is 640/640 exact at the new default – and
+cosim reports <code class="docutils literal notranslate"><span class="pre">COSIM</span> <span class="pre">OK</span></code>.</p>
+<p><strong>What it costs, and what is not yet known.</strong> The FPGA price is <strong>+9.3 %
+flip-flops</strong> at the shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>),
+with BRAM, DSP and the 2.431 ns estimated period unchanged. <strong>The ASIC price
+is unmeasured</strong>: the figure on record is a count from the RTL priced at this
+design’s own area per sequential cell, not a DC run. And <strong>the Gemmini parity
+sweep was measured at ``QD=8``</strong>, so the deficit has to be re-measured before
+any comparison is restated. The full accounting is <a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>.</p>
+</section>
 <section id="the-published-row-moved-by-one-cycle-2026-09-22">
 <h3>The published row moved by one cycle, 2026-09-22<a class="headerlink" href="#the-published-row-moved-by-one-cycle-2026-09-22" title="Link to this heading"><span>¶</span></a></h3>
 <p><strong>The row moved by one cycle at every shape on 2026-09-22</strong>, from
@@ -2521,6 +2568,7 @@ pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
 </li>
 <li><a class="reference internal" href="#standard-cell-synthesis-one-number-and-what-it-is-not">Standard-cell synthesis: one number, and what it is not</a></li>
 <li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#the-channel-depth-moved-the-row-again-2026-09-24">The channel depth moved the row again, 2026-09-24</a></li>
 <li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-2026-09-22">The published row moved by one cycle, 2026-09-22</a></li>
 <li><a class="reference internal" href="#the-signed-bit-slice-bug-that-the-spare-bit-rule-came-from">The signed bit-slice bug that the spare-bit rule came from</a></li>
 <li><a class="reference internal" href="#the-one-owner-rule-was-charged-to-vitis-as-well-as-to-allo">The one-owner rule was charged to Vitis as well as to Allo</a></li>

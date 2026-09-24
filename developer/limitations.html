@@ -177,6 +177,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
@@ -1731,11 +1732,17 @@ pending re-verification.</p>
 </section>
 <section id="five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes">
 <span id="limitation-24"></span><h3>24. Five checks pass a TinyTPU-isa program whose Vitis cosim never completes<a class="headerlink" href="#five-checks-pass-a-tinytpu-isa-program-whose-vitis-cosim-never-completes" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-2026-09-22 admonition">
-<p class="admonition-title">Status (2026-09-22)</p>
-<p>REPRODUCES at the shipped <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>, and <strong>DIAGNOSED as a channel-depth
-threshold</strong>: the same ten programs, same tree, same toolchain, all complete
-at <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> (<a class="reference internal" href="#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). Cheap half:
+<div class="admonition-status-2026-09-24-fixed-in-the-shipped-design admonition">
+<p class="admonition-title">Status (2026-09-24): FIXED in the shipped design</p>
+<p><strong>DIAGNOSED as a channel-depth threshold</strong> on 2026-09-22 – the same ten
+programs, same tree, same toolchain, all complete at <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>
+(<a class="reference internal" href="#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>) – and <strong>landed</strong>: <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> is the default in
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> as of <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> (2026-09-24), which moved the
+published row to <strong>175 / 265 / 421 / 482 / 674</strong>
+(<a class="reference internal" href="#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>). The item still reproduces at <code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code>,
+which is now an override rather than the shipped configuration, and the
+<em>predicate</em> – which programs need which depth – remains open, so this is
+a cure and not a characterisation. Cheap half:
 <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code> (seconds, no Vitis). RTL half:
 <code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file (one csynth, ten cosims, tens of
 minutes). Family and bisection:
@@ -1997,12 +2004,14 @@ characterisation, and a program cannot be screened by counting.</p>
 <span id="limitation-24-price"></span><h4>What <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> costs the shipped design<a class="headerlink" href="#what-qd-16-costs-the-shipped-design" title="Link to this heading"><span>¶</span></a></h4>
 <p>Raising the depth is a change to the <strong>shipped</strong> design, which the reproduce
 gate pins at five numbers, so it is measured in the same paired form: one
-tree, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>, everything else unset, <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> and then <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>.</p>
+tree, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>, everything else unset, <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> and then <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>.
+The right-hand column is the <strong>published row since</strong> <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>; the
+left-hand one is what was published before it.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=8</span></code> (published)</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=16</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=8</span></code> (published until 2026-09-24)</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">QD=16</span></code> (<strong>published now</strong>)</p></th>
 <th class="head"><p>delta</p></th>
 </tr>
 </thead>
@@ -2038,8 +2047,12 @@ tree, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16
 three smallest shapes pay the pipeline skew of deeper FIFOs (+4 each, the same
 +4 the item-24 family paid), and the two largest <strong>get faster</strong>, because a
 deeper queue lets the sequencer run further ahead of the units it dispatches
-to. The QD=8 column reproduces the published <code class="docutils literal notranslate"><span class="pre">171</span> <span class="pre">/</span> <span class="pre">261</span> <span class="pre">/</span> <span class="pre">417</span> <span class="pre">/</span> <span class="pre">483</span> <span class="pre">/</span> <span class="pre">685</span></code>
-exactly, which is the control.</p>
+to. The QD=8 column reproduces the then-published
+<code class="docutils literal notranslate"><span class="pre">171</span> <span class="pre">/</span> <span class="pre">261</span> <span class="pre">/</span> <span class="pre">417</span> <span class="pre">/</span> <span class="pre">483</span> <span class="pre">/</span> <span class="pre">685</span></code> exactly, which is the control; the QD=16
+column is the row <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> checks today. The same deltas reproduce
+independently at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>: 218 / 357 / 563 / 677 / 879 becomes
+<strong>222 / 361 / 567 / 676 / 868</strong>, +4 / +4 / +4 / -1 / -11 again, so the
+lumpiness is a property of the depth and not of one stride.</p>
 <p>Correctness at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> is unchanged: <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> prints <strong>STRESS OK:
 492/492</strong>, and the RTL gate (<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code>) is 0 wrong over six calls at
 both 4x4x4 and 16x16x16 – including <code class="docutils literal notranslate"><span class="pre">ar_distance(4)</span></code>, so the accumulator’s
@@ -2162,11 +2175,12 @@ FPGA number is control overhead with the storage free in SRLs, the ASIC number
 is the storage itself. At QD=32 the ASIC cost doubles again (+33,280 flops,
 linear) where the FPGA adds only a further 1,080 FF.</p>
 </section>
-<section id="the-recommendation">
-<h4>The recommendation<a class="headerlink" href="#the-recommendation" title="Link to this heading"><span>¶</span></a></h4>
-<p><strong>Raise the default to ``QD=16``.</strong> A design that does not complete on legal
-programs is worse than one four cycles slower, and every reason to hesitate
-was checked rather than assumed:</p>
+<section id="the-decision-and-what-landing-it-left-open">
+<h4>The decision, and what landing it left open<a class="headerlink" href="#the-decision-and-what-landing-it-left-open" title="Link to this heading"><span>¶</span></a></h4>
+<p><strong>Landed: ``QD=16`` is the default</strong> (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>, 2026-09-24), and the
+published row is now <code class="docutils literal notranslate"><span class="pre">175</span> <span class="pre">/</span> <span class="pre">265</span> <span class="pre">/</span> <span class="pre">421</span> <span class="pre">/</span> <span class="pre">482</span> <span class="pre">/</span> <span class="pre">674</span></code>. A design that does not
+complete on legal programs is worse than one four cycles slower, and every
+reason to hesitate was checked rather than assumed:</p>
 <ul class="simple">
 <li><p>the five-shape row moves by +4 / +4 / +4 / -1 / -11, and <strong>no margin against
 Gemmini flips</strong>: at these shapes the design is behind Gemmini at QD=8 and
@@ -2184,6 +2198,50 @@ assembled and a sequential-cell change of that size lands directly on it.</p></l
 it for a hazard whose predicate is still open. Nobody should read “depth is
 the cure” as “depth is free at any depth”: the FPGA ladder is sub-linear only
 because of SRL16, and the ASIC cost is linear.</p>
+<p><strong>What landing it did not settle</strong>, and what must not be quietly absorbed:</p>
+<ul class="simple">
+<li><p><strong>The ASIC price is still unmeasured.</strong> The +16,640 flip-flops above are a
+count from the RTL priced at this design’s own measured area per sequential
+cell, not a DC run, and the T=8 ASIC export was taken from the <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>
+RTL. Both need redoing against the shipped netlist.</p></li>
+<li><p><strong>The Gemmini parity sweep was measured at ``QD=8``.</strong> Every deficit and
+ratio on <a class="reference internal" href="../designs/gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> and
+<a class="reference internal" href="../designs/benchmarks.html"><span class="doc">The Benchmark Set</span></a> therefore describes the previous default. The
+pre-landing check above says no margin <em>flips</em>, which is why landing was
+safe; it is not a re-measurement, and <strong>no comparison should be restated
+until the sweep is re-run at ``QD=16``</strong>.</p></li>
+</ul>
+<div class="admonition-a-channel-depth-flips-it-and-the-program-is-a-shipped-mapping admonition">
+<p class="admonition-title">2026-09-22: a channel depth flips it, and the program is a
+shipped mapping</p>
+<p>A fifth instance, from the PyTorch workload suite
+(<a class="reference internal" href="../designs/workload_suite.html"><span class="doc">The Workload Suite: PyTorch MLPs on TinyTPU</span></a>), narrows the search. The program is
+<code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program(4,</span> <span class="pre">16,</span> <span class="pre">16,</span> <span class="pre">relu=True)</span></code> – the <strong>shipped</strong> GEMM
+mapping, the same one <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> cosims at other shapes, and the one
+the ACT search independently picks for that shape. At the shipped
+<code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code> (the default): <strong>no completion</strong>. One progress line, none
+after it, and <code class="docutils literal notranslate"><span class="pre">xsimk</span></code> held a core at 99 % for over twelve minutes
+against a program the same build runs in 584 cycles.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>, the only knob changed: <strong>584 cycles, 0 of 4096 bytes
+wrong</strong>. Its second layer, and all four layers of a four-layer MLP, the
+same.</p></li>
+</ul>
+<p>Two things follow. First, <strong>the fault is sensitive to channel depth</strong>,
+which the earlier bisection never varied – so whatever blocks is a
+handshake and not a value, and <code class="docutils literal notranslate"><span class="pre">QD</span></code> is the first knob found that moves
+the boundary rather than the program. Second, <strong>a hand-written shipped
+mapping is in the failing class</strong>, so this is not a property of generated
+or unusual programs; the published counts avoid it only because they are
+measured at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>, where the burst is four times shorter.</p>
+<p><code class="docutils literal notranslate"><span class="pre">kpn_model</span></code> is not fooled for lack of trying: it reports minimum channel
+depth 1 for this program, so the protocol model says <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> is ample.
+That is the same weakness the priority note below describes – the cheap
+checks descend from <code class="docutils literal notranslate"><span class="pre">assemble()</span></code>’s own header – now with a knob attached
+to it. <strong>Try ``TPU_QD=16`` before treating a hang as a verdict on the
+program.</strong></p>
+</div>
 <ul class="simple">
 <li><p><strong>Priority: High as a warning, Medium as an action.</strong> The warning is that on
 this design the cheap checks do not substitute for cosim, and two of them
@@ -2446,7 +2504,7 @@ sub-region – about five lines, not yet prototyped.</p>
 <li><a class="reference internal" href="#what-qd-16-costs-the-shipped-design">What <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> costs the shipped design</a></li>
 <li><a class="reference internal" href="#the-price-on-the-fpga">The price, on the FPGA</a></li>
 <li><a class="reference internal" href="#the-price-on-standard-cells-which-is-a-different-object">The price, on standard cells – which is a different object</a></li>
-<li><a class="reference internal" href="#the-recommendation">The recommendation</a></li>
+<li><a class="reference internal" href="#the-decision-and-what-landing-it-left-open">The decision, and what landing it left open</a></li>
 </ul>
 </li>
 </ul>

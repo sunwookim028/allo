@@ -329,7 +329,9 @@ differs only in identifier spelling.
 -- MAXDIM to 64, the memory sizes derived rather than typed in, two
 encoding-ceiling assertions, a parametric operand-burst width, a ``because=``
 obligation on the dependence claim -- and the published row moved with it, to
-171 / 261 / 417 / 483 / 685. The branch was merged and the design
+171 / 261 / 417 / 483 / 685 (it has moved once more since, to
+175 / 265 / 421 / 482 / 674, when ``QD=16`` became the default on
+2026-09-24). The branch was merged and the design
 re-decomposed rather than the old shape reapplied, and the comparison that
 matters is now against ``main``: the MLIR the composed region emits is
 **identical to the MLIR main's monolithic design emits**, 4325 lines, under

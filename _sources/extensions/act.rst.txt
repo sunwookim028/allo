@@ -776,8 +776,10 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
 The ``gemm`` rows reproduce **172 / 262 / 418 / 484 / 686** exactly, all five,
 so the harness is the one those figures came from. (That was the published row
 when this was measured. It moved to **171 / 261 / 417 / 483 / 685** on
-2026-09-22 when the memory sizing became derived; the reproduction above is of
-the design as it then stood, and is not a disagreement.) The
+2026-09-22 when the memory sizing became derived, and to
+**175 / 265 / 421 / 482 / 674** on 2026-09-24 when ``QD=16`` became the
+default channel depth; the reproduction above is of the design as it then
+stood, and is not a disagreement.) The
 ``gemm.relu`` row settles what they are: **plain** ``gemm``, because
 ``cosim.py``'s ``testbench(M, K, N)`` leaves ``relu`` at its default.
 ``gemm.relu`` at 16x16x16 is 750, and 750 - 686 = **64**, exactly the four
