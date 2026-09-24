@@ -132,7 +132,9 @@ public:
   }
   void visitCeilDivExpr(AffineBinaryOpExpr expr) {
     // This is super inefficient.
-    os << "(";
+    // "((" not "(": the tail below emits ") / " + rhs + ")", i.e. two ')'.
+    // A single '(' emitted unbalanced `(a + b - 1) / b)`, which does not compile.
+    os << "((";
     visit(expr.getLHS());
     os << " + ";
     visit(expr.getRHS());

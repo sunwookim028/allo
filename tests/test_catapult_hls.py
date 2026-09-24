@@ -141,6 +141,17 @@ def test_catapult_pipeline():
 
         # Check Catapult-specific pipeline pragma
         assert "#pragma hls_pipeline_init_interval" in mod.hls_code
+        # The pragma MUST precede the loop it binds to -- Catapult drops an in-body
+        # pragma with CIN-319 ("cannot bind pragma"), silently disabling pipelining.
+        lines = mod.hls_code.splitlines()
+        idx = next(
+            i for i, l in enumerate(lines) if "hls_pipeline_init_interval" in l
+        )
+        nxt = lines[idx + 1].lstrip()
+        assert nxt.startswith(("l_", "for ", "while ")), (
+            "hls_pipeline_init_interval must be emitted immediately before the loop "
+            f"(Catapult binds to the following construct); next line was: {nxt!r}"
+        )
         print("test_catapult_pipeline passed!")
 
 

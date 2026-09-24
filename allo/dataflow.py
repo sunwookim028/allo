@@ -55,6 +55,30 @@ def get_pid():
     raise NotImplementedError("This function should be called in a kernel function.")
 
 
+# Dataflow link ops -- Stream (FIFO), Wire (combinational), Channel (handshake)
+# -- all get the same interface-lifting treatment. These tuples let the lifting
+# logic below treat all three link kinds uniformly.
+_LINK_CONSTRUCT_OPS = (
+    allo_d.StreamConstructOp,
+    allo_d.WireConstructOp,
+    allo_d.ChannelConstructOp,
+)
+_LINK_GET_OPS = (
+    allo_d.StreamGetOp,
+    allo_d.StreamTryGetOp,
+    allo_d.WireGetOp,
+    allo_d.ChannelGetOp,
+    allo_d.ChannelTryGetOp,
+)
+_LINK_PUT_OPS = (
+    allo_d.StreamPutOp,
+    allo_d.StreamTryPutOp,
+    allo_d.WirePutOp,
+    allo_d.ChannelPutOp,
+    allo_d.ChannelTryPutOp,
+)
+
+
 # pylint: disable=eval-used, bad-builtin, too-many-branches, too-many-nested-blocks
 def move_stream_to_interface(
     s: Schedule,
@@ -102,7 +126,7 @@ def move_stream_to_interface(
         )  # stream_name -> first op
         duplicate_stream_ops = []  # Duplicate ops to erase after iteration
         for op in func.entry_block.operations:
-            if isinstance(op, allo_d.StreamConstructOp):
+            if isinstance(op, _LINK_CONSTRUCT_OPS):
                 stream_name = op.attributes["name"].value
                 if stream_name in first_stream_ops:
                     # Duplicate: replace uses with first stream's result and mark for erasure
@@ -117,11 +141,11 @@ def move_stream_to_interface(
                 for use in op.result.uses:
                     # get use's parent operation
                     if isinstance(
-                        use.owner, (allo_d.StreamGetOp, allo_d.StreamTryGetOp)
+                        use.owner, _LINK_GET_OPS
                     ):
                         direction = "in"
                     elif isinstance(
-                        use.owner, (allo_d.StreamPutOp, allo_d.StreamTryPutOp)
+                        use.owner, _LINK_PUT_OPS
                     ):
                         direction = "out"
                     elif isinstance(
@@ -314,17 +338,17 @@ def move_stream_to_interface(
 
         # Collect stream constructs in this nested kernel
         for op in func.entry_block.operations:
-            if isinstance(op, allo_d.StreamConstructOp):
+            if isinstance(op, _LINK_CONSTRUCT_OPS):
                 stream_ops.append(op)
                 stream_types.append(op.result.type)
                 stream_signed += "u" if "unsigned" in op.attributes else "_"
                 for use in op.result.uses:
                     if isinstance(
-                        use.owner, (allo_d.StreamGetOp, allo_d.StreamTryGetOp)
+                        use.owner, _LINK_GET_OPS
                     ):
                         direction = "in"
                     elif isinstance(
-                        use.owner, (allo_d.StreamPutOp, allo_d.StreamTryPutOp)
+                        use.owner, _LINK_PUT_OPS
                     ):
                         direction = "out"
                     elif isinstance(
@@ -410,7 +434,7 @@ def move_stream_to_interface(
         # Collect stream constructs in this function (parent)
         parent_stream_map = {}  # stream name -> stream construct op
         for op in func.entry_block.operations:
-            if isinstance(op, allo_d.StreamConstructOp):
+            if isinstance(op, _LINK_CONSTRUCT_OPS):
                 stream_name = op.attributes["name"].value
                 parent_stream_map[stream_name] = op
 
@@ -506,7 +530,15 @@ def _build_top(s, stream_info, enable_layout=False):
         func_name = func.attributes["sym_name"].value
         arg_mapping[func_name] = []
         for i, arg in enumerate(func.arguments):
-            if "!allo.stream" not in str(arg.type):
+            # Wire/Channel links are SystemC-flow links that, like `!allo.stream`,
+            # are not region-level arguments; they must be excluded here too
+            # (merged from choonsik1/SystemC-emitter, which added the two kinds
+            # to an older `used_args` dedup this fork has since replaced with
+            # the `top_args` ordering above).
+            if not any(
+                k in str(arg.type)
+                for k in ("!allo.stream", "!allo.wire", "!allo.channel")
+            ):
                 arg_name = s.func_args[func_name][i].top_name
                 if "itypes" in func.attributes:
                     input_signed[top_args[arg_name]] = func.attributes["itypes"].value[
@@ -542,7 +574,7 @@ def _build_top(s, stream_info, enable_layout=False):
         # get all global streams
         stream_map = {}
         for op in new_top.entry_block.operations:
-            if isinstance(op, allo_d.StreamConstructOp):
+            if isinstance(op, _LINK_CONSTRUCT_OPS):
                 stream_name = op.attributes["name"].value
                 stream_map[stream_name] = op
         # add call functions

@@ -1134,6 +1134,85 @@ def GlobalStreamPutOp : Allo_Op<"put_stream_global"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Wire operations
+//===----------------------------------------------------------------------===//
+
+def WireConstructOp : Allo_Op<"wire_construct"> {
+  let summary = "Create a wire object";
+  let arguments = (ins );
+  let results = (outs WireLike:$res);
+  let assemblyFormat = [{
+      `(` `)` attr-dict `:` qualified(type($res))
+  }];
+}
+
+def WirePutOp : Allo_Op<"wire_put"> {
+    let summary = "Write a value to a wire";
+    let arguments = (ins WireLike:$wire, DenseI64ArrayAttr:$indices, AnyType:$data);
+    let assemblyFormat = [{
+        `(` $wire `,` $indices `,` $data `)` attr-dict `:` qualified(type($wire)) `contains` type($data)
+    }];
+}
+
+def WireGetOp : Allo_Op<"wire_get"> {
+    let summary = "Read a value from a wire";
+    let arguments = (ins WireLike:$wire, DenseI64ArrayAttr:$indices);
+    let results = (outs AnyType:$res);
+    let assemblyFormat = [{
+        `(` $wire `,` $indices `)` attr-dict `:` qualified(type($wire)) `->` type($res)
+    }];
+}
+
+//===----------------------------------------------------------------------===//
+// Channel operations
+//===----------------------------------------------------------------------===//
+
+def ChannelConstructOp : Allo_Op<"channel_construct"> {
+  let summary = "Create a channel object";
+  let arguments = (ins );
+  let results = (outs ChannelLike:$res);
+  let assemblyFormat = [{
+      `(` `)` attr-dict `:` qualified(type($res))
+  }];
+}
+
+def ChannelGetOp : Allo_Op<"channel_get"> {
+  let summary = "Get an object from a channel";
+  let arguments = (ins ChannelLike:$channel, DenseI64ArrayAttr:$indices);
+  let results = (outs AnyType:$res);
+  let assemblyFormat = [{
+      `(` $channel `,` $indices`)` attr-dict `:` qualified(type($channel)) `->` type($res)
+  }];
+}
+
+def ChannelPutOp : Allo_Op<"channel_put"> {
+  let summary = "Put an object into a channel";
+  let arguments = (ins ChannelLike:$channel, DenseI64ArrayAttr:$indices, AnyType:$data);
+  let results = (outs );
+  let assemblyFormat = [{
+      `(` $channel `,` $indices `,` $data `)` attr-dict `:` qualified(type($channel)) `contains` type($data)
+  }];
+}
+
+def ChannelTryGetOp : Allo_Op<"channel_try_get"> {
+  let summary = "Try to get an object from a channel non-blockingly";
+  let arguments = (ins ChannelLike:$channel, DenseI64ArrayAttr:$indices);
+  let results = (outs AnyType:$data, BoolLike:$success);
+  let assemblyFormat = [{
+      `(` $channel `,` $indices`)` attr-dict `:` qualified(type($channel)) `->` type($data) `,` type($success)
+  }];
+}
+
+def ChannelTryPutOp : Allo_Op<"channel_try_put"> {
+  let summary = "Try to put an object into a channel non-blockingly";
+  let arguments = (ins ChannelLike:$channel, DenseI64ArrayAttr:$indices, AnyType:$data);
+  let results = (outs BoolLike:$success);
+  let assemblyFormat = [{
+      `(` $channel `,` $indices `,` $data `)` attr-dict `:` qualified(type($channel)) `contains` type($data) `->` type($success)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Layout operations
 //===----------------------------------------------------------------------===//
 

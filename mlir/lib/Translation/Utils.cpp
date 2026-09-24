@@ -61,6 +61,9 @@ SmallString<8> AlloEmitterBase::getName(Value val) {
         if (std::isfinite(value)) {
           if (bitwidth == 32)
             return SmallString<8>(std::to_string((float)value) + "f");
+          else if (state.acFloatConstCtor && bitwidth == 16)
+            // ac_ieee_float<binary16> ('half') needs explicit construction.
+            return SmallString<8>("half(" + std::to_string((float)value) + "f)");
           else
             return SmallString<8>(std::to_string(value));
         } else if (value > 0)

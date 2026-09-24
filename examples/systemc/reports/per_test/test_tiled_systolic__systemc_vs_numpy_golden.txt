@@ -1,0 +1,264 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v587_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v587_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v588_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v588_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v589_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v589_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v590_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v590_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v591_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v591_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v592_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v592_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v593_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v593_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v599_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v599_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v605_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v605_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v611_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v611_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v617_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v617_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v618_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v618_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v619_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v619_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v620_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v620_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v621_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v621_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v622_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v622_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v623_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v623_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v624_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v624_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v625_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v625_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v626_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v626_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v627_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v627_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v628_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v628_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v629_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v629_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v634_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v634_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v635_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v635_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v640_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v640_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v641_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v641_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v646_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v646_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v647_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v647_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v652_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v652_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v653_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v653_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v658_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v658_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v587_fifo.run.check_registration @ 50 ps
+[19:26:11] Compiling with g++ ...
+[19:26:16] Running simulation ...
+SC_vs_numpy OK  maxdiff=0

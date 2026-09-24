@@ -214,20 +214,20 @@ class IPModule:
         # Get nanobind paths and configuration using Python API
         try:
             nanobind_include = subprocess.check_output(
-                ["python3", "-c", "import nanobind; print(nanobind.include_dir())"],
+                [sys.executable, "-c", "import nanobind; print(nanobind.include_dir())"],
                 universal_newlines=True,
             ).strip()
 
             # Get the nanobind cmake directory to find the static library
             nanobind_cmake_dir = subprocess.check_output(
-                ["python3", "-c", "import nanobind; print(nanobind.cmake_dir())"],
+                [sys.executable, "-c", "import nanobind; print(nanobind.cmake_dir())"],
                 universal_newlines=True,
             ).strip()
 
             # Get Python include directory
             python_include = subprocess.check_output(
                 [
-                    "python3",
+                    sys.executable,
                     "-c",
                     "import sysconfig; print(sysconfig.get_path('include'))",
                 ],
@@ -237,7 +237,7 @@ class IPModule:
             # Get Python library directory for linking
             python_libdir = subprocess.check_output(
                 [
-                    "python3",
+                    sys.executable,
                     "-c",
                     "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))",
                 ],
@@ -247,7 +247,7 @@ class IPModule:
             # Get extension suffix
             extension_suffix = subprocess.check_output(
                 [
-                    "python3",
+                    sys.executable,
                     "-c",
                     "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))",
                 ],
@@ -279,7 +279,7 @@ class IPModule:
             # Get the nanobind source directory
             nanobind_src_dir = subprocess.check_output(
                 [
-                    "python3",
+                    sys.executable,
                     "-c",
                     "import nanobind; import os; print(os.path.dirname(nanobind.__file__))",
                 ],

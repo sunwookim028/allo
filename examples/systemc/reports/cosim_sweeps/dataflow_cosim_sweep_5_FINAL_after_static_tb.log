@@ -1,0 +1,29 @@
+  COSIM_OK         test_cooperative_gemv                  
+  COSIM_OK         test_systolic                          
+  CSIM_RUN_FAIL    test_decoupled_message_passing         Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  CSIM_RUN_FAIL    test_decoupled_2x1_mesh                Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  COSIM_OK         test_func_index                        
+  COSIM_OK         test_hierachical_function              
+  COSIM_OK         test_hierarchical_omp_deadlock_fix     
+  CSIM_RUN_FAIL    test_mlp                               Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  COSIM_OK         test_large_scale_gemm                  
+  COSIM_OK         test_packed_systolic                   
+  COSIM_OK         test_cooperative_gemm                  
+  COSIM_OK         test_producer_consumer                 
+  COSIM_OK         test_double_put                        
+  CSIM_RUN_FAIL    test_region_stateful_single_kernel     Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  CSIM_RUN_FAIL    test_region_stateful_two_kernels_shared Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  CSIM_RUN_FAIL    test_region_stateful_with_stream       Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  COSIM_OK         test_region_toparg_aliasing            
+  COSIM_OK         test_systolic                          
+  COSIM_MISMATCH   test_scalar_empty_full_sim             1 arg(s) differ
+  COSIM_MISMATCH   test_empty_full_sim                    1 arg(s) differ
+  COSIM_OK         test_2d_blocks                         
+  COSIM_OK         test_blocks_compute                    
+  CSIM_RUN_FAIL    test_multiple_blocks                   Failed to compile with g++. Check if g++ is installed and ac_types headers are c
+  COSIM_OK         test_systemc_golden                    
+  COSIM_OK         test_systolic                          
+  COSIM_OK         test_tiled_gemm                        
+  COSIM_OK         test_systolic                          
+=== COSIM SWEEP DONE ===
+SWEEP AFTER STATIC-TB DONE

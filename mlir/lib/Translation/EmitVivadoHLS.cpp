@@ -326,7 +326,9 @@ public:
   }
   void visitCeilDivExpr(AffineBinaryOpExpr expr) {
     // This is super inefficient.
-    os << "(";
+    // "((" not "(": the tail below emits ") / " + rhs + ")", i.e. two ')'.
+    // A single '(' emitted unbalanced `(a + b - 1) / b)`, which does not compile.
+    os << "((";
     visit(expr.getLHS());
     os << " + ";
     visit(expr.getRHS());
@@ -446,6 +448,7 @@ public:
   bool visitOp(memref::GlobalOp op) { return emitter.emitGlobal(op), true; }
   bool visitOp(memref::DeallocOp op) { return true; }
   bool visitOp(memref::SubViewOp op) { return emitter.emitSubView(op), true; }
+  bool visitOp(memref::CopyOp op) { return emitter.emitCopy(op), true; }
   bool visitOp(memref::ReshapeOp op) { return emitter.emitReshape(op), true; }
 
   /// Tensor-related statements.
@@ -678,6 +681,30 @@ public:
     return emitter.emitStreamFull(op), true;
   }
 
+  /// Wire operations.
+  bool visitOp(allo::WireConstructOp op) {
+    return emitter.emitWireConstruct(op), true;
+  }
+  bool visitOp(allo::WireGetOp op) { return emitter.emitWireGet(op), true; }
+  bool visitOp(allo::WirePutOp op) { return emitter.emitWirePut(op), true; }
+
+  /// Channel operations.
+  bool visitOp(allo::ChannelConstructOp op) {
+    return emitter.emitChannelConstruct(op), true;
+  }
+  bool visitOp(allo::ChannelGetOp op) {
+    return emitter.emitChannelGet(op), true;
+  }
+  bool visitOp(allo::ChannelPutOp op) {
+    return emitter.emitChannelPut(op), true;
+  }
+  bool visitOp(allo::ChannelTryGetOp op) {
+    return emitter.emitChannelTryGet(op), true;
+  }
+  bool visitOp(allo::ChannelTryPutOp op) {
+    return emitter.emitChannelTryPut(op), true;
+  }
+
 private:
   allo::hls::VhlsModuleEmitter &emitter;
 };
@@ -760,8 +787,34 @@ bool ExprVisitor::visitOp(allo::CmpFixedOp op) {
 // ModuleEmitter Class Definition
 //===----------------------------------------------------------------------===//
 
+// SystemC clocked-thread flow: a loop whose body issues a non-blocking stream op
+// (try_put/try_get -> PushNB/PopNB) needs a wait() per iteration, or all iterations
+// run in ZERO simulated time and the peer/FIFO threads never get scheduled between
+// attempts, so NO data moves (blocking put/get wait() internally, so they're fine).
+// Detect such ops in THIS loop's body -- descend into non-loop regions (scf.if, ...)
+// but STOP at nested loops, which get their own wait(), so we don't double-count.
+static bool loopBodyIssuesNonBlockingStream(Region &body) {
+  for (Block &blk : body)
+    for (Operation &op : blk) {
+      if (llvm::isa<allo::StreamTryPutOp, allo::StreamTryGetOp,
+                    allo::ChannelTryPutOp, allo::ChannelTryGetOp,
+                    allo::StreamEmptyOp, allo::StreamFullOp>(&op))
+        // empty()/full() polling loops must also yield per iteration (systemc-gated
+        // by scfWhileWait): otherwise the poll spins in zero sim time and the
+        // producer/FIFO never advances, so the status wire never changes.
+        return true;
+      if (llvm::isa<scf::ForOp, scf::WhileOp, AffineForOp>(&op))
+        continue; // nested loop -> its own wait(), don't descend
+      for (Region &r : op.getRegions())
+        if (loopBodyIssuesNonBlockingStream(r))
+          return true;
+    }
+  return false;
+}
+
 /// SCF statement emitters.
 void allo::hls::VhlsModuleEmitter::emitScfFor(scf::ForOp op) {
+  emitLoopDirectivesPreheader(op); // no-op except for backends that pragma before the loop
   indent();
   os << "for (";
   auto iterVar = op.getInductionVar();
@@ -789,6 +842,20 @@ void allo::hls::VhlsModuleEmitter::emitScfFor(scf::ForOp op) {
 
   emitLoopDirectives(op);
   emitBlock(*op.getBody());
+  // SystemC: a csim SC_THREAD doesn't yield on its own, so a for-loop issuing a
+  // non-blocking stream op needs a wait() per iteration or the peer/FIFO threads
+  // never run between attempts and no data moves. Guard it to CSIM: under
+  // __SYNTHESIS__ the PushNB/PopNB handshake already supplies the cycle boundary, and
+  // a redundant wait() alongside several meta_for-unrolled handshakes in one body
+  // over-constrains Catapult's fixed iomode offsets (SCHD-67). (while-loop retry
+  // spins keep an UNCONDITIONAL wait() -- a spin with no boundary is a zero-time
+  // combinational loop the RTL scheduler can't handle either.)
+  if (state.scfWhileWait && loopBodyIssuesNonBlockingStream(op.getRegion())) {
+    os << "#ifndef __SYNTHESIS__\n";
+    indent();
+    os << "wait();\n";
+    os << "#endif\n";
+  }
   reduceIndent();
 
   indent();
@@ -874,6 +941,14 @@ void allo::hls::VhlsModuleEmitter::emitScfWhile(scf::WhileOp op) {
   // After the scf.condition updates loop vars and checks condition,
   // emit the after block (loop body)
   emitBlock(*op.getAfterBody());
+
+  // SystemC clocked-thread flow: advance the clock each iteration so a busy-wait
+  // spin on a non-blocking op (try_put/try_get) can make progress instead of
+  // hanging RTL cosim in a zero-time combinational loop (see scfWhileWait).
+  if (state.scfWhileWait) {
+    indent();
+    os << "wait();\n";
+  }
 
   reduceIndent();
   indent();
@@ -963,6 +1038,7 @@ void allo::hls::VhlsModuleEmitter::emitScfYield(scf::YieldOp op) {
 
 /// Affine statement emitters.
 void allo::hls::VhlsModuleEmitter::emitAffineFor(AffineForOp op) {
+  emitLoopDirectivesPreheader(op); // no-op except for backends that pragma before the loop
   indent();
   auto iterVar = op.getInductionVar();
   std::string loop_name = "";
@@ -1037,6 +1113,20 @@ void allo::hls::VhlsModuleEmitter::emitAffineFor(AffineForOp op) {
 
   emitLoopDirectives(op);
   emitBlock(*op.getBody());
+  // SystemC: a csim SC_THREAD doesn't yield on its own, so a for-loop issuing a
+  // non-blocking stream op needs a wait() per iteration or the peer/FIFO threads
+  // never run between attempts and no data moves. Guard it to CSIM: under
+  // __SYNTHESIS__ the PushNB/PopNB handshake already supplies the cycle boundary, and
+  // a redundant wait() alongside several meta_for-unrolled handshakes in one body
+  // over-constrains Catapult's fixed iomode offsets (SCHD-67). (while-loop retry
+  // spins keep an UNCONDITIONAL wait() -- a spin with no boundary is a zero-time
+  // combinational loop the RTL scheduler can't handle either.)
+  if (state.scfWhileWait && loopBodyIssuesNonBlockingStream(op.getRegion())) {
+    os << "#ifndef __SYNTHESIS__\n";
+    indent();
+    os << "wait();\n";
+    os << "#endif\n";
+  }
   reduceIndent();
 
   indent();
@@ -1438,9 +1528,12 @@ void allo::hls::VhlsModuleEmitter::emitAlloc(OpType op) {
     name = attr.getValue().str();
   }
 
-  indent();
   Value result = op.getResult(); // memref
   fixUnsignedType(result, op->hasAttr("unsigned"));
+  // Pragmas that must PRECEDE the declaration (Catapult's hls_resource). No-op in this
+  // emitter and every other one except Catapult; see EmitBaseHLS.h.
+  emitArrayDirectivesPreheader(result);
+  indent();
   emitArrayDecl(result, false, name);
   os << ";";
   emitInfoAndNewLine(op);
@@ -1594,22 +1687,7 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
     indent();
     auto arrayType = llvm::dyn_cast<ShapedType>(op.getType());
     auto type = arrayType.getElementType();
-    // Check for static attribute or stateful variable naming pattern
-    bool isStatic = op->hasAttr("static");
-    if (!isStatic) {
-      // Check if symbol name contains "__stateful_" pattern (stateful
-      // variables)
-      std::string symName = op.getSymName().str();
-      if (symName.find("__stateful_") != std::string::npos) {
-        isStatic = true;
-      }
-    }
-    if (isStatic) {
-      os << "static ";
-    }
-    if (op->hasAttr("constant")) {
-      os << "const ";
-    }
+    emitGlobalStorageQualifier(op);
     emitStatefulGlobalElementType(type);
     // The symbol is printed raw, bypassing the name table; reserve it so a
     // generated identifier cannot later collide with it.
@@ -1661,14 +1739,101 @@ void allo::hls::VhlsModuleEmitter::emitGlobal(memref::GlobalOp op) {
   }
 }
 
-void allo::hls::VhlsModuleEmitter::emitSubView(memref::SubViewOp op) {
+/// memref.copy -- a whole-array copy, produced by a slice assignment such as
+/// `local_A[pid, :] = const_array`. No HLS emitter implemented it, so any such
+/// assignment aborted the emitter with "'memref.copy' op is unsupported operation"
+/// (the TypeSwitch default). Emit it as an explicit element-wise nested loop, which is
+/// what the backends can schedule; HLS unrolls or pipelines it like any other loop.
+void allo::hls::VhlsModuleEmitter::emitCopy(memref::CopyOp op) {
+  auto src = op.getSource();
+  auto dst = op.getTarget();
+  auto srcType = llvm::dyn_cast<MemRefType>(src.getType());
+  auto dstType = llvm::dyn_cast<MemRefType>(dst.getType());
+  if (!srcType || !dstType || !srcType.hasStaticShape() ||
+      !dstType.hasStaticShape()) {
+    emitError(op, "memref.copy requires statically shaped operands.");
+    return;
+  }
+  auto shape = srcType.getShape();
+
   indent();
-  emitArrayDecl(op.getResult(), true);
+  os << "{\n";
+  addIndent();
+  unsigned dimIdx = 0;
+  for (auto dim : shape) {
+    indent();
+    os << "for (int _cp" << dimIdx << " = 0; _cp" << dimIdx << " < " << dim
+       << "; ++_cp" << dimIdx++ << ") {\n";
+    addIndent();
+  }
+  indent();
+  emitValue(dst);
+  for (unsigned i = 0; i < shape.size(); ++i)
+    os << "[_cp" << i << "]";
   os << " = ";
+  emitValue(src);
+  for (unsigned i = 0; i < shape.size(); ++i)
+    os << "[_cp" << i << "]";
+  os << ";\n";
+  for (unsigned i = 0; i < shape.size(); ++i) {
+    reduceIndent();
+    indent();
+    os << "}\n";
+  }
+  reduceIndent();
+  indent();
+  os << "}";
+  emitInfoAndNewLine(op);
+}
+
+/// memref.subview -- an ALIAS into its source, not a copy.
+///
+/// This used to emit `int32_t v2[4] = v0;`, which is wrong twice over. It is not legal
+/// C++ (arrays have no copy-initialisation -- "array must be initialized with a
+/// brace-enclosed initializer"), and even had it compiled it would have produced a
+/// LOCAL copy, so writes through the subview would never reach the source array and a
+/// slice assignment like `local_A[pid, :] = const_array` would silently do nothing.
+///
+/// Emit a pointer to the first element of the slice instead, so indexing the subview
+/// reads and writes the source in place. Only contiguous (unit-stride) slices can be
+/// expressed as a flat pointer; anything else is rejected rather than mis-emitted.
+void allo::hls::VhlsModuleEmitter::emitSubView(memref::SubViewOp op) {
+  auto resType = llvm::dyn_cast<MemRefType>(op.getResult().getType());
+  auto srcType = llvm::dyn_cast<MemRefType>(op.getSource().getType());
+  if (!resType || !srcType || !srcType.hasStaticShape()) {
+    emitError(op, "memref.subview requires a statically shaped source.");
+    return;
+  }
+  // Contiguity: every stride must be 1, and every dimension after the first sliced one
+  // must span the whole source dimension. Otherwise the slice is not a flat run of
+  // elements and a pointer cannot represent it.
+  for (auto stride : op.getMixedStrides()) {
+    auto attr = llvm::dyn_cast_or_null<Attribute>(stride);
+    if (!attr || llvm::cast<IntegerAttr>(attr).getInt() != 1) {
+      emitError(op, "only unit-stride memref.subview is supported.");
+      return;
+    }
+  }
+  auto sizes = op.getMixedSizes();
+  auto srcShape = srcType.getShape();
+  for (unsigned i = 1; i < sizes.size(); ++i) {
+    auto attr = llvm::dyn_cast_or_null<Attribute>(sizes[i]);
+    if (!attr || llvm::cast<IntegerAttr>(attr).getInt() != srcShape[i]) {
+      emitError(op, "only a contiguous memref.subview is supported.");
+      return;
+    }
+  }
+
+  indent();
+  os << getTypeName(op.getResult()) << " *"
+     << addName(op.getResult(), /*isPtr=*/false) << " = &";
   emitValue(op.getSource());
-  for (auto index : op.getOffsets()) {
+  for (auto offset : op.getMixedOffsets()) {
     os << "[";
-    emitValue(index);
+    if (auto attr = llvm::dyn_cast_or_null<Attribute>(offset))
+      os << llvm::cast<IntegerAttr>(attr).getInt();
+    else
+      emitValue(llvm::cast<Value>(offset));
     os << "]";
   }
   os << ";";
@@ -2387,6 +2552,11 @@ void allo::hls::VhlsModuleEmitter::emitCast(CastOpType op) {
   emitValue(result);
   os << " = ";
   emitValue(op.getOperand());
+  // Backend hook: the SystemC emitter appends a .to_int64()/.to_uint64() when
+  // narrowing a >64-bit ac_int to a native int/index (no implicit conversion
+  // under __SYNTHESIS__ -> Catapult CRD-413). Default is a no-op, so Vivado/Vitis
+  // output (whose ap_int narrows implicitly) is unchanged.
+  emitNarrowCastSuffix(op.getOperand(), op.getResult());
   os << ";";
   emitInfoAndNewLine(op);
 }
@@ -3017,6 +3187,24 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
 
 void allo::hls::VhlsModuleEmitter::emitStatefulGlobalElementType(Type type) {
   os << getTypeName(type);
+}
+
+/// Storage class for a global's declaration. A C function is CALLED REPEATEDLY, so
+/// `static` is what makes a stateful variable persist between calls -- hence both the
+/// explicit `static` attr and the `__stateful_` naming convention map to it here.
+void allo::hls::VhlsModuleEmitter::emitGlobalStorageQualifier(
+    memref::GlobalOp op) {
+  bool isStatic = op->hasAttr("static");
+  if (!isStatic) {
+    // Check if symbol name contains "__stateful_" pattern (stateful variables)
+    std::string symName = op.getSymName().str();
+    if (symName.find("__stateful_") != std::string::npos)
+      isStatic = true;
+  }
+  if (isStatic)
+    os << "static ";
+  if (op->hasAttr("constant"))
+    os << "const ";
 }
 
 void allo::hls::VhlsModuleEmitter::emitFloatArrayElement(float value) {

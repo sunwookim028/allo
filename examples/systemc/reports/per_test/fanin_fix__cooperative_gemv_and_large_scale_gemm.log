@@ -1,0 +1,5 @@
+test_multi_cache_gemm.py::test_large_scale_gemm   CSIM_RUN_FAIL    test_large_scale_gemm                  Simulation failed.
+test_producer_consumer.py::test_producer_consumer   COSIM_OK         test_producer_consumer                 
+test_smith_waterman_systolic.py::test_systolic   COSIM_OK         test_systolic                          
+test_tiled_gemm.py::test_tiled_gemm          COSIM_OK         test_tiled_gemm                        
+DONE

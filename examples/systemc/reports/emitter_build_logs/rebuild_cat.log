@@ -1,0 +1,43 @@
+ninja: Entering directory `mlir/build'
+[1/41] Linking CXX static library lib/TransformOps/libMLIRAlloTransformOps.a
+[2/41] Linking CXX static library lib/Dialect/libMLIRAllo.a
+[3/41] Linking CXX static library lib/Support/libMLIRAlloSupport.a
+[4/41] Linking CXX static library lib/Conversion/libMLIRAlloConversion.a
+[5/41] Linking CXX static library lib/Transforms/libMLIRAlloPasses.a
+[6/41] Linking CXX static library lib/CAPI/Dialect/libMLIRAlloCAPI.a
+[7/41] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitTapaHLS.cpp.o
+[8/41] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitXlsHLS.cpp.o
+[9/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitBaseHLS.cpp.o
+[10/41] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitVivadoHLS.cpp.o
+[11/41] Building CXX object lib/CAPI/Translation/CMakeFiles/obj.MLIRAlloCAPIEmitHLSCpp.dir/EmitIntelHLS.cpp.o
+[12/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitXlsHLS.cpp.o
+[13/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitCatapultHLS.cpp.o
+[14/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitSystemC.cpp.o
+[15/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitIntelHLS.cpp.o
+[16/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitVivadoHLS.cpp.o
+[17/41] Building CXX object lib/Translation/CMakeFiles/obj.MLIRAlloEmitHLSCpp.dir/EmitTapaHLS.cpp.o
+[18/41] Linking CXX static library lib/Translation/libMLIRAlloEmitHLSCpp.a
+[19/41] Linking CXX static library lib/CAPI/Translation/libMLIRAlloCAPIEmitHLSCpp.a
+[20/41] Linking CXX shared library tools/allo/_mlir/libAlloMLIRAggregateCAPI.so.22.0git
+[21/41] Creating library symlink tools/allo/_mlir/libAlloMLIRAggregateCAPI.so
+[22/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirSparseTensorPasses.cpython-312-x86_64-linux-gnu.so
+[23/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsGPU.cpython-312-x86_64-linux-gnu.so
+[24/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsLLVM.cpython-312-x86_64-linux-gnu.so
+[25/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsAMDGPU.cpython-312-x86_64-linux-gnu.so
+[26/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsPDL.cpython-312-x86_64-linux-gnu.so
+[27/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirTransformInterpreter.cpython-312-x86_64-linux-gnu.so
+[28/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsNVGPU.cpython-312-x86_64-linux-gnu.so
+[29/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirGPUPasses.cpython-312-x86_64-linux-gnu.so
+[30/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsLinalg.cpython-312-x86_64-linux-gnu.so
+[31/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirLinalgPasses.cpython-312-x86_64-linux-gnu.so
+[32/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirAsyncPasses.cpython-312-x86_64-linux-gnu.so
+[33/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsTransform.cpython-312-x86_64-linux-gnu.so
+[34/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsQuant.cpython-312-x86_64-linux-gnu.so
+[35/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsSparseTensor.cpython-312-x86_64-linux-gnu.so
+[36/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsSMT.cpython-312-x86_64-linux-gnu.so
+[37/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_allo.cpython-312-x86_64-linux-gnu.so
+[38/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirDialectsIRDL.cpython-312-x86_64-linux-gnu.so
+[39/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirExecutionEngine.cpython-312-x86_64-linux-gnu.so
+[40/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlirRegisterEverything.cpython-312-x86_64-linux-gnu.so
+[41/41] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlir.cpython-312-x86_64-linux-gnu.so
+OK (zhang-21.ece.cornell.edu): mlir/build/tools/allo/_mlir/_mlir_libs/_allo.cpython-312-x86_64-linux-gnu.so

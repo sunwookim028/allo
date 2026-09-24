@@ -1,0 +1,18 @@
+########## 1) backend suite (28 csim tests) ##########
+............................                                             [100%]
+28 passed in 76.89s (0:01:16)
+########## 2) confirm emitted tb is now static ##########
+(will check freshly-generated below)
+########## 3) EVA 1x1 passthrough cosim (regenerates with new emitter) ##########
+SYSTEMC out_e  : [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+COSIM RESULT   : PASS (bit-exact)
+  static tb t("t");
+  -> tb is static in generated code
+########## 4) EVA 8x8 WITHOUT ulimit (the fix's purpose) ##########
+=== 8x8 EMIT OK in 54.8s -> /tmp/claude-1838657/-home-zsm9-allo-sup/eb682555-027f-481b-af99-40e733dfa3f4/scratchpad/eva_8x8_prj
+kernel.cpp lines=140931  bytes=5626345  SC_MODULEs=85  AlloFifo=1152
+  static tb t("t");
+  -> 8x8 tb is static
+8192
+8x8 csim.sh exit=143 (0 = runs on default stack)
+########## DONE ##########

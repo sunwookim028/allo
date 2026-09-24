@@ -1,0 +1,8 @@
+=== backend suite ===
+28 passed in 75.20s (0:01:15)
+=== cosim harness ===
+test_multi_cache_gemm.py::test_large_scale_gemm   COSIM_OK         test_large_scale_gemm                  
+test_cooperative_gemv.py::test_cooperative_gemv   COSIM_OK         test_cooperative_gemv                  
+test_producer_consumer.py::test_producer_consumer   COSIM_OK         test_producer_consumer                 
+test_smith_waterman_systolic.py::test_systolic   COSIM_OK         test_systolic                          
+DONE
