@@ -142,14 +142,25 @@ def test_region_stateful_with_stream():
 
 
 def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(capfd):
-    """Sharing is honoured by the simulator but is not expressible in HLS.
+    """Sharing is honoured by the simulator; Vitis refuses several clients.
 
     The emitter re-emits each stateful global as a function-local ``static``,
     so two kernels referencing one region-scope ``Stateful`` would get two
-    *independent* copies -- and real sharing is not available either: under
-    ``#pragma HLS dataflow`` a variable written by one process and read by
-    another is exactly what dataflow forbids.  The emitter therefore has to
-    fail the build rather than emit a silently wrong circuit.
+    *independent* copies.
+
+    Vitis does have unsynchronised sharing -- ``#pragma HLS stream
+    variable=X type=shared`` and ``type=unsync`` -- but neither reaches more
+    than one contending client.  Measured on Vitis HLS 2023.2 on this host, a
+    4-element array in a ``#pragma HLS dataflow`` region: ``type=shared`` with
+    1 writer + 1 reader csynths clean; with 1 writer + 2 readers it is
+    ``ERROR [HLS 200-1014] Synchronized shared array 'buf' failed dataflow
+    checking: it can only have a single reader and a single writer``; with 2
+    writers + 1 reader, that plus ``[HLS 200-979] it can only be written in one
+    process function``; ``type=unsync`` with 2 writers + 1 reader gives 200-979
+    plus ``[HLS 200-780] it has 3 processes accessing it and only 2 ports``.
+    So the 1R1W rule is not scoped to scalar channels -- a ``type=shared``
+    array carries its own -- and the emitter has to fail the build rather than
+    emit a silently wrong circuit.
     """
 
     @df.region()

@@ -3392,10 +3392,29 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
   // *independent* copies. That is right for the kernel-private model (#487),
   // where each kernel owns its buffer -- but a region-scope `Stateful` is
   // documented (allo/dataflow.py) as "a single persistent buffer shared by
-  // every kernel in the region", and the simulator honours that. Sharing is
-  // not expressible here at all: under `#pragma HLS dataflow` a variable
-  // written by one process and read by another is exactly what dataflow
-  // forbids. Fail the build rather than emit a silently wrong circuit.
+  // every kernel in the region", and the simulator honours that.
+  //
+  // Vitis DOES have an unsynchronised sharing mode -- two, in fact: `#pragma
+  // HLS stream variable=X type=shared` and `type=unsync` (`set_directive_shared`
+  // is the same thing, deprecated in favour of the first). Neither one reaches
+  // more than one contending client. Measured on Vitis HLS 2023.2 on this host,
+  // a 4-element array in a `#pragma HLS dataflow` region:
+  //
+  //   type=shared, 1 writer + 1 reader  -> csynth clean
+  //   type=shared, 1 writer + 2 readers -> ERROR [HLS 200-1014] "Synchronized
+  //                shared array 'buf' failed dataflow checking: it can only
+  //                have a single reader and a single writer."
+  //   type=shared, 2 writers + 1 reader -> the same 200-1014, plus ERROR
+  //                [HLS 200-979] "it can only be written in one process
+  //                function."
+  //   type=unsync, 2 writers + 1 reader -> ERROR [HLS 200-979], plus ERROR
+  //                [HLS 200-780] "it has 3 processes accessing it and only 2
+  //                ports."
+  //
+  // So the 1R1W rule is NOT scoped to scalar channels (that is just the wording
+  // of the scalar diagnostic); a `type=shared` ARRAY carries its own 1R1W rule.
+  // Several contending clients are refused by Vitis itself, not merely by us.
+  // Fail the build rather than emit a silently wrong circuit.
   for (auto &globalOp : statefulGlobals) {
     SmallVector<StringRef, 4> users;
     for (auto other :
@@ -3419,10 +3438,13 @@ void allo::hls::VhlsModuleEmitter::emitFunction(func::FuncOp func) {
         ss << (i ? ", " : "") << users[i];
       ss << "), but it is emitted as a function-local `static`, which gives "
             "each of them an independent copy rather than the shared buffer "
-            "the dataflow region promises. Sharing mutable state between "
-            "processes is not expressible under `#pragma HLS dataflow`: "
-            "declare the buffer inside a single kernel, or pass the values "
-            "between kernels through a Stream.";
+            "the dataflow region promises. Vitis' unsynchronised sharing modes "
+            "(`#pragma HLS stream variable=X type=shared`, and `type=unsync`) "
+            "do not reach this case: both are limited to a single reader and a "
+            "single writer, and Vitis HLS 2023.2 refuses more than that "
+            "(HLS 200-1014 / 200-979 / 200-780). Declare the buffer inside a "
+            "single kernel, or pass the values between kernels through a "
+            "Stream.";
       emitError(func, msg);
       return;
     }

@@ -543,6 +543,60 @@ unstyled ``s.pipeline`` reaches every backend exactly as before. The LLVM and
 simulator paths are unaffected: they make no claim about RTL scheduling.
 
 
+Sharing one array between dataflow processes: what ``type=shared`` reaches
+--------------------------------------------------------------------------
+
+A region-scope ``@ Stateful`` touched by several kernels asks for one buffer
+shared by several concurrent processes. All three HLS emitters refuse it
+(``vhls``, ``systemc``, ``catapult``), and the refusal used to say the thing is
+"not expressible under ``#pragma HLS dataflow``". That was too strong as
+written, because Vitis does ship unsynchronised sharing:
+``HLSPragma.json`` documents ``shared`` as "shared among multiple dataflow
+processes, without the need for synchronization" (visibility **Deprecated**,
+replaced by ``set_directive_stream type=shared``), and the live
+``#pragma HLS stream variable=X type=`` enum is ``fifo, pipo, shared, unsync``
+-- *two* unsynchronised modes, not one.
+
+The install carries no text saying what either mode does with several
+contending clients, so that was measured rather than argued. A 4-element
+``int`` array declared in a ``#pragma HLS dataflow`` region, one process per
+role, ``xcu250-figd2104-2L-e`` at 3.33 ns, ``csynth_design`` only:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 25 55
+
+   * - mode
+     - clients
+     - result
+   * - ``type=shared``
+     - 1 writer, 1 reader
+     - csynth clean
+   * - ``type=shared``
+     - 1 writer, 2 readers
+     - ``ERROR [HLS 200-1014] Synchronized shared array 'buf' failed dataflow
+       checking: it can only have a single reader and a single writer.``
+   * - ``type=shared``
+     - 2 writers, 1 reader
+     - the same 200-1014, plus ``ERROR [HLS 200-979] ... it can only be
+       written in one process function.``
+   * - ``type=unsync``
+     - 2 writers, 1 reader
+     - ``ERROR [HLS 200-979]``, plus ``ERROR [HLS 200-780] Array 'buf' ...
+       it has 3 processes accessing it and only 2 ports.``
+
+Two things follow. The 1R1W rule is **not** scoped to scalar channels -- the
+library string "Scalar channel must only have 1 reader and 1 writer" is just
+the scalar diagnostic; a ``type=shared`` *array* carries a 1R1W rule of its
+own (200-1014). And the accurate claim for our error messages is neither "not
+expressible" nor "expressible only unsynchronised": Vitis HLS 2023.2 **refuses
+it itself** past one reader and one writer. Our emitters refuse the same
+thing, earlier and with the variable and kernels named.
+
+What this does *not* settle: whether a shared buffer between contending
+clients should be lowered at all, and by what mechanism. That needs
+arbitration -- a decision that has not been made. The guards are guards.
+
 Vitis 2023.2 Linker vs. Newer glibc
 -----------------------------------
 Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux
