@@ -28,7 +28,7 @@ from .ir.utils import (
     get_global_vars,
 )
 from .backend.simulator import LLVMOMPModule
-from .passes import df_pipeline
+from .passes import df_pipeline, analyze_arg_load_store
 from .backend import AIE_MLIRModule
 
 # pylint: disable=unused-import
@@ -770,6 +770,95 @@ def region(deadlock_free_because: str = None):
     return actual_decorator
 
 
+def _build_manifest_top_arguments(
+    source_arguments, realized_names, realized_directions, direction_map
+):
+    """The top interface as the compiler realized it, for the ASIC manifest.
+
+    A region's arguments are not necessarily emitted in the order they were
+    declared (``docs/source/developer/pitfalls.rst``), and the direction of
+    each one is a fact about the body, not the declaration -- so the manifest
+    records the *realized* order and the *analyzed* direction, and finds each
+    argument's shape and dtype by name rather than by position. Getting this
+    wrong is silent: the flow's testbench generator checks the frozen
+    workload's ``call_signature`` against this order and would bind vectors to
+    the wrong ports.
+    """
+    by_name = {}
+    for argument in source_arguments:
+        by_name.setdefault(getattr(argument, "top_name", None), argument)
+        by_name.setdefault(getattr(argument, "name", None), argument)
+    arguments = []
+    for ordinal, (name, direction) in enumerate(
+        zip(realized_names, realized_directions)
+    ):
+        argument = by_name.get(name)
+        if argument is None:
+            raise RuntimeError(f"realized top argument {name!r} has no declaration")
+        arguments.append(
+            {
+                "ordinal": ordinal,
+                "name": getattr(argument, "name", name),
+                "shape": list(getattr(argument, "shape", ()) or ()),
+                "type": str(getattr(argument, "dtype", "")),
+                "direction": direction_map.get(direction, direction),
+            }
+        )
+    return arguments
+
+
+def _emit_asic_manifest(func, s, project, target, configs):
+    """Write the ``pre_hls`` manifest when ``configs`` asks for one.
+
+    The flow's compilation node passes ``configs["asic_manifest"]`` into
+    ``build()`` and then expects the manifest beside the project. It is written
+    here, from the schedule that is about to be handed to the backend, so what
+    the flow plans against and what HLS compiles are the same architecture.
+    """
+    from .backend import asic_manifest  # noqa: PLC0415  -- one direction
+
+    requested = asic_manifest.options(configs)
+    if requested is None:
+        return None
+    backend = {
+        "vitis_hls": "vitis",
+        "catapult": "catapult",
+        "systemc": "systemc",
+    }.get(target)
+    if backend is None:
+        raise RuntimeError(
+            f"asic_manifest is not defined for target {target!r}; "
+            "supported: vitis_hls, catapult, systemc"
+        )
+    directions = analyze_arg_load_store(s.module)[s.top_func_name]
+    source_arguments = s.func_args[s.top_func_name]
+    realized_names = [
+        getattr(argument, "top_name", getattr(argument, "name", None))
+        for argument in source_arguments
+    ]
+    frequency = (configs or {}).get("frequency")
+    manifest = asic_manifest.collect(
+        s.module,
+        s.top_func_name,
+        top_arguments=_build_manifest_top_arguments(
+            source_arguments,
+            realized_names,
+            directions,
+            asic_manifest.DIRECTION_MAP,
+        ),
+        mappings=getattr(func, "mappings", None),
+        backend=backend,
+        clock_period_ns=(1000.0 / frequency) if frequency else None,
+    )
+    asic_manifest.write(
+        manifest,
+        project,
+        requested["path"],
+        debug_dir=requested["debug_dir"] if requested["debug_artifacts"] else None,
+    )
+    return manifest
+
+
 def df_primitive_default(s):
     df_pipeline(s.module, rewind=True)
 
@@ -855,6 +944,9 @@ def build(
         return LLVMOMPModule(s.module, s.top_func_name)
     # FPGA backend (vitis_hls, vivado_hls, tapa, ihls)
     s = customize(func, enable_tensor=enable_tensor)
+    # Before the backend runs: the architecture this build is about to compile,
+    # for `allo/backend/asic`'s AAAH nodes. No-op unless `configs` asks.
+    _emit_asic_manifest(func, s, project, target, configs)
     hls_mod = s.build(
         target=target,
         mode=mode,

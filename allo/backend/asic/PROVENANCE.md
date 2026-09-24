@@ -57,10 +57,18 @@ fixed here, so that the vendored code still matches its upstream:
 
 The node library's own tests pass **per node directory**, 182 of them. They
 cannot be collected as one suite from the repository root: several share a
-basename and several assume the working directory is their own node. The single
-failing directory is `nodes/allo-asic-compilation`, which imports `allo` and
-expects the `asic_manifest` emitter that this fork does not have — the same
-reason the TinyTPU runs enter at the flat flow instead.
+basename and several assume the working directory is their own node.
+
+`nodes/allo-asic-compilation` used to be the one failing directory, because it
+imports `allo` and expects an `asic_manifest` emitter this fork did not have.
+`allo/backend/asic_manifest.py` is now that emitter
+(`docs/source/backends/asic_manifest.rst`), and the directory's other 17 tests
+pass with `ALLO_HOME` set to the checkout. What still fails there is
+`test_catapult_manifest.py`, and only its second half: it also loads
+`$ALLO_HOME/scripts/extract_catapult_pe_manifest.py`, the post-HLS *Catapult
+RTL* extractor, which is a parse of generated Verilog rather than an
+architectural fact and is not written here. The import it opens with,
+`from allo.dataflow import _build_manifest_top_arguments`, now resolves.
 
 ```bash
 cd allo/backend/asic/nodes/<node> && python -m pytest -q .

@@ -116,17 +116,25 @@ than inferring from its name.
 Do not force one answer onto both. The flat flow is infrastructure and the
 AAAH-facing half is a backend, and they can coexist.
 
-**The blocking gap: our Allo does not emit that manifest.** `asic_manifest`
-appears nowhere in our `allo/`. The interface is satisfied by a different
-lineage of Allo, which is why the TinyTPU path was routed *around* the
-compilation node in the first place. So adopting AAAH is not a directory move —
-**it needs the manifest emitter implemented here**, and until it exists those
-nodes cannot run against our designs at all.
+**That gap is closed as of 2026-09-24.** `allo/backend/asic_manifest.py` emits
+both stages (`pre_hls` from `allo.dataflow.build`, `post_hls_enriched` from
+`HLSModule` once Vitis `csyn` succeeds), derived from the realized dataflow IR
+rather than from a table; `tests/dataflow/test_asic_manifest.py` runs the
+flow's own `plan_macros` and `plan_physical_intent` on the result, and
+`docs/source/backends/asic_manifest.rst` has the schema and the limits. What
+this does NOT mean is that the loop is closed: no end-to-end PD run from a
+specification has been performed, the Catapult/SystemC per-argument RTL
+protocol capture is still missing, and on the Vitis path every PE hashes to
+its own macro class, so macro planning at `min_macro_reuse=2` would still find
+nothing to harden. Before this, the interface was satisfied only by a
+different lineage of Allo, which is why the TinyTPU path was routed *around*
+the compilation node in the first place.
 
-We are unusually well placed to write it. `ip/compose.py` already holds an
-`Architecture` of units, channels and memories, with per-channel widths and
-explicit endpoints — which is most of what the manifest asks for. The emitter
-is largely a serialisation of a structure we already build, not a new analysis.
+We were unusually well placed to write it, and that is why it was small.
+`allo/compose.py` holds an `Architecture` of units, channels and memories with
+per-channel widths and explicit endpoints; the emitter reads the same facts
+back out of the realized IR that `customize` produces from it, so it is a
+serialisation of a structure we already build rather than a new analysis.
 
 **And there is a ceiling worth stating before anyone promises too much.** Even
 with a perfect manifest, DC at the flattening effort these runs use dissolves
