@@ -1801,7 +1801,7 @@ def check_actions(spec, U, E):
           f"their actions name, read out of ip/units/sequencer.py")
 
     # 3. each unit's declared ISA namespace against the opcodes it acts on.
-    from examples.accelerator.tinytpu_vitis.ip import tinytpu as T_  # noqa: PLC0415
+    from examples.tinytpu.ip import tinytpu as T_  # noqa: PLC0415
     by_name = {u.name: u for u in T_.units()}
     n = 0
     for u in spec["units"]["list"]:

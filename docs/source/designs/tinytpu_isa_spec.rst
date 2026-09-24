@@ -202,7 +202,7 @@ Opcodes
        | ``f2`` = col_block: packed-word column block within the row, 0 .. WPR-1
        | ``f3`` = dst_row0: first destination row, in spad or vr by the mode bit
      - nr DRAM rows
-     - ``dma_ld``, spm (dst = spad) or vru (dst = vr)
+     - ``dma_ld``, ``spm``, ``vru``
    * - ``OP_DMA_ST``
      - 2
      - dma_st
@@ -224,7 +224,7 @@ Opcodes
        | ``f2`` = acc: 0 = overwrite ar, 1 = accumulate into ar
        | ``f3`` = spad_w: first of T weight rows in spad
      - nr activation rows (wavefront rows through the array)
-     - ``spm``, ``vru``, ``accu``
+     - ``spm``, ``array``, ``vru``, ``accu``
    * - ``OP_VADD``
      - 5
      - vadd
@@ -260,6 +260,431 @@ Opcodes
      -
      - none
      - ``sequencer``
+   * - ``OP_VADDRELU``
+     - 10
+     - vaddrelu
+     - | ``f0`` = ar_d: first destination accumulator row
+       | ``f1`` = ar_s1: first row of the left source
+       | ``f2`` = ar_s2: first row of the right source
+     - nr accumulator rows
+     - ``accu``
+
+The ``units`` column is **derived** from the actions below, not written beside each opcode: an opcode reaches whichever units its actions name. It used to be typed, and it was wrong twice -- ``mm`` did not name the array, and ``dma_ld`` named its destination in prose.
+
+Instructions as compositions of Actions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Every instruction is an ordered list of per-unit **effects**. Each effect names a unit, one of that unit's ports, and the element it touches. ``allo.actions`` holds the model and its legality rule; this table is what the spec declares, and the per-unit work counts in the header, the dispatch rewrites and the reads and writes below are queries over it rather than further declarations.
+
+.. list-table:: Actions
+   :header-rows: 1
+
+   * - opcode
+     - unit
+     - port
+     - kind
+     - state
+     - base
+     - items
+     - only if
+   * - dma_ld
+     - dma_ld
+     - dram.read
+     - read
+     - ``A``
+     - dram_row0
+     - nr
+     - (mode & 1) == 0
+   * - dma_ld
+     - dma_ld
+     - dram.read
+     - read
+     - ``B``
+     - dram_row0
+     - nr
+     - (mode & 1) == 1
+   * - dma_ld
+     - dma_ld
+     - mux
+     - compute
+     - ``select``
+     - --
+     - nr
+     - --
+   * - dma_ld
+     - dma_ld
+     - dma2sp
+     - emit
+     - --
+     - --
+     - nr
+     - (mode & 2) == 0
+   * - dma_ld
+     - dma_ld
+     - dma2vr
+     - emit
+     - --
+     - --
+     - nr
+     - (mode & 2) == 2
+   * - dma_ld
+     - spm
+     - dma2sp
+     - receive
+     - --
+     - --
+     - nr
+     - (mode & 2) == 0
+   * - dma_ld
+     - spm
+     - spad.write
+     - write
+     - ``spad``
+     - dst_row0
+     - nr
+     - (mode & 2) == 0
+   * - dma_ld
+     - vru
+     - dma2vr
+     - receive
+     - --
+     - --
+     - nr
+     - (mode & 2) == 2
+   * - dma_ld
+     - vru
+     - vr.write
+     - write
+     - ``vr``
+     - dst_row0
+     - nr
+     - (mode & 2) == 2
+   * - vld
+     - spm
+     - spad.read
+     - read
+     - ``spad``
+     - spad0
+     - nr
+     - --
+   * - vld
+     - spm
+     - sp2vr
+     - emit
+     - --
+     - --
+     - nr
+     - --
+   * - vld
+     - vru
+     - sp2vr
+     - receive
+     - --
+     - --
+     - nr
+     - --
+   * - vld
+     - vru
+     - vr.write
+     - write
+     - ``vr``
+     - vr0
+     - nr
+     - --
+   * - mm
+     - spm
+     - spad.read
+     - read
+     - ``spad``
+     - spad_w
+     - T
+     - --
+   * - mm
+     - spm
+     - wcol
+     - emit
+     - --
+     - --
+     - T + 1
+     - --
+   * - mm
+     - array
+     - wcol
+     - receive
+     - --
+     - --
+     - T + 1
+     - --
+   * - mm
+     - array
+     - instructions
+     - emit
+     - --
+     - --
+     - 1
+     - --
+   * - mm
+     - vru
+     - vr.read
+     - read
+     - ``vr``
+     - vr_a
+     - nr
+     - --
+   * - mm
+     - vru
+     - acol
+     - emit
+     - --
+     - --
+     - nr
+     - --
+   * - mm
+     - array
+     - acol
+     - receive
+     - --
+     - --
+     - nr
+     - --
+   * - mm
+     - array
+     - mac
+     - compute
+     - ``matmul``
+     - --
+     - nr
+     - --
+   * - mm
+     - array
+     - cw
+     - emit
+     - --
+     - --
+     - nr
+     - --
+   * - mm
+     - accu
+     - cw
+     - receive
+     - --
+     - --
+     - nr
+     - --
+   * - mm
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar0
+     - nr
+     - acc == 1
+   * - mm
+     - accu
+     - alu
+     - compute
+     - ``acc_add``
+     - --
+     - nr
+     - --
+   * - mm
+     - accu
+     - ar.write
+     - write
+     - ``ar``
+     - ar0
+     - nr
+     - --
+   * - vadd
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s1
+     - nr
+     - --
+   * - vadd
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s2
+     - nr
+     - --
+   * - vadd
+     - accu
+     - alu
+     - compute
+     - ``add``
+     - --
+     - nr
+     - --
+   * - vadd
+     - accu
+     - ar.write
+     - write
+     - ``ar``
+     - ar_d
+     - nr
+     - --
+   * - vrelu
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s
+     - nr
+     - --
+   * - vrelu
+     - accu
+     - alu
+     - compute
+     - ``max0``
+     - --
+     - nr
+     - --
+   * - vrelu
+     - accu
+     - ar.write
+     - write
+     - ``ar``
+     - ar_d
+     - nr
+     - --
+   * - mvout
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar0
+     - nr
+     - --
+   * - mvout
+     - accu
+     - alu
+     - compute
+     - ``to_operand``
+     - --
+     - nr
+     - --
+   * - mvout
+     - accu
+     - ac2sp
+     - emit
+     - --
+     - --
+     - nr
+     - --
+   * - mvout
+     - dma_st
+     - ac2sp
+     - receive
+     - --
+     - --
+     - nr
+     - --
+   * - mvout
+     - dma_st
+     - dram.write
+     - write
+     - ``C``
+     - dram_row0
+     - nr
+     - --
+   * - loop
+     - sequencer
+     - fetch
+     - compute
+     - ``push_loop``
+     - --
+     - 1
+     - --
+   * - endloop
+     - sequencer
+     - fetch
+     - compute
+     - ``pop_loop``
+     - --
+     - 1
+     - --
+   * - vaddrelu
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s1
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - ar.read
+     - read
+     - ``ar``
+     - ar_s2
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - alu
+     - compute
+     - ``add``
+     - --
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - alu
+     - compute
+     - ``max0``
+     - --
+     - nr
+     - --
+   * - vaddrelu
+     - accu
+     - ar.write
+     - write
+     - ``ar``
+     - ar_d
+     - nr
+     - --
+
+.. list-table:: Units: ports, step rate, elasticity
+   :header-rows: 1
+
+   * - unit
+     - ports (items per cycle)
+     - II
+     - elastic
+   * - sequencer
+     - ``fetch``, ``dispatch`` x5
+     - 1
+     - yes
+   * - dma_ld
+     - ``dram.read``, ``mux``, ``dma2sp``, ``dma2vr``
+     - 1
+     - yes
+   * - spm
+     - ``spad.read``, ``spad.write``, ``dma2sp``, ``sp2vr``, ``wcol``
+     - 1
+     - yes
+   * - vru
+     - ``vr.read``, ``vr.write``, ``acol``, ``sp2vr``, ``dma2vr``
+     - 1
+     - yes
+   * - array
+     - ``wcol``, ``acol``, ``instructions``, ``mac``, ``cw``
+     - 1
+     - yes
+   * - accu
+     - ``cw``, ``ar.read``, ``ar.write``, ``alu`` x2, ``ac2sp``
+     - 1
+     - yes
+   * - dma_st
+     - ``ac2sp``, ``dram.write``
+     - 1
+     - yes
+
+A unit's cost for an instruction is its busiest port's item count, so ``spm`` charging an ``mm`` ``T + 1`` iterations and ``accu`` charging a ``vadd`` two steps a row are consequences of these ports and not entries in a table. ``elastic`` says whether contention inside a unit costs a step or is illegal.
 
 Derived properties
 ~~~~~~~~~~~~~~~~~~
@@ -315,12 +740,18 @@ The sequencer hands two units a rewritten copy of the word, so each unit's flat 
      - why
    * - ``mm``
      - ``spm``
-     - ``nr`` = T + 1, ``f1`` = the instruction's own nr
+     - ``nr`` = T + 1
      - One header word plus T weight rows down wcol; f1 carries the array's row count into the header word.
    * - ``vadd``
      - ``accu``
      - ``nr`` = 2 * nr
      - accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.
+   * - ``vaddrelu``
+     - ``accu``
+     - ``nr`` = 2 * nr
+     -
+
+Which units need a rewrite, and to what, is **derived**: it is every unit the sequencer dispatches to whose own work count differs from the instruction's row count. Nothing states it, so adding an instruction adds no entry here.
 
 Instruction memory header
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -343,56 +774,102 @@ Instruction memory header
    * - ``imem[1]``
      - ``[0:16]``
      - ``dma_ld_rows``
-     - rows of ``dma_ld``
+     - the steps ``dma_ld`` spends
      - ``dma_ld``
    * - ``imem[2]``
      - ``[0:16]``
      - ``spm_rows``
-     - | the sum of:
-       |   rows of ``dma_ld`` with destination ``spad``
-       |   rows of ``vld``
-       |   issues of ``mm``, times T + 1
+     - the steps ``spm`` spends
      - ``spm``
    * - ``imem[3]``
      - ``[0:16]``
      - ``vru_words``
-     - | the sum of:
-       |   rows of ``dma_ld`` with destination ``vr``
-       |   rows of ``vld``
-       |   rows of ``mm``
+     - the steps ``vru`` spends
      - ``vru``
    * - ``imem[4]``
      - ``[0:16]``
      - ``mm_count``
-     - issues of ``mm``
+     - items on ``array``'s ``instructions`` port
      - the array, via spm's header word
    * - ``imem[4]``
      - ``[16:32]``
      - ``mm_rows``
-     - rows of ``mm``
+     - items on ``array``'s ``mac`` port
      - the array, via spm's header word
    * - ``imem[5]``
      - ``[0:16]``
      - ``accu_iterations``
-     - | the sum of:
-       |   rows of ``mm``, ``vrelu``, ``mvout``
-       |   rows of ``vadd``, times 2
+     - the steps ``accu`` spends
      - ``accu``
    * - ``imem[6]``
      - ``[0:16]``
      - ``dma_st_rows``
-     - rows of ``mvout``
+     - the steps ``dma_st`` spends
      - ``dma_st``
    * - ``imem[7]``
      - ``[0:16]``
      - ``a_span``
-     - max(first row + rows) over ``dma_ld`` with source ``A``
+     - the row span of ``A`` every ``dma_ld`` reads
      - ``dma_ld``
    * - ``imem[7]``
      - ``[16:32]``
      - ``b_span``
-     - max(first row + rows) over ``dma_ld`` with source ``B``
+     - the row span of ``B`` every ``dma_ld`` reads
      - ``dma_ld``
+
+Every count but the static one is **the work a unit does**, summed over the issues the program makes, and it is computed from the actions above rather than written here. The per-opcode costs that follow are therefore derived too:
+
+.. list-table:: Per-unit cost, derived from the ports
+   :header-rows: 1
+
+   * - opcode
+     - unit
+     - steps
+   * - dma_ld
+     - dma_ld
+     - ``1 x nr``
+   * - dma_ld
+     - spm
+     - ``1 x nr``
+   * - vld
+     - spm
+     - ``1 x nr``
+   * - vld
+     - vru
+     - ``1 x nr``
+   * - mm
+     - spm
+     - ``T + 1`` per issue
+   * - mm
+     - array
+     - 13 at nr=8
+   * - mm
+     - vru
+     - ``1 x nr``
+   * - mm
+     - accu
+     - ``1 x nr``
+   * - vadd
+     - accu
+     - ``2 x nr``
+   * - vrelu
+     - accu
+     - ``1 x nr``
+   * - mvout
+     - accu
+     - ``1 x nr``
+   * - mvout
+     - dma_st
+     - ``1 x nr``
+   * - loop
+     - sequencer
+     - 1 at nr=8
+   * - endloop
+     - sequencer
+     - 1 at nr=8
+   * - vaddrelu
+     - accu
+     - ``2 x nr``
 
 Memory map
 ~~~~~~~~~~
@@ -411,51 +888,53 @@ Memory map
      - ``spm``
      - ``SPAD_ROWS``
      - ``T * 8`` bits
-     - dma_ld (dst = spad)
-     - vld, mm (weights)
+     - ``dma_ld`` [(mode & 2) == 0]
+     - ``vld`` (the row to copy), ``mm`` (weights)
      - **no**
    * - ``vr``
      - ``vru``
      - ``NVR``
      - ``T * 8`` bits
-     - dma_ld (dst = vr), vld
-     - mm (activations)
+     - ``dma_ld`` [(mode & 2) == 2], ``vld``
+     - ``mm`` (activations)
      - **no**
    * - ``ar``
      - ``accu``
      - ``NAR``
      - ``T * 32`` bits
-     - mm, vadd, vrelu
-     - mm (acc = 1), vadd, vrelu, mvout
+     - ``mm``, ``vadd``, ``vrelu``, ``vaddrelu``
+     - ``mm`` (the accumulate base) [acc == 1], ``vadd`` (a source), ``vrelu`` (a source), ``mvout`` (the value to retire), ``vaddrelu`` (a source)
      - **no**
    * - ``imem``
      - ``sequencer``
      - ``IMEM_SIZE``
      - ``64`` bits
-     - the host, through m_axi
-     - sequencer
+     - the host
+     - ``sequencer``
      - **no**
    * - ``A``
      - ``dma_ld``
      - ``MAXDIM * MAXDIM``
      - ``8`` bits
      - the host
-     - dma_ld
+     - ``dma_ld`` (the source rows) [(mode & 1) == 0]
      - **no**
    * - ``B``
      - ``dma_ld``
      - ``MAXDIM * MAXDIM``
      - ``8`` bits
      - the host
-     - dma_ld
+     - ``dma_ld`` (the source rows) [(mode & 1) == 1]
      - **no**
    * - ``C``
      - ``dma_st``
      - ``MAXDIM * MAXDIM``
      - ``8`` bits
-     - dma_st (mvout)
+     - ``mvout``
      - the host
      - **no**
+
+The ``written by`` and ``read by`` columns are **derived** from the actions. They used to be two lists beside each memory that nothing computed from and nothing checked.
 
 No on-chip memory is cleared by the hardware, so every read of one is the program's obligation; see the contracts below.
 

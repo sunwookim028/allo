@@ -45,9 +45,9 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, ".mutants-actions")
-DOC = os.path.join("docs", "source", "designs", "tinytpu_isa.rst")
+DOC = os.path.join("docs", "source", "designs", "tinytpu_isa_spec.rst")
 
 
 def _opcode(spec, name):
@@ -131,7 +131,7 @@ def sandbox(name, mutate):
     """A copy of this directory and the ISA doc, with the spec mutated."""
     root = os.path.join(WORK, name)
     shutil.rmtree(root, ignore_errors=True)
-    here = os.path.join(root, "examples", "accelerator", "tinytpu_vitis")
+    here = os.path.join(root, "examples", "tinytpu")
     os.makedirs(os.path.dirname(here), exist_ok=True)
     shutil.copytree(HERE, here, ignore=shutil.ignore_patterns(
         ".mutants*", ".scratch", "__pycache__", "*.log", "logs", "gemmini",
