@@ -36,7 +36,8 @@ from examples.tinytpu.ip.assembler import (  # noqa: F401
 from examples.tinytpu.ip.isa import (  # noqa: F401
     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, DMA_SRC_B, DMA_TO_VR, IWORDS,
     LOOP_DEPTH, MAXROWS, NHDR, OP_DMA_LD, OP_DMA_ST, OP_ENDLOOP, OP_LOOP,
-    OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD, OP_VRELU, enc, enc_agu)
+    OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VADDRELU, OP_VLD, OP_VRELU, enc,
+    enc_agu)
 
 # Instruction slots. Sized to the longest program shipped (the stress harness's
 # random programs), not to a round number: the sequencer's prefetch is

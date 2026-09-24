@@ -303,18 +303,15 @@
       "value": 0,
       "software_constant": "OP_NOP",
       "rows": "none",
-      "units": [],
-      "operands": []
+      "operands": [],
+      "rows_expression": "1",
+      "actions": []
     },
     {
       "name": "dma_ld",
       "value": 1,
       "software_constant": "OP_DMA_LD",
       "rows": "nr DRAM rows",
-      "units": [
-        "dma_ld",
-        "spm (dst = spad) or vru (dst = vr)"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -358,18 +355,100 @@
           "meaning": "first destination row, in spad or vr by the mode bit"
         }
       ],
-      "reads": [
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "A or B",
+          "unit": "dma_ld",
+          "kind": "read",
+          "port": "dram.read",
+          "state": "A",
           "base": "dram_row0",
-          "rows": "nr"
-        }
-      ],
-      "writes": [
+          "when": "(mode & 1) == 0",
+          "into": "from_a",
+          "role": "the source rows",
+          "offset": "col_block * T"
+        },
         {
-          "memory": "spad or vr",
+          "unit": "dma_ld",
+          "kind": "read",
+          "port": "dram.read",
+          "state": "B",
+          "base": "dram_row0",
+          "when": "(mode & 1) == 1",
+          "into": "from_b",
+          "role": "the source rows",
+          "offset": "col_block * T"
+        },
+        {
+          "unit": "dma_ld",
+          "kind": "compute",
+          "port": "mux",
+          "compute": "select",
+          "args": [
+            "from_a",
+            "from_b"
+          ],
+          "into": "beat"
+        },
+        {
+          "unit": "dma_ld",
+          "kind": "emit",
+          "port": "dma2sp",
+          "args": [
+            "beat"
+          ],
+          "when": "(mode & 2) == 0"
+        },
+        {
+          "unit": "dma_ld",
+          "kind": "emit",
+          "port": "dma2vr",
+          "args": [
+            "beat"
+          ],
+          "when": "(mode & 2) == 2"
+        },
+        {
+          "unit": "spm",
+          "kind": "receive",
+          "port": "dma2sp",
+          "into": "landing",
+          "when": "(mode & 2) == 0",
+          "args": [
+            "beat"
+          ]
+        },
+        {
+          "unit": "spm",
+          "kind": "write",
+          "port": "spad.write",
+          "state": "spad",
           "base": "dst_row0",
-          "rows": "nr"
+          "args": [
+            "landing"
+          ],
+          "when": "(mode & 2) == 0"
+        },
+        {
+          "unit": "vru",
+          "kind": "receive",
+          "port": "dma2vr",
+          "into": "landing",
+          "when": "(mode & 2) == 2",
+          "args": [
+            "beat"
+          ]
+        },
+        {
+          "unit": "vru",
+          "kind": "write",
+          "port": "vr.write",
+          "state": "vr",
+          "base": "dst_row0",
+          "args": [
+            "landing"
+          ],
+          "when": "(mode & 2) == 2"
         }
       ]
     },
@@ -379,19 +458,16 @@
       "software_constant": "OP_DMA_ST",
       "retired": true,
       "rows": "none",
-      "units": [],
       "operands": [],
-      "note": "Retired: results leave via mvout. `check_program` refuses it, so the number stays reserved rather than reusable."
+      "note": "Retired: results leave via mvout. `check_program` refuses it, so the number stays reserved rather than reusable.",
+      "rows_expression": "1",
+      "actions": []
     },
     {
       "name": "vld",
       "value": 3,
       "software_constant": "OP_VLD",
       "rows": "nr packed words",
-      "units": [
-        "spm",
-        "vru"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -404,32 +480,52 @@
           "meaning": "first source scratchpad row"
         }
       ],
-      "reads": [
+      "note": "A pure copy. It MAY copy an unwritten spad row, but the copy is then unwritten too.",
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "spad",
+          "unit": "spm",
+          "kind": "read",
+          "port": "spad.read",
+          "state": "spad",
           "base": "spad0",
-          "rows": "nr"
-        }
-      ],
-      "writes": [
+          "into": "word",
+          "role": "the row to copy"
+        },
         {
-          "memory": "vr",
+          "unit": "spm",
+          "kind": "emit",
+          "port": "sp2vr",
+          "args": [
+            "word"
+          ]
+        },
+        {
+          "unit": "vru",
+          "kind": "receive",
+          "port": "sp2vr",
+          "into": "word_in",
+          "args": [
+            "word"
+          ]
+        },
+        {
+          "unit": "vru",
+          "kind": "write",
+          "port": "vr.write",
+          "state": "vr",
           "base": "vr0",
-          "rows": "nr"
+          "args": [
+            "word_in"
+          ]
         }
-      ],
-      "note": "A pure copy. It MAY copy an unwritten spad row, but the copy is then unwritten too."
+      ]
     },
     {
       "name": "mm",
       "value": 4,
       "software_constant": "OP_MM",
       "rows": "nr activation rows (wavefront rows through the array)",
-      "units": [
-        "spm",
-        "vru",
-        "accu"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -456,44 +552,142 @@
           "meaning": "first of T weight rows in spad"
         }
       ],
-      "reads": [
+      "note": "PE(i, j) holds lane j of weight row i and taps lane i of the activation word, so output column j is sum_i act[i] * W[i][j].",
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "vr",
-          "base": "vr_a",
-          "rows": "nr",
-          "as": "activations"
-        },
-        {
-          "memory": "spad",
+          "unit": "spm",
+          "kind": "read",
+          "port": "spad.read",
+          "state": "spad",
           "base": "spad_w",
-          "rows": "T",
-          "as": "weights"
+          "count": "T",
+          "per": "instruction",
+          "into": "weights",
+          "role": "weights"
         },
         {
-          "memory": "ar",
-          "base": "ar0",
-          "rows": "nr",
-          "as": "accumulate base",
-          "only_if": "acc == 1"
-        }
-      ],
-      "writes": [
+          "unit": "spm",
+          "kind": "emit",
+          "port": "wcol",
+          "count": "T + 1",
+          "per": "instruction",
+          "args": [
+            "weights"
+          ]
+        },
         {
-          "memory": "ar",
+          "unit": "array",
+          "kind": "receive",
+          "port": "wcol",
+          "count": "T + 1",
+          "per": "instruction",
+          "into": "weights_in",
+          "args": [
+            "weights"
+          ]
+        },
+        {
+          "unit": "array",
+          "kind": "emit",
+          "port": "instructions",
+          "per": "instruction",
+          "args": [
+            "weights_in"
+          ]
+        },
+        {
+          "unit": "vru",
+          "kind": "read",
+          "port": "vr.read",
+          "state": "vr",
+          "base": "vr_a",
+          "into": "activation",
+          "role": "activations"
+        },
+        {
+          "unit": "vru",
+          "kind": "emit",
+          "port": "acol",
+          "args": [
+            "activation"
+          ]
+        },
+        {
+          "unit": "array",
+          "kind": "receive",
+          "port": "acol",
+          "into": "activation_in",
+          "args": [
+            "activation"
+          ]
+        },
+        {
+          "unit": "array",
+          "kind": "compute",
+          "port": "mac",
+          "compute": "matmul",
+          "args": [
+            "activation_in",
+            "weights_in"
+          ],
+          "into": "psum"
+        },
+        {
+          "unit": "array",
+          "kind": "emit",
+          "port": "cw",
+          "args": [
+            "psum"
+          ]
+        },
+        {
+          "unit": "accu",
+          "kind": "receive",
+          "port": "cw",
+          "into": "psum_in",
+          "args": [
+            "psum"
+          ]
+        },
+        {
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
           "base": "ar0",
-          "rows": "nr"
+          "when": "acc == 1",
+          "into": "carried",
+          "role": "the accumulate base"
+        },
+        {
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "acc_add",
+          "args": [
+            "carried",
+            "psum_in"
+          ],
+          "into": "total"
+        },
+        {
+          "unit": "accu",
+          "kind": "write",
+          "port": "ar.write",
+          "state": "ar",
+          "base": "ar0",
+          "args": [
+            "total"
+          ]
         }
-      ],
-      "note": "PE(i, j) holds lane j of weight row i and taps lane i of the activation word, so output column j is sum_i act[i] * W[i][j]."
+      ]
     },
     {
       "name": "vadd",
       "value": 5,
       "software_constant": "OP_VADD",
       "rows": "nr accumulator rows",
-      "units": [
-        "accu"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -511,25 +705,46 @@
           "meaning": "first row of the right source"
         }
       ],
-      "reads": [
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
           "base": "ar_s1",
-          "rows": "nr",
-          "as": "a source"
+          "into": "left",
+          "role": "a source"
         },
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
           "base": "ar_s2",
-          "rows": "nr",
-          "as": "a source"
-        }
-      ],
-      "writes": [
+          "into": "right",
+          "role": "a source"
+        },
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "add",
+          "args": [
+            "left",
+            "right"
+          ],
+          "into": "total"
+        },
+        {
+          "unit": "accu",
+          "kind": "write",
+          "port": "ar.write",
+          "state": "ar",
           "base": "ar_d",
-          "rows": "nr"
+          "args": [
+            "total"
+          ]
         }
       ]
     },
@@ -538,9 +753,6 @@
       "value": 6,
       "software_constant": "OP_VRELU",
       "rows": "nr accumulator rows",
-      "units": [
-        "accu"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -553,19 +765,36 @@
           "meaning": "first source accumulator row"
         }
       ],
-      "reads": [
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
           "base": "ar_s",
-          "rows": "nr",
-          "as": "a source"
-        }
-      ],
-      "writes": [
+          "into": "before",
+          "role": "a source"
+        },
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "max0",
+          "args": [
+            "before"
+          ],
+          "into": "after"
+        },
+        {
+          "unit": "accu",
+          "kind": "write",
+          "port": "ar.write",
+          "state": "ar",
           "base": "ar_d",
-          "rows": "nr"
+          "args": [
+            "after"
+          ]
         }
       ]
     },
@@ -574,10 +803,6 @@
       "value": 7,
       "software_constant": "OP_MVOUT",
       "rows": "nr accumulator rows",
-      "units": [
-        "accu",
-        "dma_st"
-      ],
       "operands": [
         {
           "field": "f0",
@@ -595,42 +820,169 @@
           "meaning": "packed-word column block of C, 0 .. WPR-1"
         }
       ],
-      "reads": [
+      "note": "The only way a result leaves the accelerator. Values pass through the output conversion in the numerics section.",
+      "rows_expression": "nr",
+      "actions": [
         {
-          "memory": "ar",
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
           "base": "ar0",
-          "rows": "nr",
-          "as": "the value to retire"
-        }
-      ],
-      "writes": [
+          "into": "value",
+          "role": "the value to retire"
+        },
         {
-          "memory": "C",
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "to_operand",
+          "args": [
+            "value"
+          ],
+          "into": "clipped"
+        },
+        {
+          "unit": "accu",
+          "kind": "emit",
+          "port": "ac2sp",
+          "args": [
+            "clipped"
+          ]
+        },
+        {
+          "unit": "dma_st",
+          "kind": "receive",
+          "port": "ac2sp",
+          "into": "clipped_in",
+          "args": [
+            "clipped"
+          ]
+        },
+        {
+          "unit": "dma_st",
+          "kind": "write",
+          "port": "dram.write",
+          "state": "C",
           "base": "dram_row0",
-          "rows": "nr"
+          "args": [
+            "clipped_in"
+          ],
+          "offset": "col_block * T"
         }
-      ],
-      "note": "The only way a result leaves the accelerator. Values pass through the output conversion in the numerics section."
+      ]
     },
     {
       "name": "loop",
       "value": 8,
       "software_constant": "OP_LOOP",
       "rows": "nr is the trip count, minimum 1",
-      "units": [
-        "sequencer"
-      ],
-      "operands": []
+      "operands": [],
+      "rows_expression": "1",
+      "actions": [
+        {
+          "unit": "sequencer",
+          "kind": "compute",
+          "port": "fetch",
+          "compute": "push_loop",
+          "per": "instruction",
+          "into": "frame"
+        }
+      ]
     },
     {
       "name": "endloop",
       "value": 9,
       "software_constant": "OP_ENDLOOP",
       "rows": "none",
-      "units": [
-        "sequencer"
+      "operands": [],
+      "rows_expression": "1",
+      "actions": [
+        {
+          "unit": "sequencer",
+          "kind": "compute",
+          "port": "fetch",
+          "compute": "pop_loop",
+          "per": "instruction",
+          "into": "frame"
+        }
+      ]
+    },
+    {
+      "name": "vaddrelu",
+      "value": 10,
+      "software_constant": "OP_VADDRELU",
+      "rows": "nr accumulator rows",
+      "operands": [
+        {
+          "field": "f0",
+          "name": "ar_d",
+          "meaning": "first destination accumulator row"
+        },
+        {
+          "field": "f1",
+          "name": "ar_s1",
+          "meaning": "first row of the left source"
+        },
+        {
+          "field": "f2",
+          "name": "ar_s2",
+          "meaning": "first row of the right source"
+        }
       ],
-      "operands": []
+      "rows_expression": "nr",
+      "actions": [
+        {
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
+          "base": "ar_s1",
+          "into": "left",
+          "role": "a source"
+        },
+        {
+          "unit": "accu",
+          "kind": "read",
+          "port": "ar.read",
+          "state": "ar",
+          "base": "ar_s2",
+          "into": "right",
+          "role": "a source"
+        },
+        {
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "add",
+          "args": [
+            "left",
+            "right"
+          ],
+          "into": "total"
+        },
+        {
+          "unit": "accu",
+          "kind": "compute",
+          "port": "alu",
+          "compute": "max0",
+          "args": [
+            "total"
+          ],
+          "into": "rectified"
+        },
+        {
+          "unit": "accu",
+          "kind": "write",
+          "port": "ar.write",
+          "state": "ar",
+          "base": "ar_d",
+          "args": [
+            "rectified"
+          ]
+        }
+      ],
+      "note": "`vadd` then `vrelu` in one pass: the accumulator already has both the adder and the rectifier, so the composition costs a mux and saves a pass over `ar` and an intermediate row. Two `ar` reads a row, so two accu steps a row -- which nothing here says, because it follows from `accu` having one `ar` read port."
     }
   ],
   "dispatch": {
@@ -642,27 +994,18 @@
       "deadlocks. Two units get a REWRITTEN copy so their flat row loops can",
       "read their own work count straight out of `nr` -- a row count that",
       "depends on the decoded opcode is a carried dependence and closes a",
-      "flat loop at Final II = 2."
+      "flat loop at Final II = 2.",
+      "",
+      "WHICH units need a rewritten `nr`, and to what, is not stated here any",
+      "more: it is every unit the sequencer dispatches to whose own work count",
+      "differs from the instruction's row count, and that follows from the",
+      "actions and the ports. `notes` keeps only the prose, keyed by",
+      "opcode/unit; adding an instruction adds no entry to either."
     ],
-    "rewrites": [
-      {
-        "opcode": "mm",
-        "unit": "spm",
-        "set": {
-          "nr": "T + 1",
-          "f1": "the instruction's own nr"
-        },
-        "note": "One header word plus T weight rows down wcol; f1 carries the array's row count into the header word."
-      },
-      {
-        "opcode": "vadd",
-        "unit": "accu",
-        "set": {
-          "nr": "2 * nr"
-        },
-        "note": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
-      }
-    ]
+    "notes": {
+      "mm/spm": "One header word plus T weight rows down wcol; f1 carries the array's row count into the header word.",
+      "vadd/accu": "accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field."
+    }
   },
   "imem": {
     "_comment": [
@@ -673,7 +1016,15 @@
       "counts, because every unit runs one flat loop over the rows (or words,",
       "or iterations) it will actually process. A unit promised the wrong",
       "number here does not produce a wrong answer, it HANGS -- the one place",
-      "where the assembler and the microarchitecture are coupled."
+      "where the assembler and the microarchitecture are coupled.",
+      "",
+      "Every count but the static one is now THE WORK A UNIT DOES, computed from",
+      "the actions in `opcodes` and the ports in `units` rather than restated",
+      "here: an entry names a unit (its busiest port), a unit and one port, or a",
+      "memory whose row span a burst must cover. `spm` charging an `mm` T+1 and",
+      "`accu` charging a `vadd` two steps a row used to be two sentences in this",
+      "file and are now consequences of `spm` putting T+1 words down `wcol` and",
+      "of `accu` having one `ar` read port."
     ],
     "header_words": 8,
     "software_constant": "NHDR",
@@ -688,12 +1039,10 @@
         ],
         "name": "n_instr",
         "consumer": "sequencer",
-        "terms": [
-          {
-            "kind": "static_instructions"
-          }
-        ],
-        "note": "Bounds the fetch loop: the sequencer stops when pc >= n_instr."
+        "note": "Bounds the fetch loop: the sequencer stops when pc >= n_instr.",
+        "work": {
+          "kind": "static_instructions"
+        }
       },
       {
         "index": 1,
@@ -703,14 +1052,9 @@
         ],
         "name": "dma_ld_rows",
         "consumer": "dma_ld",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "dma_ld"
-            ]
-          }
-        ]
+        "work": {
+          "unit": "dma_ld"
+        }
       },
       {
         "index": 2,
@@ -720,29 +1064,10 @@
         ],
         "name": "spm_rows",
         "consumer": "spm",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "dma_ld"
-            ],
-            "where": "dst_spad"
-          },
-          {
-            "kind": "rows",
-            "ops": [
-              "vld"
-            ]
-          },
-          {
-            "kind": "instructions",
-            "ops": [
-              "mm"
-            ],
-            "scale": "T + 1"
-          }
-        ],
-        "note": "A dma_ld counts for spm or for vru by its destination bit, never both."
+        "note": "A dma_ld counts for spm or for vru by its destination bit, never both.",
+        "work": {
+          "unit": "spm"
+        }
       },
       {
         "index": 3,
@@ -752,27 +1077,9 @@
         ],
         "name": "vru_words",
         "consumer": "vru",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "dma_ld"
-            ],
-            "where": "dst_vr"
-          },
-          {
-            "kind": "rows",
-            "ops": [
-              "vld"
-            ]
-          },
-          {
-            "kind": "rows",
-            "ops": [
-              "mm"
-            ]
-          }
-        ]
+        "work": {
+          "unit": "vru"
+        }
       },
       {
         "index": 4,
@@ -782,14 +1089,10 @@
         ],
         "name": "mm_count",
         "consumer": "the array, via spm's header word",
-        "terms": [
-          {
-            "kind": "instructions",
-            "ops": [
-              "mm"
-            ]
-          }
-        ]
+        "work": {
+          "unit": "array",
+          "port": "instructions"
+        }
       },
       {
         "index": 4,
@@ -799,15 +1102,11 @@
         ],
         "name": "mm_rows",
         "consumer": "the array, via spm's header word",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "mm"
-            ]
-          }
-        ],
-        "note": "Each PE's own flat trip count: every wavefront row of every mm."
+        "note": "Each PE's own flat trip count: every wavefront row of every mm.",
+        "work": {
+          "unit": "array",
+          "port": "mac"
+        }
       },
       {
         "index": 5,
@@ -817,23 +1116,9 @@
         ],
         "name": "accu_iterations",
         "consumer": "accu",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "mm",
-              "vrelu",
-              "mvout"
-            ]
-          },
-          {
-            "kind": "rows",
-            "ops": [
-              "vadd"
-            ],
-            "scale": "2"
-          }
-        ]
+        "work": {
+          "unit": "accu"
+        }
       },
       {
         "index": 6,
@@ -843,14 +1128,9 @@
         ],
         "name": "dma_st_rows",
         "consumer": "dma_st",
-        "terms": [
-          {
-            "kind": "rows",
-            "ops": [
-              "mvout"
-            ]
-          }
-        ]
+        "work": {
+          "unit": "dma_st"
+        }
       },
       {
         "index": 7,
@@ -860,17 +1140,11 @@
         ],
         "name": "a_span",
         "consumer": "dma_ld",
-        "terms": [
-          {
-            "kind": "row_span",
-            "ops": [
-              "dma_ld"
-            ],
-            "where": "src_a",
-            "operand": "dram_row0"
-          }
-        ],
-        "note": "The DRAM row span dma_ld must burst for A: the highest row any of its dma_lds names once the AGU is resolved."
+        "note": "The DRAM row span dma_ld must burst for A: the highest row any of its dma_lds names once the AGU is resolved.",
+        "work": {
+          "kind": "row_span",
+          "state": "A"
+        }
       },
       {
         "index": 7,
@@ -880,16 +1154,10 @@
         ],
         "name": "b_span",
         "consumer": "dma_ld",
-        "terms": [
-          {
-            "kind": "row_span",
-            "ops": [
-              "dma_ld"
-            ],
-            "where": "src_b",
-            "operand": "dram_row0"
-          }
-        ]
+        "work": {
+          "kind": "row_span",
+          "state": "B"
+        }
       }
     ],
     "size": {
@@ -910,15 +1178,13 @@
       "row_width_bits": "T * 8",
       "row_width_constant": "VW",
       "row_contents": "T int8 lanes, one packed word",
-      "written_by": [
-        "dma_ld (dst = spad)"
-      ],
-      "read_by": [
-        "vld",
-        "mm (weights)"
-      ],
       "cleared_by_hardware": false,
-      "note": "Pure SIMD access: an address names a whole packed word and there is no way to address a lane, which is what lets a single-ported memory feed T lanes per cycle."
+      "note": "Pure SIMD access: an address names a whole packed word and there is no way to address a lane, which is what lets a single-ported memory feed T lanes per cycle.",
+      "lanes": "T",
+      "collision_note": "one writer by construction: the owning unit is the memory's sole owner, so a same-element collision cannot be composed",
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "vr",
@@ -927,14 +1193,12 @@
       "row_width_bits": "T * 8",
       "row_width_constant": "VW",
       "row_contents": "T int8 lanes, one packed word",
-      "written_by": [
-        "dma_ld (dst = vr)",
-        "vld"
-      ],
-      "read_by": [
-        "mm (activations)"
-      ],
-      "cleared_by_hardware": false
+      "cleared_by_hardware": false,
+      "lanes": "T",
+      "collision_note": "one writer by construction: the owning unit is the memory's sole owner, so a same-element collision cannot be composed",
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "ar",
@@ -943,18 +1207,12 @@
       "row_width_bits": "T * 32",
       "row_width_constant": "AW",
       "row_contents": "T accumulator lanes",
-      "written_by": [
-        "mm",
-        "vadd",
-        "vrelu"
-      ],
-      "read_by": [
-        "mm (acc = 1)",
-        "vadd",
-        "vrelu",
-        "mvout"
-      ],
-      "cleared_by_hardware": false
+      "cleared_by_hardware": false,
+      "lanes": "T",
+      "collision_note": "one writer by construction: the owning unit is the memory's sole owner, so a same-element collision cannot be composed",
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "imem",
@@ -962,14 +1220,11 @@
       "depth_parameter": "IMEM_SIZE",
       "row_width_bits": 64,
       "row_contents": "header words, then two words per instruction",
-      "written_by": [
-        "the host, through m_axi"
-      ],
-      "read_by": [
-        "sequencer"
-      ],
       "cleared_by_hardware": false,
-      "note": "Prefetched on-chip in full by one burst before anything runs, so it cannot be read early."
+      "note": "Prefetched on-chip in full by one burst before anything runs, so it cannot be read early.",
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "A",
@@ -977,13 +1232,10 @@
       "depth_parameter": "MAXDIM * MAXDIM",
       "row_width_bits": 8,
       "row_contents": "int8, flat, addressed row * MAXDIM + col",
-      "written_by": [
-        "the host"
-      ],
-      "read_by": [
-        "dma_ld"
-      ],
-      "cleared_by_hardware": false
+      "cleared_by_hardware": false,
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "B",
@@ -991,13 +1243,10 @@
       "depth_parameter": "MAXDIM * MAXDIM",
       "row_width_bits": 8,
       "row_contents": "int8, flat, addressed row * MAXDIM + col",
-      "written_by": [
-        "the host"
-      ],
-      "read_by": [
-        "dma_ld"
-      ],
-      "cleared_by_hardware": false
+      "cleared_by_hardware": false,
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     },
     {
       "name": "C",
@@ -1005,14 +1254,11 @@
       "depth_parameter": "MAXDIM * MAXDIM",
       "row_width_bits": 8,
       "row_contents": "int8, flat, addressed row * MAXDIM + col",
-      "written_by": [
-        "dma_st (mvout)"
-      ],
-      "read_by": [
-        "the host"
-      ],
       "cleared_by_hardware": false,
-      "note": "Rows and column blocks no mvout names are left exactly as the host passed them, which is how a sentinel check falls out of comparing the whole of C."
+      "note": "Rows and column blocks no mvout names are left exactly as the host passed them, which is how a sentinel check falls out of comparing the whole of C.",
+      "read_ports": 1,
+      "write_ports": 1,
+      "collision": "defined"
     }
   ],
   "contracts": {
@@ -1498,6 +1744,168 @@
         "allowed": "32767",
         "rule": "accu's per-unit work count is read back through a 15-bit slice. It is the largest header count, and it depends on the SHAPE, not only on MAXDIM.",
         "enforced_by": "microarch_isa.assemble"
+      }
+    ]
+  },
+  "units": {
+    "_comment": [
+      "THE UNITS, AS PORTS AND A STEP RATE. An instruction's per-unit cost is",
+      "not written down anywhere in this file: it FOLLOWS from the actions",
+      "below and these ports. `vadd` costs `accu` two steps a row because it",
+      "reads `ar` twice and `accu` has one `ar` read port, not because anyone",
+      "typed 2. Read and write ports are counted separately because they do",
+      "not cost the same -- MiniTPU measured a third read port at +592 LUT and",
+      "a second write port at 4.3x the LUTs plus a timing miss, and our own",
+      "ASIC flow hit the same asymmetry in ELAB-366.",
+      "",
+      "`ii` is the cycles between a unit's steps and `elastic` says what",
+      "happens when an issue needs more cycles than one step: a flat work loop",
+      "spends another step, a body that must retire every `ii` cycles cannot",
+      "and the composition is refused instead. `allo/actions.py` holds the",
+      "rule; `docs/source/developer/actions.rst` says why a port count without",
+      "an initiation interval decides a two-store loop wrongly in BOTH",
+      "directions."
+    ],
+    "list": [
+      {
+        "name": "sequencer",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "fetch"
+          },
+          {
+            "name": "dispatch",
+            "physical": 5
+          }
+        ],
+        "note": "The program counter and the loop stack. Only `loop` and `endloop` are its own work; every other opcode it dispatches."
+      },
+      {
+        "name": "dma_ld",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "dram.read"
+          },
+          {
+            "name": "mux"
+          },
+          {
+            "name": "dma2sp"
+          },
+          {
+            "name": "dma2vr"
+          }
+        ]
+      },
+      {
+        "name": "spm",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "spad.read"
+          },
+          {
+            "name": "spad.write"
+          },
+          {
+            "name": "dma2sp"
+          },
+          {
+            "name": "sp2vr"
+          },
+          {
+            "name": "wcol"
+          }
+        ],
+        "note": "One spad access per step at a muxed address, which a dual-port BRAM holds at II=1."
+      },
+      {
+        "name": "vru",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "vr.read"
+          },
+          {
+            "name": "vr.write"
+          },
+          {
+            "name": "acol"
+          },
+          {
+            "name": "sp2vr"
+          },
+          {
+            "name": "dma2vr"
+          }
+        ]
+      },
+      {
+        "name": "array",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "wcol"
+          },
+          {
+            "name": "acol"
+          },
+          {
+            "name": "instructions"
+          },
+          {
+            "name": "mac"
+          },
+          {
+            "name": "cw"
+          }
+        ],
+        "note": "`wld` and `pe`, T x T of each. They decode no instruction; the counts they run on arrive in spm's header word. The reduction down each column is the `p_fwd` chain, which is the unit GRAPH rather than a declaration -- see the doc page on what this model cannot say about it."
+      },
+      {
+        "name": "accu",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "cw"
+          },
+          {
+            "name": "ar.read"
+          },
+          {
+            "name": "ar.write"
+          },
+          {
+            "name": "alu",
+            "physical": 2,
+            "note": "Two CHAINED lane operations per step. `vadd` and `vrelu` use one; `vaddrelu` uses both, which is exactly what fusing them into one accumulator pass claims. It is a TIMING claim about combinational depth, not a count of anything, so it is the one number here that has to be measured against synthesis rather than declared -- raise it far enough and the model will happily compose an instruction the clock cannot close."
+          },
+          {
+            "name": "ac2sp"
+          }
+        ],
+        "note": "Every arm is muxed down to one `ar` read and one `ar` write per step. Its II=1 rests on a dependence claim the assembler makes true, not on the hardware."
+      },
+      {
+        "name": "dma_st",
+        "ii": 1,
+        "elastic": true,
+        "ports": [
+          {
+            "name": "ac2sp"
+          },
+          {
+            "name": "dram.write"
+          }
+        ]
       }
     ]
   }
