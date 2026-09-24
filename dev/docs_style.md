@@ -90,6 +90,14 @@ if there is a lot. Never above the Reference section.
 - **One claim per figure, and cite the file it comes from** rather than
   retyping it — `allo/backend/asic/tools/check_numbers.py --reports <design>/asic_synthesis/reports`
   enforces this for area.
+- **Associate a figure with its run by declaring it, not by inferring it.**
+  `check_numbers.py` matches area-shaped figures against the set of committed
+  totals, which is decidable. Associating a figure with the *cycle counts near
+  it in prose* is not: a tool that guesses at that would produce false
+  failures, and a checker that cries wolf stops being run. If that association
+  is ever enforced, the honest form is a directive in the page naming the run
+  it quotes -- declared by the author, checkable by a tool. That is a docs
+  change, not a checker change, and it is not done.
 - **Move history down or out.** Dated measurements belong in `dev/records/`;
   the page states the current state, with a pointer.
 - **Cut the hedges.** Write the measured fact. Caveats belong in one place next

@@ -159,6 +159,16 @@ Recorded because each cost real work today.
   allo` still worked from inside a checkout and failed everywhere else, so it
   surfaced only when an agent ran a docs build from its own worktree. Removing
   a worktree is not free if anything outside git references it.
+- **Test a check's failure path, not only its pass path.** A check that has
+  only ever said ok proves nothing. The ASIC preflight's library-checksum
+  branch was confirmed by copying a real `stdcells.db`, appending one null
+  byte, and pointing the preflight at it: it reported the mismatch, named both
+  digests, said the areas were not comparable with the committed set, and
+  **refused to print the run sequence**. That is discrimination; a passing run
+  alone would not have shown it. The same tool has one branch still untested --
+  what it does when committed snapshots disagree about the library -- for the
+  good reason that there is no second library to test it with, and that is
+  recorded rather than glossed.
 - **The session scratchpad is shared between concurrent agents.** Two agents
   writing `reproduce.sh` output to the same scratchpad path truncated one
   another's log mid-cosim; the verdict survived only because the summary block
