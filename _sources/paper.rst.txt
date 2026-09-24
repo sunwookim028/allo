@@ -367,10 +367,17 @@ from the opposite direction, on someone else's design.
      - 37.2%
      - **≈80%**
 
-**Their logic is gate-heavy; ours is flop-heavy — at both sizes, and
-regardless of the memory treatment.** No node scaling, no capacity matching and
-no exclusion rule enters that comparison; it is a share of each design's own
-logic. It is therefore a structural statement about **what HLS emits versus
+**Their logic is gate-heavy; ours is flop-heavy, at both sizes.** No node
+scaling, no capacity matching and no exclusion rule enters that comparison; it
+is a share of each design's own logic.
+
+*Corrected after the full DIM=8 run.* An earlier version of this paragraph
+added "and regardless of the memory treatment", which is true of our design and
+**false of theirs**: with memories rendered as flip-flops their share moves from
+37.2% to **60.7%**, while ours is ≈80% either way. So the substrate distortion
+is **larger for their design than for ours** — the opposite of what we
+expected — and the gate-versus-flop statement holds on the logic-only pair
+only. It is stated that way now. It is therefore a structural statement about **what HLS emits versus
 what a Chisel generator emits**, not about either accelerator, and it is the
 most transferable result the area track produced.
 
@@ -382,10 +389,89 @@ ours. It must be written as *"closes at 3.33 ns"* and never as headroom: a
 in prose. If a frequency comparison is ever attempted, Gemmini's is the number
 that moves first.
 
-**The clean pair is still two runs away.** Our 1,396,966 against their 524,402
-is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
-single-variable comparison. The pair that answers the question is our
-T=8/MAXDIM=64 at QD=16 against this run, and both remain queued.
+**6.2e One change, measured two ways.** Gemmini DIM=8 *full* is
+**1,138,578 µm²**, against 990,938 at DIM=4 — **+14.9%** for doubling the mesh.
+The logic-only pair gives **+37.3%** for the same change. The stubbed
+scratchpad and accumulator are 53.9% of the full figure, and that mass is
+insensitive to the mesh, so it dilutes the delta.
+
+**The same design change reads as +14.9% or +37.3% depending only on how the
+memories were treated.** That is the strongest argument in this work for
+quoting the logic-only pair — stronger than the gate-versus-flop share above,
+because it is *one change measured two ways* rather than an inference about
+which component dominates.
+
+**And that run misses timing**, the only one in the set that does not close:
+worst slack −0.01 ns on a 3.33 ns target, 80 violating paths in a
+491,512-cell design. Per the methodology fixed before any number existed, this
+is reported as **"the comparison design's RTL was not targeted at this
+constraint"**, not as "it is slower": 0.3% of the period is what a longer
+period, a higher effort or a retarget would absorb, and a synthesis-stage
+estimate is a floor rather than an achieved frequency. The miss is stated and
+the inference refused.
+
+**6.2f The matched pair, and where the difference goes.** Eleven runs under one
+flow — DC W-2024.09, FreePDK45, 3.33 ns, topographical, flatten effort 3 —
+give the comparison this section was built for. Our T=8/MAXDIM=64 at QD=16
+against Gemmini DIM=8, **logic-only, capacities matched to 2%, same library,
+same clock, same exclusion rule, both closing timing**:
+
+    2,272,572 µm²  against  524,402 µm²  —  **4.33×**
+
+**And it is not compute.** Hierarchical attribution of our logic:
+
+.. list-table::
+   :header-rows: 1
+
+   * - component
+     - µm²
+     - share of our logic
+   * - instruction-fetch adapter
+     - 697,974
+     - **30.7%**
+   * - DMA load unit
+     - 372,150
+     - 16.4%
+   * - two operand adapters
+     - 102,105 + 102,101
+     - 9.0%
+   * - output adapter
+     - 27,334
+     - 1.2%
+   * - sequencer
+     - 33,516
+     - 1.5%
+   * - **the 64-PE array**
+     - ≈ 84,700
+     - **≈ 3.7%**
+
+**The four memory-interface adapters are 40.9% of our logic, 57.3% with the DMA
+unit; the array that does the arithmetic is under 4%.** Gemmini's entire
+reader/writer/transaction path is 23,885 µm² — **6.3%** of its logic. So the
+4.33× is memory-interface mass that TileLink at this width does not produce,
+measured at matched capacity with both sides' cycles taken from the RTL that
+was synthesised. It is §6.2's finding at a second design point, and this time
+it is the headline rather than an inference.
+
+**Why the logic-only pair and not the full one, as a measurement rather than an
+argument.** The stubbed arrays are **19.8% of our full figure and 53.9% of
+theirs** — their design is far more memory-dominated once memories become
+flip-flops, so the full-design ratio of **2.49×** understates the logic
+difference by an amount that is purely an artefact of the memory treatment.
+Together with §6.2e's *same change, two ways*, that is the whole case for
+quoting logic-only, and neither half of it is an opinion about which component
+matters.
+
+**Two numbers deliberately not claimed**, because each would mix two compiler
+commits:
+
+- **+62.7% for T=4 to T=8 logic-only.** It compares a QD=16 export against a
+  QD=8 one, so it *bounds* the cost of doubling T rather than measuring it. A
+  clean figure needs both variants emitted from one commit.
+- **+14.2% between the two T=8 full runs as the price of channel depth.** Same
+  defect, and it bounds from above — while the FPGA reports **+0.9% flip-flops**
+  for that same pair, which is the third instance of the FPGA resource table
+  understating what standard cells charge.
 
 **Two methodological points are now settled on evidence rather than argument.**
 First, the exclusion of our instruction-fetch adapter: **no cells inside the
@@ -525,6 +611,31 @@ activity annotation would remove one of three objections and leave two.
 §4 is two arms and one seeded property, without unseeded replication. §5 is one
 machine and one new instruction, with the demonstrating instruction chosen by
 the abstraction's author.
+
+**Cycles and area are joined by declaration, not by proximity.** Cycle counts
+come from Vitis cosim and area from Design Compiler. Each flow is internally
+consistent, so each flow's own check passes while the *join* between them can
+be wrong, and the errors this work made most often lived exactly there. We
+therefore treat a cycle count and an area figure as describing one machine only
+when one of two conditions holds, and a checker
+(``allo/backend/asic/tools/check_pairing.py``) decides which: either both cite
+the **same committed RTL export**, verified by the manifest checksum the
+synthesis run recorded, in which case their configuration agrees by
+construction; or both **declare every configuration parameter** --- ``T``,
+``MAXDIM``, ``QD``, ``DMA_WORDS`` --- and the four agree. A parameter that is
+absent on either side is treated as *cannot pair*, never as a match, because
+the exports predating a parameter record nothing about it and the default at
+the time was usually not today's.
+
+Applying that rule to this repository refuses more than it admits, and two of
+the refusals are results rather than formalities. **No model-level cycle count
+can currently be paired with any committed area figure**: the workload numbers
+were measured at ``QD=16`` and every committed TinyTPU export was emitted
+before ``QD=16`` became the default and records no ``QD``, so the end-to-end
+claim reaches cycles and stops. And the ``T=8`` area is **orphaned**: the
+export it was synthesised from was re-emitted two days later, so the RTL a
+reader finds at that path is not the RTL that area describes. Neither fact was
+visible to any single-flow check; both were produced by the join.
 
 **Instrument failures.** Four instruments were observed reporting success
 without having run: a tool server that answered without binding, a cost meter

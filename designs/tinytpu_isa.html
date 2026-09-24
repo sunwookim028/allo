@@ -206,6 +206,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/actions.html">Actions: an Instruction as Composed Unit Effects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -907,6 +908,17 @@ partial sum to int16 still prints <code class="docutils literal notranslate"><sp
 below. Run <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> after <strong>any</strong> change to the design, and
 <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> after any change to the harness.</p>
 <dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">examples/tinytpu/e2e_gate.sh</span></code></dt><dd><p>About 36 s, no Vitis and no licence. The gate for the claim no single-flow
+check can make: <strong>a PyTorch model through mapping to cycles, and the join
+to area.</strong> It runs the workload suite’s claims gate
+(<a class="reference internal" href="workload_suite.html"><span class="doc">The Workload Suite: PyTorch MLPs on TinyTPU</span></a>), then <code class="docutils literal notranslate"><span class="pre">check_pairing.py</span></code>, which refuses to let a
+cycle count stand beside an area figure from a different configuration,
+then <code class="docutils literal notranslate"><span class="pre">check_numbers.py</span></code>. It prints the remote tier – the Design Compiler
+run – rather than claiming it, because that needs a licence this
+repository does not have, and it names what it therefore cannot cover. The
+failure paths of both gates are tested in
+<code class="docutils literal notranslate"><span class="pre">tests/act/test_gates_negative.py</span></code>.</p>
+</dd>
 <dt><code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code></dt><dd><p>About 6 s. The ISA conformance check described in
 <a class="reference internal" href="#tinytpu-isa-conformance"><span class="std std-ref">The spec, and holding both consumers to it</span></a>: both generated artefacts regenerated and
 diffed byte for byte, every consumer of <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> held to it, the

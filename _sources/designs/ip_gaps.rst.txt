@@ -168,10 +168,11 @@ if anything imports it expecting an implementation.
      - a latency contract beside ``ip/isa.py``, generated-from and
        checked-against like the encoding is, plus a **two-sided** probe
      - ``test_unit_cannot_declare_latency``. ``reduce_tree``'s two outputs sit
-       ``RED_DEPTH - RED_TAP_LEVEL`` adder levels apart and nothing says what
-       that is in cycles
-     - cannot refuse -- **flagged to ``unit-actions``, deliberately not built
-       here**
+       ``RED_DEPTH - RED_TAP_LEVEL`` adder levels apart, and each one's cycle
+       count is now an ``Action.at`` measured by ``reduce_latency_probe.py``
+     - cannot refuse -- **FILLED on the action side**, :doc:`/developer/actions`.
+       ``compose.Unit`` is unchanged and the test still holds, which is the
+       point: a unit does not have a latency, each of its outputs does
    * - 7
      - **A unit does not declare its arithmetic.**
      - all three: MXFP4/FP8 on Jalapeño, BF16 on MiniTPU, int8 here
@@ -534,6 +535,24 @@ a tree instantiated past what its accumulator is exact for composed, built and
 returned plausible wrong numbers. Six lines, and it is where every derived
 relation in the tree is pinned.
 
+A second thing it needed later, when the same unit was described as
+:doc:`Actions </developer/actions>`: ``Channel`` gained ``lanes`` and
+``lane_bits``, and **derives** its ``dtype`` from the pair. A reduction's
+leaf order is checkable only against a lane count, and the only thing that
+had one was addressed state -- so the packed word had to be declared a
+one-row memory to be checkable at all. It is now the channel's own count,
+written once, with the width following from it. The emitted region source is
+byte-identical, which is the test that this is a declaration and not a
+change.
+
+What the join measured is on :doc:`/developer/actions`: of the 28 ports
+TinyTPU's Action model declares, 20 are channels and memories
+``ip/tinytpu.py`` already declares and 4 more stand for them, 3 are
+arithmetic that no composition can carry, and one unit in eight does not
+correspond at all -- ``wld`` + ``pe``, the ``T x T`` mesh the ISA sees as one
+``array``. ``gen_isa.py --check`` holds the two models together where they
+overlap and names every place they cannot.
+
 What is not filled, and why
 ===========================
 
@@ -584,7 +603,7 @@ What running the gaps looks like
 
 .. code-block:: bash
 
-   pytest tests/ip/                    # 23 pass, 1 xfail -- the xfail IS row 3
+   pytest tests/ip/                    # the xfail IS row 3
    python examples/tinytpu/reduce_csynth.py 64:8
 
 ``tests/ip/test_ip_gaps.py`` is one test per unfilled row. A row that gets

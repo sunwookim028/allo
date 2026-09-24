@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Actions: an Instruction as Composed Unit Effects &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Allo Limitations Register" href="limitations.html" />
+    <link rel="prev" title="Stream Ports: a Unit with an Interface" href="stream_ports.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Actions: an Instruction as Composed Unit Effects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="actions-an-instruction-as-composed-unit-effects">
+<span id="actions"></span><h1>Actions: an Instruction as Composed Unit Effects<a class="headerlink" href="#actions-an-instruction-as-composed-unit-effects" title="Link to this heading"><span>¶</span></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">allo/actions.py</span></code>. An instruction is not a primitive: it is an ordered list
+of effects, each one belonging to a named unit and spending a named port of
+that unit. Everything a consumer usually restates – which units an opcode
+reaches, how many steps each spends on it, which rows of which memory it
+reads before it writes, what value comes out – is a query over that one
+list. The model is machine-independent; <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> builds
+one out of <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> and <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/ip/reduce.py</span></code> builds a
+second out of the adder tree’s parameters.</p>
+<p>This page is about the question the two models raised the moment they
+existed side by side: <strong>``allo/compose.py`` and ``allo/actions.py`` were two
+descriptions of one machine with no type in common, so the Action layer was a
+second declaration of every unit</strong> – which is the failure class it exists to
+remove. What follows is what was measured when they were joined, what joined
+cleanly, and what did not.</p>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#the-two-models-and-the-one-question" id="id1">The two models, and the one question</a></p></li>
+<li><p><a class="reference internal" href="#what-derives-and-what-does-not" id="id2">What derives, and what does not</a></p></li>
+<li><p><a class="reference internal" href="#a-latency-is-not-an-initiation-interval" id="id3">A latency is not an initiation interval</a></p></li>
+<li><p><a class="reference internal" href="#a-lane-count-belongs-to-the-channel" id="id4">A lane count belongs to the channel</a></p></li>
+<li><p><a class="reference internal" href="#what-is-still-true" id="id5">What is still true</a></p></li>
+<li><p><a class="reference internal" href="#what-one-file-would-have-to-keep" id="id6">What one file would have to keep</a></p></li>
+</ul>
+</nav>
+<section id="the-two-models-and-the-one-question">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">The two models, and the one question</a><a class="headerlink" href="#the-two-models-and-the-one-question" title="Link to this heading"><span>¶</span></a></h2>
+<p><a class="reference internal" href="../designs/tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a> describes <code class="docutils literal notranslate"><span class="pre">allo/compose.py</span></code>: a <code class="docutils literal notranslate"><span class="pre">Unit</span></code>
+declares the <code class="docutils literal notranslate"><span class="pre">instances</span></code> it is replicated into, the region arguments it
+addresses, and every channel it reads or writes; an <code class="docutils literal notranslate"><span class="pre">Architecture</span></code> binds
+them and emits the region’s <em>source</em>, because Allo reaches a <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code>
+only as a nested <code class="docutils literal notranslate"><span class="pre">ast.FunctionDef</span></code>. It is a <strong>structural</strong> model: what is
+wired to what.</p>
+<p><code class="docutils literal notranslate"><span class="pre">allo/actions.py</span></code> is a <strong>behavioural</strong> model: a <code class="docutils literal notranslate"><span class="pre">Unit</span></code> has <code class="docutils literal notranslate"><span class="pre">ports</span></code> and
+an <code class="docutils literal notranslate"><span class="pre">ii</span></code>, an <code class="docutils literal notranslate"><span class="pre">Action</span></code> spends a port over declared <code class="docutils literal notranslate"><span class="pre">State</span></code>, and an
+<code class="docutils literal notranslate"><span class="pre">Instruction</span></code> is a composition of them. Its rule is one-sided in the shape
+<code class="docutils literal notranslate"><span class="pre">allo.dependence</span></code> uses: it refuses what it can disprove and confirms
+nothing, and what an accepted composition still rests on comes back as an
+<code class="docutils literal notranslate"><span class="pre">Obligation</span></code>.</p>
+<p>The question, in one sentence: <strong>can the behavioural model’s ports be
+derived from the structural model’s channels and memories, so that nothing
+is declared twice?</strong></p>
+</section>
+<section id="what-derives-and-what-does-not">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">What derives, and what does not</a><a class="headerlink" href="#what-derives-and-what-does-not" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">allo.actions.structure(architecture)</span></code> answers it by construction. It
+builds the units, ports, states and channels a composed <code class="docutils literal notranslate"><span class="pre">Architecture</span></code>
+already implies: one port per channel endpoint the unit declares, and one
+<code class="docutils literal notranslate"><span class="pre">&lt;memory&gt;.read</span></code> / <code class="docutils literal notranslate"><span class="pre">&lt;memory&gt;.write</span></code> port per array its body addresses –
+read off the same AST that <code class="docutils literal notranslate"><span class="pre">Unit.check</span></code> already parses to hold the
+declaration to the body, so no new declaration is introduced to derive from.
+<code class="docutils literal notranslate"><span class="pre">allo.actions.projection(architecture,</span> <span class="pre">machine)</span></code> diffs that against a
+hand-written machine, and <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> runs the diff as a gate.</p>
+<p>On TinyTPU, whose 7 Action units declare 28 ports between them:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 46.0%" />
+<col style="width: 44.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Ports</p></th>
+<th class="head"><p>What they are</p></th>
+<th class="head"><p>Does it derive?</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>20</strong></p></td>
+<td><p>a channel the unit is declared to touch, or a memory its body
+addresses – <code class="docutils literal notranslate"><span class="pre">spad.read</span></code>, <code class="docutils literal notranslate"><span class="pre">wcol</span></code>, <code class="docutils literal notranslate"><span class="pre">ar.write</span></code>, <code class="docutils literal notranslate"><span class="pre">ac2sp</span></code> …</p></td>
+<td><p><strong>Yes.</strong> <code class="docutils literal notranslate"><span class="pre">spm</span></code> and <code class="docutils literal notranslate"><span class="pre">vru</span></code> derive completely: every port they have
+is the composition’s own, and nothing about them is stated twice</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>4</strong></p></td>
+<td><p>an ALIAS: one declared port standing for composed ones –
+<code class="docutils literal notranslate"><span class="pre">dram.read</span></code> for <code class="docutils literal notranslate"><span class="pre">A.read</span></code> + <code class="docutils literal notranslate"><span class="pre">B.read</span></code>, <code class="docutils literal notranslate"><span class="pre">dispatch</span></code> for the five
+control channels, <code class="docutils literal notranslate"><span class="pre">fetch</span></code> for <code class="docutils literal notranslate"><span class="pre">imem.read</span></code></p></td>
+<td><p><strong>Partly.</strong> What it stands for is checked; the aggregation itself is
+a capacity claim about the AXI path, which is a hardware fact</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>3</strong></p></td>
+<td><p>ARITHMETIC: <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s operand select, the array’s MAC, the
+accumulator’s ALU</p></td>
+<td><p><strong>No, and never.</strong> A composed region declares what a unit is wired
+to, never what it computes. This is the Action layer’s reason to
+exist</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>1</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">array.instructions</span></code>, a counting port that carries nothing: the
+header word <code class="docutils literal notranslate"><span class="pre">mm_count</span></code> is <code class="docutils literal notranslate"><span class="pre">items(array,</span> <span class="pre">'instructions')</span></code></p></td>
+<td><p><strong>No.</strong> It is an artefact of counting through ports</p></td>
+</tr>
+</tbody>
+</table>
+<p>Going the other way, the composition implies <strong>15 ports the Action model
+does not model</strong>, each of which is now listed with its reason in
+<code class="docutils literal notranslate"><span class="pre">gen_isa.UNMODELLED</span></code> and checked in both directions, and <strong>three on-chip
+memories the model never had</strong>: the sequencer’s prefetch window <code class="docutils literal notranslate"><span class="pre">program</span></code>
+and the two burst landing buffers <code class="docutils literal notranslate"><span class="pre">a_onchip</span></code>/<code class="docutils literal notranslate"><span class="pre">b_onchip</span></code>. The derivation
+found them; reading the RTL had not.</p>
+<p>Two of those reasons are results rather than bookkeeping.</p>
+<p><strong>The control path cannot be written as an action.</strong> Every data unit reads
+its dispatch queue when its row counter runs out, <em>inside</em> the step it is
+already spending. An action is per-row or per-instruction: a per-row receive
+would say every row fetches, and a per-instruction one adds a head step to
+the unit’s work count – which is the number the instruction-memory header
+carries, so the sequencer would promise <code class="docutils literal notranslate"><span class="pre">accu</span></code> one iteration more than it
+performs. <code class="docutils literal notranslate"><span class="pre">test_the_control_path_cannot_be_modelled_as_an_action</span></code> writes
+the per-instruction version and measures the damage: 6 steps become 7.</p>
+<p><strong>The two models disagree about what a unit is.</strong> A compose unit is a
+KERNEL, replicated by <code class="docutils literal notranslate"><span class="pre">instances</span></code> and wired to its copies by stream
+arrays. An Action unit is a DISPATCH DOMAIN: one work counter, fed one row
+count by the sequencer. They are the same object for every unit instantiated
+once, and a different object for every unit that is not. TinyTPU has exactly
+one such region – <code class="docutils literal notranslate"><span class="pre">wld</span></code> and <code class="docutils literal notranslate"><span class="pre">pe</span></code>, <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">x</span> <span class="pre">T</span></code> of each, wired by five
+chains – and the ISA sees it as one <code class="docutils literal notranslate"><span class="pre">array</span></code>. This is not a naming
+difference and no convention closes it: <code class="docutils literal notranslate"><span class="pre">items(array,</span> <span class="pre">'mac')</span></code> is the
+header’s <code class="docutils literal notranslate"><span class="pre">mm_rows</span></code>, and at the composed grain the same quantity is a
+per-instance count over <code class="docutils literal notranslate"><span class="pre">T*T</span></code> kernels, of which the Action model has no
+word.</p>
+<p>On <code class="docutils literal notranslate"><span class="pre">DotTree</span></code>, the second architecture, every unit is instantiated once, so
+the grain agrees and the whole structure derives. <code class="docutils literal notranslate"><span class="pre">ip/reduce.py</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">machine()</span></code> declares exactly two ports of its own – <code class="docutils literal notranslate"><span class="pre">mul</span></code> and <code class="docutils literal notranslate"><span class="pre">adder</span></code>
+– and takes its three units, their channel and memory ports, its six states
+and the packed word’s lane count from <code class="docutils literal notranslate"><span class="pre">structure(architecture())</span></code>.</p>
+</section>
+<section id="a-latency-is-not-an-initiation-interval">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">A latency is not an initiation interval</a><a class="headerlink" href="#a-latency-is-not-an-initiation-interval" title="Link to this heading"><span>¶</span></a></h2>
+<p>The Action layer’s headline defect, found by the second machine and not
+findable by the first: <code class="docutils literal notranslate"><span class="pre">Machine.work</span></code> returned <strong>80</strong> steps for
+<code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> where the hardware does <strong>16</strong>. <code class="docutils literal notranslate"><span class="pre">_book</span></code> placed each action
+at <code class="docutils literal notranslate"><span class="pre">max(ready</span> <span class="pre">of</span> <span class="pre">its</span> <span class="pre">args)</span> <span class="pre">+</span> <span class="pre">at</span></code> and took the per-row cost to be the SPAN
+of that placement, so a measured <code class="docutils literal notranslate"><span class="pre">at=2</span></code> was charged as OCCUPANCY – paid
+once per row instead of once per stream. <code class="docutils literal notranslate"><span class="pre">Unit.ii</span></code> could not stand in for
+it: <code class="docutils literal notranslate"><span class="pre">ii</span></code> is the interval between a unit’s own steps, so <code class="docutils literal notranslate"><span class="pre">ii=5</span></code> would have
+bought the right number by declaring something false. TinyTPU is described
+throughout without <code class="docutils literal notranslate"><span class="pre">at=</span></code>, which is why one machine could never have shown
+it.</p>
+<p><code class="docutils literal notranslate"><span class="pre">_book</span></code> now returns both numbers and they answer different questions:</p>
+<ul class="simple">
+<li><p>the <strong>span</strong> is the latency, the cycles from a row’s first effect to its
+last, which a declared <code class="docutils literal notranslate"><span class="pre">at=</span></code> lengthens;</p></li>
+<li><p>the <strong>initiation</strong> is the rate, the cycles before the same actions can be
+placed again, which is set by the busiest resource they book – read off
+the ports the unit already declares.</p></li>
+</ul>
+<p>Nothing new is declared. The calendar is unchanged (the fold still lands two
+cycles after the word arrives, both emits two after that), <code class="docutils literal notranslate"><span class="pre">Unit.ii</span></code> is
+untouched, and <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> is now 16 steps of work with a latency of 20
+cycles for 16 rows. Every TinyTPU work count is unchanged, because a unit
+with no declared latency has span == initiation, which is why <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span>
+<span class="pre">--check</span></code> is still <code class="docutils literal notranslate"><span class="pre">ISA</span> <span class="pre">OK</span></code> and the published cosim row is unmoved.</p>
+<p>The distinction also repairs a refusal: <code class="docutils literal notranslate"><span class="pre">Unit(elastic=False)</span></code> used to be
+refused when a row’s <em>latency</em> exceeded its <code class="docutils literal notranslate"><span class="pre">ii</span></code>, which is exactly what a
+pipelined unit is. It is now refused when its <em>rate</em> does.</p>
+<p><strong>And it cost a catch, which is the more interesting half.</strong>
+<code class="docutils literal notranslate"><span class="pre">mutate_actions.py</span></code> declares <code class="docutils literal notranslate"><span class="pre">accu</span></code>’s ALU one lane operation a step
+instead of two – the single hardware fact <code class="docutils literal notranslate"><span class="pre">vaddrelu</span></code> rests on – and
+<code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> used to catch it: a single-issue ALU pushed the
+rectify into a third cycle and the work count went to 3 a row against the
+sequencer’s 2. That catch was an <strong>artefact of the defect</strong>. A pipelined unit
+retires a row every <code class="docutils literal notranslate"><span class="pre">max(resource)</span></code> cycles, and <code class="docutils literal notranslate"><span class="pre">accu</span></code> reads <code class="docutils literal notranslate"><span class="pre">ar</span></code> twice
+a row through one port, so the read port binds at 2 a row either way: the
+rectify of row <em>r</em> and the add of row <em>r+1</em> take alternate cycles and fit a
+single-issue ALU exactly. Correcting the cost model therefore <strong>lost</strong> a
+static catch and gained nothing back, and the mutant table now says so in its
+own row rather than quietly dropping to fourteen. A checker that is
+conservative in the wrong place catches more than it is entitled to, and some
+of what it catches it has no right to.</p>
+</section>
+<section id="a-lane-count-belongs-to-the-channel">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">A lane count belongs to the channel</a><a class="headerlink" href="#a-lane-count-belongs-to-the-channel" title="Link to this heading"><span>¶</span></a></h2>
+<p>A reduction’s leaf order is checkable only against a WIDTH, and the model
+read that width off addressed state alone. MiniTPU’s fold reads a vector
+register file, so its width is a property of a memory; ours arrives on a
+FIFO, and the packed word had to be declared a one-row <code class="docutils literal notranslate"><span class="pre">State</span></code> – a memory
+nothing addresses – to get the composition accepted at all.</p>
+<p><code class="docutils literal notranslate"><span class="pre">compose.Channel</span></code> now carries <code class="docutils literal notranslate"><span class="pre">lanes</span></code> and <code class="docutils literal notranslate"><span class="pre">lane_bits</span></code>, and <strong>derives</strong>
+its <code class="docutils literal notranslate"><span class="pre">dtype</span></code> from the pair, so the count is written once and the width
+cannot disagree with it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Channel</span><span class="p">(</span><span class="s2">"red_in"</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="s2">"QD"</span><span class="p">,</span> <span class="n">lanes</span><span class="o">=</span><span class="s2">"RED_LANES"</span><span class="p">,</span> <span class="n">lane_bits</span><span class="o">=</span><span class="s2">"RED_IN_BITS"</span><span class="p">,</span>
+        <span class="n">carries</span><span class="o">=</span><span class="s2">"one packed word of RED_LANES lanes, per output"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">actions.Channel</span></code> carries the same two fields, and an action that folds a
+value takes its width from the channel the value arrived on – found by
+following the value flow the rule already checks, so no field is added to
+<code class="docutils literal notranslate"><span class="pre">Action</span></code>. The shadow state is gone. The finding underneath is small and
+exact: what the model was missing was <strong>a lane count, not addressed state</strong>.
+A channel has no rows, no bank map and no collision rule, and a fold needs
+none of them.</p>
+</section>
+<section id="what-is-still-true">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">What is still true</a><a class="headerlink" href="#what-is-still-true" title="Link to this heading"><span>¶</span></a></h2>
+<p>A consolidation that quietly drops a negative result is worse than no
+consolidation. These survived intact.</p>
+<p><strong>One fold read at two taps still cannot be said.</strong> <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> computes
+one tree and reads it at the root and one level down; the model has no way
+to say “one fold, two taps off it”, so the pair is written as two <code class="docutils literal notranslate"><span class="pre">compute</span></code>
+actions and the single reassociation is reported as <strong>two</strong> obligations. The
+direction is right – discharged under <code class="docutils literal notranslate"><span class="pre">EXACT</span></code>, open under <code class="docutils literal notranslate"><span class="pre">ROUNDING</span></code> –
+and the multiplicity is the model’s. The repair would be an <code class="docutils literal notranslate"><span class="pre">Action</span></code> with
+more than one <code class="docutils literal notranslate"><span class="pre">into</span></code>, each with its own <code class="docutils literal notranslate"><span class="pre">at</span></code>; it has not been made.</p>
+<p><strong>Six wrong declarations out of fifteen are invisible to every static
+check.</strong> <code class="docutils literal notranslate"><span class="pre">mutate_actions.py</span></code> breaks one action of one instruction in a
+sandbox copy of the spec and asks which level notices: 5 are refused by the
+rule when the machine is built, 3 move a work count and are caught by
+<code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code>, <strong>6 are caught only by running a program on the
+hardware</strong> – a source declared as the other source, a subtract for an add, a
+fused instruction without its rectify, an accumulate read that loses its
+predicate, a load that ignores its column block, a store to the wrong DRAM
+row – and <strong>one is caught by nothing static at all</strong> (the ALU’s width,
+above). The model verifies composition, not arithmetic, and the port
+projection added here does not change that split: none of the six touches a
+port. The split was 5 / 4 / 6 before the cost model was corrected.</p>
+<p><strong>A derived port is one read and one write port.</strong> <code class="docutils literal notranslate"><span class="pre">structure()</span></code> gives
+every array a single read and a single write port, and a fully partitioned
+array – <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code>’s <code class="docutils literal notranslate"><span class="pre">node</span></code>, which is wires – is not that. The unit
+says so in Vitis terms, through its <code class="docutils literal notranslate"><span class="pre">directives</span></code>, and nothing structural
+says it. An action over such an array would be costed wrongly, which is why
+the tree’s actions do not name it.</p>
+</section>
+<section id="what-one-file-would-have-to-keep">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">What one file would have to keep</a><a class="headerlink" href="#what-one-file-would-have-to-keep" title="Link to this heading"><span>¶</span></a></h2>
+<p>The end state this was aimed at is <em>a single file, architectures composable,
+an ISA modelled as composed Actions</em>. The parts that did not reach it, with
+the reason each:</p>
+<ul class="simple">
+<li><p><strong>The structural model may not import the behavioural one, or the
+reverse.</strong> <code class="docutils literal notranslate"><span class="pre">allo/actions.py</span></code> imports nothing from Allo – <code class="docutils literal notranslate"><span class="pre">structure()</span></code>
+reads an architecture by duck typing – and that independence is what lets
+the ISA spec’s machine be built and checked without the front end. Merging
+the two files would make the Action model depend on <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py</span></code>
+and on MLIR bindings, for no capability.</p></li>
+<li><p><strong>The ISA spec’s unit table may not simply become the derivation.</strong> The
+discipline <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span></code> enforces is that the spec is the source of truth
+and the design is held to it <em>independently</em>; a spec that reads its ports
+out of the design cannot check the design’s ports. Turning the second
+declaration into a <strong>checked projection</strong> is what is available, and it is
+what landed: where the two models overlap they can no longer drift, and
+where they cannot overlap the reason is written down and checked in both
+directions.</p></li>
+<li><p><strong>The grain.</strong> Until an Action unit can be a replicated kernel, or a
+compose unit can declare that it is one dispatch domain with its copies,
+one machine in eight will not correspond.</p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Actions: an Instruction as Composed Unit Effects</a><ul>
+<li><a class="reference internal" href="#the-two-models-and-the-one-question">The two models, and the one question</a></li>
+<li><a class="reference internal" href="#what-derives-and-what-does-not">What derives, and what does not</a></li>
+<li><a class="reference internal" href="#a-latency-is-not-an-initiation-interval">A latency is not an initiation interval</a></li>
+<li><a class="reference internal" href="#a-lane-count-belongs-to-the-channel">A lane count belongs to the channel</a></li>
+<li><a class="reference internal" href="#what-is-still-true">What is still true</a></li>
+<li><a class="reference internal" href="#what-one-file-would-have-to-keep">What one file would have to keep</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="stream_ports.html">
+                    <span class="icon">&lt;</span><span>Stream Ports: a Unit with an Interface</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="limitations.html"><span>Allo Limitations Register</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

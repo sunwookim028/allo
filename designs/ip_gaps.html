@@ -206,6 +206,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/actions.html">Actions: an Instruction as Composed Unit Effects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -386,10 +387,11 @@ ends.</strong></p></td>
 <td><p>a latency contract beside <code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code>, generated-from and
 checked-against like the encoding is, plus a <strong>two-sided</strong> probe</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">test_unit_cannot_declare_latency</span></code>. <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code>’s two outputs sit
-<code class="docutils literal notranslate"><span class="pre">RED_DEPTH</span> <span class="pre">-</span> <span class="pre">RED_TAP_LEVEL</span></code> adder levels apart and nothing says what
-that is in cycles</p></td>
-<td><p>cannot refuse – <strong>flagged to ``unit-actions``, deliberately not built
-here</strong></p></td>
+<code class="docutils literal notranslate"><span class="pre">RED_DEPTH</span> <span class="pre">-</span> <span class="pre">RED_TAP_LEVEL</span></code> adder levels apart, and each one’s cycle
+count is now an <code class="docutils literal notranslate"><span class="pre">Action.at</span></code> measured by <code class="docutils literal notranslate"><span class="pre">reduce_latency_probe.py</span></code></p></td>
+<td><p>cannot refuse – <strong>FILLED on the action side</strong>, <a class="reference internal" href="../developer/actions.html"><span class="doc">Actions: an Instruction as Composed Unit Effects</span></a>.
+<code class="docutils literal notranslate"><span class="pre">compose.Unit</span></code> is unchanged and the test still holds, which is the
+point: a unit does not have a latency, each of its outputs does</p></td>
 </tr>
 <tr class="row-even"><td><p>7</p></td>
 <td><p><strong>A unit does not declare its arithmetic.</strong></p></td>
@@ -754,6 +756,22 @@ capability: <code class="docutils literal notranslate"><span class="pre">Unit</s
 a tree instantiated past what its accumulator is exact for composed, built and
 returned plausible wrong numbers. Six lines, and it is where every derived
 relation in the tree is pinned.</p>
+<p>A second thing it needed later, when the same unit was described as
+<a class="reference internal" href="../developer/actions.html"><span class="doc">Actions</span></a>: <code class="docutils literal notranslate"><span class="pre">Channel</span></code> gained <code class="docutils literal notranslate"><span class="pre">lanes</span></code> and
+<code class="docutils literal notranslate"><span class="pre">lane_bits</span></code>, and <strong>derives</strong> its <code class="docutils literal notranslate"><span class="pre">dtype</span></code> from the pair. A reduction’s
+leaf order is checkable only against a lane count, and the only thing that
+had one was addressed state – so the packed word had to be declared a
+one-row memory to be checkable at all. It is now the channel’s own count,
+written once, with the width following from it. The emitted region source is
+byte-identical, which is the test that this is a declaration and not a
+change.</p>
+<p>What the join measured is on <a class="reference internal" href="../developer/actions.html"><span class="doc">Actions: an Instruction as Composed Unit Effects</span></a>: of the 28 ports
+TinyTPU’s Action model declares, 20 are channels and memories
+<code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code> already declares and 4 more stand for them, 3 are
+arithmetic that no composition can carry, and one unit in eight does not
+correspond at all – <code class="docutils literal notranslate"><span class="pre">wld</span></code> + <code class="docutils literal notranslate"><span class="pre">pe</span></code>, the <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">x</span> <span class="pre">T</span></code> mesh the ISA sees as one
+<code class="docutils literal notranslate"><span class="pre">array</span></code>. <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> holds the two models together where they
+overlap and names every place they cannot.</p>
 </section>
 <section id="what-is-not-filled-and-why">
 <h2><a class="toc-backref" href="#id8" role="doc-backlink">What is not filled, and why</a><a class="headerlink" href="#what-is-not-filled-and-why" title="Link to this heading"><span>¶</span></a></h2>
@@ -814,7 +832,7 @@ check</p></td>
 </section>
 <section id="what-running-the-gaps-looks-like">
 <h2><a class="toc-backref" href="#id9" role="doc-backlink">What running the gaps looks like</a><a class="headerlink" href="#what-running-the-gaps-looks-like" title="Link to this heading"><span>¶</span></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>tests/ip/<span class="w">                    </span><span class="c1"># 23 pass, 1 xfail -- the xfail IS row 3</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>tests/ip/<span class="w">                    </span><span class="c1"># the xfail IS row 3</span>
 python<span class="w"> </span>examples/tinytpu/reduce_csynth.py<span class="w"> </span><span class="m">64</span>:8
 </pre></div>
 </div>

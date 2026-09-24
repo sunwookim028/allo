@@ -206,6 +206,7 @@
 <li class="toctree-l1"><a class="reference internal" href="gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developer/actions.html">Actions: an Instruction as Composed Unit Effects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -559,10 +560,16 @@ from the opposite direction, on someone else’s design.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Their logic is gate-heavy; ours is flop-heavy — at both sizes, and
-regardless of the memory treatment.</strong> No node scaling, no capacity matching and
-no exclusion rule enters that comparison; it is a share of each design’s own
-logic. It is therefore a structural statement about <strong>what HLS emits versus
+<p><strong>Their logic is gate-heavy; ours is flop-heavy, at both sizes.</strong> No node
+scaling, no capacity matching and no exclusion rule enters that comparison; it
+is a share of each design’s own logic.</p>
+<p><em>Corrected after the full DIM=8 run.</em> An earlier version of this paragraph
+added “and regardless of the memory treatment”, which is true of our design and
+<strong>false of theirs</strong>: with memories rendered as flip-flops their share moves from
+37.2% to <strong>60.7%</strong>, while ours is ≈80% either way. So the substrate distortion
+is <strong>larger for their design than for ours</strong> — the opposite of what we
+expected — and the gate-versus-flop statement holds on the logic-only pair
+only. It is stated that way now. It is therefore a structural statement about <strong>what HLS emits versus
 what a Chisel generator emits</strong>, not about either accelerator, and it is the
 most transferable result the area track produced.</p>
 <p><strong>A caution that belongs beside the frequency numbers.</strong> Gemmini DIM=8’s worst
@@ -572,10 +579,93 @@ ours. It must be written as <em>“closes at 3.33 ns”</em> and never as headro
 <cite>0.00</cite> that reads as “met” in a table becomes “both close at 3.33 ns, equally”
 in prose. If a frequency comparison is ever attempted, Gemmini’s is the number
 that moves first.</p>
-<p><strong>The clean pair is still two runs away.</strong> Our 1,396,966 against their 524,402
-is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
-single-variable comparison. The pair that answers the question is our
-T=8/MAXDIM=64 at QD=16 against this run, and both remain queued.</p>
+<p><strong>6.2e One change, measured two ways.</strong> Gemmini DIM=8 <em>full</em> is
+<strong>1,138,578 µm²</strong>, against 990,938 at DIM=4 — <strong>+14.9%</strong> for doubling the mesh.
+The logic-only pair gives <strong>+37.3%</strong> for the same change. The stubbed
+scratchpad and accumulator are 53.9% of the full figure, and that mass is
+insensitive to the mesh, so it dilutes the delta.</p>
+<p><strong>The same design change reads as +14.9% or +37.3% depending only on how the
+memories were treated.</strong> That is the strongest argument in this work for
+quoting the logic-only pair — stronger than the gate-versus-flop share above,
+because it is <em>one change measured two ways</em> rather than an inference about
+which component dominates.</p>
+<p><strong>And that run misses timing</strong>, the only one in the set that does not close:
+worst slack −0.01 ns on a 3.33 ns target, 80 violating paths in a
+491,512-cell design. Per the methodology fixed before any number existed, this
+is reported as <strong>“the comparison design’s RTL was not targeted at this
+constraint”</strong>, not as “it is slower”: 0.3% of the period is what a longer
+period, a higher effort or a retarget would absorb, and a synthesis-stage
+estimate is a floor rather than an achieved frequency. The miss is stated and
+the inference refused.</p>
+<p><strong>6.2f The matched pair, and where the difference goes.</strong> Eleven runs under one
+flow — DC W-2024.09, FreePDK45, 3.33 ns, topographical, flatten effort 3 —
+give the comparison this section was built for. Our T=8/MAXDIM=64 at QD=16
+against Gemmini DIM=8, <strong>logic-only, capacities matched to 2%, same library,
+same clock, same exclusion rule, both closing timing</strong>:</p>
+<blockquote>
+<div><p>2,272,572 µm²  against  524,402 µm²  —  <strong>4.33×</strong></p>
+</div></blockquote>
+<p><strong>And it is not compute.</strong> Hierarchical attribution of our logic:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>component</p></th>
+<th class="head"><p>µm²</p></th>
+<th class="head"><p>share of our logic</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>instruction-fetch adapter</p></td>
+<td><p>697,974</p></td>
+<td><p><strong>30.7%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>DMA load unit</p></td>
+<td><p>372,150</p></td>
+<td><p>16.4%</p></td>
+</tr>
+<tr class="row-even"><td><p>two operand adapters</p></td>
+<td><p>102,105 + 102,101</p></td>
+<td><p>9.0%</p></td>
+</tr>
+<tr class="row-odd"><td><p>output adapter</p></td>
+<td><p>27,334</p></td>
+<td><p>1.2%</p></td>
+</tr>
+<tr class="row-even"><td><p>sequencer</p></td>
+<td><p>33,516</p></td>
+<td><p>1.5%</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>the 64-PE array</strong></p></td>
+<td><p>≈ 84,700</p></td>
+<td><p><strong>≈ 3.7%</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The four memory-interface adapters are 40.9% of our logic, 57.3% with the DMA
+unit; the array that does the arithmetic is under 4%.</strong> Gemmini’s entire
+reader/writer/transaction path is 23,885 µm² — <strong>6.3%</strong> of its logic. So the
+4.33× is memory-interface mass that TileLink at this width does not produce,
+measured at matched capacity with both sides’ cycles taken from the RTL that
+was synthesised. It is §6.2’s finding at a second design point, and this time
+it is the headline rather than an inference.</p>
+<p><strong>Why the logic-only pair and not the full one, as a measurement rather than an
+argument.</strong> The stubbed arrays are <strong>19.8% of our full figure and 53.9% of
+theirs</strong> — their design is far more memory-dominated once memories become
+flip-flops, so the full-design ratio of <strong>2.49×</strong> understates the logic
+difference by an amount that is purely an artefact of the memory treatment.
+Together with §6.2e’s <em>same change, two ways</em>, that is the whole case for
+quoting logic-only, and neither half of it is an opinion about which component
+matters.</p>
+<p><strong>Two numbers deliberately not claimed</strong>, because each would mix two compiler
+commits:</p>
+<ul class="simple">
+<li><p><strong>+62.7% for T=4 to T=8 logic-only.</strong> It compares a QD=16 export against a
+QD=8 one, so it <em>bounds</em> the cost of doubling T rather than measuring it. A
+clean figure needs both variants emitted from one commit.</p></li>
+<li><p><strong>+14.2% between the two T=8 full runs as the price of channel depth.</strong> Same
+defect, and it bounds from above — while the FPGA reports <strong>+0.9% flip-flops</strong>
+for that same pair, which is the third instance of the FPGA resource table
+understating what standard cells charge.</p></li>
+</ul>
 <p><strong>Two methodological points are now settled on evidence rather than argument.</strong>
 First, the exclusion of our instruction-fetch adapter: <strong>no cells inside the
 Gemmini boundary match instruction fetch at all.</strong> What exists is command queue
@@ -700,6 +790,29 @@ activity annotation would remove one of three objections and leave two.</p>
 <p>§4 is two arms and one seeded property, without unseeded replication. §5 is one
 machine and one new instruction, with the demonstrating instruction chosen by
 the abstraction’s author.</p>
+<p><strong>Cycles and area are joined by declaration, not by proximity.</strong> Cycle counts
+come from Vitis cosim and area from Design Compiler. Each flow is internally
+consistent, so each flow’s own check passes while the <em>join</em> between them can
+be wrong, and the errors this work made most often lived exactly there. We
+therefore treat a cycle count and an area figure as describing one machine only
+when one of two conditions holds, and a checker
+(<code class="docutils literal notranslate"><span class="pre">allo/backend/asic/tools/check_pairing.py</span></code>) decides which: either both cite
+the <strong>same committed RTL export</strong>, verified by the manifest checksum the
+synthesis run recorded, in which case their configuration agrees by
+construction; or both <strong>declare every configuration parameter</strong> — <code class="docutils literal notranslate"><span class="pre">T</span></code>,
+<code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>, <code class="docutils literal notranslate"><span class="pre">QD</span></code>, <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> — and the four agree. A parameter that is
+absent on either side is treated as <em>cannot pair</em>, never as a match, because
+the exports predating a parameter record nothing about it and the default at
+the time was usually not today’s.</p>
+<p>Applying that rule to this repository refuses more than it admits, and two of
+the refusals are results rather than formalities. <strong>No model-level cycle count
+can currently be paired with any committed area figure</strong>: the workload numbers
+were measured at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> and every committed TinyTPU export was emitted
+before <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default and records no <code class="docutils literal notranslate"><span class="pre">QD</span></code>, so the end-to-end
+claim reaches cycles and stops. And the <code class="docutils literal notranslate"><span class="pre">T=8</span></code> area is <strong>orphaned</strong>: the
+export it was synthesised from was re-emitted two days later, so the RTL a
+reader finds at that path is not the RTL that area describes. Neither fact was
+visible to any single-flow check; both were produced by the join.</p>
 <p><strong>Instrument failures.</strong> Four instruments were observed reporting success
 without having run: a tool server that answered without binding, a cost meter
 reporting zero for a billed call, a self-consistent manifest describing a

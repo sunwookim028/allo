@@ -206,6 +206,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/actions.html">Actions: an Instruction as Composed Unit Effects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
@@ -408,6 +409,26 @@ machinery, below, each compared against <code class="docutils literal notranslat
 <p>These are different claims and the suite keeps them apart, on the ladder
 <code class="docutils literal notranslate"><span class="pre">act/judge.py</span></code> already defines — <code class="docutils literal notranslate"><span class="pre">legal</span></code>, then <code class="docutils literal notranslate"><span class="pre">correct</span></code>, then
 <code class="docutils literal notranslate"><span class="pre">confirmed</span></code>.</p>
+<p><strong>And a gate enforces the difference</strong>, which it did not when this page was
+first written. <code class="docutils literal notranslate"><span class="pre">workloads/claims.json</span></code> declares, per model, its tier and —
+for a model at <code class="docutils literal notranslate"><span class="pre">confirmed</span></code> — the RTL measurement that earned it <em>together
+with the configuration it was measured at</em>. <code class="docutils literal notranslate"><span class="pre">workloads/gate.py</span></code> extracts
+every model, maps every layer, checks bit-exactness against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> and
+against PyTorch, and then checks the tier:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/tinytpu/workloads/gate.py<span class="w">          </span><span class="c1"># ~30 s, no Vitis</span>
+python<span class="w"> </span>examples/tinytpu/workloads/gate.py<span class="w"> </span>--simulator
+</pre></div>
+</div>
+<p>It refuses more than it accepts, and that is the point. A measurement whose
+<code class="docutils literal notranslate"><span class="pre">T</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>, <code class="docutils literal notranslate"><span class="pre">QD</span></code> or <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> is not the configuration the gate is
+running is refused as unpairable rather than quoted — <strong>and a configuration
+key that is absent is “cannot pair”, not “matches”</strong>, because an older row
+carries no <code class="docutils literal notranslate"><span class="pre">QD</span></code> field at all and the absence dates it. <code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code> must
+still refuse, and for the stated reason: a run in which the probe maps cleanly
+fails here, since a gate that made every model pass would be the wrong gate.
+<code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> must carry <em>no</em> measurement, so the ladder cannot be climbed by
+editing a table. The failure path is tested rather than assumed, in
+<code class="docutils literal notranslate"><span class="pre">tests/act/test_gates_negative.py</span></code>.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>model</p></th>
@@ -887,6 +908,13 @@ builds, both burst widths:</p>
 </tr>
 </tbody>
 </table>
+<p><strong>Re-checked on 2026-09-24, after ``QD=16`` became the default</strong> (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>)
+and cleared item 24 for the three small models. It changes nothing here:
+<code class="docutils literal notranslate"><span class="pre">mlp_wide_l0</span></code> on a fresh <code class="docutils literal notranslate"><span class="pre">csynth</span></code> of <code class="docutils literal notranslate"><span class="pre">T=4</span> <span class="pre">MAXDIM=64</span> <span class="pre">QD=16</span> <span class="pre">DMA_WORDS=1</span></code>
+still does not complete inside 600 s, with the same signature as the row above
+— csim exact at <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">4096</span></code>, last RTL progress <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">&quot;109000&quot;</span></code> ps, no second
+periodic report. So <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> stays <em>correct and not confirmed</em>, and
+<code class="docutils literal notranslate"><span class="pre">workloads/gate.py</span></code> enforces that it carries no cycle count.</p>
 <p>Its layers have <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">=</span> <span class="pre">16</span></code>, so <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">&gt;=</span> <span class="pre">QD</span></code> holds at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, which is the
 one condition the parity work has a rule for — but <code class="docutils literal notranslate"><span class="pre">QD=32</span></code> breaks that
 condition and does not fix the hang. What <code class="docutils literal notranslate"><span class="pre">QD=32</span></code> does change is the
