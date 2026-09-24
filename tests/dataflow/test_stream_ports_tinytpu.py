@@ -3,7 +3,7 @@
 
 """The fork's own accelerator, wired through declared ports.
 
-``examples/accelerator/tinytpu_vitis/units_isa.py`` holds TinyTPU-isa's eight
+``examples/tinytpu/units_isa.py`` holds TinyTPU-isa's eight
 kernel bodies unchanged at module level, each naming its streams in its own
 signature, and an architecture that wires them under channel names the design
 never uses. The design itself (``microarch_isa.py``) is untouched and remains
@@ -21,15 +21,15 @@ os.environ.setdefault("TPU_MAXDIM", "16")
 
 import allo.dataflow as df  # noqa: E402
 from allo.netlist import netlist_of  # noqa: E402
-from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
+from examples.tinytpu.microarch_isa import (  # noqa: E402
     tinytpu_isa,
     gemm_program_flat,
     assemble,
     MAXDIM,
     IMEM_SIZE,
 )
-from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
-from examples.accelerator.tinytpu_vitis.units_isa import (  # noqa: E402
+from examples.tinytpu.isa_dsl import gemm_program  # noqa: E402
+from examples.tinytpu.units_isa import (  # noqa: E402
     tinytpu_ports,
 )
 

@@ -21,8 +21,8 @@ import numpy as np
 import pytest
 
 import allo.dataflow as df
-from examples.accelerator.tinytpu_vitis.ip import placeholders
-from examples.accelerator.tinytpu_vitis.ip.compose import (
+from examples.tinytpu.ip import placeholders
+from allo.compose import (
     Architecture, Channel, Memory, Unit, unit)
 
 
@@ -122,7 +122,7 @@ def test_no_collective_topology():
 def test_unit_cannot_declare_latency():
     """Flagged to `unit-actions`: a latency belongs to an action, not to a
     unit, and reduce_tree's two outputs are the case that needs it."""
-    from examples.accelerator.tinytpu_vitis.ip.reduce import ReduceParams
+    from examples.tinytpu.ip.reduce import ReduceParams
     p = ReduceParams()
     assert p.RED_DEPTH - p.RED_TAP_LEVEL == 1, (
         "the tap and the root are one adder level apart at the default "
@@ -137,7 +137,7 @@ def test_datatype_parametric_slices_widen_to_32_bits():
     slice whose bounds are expressions over a named width loses its inferred
     width. The results are right and the circuit is wider than declared."""
     import warnings
-    from examples.accelerator.tinytpu_vitis.ip.reduce import DotTree
+    from examples.tinytpu.ip.reduce import DotTree
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         df.build(DotTree(name="dot_tree_widths").region, target="simulator")
@@ -225,8 +225,8 @@ def test_units_do_not_declare_arithmetic():
     """pe computes an int8 x int8 product into an int32 and its interface says
     only T, VW, AW. reduce_tree declares RED_IN and RED_ACC and is the shape
     the other eight would take."""
-    from examples.accelerator.tinytpu_vitis.ip.units.pe import pe
-    from examples.accelerator.tinytpu_vitis.ip.units.reduction_tree import (
+    from examples.tinytpu.ip.units.pe import pe
+    from examples.tinytpu.ip.units.reduction_tree import (
         reduce_tree)
     assert "int8" in pe.source() and "int8" not in pe.declared_names
     assert {"RED_IN", "RED_ACC"} <= set(reduce_tree.parameters)

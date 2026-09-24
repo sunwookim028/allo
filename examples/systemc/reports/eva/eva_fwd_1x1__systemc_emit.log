@@ -1,0 +1,9 @@
+allo resolves to: /home/zsm9/allo_sup/allo
+scheduled EVA region OK
+=== SYSTEMC BUILD OK -> /tmp/claude-1838657/-home-zsm9-allo-sup/eb682555-027f-481b-af99-40e733dfa3f4/scratchpad/eva_systemc_prj
+csim.sh
+kernel.cpp
+kernel.h
+Makefile
+run.tcl
+

@@ -3,7 +3,7 @@
 Measured 2026-09-19 for the CHIA run's seed hypotheses, with main's own
 profiling scripts, unchanged:
 
-    cd examples/accelerator/tinytpu_vitis/impact && source env.sh
+    cd examples/tinytpu/impact && source env.sh
     TPU_SHAPES=16x16x16 TPU_PRJ=$PWD/runs/landed/isa_sweep.prj \
         python pyrun.py cosim_variant.py base runs/landed
     ./profile.sh runs/landed

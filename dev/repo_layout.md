@@ -9,12 +9,13 @@ passes**, and push-button scripts and docs must assume it.
 ## What is wrong today
 
 `examples/feather/` is three plain Python files: a design expressed in Allo.
-`examples/accelerator/tinytpu_vitis/` is a whole project — `ip/`, `act/`,
+`examples/accelerator/tinytpu_vitis/` was a whole project — `ip/`, `act/`,
 `asic_synthesis/`, `chia_agent/`, an RTL exporter, reports and a reproduce
 script. Two problems follow:
 
 1. **TinyTPU sits a level deeper than every other example** for no reason a
-   reader can infer, so `examples/` no longer lists the designs.
+   reader can infer, so `examples/` no longer lists the designs. *(Fixed
+   2026-09-24 by step 2 of the sequencing below.)*
 2. **The flows live inside one design's directory.** The ASIC flow, the ACT
    mapper and the CHIA loop are not properties of TinyTPU, but a second design
    cannot reach them without importing through `examples/accelerator/
@@ -173,7 +174,8 @@ flow all depend on, so it must not run concurrently with work in flight.
 1. **Wait** for the cycle-row doc update and the incoming ASIC-flow commits.
 2. **Move designs first** — `examples/accelerator/tinytpu_vitis/` →
    `examples/tinytpu/`. One rename, references updated, gates re-run. Low risk,
-   and it makes `examples/` list the designs again.
+   and it makes `examples/` list the designs again. **Landed 2026-09-24**:
+   `examples/accelerator/` is gone and `examples/` lists the designs again.
 3. **Then extract tools**, one at a time, each with the "could MiniTPU call
    this?" test applied and recorded. `tools/asic/` first, because a second
    machine is already committing into it and the sooner its home is stable the
@@ -249,6 +251,13 @@ alongside the minimum so the choice is visible rather than implicit.
 `asic_synthesis/construct-commercial.py` resolves its node library and ADK at
 `examples/accelerator/{nodes,adks}/`, which do not exist in this repository, so
 it **cannot run from a clean checkout today**. Wherever the vendored nodes
-land, that path has to match. Note also that the construct graph and
+land, that path has to match. **Resolved 2026-09-24.** The vendored flow landed
+at `allo/backend/asic/{nodes,adks}/` and the construct script was pointed at
+it — but by three `dirname` calls from `asic_synthesis/`, which under
+`examples/accelerator/tinytpu_vitis/` reached `examples/`, not the repository
+root, so it still could not find the nodes. The design move removes exactly one
+level, so the same three `dirname` calls now land on the repository root; the
+levels are named in a comment there so the next move does not silently break
+it again. Note also that the construct graph and
 `make_stubs.py` were committed by a different session than the one that
 produced the reports; attribute them accordingly when moving.

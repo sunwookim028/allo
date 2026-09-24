@@ -37,11 +37,11 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from examples.accelerator.tinytpu_vitis import cosim, isa_ref  # noqa: E402
-from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+from examples.tinytpu import cosim, isa_ref  # noqa: E402
+from examples.tinytpu.isa_dsl import (  # noqa: E402
     Program, Ref,
 )
-from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
+from examples.tinytpu.microarch_isa import (  # noqa: E402
     IMEM_SIZE, MAXDIM, T, assemble,
 )
 
@@ -165,7 +165,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     from allo.dataflow import customize
-    from examples.accelerator.tinytpu_vitis.microarch_isa import (
+    from examples.tinytpu.microarch_isa import (
         schedule, tinytpu_isa)
 
     A, B = operands()

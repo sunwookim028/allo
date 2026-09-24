@@ -52,6 +52,9 @@ public:
   virtual void emitGetGlobalFixed(allo::GetGlobalFixedOp op) {}
   virtual void emitGlobal(memref::GlobalOp op) {}
   virtual void emitSubView(memref::SubViewOp op) {}
+  // Whole-array copy (`dst[:] = src`). Every HLS backend lacked this, so any
+  // slice assignment aborted with "'memref.copy' op is unsupported operation".
+  virtual void emitCopy(memref::CopyOp op) {}
   virtual void emitReshape(memref::ReshapeOp op) {}
 
   /// Tensor-related statement emitters.
@@ -71,6 +74,10 @@ public:
   virtual void emitSelect(arith::SelectOp op) {}
   virtual void emitConstant(arith::ConstantOp op) {}
   virtual void emitGeneralCast(UnrealizedConversionCastOp op) {}
+  // Hook called by emitCast after the operand: a backend may emit a narrowing
+  // suffix (e.g. `.to_int64()`) when converting a >64-bit ac_int to a native
+  // int/index, which under __SYNTHESIS__ has no implicit conversion. Default: none.
+  virtual void emitNarrowCastSuffix(Value src, Value dst) {}
   virtual void emitGetBit(allo::GetIntBitOp op) {}
   virtual void emitSetBit(allo::SetIntBitOp op) {}
   virtual void emitGetSlice(allo::GetIntSliceOp op) {}
@@ -86,6 +93,18 @@ public:
   virtual void emitStreamTryPut(allo::StreamTryPutOp op) {}
   virtual void emitStreamEmpty(allo::StreamEmptyOp op) {}
   virtual void emitStreamFull(allo::StreamFullOp op) {}
+
+  // Wire operations (combinational link).
+  virtual void emitWireConstruct(allo::WireConstructOp op) {}
+  virtual void emitWireGet(allo::WireGetOp op) {}
+  virtual void emitWirePut(allo::WirePutOp op) {}
+
+  // Channel operations (handshake link).
+  virtual void emitChannelConstruct(allo::ChannelConstructOp op) {}
+  virtual void emitChannelGet(allo::ChannelGetOp op) {}
+  virtual void emitChannelPut(allo::ChannelPutOp op) {}
+  virtual void emitChannelTryGet(allo::ChannelTryGetOp op) {}
+  virtual void emitChannelTryPut(allo::ChannelTryPutOp op) {}
 
   /// Top-level MLIR module emitter.
   virtual void emitModule(ModuleOp module) {}
@@ -108,7 +127,18 @@ protected:
   /// MLIR component and HLS C++ pragma emitters.
   virtual void emitBlock(Block &block) {}
   virtual void emitLoopDirectives(Operation *op) {}
+  // Loop directives that must be emitted BEFORE the loop header (default: none).
+  // Catapult's #pragma hls_pipeline_init_interval / hls_unroll bind to the loop
+  // that FOLLOWS them, unlike Vivado's in-body pragmas -- see the Catapult override.
+  virtual void emitLoopDirectivesPreheader(Operation *op) {}
   virtual void emitArrayDirectives(Value memref) {}
+  // Array directives that must be emitted BEFORE the declaration (default: none).
+  // Same asymmetry as emitLoopDirectivesPreheader: Vivado's array pragmas follow the
+  // declaration they name, but Catapult's #pragma hls_resource binds to the variable
+  // DECLARED AFTER IT. Emitted after the declaration it is silently ineffective, and
+  // Catapult then picks a 1R1W RAM for the array -- which serialises every read and,
+  // because Genus treats the RAM as an unresolved black box, reports its area as ZERO.
+  virtual void emitArrayDirectivesPreheader(Value memref) {}
   virtual void emitFunctionDirectives(func::FuncOp func, ArrayRef<Value> portList) {}
 
   virtual void emitFunction(func::FuncOp func) {}

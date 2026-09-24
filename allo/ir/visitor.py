@@ -194,7 +194,14 @@ class ASTContext:
         """
         ip_op = None
         for ip_op in self.top_func.entry_block.operations:
-            if not isinstance(ip_op, allo_d.StreamConstructOp):
+            if not isinstance(
+                ip_op,
+                (
+                    allo_d.StreamConstructOp,
+                    allo_d.WireConstructOp,
+                    allo_d.ChannelConstructOp,
+                ),
+            ):
                 break
         ip = (
             InsertionPoint(ip_op)

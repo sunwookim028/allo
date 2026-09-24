@@ -13,9 +13,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 pytest.importorskip("torch", reason="the suite's front end is torch.fx")
 pytest.importorskip("allo._mlir", reason="the specs are validated against the build")
 
-from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E402
-from examples.accelerator.tinytpu_vitis.isa_dsl import gemm_program  # noqa: E402
-from examples.accelerator.tinytpu_vitis.workloads import (  # noqa: E402
+from examples.tinytpu.act import spec as spec_mod  # noqa: E402
+from examples.tinytpu.isa_dsl import gemm_program  # noqa: E402
+from examples.tinytpu.workloads import (  # noqa: E402
     burst, extract, models,
 )
 
@@ -41,7 +41,7 @@ def test_the_corpus_reference_submission_consumes_the_specs(name):
     """The convention claim, tested rather than asserted: `act.baseline`, which
     exists to map `act/corpus/`, maps every spec the extractor emits with no
     change to it."""
-    from examples.accelerator.tinytpu_vitis.act import baseline
+    from examples.tinytpu.act import baseline
     for sp in extract.specs(extract.of(name)):
         assert baseline.program(sp)
 

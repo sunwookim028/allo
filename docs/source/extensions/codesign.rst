@@ -267,16 +267,16 @@ Running it
 
     conda activate allo
     export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
-    examples/accelerator/tinytpu_vitis/reproduce_codesign.sh mapspace   # ~2 s
-    examples/accelerator/tinytpu_vitis/reproduce_codesign.sh control    # ~3 min
-    examples/accelerator/tinytpu_vitis/chia_agent/test_codesign.py      # ~7 min
+    examples/tinytpu/reproduce_codesign.sh mapspace   # ~2 s
+    examples/tinytpu/reproduce_codesign.sh control    # ~3 min
+    examples/tinytpu/chia_agent/test_codesign.py      # ~7 min
 
 A search::
 
     conda activate chia_env
     set -a; source chia.env; set +a          # CHIA_TOTAL_CAP_USD per allocation.json
     ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
-    cd examples/accelerator/tinytpu_vitis/chia_agent
+    cd examples/tinytpu/chia_agent
     python preflight.py --budget-usd 15                       # the gate alone, $0
     python swarm.py --codesign --workers 2 --iterations 3 --budget-usd 15
     python accept.py --codesign --diff <run>/<worker>/best.diff \

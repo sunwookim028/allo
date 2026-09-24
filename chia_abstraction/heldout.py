@@ -73,13 +73,13 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 EMIT = "mlir/lib/Translation/EmitVivadoHLS.cpp"
 CUSTOMIZE = "allo/customize.py"
-DESIGN = "examples/accelerator/tinytpu_vitis/microarch_isa.py"
+DESIGN = "examples/tinytpu/microarch_isa.py"
 VHLS_TESTS = "tests/test_vhls.py"
 
 HELDOUT_BRANCH = "chia-abstraction-heldout-dependence"
 
 #: The BETTER held-out base, prepared on main at
-#: `examples/accelerator/tinytpu_vitis/chia_agent/holdout/`: the parent of the
+#: `examples/tinytpu/chia_agent/holdout/`: the parent of the
 #: commit that introduced `s.dependence`. At that commit the primitive has
 #: never existed, no test mentions it, the design does not call it and no
 #: document describes it -- the absence is REAL rather than simulated, and
@@ -93,7 +93,7 @@ HELDOUT_BRANCH = "chia-abstraction-heldout-dependence"
 #: eleven, including the design loop's own recorded evidence.
 PREPARED_BASE = "a4151ca0"
 PREPARED_ANSWER = "bbea2af0"
-PREPARED_SYMPTOM = ("examples/accelerator/tinytpu_vitis/chia_agent/holdout/"
+PREPARED_SYMPTOM = ("examples/tinytpu/chia_agent/holdout/"
                     "symptom.md")
 
 #: ONE pattern set, used both to redact and to detect a leak, so the two
@@ -473,7 +473,7 @@ def graft(out: Path, base: str = PREPARED_BASE) -> dict:
     # only `chia_agent/gate_runner.py` and `param_check.py` are absent, and
     # those are runners, not gates.
     for path in ("chia_abstraction",
-                 "examples/accelerator/tinytpu_vitis/chia_agent",
+                 "examples/tinytpu/chia_agent",
                  "tests/limits"):
         sh(["git", "checkout", head, "--", path], cwd=wt, check=False)
     # Redact what the graft brought in AND the base commit's own docs. The

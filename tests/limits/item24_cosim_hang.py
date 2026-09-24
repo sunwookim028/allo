@@ -23,15 +23,15 @@ from _worktree import verdict
 
 ITEM = 24
 
-EX = os.path.join(_worktree.ROOT, "examples", "accelerator", "tinytpu_vitis")
+EX = os.path.join(_worktree.ROOT, "examples", "tinytpu")
 sys.path.insert(0, _worktree.ROOT)
 
-from examples.accelerator.tinytpu_vitis import isa_ref, kpn_model  # noqa: E402
-from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
+from examples.tinytpu import isa_ref, kpn_model  # noqa: E402
+from examples.tinytpu.microarch_isa import (  # noqa: E402
     check_program,
 )
-from examples.accelerator.tinytpu_vitis.act import spec as spec_mod  # noqa: E402
-from examples.accelerator.tinytpu_vitis.act.rtl_hang import (  # noqa: E402
+from examples.tinytpu.act import spec as spec_mod  # noqa: E402
+from examples.tinytpu.act.rtl_hang import (  # noqa: E402
     family, host_spec,
 )
 
@@ -41,7 +41,7 @@ HANGS = ("tiled n2 b2 k2 r4", "pointwise n4 r16 relu", "pointwise n4 r4 relu")
 
 
 def cheap(prog, mod):
-    from examples.accelerator.tinytpu_vitis.stress_isa import execute
+    from examples.tinytpu.stress_isa import execute
     check_program(prog)
     good, _ = kpn_model.run(prog)
     A, B, C0 = spec_mod.buffers(host_spec(), "full", 900)
@@ -52,7 +52,7 @@ def cheap(prog, mod):
 
 def main():
     import allo.dataflow as df
-    from examples.accelerator.tinytpu_vitis.microarch_isa import tinytpu_isa
+    from examples.tinytpu.microarch_isa import tinytpu_isa
 
     mod = df.build(tinytpu_isa, target="simulator")
     res = {}
@@ -71,7 +71,7 @@ def main():
                 f"the RTL half.")
         return
 
-    from examples.accelerator.tinytpu_vitis.act import measure
+    from examples.tinytpu.act import measure
     prj = measure.PRJ
     sp = host_spec()
     try:

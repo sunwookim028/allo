@@ -4,6 +4,7 @@
 # pylint: disable=no-name-in-module, unused-argument, unexpected-keyword-arg, no-value-for-parameter, eval-used
 
 import gc
+import os
 import ast
 import copy
 import inspect
@@ -77,6 +78,8 @@ from .types import (
     Struct,
     float32,
     Stream,
+    Wire,
+    Channel,
     allo_type_from_mlir_type,
 )
 from ..memory import Memory
@@ -1056,7 +1059,17 @@ class ASTTransformer(ASTBuilder):
             rhs = build_stmt(ctx, value)
             conversion_enabled = rhs is not None
         if conversion_enabled:
-            if isinstance(rhs, (allo_d.StreamConstructOp, allo_d.StreamGetOp)):
+            if isinstance(
+                rhs,
+                (
+                    allo_d.StreamConstructOp,
+                    allo_d.StreamGetOp,
+                    allo_d.WireConstructOp,
+                    allo_d.WireGetOp,
+                    allo_d.ChannelConstructOp,
+                    allo_d.ChannelGetOp,
+                ),
+            ):
                 pass
             else:
                 # dtype cast & broadcast
@@ -1978,8 +1991,36 @@ class ASTTransformer(ASTBuilder):
             ctx.put_symbol(name=node.target.id, val=get_global_op)
 
             return None
-        # stream can only be declared with annotated assign stmt
-        # TODO: guard, stream declaration has no rhs
+        # stream/wire/channel can only be declared with annotated assign stmt
+        # TODO: guard, declaration has no rhs
+        if isinstance(dtype, (Wire, Channel)):
+            if isinstance(dtype, Wire):
+                link_type = allo_d.WireType.get(dtype.build())
+                construct = allo_d.WireConstructOp
+            else:
+                link_type = allo_d.ChannelType.get(dtype.build(), dtype.protocol)
+                construct = allo_d.ChannelConstructOp
+            if len(shape) == 0:
+                # single wire/channel
+                link_op = construct(link_type, ip=ctx.get_ip())
+                if isinstance(dtype.dtype, UInt):
+                    link_op.attributes["unsigned"] = UnitAttr.get()
+                link_op.attributes["name"] = StringAttr.get(node.target.id)
+                ctx.buffers[node.target.id] = link_op
+                ctx.put_symbol(name=node.target.id, val=link_op)
+            else:
+                # array of wires/channels
+                for dim in np.ndindex(*shape):
+                    link_op = construct(link_type, ip=ctx.get_ip())
+                    if isinstance(dtype.dtype, UInt):
+                        link_op.attributes["unsigned"] = UnitAttr.get()
+                    # pylint: disable=bad-builtin
+                    new_name = node.target.id + "_" + "_".join(map(str, dim))
+                    link_op.attributes["name"] = StringAttr.get(new_name)
+                    ctx.buffers[new_name] = link_op
+                    ctx.put_symbol(name=new_name, val=link_op)
+                ctx.put_symbol(name=node.target.id, val=shape)
+            return None
         if isinstance(dtype, Stream):
             stream_type = allo_d.StreamType.get(dtype.build(), depth=dtype.depth)
             if len(shape) == 0:
@@ -2620,12 +2661,20 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    put_op = allo_d.StreamPutOp(
-                        stream.result,
-                        [],
-                        ASTTransformer.get_mlir_op_result(ctx, stmts[0]),
-                        ip=ctx.get_ip(),
-                    )
+                    _put_data = ASTTransformer.get_mlir_op_result(ctx, stmts[0])
+                    _link_ty = stream.result.type
+                    if allo_d.WireType.isinstance(_link_ty):
+                        put_op = allo_d.WirePutOp(
+                            stream.result, [], _put_data, ip=ctx.get_ip()
+                        )
+                    elif allo_d.ChannelType.isinstance(_link_ty):
+                        put_op = allo_d.ChannelPutOp(
+                            stream.result, [], _put_data, ip=ctx.get_ip()
+                        )
+                    else:
+                        put_op = allo_d.StreamPutOp(
+                            stream.result, [], _put_data, ip=ctx.get_ip()
+                        )
                     if isinstance(node.func.value.dtype, UInt):
                         put_op.attributes["unsigned"] = UnitAttr.get()
                     return
@@ -2642,12 +2691,20 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    get_op = allo_d.StreamGetOp(
-                        node.func.value.dtype.build(),
-                        stream.result,
-                        [],
-                        ip=ctx.get_ip(),
-                    )
+                    _res_ty = node.func.value.dtype.build()
+                    _link_ty = stream.result.type
+                    if allo_d.WireType.isinstance(_link_ty):
+                        get_op = allo_d.WireGetOp(
+                            _res_ty, stream.result, [], ip=ctx.get_ip()
+                        )
+                    elif allo_d.ChannelType.isinstance(_link_ty):
+                        get_op = allo_d.ChannelGetOp(
+                            _res_ty, stream.result, [], ip=ctx.get_ip()
+                        )
+                    else:
+                        get_op = allo_d.StreamGetOp(
+                            _res_ty, stream.result, [], ip=ctx.get_ip()
+                        )
                     if isinstance(node.func.value.dtype.dtype, UInt):
                         get_op.attributes["unsigned"] = UnitAttr.get()
                     return get_op
@@ -2665,23 +2722,57 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
-                    put_op = allo_d.StreamTryPutOp(
-                        IntegerType.get_signless(1),
-                        stream.result,
-                        indices,
-                        ASTTransformer.get_mlir_op_result(ctx, stmts[0]),
-                        ip=ctx.get_ip(),
-                    )
-                    if isinstance(node.func.value.dtype, UInt):
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
+                    # Dispatch by link kind, like the blocking put/get above.
+                    # Wire has no non-blocking form: a wire is always its current
+                    # value, so there is nothing to "try" -- reject it rather than
+                    # silently building a Stream op on a wire-typed value.
+                    _link_ty = stream.result.type
+                    _put_data = ASTTransformer.get_mlir_op_result(ctx, stmts[0])
+                    if allo_d.WireType.isinstance(_link_ty):
+                        raise RuntimeError(
+                            "Wire has no `try_put`: a wire is always its current "
+                            "value, so there is nothing to try. Use `put()`."
+                        )
+                    if allo_d.ChannelType.isinstance(_link_ty):
+                        put_op = allo_d.ChannelTryPutOp(
+                            IntegerType.get_signless(1),
+                            stream.result,
+                            indices,
+                            _put_data,
+                            ip=ctx.get_ip(),
+                        )
+                    else:
+                        put_op = allo_d.StreamTryPutOp(
+                            IntegerType.get_signless(1),
+                            stream.result,
+                            indices,
+                            _put_data,
+                            ip=ctx.get_ip(),
+                        )
+                    # try_put's inference (infer.py) sets node.func.value.dtype to
+                    # the LINK type (like get/try_get), so the UInt check is on the
+                    # ELEMENT (.dtype.dtype) -- not .dtype (which is put's pattern,
+                    # where infer sets the element directly). Getting this wrong left
+                    # UInt try_put without the `unsigned` attr, so a non-blocking
+                    # producer's Connections::Out port emitted signed (mismatching the
+                    # unsigned In/Combinational the other ops produce).
+                    if isinstance(node.func.value.dtype.dtype, UInt):
                         put_op.attributes["unsigned"] = UnitAttr.get()
                     return put_op
                 if node.func.attr == "try_get":
@@ -2696,22 +2787,46 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
-                    get_op = allo_d.StreamTryGetOp(
-                        node.func.value.dtype.build(),
-                        IntegerType.get_signless(1),
-                        stream.result,
-                        indices,
-                        ip=ctx.get_ip(),
-                    )
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
+                    # Dispatch by link kind (mirror of try_put above). Wire has no
+                    # non-blocking form -- see the comment there.
+                    _link_ty = stream.result.type
+                    if allo_d.WireType.isinstance(_link_ty):
+                        raise RuntimeError(
+                            "Wire has no `try_get`: a wire is always its current "
+                            "value, so there is nothing to try. Use `get()`."
+                        )
+                    if allo_d.ChannelType.isinstance(_link_ty):
+                        get_op = allo_d.ChannelTryGetOp(
+                            node.func.value.dtype.build(),
+                            IntegerType.get_signless(1),
+                            stream.result,
+                            indices,
+                            ip=ctx.get_ip(),
+                        )
+                    else:
+                        get_op = allo_d.StreamTryGetOp(
+                            node.func.value.dtype.build(),
+                            IntegerType.get_signless(1),
+                            stream.result,
+                            indices,
+                            ip=ctx.get_ip(),
+                        )
                     if isinstance(node.func.value.dtype.dtype, UInt):
                         get_op.attributes["unsigned"] = UnitAttr.get()
                     return get_op
@@ -2727,15 +2842,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     empty_op = allo_d.StreamEmptyOp(
                         IntegerType.get_signless(1),
                         stream.result,
@@ -2755,15 +2877,22 @@ class ASTTransformer(ASTBuilder):
                             symbolic_slice
                         )
                         stream.attributes["iterators"] = DictAttr.get(iterator_infos)
-                    indices = (
-                        node.func.value.slice.value
-                        if isinstance(node.func.value.slice, ast.Index)
-                        else node.func.value.slice
-                    )
-                    indices = (
-                        indices.elts if isinstance(indices, ast.Tuple) else [indices]
-                    )
-                    indices = [ASTResolver.resolve_constant(x, ctx) for x in indices]
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []  # scalar stream: no subscript -> no indices
                     full_op = allo_d.StreamFullOp(
                         IntegerType.get_signless(1),
                         stream.result,
@@ -2951,7 +3080,7 @@ class ASTTransformer(ASTBuilder):
             and not obj.__module__.startswith("allo._mlir")
         ):
             # Local imports to avoid cyclic dependencies
-            from ..backend.ip import IPModule
+            from ..backend.ip import IPModule, STREAM
 
             try:
                 from ..backend.aie.external_kernel import ExternalModule
@@ -3190,12 +3319,79 @@ class ASTTransformer(ASTBuilder):
                         return alloc_op
                     return for_op if not ctx.unroll else None
             # Allo library functions
-            new_args = build_stmts(ctx, node.args)
+            if isinstance(obj, (IPModule, ExternalModule)) and any(
+                shape is STREAM for _, shape in obj.args
+            ):
+                # Do not build stream arguments as value expressions. A bare
+                # stream name happens to build (it resolves to its construct op),
+                # but a *stream array element* -- `cr_e[0, 0]`, which is how a
+                # mesh design names its links -- does not: the array symbol is a
+                # tuple of constructs, so build_Subscript fails with
+                # "'tuple' object has no attribute 'result'".
+                #
+                # Nothing needs them anyway: the branch below re-derives each
+                # stream through get_stream_name(), and the copy-back loop skips
+                # stream operands (they pass by reference). So leave a None
+                # placeholder to keep the positions aligned with call_operands.
+                new_args = [
+                    None if shape is STREAM else build_stmt(ctx, arg)
+                    for arg, (_, shape) in zip(node.args, obj.args)
+                ]
+            else:
+                new_args = build_stmts(ctx, node.args)
             if isinstance(obj, (IPModule, ExternalModule)):
-                input_idx = obj.input_idx if isinstance(obj, ExternalModule) else None
+                # input_idx / output_idx give per-argument direction (which args
+                # the IP reads vs writes). ExternalModule has always carried them;
+                # IPModule now does too, which is what lets us direct hls::stream
+                # ports (C++ `hls::stream<T>&` is used for both read and write).
+                input_idx = obj.input_idx
+                output_idx = getattr(obj, "output_idx", None)
                 input_types = []
                 call_operands = []
+                # Per-operand direction string attached to the emitted call: one
+                # char per argument -- 'i' input stream, 'o' output stream, '_'
+                # anything else. move_stream_to_interface() reads it to classify
+                # a stream whose only use is this call (a func.call is neither a
+                # StreamPut nor a StreamGet, so it cannot infer direction itself).
+                stream_dirs = ""
+                stream_indices = set()
                 for idx, (arg_type, shape) in enumerate(obj.args):
+                    if shape is STREAM:
+                        # An `hls::stream<T> &` port. Adopt the operand's own
+                        # stream type: it already carries the element type AND the
+                        # FIFO depth, neither of which the C++ signature encodes.
+                        # Clone the stream_construct into this kernel exactly as
+                        # put/get do (builder ~L2604), so the call becomes a use
+                        # of a same-named construct local to this function;
+                        # move_stream_to_interface() later dedups by name.
+                        stream_indices.add(idx)
+                        new_name, _, _ = ASTTransformer.get_stream_name(
+                            ctx, node.args[idx]
+                        )
+                        stream = ctx.get_symbol(new_name).clone(
+                            ip=ctx.get_stream_construct_ip()
+                        )
+                        input_types.append(stream.result.type)
+                        call_operands.append(stream.result)
+                        # A SystemC port states its own direction in the type
+                        # (Connections::In vs Out), so sc_dirs is authoritative
+                        # and input_idx/output_idx are neither needed nor read.
+                        sc_dirs = getattr(obj, "sc_dirs", None)
+                        if sc_dirs is not None:
+                            stream_dirs += sc_dirs[idx]
+                        elif output_idx is not None and idx in output_idx:
+                            stream_dirs += "o"
+                        elif input_idx is not None and idx in input_idx:
+                            stream_dirs += "i"
+                        else:
+                            raise RuntimeError(
+                                f"Stream argument {idx} of IP '{obj.top}' must be "
+                                "listed in input_idx or output_idx to declare its "
+                                "direction: hls::stream<T>& is written the same way "
+                                "whether the IP reads or writes it."
+                            )
+                        continue
+                    stream_dirs += "_"
                     ele_type = get_mlir_dtype_from_str(c2allo_type[arg_type])
                     if len(shape) != 0:
                         memref = MemRefType.get(shape, ele_type)
@@ -3230,9 +3426,62 @@ class ASTTransformer(ASTBuilder):
                     call_operands,
                     ip=ctx.get_ip(),
                 )
+                if "i" in stream_dirs or "o" in stream_dirs:
+                    call_op.attributes["stream_dirs"] = StringAttr.get(stream_dirs)
+                # A SystemC IP is INSTANTIATED and its ports bound BY NAME, not
+                # called positionally, so the emitter needs the names the IP
+                # actually declares -- stream_dirs alone cannot bind mmio_in and
+                # mmio_out. Comma-separated, in argument order.
+                if getattr(obj, "is_systemc", False):
+                    call_op.attributes["sc_ports"] = StringAttr.get(
+                        ",".join(obj.sc_names)
+                    )
+                    # The payload type each port declares, in the same order.
+                    # The emitter declares the channel with THIS rather than the
+                    # type derived from the Allo stream: an IP is third-party, so
+                    # at its boundary its own type is the one that cannot change.
+                    # ';' not ',': a payload type can CONTAIN a comma
+                    # (`ac_int<26, false>`), which a comma-separated list
+                    # silently truncates. Port names cannot, so sc_ports above
+                    # is fine as it is.
+                    call_op.attributes["sc_ptypes"] = StringAttr.get(
+                        ";".join(obj.sc_ptypes)
+                    )
+                    # clk is needed to bind the instance. rst is None when the IP
+                    # has more than one sc_in<bool> and the parser refuses to
+                    # guess, so that attribute is simply absent and the emitter
+                    # has to cope rather than assume a name.
+                    if obj.sc_clk is not None:
+                        call_op.attributes["sc_clk"] = StringAttr.get(obj.sc_clk)
+                    if obj.sc_rst is not None:
+                        call_op.attributes["sc_rst"] = StringAttr.get(obj.sc_rst)
+                    # The header to #include. copy_ext_libs copies the file into
+                    # the project but splices no include, so without this the
+                    # emitted SystemC names the IP module and never declares it.
+                    call_op.attributes["sc_impl"] = StringAttr.get(
+                        os.path.basename(obj.impl)
+                    )
+                    # Non-stream ports the emitter must still bind, as
+                    # `name|in|type|const` records joined by ';'. Inputs default
+                    # to 0; the reset is excluded because it is bound separately.
+                    recs = [
+                        f"{n}|{d}|{t}|{obj.sc_bind.get(n, 0) if d == 'in' else ''}"
+                        for n, d, t in obj.sc_scalars
+                        # clk and rst are bound separately. Both must be
+                        # excluded here, not just rst: a module that declares
+                        # `sc_in<bool> clk` rather than `sc_in_clk` puts its
+                        # clock in this list too, and binding a port twice is
+                        # a SystemC error.
+                        if n not in (obj.sc_rst, obj.sc_clk)
+                    ]
+                    if recs:
+                        call_op.attributes["sc_scalars"] = StringAttr.get(";".join(recs))
                 for idx, (call_operand, operand_op) in enumerate(
                     zip(call_operands, new_args)
                 ):
+                    # Streams pass by reference; there is nothing to copy back.
+                    if idx in stream_indices:
+                        continue
                     if input_idx is not None and idx not in input_idx:
                         operand_op_result = ASTTransformer.get_mlir_op_result(
                             ctx, operand_op

@@ -22,7 +22,7 @@
 The IP Library's Gaps, and the Adder Tree
 ##############################################
 
-What a real accelerator needs that ``examples/accelerator/tinytpu_vitis/ip/``
+What a real accelerator needs that ``examples/tinytpu/ip/``
 does not have. The reference is :doc:`minitpu`, another engineer's machine;
 the destinations are Groq's **LPU** and OpenAI's **Jalapeño**
 (`zartbot's analysis <https://zartbot.github.io/blog/arch/jalapeno/en.html>`_).
@@ -87,7 +87,7 @@ The gap table
 
 Every "evidence" cell names a test in ``tests/ip/test_ip_gaps.py`` or a place
 in the source. Every unfilled row has a declaration in
-``examples/accelerator/tinytpu_vitis/ip/placeholders.py`` carrying its
+``examples/tinytpu/ip/placeholders.py`` carrying its
 interface, what would make it real, and a ``NotBuilt`` exception that says so
 if anything imports it expecting an implementation.
 
@@ -379,7 +379,7 @@ and the ASIC flow is our substrate.
 Synthesis
 ---------
 
-``python examples/accelerator/tinytpu_vitis/reduce_csynth.py 8:2 16:4 32:8
+``python examples/tinytpu/reduce_csynth.py 8:2 16:4 32:8
 64:8`` -- one ``csynth_design`` each, ``xcu280``, 3.33 ns target, project
 deleted as soon as it is parsed. The per-instance row for ``reduce_tree_0_U0``
 is the unit; the rig's feeder, sink and Vitis's five ``m_axi`` shims are not.
@@ -585,7 +585,7 @@ What running the gaps looks like
 .. code-block:: bash
 
    pytest tests/ip/                    # 23 pass, 1 xfail -- the xfail IS row 3
-   python examples/accelerator/tinytpu_vitis/reduce_csynth.py 64:8
+   python examples/tinytpu/reduce_csynth.py 64:8
 
 ``tests/ip/test_ip_gaps.py`` is one test per unfilled row. A row that gets
 filled makes its test fail -- the second-instance test is

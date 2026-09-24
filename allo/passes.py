@@ -346,6 +346,32 @@ def generate_input_output_buffers(module, top_func_name, flatten=False, mappings
 
 
 # pylint: disable=dangerous-default-value
+def _io_through_view(value, depth=0):
+    """IO bits contributed by uses of `value`, following memref.subview aliases.
+
+    A subview is an ALIAS, not a copy: writing through the view writes the source. So an
+    argument whose ONLY use is a subview (which is what a slice assignment
+    `local_A[pid, :] = rhs` lowers to) must inherit the view's direction. Without this the
+    argument scored 0 -> "func" -> it was never treated as an output, the testbench never
+    read it back, and cosim compared 0 arrays while the result silently stayed zero.
+    """
+    if depth > 4:  # guard against pathological alias chains
+        return 0
+    bits = 0
+    for use in value.uses:
+        owner = use.owner
+        if isinstance(owner, (memref_d.LoadOp, affine_d.AffineLoadOp)):
+            bits |= 2
+        elif isinstance(owner, (memref_d.StoreOp, affine_d.AffineStoreOp)):
+            bits |= 1
+        elif isinstance(owner, memref_d.CopyOp):
+            # copy(source, target): operand 0 is read, operand 1 is written.
+            bits |= 2 if use.operand_number == 0 else 1
+        elif isinstance(owner, memref_d.SubViewOp):
+            bits |= _io_through_view(owner.result, depth + 1)
+    return bits
+
+
 def analyze_arg_load_store_in_func(func, mapping={}):
     res = []
     if func.is_external:
@@ -361,11 +387,24 @@ def analyze_arg_load_store_in_func(func, mapping={}):
                 use.owner, (memref_d.LoadOp, affine_d.AffineLoadOp, allo_d.StreamGetOp)
             ):
                 io_type |= 2
+            elif isinstance(use.owner, allo_d.StreamPutOp):
+                # stream_put(stream, indices, data): operand 0 is the stream (written
+                # -> out), but the DATA operand is READ (put copies it into the
+                # stream). A whole-block memref passed as `data` must be marked IN,
+                # not OUT -- otherwise it becomes a store-only mem-port whose read is
+                # left undeclared ('v0 was not declared', test_multiple_blocks).
+                io_type |= 1 if use.operand_number == 0 else 2
             elif isinstance(
                 use.owner,
-                (memref_d.StoreOp, affine_d.AffineStoreOp, allo_d.StreamPutOp),
+                (memref_d.StoreOp, affine_d.AffineStoreOp),
             ):
                 io_type |= 1
+            elif isinstance(use.owner, memref_d.CopyOp):
+                # copy(source, target): operand 0 read, operand 1 written.
+                io_type |= 2 if use.operand_number == 0 else 1
+            elif isinstance(use.owner, memref_d.SubViewOp):
+                # A subview aliases this arg -- inherit whatever is done through it.
+                io_type |= _io_through_view(use.owner.result)
             elif isinstance(use.owner, func_d.CallOp):
                 callee = use.owner.attributes["callee"].value
                 if callee in mapping:

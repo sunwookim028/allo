@@ -66,7 +66,7 @@ Branch layout (as of 2026-09-19)
 |                            |                          | **automatic — it is an explicit call.**  |
 +----------------------------+--------------------------+------------------------------------------+
 | ``chia-isa``               | ``main``                 | **Landed on main 2026-09-19** (the CHIA  |
-|                            |                          | loop, ``tinytpu_vitis/chia_agent/``) and |
+|                            |                          | loop, ``tinytpu/chia_agent/``) and       |
 |                            |                          | deleted. History and raw run output:     |
 |                            |                          | tag ``chia-isa-run1-evidence``.          |
 +----------------------------+--------------------------+------------------------------------------+
@@ -86,7 +86,7 @@ Branch layout (as of 2026-09-19)
 
 ``impact-limits`` (the gap attribution's measured design variants) was folded
 into ``main`` on 2026-09-19 (``96c3aef6``, under
-``examples/accelerator/tinytpu_vitis/impact/``), after its best stack became the
+``examples/tinytpu/impact/``), after its best stack became the
 shipped design (``e24e433b``), and deleted.
 
 ``main`` is the one long-lived working branch; ``upstream`` is just the mirror,

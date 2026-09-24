@@ -48,7 +48,7 @@ actions = pytest.importorskip(
 from allo.actions import (  # noqa: E402
     Action, Contract, EXACT, Instruction, Machine, Port, State, Unit, check)
 
-from examples.accelerator.tinytpu_vitis.ip.reduce import ReduceParams  # noqa: E402
+from examples.tinytpu.ip.reduce import ReduceParams  # noqa: E402
 
 
 #: What `reduce_latency_probe.py` measured on the emitted Verilog at 8:2,

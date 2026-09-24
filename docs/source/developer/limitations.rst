@@ -174,7 +174,7 @@ Open
      - HLS driver
      - ``hls.py:331-338`` rejects ``mode="cosim"``; ``vitis.py:410`` emits
        ``m_axi`` with no ``depth=``.
-     - ``tinytpu_vitis/cosim.py`` (216 lines, ``patch_axi_depths`` at ``:109``)
+     - ``tinytpu/cosim.py`` (216 lines, ``patch_axi_depths`` at ``:109``)
        exists because of it
      - ~150 lines
      - `item16_cosim_not_wired.py <https://github.com/sunwookim028/allo/blob/main/tests/limits/item16_cosim_not_wired.py>`__
@@ -237,7 +237,7 @@ Open
        Allo-legal
      - SystemC fork: ~50-100 lines (bind one writer and one reader to one
        instance's two pin sets)
-     - `impact/probe_shared/ <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__
+     - `impact/probe_shared/ <https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact/probe_shared>`__
    * - :ref:`A <limitation-a>`
      - REPRODUCES
      - simulator
@@ -298,7 +298,7 @@ Open
      - **+409 / +361 cycles** at 4x4x4 / 16x16x16 when restored on ``spad``
        (measured, ``v_memset``); the shipped design avoids it
      - not sized (warn; or reset-time init; or elide -- see item)
-     - ``v_memset`` in `impact/ <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact>`__
+     - ``v_memset`` in `impact/ <https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact>`__
    * - :ref:`H <limitation-h>`
      - REPRODUCES
      - frontend
@@ -578,7 +578,7 @@ project's Makefile; Allo keeps no simulator cache. Closed as
 Surfaced while building an instruction-programmable TPU (2026-09)
 -----------------------------------------------------------------
 
-A second pass, from building ``examples/accelerator/tinytpu_vitis/`` on ``main``:
+A second pass, from building ``examples/tinytpu/`` on ``main``:
 an int8 instruction-programmable tiled-GEMM accelerator taken through the
 Vitis dataflow path to **RTL co-simulation**, and compared against a data-type-
 and mesh-matched Gemmini (:doc:`/designs/gemmini_comparison`).
@@ -755,7 +755,7 @@ OpenCL/XRT host, which is not what ``cosim_design`` wants.
   predicts a *schedule* being read as a prediction about the emitter you
   actually shipped.
 
-- ``examples/accelerator/tinytpu_vitis/cosim.py`` is a working driver: it
+- ``examples/tinytpu/cosim.py`` is a working driver: it
   generates a plain C++ testbench from the same program and reference the
   simulator uses, patches ``m_axi`` depths (cosim requires them; Allo emits none),
   and drives ``vitis_hls``. It is ~180 lines and could be folded into the backend.
@@ -1049,7 +1049,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
   at II=2.
 - **Priced, 2026-09-19** (replacing "the 2.3% itself, forgone"): injecting
   ``#pragma HLS dependence variable=ar inter false`` into the emitted
-  ``kernel.cpp`` (``v_accudep``, now under ``examples/accelerator/tinytpu_vitis/impact/``)
+  ``kernel.cpp`` (``v_accudep``, now under ``examples/tinytpu/impact/``)
   measures **35 cycles** at 16x16x16 on the then-shipped design (919 -> 884; 5
   at 4x4x4), and **95** once the design fixes are in (``v_design_dep``). The
   pragma form costs **1,744 FF** in ``accu`` against **17,438** for the
@@ -1200,11 +1200,11 @@ traffic becomes nearly free. Vitis refuses:
 
 **Scope, and it is the point of this item: every result below was measured on
 PROBES** -- small standalone kernels written to provoke that message -- **not on
-the real design** (``examples/accelerator/tinytpu_vitis/microarch_isa.py``).
+the real design** (``examples/tinytpu/microarch_isa.py``).
 Whether the real design reproduces ``HLS 214-307`` at all is an **open question**,
 under separate investigation as of 2026-09-18. Three files already assert the
 widening block as a whole-design fact --
-``examples/accelerator/tinytpu_vitis/microarch_isa.py:247``,
+``examples/tinytpu/microarch_isa.py:247``,
 ``RESULTS_ISA.md:467``, ``COMPARISON.md:280`` -- and the probes do **not** establish
 that. Nothing here upgrades them; a probe result is not a design result.
 
@@ -1297,7 +1297,7 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    ``python tests/limits/item24_cosim_hang.py`` (seconds, no Vitis). RTL half:
    ``ALLO_LIMITS_COSIM=1`` on the same file (one csynth, ten cosims, tens of
    minutes). Family and bisection:
-   ``examples/accelerator/tinytpu_vitis/act/rtl_hang.py``; log:
+   ``examples/tinytpu/act/rtl_hang.py``; log:
    ``dev/records/tinytpu/logs/cosim_act_rtl_hang_bisect.log``.
 
 A legal, bit-exact TinyTPU-isa program of **sixteen instructions** passes every
@@ -1785,7 +1785,7 @@ Surfaced by the 2026-09-19 re-verification and impact analysis
 Found while re-verifying the items above (A-F, with repros under
 ``tests/limits/``) and while pricing the TinyTPU-isa deficit to Gemmini (G and
 the shared-memory item; the variants are on ``main`` under
-``examples/accelerator/tinytpu_vitis/impact/``, folded in from branch
+``examples/tinytpu/impact/``, folded in from branch
 ``impact-limits`` -- commits ``f98c0dac`` and ``55405e00`` -- since deleted).
 
 .. _limitation-shared-memory:

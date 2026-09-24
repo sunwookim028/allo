@@ -96,3 +96,37 @@ MlirType alloMlirStreamTypeGetBaseType(MlirType type) {
 unsigned alloMlirStreamTypeGetDepth(MlirType type) {
   return llvm::dyn_cast<allo::StreamType>(unwrap(type)).getDepth();
 }
+
+// Wire
+bool alloMlirTypeIsAWireType(MlirType type) {
+  return llvm::isa<allo::WireType>(unwrap(type));
+}
+
+MlirType alloMlirWireTypeGet(MlirContext ctx, MlirType baseType) {
+  return wrap(allo::WireType::get(unwrap(ctx), unwrap(baseType)));
+}
+
+MlirType alloMlirWireTypeGetBaseType(MlirType type) {
+  return wrap(llvm::dyn_cast<allo::WireType>(unwrap(type)).getBaseType());
+}
+
+// Channel
+bool alloMlirTypeIsAChannelType(MlirType type) {
+  return llvm::isa<allo::ChannelType>(unwrap(type));
+}
+
+MlirType alloMlirChannelTypeGet(MlirContext ctx, MlirType baseType,
+                                unsigned protocol) {
+  return wrap(allo::ChannelType::get(
+      unwrap(ctx), unwrap(baseType),
+      static_cast<allo::ChannelProtocol>(protocol)));
+}
+
+MlirType alloMlirChannelTypeGetBaseType(MlirType type) {
+  return wrap(llvm::dyn_cast<allo::ChannelType>(unwrap(type)).getBaseType());
+}
+
+unsigned alloMlirChannelTypeGetProtocol(MlirType type) {
+  return static_cast<unsigned>(
+      llvm::dyn_cast<allo::ChannelType>(unwrap(type)).getProtocol());
+}

@@ -50,7 +50,7 @@ def test_the_compiled_extension_comes_from_this_checkout():
     assert inside(where, CHECKOUT), (
         f"`allo` is {CHECKOUT}/allo but the `_allo` extension is {where}, "
         f"which belongs to a different checkout. Build this one's bindings "
-        f"(examples/accelerator/tinytpu_vitis/reproduce.sh, or ninja -C "
+        f"(examples/tinytpu/reproduce.sh, or ninja -C "
         f"mlir/build) so the tracked `allo/_mlir` symlink resolves inside it. "
         f"See docs/source/developer/toolchains.rst.")
 

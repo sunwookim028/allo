@@ -9,6 +9,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 
+#include "allo/Dialect/AlloAttrs.h"
+
 #define GET_TYPEDEF_CLASSES
 #include "allo/Dialect/AlloTypes.h.inc"
 

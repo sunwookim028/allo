@@ -31,7 +31,7 @@ using namespace allo;
 // used for determine whether to generate C++ default types or ac_(u)int
 static bool BIT_FLAG = false;
 
-static SmallString<16> getCatapultTypeName(Type valType) {
+llvm::SmallString<16> mlir::allo::getCatapultTypeName(Type valType) {
   if (auto arrayType = llvm::dyn_cast<ShapedType>(valType))
     valType = arrayType.getElementType();
 
@@ -104,64 +104,23 @@ static SmallString<16> getCatapultTypeName(Type valType) {
   return SmallString<16>();
 }
 
-namespace {
-// Catapult ModuleEmitter that inherits from Vivado HLS ModuleEmitter
-class CatapultModuleEmitter : public allo::hls::VhlsModuleEmitter {
-public:
-  using operand_range = Operation::operand_range;
-  explicit CatapultModuleEmitter(AlloEmitterState &state)
-      : allo::hls::VhlsModuleEmitter(state) {}
-
-  // Override methods that need Catapult-specific behavior
-  void emitModule(ModuleOp module) override;
-  void emitFunctionDirectives(func::FuncOp func,
-                              ArrayRef<Value> portList) override;
-  void emitArrayDecl(Value array, bool isFunc = false,
-                     std::string name = "") override;
-  void emitLoopDirectives(Operation *op) override;
-  void emitStreamConstruct(allo::StreamConstructOp op) override;
-  void emitStreamTryGet(allo::StreamTryGetOp op) override;
-  void emitStreamTryPut(allo::StreamTryPutOp op) override;
-  void emitStreamEmpty(allo::StreamEmptyOp op) override;
-  void emitStreamFull(allo::StreamFullOp op) override;
-  void emitArrayDirectives(Value memref) override;
-  void emitFunction(func::FuncOp func) override;
-
-protected:
-  void emitValue(Value val, unsigned rank = 0, bool isPtr = false,
-                 std::string name = "") override;
-  // Helper method to get Catapult-specific type names
-  SmallString<16> getTypeName(Type valType) {
-    return getCatapultTypeName(valType);
-  }
-  SmallString<16> getTypeName(Value val) {
-    return getCatapultTypeName(val.getType());
-  }
-
-  // Override stateful global element type to use ac_ieee_float<binary32>
-  // for f32 (nangate-45nm_beh doesn't support native float).
-  void emitStatefulGlobalElementType(Type type) override {
-    os << getCatapultTypeName(type);
-  }
-
-  // Override float array element emission to add 'f' suffix.
-  // ac_ieee_float<binary32> has no constructor from double literals;
-  // float literals (with 'f' suffix) convert via the float constructor.
-  void emitFloatArrayElement(float value) override {
-    if (std::isfinite(value)) {
-      // std::to_string gives 6 decimal places; append 'f' for float literal
-      os << std::to_string(value) << "f";
-    } else if (value > 0)
-      os << "INFINITY";
-    else
-      os << "-INFINITY";
-  }
-};
-} // namespace
-
 //===----------------------------------------------------------------------===//
 // Catapult-specific implementations
+//   (CatapultModuleEmitter is now declared in EmitCatapultHLS.h so downstream
+//    emitters -- e.g. EmitCatapultHLS2 -- can inherit its C++ compute codegen.)
 //===----------------------------------------------------------------------===//
+
+// ac_ieee_float<binary32> has no constructor from double literals; float
+// literals (with 'f' suffix) convert via the float constructor.
+void CatapultModuleEmitter::emitFloatArrayElement(float value) {
+  if (std::isfinite(value)) {
+    // std::to_string gives 6 decimal places; append 'f' for float literal
+    os << std::to_string(value) << "f";
+  } else if (value > 0)
+    os << "INFINITY";
+  else
+    os << "-INFINITY";
+}
 
 void CatapultModuleEmitter::emitValue(Value val, unsigned rank, bool isPtr,
                                       std::string name) {
@@ -261,42 +220,41 @@ void CatapultModuleEmitter::emitArrayDecl(Value array, bool isFunc,
     emitValue(array, /*rank=*/0, /*isPtr=*/true, name);
 }
 
-void CatapultModuleEmitter::emitLoopDirectives(Operation *op) {
+// Catapult loop pragmas must PRECEDE the loop header -- hls_pipeline_init_interval
+// / hls_unroll bind to the construct that FOLLOWS them (Catapult's own matchlib
+// examples place them before `while(1)`/`for`). Emitting them in the loop body (the
+// Vivado convention the base for-emitter uses) makes Catapult drop them with
+// CIN-319 "Cannot bind pragma to any valid construct" -- so pipelining silently
+// never happened. The in-body hook is therefore a no-op; the pragmas are emitted
+// from emitLoopDirectivesPreheader, which the base for-emitter calls just before
+// the loop header.
+void CatapultModuleEmitter::emitLoopDirectives(Operation *op) {}
+
+void CatapultModuleEmitter::emitLoopDirectivesPreheader(Operation *op) {
+  // Called at the loop's own indent level, immediately before the loop header.
   if (auto ii = getLoopDirective(op, "pipeline_ii")) {
-    reduceIndent();
     indent();
     os << "#pragma hls_pipeline_init_interval "
-       << llvm::cast<IntegerAttr>(ii).getValue();
-    os << "\n";
-    addIndent();
+       << llvm::cast<IntegerAttr>(ii).getValue() << "\n";
   }
 
   if (auto factor = getLoopDirective(op, "unroll")) {
-    reduceIndent();
     indent();
     auto val = llvm::cast<IntegerAttr>(factor).getValue();
     if (val == 0)
-      os << "#pragma hls_unroll"
-         << "\n";
+      os << "#pragma hls_unroll\n";
     else
       os << "#pragma hls_unroll " << val << "\n";
-    addIndent();
   }
 
   if (auto parallel = getLoopDirective(op, "parallel")) {
-    reduceIndent();
     indent();
-    // parallel implies full unroll
-    os << "#pragma hls_unroll"
-       << "\n";
-    addIndent();
+    os << "#pragma hls_unroll\n"; // parallel implies full unroll
   }
 
   if (auto dataflow = getLoopDirective(op, "dataflow")) {
-    reduceIndent();
     indent();
     os << "#pragma hls_design dataflow\n";
-    addIndent();
   }
 }
 
@@ -436,12 +394,67 @@ void CatapultModuleEmitter::emitArrayDirectives(Value memref) {
     }
   }
 
-  // For other array directives, delegate to the parent implementation
-  // but we need to call the parent method explicitly
-  // allo::hls::VhlsModuleEmitter::emitArrayDirectives(memref);
-  // Catapult ignores #pragma HLS array_partition.
-  // TODO: Implement Catapult-specific memory directives (e.g. via TCL or other
-  // pragmas)
+  // Catapult ignores #pragma HLS array_partition, so nothing is emitted AFTER the
+  // declaration. The memory-implementation directive it does understand is
+  // #pragma hls_resource, which must PRECEDE the declaration -- see
+  // emitArrayDirectivesPreheader below.
+}
+
+// A fully-partitioned array means REGISTERS, and Catapult spells that
+//   #pragma hls_resource <name>_rsc variables="<name>" map_to_module="[Register]"
+// placed immediately BEFORE the declaration (verified: Catapult acknowledges it with
+// CIN-341 "Pragma 'hls_resource<..>' detected, variable = '..', module = '[Register]'").
+//
+// WHY THIS MATTERS. Without it Catapult maps any array big enough to a synchronous RAM
+// (its generated tcl does `solution library add ccs_sample_mem`). For a flit buffer read
+// once per slot that is fatal twice over: a 1R1W RAM allows ONE read per cycle, so five
+// slot reads cannot be scheduled together (SCHD-4 "insufficient resources ...  5 are
+// needed, but only 1 instances are available"), and Genus then treats the RAM as an
+// unresolved black box whose area counts as ZERO -- an 8-deep buffer measured SMALLER
+// than a 2-deep one. This used to be worked around with a TCL directive
+// (`directive set /<top>/<proc>/<array>:rsc -MAP_TO_MODULE {[Register]}`), which cannot
+// reach a cosim build because that flow never patches run.tcl.
+//
+// Reusing partition rather than inventing a primitive: s.partition(.., Partition.Complete)
+// already MEANS "make this registers" -- that is exactly how the Vivado backend
+// implements it -- so the Catapult spelling of the same request belongs here.
+//
+// SCOPE: LOCAL arrays only. emitAlloc returns early for a memref that is already declared
+// (a function port), so a partitioned ARGUMENT never reaches here. Ports are a different
+// Catapult concept anyway (hls_design_interface), not hls_resource -- so a partitioned
+// port silently gets no directive. Not a problem for dataflow kernels, whose state arrays
+// are all locals, but worth knowing before reaching for this on a port.
+void CatapultModuleEmitter::emitArrayDirectivesPreheader(Value memref) {
+  auto type = llvm::dyn_cast<MemRefType>(memref.getType());
+  if (!type || !type.hasStaticShape())
+    return;
+
+  // Streams are ac_channel, not memories -- no resource directive applies.
+  if (auto strAttr = llvm::dyn_cast_or_null<StringAttr>(type.getMemorySpace()))
+    if (strAttr.getValue().str().substr(0, 6) == "stream")
+      return;
+
+  // Only a COMPLETE partition maps to registers. A block/cyclic partition asks for
+  // several smaller memories, which is a different directive; leave those to the RAM.
+  if (!getLayoutMap(type))
+    return;
+  for (int64_t dim = 0; dim < type.getRank(); ++dim)
+    if (!isFullyPartitioned(type, dim))
+      return;
+
+  // The name must already exist: emitAlloc calls this before emitArrayDecl, which is
+  // what ADDS the name. Resolve it the same way emitArrayDecl will, via the alloc's
+  // "name" attribute, falling back to the declared name when there is no attribute.
+  std::string name;
+  if (auto *def = memref.getDefiningOp())
+    if (auto attr = llvm::dyn_cast_or_null<StringAttr>(def->getAttr("name")))
+      name = attr.getValue().str();
+  if (name.empty())
+    return; // unnamed temporary: nothing stable to bind the pragma to
+
+  indent();
+  os << "#pragma hls_resource " << name << "_rsc variables=\"" << name
+     << "\" map_to_module=\"[Register]\"\n";
 }
 
 void CatapultModuleEmitter::emitFunction(func::FuncOp func) {

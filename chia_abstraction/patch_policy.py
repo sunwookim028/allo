@@ -8,7 +8,7 @@ The design-level loop's candidate is two files in a private directory, so
 PATCH against a checkout, in one of two dispositions:
 
     using        the design and its program generator, with today's Allo
-                 abstractions:  examples/accelerator/tinytpu_vitis/
+                 abstractions:  examples/tinytpu/
                  {microarch_isa,isa_dsl}.py
     maintaining  Allo itself, when an abstraction is what blocks the design:
                  allo/**.py, mlir/lib/**, mlir/include/allo/**
@@ -70,7 +70,7 @@ import re
 
 DISPOSITIONS = ("using", "maintaining")
 
-DESIGN_PKG = "examples/accelerator/tinytpu_vitis"
+DESIGN_PKG = "examples/tinytpu"
 
 #: Checked FIRST, in both dispositions. Nothing here is ever editable.
 FROZEN_GLOBS = (

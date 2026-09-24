@@ -146,7 +146,7 @@ builder-local type alias resolves to nothing.
 
 ## What is reused, and what is rewritten
 
-Reused from `examples/accelerator/tinytpu_vitis/chia_agent/`, by import rather
+Reused from `examples/tinytpu/chia_agent/`, by import rather
 than by copy:
 
 - `gate_runner._Frozen` / `_snapshot` / `_changed` — the module-freezing
@@ -221,7 +221,7 @@ python chia_abstraction/abs_loop.py --disposition maintaining \
 
 `CHIA_TOTAL_CAP_USD` is a **cumulative** ceiling on CHIA2026 spend, not a
 per-run one. The split between the two tracks is recorded in
-`../examples/accelerator/tinytpu_vitis/chia_agent/allocation.json`; the
+`../examples/tinytpu/chia_agent/allocation.json`; the
 pre-flight gate cannot tell the tracks apart, so each track honours the split by
 setting its own ceiling.
 

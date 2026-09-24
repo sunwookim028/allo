@@ -1,0 +1,24 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v1111_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v1111_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v1111_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v1111_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v1116_in_sim_out wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v1111_fifo.run.check_registration @ 50 ps
+
+Warning: CONNECTIONS-101: Port or channel t.dut.v1116_out_sim_in wasn't reset! In thread or process 'check_registration'.
+In file: /opt/siemens/catapult/2024.2/Mgc_home/shared/include/connections/connections.h:444
+In process: t.dut.v1111_fifo.run.check_registration @ 50 ps
+[19:15:30] Compiling with g++ ...
+[19:15:35] Running simulation ...
+SC_vs_numpy OK  maxdiff=0

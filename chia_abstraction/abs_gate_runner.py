@@ -51,7 +51,7 @@ import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-DESIGN = os.path.join(REPO, "examples", "accelerator", "tinytpu_vitis")
+DESIGN = os.path.join(REPO, "examples", "tinytpu")
 DESIGN_AGENT = os.path.join(DESIGN, "chia_agent")
 
 #: Frozen scripts run as `__main__`; the verdict is SystemExit(0) from their
@@ -62,7 +62,7 @@ SCRIPTS = {
 }
 #: Frozen modules with a `main(argv) -> int`; the verdict is the return value.
 MODULES = {
-    "stress_isa": "examples.accelerator.tinytpu_vitis.stress_isa",
+    "stress_isa": "examples.tinytpu.stress_isa",
     "param_check": None,   # chia_agent/param_check.py, run as a script below
 }
 #: What the checks compute their golden references with. NOT `allo`: allo is

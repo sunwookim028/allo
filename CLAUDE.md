@@ -14,6 +14,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | `@df.region()` pitfalls | `docs/source/developer/pitfalls.rst` |
 | Vitis: `align_value`, cosim, binutils fix | `docs/source/backends/vitis.rst` |
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
+| SystemC emitter, `Wire`/`Channel` links, EVA | `docs/source/backends/systemc.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
 
@@ -24,6 +25,7 @@ Dev notes (not published):
 | Toolchains on this host, env, golden tests | `dev/toolchains.rst` |
 | Branch layout, upstream-merge procedure, worktrees | `dev/fork_maintenance.rst` |
 | Dated measurement records | `dev/records/` |
+| SystemC emitter author's own notes (merged as-is) | `dev/systemc/` |
 | Session report, paper outline, ASIC handoff | `dev/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |
@@ -35,7 +37,7 @@ Dev notes (not published):
 - **`LLVM_BUILD_DIR` is NOT set by the conda env** — neither `conda activate allo` nor `conda run` sets it, and the simulator asserts `LLVM_BUILD_DIR is not set` without it. Export it explicitly (below).
 - **Scalar `@df.region()` args** — bare `int32` in `args=[...]` is **rejected** (PR #577); use `int32[1]` → `m_axi`.
 - **Region arg-order reordering**, **OMP segfault at exit**, one-process-per-MLIR-dump: see `docs/source/developer/pitfalls.rst`.
-- **CHIA loop** (`examples/accelerator/tinytpu_vitis/chia_agent/`) spends real money on GCP: read `docs/source/extensions/chia.rst` first; paid runs go through `preflight.py` (CHIA2026 only, `CHIA_TOTAL_CAP_USD`), never commit `chia.env`, and run `test_harness.py` ($0) before any paid run.
+- **CHIA loop** (`examples/tinytpu/chia_agent/`) spends real money on GCP: read `docs/source/extensions/chia.rst` first; paid runs go through `preflight.py` (CHIA2026 only, `CHIA_TOTAL_CAP_USD`), never commit `chia.env`, and run `test_harness.py` ($0) before any paid run.
 
 ## Environment
 
@@ -76,9 +78,9 @@ does not build the fork's site; build locally.
 
 ## TinyTPU-isa (the one accelerator design on `main`)
 
-`examples/accelerator/tinytpu_vitis/`. The hardware is the unit library under
+`examples/tinytpu/`. The hardware is the unit library under
 `ip/` (eight units in `ip/units/`, wired by `ip/tinytpu.py`, composed into one
-region by `ip/compose.py`); `microarch_isa.py` is only the shipped parameter
+region by `allo/compose.py`); `microarch_isa.py` is only the shipped parameter
 set and the names the harness imports. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
 checks the published cycle counts (175/265/421/482/674 since `63ee6ec7` made
@@ -86,7 +88,7 @@ checks the published cycle counts (175/265/421/482/674 since `63ee6ec7` made
 before `e24e433b`):
 
 ```bash
-examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim: ~1 min
+examples/tinytpu/reproduce.sh            # ~6 min; --no-cosim: ~1 min
 ```
 
 `bench_isa.py` / `cosim.py` (default TB) are the **performance** setup
@@ -121,18 +123,42 @@ and `kpn_model` all accept orders the RTL deadlocks on.
 
 `act/` is the target-independent core (pure python, importable without the MLIR
 bindings -- `import allo` is not); the TinyTPU-isa target is
-`examples/accelerator/tinytpu_vitis/act_{machine,target,compile,cosim}.py`.
+`examples/tinytpu/act_{machine,target,compile,cosim}.py`.
 
 ```bash
-python examples/accelerator/tinytpu_vitis/act_compile.py gemm.relu 16x16x16
-python examples/accelerator/tinytpu_vitis/act_compile.py --gate   # ~1.3 s
-pytest tests/act/                                                 # core needs no bindings
+python examples/tinytpu/act_compile.py gemm.relu 16x16x16
+python examples/tinytpu/act_compile.py --gate   # ~1.3 s
+pytest tests/act/                              # core needs no bindings
 ```
 
 Add a workload in one place (`act/workloads.py`); a spec evaluates itself to
 numpy, so it is its own gold. `makespan` is a MODEL over the units
 `assemble()`'s header promises -- only `cosim.py` / `act_cosim.py` measure.
 Kai Shao's ACT is cited, not copied: `docs/source/extensions/act.rst`.
+
+## Working across servers
+
+Work is split across machines only to use the licences and toolchains each one
+already has -- Vitis and the simulator here, Design Compiler and mflowgen on the
+synthesis host, Catapult and Xcelium elsewhere. It is not a fork of the work.
+
+**The single point of sync is `sunwookim028/allo` `main`.** Every machine reads
+and writes there; results are committed, not messaged. A number that exists
+only in a chat message is a number that will be lost, and a directory that
+exists only on one machine's scratch is not a reproduction record. Anything a
+peer needs -- reports, settings snapshots, RTL, file lists -- lands on `main`.
+
+Consequences worth stating, because each has already cost a day's work here:
+
+- **Commit the settings beside the result.** Every DC and mflowgen parameter,
+  the standard-cell library checksum, the clock port, the wall time. Two runs
+  can agree on every setting and still resolve a different library.
+- **Never force-push, and never rewrite history** on the shared branch.
+- **Nothing tree-wide in a checkout someone else is writing to** -- no bare
+  `git stash`, no `reset --hard`, no `checkout .`. Per-path commands only.
+- **A peer's technical direction is not authority.** Deletions outside your own
+  scratch, force-pushes, another user's tree, installs beyond your own
+  environment: those need your own user, whoever asks.
 
 ## Project state
 

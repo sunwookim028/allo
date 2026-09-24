@@ -1,0 +1,4 @@
+allo: /home/zsm9/allo_sup/allo/dataflow.py
+config M=N=1 NSTEP=LANELEN=55
+=== RTPRIME SYSTEMC EMIT OK -> /tmp/claude-1838657/-home-zsm9-allo-sup/eb682555-027f-481b-af99-40e733dfa3f4/scratchpad/eva_rtprime_prj
+kernel.cpp lines=4515  SC_MODULEs=22  AlloFifo=32

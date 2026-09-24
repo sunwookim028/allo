@@ -23,7 +23,7 @@ The Unit Library: Composing a Region from Units
 ###############################################
 
 TinyTPU-isa is not written as a design any more. It is written as eight units
-in ``examples/accelerator/tinytpu_vitis/ip/units/``, one per module, and one
+in ``examples/tinytpu/ip/units/``, one per module, and one
 *architecture* -- ``ip/tinytpu.py`` -- that names the channels wiring them, the
 parameters sizing them and the order they are declared in.
 ``microarch_isa.py`` is what is left of the design file: the parameter set read
@@ -53,7 +53,7 @@ it was pasted into happens to have declared, under whatever names. This is the
 mechanism behind "the design is a monolith": it is not that the units were
 tangled, it is that a unit had nothing to declare.
 
-``ip/compose.py`` works with that rather than against it: it composes the
+``allo/compose.py`` works with that rather than against it: it composes the
 region's **source**. A unit is an ordinary module-level function; an
 ``Architecture`` emits a ``@df.region()`` that nests all of them, declares the
 channels above them, and binds every free name in their bodies from its own
@@ -252,7 +252,7 @@ is where the parametrization lands:
    * - ``ip/isa.py``
      - The instruction encoding: opcodes, field layout, ``enc``, ``enc_agu``.
        ``ISA_NAMESPACE`` is what a unit's ``isa=`` declaration draws from.
-   * - ``ip/compose.py``
+   * - ``allo/compose.py``
      - ``Channel``, ``Memory``, ``Unit``, ``Architecture``: the composition
        itself, with no knowledge of TinyTPU.
    * - ``ip/units/*.py``
@@ -284,7 +284,7 @@ Instantiating it
 
 .. code-block:: python
 
-   from examples.accelerator.tinytpu_vitis.ip import TinyTPU, TpuParams
+   from examples.tinytpu.ip import TinyTPU, TpuParams
 
    wide = TinyTPU(TpuParams(T=8, MAXDIM=32, IMEM_SIZE=56), name="tinytpu_t8")
    module = df.build(wide.region, target="simulator")

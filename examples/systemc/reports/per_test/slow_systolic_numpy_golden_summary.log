@@ -1,0 +1,6 @@
+test_weight_stationary_gemm    SIM_OK       SC_vs_numpy OK  maxdiff=1.19e-07
+test_daisy_chain_gemm          SIM_OK       SC_vs_numpy OK  maxdiff=0
+test_systolic_conv             SIM_OK       SC_vs_numpy MISMATCH  maxdiff=0.943
+test_1D_systolic               SIM_TIMEOUT  SC_vs_numpy OK  maxdiff=9.54e-07
+test_tiled_systolic            SIM_TIMEOUT  SC_vs_numpy OK  maxdiff=0
+GOLDEN DONE
