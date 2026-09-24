@@ -1926,7 +1926,7 @@ is the storage itself. At QD=32 the ASIC cost doubles again (+33,280 flops,
 linear) where the FPGA adds only a further 1,080 FF.
 
 The decision, and what landing it left open
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Landed: ``QD=16`` is the default** (``63ee6ec7``, 2026-09-24), and the
 published row is now ``175 / 265 / 421 / 482 / 674``. A design that does not
