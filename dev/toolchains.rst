@@ -48,6 +48,26 @@ explicitly (see ``docs/source/developer/pitfalls.rst``).
    # unblock it and the region hung SILENTLY. See docs/source/developer/limitations.rst, item 11.
    export OMP_NUM_THREADS=8
 
+.. warning::
+
+   **The LLVM git history on this machine was deleted on 2026-09-24**, with the
+   owner's approval, to reclaim 12 GB on a ``/home`` that was 99 % full.
+
+   ``/home/sk3463/allo/externals/llvm-project`` and
+   ``/home/sk3463/llvm-allo-6b09f739`` are now **plain directories, not git
+   repositories**. The second was a git *worktree* of the first, so its
+   ``.git`` pointer was removed before the history, and nothing dangles.
+
+   What still works: the sources, and the build at ``LLVM_BUILD_DIR``
+   (``mlir-opt --version`` runs). What no longer works: any ``git`` command in
+   either tree, and any rebuild step that stamps a revision from git.
+
+   To restore history, re-clone ``llvm-project`` and check out
+   ``6b09f739c4d085dc39eb9ff220c786bc3aa8c7fb`` -- the pin recorded in
+   ``scripts/act-test-recipe.sh``, and the commit the build directory's name
+   encodes. Prefer ``--filter=blob:none``; the full history is what filled the
+   disk.
+
 Which bindings a worktree loads
 -------------------------------
 
