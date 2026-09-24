@@ -1,0 +1,68 @@
+name: allo-asic-flow-summary
+
+inputs:
+  - macro-registry
+  - macro-registry.json
+  - allo-compilation-metrics.json
+  - macro-synthesis-metrics.json
+  - macro-pnr-metrics.json
+  - macro-physical-verify-metrics.json
+  - macro-signoff-metrics.json
+  - full-chip-synthesis-metrics.json
+  - full-chip-pnr-metrics.json
+  - full-chip-area.rpt
+  - physical-intent.json
+  - innovus-drc.rpt
+  - innovus-antenna.rpt
+  - full-chip-gdsmerge-metrics.json
+  - full-chip-drc-metrics.json
+  - drc.summary
+  - drc-policy.json
+  - full-chip-lvs-metrics.json
+  - lvs.report
+  - ffgl-simulation-report.json
+  - bagl-simulation-report.json
+  - macro-activity-manifest.json
+  - macro-power-summary.json
+  - aggregate-power.rpt
+
+outputs:
+  - flow-summary.json
+  - flow-summary.tcl
+  - flow-summary.txt
+  - google-sheets-export.json
+
+commands:
+  - python summarize_flow.py
+  - python export_summary_to_google_sheets.py
+
+parameters:
+  design_name: undefined
+  report_design_name: undefined
+  clock_period: 10.0
+  macro_clock_period: 8.0
+  min_macro_reuse: 2
+  highest_macro_routing_layer: 6
+  antenna_check_policy: report
+  drc_check_policy: error
+  google_sheets_enabled: false
+  google_sheets_required: true
+  google_sheets_credentials: /home/jb2698/.config/gspread/service_account.json
+  google_spreadsheet_id: REPLACE_WITH_SPREADSHEET_ID
+  google_worksheet_name: Results
+  google_sheet_columns_file: google-sheet-columns.json
+
+preconditions:
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/macro-registry.json' )
+  - assert File( 'inputs/ffgl-simulation-report.json' )
+  - assert File( 'inputs/bagl-simulation-report.json' )
+  - assert File( 'inputs/macro-activity-manifest.json' )
+  - assert File( 'inputs/macro-power-summary.json' )
+  - assert File( 'inputs/aggregate-power.rpt' )
+
+postconditions:
+  - assert File( 'outputs/flow-summary.json' )
+  - assert File( 'outputs/flow-summary.tcl' )
+  - assert File( 'outputs/flow-summary.txt' )
+  - assert File( 'outputs/google-sheets-export.json' )

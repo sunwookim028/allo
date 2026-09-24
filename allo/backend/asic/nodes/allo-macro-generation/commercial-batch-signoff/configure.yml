@@ -1,0 +1,38 @@
+name: commercial-batch-signoff
+
+inputs:
+  - adk
+  - verified-pnr-batch
+  - srams
+  - cleanup-node.py
+
+outputs:
+  - signoff-batch
+  - signoff-status.json
+  - macro-signoff-metrics.json
+  - macro-signoff-cleanup-metrics.json
+
+commands:
+  - python batch_signoff.py
+  - python3 inputs/cleanup-node.py --node commercial-batch-signoff --output macro-signoff-cleanup-metrics.json work
+
+parameters:
+  corner_setup: typical
+  corner_hold: bc
+  cleanup_enabled: True
+
+preconditions:
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/verified-pnr-batch' )
+  - |
+    import json
+    from pathlib import Path
+    entries = json.loads(Path('inputs/verified-pnr-batch/index.json').read_text()).get('entries', [])
+    assert not entries or Tool( 'pt_shell' )
+    assert not entries or Tool( 'lc_shell' )
+
+postconditions:
+  - assert File( 'outputs/signoff-batch' )
+  - assert File( 'outputs/signoff-status.json' )
+  - assert File( 'outputs/macro-signoff-metrics.json' )
+  - assert File( 'outputs/macro-signoff-cleanup-metrics.json' )

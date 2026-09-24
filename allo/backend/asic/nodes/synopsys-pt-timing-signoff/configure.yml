@@ -1,0 +1,62 @@
+#=========================================================================
+# Synopsys PT Timing Signoff
+#=========================================================================
+# Author : Alex Carsello
+# Date   : January 31, 2020
+#
+
+name: synopsys-pt-timing-signoff
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+# We will also get SPEF files for any blocks in the design.
+# These will be added as inputs in construct.py.
+inputs:
+  - adk
+  - design.vcs.v
+  - design.pt.sdc
+  - design.spef.gz
+  - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
+
+outputs:
+  - design.sdf
+  - timing-reports
+  - timing-metrics.json
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - bash run.sh
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  corner_setup: typical
+  corner_hold: bc
+  setup_target_slack: 0.0
+  hold_target_slack: 0.0
+  timing_check_policy: error
+
+preconditions:
+  - assert Tool( 'pt_shell' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.vcs.v' )
+  - assert File( 'inputs/design.pt.sdc' )
+  - assert File( 'inputs/design.spef.gz' )
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
+
+postconditions:
+  - assert File( 'outputs/design.sdf' )
+  - assert File( 'outputs/timing-reports' )
+  - assert File( 'outputs/timing-metrics.json' )

@@ -1,0 +1,33 @@
+name: commercial-full-chip-gdsmerge
+
+inputs:
+  - design.gds.gz
+  - macro-registry
+  - adk
+  - srams
+
+outputs:
+  - design_merged.gds
+  - full-chip-gdsmerge-metrics.json
+  - merge.log
+
+commands:
+  - bash run.sh
+
+parameters:
+  design_name: undefined
+
+debug:
+  - calibredrv -m design_merged.gds -l inputs/adk/calibre.layerprops
+
+preconditions:
+  - assert Tool( 'calibredrv' )
+  - assert File( 'inputs/design.gds.gz' )
+  - assert File( 'inputs/macro-registry' )
+  - assert File( 'inputs/adk' )
+
+postconditions:
+  - assert File( 'outputs/design_merged.gds' )
+  - assert File( 'outputs/full-chip-gdsmerge-metrics.json' )
+  - assert File( 'outputs/merge.log' )
+  - "assert 'WARNING: Ignoring duplicate structure' not in File( 'outputs/merge.log' )"

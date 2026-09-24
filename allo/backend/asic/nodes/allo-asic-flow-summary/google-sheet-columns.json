@@ -1,0 +1,140 @@
+{
+  "columns": [
+    {
+      "header": "Timestamp UTC",
+      "path": "run.timestamp_utc"
+    },
+    {
+      "header": "Design",
+      "path": "run.design_name"
+    },
+    {
+      "header": "Implementation style",
+      "path": "implementation_style"
+    },
+    {
+      "header": "Clock period (ns)",
+      "path": "parameters.clock_period"
+    },
+    {
+      "header": "Macro clock period (ns)",
+      "path": "parameters.macro_clock_period"
+    },
+    {
+      "header": "Minimum macro reuse",
+      "path": "parameters.min_macro_reuse"
+    },
+    {
+      "header": "Highest macro routing layer",
+      "path": "parameters.highest_macro_routing_layer"
+    },
+    {
+      "header": "Macro classes",
+      "path": "macro_count"
+    },
+    {
+      "header": "Macro physical area (um^2)",
+      "path": "macro_physical_area_um2"
+    },
+    {
+      "header": "Allo compilation time (s)",
+      "path": "stages_by_node.allo-asic-compilation.wall_seconds"
+    },
+    {
+      "header": "Macro synthesis time (s)",
+      "path": "stages_by_node.commercial-batch-synthesis.wall_seconds"
+    },
+    {
+      "header": "Macro PNR time (s)",
+      "path": "stages_by_node.commercial-macro-pnr.wall_seconds"
+    },
+    {
+      "header": "Full-chip synthesis time (s)",
+      "path": "stages_by_node.commercial-full-chip-synthesis.wall_seconds"
+    },
+    {
+      "header": "Full-chip PNR time (s)",
+      "path": "stages_by_node.commercial-full-chip-pnr.wall_seconds"
+    },
+    {
+      "header": "GDS merge time (s)",
+      "path": "stages_by_node.commercial-full-chip-gdsmerge.wall_seconds"
+    },
+    {
+      "header": "DRC time (s)",
+      "path": "stages_by_node.commercial-full-chip-drc.wall_seconds"
+    },
+    {
+      "header": "LVS time (s)",
+      "path": "stages_by_node.commercial-full-chip-lvs.wall_seconds"
+    },
+    {
+      "header": "Full-chip DRC results",
+      "path": "full_chip_verification.drc_results"
+    },
+    {
+      "header": "Innovus route DRC results",
+      "path": "full_chip_verification.innovus_route_drc_results"
+    },
+    {
+      "header": "Full-chip LVS status",
+      "path": "full_chip_verification.lvs_status"
+    },
+    {
+      "header": "Physical macro coverage (%)",
+      "path": "coverage.physical_macro_coverage_percent"
+    },
+    {
+      "header": "Logic hardening coverage (%)",
+      "path": "coverage.logic_hardening_coverage_percent"
+    },
+    {
+      "header": "Instantiated macro footprint (um^2)",
+      "path": "coverage.instantiated_macro_footprint_area_um2"
+    },
+    {
+      "header": "Core area (um^2)",
+      "path": "coverage.core_area_um2"
+    },
+    {
+      "header": "Hardened macro internal cell area (um^2)",
+      "path": "coverage.hardened_macro_internal_standard_cell_area_um2"
+    },
+    {
+      "header": "Equivalent total standard-cell area (um^2)",
+      "path": "coverage.equivalent_total_standard_cell_area_um2"
+    },
+    {
+      "header": "FFGL status",
+      "path": "simulation.ffgl.status"
+    },
+    {
+      "header": "BAGL status",
+      "path": "simulation.bagl.status"
+    },
+    {
+      "header": "Macro activity status",
+      "path": "macro_activity.status"
+    },
+    {
+      "header": "Top-level shell power (W)",
+      "path": "power.top_level_power_w.total_w"
+    },
+    {
+      "header": "Weighted macro power (W)",
+      "path": "power.weighted_macro_power_w.total_w"
+    },
+    {
+      "header": "Combined power (W)",
+      "path": "power.combined_power_w.total_w"
+    },
+    {
+      "header": "Full-chip PNR peak memory (MB)",
+      "path": "resources.full_chip_pnr_peak_memory_mb"
+    },
+    {
+      "header": "Build directory size (GiB)",
+      "path": "resources.build_directory_size_gib"
+    }
+  ]
+}

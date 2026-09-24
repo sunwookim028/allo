@@ -1,0 +1,3 @@
+# FreePDK45/Nangate SDF timing-check configuration.
++define+NTC
++define+RECREM

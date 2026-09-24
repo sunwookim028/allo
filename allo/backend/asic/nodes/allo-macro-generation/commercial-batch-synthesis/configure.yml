@@ -1,0 +1,45 @@
+name: commercial-batch-synthesis
+
+inputs:
+  - adk
+  - macro-batch
+  - srams
+  - cleanup-node.py
+
+outputs:
+  - synthesis-batch
+  - synthesis-status.json
+  - macro-synthesis-metrics.json
+  - macro-synthesis-cleanup-metrics.json
+
+commands:
+  - python batch_synthesis.py
+  - python3 inputs/cleanup-node.py --node commercial-batch-synthesis --output macro-synthesis-cleanup-metrics.json work
+
+parameters:
+  macro_clock_period: 8.0
+  flatten_effort: 0
+  topographical: True
+  nthreads: 4
+  high_effort_area_opt: False
+  gate_clock: True
+  uniquify_with_design_name: True
+  suppress_msg: False
+  suppressed_msg: ''
+  write_svsim_wrapper: False
+  cleanup_enabled: True
+
+preconditions:
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/macro-batch' )
+  - |
+    import json
+    from pathlib import Path
+    entries = json.loads(Path('inputs/macro-batch/index.json').read_text()).get('entries', [])
+    assert not entries or Tool( 'dc_shell-xg-t' )
+
+postconditions:
+  - assert File( 'outputs/synthesis-batch' )
+  - assert File( 'outputs/synthesis-status.json' )
+  - assert File( 'outputs/macro-synthesis-metrics.json' )
+  - assert File( 'outputs/macro-synthesis-cleanup-metrics.json' )

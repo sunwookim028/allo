@@ -1,0 +1,65 @@
+name: allo-asic-compilation
+
+inputs:
+  - cleanup-node.py
+
+outputs:
+  - allo-build
+  - asic-debug
+  - backend-rtl
+  - asic-manifest.json
+  - asic-manifest.tcl
+  - asic-manifest-final.json
+  - asic-manifest-final.tcl
+  - build-metadata.json
+  - allo-build.log
+  - build-success
+  - allo-compilation-metrics.json
+  - workload-manifest.json
+  - workload-vectors
+  - allo-compilation-cleanup-metrics.json
+
+commands:
+  - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-asic-compilation --output allo-compilation-cleanup-metrics.json work
+
+parameters:
+  construct_path: undefined
+  allo_design_file: undefined
+  allo_entrypoint: build
+  backend: vitis
+  build_mode: csyn
+  clock_period: 10.0
+  macro_clock_period: 8.0
+  # Empty selects U280 for Vitis or Nangate45 for Catapult/SystemC.
+  backend_options: ""
+  allo_testbench_enabled: True
+  allo_testbench_workload_factory: testbench_workload
+  allo_testbench_top_function: undefined
+  python_bin: python
+  allo_setup_script: /work/shared/common/allo/setup-llvm-main.sh
+  cleanup_enabled: True
+
+preconditions:
+  - assert File( 'preflight.py' )
+  - assert File( 'run.sh' )
+  - assert File( 'backend.py' )
+  - assert File( 'export_workload.py' )
+
+postconditions:
+  - assert File( 'outputs/build-success' )
+  - assert File( 'outputs/allo-build' )
+  - assert File( 'outputs/asic-debug' )
+  - assert File( 'outputs/backend-rtl' )
+  - assert File( 'outputs/asic-manifest.json' )
+  - assert File( 'outputs/asic-manifest.tcl' )
+  - assert File( 'outputs/asic-manifest-final.json' )
+  - assert File( 'outputs/asic-manifest-final.tcl' )
+  - assert File( 'outputs/build-metadata.json' )
+  - assert File( 'outputs/allo-build.log' )
+  - assert File( 'outputs/allo-compilation-metrics.json' )
+  - assert File( 'outputs/workload-manifest.json' )
+  - assert File( 'outputs/workload-vectors' )
+  - assert File( 'outputs/allo-compilation-cleanup-metrics.json' )
+  - assert 'traceback' not in File( 'outputs/allo-build.log' )
+  - assert 'post_hls_enriched' in File( 'outputs/asic-manifest-final.json' )

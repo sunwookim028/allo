@@ -1,0 +1,71 @@
+#=========================================================================
+# Mentor Calibre DRC
+#=========================================================================
+# Author : Christopher Torng
+# Date   : November 5, 2019
+#
+
+name: mentor-calibre-drc
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+inputs:
+  - design_merged.gds
+  - adk
+
+outputs:
+  - drc.results
+  - drc.summary
+  - drc-policy.json
+  - drc-metrics.json
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - bash run.sh
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  drc_nthreads: 16
+  # Use the rule deck "inputs/adk/${drc_rule_deck}"
+  drc_rule_deck: calibre-drc-block.rule
+  # Optional: if the technology accepts DRC params
+  # as environment variables, source this script
+  # to set environment variables before running.
+  drc_env_setup: undefined
+  antenna_check_policy: report
+  drc_check_policy: error
+
+#-------------------------------------------------------------------------
+# Debug
+#-------------------------------------------------------------------------
+
+debug:
+  - calibredrv -m inputs/design_merged.gds \
+               -l inputs/adk/calibre.layerprops \
+               -rve -drc drc.results
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+
+  - assert Tool( 'calibre' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design_merged.gds' )
+  - assert File( 'run.sh' )
+  - assert File( 'parse_drc.py' )
+postconditions:
+  - assert File( 'outputs/drc.results' )
+  - assert File( 'outputs/drc.summary' )
+  - assert File( 'outputs/drc-policy.json' )
+  - assert File( 'outputs/drc-metrics.json' )

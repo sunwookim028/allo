@@ -1,0 +1,34 @@
+name: allo-macro-activity-extraction
+
+inputs:
+  - run.vcd
+  - assembly-plan.json
+  - macro-registry.json
+
+outputs:
+  - macro-activity
+  - macro-activity-manifest.json
+
+commands:
+  - python3 extract_macro_activity.py
+
+parameters:
+  testbench_name: allo_generated_testbench
+  dut_name: dut
+
+preconditions:
+  - assert Tool( 'python3' )
+  - assert Tool( 'vcd2saif' )
+  - assert File( 'inputs/run.vcd' )
+  - assert File( 'inputs/assembly-plan.json' )
+  - assert File( 'inputs/macro-registry.json' )
+
+postconditions:
+  - assert File( 'outputs/macro-activity' )
+  - assert File( 'outputs/macro-activity-manifest.json' )
+  - |
+      import json
+      from pathlib import Path
+      manifest = json.loads(Path('outputs/macro-activity-manifest.json').read_text())
+      assert manifest['failed_count'] == 0
+      assert manifest['extracted_count'] == manifest['class_count']

@@ -1,0 +1,46 @@
+name: allo-asic-macro-plan
+
+inputs:
+  - design.v
+  - asic-manifest-final.json
+  - asic-manifest-final.tcl
+  - build-metadata.json
+
+outputs:
+  - macro-batch
+  - macro-plan.json
+  - macro-plan.tcl
+  - residual-design.v
+  - macro-plan.log
+
+commands:
+  - python plan_macros.py
+
+parameters:
+  backend: vitis
+  min_macro_reuse: 2
+  harden_repeated_hls_submodules: False
+  macro_clock_period: 8.0
+  bypass_macro_generation: False
+  fold_fifos_into_macro: False
+
+preconditions:
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/asic-manifest-final.json' )
+  - assert File( 'inputs/build-metadata.json' )
+  - >-
+    assert '{backend}' != 'vitis' or
+    '"backend": "vitis"' in File( 'inputs/build-metadata.json' )
+  - >-
+    assert '{backend}' != 'catapult' or
+    '"backend": "catapult"' in File( 'inputs/asic-manifest-final.json' )
+  - >-
+    assert '{backend}' != 'systemc' or
+    '"backend": "systemc"' in File( 'inputs/asic-manifest-final.json' )
+
+postconditions:
+  - assert File( 'outputs/macro-batch' )
+  - assert File( 'outputs/macro-plan.json' )
+  - assert File( 'outputs/macro-plan.tcl' )
+  - assert File( 'outputs/residual-design.v' )
+  - assert 'ERROR:' not in File( 'outputs/macro-plan.log' )
