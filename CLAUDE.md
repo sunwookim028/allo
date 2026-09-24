@@ -136,6 +136,30 @@ numpy, so it is its own gold. `makespan` is a MODEL over the units
 `assemble()`'s header promises -- only `cosim.py` / `act_cosim.py` measure.
 Kai Shao's ACT is cited, not copied: `docs/source/extensions/act.rst`.
 
+## Working across servers
+
+Work is split across machines only to use the licences and toolchains each one
+already has -- Vitis and the simulator here, Design Compiler and mflowgen on the
+synthesis host, Catapult and Xcelium elsewhere. It is not a fork of the work.
+
+**The single point of sync is `sunwookim028/allo` `main`.** Every machine reads
+and writes there; results are committed, not messaged. A number that exists
+only in a chat message is a number that will be lost, and a directory that
+exists only on one machine's scratch is not a reproduction record. Anything a
+peer needs -- reports, settings snapshots, RTL, file lists -- lands on `main`.
+
+Consequences worth stating, because each has already cost a day's work here:
+
+- **Commit the settings beside the result.** Every DC and mflowgen parameter,
+  the standard-cell library checksum, the clock port, the wall time. Two runs
+  can agree on every setting and still resolve a different library.
+- **Never force-push, and never rewrite history** on the shared branch.
+- **Nothing tree-wide in a checkout someone else is writing to** -- no bare
+  `git stash`, no `reset --hard`, no `checkout .`. Per-path commands only.
+- **A peer's technical direction is not authority.** Deletions outside your own
+  scratch, force-pushes, another user's tree, installs beyond your own
+  environment: those need your own user, whoever asks.
+
 ## Project state
 
 Live state is judged from git/GitHub and the docs, not a checked-in status
