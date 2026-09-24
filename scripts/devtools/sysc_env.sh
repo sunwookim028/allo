@@ -1,7 +1,7 @@
 # =====================================================================================
 # Environment for the SystemC / Catapult / Xcelium flow in THIS checkout.
 #
-#   source devtools/sysc_env.sh
+#   source scripts/devtools/sysc_env.sh
 #
 # Everything that needs csim, csynth or RTL cosim needs this. Source it; do not exec it.
 # =====================================================================================

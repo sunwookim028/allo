@@ -1,4 +1,10 @@
-# agents/
+# The agent-driven interconnect experiment — measured state, 2026-08-15
+
+*This was `agents/README.md`. On 2026-09-24 `agents/` was dissolved: a root
+holding two Allo designs, one reference document and this dated note is three
+kinds of thing in one place. The designs are `examples/eva/{eva_blocks,pe_alu,
+eva_pe_router_split}.py`, the contract is `dev/interconnect_reference.md`, and
+the note is this file. Paths below have been updated; nothing else has.*
 
 An experiment in **LLM/agent-driven interconnect design**: fix the compute blocks, and let an
 agent choose only how they are *wired together*.
@@ -8,11 +14,11 @@ by a human and verified once, while the interconnect — which link primitive, w
 what FIFO depth — is a large, mechanical design space worth searching. So the blocks here are
 stripped down to plain callable functions with a declared `PORT_SPEC`, and the agent emits
 only the connections between them. A verifier then checks the emitted wiring against
-[`INTERCONNECT.md`](INTERCONNECT.md) and each block's `PORT_SPEC`.
+[`dev/interconnect_reference.md`](../interconnect_reference.md) and each block's `PORT_SPEC`.
 
 ## The contract
 
-**[`INTERCONNECT.md`](INTERCONNECT.md)** is the agent-facing reference: the three link
+**[`dev/interconnect_reference.md`](../interconnect_reference.md)** is the agent-facing reference: the three link
 primitives, their methods, and the rules for combining them. Ground truth is
 `allo/ir/types.py` (types and methods) and `allo/backend/hls.py` (the backend guard) — the
 document exists so an agent does not invent API outside that table.
@@ -21,10 +27,10 @@ document exists so an agent does not invent API outside that table.
 
 | File | State |
 |---|---|
-| `INTERCONNECT.md` | **good** — a document, no dependencies to rot |
-| `eva_blocks.py` | **good** — EVA blocks as plain functions (router, switch, PE) on abstract ports; imports cleanly |
-| `pe_alu.py` | **good** — the simplest possible PE: `(op1, op2, opcode) -> result`, no state, no sequencer; imports cleanly |
-| `eva_pe_router_split.py` | **stale, kept** — the EVA design split into router + PE. Unique (not a copy), but dies at `s.partition("node_{i}_{j}:...")` with `RuntimeError: Target function node_0_0 not found`: the kernel-instance naming it assumes no longer matches current Allo. Kept because nothing else holds this split. |
+| `dev/interconnect_reference.md` | **good** — a document, no dependencies to rot |
+| `examples/eva/eva_blocks.py` | **good** — EVA blocks as plain functions (router, switch, PE) on abstract ports; imports cleanly |
+| `examples/eva/pe_alu.py` | **good** — the simplest possible PE: `(op1, op2, opcode) -> result`, no state, no sequencer; imports cleanly |
+| `examples/eva/eva_pe_router_split.py` | **stale, kept** — the EVA design split into router + PE. Unique (not a copy), but dies at `s.partition("node_{i}_{j}:...")` with `RuntimeError: Target function node_0_0 not found`: the kernel-instance naming it assumes no longer matches current Allo. Kept because nothing else holds this split. |
 
 ## What was deleted, and why
 
@@ -49,12 +55,12 @@ git checkout 779e435^ -- agents/noc     # all 53 files
 `examples/eva/eva_sb_syscredit_rtprime.py`. That directory is the maintained
 home: it has the build and cosim drivers, workloads and a README.
 
-The generator that would consume `INTERCONNECT.md` was never built.
+The generator that would consume `dev/interconnect_reference.md` was never built.
 
 **The one finding worth keeping, because it is not recorded anywhere else:** block
 parameters must be annotated — an unannotated parameter silently changes how the block
 lowers. The experiments that established this no longer run, and they never wrote their
 results down, so this line is the surviving record.
 
-See [`../dev/SESSION_REPORT.md`](../dev/SESSION_REPORT.md) for where this sits relative
+See [`dev/SESSION_REPORT.md`](../SESSION_REPORT.md) for where this sits relative
 to the rest of the work.

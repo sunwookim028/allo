@@ -1,4 +1,4 @@
-# devtools/
+# scripts/devtools/
 
 Introspection and sweep scripts for working *on* the compiler, as opposed to designs built
 *with* it. Nothing here is imported by `allo`; these are standalone tools.

@@ -1,7 +1,11 @@
 # Allo Interconnect Reference (agent-facing)
 
+*Was `agents/INTERCONNECT.md`. The experiment it was written for is recorded in
+`dev/records/agent_interconnect_2026-08-15.md`; the blocks it describes are
+`examples/eva/{eva_blocks,pe_alu}.py`.*
+
 The contract an agent uses to **wire IP blocks together**. Blocks are fixed logic
-with a typed port list (see each block's `PORT_SPEC`, e.g. `eva_stripped.py`); the
+with a typed port list (see each block's `PORT_SPEC`, e.g. `examples/eva/eva_blocks.py`); the
 agent chooses the *connections* — which primitive, which topology, which
 directions, what depth — subject to the rules here. A verifier checks the emitted
 wiring against this reference + the blocks' `PORT_SPEC`.

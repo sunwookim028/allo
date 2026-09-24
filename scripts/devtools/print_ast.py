@@ -1,16 +1,28 @@
 # Print a compact AST of one function in a Python file.
 # Usage:  python print_ast.py <file.py> [function_name]
-#   e.g.  python print_ast.py ../tests/systemc/demos/stream_producer_consumer.py top
+#   e.g.  python print_ast.py ../../tests/systemc/demos/stream_producer_consumer.py top
 # Pure stdlib — no allo / conda env needed.
 import ast
 import os
 import sys
 
-# Default to the example this tool was written against; it lives in examples/,
-# while this script lives in devtools/.
-_DEFAULT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "examples", "stream_producer_consumer.py")
+def _repo_root():
+    """Upward search for a marker, never a count of levels (dev/repo_layout.md)."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        if os.path.exists(os.path.join(d, "pyproject.toml")) and \
+           os.path.isdir(os.path.join(d, "allo")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise RuntimeError("not inside an allo checkout")
+        d = parent
+
+
+# Default to the program this tool was written against. It is a SystemC-backend
+# demonstration, so it lives in tests/systemc/demos/ (dev/repo_layout.md).
+_DEFAULT = os.path.join(_repo_root(), "tests", "systemc", "demos",
+                        "stream_producer_consumer.py")
 
 path = sys.argv[1] if len(sys.argv) > 1 else _DEFAULT
 want = sys.argv[2] if len(sys.argv) > 2 else None

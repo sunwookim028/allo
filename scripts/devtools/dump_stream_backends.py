@@ -14,11 +14,27 @@ import sys
 # editable package happens to be installed (/home/zsm9/allo). Without this,
 # running from examples/ picks up the installed package, which is an older
 # checkout missing newer bindings like emit_systemc. Prepend repo root (for
-# `import allo`) and examples/ (for `import stream_producer_consumer` -- this
-# script lives in devtools/, the design it dumps lives in examples/).
+# `import allo`) and tests/systemc/demos/ (for `import stream_producer_consumer`
+# -- this script lives in scripts/devtools/, the program it dumps is a backend
+# demonstration in tests/systemc/demos/).
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(_HERE)
-sys.path.insert(0, os.path.join(_REPO_ROOT, "examples"))
+
+
+def _repo_root():
+    """Upward search for a marker, never a count of levels (dev/repo_layout.md)."""
+    d = _HERE
+    while True:
+        if os.path.exists(os.path.join(d, "pyproject.toml")) and \
+           os.path.isdir(os.path.join(d, "allo")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise RuntimeError("not inside an allo checkout")
+        d = parent
+
+
+_REPO_ROOT = _repo_root()
+sys.path.insert(0, os.path.join(_REPO_ROOT, "tests", "systemc", "demos"))
 sys.path.insert(0, _REPO_ROOT)
 
 BACKENDS = ["frontend", "vhls", "catapult", "systemc", "tapa", "ihls", "xls", "llvm", "ll"]

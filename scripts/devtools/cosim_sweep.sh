@@ -3,12 +3,12 @@
 # Run EVERY tests/dataflow design through systemc csim -> csynth -> Xcelium RTL cosim
 # and record one verdict line per design.
 #
-#   ./devtools/cosim_sweep.sh                 # all tests
-#   ./devtools/cosim_sweep.sh test_tiled_gemm.py test_systolic.py   # a subset
+#   ./scripts/devtools/cosim_sweep.sh                 # all tests
+#   ./scripts/devtools/cosim_sweep.sh test_tiled_gemm.py test_systolic.py   # a subset
 #
 # Results stream to $OUT/cosim_results.txt as they finish, so it can be tailed live.
 #
-# HOW IT WORKS. The pytest plugin devtools/scpatch_cosim2.py intercepts df.build() and
+# HOW IT WORKS. The pytest plugin scripts/devtools/scpatch_cosim2.py intercepts df.build() and
 # does all the work AT INTERCEPTION -- it does not depend on the test calling the returned
 # module. It self-generates inputs from the region signature, runs systemc csim as the
 # software golden, csynths, runs the RTL under Xcelium, diffs, then aborts the test. So a
@@ -19,11 +19,16 @@
 # "optimise" it into a single pytest invocation.
 #
 # Expect 2-8 minutes per design. The full sweep is hours -- run it detached:
-#   nohup ./devtools/cosim_sweep.sh > /dev/null 2>&1 &
+#   nohup ./scripts/devtools/cosim_sweep.sh > /dev/null 2>&1 &
 # =====================================================================================
 set -u
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(dirname "$HERE")
+# Upward search for a marker, never a count of levels (dev/repo_layout.md).
+ROOT=$HERE
+while [ ! -f "$ROOT/pyproject.toml" ] || [ ! -d "$ROOT/allo" ]; do
+  [ "$ROOT" = "/" ] && { echo "not inside an allo checkout" >&2; exit 1; }
+  ROOT=$(dirname "$ROOT")
+done
 source "$HERE/sysc_env.sh"
 
 OUT=${OUT:-/scratch/cosim_work/sweep_$(date +%Y%m%d_%H%M%S)}

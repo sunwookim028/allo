@@ -19,6 +19,21 @@ it as a MatchLib Connections csim.
   - `csim.sh` — g++ compile (against MatchLib) + run.  `kernel.h`, `Makefile`,
     `run.tcl` — supporting build files.
 
+The same design, decomposed — moved here from the root `agents/` directory on
+2026-09-24, which held them beside a reference document and a dated note:
+
+- `eva_blocks.py` — the EVA blocks as plain callable functions (router, switch,
+  PE) on abstract ports, for an experiment in agent-chosen wiring.
+- `pe_alu.py` — the simplest possible PE: `(op1, op2, opcode) -> result`.
+- `eva_pe_router_split.py` — the design split into router + PE. **Stale**: it
+  dies at `s.partition("node_{i}_{j}:...")` because the kernel-instance naming
+  it assumes no longer matches current Allo. Kept because nothing else holds
+  this split.
+
+The link-type contract those blocks are wired against is
+`dev/interconnect_reference.md`; the experiment's state is
+`dev/records/agent_interconnect_2026-08-15.md`.
+
 ## Reproduce
 ```bash
 # env (adjust MGC_HOME to your Catapult install)
