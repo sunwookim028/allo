@@ -1,0 +1,70 @@
+{
+  "build_dir": "/scratch/users/sk3463/builds/t8-qd16-logic",
+  "constrained_clock": {
+    "period_ns": 3.33,
+    "port": "ap_clk"
+  },
+  "parameters": {
+    "adk": "freepdk-45nm",
+    "adk_view": "view-standard",
+    "clock_period": "3.33",
+    "clock_port": "ap_clk",
+    "clock_uncertainty": "0.0",
+    "design_name": "tinytpu_isa",
+    "design_path": "/scratch/users/sk3463/rtl_T8_qd16",
+    "flatten_effort": "3",
+    "gate_clock": "true",
+    "high_effort_area_opt": "false",
+    "input_delay_fraction": "0.5",
+    "manifest": "/scratch/users/sk3463/rtl_T8_qd16/sv2v_manifest_nomem_stubbed.f",
+    "max_fanout": "20",
+    "max_transition_fraction": "0.25",
+    "normalize_rtl": "false",
+    "nthreads": "16",
+    "output_delay_fraction": "0.0",
+    "sram_mode": "none",
+    "sv2v_defines": "TARGET_ASIC=1",
+    "top_module": "tinytpu_isa",
+    "topographical": "true",
+    "uniquify_with_design_name": "false",
+    "write_svsim_wrapper": "false"
+  },
+  "rtl": {
+    "allo_commit": "92f0618ff40b35d3f5344a744302485940468de7",
+    "config": {
+      "TPU_MAXDIM": "64",
+      "TPU_T": "8"
+    },
+    "content_md5": "5b5be7198d0e76a7b19425fca684d2af",
+    "cycles": {
+      "16x16x16": 490,
+      "16x16x8": 425,
+      "32x32x32": 1410,
+      "32x64x32": 2434,
+      "48x48x48": 3443,
+      "64x32x64": 4356,
+      "64x64x64": 6916,
+      "8x8x8": 286
+    },
+    "dir": "/scratch/users/sk3463/rtl_T8_qd16",
+    "files": 433,
+    "files_hashed": 433,
+    "manifest": "sv2v_manifest_nomem_stubbed.f",
+    "manifest_md5": "1d92213e17042462bc012e495f59c0ee",
+    "memory_bits": 100352,
+    "params": {
+      "DMA_WORDS": 1,
+      "IMEM_SIZE": 56,
+      "MAXDIM": 64,
+      "NAR": 136,
+      "NVR": 512,
+      "QD": 16,
+      "SPAD_ROWS": 512,
+      "T": 8,
+      "data type": "int8 x int8 -> int32, mvout clips to int8"
+    },
+    "stress_isa": "STRESS OK: 630/630 runs exact",
+    "top": "tinytpu_isa"
+  },
+  "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+}

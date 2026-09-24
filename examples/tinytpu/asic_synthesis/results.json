@@ -79,6 +79,20 @@
       "wall_seconds": 5497.0,
       "worst_path_group_slack": 0.17
     },
+    "T8_MAXDIM64_qd16_logiconly": {
+      "allo_commit": "92f0618ff40b35d3f5344a744302485940468de7",
+      "design_params": {
+        "MAXDIM": 64,
+        "QD": 16,
+        "T": 8
+      },
+      "manifest": "sv2v_manifest_nomem_stubbed.f",
+      "noncombinational": 1809516.804868,
+      "total_cell_area": 2272572.008212,
+      "violating_paths": 0,
+      "wall_seconds": 4072.0,
+      "worst_path_group_slack": 0.2
+    },
     "gemmini_DIM4_full": {
       "allo_commit": null,
       "design_params": null,

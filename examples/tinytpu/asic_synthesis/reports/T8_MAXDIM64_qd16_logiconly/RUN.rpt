@@ -1,0 +1,50 @@
+TinyTPU-isa T=8, MAXDIM=64, QD=16 -- LOGIC-ONLY (scratchpad and accumulator stubbed)
+
+Run by session allo-zhang-21 on 2026-09-24, build /scratch/users/sk3463/builds/t8-qd16-logic.
+RTL: rtl_handoff/T8_MAXDIM64 at f0ee3223, allo 92f0618f,
+sv2v_manifest_nomem_stubbed.f, content_md5 5b5be719. Settings identical to every
+run in the set; library md5 f5560259; ap_clk at 3.33 ns. QD=16 and the export's
+measured cycles are in settings.json.
+
+  Total cell area        2,272,572.01
+    combinational          463,055.20   (buf/inv 43,308.52)
+    noncombinational     1,809,516.80   (79.6%)
+    macro/black box              0.00
+  Cells                    781,246 leaf: 400,527 sequential, 380,719 combinational
+  Timing                   MET. Design WNS 0.00, TNS 0.00, zero violating paths;
+                           hold WNS 0.00, zero violations. Worst path group
+                           +0.20 ns, next +0.56.
+  Wall                     4,072 s (68 min), 10:42:48Z to 11:50:40Z
+
+THE PAIR THIS SET WAS BUILT FOR -- ours against Gemmini, logic-only, capacities
+matched to 2%, same library, same clock, same stub criterion, both closing timing:
+
+    ours T=8 MAXDIM=64 QD=16     2,272,572.01
+    Gemmini DIM=8                  524,401.97
+    ratio                                4.33x
+
+Where our 4.33x goes, from report_area -hierarchy beside this file:
+    gmem0_m_axi_U    697,974.4   30.7%
+    dma_ld_0_1_U0    372,150.0   16.4%
+    gmem1_m_axi_U    102,105.2    4.5%
+    gmem2_m_axi_U    102,100.9    4.5%
+    gmem3_m_axi_U     27,333.6    1.2%
+    sequencer_0_1_U0  33,515.7    1.5%
+The four AXI adapters are 40.9% of this design's logic, 57.3% with the DMA load
+unit. The 64-PE spatial array, at the 1,324.28 um2/PE measured on the T=4 designs,
+would be about 3.7%. So the 4.33x is not compute: it is memory-interface mass that
+Gemmini's TileLink path does not produce -- its reader, writer and transaction
+tracker together are 23,885 um2, 6.3% of its logic.
+
+Other readings:
+- Against its own with-memory run (2,833,543.92): the two stubbed arrays are 19.8%
+  of the full figure, against 53.9% for Gemmini at DIM=8. Their design is far more
+  memory-dominated once memories become flip-flops, which is why the full-design
+  ratio (2.49x) understates the logic difference and the logic-only ratio is the
+  one to quote.
+- Against our T=4 MAXDIM=64 logic-only (1,396,966.00): +62.7% for doubling T. Not
+  a clean single-variable delta -- that run is a QD=8 export from allo 6db2dc7a -
+  so it bounds the T=4-to-8 logic cost rather than measuring it.
+- Non-combinational 79.6%, against 80.1% with memories in and ~80% in every
+  TinyTPU run. Gemmini's logic-only share is 37.2%. Gate-heavy against flop-heavy,
+  unchanged by array size, memory treatment or queue depth.
