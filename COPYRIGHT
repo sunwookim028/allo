@@ -1,0 +1,58 @@
+Copyright and licensing of this repository
+==========================================
+
+This repository is a fork of the Allo project. It therefore contains material
+under more than one licence, and this file says which is which. It is a
+statement of intent for the work originating here; it is not legal advice, and
+it does not — and cannot — change the licence of anything obtained from
+elsewhere.
+
+1. Upstream Allo
+----------------
+
+Everything inherited from the upstream project (https://github.com/cornell-zhang/allo)
+remains licensed under the Apache License, Version 2.0, as recorded in
+``LICENSE``. That licence was granted by its authors and is not ours to alter,
+narrow or revoke. Files carrying an ``SPDX-License-Identifier: Apache-2.0``
+header are Apache-2.0 regardless of anything stated in this file.
+
+2. Fork-original material
+-------------------------
+
+Work originating in this fork and **not** carrying an Apache-2.0 header is
+
+    Copyright (c) 2026 the fork's authors. All rights reserved.
+
+It is published here for collaboration and review. No licence to use, copy,
+modify, distribute or create derivative works is granted, pending publication.
+This is deliberately conservative and is expected to be replaced with an open
+licence once the associated work is published.
+
+3. Third-party components
+-------------------------
+
+Vendored third-party material keeps the licence it arrived with, and that
+licence governs it. Each such component states its origin and licence in the
+directory that contains it, and ``NOTICE`` lists them. Nothing in section 2
+applies to them.
+
+A known outstanding item: a process design kit used by the ASIC flow is
+**deliberately not vendored**, because its redistribution terms have not been
+reviewed. The flow fetches it and verifies it by checksum instead. Do not
+commit it without checking those terms.
+
+4. A known inconsistency, stated rather than hidden
+---------------------------------------------------
+
+**103 fork-original files currently carry an ``SPDX-License-Identifier:
+Apache-2.0`` header**, inherited from the project's file template rather than
+chosen. Under section 1 those files are Apache-2.0, and section 2 does not
+reach them.
+
+Reserving rights over that material would require changing those headers, which
+is a deliberate act with legal effect and has not been done. Until it is, the
+honest description of this repository is: **upstream code and 103 fork-original
+files under Apache-2.0; the remainder of the fork-original work reserved.**
+
+This is recorded here so that the gap is visible to anyone relying on it,
+rather than resolved silently in either direction.
