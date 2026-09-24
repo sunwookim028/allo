@@ -16,13 +16,22 @@ It checks:
   confusing rather than clean
 * ``sv2v``, reporting the version, which is unpinned upstream
 * the vendored node library and ADK definition under ``allo/backend/asic``
-* the RTL directory and file list for the requested variant
+* the RTL directory and file list for the requested variant, under the design
+  given by ``--design`` -- the flow is shared, the design is not, so the design
+  is named on the command line rather than assumed
 * the fetched ``stdcells.db`` against the md5 recorded in the committed settings
   snapshots -- the ADK payload is not vendored (see
   ``allo/backend/asic/PROVENANCE.md``), so this is what ties a rerun to the
   library the published numbers were measured against
 
-Run: python asic_synthesis/tools/preflight.py [--variant T8_MAXDIM64] [--build DIR]
+Run: python allo/backend/asic/tools/preflight.py --design DIR
+         [--variant T8_MAXDIM64] [--build DIR]
+
+For the TinyTPU design, from the repository root::
+
+    python allo/backend/asic/tools/preflight.py \
+        --design examples/tinytpu/asic_synthesis
+
 Exit 0 if a run is possible, 1 otherwise.
 """
 
@@ -37,11 +46,10 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASIC = os.path.dirname(HERE)
-TINYTPU = os.path.dirname(ASIC)
-REPO = os.path.abspath(os.path.join(TINYTPU, "..", ".."))
-FLOW = os.environ.get("ALLO_ASIC_FLOW",
-                      os.path.join(REPO, "allo", "backend", "asic"))
+# This script now lives inside the flow, so the flow is its own parent.
+FLOW = os.environ.get("ALLO_ASIC_FLOW", os.path.dirname(HERE))
+# allo/backend/asic/tools -> allo/backend/asic -> allo/backend -> allo -> repo.
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 MFLOWGEN_PIN = "aee0e5d640638bd38b44007d7258828eef66c641"
 
 ok, bad = [], []
@@ -108,11 +116,10 @@ def check_flow():
         missing(f"no ADK definition at {adk}", "same as above")
 
 
-def expected_library_md5():
+def expected_library_md5(reports):
     """Every stdcells.db md5 recorded in the committed settings snapshots."""
     out = {}
-    for path in sorted(glob.glob(os.path.join(ASIC, "reports", "*",
-                                              "settings.json"))):
+    for path in sorted(glob.glob(os.path.join(reports, "*", "settings.json"))):
         with open(path) as fh:
             digest = json.load(fh).get("stdcells_db_md5")
         if digest:
@@ -121,8 +128,8 @@ def expected_library_md5():
     return out
 
 
-def check_library(build):
-    expected = expected_library_md5()
+def check_library(reports, build):
+    expected = expected_library_md5(reports)
     if not expected:
         missing("no stdcells_db_md5 in any settings snapshot",
                 "run extract_results.py --capture-settings for a completed run")
@@ -157,9 +164,10 @@ def check_library(build):
                 "this library are not comparable with the committed set")
 
 
-def check_variant(variant):
+def check_variant(design, variant):
+    root = os.path.dirname(design)
     for base in ("rtl_handoff", "gemmini_rtl"):
-        d = os.path.join(TINYTPU, base, variant)
+        d = os.path.join(root, base, variant)
         if os.path.isdir(d):
             lists = [f for f in sorted(os.listdir(d)) if f.startswith("sv2v_manifest")]
             count = len(glob.glob(os.path.join(d, "*.v"))) + \
@@ -167,19 +175,29 @@ def check_variant(variant):
             good(f"RTL for {variant}", f"{count} files, lists: {', '.join(lists)}")
             return
     missing(f"no RTL directory for {variant}",
-            f"expected {TINYTPU}/rtl_handoff/{variant} or gemmini_rtl/{variant}")
+            f"expected {root}/rtl_handoff/{variant} or "
+            f"{root}/gemmini_rtl/{variant}")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--design", required=True,
+                    help="a design's synthesis directory, holding "
+                         "construct-commercial.py and reports/ "
+                         "(e.g. examples/tinytpu/asic_synthesis)")
     ap.add_argument("--variant", default="T8_MAXDIM64")
     ap.add_argument("--build", help="a build directory, to verify the fetched ADK")
     args = ap.parse_args()
 
+    design = os.path.abspath(args.design)
+    if not os.path.isdir(design):
+        sys.exit(f"no design directory at {design}")
+    reports = os.path.join(design, "reports")
+
     check_tools()
     check_flow()
-    check_variant(args.variant)
-    check_library(args.build)
+    check_variant(design, args.variant)
+    check_library(reports, args.build)
 
     for line in ok:
         print(f"  ok      {line}")
@@ -191,19 +209,21 @@ def main():
               "Nothing was started.")
         return 1
 
+    tools = os.path.relpath(HERE, REPO)
+    rel_reports = os.path.relpath(reports, REPO)
     print(f"""
 Prerequisites present. The sequence, for {args.variant}:
 
   mkdir -p <build-dir> && cd <build-dir>
-  mflowgen run --design {ASIC}/construct-commercial.py
+  mflowgen run --design {design}/construct-commercial.py
   make 4          # DC synthesis; 40-70 min depending on the variant
 
 Then, back in the repository:
 
-  python {os.path.relpath(HERE, REPO)}/extract_results.py \\
+  python {tools}/extract_results.py --reports {rel_reports} \\
       --capture-settings {args.variant}=<build-dir>
-  python {os.path.relpath(HERE, REPO)}/extract_results.py
-  python {os.path.relpath(HERE, REPO)}/check_numbers.py
+  python {tools}/extract_results.py --reports {rel_reports}
+  python {tools}/check_numbers.py --reports {rel_reports}
 
 The licensed tool time is part of the cost and this script does not remove it.""")
     return 0

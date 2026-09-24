@@ -62,7 +62,8 @@ def construct():
         raise SystemExit(
           'no allo/backend/asic/nodes in any parent of '
           f'{os.path.dirname(os.path.abspath(__file__))}. Set ALLO_ASIC_FLOW to '
-          'a checkout of the flow, or run the preflight to see what is missing.')
+          'a checkout of the flow, or run '
+          'allo/backend/asic/tools/preflight.py to see what is missing.')
       d = parent
   nodes_dir = os.path.join(asic_dir, 'nodes')
   if not os.path.isdir(nodes_dir):

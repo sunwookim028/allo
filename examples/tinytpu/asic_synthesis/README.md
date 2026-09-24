@@ -148,8 +148,24 @@ attribute. See `../gemmini_rtl/README.md` and
 
 ## Reproducing
 
-The flow is mflowgen at `~/allo-asic` on zhang-21; `construct-commercial.py`
-here is the design, copied from `~/allo-asic/designs/allo-tinytpu-isa/`.
+The flow is vendored at `allo/backend/asic/`, and `construct-commercial.py`
+here is the design: it resolves `nodes/` and `adks/` from the repository root
+by its own location, so a clean checkout is enough (override with
+`ALLO_ASIC_FLOW`). Running it still needs DC and mflowgen, which live on
+zhang-21.
+
+**Check first, it costs seconds:**
+
+```bash
+python allo/backend/asic/tools/preflight.py \
+    --design examples/tinytpu/asic_synthesis --variant T4_MAXDIM64_shipped
+```
+
+It reports `dc_shell`, the pinned mflowgen, sv2v, the vendored nodes and ADK
+definition, the variant's RTL and file lists, and -- with `--build` -- the
+fetched `stdcells.db` against the md5 every committed run recorded. **This is
+not push-button**: a run needs a DC licence and 40-70 minutes of that machine.
+Failing in seconds rather than an hour in is the whole value.
 
 ```bash
 source /etc/profile.d/modules.sh
@@ -159,8 +175,19 @@ conda activate /scratch/users/sk3463/envs/asicflow
 export SNPSLMD_LICENSE_FILE=27020@en-license-05.coecis.cornell.edu
 
 mkdir -p /scratch/users/sk3463/build_tinytpu_t4 && cd $_
-mflowgen run --design ~/allo-asic/designs/allo-tinytpu-isa/construct-commercial.py
+mflowgen run --design <repo>/examples/tinytpu/asic_synthesis/construct-commercial.py
 make 4          # synopsys-dc-synthesis
+```
+
+Afterwards, back in the repository -- the numbers are **generated from the
+reports, never typed**:
+
+```bash
+R=examples/tinytpu/asic_synthesis/reports
+python allo/backend/asic/tools/extract_results.py --reports $R \
+    --capture-settings T4_MAXDIM64_shipped=<build-dir>
+python allo/backend/asic/tools/extract_results.py --reports $R
+python allo/backend/asic/tools/check_numbers.py   --reports $R
 ```
 
 Build directories belong on `/scratch` (local), not NFS. `TINYTPU_RTL` points
@@ -191,11 +218,13 @@ used — see below), DC **W-2024.09**, ADK `freepdk-45nm` **view-standard**.
   until the check tolerates an attribute on the `module` line.
 - **The `freepdk-45nm` ADK node is not idempotent and mutates its own source
   tree.** It runs `mv <view>/adk.tcl <view>/adk-base.tcl; cp adk-overlay.tcl
-  <view>/adk.tcl` against `~/allo-asic/adks/...`, not a build copy. A second run
-  moves the overlay onto `adk-base.tcl`, so `adk.tcl` sources itself and DC
-  fails with "too many nested evaluations (infinite loop?)". Recover with
-  `git checkout` in `~/allo-asic` (the original `adk.tcl` is a symlink to
-  `../pkgs/base/adk.tcl`) and delete the leftover `adk-base.tcl`. `view-standard`
+  <view>/adk.tcl` against `allo/backend/asic/adks/...`, not a build copy. A
+  second run moves the overlay onto `adk-base.tcl`, so `adk.tcl` sources itself
+  and DC fails with "too many nested evaluations (infinite loop?)". Recover
+  with `git checkout` on that directory and delete the leftover `adk-base.tcl`.
+  It cannot bite as vendored here -- only `configure.yml`, `adk-overlay.tcl`
+  and the `.args` files came across, no view in the tree -- but it would
+  against a checkout that has one. `view-standard`
   is unaffected, being unpacked fresh in the build directory.
 
 ## Logic-only runs: why the memory stubs exist
@@ -208,7 +237,7 @@ Warning: Unable to resolve reference 'mem_ext' in 'mem'.  (LINK-5)
 Error: failed to link design Gemmini
 ```
 
-`tools/make_stubs.py` copies each omitted module's header verbatim from its own
+`allo/backend/asic/tools/make_stubs.py` copies each omitted module's header verbatim from its own
 source — ports only, comments stripped, no body — and writes `<name>_stub.v`,
 which is appended to the logic-only file list. It refuses if a header cannot be
 found rather than inventing one.
