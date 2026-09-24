@@ -2060,6 +2060,35 @@ config patches for both matched points are committed at
    :doc:`minitpu` for MiniTPU.
 
 
+Where the other pages' results live
+===================================
+
+This page is the benchmark set. The reference pages for each design and each
+flow carry no measurements of their own; their results, corrections and
+retractions are on a results page of their own, listed here so that a
+superseded figure can be traced from whichever page quoted it.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - results page
+     - what it carries
+   * - :doc:`tinytpu_isa_results`
+     - the five-shape latency row at ``MAXDIM=16``, resources, the one
+       standard-cell synthesis figure, and how the published row moved
+   * - :doc:`gemmini_results`
+     - the matched comparison, the marginal-cost sweep, area and frequency,
+       and the parity-baseline results
+   * - :doc:`/extensions/chia_results`
+     - the CHIA loop's paid runs, what they do and do not demonstrate, and
+       the planned experiments
+   * - :doc:`/extensions/chia_codesign`
+     - the retired ``chia-codesign`` effort and its claim register
+   * - :doc:`tinytpu_history`
+     - the design's longer optimisation history
+
+
 Earlier measurements and corrections
 ====================================
 
