@@ -4,6 +4,7 @@
 
 import re
 import numbers
+from enum import IntEnum
 from collections import OrderedDict
 
 from .._mlir.ir import (
@@ -357,6 +358,86 @@ class Stream(AlloType):
         pass
 
     def full(self):
+        pass
+
+
+class ChannelProtocol(IntEnum):
+    # NOTE: values MUST match AlloAttrs.td's ChannelProtocol enum.
+    valid_only = 0
+    valid_ready = 1
+
+
+# Convenience names so users can write `Channel[int32, valid_ready]`.
+valid_only = ChannelProtocol.valid_only
+valid_ready = ChannelProtocol.valid_ready
+
+
+class Wire(AlloType):
+    """
+    A combinational wire: an unbuffered, zero-latency point-to-point link
+    between two dataflow kernels -- no handshake, no backpressure.
+    (For a buffered FIFO use `Stream`; for a handshake link use `Channel`.)
+    """
+
+    def __init__(self, dtype, shape):
+        assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
+        self.dtype = dtype
+        self.shape = shape  # element shape (() for a scalar wire)
+        super().__init__(0, 0, f"wire<{dtype}>")
+
+    def build(self):
+        if len(self.shape) > 0:
+            return MemRefType.get(self.shape, self.dtype.build())
+        return self.dtype.build()
+
+    def __repr__(self):
+        shape = ", ".join(str(s) for s in self.shape)
+        return f"Wire({self.dtype}[{shape}])"
+
+    # No-op stubs (resolved at IR-build time). A wire never blocks, so there
+    # are no try_*/empty/full variants.
+    def put(self, data):
+        pass
+
+    def get(self):
+        pass
+
+
+class Channel(AlloType):
+    """
+    A handshake channel: a point-to-point link with an explicit handshake
+    protocol (`valid_only` or `valid_ready`), but no buffering.
+    """
+
+    def __init__(self, dtype, shape, protocol):
+        assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
+        self.dtype = dtype
+        self.shape = shape  # element shape (() for a scalar channel)
+        self.protocol = int(protocol)  # ChannelProtocol value (0/1)
+        super().__init__(0, 0, f"channel<{dtype}>")
+
+    def build(self):
+        if len(self.shape) > 0:
+            return MemRefType.get(self.shape, self.dtype.build())
+        return self.dtype.build()
+
+    def __repr__(self):
+        shape = ", ".join(str(s) for s in self.shape)
+        proto = ChannelProtocol(self.protocol).name
+        return f"Channel({self.dtype}[{shape}], {proto})"
+
+    # No-op stubs (resolved at IR-build time). Channels can be non-blocking,
+    # so try_* variants exist (mapping to channel_try_put/get).
+    def put(self, data):
+        pass
+
+    def get(self):
+        pass
+
+    def try_put(self, data):
+        pass
+
+    def try_get(self):
         pass
 
 

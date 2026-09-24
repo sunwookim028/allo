@@ -44,6 +44,7 @@ public:
   void emitGetGlobalFixed(allo::GetGlobalFixedOp op) override;
   void emitGlobal(memref::GlobalOp op) override;
   void emitSubView(memref::SubViewOp op) override;
+  void emitCopy(memref::CopyOp op) override;
   void emitReshape(memref::ReshapeOp op) override;
 
   /// Tensor-related statement emitters.
@@ -103,6 +104,12 @@ protected:
   /// Virtual hook: emit a float constant value for an array initializer element.
   /// Override to append 'f' suffix for backends that require float literals.
   virtual void emitFloatArrayElement(float value);
+  /// Virtual hook: emit the storage qualifiers ("static ", "const ") preceding a
+  /// global's declaration. Split out of emitGlobal so a backend can change the
+  /// STORAGE CLASS without duplicating the initializer formatting below it. The
+  /// SystemC emitter overrides it: there a stateful global is a per-instance
+  /// local in the SC_THREAD reset action, not a function-scope static.
+  virtual void emitGlobalStorageQualifier(memref::GlobalOp op);
 };
 
 } // namespace hls

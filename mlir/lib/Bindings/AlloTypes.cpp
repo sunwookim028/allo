@@ -109,4 +109,37 @@ void mlir::python::populateAlloIRTypes(nb::module_ &m) {
           "depth",
           [](MlirType type) { return alloMlirStreamTypeGetDepth(type); },
           "Returns the depth of the stream");
+          
+   mlir_type_subclass(m, "WireType", alloMlirTypeIsAWireType)
+        .def_classmethod(
+            "get",
+            [](nb::object cls, MlirType &baseType, MlirContext ctx) {
+              return cls(alloMlirWireTypeGet(ctx, baseType));
+            },
+            "Get an instance of WireType in given context.", nb::arg("cls"),
+            nb::arg("base_type"), nb::arg("context") = nb::none())
+        .def_property_readonly(
+            "base_type",
+            [](MlirType type) { return alloMlirWireTypeGetBaseType(type); },
+            "Returns the base type of the wire object");
+
+    mlir_type_subclass(m, "ChannelType", alloMlirTypeIsAChannelType)
+        .def_classmethod(
+            "get",
+            [](nb::object cls, MlirType &baseType, unsigned protocol,
+               MlirContext ctx) {
+              return cls(alloMlirChannelTypeGet(ctx, baseType, protocol));
+            },
+            "Get an instance of ChannelType in given context.", nb::arg("cls"),
+            nb::arg("base_type"), nb::arg("protocol"),
+            nb::arg("context") = nb::none())
+        .def_property_readonly(
+            "base_type",
+            [](MlirType type) { return alloMlirChannelTypeGetBaseType(type); },
+            "Returns the base type of the channel object")
+        .def_property_readonly(
+            "protocol",
+            [](MlirType type) { return alloMlirChannelTypeGetProtocol(type); },
+            "Returns the protocol of the channel (int enum value)");       
+          
 }

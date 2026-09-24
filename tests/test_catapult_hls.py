@@ -97,8 +97,15 @@ def test_catapult_float():
     with tempfile.TemporaryDirectory() as tmpdir:
         mod = s.build(target="catapult", mode="csyn", project=tmpdir)
 
-        # Check float type is used
-        assert "float " in mod.hls_code
+        # F32 must come out as ac_ieee_float<binary32>, NOT native `float`.
+        # nangate-45nm_beh does not synthesize native C++ float -- Catapult
+        # stops with CIN-291 ("Type 'float' is not synthesizable with library
+        # 'nangate-45nm_beh'"), which docs/source/backends/catapult.rst has
+        # described as the emitter's behaviour since before it was true. The
+        # SystemC-emitter merge makes it true; this assertion used to accept
+        # the unsynthesizable spelling.
+        assert "ac_ieee_float<binary32>" in mod.hls_code
+        assert "float " not in mod.hls_code
         print("test_catapult_float passed!")
 
 
@@ -141,6 +148,17 @@ def test_catapult_pipeline():
 
         # Check Catapult-specific pipeline pragma
         assert "#pragma hls_pipeline_init_interval" in mod.hls_code
+        # The pragma MUST precede the loop it binds to -- Catapult drops an in-body
+        # pragma with CIN-319 ("cannot bind pragma"), silently disabling pipelining.
+        lines = mod.hls_code.splitlines()
+        idx = next(
+            i for i, l in enumerate(lines) if "hls_pipeline_init_interval" in l
+        )
+        nxt = lines[idx + 1].lstrip()
+        assert nxt.startswith(("l_", "for ", "while ")), (
+            "hls_pipeline_init_interval must be emitted immediately before the loop "
+            f"(Catapult binds to the following construct); next line was: {nxt!r}"
+        )
         print("test_catapult_pipeline passed!")
 
 

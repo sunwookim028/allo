@@ -101,6 +101,14 @@ tests/xlscc_tests/**/test
 # Filled-in CHIA credentials template (GCP project/keys) -- never commit
 chia.env
 
+# Per-worktree scratch: build logs, Sphinx output, ad-hoc runs. Anything a
+# command writes for its own use and nothing reads back. NOT just the tinytpu
+# one below -- `reproduce.sh`, the docs build and the gate runs all write a
+# top-level `.scratch/`, and without this line a `git add -A` commits a whole
+# generated HTML tree (which is how 398 files of Sphinx output reached a merge
+# branch once).
+.scratch/
+
 # tinytpu_vitis verification scratch (mutate.py, ad-hoc runs)
 examples/accelerator/tinytpu_vitis/.mutants/
 examples/accelerator/tinytpu_vitis/.scratch/
@@ -114,3 +122,16 @@ examples/accelerator/tinytpu_vitis/chia_agent/__pycache__/
 # claim is copied, trimmed, into dev/records/tinytpu/chia-evidence/; raw runs
 # are on tags.
 chia_runs/
+
+# Generated Catapult/SystemC project dirs written by df.build(project=...). A test that
+# passes project="test_x" creates tests/dataflow/test_x/ holding kernel.cpp, run.tcl,
+# the compiled sim and a full cosb/Catapult/ tree (hundreds of files). All regenerable.
+tests/dataflow/*/
+!tests/dataflow/aie/
+!tests/dataflow/sparse/
+!tests/dataflow/__pycache__/
+*.prj/
+
+# Internal binary documents. Kept on disk, never committed: large, unreviewable in a
+# diff, and this fork's remote is a public GitHub fork.
+*.docx

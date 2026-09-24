@@ -1,0 +1,6 @@
+test_systolic                      COSIM_OK         test_systolic                          
+test_1D_systolic                 (no cosim line / skip / timeout)
+test_weight_stationary_gemm        COSIM_OK         test_systolic                          
+test_daisy_chain_gemm              COSIM_OK         test_systolic                          
+test_smith_waterman_systolic       COSIM_MISMATCH   test_systolic                          1 arg(s) differ
+ALL DONE

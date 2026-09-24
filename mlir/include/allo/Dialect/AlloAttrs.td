@@ -81,4 +81,14 @@ def CmpFixedPredicateAttr : I64EnumAttr<
 //   }];
 // }
 
+def CH_ValidOnly  : I32EnumAttrCase<"ValidOnly",  0, "valid_only">;   // data + valid, no backpressure
+   def CH_ValidReady : I32EnumAttrCase<"ValidReady", 1, "valid_ready">;  // full valid/ready handshake
+   def ChannelProtocol : I32EnumAttr<"ChannelProtocol",
+        "handshake protocol for allo.channel",
+        [CH_ValidOnly, CH_ValidReady]> {
+    let cppNamespace = "::mlir::allo";
+}
+
+
+
 #endif // ALLO_ATTRS

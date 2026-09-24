@@ -1,0 +1,11 @@
+  NO_COSIM         test_1D_systolic.py::test_systolic
+  NO_COSIM         test_tiled_systolic.py::test_tiled_systolic
+  NO_COSIM         test_systolic_conv.py::test_convolution
+  NO_COSIM         test_unified_systolic.py::test_unified_simple
+  NO_COSIM         test_unified_systolic.py::test_unified_daisy_chain
+  NO_COSIM         test_unified_systolic.py::test_unified_tiling
+  NO_COSIM         test_daisy_chain_gemm.py::test_systolic
+  NO_COSIM         test_weight_stationary_gemm.py::test_systolic
+  NO_COSIM         test_hierachical_mesh.py::test_2x1
+  NO_COSIM         test_hierachical_mesh.py::test_2x2
+=== SLOW SWEEP DONE ===

@@ -46,7 +46,7 @@ public:
             memref::GetGlobalOp, allo::GetGlobalFixedOp, memref::GlobalOp,
             memref::DeallocOp, memref::DmaStartOp, memref::DmaWaitOp, memref::ReshapeOp,
             memref::ViewOp, memref::SubViewOp, memref::ReinterpretCastOp,
-            memref::AtomicRMWOp,
+            memref::AtomicRMWOp, memref::CopyOp,
             // Tensor-related statements.
             tensor::ExtractOp, tensor::InsertOp, tensor::SplatOp, memref::DimOp,
             memref::RankOp,
@@ -84,7 +84,12 @@ public:
             allo::MinFixedOp, allo::MaxFixedOp, allo::PrintOp,
             allo::StreamConstructOp, allo::StreamGetOp, allo::StreamPutOp,
             allo::StreamTryGetOp, allo::StreamTryPutOp, allo::StreamEmptyOp,
-            allo::StreamFullOp>(
+            allo::StreamFullOp,
+            // Wire operations.
+            allo::WireConstructOp, allo::WirePutOp, allo::WireGetOp,
+            // Channel operations.
+            allo::ChannelConstructOp, allo::ChannelGetOp, allo::ChannelPutOp,
+            allo::ChannelTryGetOp, allo::ChannelTryPutOp>(
             [&](auto opNode) -> ResultType {
               return thisCast->visitOp(opNode, args...);
             })
@@ -147,6 +152,7 @@ public:
   HANDLE(memref::DmaStartOp);
   HANDLE(memref::DmaWaitOp);
   HANDLE(memref::AtomicRMWOp);
+  HANDLE(memref::CopyOp);
   HANDLE(memref::ViewOp);
   HANDLE(memref::SubViewOp);
   HANDLE(memref::ReinterpretCastOp);
@@ -264,6 +270,18 @@ public:
   HANDLE(allo::StreamTryPutOp);
   HANDLE(allo::StreamEmptyOp);
   HANDLE(allo::StreamFullOp);
+
+  /// Wire operations.
+  HANDLE(allo::WireConstructOp);
+  HANDLE(allo::WirePutOp);
+  HANDLE(allo::WireGetOp);
+
+  /// Channel operations.
+  HANDLE(allo::ChannelConstructOp);
+  HANDLE(allo::ChannelGetOp);
+  HANDLE(allo::ChannelPutOp);
+  HANDLE(allo::ChannelTryGetOp);
+  HANDLE(allo::ChannelTryPutOp);
 
 #undef HANDLE
 };

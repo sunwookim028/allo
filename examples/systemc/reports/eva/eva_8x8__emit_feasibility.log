@@ -1,0 +1,3 @@
+config M=N=8  NSTEP=250  expected instances = 192
+=== 8x8 EMIT OK in 53.8s -> /tmp/claude-1838657/-home-zsm9-allo-sup/eb682555-027f-481b-af99-40e733dfa3f4/scratchpad/eva_8x8_prj
+kernel.cpp lines=140931  bytes=5626338  SC_MODULEs=85  AlloFifo=1152

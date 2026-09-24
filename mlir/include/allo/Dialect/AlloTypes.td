@@ -9,6 +9,7 @@
 include "allo/Dialect/AlloDialect.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
 include "mlir/IR/CommonTypeConstraints.td"
+include "allo/Dialect/AlloAttrs.td"
 
 def Type : Allo_Type<"Type", [MemRefElementTypeInterface]> {
   let summary = "generic type";
@@ -56,5 +57,25 @@ def Stream : Allo_Type<"Stream", [MemRefElementTypeInterface]> {
 }
 
 def StreamLike : TypeOrValueSemanticsContainer<Stream, "stream-like">;
+
+def Wire : Allo_Type<"Wire", [MemRefElementTypeInterface]> {
+    let summary = "combinational wire";
+    let mnemonic = "wire";
+    let parameters = (ins AnyType:$baseType);
+    let assemblyFormat = "`<` $baseType `>`";
+}
+
+def WireLike    : TypeOrValueSemanticsContainer<Wire,    "wire-like">;
+
+def Channel : Allo_Type<"Channel", [MemRefElementTypeInterface]> {
+    let summary = "channel type";
+    let mnemonic = "channel";
+    let parameters = (ins AnyType:$baseType,
+                          EnumParameter<ChannelProtocol>:$protocol);
+    let assemblyFormat = "`<` $baseType `,` $protocol `>`";
+}
+
+def ChannelLike : TypeOrValueSemanticsContainer<Channel, "channel-like">;
+
 
 #endif // ALLO_TYPES
