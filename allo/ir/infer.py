@@ -1196,16 +1196,40 @@ class TypeInferer(ASTVisitor):
                     visit_stmt(ctx, node.func.value)
                     # single-element operation
                     node.shape = tuple()
-                    if isinstance(node.func.value.dtype, (UInt, Int)):
-                        if node.func.value.dtype.bits == 16:
+                    src_dtype = node.func.value.dtype
+                    # `x.bitcast(ty)` -- an explicit target type. Without it the
+                    # result type is guessed from the bit count alone, which can
+                    # never name bf16: 16 bits has two float spellings (f16 and
+                    # bf16) and the bit count does not say which. The pack
+                    # direction (bf16 -> UInt(16)) needs no argument.
+                    if node.args:
+                        if len(node.args) != 1:
+                            raise RuntimeError(
+                                "bitcast takes at most one argument (the target type)"
+                            )
+                        target = ASTResolver.resolve(node.args[0], ctx.global_vars)
+                        if target is None or not isinstance(target, AlloType):
+                            raise RuntimeError(
+                                f"bitcast target must be an Allo type, got "
+                                f"{ast.unparse(node.args[0])}"
+                            )
+                        if target.bits != src_dtype.bits:
+                            raise RuntimeError(
+                                f"bitcast cannot change the bitwidth: "
+                                f"{src_dtype} is {src_dtype.bits} bits, "
+                                f"{target} is {target.bits} bits"
+                            )
+                        node.dtype = target
+                    elif isinstance(src_dtype, (UInt, Int)):
+                        if src_dtype.bits == 16:
                             node.dtype = float16
-                        elif node.func.value.dtype.bits == 32:
+                        elif src_dtype.bits == 32:
                             node.dtype = float32
-                        elif node.func.value.dtype.bits == 64:
+                        elif src_dtype.bits == 64:
                             node.dtype = float64
                         else:
                             raise RuntimeError(
-                                f"Unsupported bitwidth {node.func.value.dtype.bits}"
+                                f"Unsupported bitwidth {src_dtype.bits}"
                             )
                     else:
                         # casting between signed and unsigned types in C/C++

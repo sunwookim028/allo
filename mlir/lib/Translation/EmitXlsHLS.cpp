@@ -36,6 +36,22 @@ static bool BIT_FLAG = false;
 // Flag to control whether arrays are emitted as __xls_memory<T, size> (true)
 // or as plain C arrays int arr[size] (false - default for registers)
 static bool USE_MEMORY_FLAG = false;
+// Set when the type map meets a type it cannot spell. The emitter used to
+// abort() here, which kills the calling process; record it instead and turn it
+// into an MLIR error at the entry point. Adding a type to this backend is out
+// of scope -- the point is that "unsupported" is now a message, not a crash.
+static std::string XLS_UNSUPPORTED_TYPE;
+
+static SmallString<16> reportXlsUnsupportedType(Type valType) {
+  if (XLS_UNSUPPORTED_TYPE.empty()) {
+    std::string buf;
+    llvm::raw_string_ostream ss(buf);
+    valType.print(ss);
+    XLS_UNSUPPORTED_TYPE = ss.str();
+  }
+  return SmallString<16>("/*UNSUPPORTED-TYPE*/");
+}
+
 
 static SmallString<16> getXLSTypeName(Type valType) {
   // Extract element type if valType is a ShapedType
@@ -90,11 +106,9 @@ static SmallString<16> getXLSTypeName(Type valType) {
         "__XLS_IO_PLACEHOLDER__" + ">");
 
   // Check for unsupported types and provide clear error message
-  else if (llvm::isa<Float16Type>(valType) || llvm::isa<Float32Type>(valType) ||
-           llvm::isa<Float64Type>(valType)) {
-    assert(1 == 0 &&
-           "XLS[cc] backend does not currently support floating-point types. "
-           "Please use integer or fixed-point types instead.");
+  else if (llvm::isa<FloatType>(valType)) {
+    // XLS[cc] has no floating-point support (bf16 included).
+    return reportXlsUnsupportedType(valType);
   }
   // Replace the fixed-point assertion with actual type emission
   else if (auto fixedType = llvm::dyn_cast<allo::FixedType>(valType)) {
@@ -107,8 +121,7 @@ static SmallString<16> getXLSTypeName(Type valType) {
     return SmallString<16>("UFixed<" + std::to_string(ufixedType.getWidth()) +
                            ", " + std::to_string(ufixedType.getFrac()) + ">");
   } else {
-    assert(1 == 0 && "XLS[cc] backend encountered unsupported type. Only "
-                     "integer types and streams are currently supported.");
+    return reportXlsUnsupportedType(valType);
   }
 
   return SmallString<16>();
@@ -1509,7 +1522,15 @@ LogicalResult allo::emitXlsHLS(ModuleOp module, llvm::raw_ostream &os,
                                bool useMemory) {
   USE_MEMORY_FLAG = useMemory;
   AlloEmitterState state(os);
+  XLS_UNSUPPORTED_TYPE.clear();
   hls::XlsModuleEmitter(state).emitModule(module);
+  if (!XLS_UNSUPPORTED_TYPE.empty()) {
+    module.emitError("XLS[cc] emitter has no C++ spelling for type '")
+        << XLS_UNSUPPORTED_TYPE
+        << "'. Only integer, fixed-point and stream types are supported.";
+    XLS_UNSUPPORTED_TYPE.clear();
+    return failure();
+  }
   return failure(state.encounteredError);
 }
 

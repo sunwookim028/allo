@@ -74,7 +74,10 @@ ctype_map = {
 
 # https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html
 allo2c_type = {
-    "bfloat16": "bfloat16",
+    # The Vivado/Vitis emitter has no native bf16 to fall back on and defines
+    # `allo_bfloat16` in the generated header; this name is what the project
+    # generator reads back out of the emitted signature.
+    "bfloat16": "allo_bfloat16",
     "float16": "half",
     "float32": "float",
     "float64": "double",
@@ -141,6 +144,10 @@ def get_clostest_pow2(n):
 def get_bitwidth_from_type(dtype):
     if dtype == "index":
         return 64
+    if dtype == "bf16":
+        # Not caught by the "f" prefix below, and int("f16"[1:]) would be wrong
+        # for it anyway.
+        return 16
     if dtype.startswith("i"):
         return int(dtype[1:])
     if dtype.startswith("ui"):
@@ -149,7 +156,7 @@ def get_bitwidth_from_type(dtype):
         return int(dtype.split(",")[0].split("(")[-1])
     if dtype.startswith("f"):
         return int(dtype[1:])
-    raise RuntimeError("Unsupported type")
+    raise RuntimeError(f"Unsupported type {dtype}")
 
 
 def get_bitwidth_and_frac_from_fixed(dtype):

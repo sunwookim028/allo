@@ -150,6 +150,8 @@ static unsigned scAddrW(int64_t total) {
 static unsigned scDataW(Type elt) {
   if (auto it = llvm::dyn_cast<IntegerType>(elt))
     return it.getWidth() < 1 ? 1 : it.getWidth();
+  if (llvm::isa<BFloat16Type>(elt))
+    return 16;
   if (llvm::isa<Float16Type>(elt))
     return 16;
   if (llvm::isa<Float64Type>(elt))
@@ -1282,6 +1284,10 @@ void SystemCModuleEmitter::emitBitcast(arith::BitcastOp op) {  // override (base
 
   // fp16/fp32 bit width (0 for double / non-float: not handled by the accessors).
   auto floatBits = [](Type t) -> unsigned {
+    // bf16 -> ac::bfloat16, which has the same data_ac_int()/set_data(ac_int)
+    // pair these two branches rely on (ac_std_float.h).
+    if (llvm::isa<BFloat16Type>(t))
+      return 16;
     if (llvm::isa<Float16Type>(t))
       return 16;
     if (llvm::isa<Float32Type>(t))
@@ -3356,6 +3362,11 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 // Automatically generated file for SystemC (Catapult HLS / MatchLib Connections).
 //===----------------------------------------------------------------------===//
 #include <systemc.h>
+// ac::bfloat16's operators round toward zero by default; MLIR's arith.addf/mulf
+// on bf16 round to nearest-even. Must precede ac_std_float.h.
+#ifndef AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE
+#define AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV
+#endif
 #include <mc_connections.h>   // MatchLib Connections (LI valid/ready channels)
 #include <connections/connections_fifo.h>  // vendor FWFT Connections::Fifo (buffered streams)
 #include <ac_int.h>
@@ -3384,6 +3395,9 @@ typedef ac_ieee_float<binary16> half;
 inline unsigned long long _fbits(const half &v) {
   return (unsigned long long)v.data_ac_int().to_uint();
 }
+inline unsigned long long _fbits(const ac::bfloat16 &v) {
+  return (unsigned long long)v.data_ac_int().to_uint();
+}
 inline unsigned long long _fbits(const ac_ieee_float<binary32> &v) {
   return (unsigned long long)v.data_ac_int().to_uint();
 }
@@ -3399,6 +3413,9 @@ template <class T> inline unsigned long long _fbits(const T &v) {
 // rejected under synthesis as above).
 // tb: data files hold float text -> read a float and convert.
 inline std::istream &operator>>(std::istream &is, half &h) { float f; is >> f; h = half(f); return is; }
+inline std::istream &operator>>(std::istream &is, ac::bfloat16 &h) {
+  float f; is >> f; h = ac::bfloat16(f); return is;
+}
 inline std::istream &operator>>(std::istream &is, ac_ieee_float<binary32> &h) {
   float f; is >> f; h = ac_ieee_float<binary32>(f); return is;
 }
@@ -3407,11 +3424,18 @@ inline std::istream &operator>>(std::istream &is, ac_ieee_float<binary32> &h) {
 inline void sc_trace(sc_core::sc_trace_file *tf, const half &h, const std::string &n) {
   sc_trace(tf, (unsigned short)_fbits(h), n);
 }
+inline void sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h,
+                     const std::string &n) {
+  sc_trace(tf, (unsigned short)_fbits(h), n);
+}
 inline void sc_trace(sc_core::sc_trace_file *tf, const ac_ieee_float<binary32> &h,
                      const std::string &n) {
   sc_trace(tf, (unsigned)_fbits(h), n);
 }
 // Make ac_ieee_float<Format> a valid Connections channel/Combinational payload.
+// (bf16 needs NOTHING here: ac::bfloat16 already has one --
+// ac_marshaller.h: AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16, 16) -- which is why a
+// bf16 Stream costs less to support on this target than an f32 one did.)
 // Connections' marshaller.h ships Wrapped<> specializations for ac_std_float,
 // ac::bfloat16 and ac_float, but NOT ac_ieee_float -- so a Stream/Channel of
 // f32 (ac_ieee_float<binary32>) fails to synthesize (marshaller.h needs
@@ -3852,6 +3876,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
         // integer, not a single character (see the memory-port preload note).
         bool isF = (a.ctype == "half" || a.ctype == "double" ||
+                    a.ctype == "ac::bfloat16" ||
                     a.ctype.find("ieee_float") != std::string::npos);
         std::string rt = isF ? a.ctype : std::string("long long");
         os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
@@ -3885,6 +3910,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // operator<< prints its NUMERIC value, not a character; floats keep full
         // round-trippable precision.
         bool isF = (a.ctype == "half" || a.ctype == "double" ||
+                    a.ctype == "ac::bfloat16" ||
                     a.ctype.find("ieee_float") != std::string::npos);
         if (isF)
           os << "{ std::ofstream _f(\"output" << a.fileIdx
@@ -3929,6 +3955,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // CHARACTER extraction (reads '6','5' from "65"), not integer parsing.
         // Floats keep their own operator>> overload.
         bool isF = (mi.ctype == "half" || mi.ctype == "double" ||
+                    mi.ctype == "ac::bfloat16" ||
                     mi.ctype.find("ieee_float") != std::string::npos);
         std::string rt = isF ? mi.ctype : std::string("long long");
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
@@ -4009,7 +4036,13 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
 
 LogicalResult allo::emitSystemC(ModuleOp module, llvm::raw_ostream &os) {
   AlloEmitterState state(os); // creates shared emitter state around output stream os
+  takeCatapultUnsupportedType();                  // clear any stale record
   SystemCModuleEmitter(state).emitModule(module); // constructs emitter and walks whole module, printing SystemC
+  if (std::string bad = takeCatapultUnsupportedType(); !bad.empty()) {
+    module.emitError("SystemC emitter has no C++ spelling for type '")
+        << bad << "'.";
+    return failure();
+  }
   return failure(state.encounteredError); // reports success/failure
 }
 

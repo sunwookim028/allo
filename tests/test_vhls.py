@@ -1028,3 +1028,42 @@ def test_align_value_absent_by_default():
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+def test_unsupported_type_is_a_diagnostic_not_an_abort():
+    """Every C++ emitter must report an unknown type, not abort the process.
+
+    All of these used to run `assert(1 == 0 && "Got unsupported type.")`, i.e.
+    SIGABRT: the Python interpreter died and the user had no way to tell
+    "this type is unsupported" from "the emitter crashed". f8E4M3FN is a real
+    MLIR float type that none of these backends spells, so it exercises the
+    fall-through branch directly.
+    """
+    import io as _io
+    from allo._mlir.ir import Context, Location, Module
+    from allo._mlir.dialects import allo as allo_d
+
+    src = """
+module {
+  func.func @k(%arg0: memref<8xf8E4M3FN>) attributes {itypes = "_", otypes = ""} {
+    return
+  }
+}
+"""
+    emitters = {
+        "vhls": allo_d.emit_vhls,
+        "catapult": allo_d.emit_catapult,
+        "tapa": allo_d.emit_thls,
+        "intel": allo_d.emit_ihls,
+    }
+    for name, emit in emitters.items():
+        with Context() as ctx, Location.unknown():
+            allo_d.register_dialect(ctx)
+            module = Module.parse(src)
+            buf = _io.StringIO()
+            # The point of the test is that this call RETURNS. If the abort came
+            # back, the process dies here and pytest reports a crashed worker.
+            assert emit(module, buf) is False, f"{name} accepted f8E4M3FN"
+            # and nothing plausible-but-wrong was emitted for it
+            assert "f8E4M3FN" not in buf.getvalue()
+    print("Passed!")
