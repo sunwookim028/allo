@@ -207,3 +207,67 @@ it — the shell was blocked on the simulator, so nothing reported. It was found
 by another session's fleet-wide process sweep. A run that can deadlock needs a
 timeout at the launcher, not only a gate at the end; `ACT_COSIM_TIMEOUT` exists
 and this launcher did not use it.
+
+## ASIC flow integration: code in this repo, not only results (2026-09-24)
+
+**Decision from the project owner.** The ASIC flow's *code and scripts* belong
+in `sunwookim028/allo`, not only its outputs. Work is split across machines but
+pushes to the same remote. A submodule is acceptable if it genuinely eases
+maintenance — the flow's maintainer decides, since they maintain it; the
+default is plain directories under `asic_synthesis/`.
+
+**Committed:** construct script, RTL lists, stub generator, DC and mflowgen
+parameters, the preflight, the extractor, and the reports.
+**Not committed:** build trees, mapped netlists, full logs — a pointer plus the
+settings snapshot is enough to reproduce.
+
+**The settings snapshot records**, beyond the obvious: the **clock port** as
+well as the period (`clock` on the comparison design, `ap_clk` on ours — a real
+difference that looks like a discrepancy to a blind comparison), and the **wall
+time and start timestamp**, which is what proved one pair of runs predated
+another rather than duplicating it. Three near-duplicate runs were caught in one
+night by checking disk first; a timestamp field makes that a property rather
+than a habit.
+
+## The name-based area method is validated, and the caveat is narrower
+
+Auto-ungrouping dissolves instance hierarchy at the flattening effort these runs
+use, and **no reporting option recovers it** — checked, not assumed.
+`report_area -hierarchy` prints only what survived; `-nosplit` is cosmetic and
+`group_path` is a timing construct. Recovering it needs `set_dont_touch` or
+`-no_autoungroup`, both of which change synthesis and would break comparability
+with every run already done.
+
+**But the method was validated against a known boundary.** For a block whose
+hierarchy line survived, the report gives **705,486.0** and summing the
+**230,892** flattened leaf cells beneath it gives **705,485.998** — identical to
+the digit. So the arithmetic is exact, and the only residual uncertainty is
+**selection**: whether a cell named for a unit belongs to it, and whether logic
+merged across a boundary was renamed away.
+
+Our own selection is clean — every matched cell accounted for, and the per-unit
+distribution reproducing across two independent designs to the digit. The
+comparison design's is weaker: capitalised module names match nothing after
+flattening and only the lower-case forms do, so it rests on the generator's
+naming surviving. Tightening that is a clean experiment — re-export with those
+modules marked and see whether the totals move — and it is **not** on the
+critical path.
+
+Write it in the docs as *exact sums over a name-based selection, validated
+against a known boundary*, not as "name-prefix sums, treat with caution".
+
+## `reproduce_asic.sh` is a preflight plus a documented sequence, not push-button
+
+The deterministic part is fully capturable. What cannot go in git is the
+environment: a conda prefix on local scratch with pinned tool versions, four EDA
+modules, a DC licence, and ~70 minutes of a machine nobody outside the lab has.
+So the script checks for `dc_shell`, the mflowgen and sv2v versions, the
+`stdcells.db` checksum and the RTL manifest, prints exactly what is missing, and
+only then runs the sequence. **It must not be called push-button**, and its
+header should state that the licensed machine time is part of the cost. Failing
+in seconds rather than an hour in is the whole value.
+
+`check_numbers.py` already exists (`asic_synthesis/tools/check_numbers.py`) and
+needs no licence, environment or machine. What is still owed is **the extractor
+that generates `results.json` from the reports** — generated, never
+hand-written, or it just moves the retyping one file earlier.
