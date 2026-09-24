@@ -27,7 +27,7 @@ import pytest
 
 import allo
 import allo.dataflow as df
-from allo.ir.types import bfloat16, float32, uint16, int32, Stream
+from allo.ir.types import bfloat16, float16, float32, uint16, int32, Stream, Stateful
 
 
 def _vitis_include():
@@ -300,6 +300,47 @@ def test_bitcast_target_must_match_width():
     with pytest.raises(BaseException) as err:
         allo.customize(bad)
     assert isinstance(err.value, (SystemExit, RuntimeError))
+
+
+# ---------------------------------------------------------------------------
+# Narrow-float ARRAY INITIALIZERS (not the type table -- the value printer)
+# ---------------------------------------------------------------------------
+# The Vivado emitter's dense-initializer printer tested `type.isF32()` and then
+# `type.isF64()`, and sent everything else to "array has unsupported element
+# type." Any float narrower than f64 that is not exactly f32 -- so f16 AS WELL
+# AS bf16 -- fell off that chain. It is reachable only through an initialized
+# array, which in practice means a region-scope `@ Stateful` (a local array's
+# init lowers to stores, not to a dense attribute), which is why the existing
+# bf16 coverage above never hit it: it uses arguments and streams.
+#
+# This is emphatically NOT a bf16 bug. float16 is included as the control that
+# proves it: before the fix BOTH failed and only float32 passed.
+@pytest.mark.parametrize("dtype", [float32, float16, bfloat16])
+@pytest.mark.parametrize("target", ["vitis_hls", "catapult", "systemc"])
+def test_stateful_array_initializer_narrow_float(dtype, target):
+    if target == "catapult" and dtype is float16:
+        pytest.skip(
+            "separate, unrelated defect: a float16 array init emits a bare "
+            "`= 0.000000;` double literal, and ac_ieee_float<binary16> has no "
+            "implicit conversion from double. Independent of the element-type "
+            "chain this test covers -- bf16 and f32 both pass here."
+        )
+    T = dtype
+
+    @df.region()
+    def top(inp: T[4], out: T[4]):
+        st: T[4] @ Stateful = 0.0
+
+        @df.kernel(mapping=[1], args=[inp, out])
+        def k(a: T[4], b: T[4]):
+            for i in range(4):
+                st[i] = a[i]
+            for i in range(4):
+                b[i] = st[i]
+
+    # Emission alone is the assertion: the defect was a hard emit failure.
+    df.build(top, target=target)
+
 
 
 if __name__ == "__main__":
