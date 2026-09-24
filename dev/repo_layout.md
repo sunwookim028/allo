@@ -200,6 +200,50 @@ reproduces — with history moved to the results page.
 - Whether MiniTPU is imported or referenced. It lives in another engineer's
   tree today and is read-only from this side.
 
+## Vendoring: the nodes yes, the ADK no
+
+Settled 2026-09-24 on the flow maintainer's judgement, which is better than the
+blanket "vendor nothing" this file previously carried. They are different cases
+and treating them as one was the error.
+
+**Vendor the 36 mflowgen nodes.** They *are* the flow. Without them our
+construct scripts describe a graph whose steps live in a third-party GitHub
+repository, at an unpinned commit, on an account we do not control. A preflight
+that merely points at it is adequate for a colleague on the same machine and
+inadequate as the reproduction record for a published number: if that repository
+moves, is rewritten or disappears, **every area figure in our docs becomes
+unreproducible, and the failure is silent until someone tries.** It is 1.8 MB of
+Apache-2.0 code we are entitled to redistribute.
+
+**Do not vendor the ADK.** It is 7 MB of third-party PDK whose licence we have
+not checked, the ADK node downloads it at run time anyway, and the specific view
+it contains is unusable by DC. Instead, **have the preflight verify the fetched
+library by the `stdcells.db` md5 that the settings snapshot now records.** That
+is reproducibility without redistribution, and it is strictly better than
+either extreme.
+
+If the no-vendoring plan is ever restored for the nodes, the preflight must
+**pin and verify** the upstream commit rather than check for presence. An
+unpinned pointer is the thing that bites.
+
+## Two results from building the extractor
+
+Both are the kind of thing that only appears when a number is generated rather
+than transcribed.
+
+**The standard-cell library is now confirmed identical across all seven runs**,
+`stdcells.db` md5 `f5560259` — previously assumed. And the clock port is
+recorded as the SDC actually constrained it, read out of `design.sdc` rather
+than from a parameter claiming it: `clock` for the comparison design, `ap_clk`
+for ours.
+
+**Worst slack must be the minimum across path groups, not the first one
+reported.** Taking whichever appeared first would have given **+1.10 ns instead
+of +0.20 ns** for the T=8 design. Our published figures happen to be the correct
+minimum, so nothing is wrong — but the naive extraction would have been wrong by
+0.9 ns and looked entirely plausible. The extractor records every group's slack
+alongside the minimum so the choice is visible rather than implicit.
+
 ## Known defect to fix during the move
 
 `asic_synthesis/construct-commercial.py` resolves its node library and ADK at
