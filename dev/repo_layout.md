@@ -574,16 +574,30 @@ found by trying.
    actually read its RTL, on a machine that is not this one; editing them to
    match today's tree would be falsifying the evidence.
 
-4. **CHIA is still in two places, and neither is `chia/`.** Unchanged: this is
-   the audit's worst item and the one this pass was least able to gate. It is
-   the component that spends real money, none of the required gates exercises
-   it, and merging `chia_abstraction/` with `examples/tinytpu/chia_agent/`
-   under one root is a three-way split (code, records, tests) rather than one
-   rename. **Owner's call.**
+4. **CHIA is still in two places, and neither is `chia/`. Deferred on purpose,
+   with the destination settled and the trigger named.** The owner has
+   endorsed a root-level `chia/` ("only `chia/` might deserve a similar root
+   level position"), so **where** it goes is not the open question. **When**
+   is: it is the component that spends real money, and **no required gate
+   exercises it**. Moving a money-spending harness with nothing watching is how
+   a `CHIA_TOTAL_CAP_USD` ceiling turns into a silent failure rather than a
+   refusal.
+
+   **The trigger: move it once the $0 `chia_agent/test_harness.py` gate is in
+   the required set.** Then a move is covered by a run that costs nothing, and
+   the three-way split (`chia_abstraction/`'s code, its `evidence*`/`baseline*`
+   records, and `test_abs_harness.py`) can be made under cover.
+
+   **Do not start before that gate lands.** As of 2026-09-24 the loop is dead
+   on `main` -- every candidate fails at stage `model` because
+   `workloads/run.py`'s import closure is not in `evaluate.FROZEN` -- and a
+   repair is in flight in `examples/tinytpu/chia_agent/` and
+   `examples/tinytpu/workloads/`. Reorganising a component mid-repair costs
+   both sides more than waiting does.
 
 **`playground/` was left in place deliberately.** `int8_gemm.py` and
 `mat_vec_test.py` are scratch scripts nothing references, and one of them
 defines `test_single_systolic()` with `MODE = "csyn"` -- moving it under
 `tests/` would have pytest collect a function that needs Vitis. The honest
-answer is that it should probably not be in the repository at all, which is
-not a move to make without being asked.
+answer is that it should probably not be in the repository at all, which is a
+deletion question for the owner and not a move to make unasked.
