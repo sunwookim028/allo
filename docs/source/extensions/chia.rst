@@ -268,6 +268,15 @@ measured at MAXDIM=64 and the GEMM control stays at 16 because that is the
 published row: **two configurations, two csynths per candidate**, and that is
 what the term costs.
 
+Measured, that price is **348 s** for the model term (one ``csynth`` and six
+layer cosims, returning the published 1 150 and 2 117) on top of a ~230 s
+evaluation --- **2.5x per candidate**. Against run 3's whole-run numbers it is
+about **1.28x wall**, because the model calls dominate and they have not
+changed, and **no change to the spend cap**: the term adds no model calls, so
+the $60 cap still buys the six candidates run 3 got for $20.74. What to watch
+instead is **Vitis load, 2.5x per candidate**, which across a four-worker swarm
+is licence and CPU contention rather than money.
+
 **The FPGA table understates silicon in the components a search most wants to
 change.** The burst widening is +43 % flip-flops and +92 % block RAM on FPGA
 and **+74.4 % cell area** in 45 nm, of which **99.1 % is two AXI master ports**

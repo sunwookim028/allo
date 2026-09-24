@@ -106,9 +106,54 @@ most-repeated error, and the one ``workloads/claims.json`` exists to stop.
 
 So ``evaluate.SCORED_MODEL_ENV`` measures the model term at **MAXDIM=64**,
 beside a GEMM control that stays at MAXDIM=16 because that is the published
-row. Two configurations means **two csynths per candidate**, which roughly
-doubles the per-candidate cost, and that is the price of the term being worth
-anything.
+row. Two configurations means **two csynths per candidate**, and that is the
+price of the term being worth anything.
+
+What the price actually is
+--------------------------
+
+Measured on this host rather than estimated, because a cost discovered
+mid-run is the expensive kind.
+
+.. list-table::
+   :header-rows: 1
+
+   * - stage
+     - seconds
+     - where from
+   * - gate (``bench_isa``, ``stress_isa``, 3x ``param_check``)
+     - ~65
+     - run 3's ``variants.jsonl``, eight graded evaluations
+   * - GEMM cosim at MAXDIM=16 (1 csynth + 2 shapes)
+     - ~162
+     - same
+   * - **model term at MAXDIM=64 (1 csynth + 6 layers)**
+     - **348**
+     - this record's run; it returns 1 150 and 2 117, the published row
+   * - area proxy
+     - <1
+     - a bit census, no tools
+   * - **per candidate, before**
+     - **~230**
+     -
+   * - **per candidate, after**
+     - **~578**
+     - **2.5x**
+
+Against run 3, which is the only whole-run datum: 10 010 s of wall for eight
+graded evaluations, of which 8 x 230 = 1 840 s was evaluation and the rest was
+the model calls. The same run under this objective is 8 x 578 = 4 624 s of
+evaluation, so **12 800 s against 10 010 s --- about 1.28x wall**, because the
+LLM calls dominate and they have not changed.
+
+**The spend cap does not need to move.** The model term adds no model calls;
+run 3 spent $20.74 of a $60 cap over six candidates and the same cap buys the
+same six. Two things do change and should be watched instead:
+
+* **wall clock, +28 %**, so a run that used to finish inside a session's
+  attention now takes about a quarter longer;
+* **Vitis load per candidate, 2.5x**, which with four workers in a swarm is the
+  term most likely to bite --- licence and CPU contention, not dollars.
 
 The alternative --- move the whole scored point to MAXDIM=64 --- is cheaper per
 candidate and changes what the published five-shape row means, so it is a
