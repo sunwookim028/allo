@@ -1,0 +1,216 @@
+{
+  "why": [
+    "Which cycle count may be printed beside which area figure, declared.",
+    "",
+    "Cycles come out of Vitis cosim and area out of Design Compiler. Each flow",
+    "is internally consistent, so no single-flow gate can see the one error",
+    "this project keeps making: quoting the two beside each other when they",
+    "were taken on different RTL. check_pairing.py judges every entry here by",
+    "one rule, and this file records both what may be paired and what may not.",
+    "",
+    "A refusal is not a gap in the record. It is the record."
+  ],
+  "config_keys": ["T", "MAXDIM", "QD", "DMA_WORDS"],
+
+  "pairings": [
+    {
+      "name": "T4 MAXDIM=16 baseline -- the published five, beside their own area",
+      "basis": "same-export",
+      "export": "T4_MAXDIM16_shipped_baseline",
+      "area": {"variant": "T4_MAXDIM16_shipped_baseline"},
+      "cycles": {
+        "where": "the export's own README, measured on this export",
+        "rows": ["- 4x4x4: **172** cycles",
+                 "- 8x8x8: **262** cycles",
+                 "- 12x12x12: **418** cycles",
+                 "- 16x16x8: **484** cycles",
+                 "- 16x16x16: **686** cycles"]
+      },
+      "note": [
+        "These are NOT the design's current published row. reproduce.sh",
+        "reproduces 175 / 265 / 421 / 482 / 674, measured at TPU_QD=16; this",
+        "export was emitted from allo 6db2dc7a on 2026-09-22, and TPU_QD did",
+        "not default to 16 until 63ee6ec7 on 2026-09-24. The current row and",
+        "this area figure are therefore NOT pairable, and that pair is refused",
+        "below. What is pairable is the row this export itself carries."
+      ]
+    },
+    {
+      "name": "T4 MAXDIM=64 shipped -- the GEMM row beside its own area",
+      "basis": "same-export",
+      "export": "T4_MAXDIM64_shipped",
+      "area": {"variant": "T4_MAXDIM64_shipped"},
+      "cycles": {
+        "where": "the export's own README, measured on this export",
+        "rows": ["- 48x48x48: **10289** cycles",
+                 "- 64x64x64: **22123** cycles"]
+      }
+    },
+    {
+      "name": "T4 MAXDIM=64 shipped, logic only -- same export, memories stubbed",
+      "basis": "same-export",
+      "export": "T4_MAXDIM64_shipped",
+      "export_path_alias": "rtl_handoff_T4_MAXDIM64_shipped",
+      "area": {"variant": "T4_MAXDIM64_shipped_logiconly"},
+      "cycles": {
+        "where": "the export's own README; the stubbed manifest is the same RTL with the memory arrays removed, so the cycles are unchanged",
+        "rows": ["- 48x48x48: **10289** cycles",
+                 "- 64x64x64: **22123** cycles"]
+      },
+      "note": [
+        "The synthesis run recorded this export under a different absolute",
+        "path (/scratch/.../rtl_handoff_T4_MAXDIM64_shipped) than the other",
+        "runs. The manifest md5 -- 355775c0 for sv2v_manifest_nomem_stubbed.f",
+        "-- is what ties it to T4_MAXDIM64_shipped in the tree, and that is",
+        "what the checker verifies. A path on a machine nobody else has is not",
+        "evidence; the checksum is."
+      ]
+    },
+    {
+      "name": "T4 MAXDIM=64 burst-widened -- the widened GEMM row beside its own area",
+      "basis": "same-export",
+      "export": "T4_MAXDIM64_burstwiden",
+      "area": {"variant": "T4_MAXDIM64_burstwiden"},
+      "cycles": {
+        "where": "the export's own README, measured on this export",
+        "rows": ["- 48x48x48: **9569 (shipped 10289)** cycles",
+                 "- 64x64x64: **21163 (shipped 22123)** cycles"]
+      }
+    }
+  ],
+
+  "refused": [
+    {
+      "name": "the workload suite's model cycles beside the T4 MAXDIM=64 shipped area",
+      "basis": "declared-config",
+      "export": "T4_MAXDIM64_shipped",
+      "area": {"variant": "T4_MAXDIM64_shipped"},
+      "cycles": {
+        "where": "examples/tinytpu/workloads/claims.json, mlp_tiny / mlp_deep / mlp_small",
+        "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1},
+        "rows": ["mlp_tiny 1150", "mlp_deep 2117", "mlp_small 2781"]
+      },
+      "expect": "missing-key",
+      "why": [
+        "This is the pair the end-to-end claim wants -- PyTorch model to cycles",
+        "to area -- and it is not admissible today.",
+        "",
+        "The model cycles were measured at TPU_QD=16 on a csynth of the working",
+        "checkout. The area was synthesised from the T4_MAXDIM64_shipped",
+        "export, emitted from allo 6db2dc7a on 2026-09-22 -- two days before",
+        "63ee6ec7 made QD=16 the default -- and that export records no QD at",
+        "all. Neither its MANIFEST.json nor its README names one.",
+        "",
+        "The absence is the point. QD is the depth of every point-to-point",
+        "channel, so it changes both the area and whether the program finishes",
+        "at all; QD=16 is the whole reason mlp_tiny, mlp_deep and mlp_small",
+        "have RTL numbers. Reading the missing field as 'it was probably the",
+        "default' would be inferring an association that has to be declared,",
+        "and the default at that commit was 8.",
+        "",
+        "What clears it: a re-export of this variant at a recorded QD, and one",
+        "DC run on it. Both are named in the remote tier of e2e_gate.sh. Until",
+        "then the honest statement is that this repository has a verified",
+        "model-to-cycles path and a verified RTL-to-area path and no admissible",
+        "join between them."
+      ]
+    },
+    {
+      "name": "the design's current published row beside the MAXDIM=16 baseline area",
+      "basis": "declared-config",
+      "export": "T4_MAXDIM16_shipped_baseline",
+      "area": {"variant": "T4_MAXDIM16_shipped_baseline"},
+      "cycles": {
+        "where": "examples/tinytpu/reproduce.sh, EXPECTED",
+        "config": {"T": 4, "MAXDIM": 16, "QD": 16, "DMA_WORDS": 1},
+        "rows": ["4x4x4=175", "8x8x8=265", "12x12x12=421",
+                 "16x16x8=482", "16x16x16=674"]
+      },
+      "expect": "missing-key",
+      "why": [
+        "175 / 265 / 421 / 482 / 674 is a TPU_QD=16 row. This export carries",
+        "172 / 262 / 418 / 484 / 686 and records no QD, because it predates the",
+        "default moving. The +4 / +4 / +4 / -1 / -11 between them is the QD",
+        "change itself, which is the clearest possible demonstration that the",
+        "two rows are different machines.",
+        "",
+        "Pairing the current row with this area is a one-line edit that nothing",
+        "else in the tree would catch, and it is wrong. The same-export pairing",
+        "above is the admissible one."
+      ]
+    },
+    {
+      "name": "T8 MAXDIM=64 -- area against the export now in the tree",
+      "basis": "same-export",
+      "export": "T8_MAXDIM64",
+      "area": {"variant": "T8_MAXDIM64"},
+      "cycles": {
+        "where": "T8_MAXDIM64/MANIFEST.json, cycles",
+        "rows": ["- 16x16x16: **490** cycles"]
+      },
+      "expect": "export-superseded",
+      "why": [
+        "Found by this checker rather than declared into it. The T8 area,",
+        "2,481,925 um2, was synthesised on 2026-09-22 from the export at",
+        "7a3c2a17, sv2v_manifest.f md5 6e9b2596. On 2026-09-24 that export was",
+        "replaced -- f0ee3223, 'tinytpu: re-export T=8, MAXDIM=64 against QD=16",
+        "main' -- and the manifest in the tree is now md5 f5617 8f6, 442 lines",
+        "against 433 files recorded by the run.",
+        "",
+        "So the T8 export a reader finds is not the RTL the T8 area describes,",
+        "and the cycles the new export carries (8x8x8 286 ... 64x64x64 6916, at",
+        "the QD=16 it records) were measured on the new one. The area figure is",
+        "not wrong; it is orphaned. It is the only committed TinyTPU export",
+        "that records QD, and it is the one whose area predates the recording.",
+        "",
+        "What clears it: one DC run on the current export. The area will move."
+      ]
+    },
+    {
+      "name": "Gemmini DIM=4, logic only",
+      "basis": "not-our-design",
+      "area": {"variant": "gemmini_DIM4_logiconly"},
+      "expect": "not-our-design",
+      "why": "Berkeley's design, synthesised here for an area comparison at matched capacity. Its cycles come from its own RTL simulation, not from this repository's cosim, and pairing them with our cycle counts would compare two machines."
+    },
+    {
+      "name": "Gemmini DIM=4, full",
+      "basis": "not-our-design",
+      "area": {"variant": "gemmini_DIM4_full"},
+      "expect": "not-our-design",
+      "why": "As above. docs/source/designs/gemmini_comparison.rst states what may and may not be concluded from the pair of areas."
+    },
+    {
+      "name": "Gemmini DIM=8, logic only",
+      "basis": "not-our-design",
+      "area": {"variant": "gemmini_DIM8_logiconly"},
+      "expect": "not-our-design",
+      "why": "As above."
+    },
+    {
+      "name": "Gemmini DIM=8, full",
+      "basis": "not-our-design",
+      "area": {"variant": "gemmini_DIM8_full"},
+      "expect": "not-our-design",
+      "why": "As above, and additionally this run does not close timing: -0.01 ns on 3.33, 80 violating paths. check_numbers.py holds that acknowledgement; a synthesis node reports success when synthesis COMPLETED, not when timing CLOSED."
+    },
+    {
+      "name": "the superseded MAXDIM=16 export",
+      "basis": "declared-config",
+      "export": "T4_MAXDIM16_shipped_baseline",
+      "area": {"variant": "superseded_export_T4_MAXDIM16"},
+      "cycles": {
+        "where": "nowhere -- this figure is quoted only as the superseded one",
+        "config": {"T": 4, "MAXDIM": 16, "QD": 8, "DMA_WORDS": 1},
+        "rows": []
+      },
+      "expect": "no-settings",
+      "why": [
+        "1,271,692 um2, kept because it is cited by name in its own correction",
+        "note. Its results.json carries no settings snapshot at all, so nothing",
+        "records which RTL it read -- which is why it is superseded. It may be",
+        "quoted as a superseded figure and paired with nothing."
+      ]
+    }
+  ]
+}

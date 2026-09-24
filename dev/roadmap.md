@@ -96,7 +96,12 @@ three `dirname` calls from `asic_synthesis/` reach the repository root only from
 ## D. Push-button headline numbers
 
 A headline claim counts only when **a gate enforces it**, not when a page states
-it. **Six of eight are enforced**, up from three.
+it. **Six of eight are enforced**, up from four. The headline here said six
+before the workloads and end-to-end gates existed, which its own table did not
+support -- it listed four. The two that are still not enforced are named rather
+than counted: **CHIA**, whose harness exists and whose repair is unfinished,
+and the **ASIC run**, which has a preflight and needs a Design Compiler
+licence. Neither is an agent-session away.
 
 *Known-failing tests, so nobody chases them.* `pytest tests/` does not collect
 on this host: 25 errors, all `tests/dataflow/aie/*`, no `aie` module. With that
@@ -113,14 +118,38 @@ anything recent: `test_hierachical_mesh::test_2x2`, three in
 | numbers | every published area figure traces to a report | `check_numbers.py` | **enforced** |
 | RTL | cycles bit-exact | inside `reproduce.sh` | **enforced** |
 | CHIA | the loop runs, guards hold, $0 | `test_harness.py` | exists; **repair unfinished** |
-| workloads | real models map and run | `workloads/run.py` | runs, **no gate** |
+| workloads | which models are **verified**, which only **executed** | `workloads/gate.py` | **enforced**, 2026-09-24 |
 | ASIC | area + timing floor, one flow both sides | preflight + sequence | preflight **landed**; a run still needs a licence |
-| **end-to-end** | **PyTorch → cycles → area in one command** | — | **does not exist** |
+| **end-to-end** | **PyTorch → mapping → cycles → area** | `e2e_gate.sh` + `check_pairing.py` | **local tier enforced**; area tier needs a licence |
 
-**The end-to-end gate is the highest-value missing piece.** Every error in this
-work has lived in the seams *between* flows — a configuration claimed but not
-run, a row measured on a different design, an area figure beside cycles from
-other RTL — and no single-flow gate can see any of them.
+**The end-to-end gate is not one command, and must not be written as though it
+were.** Every error in this work has lived in the seams *between* flows — a
+configuration claimed but not run, a row measured on a different design, an
+area figure beside cycles from other RTL — and no single-flow gate can see any
+of them. `examples/tinytpu/e2e_gate.sh` runs the local tier in ~36 s (model →
+specs → mapping → verified cycles, then the join, then the area/report trace)
+and *prints* the remote tier rather than claiming it, because area needs a DC
+licence.
+
+**The join is the part that matters**, and it is enforced with or without a
+licence. `check_pairing.py` admits a cycle/area pair only when both sides cite
+the same committed export (verified by the manifest md5 the run recorded) or
+both declare all four of `T`, `MAXDIM`, `QD`, `DMA_WORDS` and they agree. A
+missing key is *cannot pair*, never *matches*.
+
+Applying it produced two findings on the first run:
+
+- **No model-level cycle count can be paired with any committed area.** The
+  workload numbers are `QD=16`; every committed TinyTPU export predates
+  `63ee6ec7` and records no `QD`. The end-to-end claim reaches cycles and
+  stops, and `pairings.json` records that as a refusal with its reason.
+- **`T8_MAXDIM64`'s area is orphaned.** It was synthesised on 2026-09-22 from
+  the export at `7a3c2a17` (manifest md5 `6e9b2596`); `f0ee3223` re-exported
+  that variant against QD=16 main on 2026-09-24, so the RTL in the tree is not
+  the RTL that area describes. One DC run on the current export clears it.
+
+Both gates test their failure paths: `tests/act/test_gates_negative.py`, 23
+constructed refusals, each asserting the gate says *why*.
 
 The ASIC row is **not** push-button and must not be written as though it were:
 `preflight.py` checks `dc_shell`, the pinned mflowgen, sv2v, the vendored nodes,
@@ -129,7 +158,10 @@ against its recorded md5 — and then prints the sequence. A run still needs a D
 licence and ~70 minutes of a specific machine. Its value is failing in seconds
 rather than an hour in.
 
-**ETA:** workload gate, 1 session. End-to-end, 2 sessions, and only after §C.
+**ETA:** both landed 2026-09-24. What remains is not agent work: one DC run
+on the current `T8_MAXDIM64` export, and a re-export of `T4_MAXDIM64_shipped`
+at a recorded `QD` plus one DC run on it, after which the model-to-area
+refusal above becomes an admissible pairing and the gate will say so itself.
 
 ## E. CHIA reproducible from this repository alone
 

@@ -221,6 +221,29 @@ These are different claims and the suite keeps them apart, on the ladder
 ``act/judge.py`` already defines --- ``legal``, then ``correct``, then
 ``confirmed``.
 
+**And a gate enforces the difference**, which it did not when this page was
+first written. ``workloads/claims.json`` declares, per model, its tier and ---
+for a model at ``confirmed`` --- the RTL measurement that earned it *together
+with the configuration it was measured at*. ``workloads/gate.py`` extracts
+every model, maps every layer, checks bit-exactness against ``isa_ref`` and
+against PyTorch, and then checks the tier:
+
+.. code-block:: bash
+
+    python examples/tinytpu/workloads/gate.py          # ~30 s, no Vitis
+    python examples/tinytpu/workloads/gate.py --simulator
+
+It refuses more than it accepts, and that is the point. A measurement whose
+``T``, ``MAXDIM``, ``QD`` or ``DMA_WORDS`` is not the configuration the gate is
+running is refused as unpairable rather than quoted --- **and a configuration
+key that is absent is "cannot pair", not "matches"**, because an older row
+carries no ``QD`` field at all and the absence dates it. ``mlp_bias`` must
+still refuse, and for the stated reason: a run in which the probe maps cleanly
+fails here, since a gate that made every model pass would be the wrong gate.
+``mlp_wide`` must carry *no* measurement, so the ladder cannot be climbed by
+editing a table. The failure path is tested rather than assumed, in
+``tests/act/test_gates_negative.py``.
+
 .. list-table::
    :header-rows: 1
 
