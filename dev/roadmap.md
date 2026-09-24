@@ -147,6 +147,20 @@ Recorded because each cost real work today.
   allo` still worked from inside a checkout and failed everywhere else, so it
   surfaced only when an agent ran a docs build from its own worktree. Removing
   a worktree is not free if anything outside git references it.
+- **Never resolve a repository root by counting levels.** Search upward for a
+  marker, or take the path as an argument. Hit three times in two days: a
+  construct script counting three `dirname`s landed on `examples/` rather than
+  the root and could not find its node library from a clean checkout (and was
+  *announced fixed without being run* -- a different check was run and taken as
+  coverage); the TinyTPU rename found ~30 `ROOT`/`REPO` values derived by
+  counting, **three already wrong** and made correct only by accident of the
+  move; and the first fix was itself a re-count that happened to suit the new
+  layout. A relative path that encodes tree shape is a latent break in any
+  repository being reorganised, and this one is mid-reorganisation.
+- **A licence-free check cannot report a licensed branch as passing.** The
+  ASIC preflight's ADK-checksum branch reports as *correctly missing* without a
+  licence, which is not the same as passing. Say which branches a run could not
+  reach rather than reporting the run as green.
 - **Read a gate's output, never its exit code**, and confirm what ran is what is
   being claimed. Four instruments were caught reporting success without having
   run; three further checks ran against the wrong object and passed.
