@@ -101,6 +101,14 @@ tests/xlscc_tests/**/test
 # Filled-in CHIA credentials template (GCP project/keys) -- never commit
 chia.env
 
+# Per-worktree scratch: build logs, Sphinx output, ad-hoc runs. Anything a
+# command writes for its own use and nothing reads back. NOT just the tinytpu
+# one below -- `reproduce.sh`, the docs build and the gate runs all write a
+# top-level `.scratch/`, and without this line a `git add -A` commits a whole
+# generated HTML tree (which is how 398 files of Sphinx output reached a merge
+# branch once).
+.scratch/
+
 # tinytpu_vitis verification scratch (mutate.py, ad-hoc runs)
 examples/accelerator/tinytpu_vitis/.mutants/
 examples/accelerator/tinytpu_vitis/.scratch/
