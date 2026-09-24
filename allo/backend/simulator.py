@@ -1678,6 +1678,13 @@ class LLVMOMPModule(LLVMModule):
                 "finalize-memref-to-llvm,"
                 "convert-func-to-llvm,"
                 "convert-index-to-llvm,"
+                # EXT (EVA div/sqrt): the dataflow simulator pipeline lowered
+                # arith/func/memref/etc. but NOT the math dialect, so math.*
+                # (e.g. allo.sqrt -> math.SqrtOp) reached LLVM-IR translation
+                # with no registered interface ("missing LLVMTranslationDialect
+                # Interface ... math.sqrt"). Lower it to llvm.intr.* first so the
+                # JIT can execute it. No-op for designs without math ops.
+                "convert-math-to-llvm,"
                 "convert-arith-to-llvm,"
                 "convert-cf-to-llvm,"
                 "convert-openmp-to-llvm,"
