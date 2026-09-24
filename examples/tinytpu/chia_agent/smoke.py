@@ -27,7 +27,9 @@ from loop import (AGENT_DIR, ALLO_PYTHON, LLVM_BUILD_DIR, REPO_ROOT,  # noqa: E4
 
 #: Per-run spend cap for the smoke call (one prompt; ~$0.05 measured).
 SMOKE_CAP_USD = 5.0
-#: The unit names in microarch_isa.py; the model can only know them by reading.
+#: The unit names in `ip/tinytpu.py`'s `units()`; the model can only know them
+#: by reading the spec. The hardware left `microarch_isa.py` for `ip/units/`,
+#: so the question has to be asked of the file that now wires them together.
 EXPECTED = ("sequencer", "dma_ld", "spm", "vru", "accu")
 
 
@@ -54,12 +56,14 @@ def main() -> int:
         print(f"      gate OK: {v['gate']}")
         print("[2/3] one model call through the MCP tool (Vertex AI)...")
         calls = []
-        response = ask(make_llm(tool), tool,
-                       "Call tpusmoke_read_spec exactly once. Then reply with a "
-                       "single line listing the names of the @df.kernel functions "
-                       "defined inside the tinytpu_isa region in microarch_isa.py, "
+        tag = f"chia-smoke {int(started)}"
+        budget = Budget(SMOKE_CAP_USD, int(started * 1000), tag, "smoke")
+        response = ask(make_llm(tool, budget.title), tool,
+                       "Call tpusmoke_read_spec with path='ip/tinytpu.py' "
+                       "exactly once. Then reply with a single line listing the "
+                       "unit names its units() function returns, in order, "
                        "comma separated, and nothing else.",
-                       Budget(SMOKE_CAP_USD, int(started * 1000)), "smoke", calls)
+                       budget, "smoke", calls)
         text = str(response.result)
         print(f"      model replied: {text.strip()[:300]}")
         print("[3/3] checking the reply came from the spec...")
@@ -68,7 +72,7 @@ def main() -> int:
             print(f"FAIL: reply did not name {missing}")
             return 1
         print(f"SMOKE OK ({time.time() - started:.0f}s, "
-              f"${calls[0].get('cost_usd', 0):.3f})")
+              f"${calls[0].get('usd', 0):.3f})")
         return 0
     finally:
         tool.stop()
