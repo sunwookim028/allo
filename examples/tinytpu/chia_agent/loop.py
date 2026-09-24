@@ -576,7 +576,7 @@ it relies on anything the tests happen not to exercise.
                 _record(log_path, {"iteration": iteration, "kind": "candidate",
                                    "diff": "", "verdict": None, "accepted": False,
                                    "reason": "no diff", "agent_summary": summary,
-                                   "llm_usd": round(sum(c.get("cost_usd", 0) for c
+                                   "llm_usd": round(sum(c.get("usd", 0) for c
                                                         in calls[n_calls:]), 4),
                                    "seconds": round(time.time() - started, 1),
                                    "llm_calls": calls[n_calls:]})
@@ -605,7 +605,7 @@ it relies on anything the tests happen not to exercise.
 
             elapsed = time.time() - started
             diff = tool.diff_against(best_snapshot)
-            usd = round(sum(c.get("cost_usd", 0) for c in calls[n_calls:]), 4)
+            usd = round(sum(c.get("usd", 0) for c in calls[n_calls:]), 4)
             entry = {"iteration": iteration, "kind": "candidate", "diff": diff,
                      "verdict": verdict, "seconds": round(elapsed, 1),
                      "agent_summary": summary, "llm_usd": usd,

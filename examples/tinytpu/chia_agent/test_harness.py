@@ -417,9 +417,16 @@ def phase_s():
             os.environ.pop("CHIA_MAIN_BASE", None)
             if old is not None:
                 os.environ["CHIA_MAIN_BASE"] = old
-        check("s.drift refused", "setup: an evaluator file differs from the base",
+        # What this reaches at THIS commit is the "absent at that base" branch:
+        # the evaluator has exactly one commit since the design moved to
+        # examples/tinytpu/, so no post-move base carries it with different
+        # content. That is the branch that was firing in production -- f59a65f6
+        # predated the move -- and the other branch shares the same code path
+        # two lines down. Named rather than glossed.
+        check("s.drift refused", "setup: refused, naming the evaluator file",
               got, got.startswith("setup:")
-              and ("differs from main" in got or "cannot read frozen" in got))
+              and ("differs from main" in got or "cannot read frozen" in got)
+              and "cosim.py" in got)
         # An UNTOUCHED file's pre-existing violation is not the candidate's.
         try:
             ev.compose(spec, tmp / "tree_ok", head_ref)
