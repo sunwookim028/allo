@@ -65,7 +65,7 @@ for arg in "$@"; do
     case "$arg" in
         --simulator) SIMULATOR="--simulator" ;;
         --preflight) PREFLIGHT=1 ;;
-        -h|--help) sed -n '3,42p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help) sed -n '4,42p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
