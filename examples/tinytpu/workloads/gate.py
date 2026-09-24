@@ -274,7 +274,7 @@ def run_model(name, entry, module, docs_root, specs_dir, live, report):
                        f"layer of it ran, not when some did.")
         check_quotes(entry, name, docs_root)
         report.append((name, "confirmed", declared_total, chained,
-                       len(extraction.layers)))
+                       len(extraction.layers), len(extraction.refusals)))
     elif tier == "correct":
         if run is not None or (entry.get("measured") or []):
             raise Fail(
@@ -287,12 +287,12 @@ def run_model(name, entry, module, docs_root, specs_dir, live, report):
                        f"not confirmed. 'Not measured' without a reason is "
                        f"indistinguishable from 'not attempted'.")
         report.append((name, "correct", None, chained,
-                       len(extraction.layers)))
+                       len(extraction.layers), len(extraction.refusals)))
     else:
         if entry.get("measured"):
             raise Fail(f"{name} is the probe and carries a measurement")
         report.append((name, "probe", None, None,
-                       len(extraction.refusals)))
+                       len(extraction.layers), len(extraction.refusals)))
 
 
 def _fmt(config):
@@ -366,16 +366,16 @@ def main(argv=None):
 
     print(f"\n  {'model':12s} {'tier':10s} {'layers':>6s} {'RTL cycles':>11s} "
           f"  what it is")
-    for name, tier, total, chained, count in report:
+    for name, tier, total, chained, count, refused in report:
         if tier == "confirmed":
-            what = (f"VERIFIED and measured; {chained} bytes match PyTorch")
+            what = f"VERIFIED and measured; {chained} bytes match PyTorch"
             cycles = f"{total}"
         elif tier == "correct":
             what = (f"VERIFIED, only executed in software; "
                     f"{chained} bytes match PyTorch")
             cycles = "--"
         else:
-            what = "the probe: refuses, as it must"
+            what = (f"the probe: {refused} refusal(s), as declared")
             cycles = "--"
         print(f"  {name:12s} {tier:10s} {count:>6d} {cycles:>11s}   {what}")
 
