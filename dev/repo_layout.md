@@ -26,29 +26,84 @@ scratch output in a place that implies it is part of the project.
 
 ## Target layout
 
+Revised 2026-09-24 after reading upstream's actual conventions. The first draft
+proposed a `tools/` root; upstream has no such thing, and inventing a root for
+work that has a natural home is how a fork drifts from the project it tracks.
+
+Upstream's conventions, as they actually are:
+
+- **`allo/`** is the compiler package. `allo/backend/` is *one module per
+  target* (`catapult.py`, `hls.py`, `llvm.py`, `tapa.py`, `vitis.py`, `xls.py`,
+  `aie/`). Alongside it sit non-backend subpackages — **`allo/autoscheduler/`**,
+  `allo/frontend/`, `allo/harness/`, `allo/ir/`, `allo/library/`,
+  `allo/primitives/` — so a search or analysis component does *not* have to be
+  a backend to live in `allo/`.
+- **`examples/`** holds designs.
+- **`scripts/`** holds setup and infrastructure, and already contains
+  `act-test-recipe.sh`.
+
+So:
+
 ```
-examples/                 one directory per design, each self-describing
+allo/
+  backend/systemc.py      the SystemC emitter, beside catapult.py
+                          (with mlir/lib/Translation/EmitSystemC.cpp)
+  act/                    the mapping compiler: spec schema, validation,
+                          mapping search, the tiered judge
+                          -- precedent is allo/autoscheduler/, not backend/
+
+chia/                     the agentic loop, at the root
+
+scripts/asic/             the PD flow: construct graph, RTL export, stubs,
+                          preflight, extractor, number checkers
+
+examples/
   feather/                (exists)
   tinytpu/                <- examples/accelerator/tinytpu_vitis/
-  minitpu/                <- to come
-  eva/                    <- from the SystemC-emitter repository
-  systemc_rtlsim/         (exists)
-
-tools/                    flows, usable by any design
-  act/                    mapping compiler: spec -> program, and its judge
-  chia/                   the agentic loop, its guards and its harness
-  asic/                   PD flow: construct graph, RTL lists, stubs,
-                          preflight, extractor, checkers
-  rtl_export/             design -> flat RTL + manifests
-
-allo/                     core IR, passes, schedule primitives (unchanged)
-docs/source/              published pages
-dev/                      working notes, not published
+    ip/                   its units
+    act/                  its ISA binding and workload corpus
+    asic/reports/         its synthesis results
+    reproduce.sh
+  minitpu/  eva/  systemc/
 ```
 
-**A design directory owns:** its units, its ISA, its programs, its own
-reproduce script, and its own results. **A tool directory owns:** everything
-that would otherwise be copied into the second design.
+**Why each landed where it did.**
+
+**The SystemC emitter is a backend**, unambiguously: it emits for a target, and
+`catapult.py` — the flow it feeds — is already a sibling. No argument needed.
+
+**ACT is not a backend and is still part of the compiler.** It does not emit for
+a target; it searches a mapping space and grades the result, which is what
+`allo/autoscheduler/` does. That precedent is the whole justification for
+`allo/act/` rather than `allo/backend/act.py`.
+
+**CHIA is at the root because it is not Allo.** It drives the compiler, the
+flows and the gates; it spends real money; it has its own guards and sandbox.
+Putting it inside `allo/` would imply that importing Allo imports an agent
+harness. It is the one component that genuinely earns a new root.
+
+**The PD flow goes under `scripts/` because it is infrastructure, not
+compilation.** It consumes RTL that Allo already emitted and runs external EDA
+tools; nothing imports it. `scripts/` is where upstream keeps exactly this kind
+of thing, and `act-test-recipe.sh` shows the fork has used it that way already.
+
+**Results stay with the design, the flow does not.** `examples/tinytpu/asic/
+reports/` holds that design's numbers; `scripts/asic/` holds the machinery every
+design shares. This resolves the tension that made `tools/` tempting: the thing
+that must be shared and the thing that must not are different things.
+
+**Two corrections to the first draft, both from the same test** — *does this act
+on designs, or is it a design?*
+
+- `examples/systemc_rtlsim/` is **not a design**. It is a cross-check harness
+  (`mgc_shim.v`, `ref_xsim/`, `run_mulacc.sh`, `REPRO.sh`) validating SystemC
+  output against RTL simulation. It belongs with the emitter's own example
+  material, as `examples/systemc/`, matching where the upstream-of-this-work
+  repository already keeps it.
+- `rtl_export/` was a bad name for something that is not a separate tool.
+  `export_rtl.py` packages a configuration's Verilog *for the ASIC handoff* —
+  its own docstring says so. It is a stage of the PD flow:
+  `scripts/asic/export.py`.
 
 ## The honest caveat about "generic"
 

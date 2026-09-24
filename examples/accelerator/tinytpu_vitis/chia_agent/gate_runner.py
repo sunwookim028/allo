@@ -37,7 +37,8 @@ unforgeable:
 Only then is `CHIA-GATE <check> OK <nonce>` printed; the evaluator requires
 that exact line. The check's own output passes through unchanged, for the log.
 
-    printf '%s\\n' NONCE | python gate_runner.py {bench_isa|stress_isa|cosim|param_check} [args...]
+    printf '%s\\n' NONCE | python gate_runner.py \\
+        {bench_isa|stress_isa|cosim|param_check|codesign|codesign_cosim} [args...]
 """
 
 import importlib
@@ -54,6 +55,12 @@ CHECKS = {
     "stress_isa": os.path.join(DESIGN, "stress_isa.py"),
     "cosim": os.path.join(DESIGN, "cosim.py"),
     "param_check": os.path.join(HERE, "param_check.py"),
+    # The co-design loop's two frozen stages: the exhaustive mapspace
+    # enumeration with its refusal histogram, and cosim of the program the
+    # mapper chose for this hardware. Both live here rather than in the design
+    # directory because the agent may not edit them.
+    "codesign": os.path.join(HERE, "codesign_gate.py"),
+    "codesign_cosim": os.path.join(HERE, "codesign_cosim.py"),
 }
 #: Module-name prefixes whose attributes the checks compute with.
 WATCHED = ("numpy", "allo", "builtins")

@@ -20,7 +20,28 @@ the objective:
     tinytpu_vitis/isa_ref.py      (the ISA as numpy; stress_isa's reference)
     tinytpu_vitis/kpn_model.py    (stress_isa's deadlock diagnosis)
     chia_agent/gate_runner.py     (runs each check, vouches for its verdict)
+    chia_agent/mapspace.py        (THE MAPPER: its enumerator, its selection
+                                   rule, and its objective)
+    chia_agent/codesign_gate.py   (the exhaustive mapspace enumeration)
+    chia_agent/codesign_cosim.py  (binds the mapper's pick into cosim.py)
     examples/__init__.py
+
+With `--codesign` two more stages run, and they are the co-design loop:
+
+3. **mapspace** -- `codesign_gate.py` enumerates the WHOLE mapspace for each
+   scored shape against this candidate's hardware, records how many nests
+   became encodable and which constraint refused the rest, proves every
+   survivor correct against `isa_ref.run`, and requires the canonical nest to
+   re-emit the candidate's own `gemm_program` word for word. The inner loop is
+   exhaustive, not agentic: the agent proposes hardware, and enumeration -- not
+   the agent -- answers what that hardware can run. A non-exhaustive inner
+   search would make this a comparison of search quality instead of hardware.
+4. **score** -- `codesign_cosim.py` runs main's frozen `cosim.py` with
+   `gemm_program` bound, in frozen code, to the nest the mapper chose. The
+   reported objective is a PAIR: cosim cycles per shape and the csynth resource
+   estimate, never collapsed into one number. No modelled cycle count is ever
+   reported; the only proxy in the loop ranks nests inside one candidate, in
+   `mapspace.py`, and never leaves it.
 
 The two tiers:
 
@@ -116,11 +137,18 @@ DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "shapes.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
+#: The co-design loop's frozen half: the mapper (its enumerator, its selection
+#: rule and its objective), the mapspace gate, and the cosim driver that binds
+#: the mapper's chosen program into main's frozen `cosim.py`. The agent edits
+#: the hardware and its encoding; it may not move the thing that scores it.
+CODESIGN = [f"{PKG}/chia_agent/{f}" for f in
+            ("mapspace.py", "codesign_gate.py", "codesign_cosim.py")]
 FROZEN = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
     GATE_RUNNER,
     PARAM_CHECK,
+    *CODESIGN,
 ]
 #: The parametricity gate: configurations the candidate is rebuilt at and must
 #: be exact at (param_check.py), besides the scored T=4 / MAXDIM=16. 12 is
@@ -387,6 +415,70 @@ def lines_with(text, needle):
     return [l.strip() for l in text.splitlines() if needle in l]
 
 
+# -- the co-design stages ----------------------------------------------------
+_MAP_COUNT = re.compile(r"^MAPSPACE (\S+): (\d+)/(\d+) encodable$", re.M)
+_MAP_REFUSED = re.compile(r"^MAPSPACE (\S+): refused\s+(\d+)\s+(.+?)\s*$", re.M)
+_MAP_CHOSEN = re.compile(
+    r"^MAPSPACE (\S+): CHOSEN (.+?) \((\d+) fetches, (\d+) words, "
+    r"IMEM_SIZE=(\d+)\)$", re.M)
+
+
+def parse_mapspace(out):
+    """The refusal histogram, per shape, out of `codesign_gate.py`'s lines.
+
+    This is the co-design signal, and it is parsed from a vouched gate's own
+    output: how many nests this hardware can encode, and which constraint
+    refused the rest. It is a REPORT, never the objective -- the objective is
+    the pair (cosim cycles, csynth resources) below.
+    """
+    shapes = {}
+    for tag, enc, total in _MAP_COUNT.findall(out):
+        shapes[tag] = {"encodable": int(enc), "total": int(total), "refused": {}}
+    for tag, n, cause in _MAP_REFUSED.findall(out):
+        shapes.setdefault(tag, {"refused": {}})["refused"][cause] = int(n)
+    for tag, name, dyn, words, imem in _MAP_CHOSEN.findall(out):
+        shapes.setdefault(tag, {"refused": {}}).update(
+            chosen=name, fetches=int(dyn), words=int(words), imem_size=int(imem))
+    return shapes
+
+
+def mapspace_gate(tree, env, work, shapes, verify_now):
+    """Enumerate the mapspace exhaustively and prove every survivor correct."""
+    ok, rc, out, sec = vouched("codesign", tree, env, work, tree, GATE_TIMEOUT,
+                               args=(",".join(shapes),))
+    verify_now("codesign")
+    if not ok or not re.search(r"^  MAPSPACE OK$", out, re.M) \
+            or "MAPSPACE FAILED" in out or "SEAM OK" not in out:
+        raise Reject("gate:mapspace", out[-4000:])
+    found = parse_mapspace(out)
+    missing = [s for s in shapes if s not in found]
+    if missing:
+        raise Reject("gate:mapspace", f"no mapspace report for {missing}\n"
+                                      f"{out[-3000:]}")
+    for s in shapes:
+        if not found[s].get("encodable") or not found[s].get("chosen"):
+            raise Reject("gate:mapspace",
+                         f"{s}: {found[s].get('encodable')} encodable nests")
+    return {"shapes": found, "seconds": round(sec, 1),
+            "rule": "min(instruction fetches incl. LOOP/ENDLOOP, static words, "
+                    "nest) over the nests this "
+                    "hardware can encode; exhaustive over the mapspace",
+            "vouched": True}
+
+
+def codesign_score(tree, env, work: Path, shapes, verify_now):
+    """cosim of the mapper's chosen program: the measured half of the objective.
+
+    Identical to `score()` except that the check is `codesign_cosim`, which
+    binds `cosim.gemm_program` to the mapper's pick in frozen code. Every
+    independent check on the number is the same: one row per shape,
+    `mismatches = 0` in the summary AND in that shape's own log, a PASS, the
+    cycle count agreeing with the log's simulated time, the csynth clock met,
+    and no interface-latency override anywhere.
+    """
+    return _cosim("codesign_cosim", tree, env, work, shapes, verify_now)
+
+
 def parse_synth(prj: Path):
     xml = prj / "out.prj/solution1/syn/report/csynth.xml"
     if not xml.exists():
@@ -422,13 +514,17 @@ def check_memory_model(prj: Path):
 
 
 def score(tree, env, work: Path, shapes, verify_now):
+    return _cosim("cosim", tree, env, work, shapes, verify_now)
+
+
+def _cosim(check, tree, env, work: Path, shapes, verify_now):
     prj = work / "isa_sweep.prj"
     # cosim.py (main since e620576d) puts its project next to itself by default,
     # which is the read-only tree here; TPU_PRJ is a path, not a memory-model
     # knob, and is the only TPU_* variable set.
     env = dict(env, TPU_SHAPES=",".join(shapes), TPU_PRJ=str(prj))
-    ok, rc, out, sec = vouched("cosim", tree, env, work, work, COSIM_TIMEOUT)
-    verify_now("cosim")
+    ok, rc, out, sec = vouched(check, tree, env, work, work, COSIM_TIMEOUT)
+    verify_now(check)
     if not ok:
         raise Reject("cosim", out[-4000:])
     synth = parse_synth(prj)
@@ -457,7 +553,11 @@ def score(tree, env, work: Path, shapes, verify_now):
                 raise Reject("cosim", f"{s}: report says {n} cycles, simulated "
                                       f"time says {sim_cycles:.0f}")
         cycles[s] = int(n)
-    return cycles, synth, round(sec, 1)
+    # `chosen`: which nest the mapper's cosim driver actually put under the RTL,
+    # read back out of the scoring process's own output. Empty for plain `cosim`.
+    chosen = {tag: name for tag, name in re.findall(
+        r"^MAPSPACE (\S+): CHOSEN (.+?) of \d+/\d+ encodable$", out, re.M)}
+    return cycles, synth, round(sec, 1), chosen
 
 
 def main():
@@ -466,13 +566,22 @@ def main():
     ap.add_argument("--work", type=Path, required=True)
     ap.add_argument("--shapes", default=",".join(SEARCH_SHAPES))
     ap.add_argument("--gate-only", action="store_true")
+    ap.add_argument("--codesign", action="store_true",
+                    help="run the co-design stages: the exhaustive mapspace "
+                         "enumeration with its refusal histogram, and cosim of "
+                         "the program the frozen mapper chose for this hardware")
     a = ap.parse_args()
     shapes = [s for s in a.shapes.split(",") if s]
     started = time.time()
     result = {"ok": False, "frozen_ref": FROZEN_REF, "shapes": shapes,
+              "codesign": a.codesign,
               "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim "
                              "(RTL), m_axi_latency default 0, one bit-exact TB "
                              "per shape"}
+    if a.codesign:
+        result["measurement"] += ("; the program under the RTL is the best nest "
+                                  "the frozen mapper can encode on this "
+                                  "hardware, chosen by exhaustive enumeration")
     try:
         bad = [s for s in shapes if s not in ALL_SHAPES]
         if bad:
@@ -501,10 +610,40 @@ def main():
         result["invariants"] = check_invariants(tree, env, work)
         verify_now("the import check")
         result["gate"] = gate(tree, env, work, verify_now)
+        if a.codesign:
+            result["mapspace"] = mapspace_gate(tree, env, work, shapes, verify_now)
         if not a.gate_only:
-            cyc, synth, sec = score(tree, env, work, shapes, verify_now)
+            runner = codesign_score if a.codesign else score
+            cyc, synth, sec, chosen = runner(tree, env, work, shapes, verify_now)
             result.update(cycles=cyc, total_cycles=sum(cyc.values()),
                           synth=synth, cosim_seconds=sec)
+            if chosen:
+                result["scored_nest"] = chosen
+                # The nest the mapspace gate chose and the nest that was
+                # actually cosimmed are two independent runs of the same frozen
+                # rule. If they disagree the candidate is not deterministic, and
+                # the cycle count does not belong to the reported mapping.
+                planned = {s: v.get("chosen")
+                           for s, v in result.get("mapspace", {})
+                           .get("shapes", {}).items()}
+                bad = {s: (planned.get(s), chosen.get(s)) for s in shapes
+                       if planned.get(s) is not None
+                       and planned[s] != chosen.get(s)}
+                if bad:
+                    raise Reject("nondeterministic",
+                                 f"the mapper chose a different nest in the gate "
+                                 f"and in the scorer: {bad}")
+            # The objective is a PAIR and is never collapsed: cycles per shape,
+            # and the csynth resource estimate for the one RTL build. A
+            # candidate that buys cycles with block RAM is a trade, not a win;
+            # `loop.py` classifies it and reports both terms.
+            result["objective"] = {
+                "cycles": cyc,
+                "resources": dict(synth.get("area", {}),
+                                  estimated_ns=synth.get("estimated_ns")),
+                "note": "two terms, reported as a pair per shape; not summed "
+                        "into one score",
+            }
         result["ok"] = True
     except Reject as r:
         result.update(stage=r.stage, detail=r.detail[-4000:])
