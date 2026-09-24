@@ -323,6 +323,60 @@ scrubbed before cosim -- so it changed the default. Writing the prediction down
 first is what makes calling it a rediscovery a check rather than an argument.
 The channel depth was not predicted.
 
+Which half won, measured afterwards at $0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The win is two changes, so ``accept.py`` was run again on the burst-widening
+half alone, reusing the control the first acceptance had measured
+(``accept-burst-only/``). No model call, so it costs nothing.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 11 11 13 12 13 12
+
+   * -
+     - 4x4x4
+     - 8x8x8
+     - 12x12x12
+     - 16x16x8
+     - 16x16x16
+     - total
+   * - control
+     - 175
+     - 265
+     - 421
+     - 482
+     - 674
+     - --
+   * - both changes
+     - 175
+     - 265
+     - 386
+     - 435
+     - 627
+     - **-129**
+   * - burst widening alone
+     - 175
+     - 265
+     - 386
+     - 435
+     - 627
+     - **-129**
+
+**Identical, shape for shape.** The ``ac2sp`` deepening is worth **exactly zero
+cycles** over the five shapes, and the whole win is the half the
+pre-registration named before the run.
+
+That agrees, from an independent measurement on a different harness, with what
+the objective work found separately: ``channel_depth`` sums to zero over the
+five published shapes. That work also established what the depth change *does*
+buy -- three legal programs going from hanging to bit-exact -- and that **no
+term in either objective scores it**. So the agent proposed a change whose value
+the objective cannot see, and kept it because the objective did not penalise it
+either. This objective would have accepted that change for no reason and would
+equally have discarded it for no reason; neither outcome is a judgement about
+the change.
+
 A recorded negative, rediscovered from three lines away
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
