@@ -119,6 +119,89 @@ Allo's scheduling primitives are translated to Catapult-specific pragmas:
    s.unroll("j")        # Generates: #pragma hls_unroll
    s.unroll("k", 4)     # Generates: #pragma hls_unroll 4
 
+**Bit operations are AC, not AP**
+
+The Catapult emitter inherits most of its C++ codegen from the Vitis emitter,
+and bit indexing and slicing are where the two languages genuinely differ.
+Vitis writes a range on an ``ap_int``; Catapult has no ``ap_int`` at all, so
+the same text is a hard front-end error (CRD-20, "identifier ap_int is
+undefined"). The AC spelling is a member call:
+
+.. code-block:: cpp
+
+   // Vitis (NOT accepted by Catapult)
+   ap_int<64> v16_tmp = v15;   v16 = v16_tmp(15, 0);
+
+   // Catapult
+   ac_int<64, false> _bs_v16 = v15;   v16 = _bs_v16.slc<16>(0);
+
+``slc<W>(lo)`` reads ``W`` bits starting at ``lo`` and ``set_slc(lo, v)``
+writes ``v``'s width, so ``W`` is ``hi - lo + 1``. The temporary exists because
+the value being sliced is often a plain C integer (``uint64_t``), which has no
+``.slc``; its **signedness is taken from the source type**, because
+``slc<W>()`` returns ``ac_int<W, S>`` with ``S`` inherited from the object it
+is called on -- a signed temporary over an unsigned source sign-extends a slice
+that is later widened, which compiles and returns the wrong number.
+
+A second difference: ``ac_int`` defines no implicit conversion to a C integer
+beyond 64 bits, so an index computed wide and then narrowed needs the
+conversion spelled out (CRD-413):
+
+.. code-block:: cpp
+
+   ac_int<65, true> v35 = v34 + 8;
+   int v36 = v35.to_int64();          // NOT `int v36 = v35;`
+
+.. _catapult-emit-gate:
+
+The emit gate: every project is compiled before it is handed off
+-----------------------------------------------------------------
+Both of the constructs above were emitted for months and were first seen on a
+licence host, where they cost a TinyTPU power run: ``go analyze`` stopped after
+7 s with 100 errors, no schedule, no simulation and no power. Neither needs a
+licence to find. ``hlslibs`` publishes ``ac_types`` under Apache-2.0, and plain
+``g++`` against it rejects both.
+
+So ``s.build(target="catapult", ...)`` now compiles the ``kernel.cpp`` it just
+wrote, in the same call that writes it -- not in whichever script does the
+handoff, because an emitter that can emit uncompilable code should fail where
+it emits. The check has two stages:
+
+1. a **text** stage that rejects Vitis-only constructs by name (``ap_int``,
+   ``ap_uint``, ``ap_fixed``, ``hls::stream``) and needs nothing installed;
+2. a **compile** stage, ``g++ -std=c++11 -fsyntax-only`` against ``ac_types``,
+   which catches everything a regex cannot -- notably the >64-bit narrowing,
+   which depends on widths.
+
+``ac_types`` is looked for in this order, first hit wins:
+
+.. code-block:: text
+
+   $ALLO_AC_TYPES_INCLUDE            # explicit; the directory holding ac_int.h
+   $MGC_HOME/shared/include          # Catapult's own copy, on a licence host
+   ~/.cache/allo/ac_types/include    # an hlslibs checkout, cached per host
+   $ALLO_AC_TYPES_HOME/include
+
+On a host with none of them the compile stage **skips loudly** -- a banner on
+stderr saying the kernel was not compiled -- because a silent skip is exactly
+how this class of defect survived. To get it:
+
+.. code-block:: bash
+
+   git clone --depth 1 https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+
+Two environment variables control the gate. ``ALLO_REQUIRE_AC_TYPES=1`` turns
+the loud skip into a failure, which is what CI and any script that produces a
+handoff should set. ``ALLO_SKIP_CATAPULT_GATE=1`` disables the gate entirely
+and says so on stderr.
+
+What the gate does **not** cover: it is Catapult's *front end*, not Catapult.
+It says the C++ parses and type-checks; it says nothing about whether the
+design schedules, whether a loop meets its II, or whether a directive names a
+loop that exists. Those still fail on the licence host. It is also
+``ac_types`` only -- a project that additionally needs ``matchlib_connections``
+(the SystemC flow) is checked by the SystemC emitter's own path, not this one.
+
 Project Structure
 -----------------
 The generated project (e.g., ``vvadd.prj``) includes:

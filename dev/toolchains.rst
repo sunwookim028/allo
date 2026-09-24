@@ -166,6 +166,32 @@ reproduce or re-point every row. The conda env, ``LLVM_BUILD_DIR`` and
 |                                                |                                             | cites Xcelium cosim results from elsewhere.)    |
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
 
+hlslibs ``ac_types`` (no Catapult licence needed)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Catapult itself is not installed here, but its *data types* are open source,
+and that is enough to compile an emitted Catapult ``kernel.cpp`` with plain
+``g++``. This host has an hlslibs checkout (29.3.0) at::
+
+    ~/.cache/allo/ac_types/include        # holds ac_int.h, ac_fixed.h, ac_std_float.h, ...
+
+which is the third place the Catapult emit gate looks (the gate is documented
+on the published Catapult page, ``docs/source/backends/catapult.rst``), after ``$ALLO_AC_TYPES_INCLUDE`` and ``$MGC_HOME/shared/include``. It is
+a cache, not a checked-in copy -- recreate it with::
+
+    git clone --depth 1 https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+
+Without it, ``s.build(target="catapult", ...)`` still runs the gate's text
+stage but skips the compile stage with a banner on stderr. Any script that
+produces a handoff should export ``ALLO_REQUIRE_AC_TYPES=1`` so the skip is a
+failure instead.
+
+There is also a 2016-vintage vendored copy at
+``~/chipyard/generators/nvdla/src/main/resources/hw/cmod/hls/include``. It is
+**not** a substitute: it has no ``ac_std_float.h``, so any kernel with an
+``f32`` operand (which the emitter maps to ``ac_ieee_float<binary32>``) will
+not compile against it.
+
 Vitis binutils vs. glibc ``.relr.dyn``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

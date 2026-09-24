@@ -6,6 +6,7 @@ import os
 import re
 import io
 import signal
+import sys
 import subprocess
 import time
 import numpy as np
@@ -38,6 +39,7 @@ from .tapa import (
     codegen_tapa_host,
 )
 from .catapult import (
+    check_emitted_cpp,
     codegen_tcl as codegen_tcl_catapult,
     codegen_host as codegen_host_catapult,
     parse_catapult_report,
@@ -803,6 +805,24 @@ class HLSModule:
                         os.path.join(project, "run.tcl"), "w", encoding="utf-8"
                     ) as tcl_file:
                         tcl_file.write(new_tcl)
+
+            # The emitted project must COMPILE. A Catapult C++ project that
+            # does not is 100 front-end errors on a licence host and no
+            # schedule, no simulation and no power -- which is what happened to
+            # TinyTPU's power handoff on 2026-09-24. The check is a g++
+            # -fsyntax-only against hlslibs ac_types and costs under a second;
+            # it is here, at emission, rather than in whichever script does the
+            # handoff, because every one of those scripts would otherwise have
+            # to remember. ALLO_SKIP_CATAPULT_GATE=1 disables it (and says so).
+            if platform == "catapult":
+                if os.environ.get("ALLO_SKIP_CATAPULT_GATE", "") not in ("", "0"):
+                    print(
+                        "[warn] Catapult emit gate DISABLED by "
+                        "ALLO_SKIP_CATAPULT_GATE; kernel.cpp is unchecked.",
+                        file=sys.stderr,
+                    )
+                else:
+                    check_emitted_cpp(os.path.join(project, "kernel.cpp"))
 
     def __repr__(self):
         if self.mode is None:

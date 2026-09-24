@@ -699,5 +699,203 @@ def test_ppa_accepts_a_testbench_already_in_the_project():
             os.path.join(tmpdir, "run.tcl"), encoding="utf-8"
         ).read()
 
+
+# =============================================================================
+# Bit ops must be emitted in ac_int, not ap_int -- and must still be RIGHT
+#
+# TinyTPU's power handoff died in Catapult's C++ front end with 100 errors
+# because the Catapult emitter inherited Vitis's bit-op codegen: `ap_int<64> t
+# = x; y = t(15, 0);` (CRD-20, 88 times) and implicit narrowing of a >64-bit
+# ac_int to int (CRD-413, 12 times). Both reproduce with plain g++ against
+# hlslibs ac_types, so both belong here rather than on the licence host. See
+# dev/records/catapult_handoff/ppa_tinytpu/zhang21_run_2026-09-24/.
+# =============================================================================
+
+_N_BITS = 8
+
+
+def _bitops_schedule():
+    from allo.ir.types import uint64
+
+    def bitops(A: uint64[8], B: int32[8], C: int32[8], D: int32[8]):
+        for i in range(8):
+            B[i] = A[i][0:16]  # get slice at offset 0
+            C[i] = A[i][20:26]  # get slice at a nonzero offset
+            x: uint64 = A[i]
+            x[8:16] = 0xAB  # set slice
+            D[i] = x[0:32] + A[i][40]  # set-slice readback, and a get bit
+
+    return allo.customize(bitops)
+
+
+def _emit_bitops(tmpdir):
+    s = _bitops_schedule()
+    s.build(target="catapult", mode="csyn", project=tmpdir)
+    with open(os.path.join(tmpdir, "kernel.cpp"), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_catapult_bit_ops_use_ac_int_not_ap_int():
+    """The Vitis idiom is not merely unidiomatic here -- Catapult has no
+    ap_int, so an emitted ap_int is a hard front-end error."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        code = _emit_bitops(tmpdir)
+    assert "ap_int" not in code and "ap_uint" not in code
+    assert "ap_fixed" not in code
+    # and the replacement is actually there
+    assert ".slc<16>(0)" in code
+    assert ".slc<6>(20)" in code
+    assert ".set_slc(8," in code
+
+
+def test_catapult_wide_ac_int_narrows_explicitly():
+    """`int v = <ac_int<65>>;` is CRD-413. Every native-int assignment whose
+    right-hand side is a >64-bit ac_int must carry an explicit .to_int64()."""
+    import re as _re
+    from allo.ir.types import int64
+
+    def wide(A: int64[8], B: int64[8]):
+        for i in range(8):
+            # index arithmetic wide enough to exceed 64 bits before the cast
+            B[i] = A[(i * 2 + 1) % 8] + 1
+
+    s = allo.customize(wide)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        s.build(target="catapult", mode="csyn", project=tmpdir)
+        code = open(os.path.join(tmpdir, "kernel.cpp"), encoding="utf-8").read()
+
+    # names declared as an ac_int wider than 64 bits
+    wide_names = set()
+    for m in _re.finditer(r"\bac_int<\s*(\d+)\s*,[^>]*>\s+(\w+)\s*=", code):
+        if int(m.group(1)) > 64:
+            wide_names.add(m.group(2))
+    assert wide_names, "the probe kernel no longer produces a >64-bit ac_int"
+    for line in code.splitlines():
+        m = _re.match(
+            r"\s*(?:int|unsigned|u?int\d+_t|long|short|char)\s+\w+\s*=\s*(\w+)\s*;",
+            line,
+        )
+        if m and m.group(1) in wide_names:
+            raise AssertionError(f"implicit >64-bit narrowing (CRD-413): {line!r}")
+
+
+# --- the gate itself -------------------------------------------------------
+
+
+def test_catapult_gate_rejects_the_vitis_idiom():
+    """The text stage needs nothing installed, so it runs everywhere."""
+    from allo.backend.catapult import check_emitted_cpp, CatapultEmitError
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        bad = os.path.join(tmpdir, "kernel.cpp")
+        with open(bad, "w", encoding="utf-8") as f:
+            f.write(
+                "#include <ac_int.h>\n"
+                "void f(unsigned long long x, unsigned short *y) {\n"
+                "  ap_int<64> x_tmp = x;\n"
+                "  *y = x_tmp(15, 0);\n"
+                "}\n"
+            )
+        with pytest.raises(CatapultEmitError, match="CRD-20"):
+            check_emitted_cpp(bad)
+
+
+def test_catapult_gate_skips_loudly_without_ac_types(tmp_path, capsys, monkeypatch):
+    """No ac_types on the host must be VISIBLE. A silent skip is how a whole
+    handoff reached a licence host with 100 errors in it."""
+    from allo.backend.catapult import check_emitted_cpp, CatapultEmitError
+
+    monkeypatch.setenv("ALLO_AC_TYPES_INCLUDE", str(tmp_path / "nowhere"))
+    monkeypatch.delenv("MGC_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))  # hides ~/.cache/allo
+    monkeypatch.delenv("ALLO_AC_TYPES_HOME", raising=False)
+    ok = os.path.join(str(tmp_path), "kernel.cpp")
+    with open(ok, "w", encoding="utf-8") as f:
+        f.write("int f() { return 0; }\n")
+
+    assert check_emitted_cpp(ok, strict=False) is False
+    err = capsys.readouterr().err
+    assert "SKIPPED" in err and "ac_types" in err
+    # ...and a handoff can demand it
+    with pytest.raises(CatapultEmitError, match="SKIPPED"):
+        check_emitted_cpp(ok, strict=True)
+
+
+def _ac_types():
+    from allo.backend.catapult import find_ac_types_include
+
+    return find_ac_types_include()
+
+
+@pytest.mark.skipif(_ac_types() is None, reason="no hlslibs ac_types on this host")
+def test_catapult_emitted_kernel_compiles_against_ac_types():
+    """The gate, on real emitter output. This is what `s.build(target=
+    "catapult", ...)` now runs for every project it writes."""
+    from allo.backend.catapult import check_emitted_cpp
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _emit_bitops(tmpdir)
+        assert check_emitted_cpp(os.path.join(tmpdir, "kernel.cpp")) is True
+
+
+@pytest.mark.skipif(_ac_types() is None, reason="no hlslibs ac_types on this host")
+def test_catapult_bit_ops_compute_the_same_values_as_the_simulator():
+    """Compiling is not enough: a slice with the wrong width, offset or
+    signedness compiles and returns the wrong number, which is worse than the
+    crash it replaced. So RUN the emitted Catapult C++ against ac_types and
+    compare every output with Allo's LLVM simulator, bit for bit."""
+    import subprocess
+
+    inc = _ac_types()
+    s = _bitops_schedule()
+    rng = np.random.default_rng(0)
+    A = rng.integers(0, 2**64, size=8, dtype=np.uint64)
+    gB, gC, gD = (np.zeros(8, np.int32) for _ in range(3))
+    s.build()(A, gB, gC, gD)  # LLVM reference
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        s.build(target="catapult", mode="csyn", project=tmpdir)
+
+        def lit(v, suffix=""):
+            return ",".join(str(int(x)) + suffix for x in v)
+
+        drv = (
+            "#include <stdint.h>\n"
+            '#include "kernel.h"\n'
+            "#include <cstdio>\n"
+            f"static uint64_t A[8] = {{{lit(A, 'ull')}}};\n"
+            f"static int32_t gB[8] = {{{lit(gB)}}};\n"
+            f"static int32_t gC[8] = {{{lit(gC)}}};\n"
+            f"static int32_t gD[8] = {{{lit(gD)}}};\n"
+            "int main() {\n"
+            "  int32_t B[8] = {0}, C[8] = {0}, D[8] = {0};\n"
+            "  bitops(A, B, C, D);\n"
+            "  int bad = 0;\n"
+            "  for (int i = 0; i < 8; i++) {\n"
+            '    if (B[i] != gB[i]) { printf("B[%d] %d != %d\\n", i, B[i], gB[i]); bad++; }\n'
+            '    if (C[i] != gC[i]) { printf("C[%d] %d != %d\\n", i, C[i], gC[i]); bad++; }\n'
+            '    if (D[i] != gD[i]) { printf("D[%d] %d != %d\\n", i, D[i], gD[i]); bad++; }\n'
+            "  }\n"
+            '  printf("mismatches=%d\\n", bad);\n'
+            "  return bad != 0;\n"
+            "}\n"
+        )
+        with open(os.path.join(tmpdir, "drv.cpp"), "w", encoding="utf-8") as f:
+            f.write(drv)
+        cp = subprocess.run(
+            ["g++", "-std=c++11", "-I", inc, "-o", "drv", "drv.cpp", "kernel.cpp"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert cp.returncode == 0, cp.stderr
+        run = subprocess.run(
+            ["./drv"], cwd=tmpdir, capture_output=True, text=True, check=False
+        )
+        assert run.returncode == 0, run.stdout + run.stderr
+        assert "mismatches=0" in run.stdout
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
