@@ -1,0 +1,1010 @@
+{
+ "phases": [
+  "s",
+  "control",
+  "e",
+  "c",
+  "g",
+  "d",
+  "abf",
+  "loop",
+  "accept"
+ ],
+ "seconds": 2817,
+ "head": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+ "results": [
+  {
+   "case": "s.policy passes the shipped design",
+   "expected": "every file but ['isa_dsl.py']",
+   "actual": [
+    "isa_dsl.py"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: type graph",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__bases__'",
+    "pe.py: uses '.__class__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: function globals",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__globals__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: module namespace",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__dict__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: name-based lookup",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__getattribute__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: builtins",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__builtins__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: code object",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__code__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy refuses: method resolution",
+   "expected": "refused",
+   "actual": [
+    "pe.py: uses '.__mro__'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.policy allows exactly the design's modules",
+   "expected": "17 modules",
+   "actual": "equal",
+   "pass": true
+  },
+  {
+   "case": "s.documentation budget is the whole candidate's",
+   "expected": "14 files losing 2 lines each is refused; one is not",
+   "actual": [
+    [
+     "the candidate removes 28 lines of comments/docstrings across the design (at most 15 may go in total): microarch_isa.py (-2), isa_dsl.py (-2), ip/isa.py (-2), ip/tinytpu.py (-2), ip/assembler.py (-2), ip/programs.py (-2), ip/units/sequencer.py (-2), ip/units/dma_load.py (-2), ip/units/scratchpad.py (-2), ip/units/vector_regs.py (-2), ip/units/weight_loader.py (-2), ip/units/pe.py (-2), ip/units/accumulator.py (-2), ip/units/dma_store.py (-2). Edit or add documentation; do not delete it"
+    ],
+    []
+   ],
+   "pass": true
+  },
+  {
+   "case": "s.main-base derived for HEAD",
+   "expected": "a merge-base, evaluator identical",
+   "actual": "d5b2a5ed, 9/9 identical",
+   "pass": true
+  },
+  {
+   "case": "s.drift refused",
+   "expected": "setup: refused, naming the evaluator file",
+   "actual": "setup: cannot read frozen examples/tinytpu/cosim.py @ 476a70d8bed3d8bdbaca098282b10b85c0e94fea: f",
+   "pass": true
+  },
+  {
+   "case": "s.untouched file's violation is not charged",
+   "expected": "composes although ['isa_dsl.py'] would fail the policy",
+   "actual": "composed",
+   "pass": true
+  },
+  {
+   "case": "s.edited file is held to the policy",
+   "expected": "policy: the violation in the file the candidate touched",
+   "actual": "policy: isa_dsl.py: uses '.__init__'",
+   "pass": true
+  },
+  {
+   "case": "s.scored configuration pinned",
+   "expected": "env_for sets {'TPU_T': '4', 'TPU_MAXDIM': '16'}; check_invariants passes at {'T': 4, 'MAXDIM': 16}",
+   "actual": {
+    "T": 4,
+    "MAXDIM": 16
+   },
+   "pass": true
+  },
+  {
+   "case": "s.per-run cap counts this run only",
+   "expected": "$9.46 (own two incl. the timed-out one + sibling worker), not the account's $26.63",
+   "actual": "run $9.46, account $26.63",
+   "pass": true
+  },
+  {
+   "case": "s.per-worker attribution finds a timed-out call",
+   "expected": "both of tpuA's sessions, $8.46",
+   "actual": {
+    "ses_mine_ok": 4.0,
+    "ses_mine_timeout": 4.46
+   },
+   "pass": true
+  },
+  {
+   "case": "s.cap stops on this run's spend",
+   "expected": "stops: $9.46 + $6.00 > $15",
+   "actual": "not starting iter3: this run has spent $9.46 over 3 session(s) + next call ~$6.00 would pa",
+   "pass": true
+  },
+  {
+   "case": "s.no money from usage",
+   "expected": "no module reads cost_usd",
+   "actual": "none",
+   "pass": true
+  },
+  {
+   "case": "control.design-identity",
+   "expected": "the two editable blobs at HEAD",
+   "actual": {
+    "microarch_isa.py": "a3a5513f57cd7dd68fa93a91b14a5eacd8cba994",
+    "isa_dsl.py": "cb5b690bbfe253f0884ded9d84ee86da981666c8",
+    "ip/isa.py": "5ef15410d6596fe6c70d667173a97e15f853f974",
+    "ip/tinytpu.py": "827d7f357b1112add026d8ece39f9cd34e0fe5ba",
+    "ip/assembler.py": "51328d2bbe8979b3b096f95b2d97c7bf23b76dc2",
+    "ip/programs.py": "28b564fab4df909d2489f80ba8a10d45c442d809",
+    "ip/units/sequencer.py": "b101676c1e7d29f319373ffec022dc1f2a48ba29",
+    "ip/units/dma_load.py": "21136c7dbf09f2773989a648c05046ed887ee74d",
+    "ip/units/scratchpad.py": "e44fa47b3b377c249315f28e199a644acd9d8910",
+    "ip/units/vector_regs.py": "8a5e665ecc4c4766b848f4ed139bcb339bea7ec4",
+    "ip/units/weight_loader.py": "d70f8e1ed87afd9deedec01f1e472c8f846c00af",
+    "ip/units/pe.py": "858891dd00c75ce90577fc029bc1fec4a5eb7b4d",
+    "ip/units/accumulator.py": "a0092791144547e6834ef1e519e7d6fc4ec87590",
+    "ip/units/dma_store.py": "8111c6abc40c75400024585a505736a4d2870966"
+   },
+   "pass": true
+  },
+  {
+   "case": "control.genuine-record-usable",
+   "expected": "no problems",
+   "actual": "none",
+   "pass": true
+  },
+  {
+   "case": "control.refused: verdict not vouched",
+   "expected": "refused, with a reason",
+   "actual": [
+    "its cosim verdict is not nonce-vouched"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: measured by another driver",
+   "expected": "refused, with a reason",
+   "actual": [
+    "measured by 'codesign_cosim', while the candidate is measured by 'cosim'"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: measured on a dirty checkout",
+   "expected": "refused, with a reason",
+   "actual": [
+    "it was not measured on a pristine checkout"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: another design's control",
+   "expected": "refused, with a reason",
+   "actual": [
+    "measured at {'microarch_isa.py': '0000000000000000000000000000000000000000', 'isa_dsl.py': '0000000000000000000000000000000000000000', 'ip/isa.py': '0000000000000000000000000000000000000000', 'ip/tinytpu.py': '0000000000000000000000000000000000000000', 'ip/assembler.py': '0000000000000000000000000000000000000000', 'ip/programs.py': '0000000000000000000000000000000000000000', 'ip/units/sequencer.py': '0000000000000000000000000000000000000000', 'ip/units/dma_load.py': '0000000000000000000000000000000000000000', 'ip/units/scratchpad.py': '0000000000000000000000000000000000000000', 'ip/units/vector_regs.py': '0000000000000000000000000000000000000000', 'ip/units/weight_loader.py': '0000000000000000000000000000000000000000', 'ip/units/pe.py': '0000000000000000000000000000000000000000', 'ip/units/accumulator.py': '0000000000000000000000000000000000000000', 'ip/units/dma_store.py': '0000000000000000000000000000000000000000'}, not at this run's design {'microarch_isa.py': 'a3a5513f57cd7dd68fa93a91b14a5eacd8cba994', 'isa_dsl.py': 'cb5b690bbfe253f0884ded9d84ee86da981666c8', 'ip/isa.py': '5ef15410d6596fe6c70d667173a97e15f853f974', 'ip/tinytpu.py': '827d7f357b1112add026d8ece39f9cd34e0fe5ba', 'ip/assembler.py': '51328d2bbe8979b3b096f95b2d97c7bf23b76dc2', 'ip/programs.py': '28b564fab4df909d2489f80ba8a10d45c442d809', 'ip/units/sequencer.py': 'b101676c1e7d29f319373ffec022dc1f2a48ba29', 'ip/units/dma_load.py': '21136c7dbf09f2773989a648c05046ed887ee74d', 'ip/units/scratchpad.py': 'e44fa47b3b377c249315f28e199a644acd9d8910', 'ip/units/vector_regs.py': '8a5e665ecc4c4766b848f4ed139bcb339bea7ec4', 'ip/units/weight_loader.py': 'd70f8e1ed87afd9deedec01f1e472c8f846c00af', 'ip/units/pe.py': '858891dd00c75ce90577fc029bc1fec4a5eb7b4d', 'ip/units/accumulator.py': 'a0092791144547e6834ef1e519e7d6fc4ec87590', 'ip/units/dma_store.py': '8111c6abc40c75400024585a505736a4d2870966'}"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: a shape left out",
+   "expected": "refused, with a reason",
+   "actual": [
+    "no measured cycles at ['16x16x16']"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: a shape invented",
+   "expected": "refused, with a reason",
+   "actual": [
+    "shapes outside the frozen five: ['32x32x32']"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: cycles never measured",
+   "expected": "refused, with a reason",
+   "actual": [
+    "no measured cycles at ['4x4x4', '8x8x8', '12x12x12', '16x16x8', '16x16x16']"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: a clock the design cannot meet",
+   "expected": "refused, with a reason",
+   "actual": [
+    "estimated clock 4.0 ns does not meet 3.33 ns"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.refused: not a record at all",
+   "expected": "refused, with a reason",
+   "actual": [
+    "not a control record"
+   ],
+   "pass": true
+  },
+  {
+   "case": "control.reuse-genuine",
+   "expected": "reused, and says where from",
+   "actual": "reused from /home/sk3463/chia-e2e-scratc",
+   "pass": true
+  },
+  {
+   "case": "control.reuse-foreign-refused",
+   "expected": "NoControl, nothing compared",
+   "actual": "refusing the control in /home/sk3463/chia-e2e-scratch/ht-full/peer-accept.json: ",
+   "pass": true
+  },
+  {
+   "case": "control.reuse-across-drivers-refused",
+   "expected": "NoControl: the candidate's driver is not the control's",
+   "actual": "measured by 'cosim', while the candidate is measured by 'codesign_cosi",
+   "pass": true
+  },
+  {
+   "case": "control.crosscheck-agrees",
+   "expected": "agree, against the published numbers",
+   "actual": "agree vs the published 'cosim' control (this desi",
+   "pass": true
+  },
+  {
+   "case": "control.crosscheck-disagrees-loudly",
+   "expected": "DISAGREES, with a banner",
+   "actual": "DISAGREES delta=1",
+   "pass": true
+  },
+  {
+   "case": "control.crosscheck-recorded-design",
+   "expected": "agree, against its own entry",
+   "actual": "agree vs the control recorded for this design und",
+   "pass": true
+  },
+  {
+   "case": "control.crosscheck-unrecorded-driver",
+   "expected": "UNRECORDED, loud, not silently checked against another driver's numbers",
+   "actual": "UNRECORDED recorded=None",
+   "pass": true
+  },
+  {
+   "case": "control.crosscheck-search-shapes",
+   "expected": "agree over the two scored shapes alone",
+   "actual": "agree ['16x16x16', '4x4x4']",
+   "pass": true
+  },
+  {
+   "case": "e.tool-surface",
+   "expected": "exactly the 7 spec tools",
+   "actual": [
+    "tpta_apply_spec_patch",
+    "tpta_insert_after",
+    "tpta_read_reference",
+    "tpta_read_spec",
+    "tpta_replace_text",
+    "tpta_run_functional_check",
+    "tpta_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "e.patch cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: patches may touch only ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assemble\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch microarch_isa.py + cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: patches may touch only ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assemble\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: patches may touch only ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assemble\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: path must be one of ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.p\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: path must be one of ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.p\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text absolute repo path",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: path must be one of ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.p\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.insert_after bench_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: path must be one of ['microarch_isa.py', 'isa_dsl.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.p\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'cosim', which is not allow\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: from examples ... import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'examples.tinytpu'; only th\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import subprocess",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'subprocess', which is not \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: open() write",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses 'open'. Describe hardware; do \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: __import__",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '__import__'. Describe hardwar\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: sys.modules",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.modules'; microarch_isa.py: \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: numpy.savetxt over stress_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.savetxt'. Describe hardware;\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: ndarray.tofile over stress_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.tofile'. Describe hardware; \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: SystemExit forged verdict",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses 'SystemExit'. Describe hardwar\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: monkeypatch numpy RNG via an alias",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: assigns to '_r.default_rng', an att\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: frame walk",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.gi_frame'. Describe hardware\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.read_reference outside the list",
+   "expected": "Unknown reference",
+   "actual": "Unknown reference; choose one of ['act.rst', 'bench_isa.py',",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk import cosim -> evaluator",
+   "expected": "ok=false at stage policy",
+   "actual": "ok=False stage=policy",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk narrow16 + numpy.savetxt over stress_isa.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.savetxt'\n{\"codesign\": false, \"frozen_ref\": \"3c68ba0074a3a7852770e2bc514eb46a19138634\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + ndarray.tofile over stress_isa.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.tofile'\n{\"codesign\": false, \"frozen_ref\": \"3c68ba0074a3a7852770e2bc514eb46a19138634\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + SystemExit forged verdict -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses 'SystemExit'\n{\"codesign\": false, \"frozen_ref\": \"3c68ba0074a3a7852770e2bc514eb46a19138634\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + method-self numpy patch -> evaluator",
+   "expected": "policy misses it; gate_runner refuses it (ok=false)",
+   "actual": "policy-missed=True ok=False stage=gate:bench_isa",
+   "pass": true,
+   "detail": "HIA gate: {self.__name__}.{name} is frozen\")\nAttributeError: CHIA gate: numpy.random.default_rng is frozen\nCHIA-GATE bench_isa FAIL importing the candidate raised AttributeError; tamper: ['refused rebinding numpy.random.default_rng']\n\n{\"codesign\": false, \"frozen_ref\": \"3c68ba0074a3a7852770e2bc514eb46a19138634\", \"invariants\": {\"IMEM_SIZE\": 56, \"MAXDIM\": 16, \"T\": 4}, \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"sandbox\": true, \"seconds\": 5.5, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"gate:bench_isa\"}"
+  },
+  {
+   "case": "e.forged cosim.py/stress_isa.py in spec dir",
+   "expected": "ignored: real stress_isa n/n, vouched",
+   "actual": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "pass": true
+  },
+  {
+   "case": "e.forged verdict past the policy",
+   "expected": "stdout forged (rc 0 + STRESS OK), runner vouches for neither gate",
+   "actual": "stdout-forged=True; runner={'bench_isa': (False, ['CHIA-GATE bench_isa FAIL importing the candidate raised SystemExit']), 'stress_isa': (False, ['CHIA-GATE stress_isa FAIL importing the candidate raised SystemExit'])}",
+   "pass": true
+  },
+  {
+   "case": "e.sandbox",
+   "expected": "only the work dir (not tree/repo/evaluator/home) writable",
+   "actual": "writable=['/home/sk3463/allo-chia-e2e/.chia_scratch/ht-full/sandbox-probe/isa_sweep.prj']",
+   "pass": true
+  },
+  {
+   "case": "e.candidate-cannot-forge-the-control",
+   "expected": "the run's control record is unwritable and unchanged",
+   "actual": "denied=True, unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16",
+   "expected": "edit accepted; bench_isa passes; REJECTED at gate:stress",
+   "actual": "'Replaced 1 occurrence in ip/units/pe.py.'; ok=False stage=gate:stress stress=STRESS FAILED: 249/492",
+   "pass": true
+  },
+  {
+   "case": "g.edit: literal T",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: 'T' must be defined exactly once, at module l\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "g.edit: literal MAXDIM",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: 'MAXDIM' must be defined exactly once, at mod\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "g.edit: second MAXDIM definition",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: 'MAXDIM' must be defined exactly once, at mod\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "g.edit: module docstring deleted",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: the edit is outside what a spec may contain -- microarch_isa.py: removes 36 lines of comments/docstrings (from', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "g.on-disk literal T + deleted docstring -> evaluator",
+   "expected": "ok=false at stage policy, naming both",
+   "actual": "ok=False stage=policy",
+   "pass": true
+  },
+  {
+   "case": "g.edit: docstring reworded",
+   "expected": "Replaced (edits are fine)",
+   "actual": "Replaced 1 occurrence in microarch_isa.py.",
+   "pass": true
+  },
+  {
+   "case": "g.wpr_literal",
+   "expected": "edit accepted; bench+stress pass at 16; REJECTED at gate:param",
+   "actual": "'Replaced 1 occurrence in ip/units/dma_lo'; ok=False stage=gate:param 'at TPU_MAXDIM=8:\\n  PARAM FAIL gemm 4x4x4 full: wrong=5/16 clobbered_outside=0\\n  '",
+   "pass": true
+  },
+  {
+   "case": "g.unmodified passes gate:param",
+   "expected": "ok, PARAM OK at all 3: ['TPU_MAXDIM=12', 'TPU_MAXDIM=8', 'TPU_T=8,TPU_MAXDIM=32']",
+   "actual": {
+    "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_MAXDIM=8": "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_T=8,TPU_MAXDIM=32": "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+   },
+   "pass": true
+  },
+  {
+   "case": "d.deadlock",
+   "expected": "REJECTED at gate:bench_isa by the 240s timeout",
+   "actual": "ok=False stage=gate:bench_isa after 243s, timeout-in-detail=True",
+   "pass": true
+  },
+  {
+   "case": "d.no-orphans",
+   "expected": "no process left under the work dir",
+   "actual": "none",
+   "pass": true
+  },
+  {
+   "case": "d.server-responsive",
+   "expected": "read_spec < 5 s during the hung gate",
+   "actual": "worst 0.06s",
+   "pass": true
+  },
+  {
+   "case": "f.same-tool-concurrent-gates",
+   "expected": "both ok (serialised on one work dir)",
+   "actual": "ok=True,True in 134s",
+   "pass": true
+  },
+  {
+   "case": "a.noop",
+   "expected": "ok, cycles == {'4x4x4': 175, '16x16x16': 674}",
+   "actual": "ok=True {'16x16x16': 674, '4x4x4': 175}",
+   "pass": true,
+   "verdict": {
+    "codesign": false,
+    "cosim_seconds": 166.8,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 175
+    },
+    "frozen_ref": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+    "gate": {
+     "bench_isa": "ALL EXACT",
+     "param": {
+      "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+      "TPU_MAXDIM=8": "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)",
+      "TPU_T=8,TPU_MAXDIM=32": "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+     },
+     "seconds": 70.6,
+     "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+     "stress_runs": 492,
+     "vouched": true
+    },
+    "invariants": {
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "T": 4
+    },
+    "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+    "objective": {
+     "cycles": {
+      "16x16x16": 674,
+      "4x4x4": 175
+     },
+     "note": "two terms, reported as a pair per shape; not summed into one score",
+     "resources": {
+      "bram_18k": 40,
+      "dsp": 14,
+      "estimated_ns": 2.431,
+      "ff": 18825,
+      "lut": 27428,
+      "uram": 0
+     }
+    },
+    "ok": true,
+    "sandbox": true,
+    "seconds": 239.8,
+    "shapes": [
+     "4x4x4",
+     "16x16x16"
+    ],
+    "synth": {
+     "area": {
+      "bram_18k": 40,
+      "dsp": 14,
+      "ff": 18825,
+      "lut": 27428,
+      "uram": 0
+     },
+     "estimated_ns": 2.431,
+     "target_ns": 3.33
+    },
+    "total_cycles": 849
+   }
+  },
+  {
+   "case": "b.spad_zero",
+   "expected": "ok (bit-exact at both shapes), WORSE in total and better at no shape",
+   "actual": "ok=True {'16x16x16': 674, '4x4x4': 202} (delta {'16x16x16': 0, '4x4x4': 27})",
+   "pass": true,
+   "verdict": {
+    "codesign": false,
+    "cosim_seconds": 171.1,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 202
+    },
+    "frozen_ref": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+    "gate": {
+     "bench_isa": "ALL EXACT",
+     "param": {
+      "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+      "TPU_MAXDIM=8": "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)",
+      "TPU_T=8,TPU_MAXDIM=32": "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+     },
+     "seconds": 65.4,
+     "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+     "stress_runs": 492,
+     "vouched": true
+    },
+    "invariants": {
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "T": 4
+    },
+    "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+    "objective": {
+     "cycles": {
+      "16x16x16": 674,
+      "4x4x4": 202
+     },
+     "note": "two terms, reported as a pair per shape; not summed into one score",
+     "resources": {
+      "bram_18k": 40,
+      "dsp": 14,
+      "estimated_ns": 2.431,
+      "ff": 18835,
+      "lut": 27540,
+      "uram": 0
+     }
+    },
+    "ok": true,
+    "sandbox": true,
+    "seconds": 239.5,
+    "shapes": [
+     "4x4x4",
+     "16x16x16"
+    ],
+    "synth": {
+     "area": {
+      "bram_18k": 40,
+      "dsp": 14,
+      "ff": 18835,
+      "lut": 27540,
+      "uram": 0
+     },
+     "estimated_ns": 2.431,
+     "target_ns": 3.33
+    },
+    "total_cycles": 876
+   }
+  },
+  {
+   "case": "f.server-responsive",
+   "expected": "read_spec < 5 s during two cosims",
+   "actual": "worst 0.07s over 240s",
+   "pass": true
+  },
+  {
+   "case": "f.no-cross-contamination",
+   "expected": "distinct work dirs, distinct results",
+   "actual": "A={'16x16x16': 674, '4x4x4': 175} B={'16x16x16': 674, '4x4x4': 202} A-logs=['cosim_16x16x16.log', 'cosim_4x4x4.log']",
+   "pass": true
+  },
+  {
+   "case": "loop.fake-model",
+   "expected": "5 scripted sessions consumed, no errors",
+   "actual": "5 sessions, errors=[]",
+   "pass": true
+  },
+  {
+   "case": "loop.baseline",
+   "expected": "cycles == {'4x4x4': 175, '16x16x16': 674}",
+   "actual": {
+    "16x16x16": 674,
+    "4x4x4": 175
+   },
+   "pass": true
+  },
+  {
+   "case": "a.noop via opencode score_cycles (mid-turn MCP)",
+   "expected": "{'4x4x4': 175, '16x16x16': 674}, returned after > 60 s",
+   "actual": "{'16x16x16': 674, '4x4x4': 175} after 233.0s",
+   "pass": true
+  },
+  {
+   "case": "loop.iter1 no-op",
+   "expected": "not accepted: no diff, not re-scored",
+   "actual": "accepted=False reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "b.spad_zero via loop",
+   "expected": "bit-exact, delta > 0, REJECTED (not better)",
+   "actual": "ok=True {'16x16x16': 674, '4x4x4': 202} delta=27 accepted=False",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16 via loop",
+   "expected": "REJECTED at gate:stress (after 1 debug session)",
+   "actual": "stage=gate:stress accepted=False",
+   "pass": true
+  },
+  {
+   "case": "e.attacks via opencode",
+   "expected": "every call Rejected; no diff",
+   "actual": "[\"Rejected: patches may touch only ['micro\", \"Rejected: path must be one of ['microarc\", 'Rejected: the edit is outside what a spe']; reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "loop.artifacts",
+   "expected": "best.diff empty, summary.json with no best",
+   "actual": "best.diff='' best=None",
+   "pass": true
+  },
+  {
+   "case": "loop.spend",
+   "expected": "the run's own sessions, found by its tag, cost $0.00",
+   "actual": "$0.00 over 5 session(s)",
+   "pass": true
+  },
+  {
+   "case": "loop.opencode-tools",
+   "expected": "only the 7 MCP tools advertised to the model",
+   "actual": [
+    "tpufrontend_tpufrontend_apply_spec_patch",
+    "tpufrontend_tpufrontend_insert_after",
+    "tpufrontend_tpufrontend_read_reference",
+    "tpufrontend_tpufrontend_read_spec",
+    "tpufrontend_tpufrontend_replace_text",
+    "tpufrontend_tpufrontend_run_functional_check",
+    "tpufrontend_tpufrontend_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "accept.spad_zero",
+   "expected": "bit-exact at all 5 shapes, claim=not-better",
+   "actual": "ok=True claim=not-better {'4x4x4': 202, '8x8x8': 265, '12x12x12': 421, '16x16x8': 482, '16x16x16': 674}",
+   "pass": true,
+   "accept": {
+    "ref": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+    "diff": "/home/sk3463/chia-e2e-scratch/ht-full/spad_zero.diff",
+    "ok": true,
+    "design": {
+     "microarch_isa.py": "a3a5513f57cd7dd68fa93a91b14a5eacd8cba994",
+     "isa_dsl.py": "cb5b690bbfe253f0884ded9d84ee86da981666c8",
+     "ip/isa.py": "5ef15410d6596fe6c70d667173a97e15f853f974",
+     "ip/tinytpu.py": "827d7f357b1112add026d8ece39f9cd34e0fe5ba",
+     "ip/assembler.py": "51328d2bbe8979b3b096f95b2d97c7bf23b76dc2",
+     "ip/programs.py": "28b564fab4df909d2489f80ba8a10d45c442d809",
+     "ip/units/sequencer.py": "b101676c1e7d29f319373ffec022dc1f2a48ba29",
+     "ip/units/dma_load.py": "21136c7dbf09f2773989a648c05046ed887ee74d",
+     "ip/units/scratchpad.py": "e44fa47b3b377c249315f28e199a644acd9d8910",
+     "ip/units/vector_regs.py": "8a5e665ecc4c4766b848f4ed139bcb339bea7ec4",
+     "ip/units/weight_loader.py": "d70f8e1ed87afd9deedec01f1e472c8f846c00af",
+     "ip/units/pe.py": "858891dd00c75ce90577fc029bc1fec4a5eb7b4d",
+     "ip/units/accumulator.py": "a0092791144547e6834ef1e519e7d6fc4ec87590",
+     "ip/units/dma_store.py": "8111c6abc40c75400024585a505736a4d2870966"
+    },
+    "driver": "cosim",
+    "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset but {'TPU_T': '4', 'TPU_MAXDIM': '16'} and TPU_PRJ",
+    "sandbox": true,
+    "allo_resolves_to": "/home/sk3463/allo-chia-e2e/.chia_scratch/accept-accept-spad_zero-1790251875/allo/__init__.py",
+    "control": {
+     "cycles": {
+      "4x4x4": 175,
+      "8x8x8": 265,
+      "12x12x12": 421,
+      "16x16x8": 482,
+      "16x16x16": 674
+     },
+     "blobs": {
+      "microarch_isa.py": "a3a5513f57cd7dd68fa93a91b14a5eacd8cba994",
+      "isa_dsl.py": "cb5b690bbfe253f0884ded9d84ee86da981666c8",
+      "ip/isa.py": "5ef15410d6596fe6c70d667173a97e15f853f974",
+      "ip/tinytpu.py": "827d7f357b1112add026d8ece39f9cd34e0fe5ba",
+      "ip/assembler.py": "51328d2bbe8979b3b096f95b2d97c7bf23b76dc2",
+      "ip/programs.py": "28b564fab4df909d2489f80ba8a10d45c442d809",
+      "ip/units/sequencer.py": "b101676c1e7d29f319373ffec022dc1f2a48ba29",
+      "ip/units/dma_load.py": "21136c7dbf09f2773989a648c05046ed887ee74d",
+      "ip/units/scratchpad.py": "e44fa47b3b377c249315f28e199a644acd9d8910",
+      "ip/units/vector_regs.py": "8a5e665ecc4c4766b848f4ed139bcb339bea7ec4",
+      "ip/units/weight_loader.py": "d70f8e1ed87afd9deedec01f1e472c8f846c00af",
+      "ip/units/pe.py": "858891dd00c75ce90577fc029bc1fec4a5eb7b4d",
+      "ip/units/accumulator.py": "a0092791144547e6834ef1e519e7d6fc4ec87590",
+      "ip/units/dma_store.py": "8111c6abc40c75400024585a505736a4d2870966"
+     },
+     "ref": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+     "vouched": true,
+     "estimated_ns": 2.431,
+     "seconds": 302.0,
+     "source": "measured in this run from git at 3c68ba00, before the candidate diff was applied",
+     "driver": "cosim",
+     "pristine_tree": true,
+     "measured_unix": 1790252217,
+     "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), all five SHAPES, TPU_* unset but {'TPU_T': '4', 'TPU_MAXDIM': '16'} and TPU_PRJ"
+    },
+    "policy": [],
+    "checkout_status": [
+     "M examples/tinytpu/ip/units/scratchpad.py"
+    ],
+    "bench_isa": {
+     "rc": 0,
+     "vouched": true,
+     "seconds": 9.4,
+     "all_exact": true
+    },
+    "stress_isa": {
+     "rc": 0,
+     "vouched": true,
+     "seconds": 18.2,
+     "line": [
+      "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)"
+     ]
+    },
+    "param": {
+     "TPU_MAXDIM=8": {
+      "ok": true,
+      "seconds": 7.5,
+      "line": [
+       "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)"
+      ]
+     },
+     "TPU_MAXDIM=12": {
+      "ok": true,
+      "seconds": 7.7,
+      "line": [
+       "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+      ]
+     },
+     "TPU_T=8,TPU_MAXDIM=32": {
+      "ok": true,
+      "seconds": 24.9,
+      "line": [
+       "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+      ]
+     }
+    },
+    "cosim": {
+     "4x4x4": {
+      "cycles": 202,
+      "tb": "TB 4x4x4 mismatches = 0 / 16"
+     },
+     "8x8x8": {
+      "cycles": 265,
+      "tb": "TB 8x8x8 mismatches = 0 / 64"
+     },
+     "12x12x12": {
+      "cycles": 421,
+      "tb": "TB 12x12x12 mismatches = 0 / 144"
+     },
+     "16x16x8": {
+      "cycles": 482,
+      "tb": "TB 16x16x8 mismatches = 0 / 128"
+     },
+     "16x16x16": {
+      "cycles": 674,
+      "tb": "TB 16x16x16 mismatches = 0 / 256"
+     }
+    },
+    "cosim_seconds": 297.4,
+    "estimated_ns": 2.431,
+    "cosim_rtl_stress": {
+     "vouched": true,
+     "ok": true,
+     "shapes": [
+      "4x 4x 4  cycles=202   TB 4x4x4 stress mismatches = 0 over 6 calls",
+      "8x 8x 8  cycles=265   TB 8x8x8 stress mismatches = 0 over 6 calls",
+      "12x12x12  cycles=379   TB 12x12x12 stress mismatches = 0 over 6 calls",
+      "16x16x 8  cycles=379   TB 16x16x8 stress mismatches = 0 over 6 calls",
+      "16x16x16  cycles=379   TB 16x16x16 stress mismatches = 0 over 6 calls"
+     ],
+     "seconds": 308.6
+    },
+    "objective": {
+     "cycles": {
+      "4x4x4": 202,
+      "8x8x8": 265,
+      "12x12x12": 421,
+      "16x16x8": 482,
+      "16x16x16": 674
+     },
+     "resources": {
+      "bram_18k": 40,
+      "dsp": 14,
+      "ff": 18835,
+      "lut": 27540,
+      "uram": 0,
+      "estimated_ns": 2.431
+     },
+     "note": "two terms, reported as a pair per shape; never summed"
+    },
+    "crosscheck": {
+     "status": "agree",
+     "against": "the published 'cosim' control (this design's blobs are not recorded)",
+     "recorded": {
+      "4x4x4": 175,
+      "8x8x8": 265,
+      "12x12x12": 421,
+      "16x16x8": 482,
+      "16x16x16": 674
+     },
+     "measured": {
+      "4x4x4": 175,
+      "8x8x8": 265,
+      "12x12x12": 421,
+      "16x16x8": 482,
+      "16x16x16": 674
+     },
+     "delta": {
+      "4x4x4": 0,
+      "8x8x8": 0,
+      "12x12x12": 0,
+      "16x16x8": 0,
+      "16x16x16": 0
+     },
+     "compared": [
+      "12x12x12",
+      "16x16x16",
+      "16x16x8",
+      "4x4x4",
+      "8x8x8"
+     ]
+    },
+    "delta": {
+     "4x4x4": 27,
+     "8x8x8": 0,
+     "12x12x12": 0,
+     "16x16x8": 0,
+     "16x16x16": 0
+    },
+    "delta_total": 27,
+    "claim": "not-better"
+   }
+  },
+  {
+   "case": "accept.control-measured-before-the-diff",
+   "expected": "measured in the run, pristine tree, {'4x4x4': 175, '8x8x8': 265, '12x12x12': 421, '16x16x8': 482, '16x16x16': 674}",
+   "actual": "source='measured in this run from git at 3c68ba00, before the candid' cycles={'4x4x4': 175, '8x8x8': 265, '12x12x12': 421, '16x16x8': 482, '16x16x16': 674} vouched=True pristine=True",
+   "pass": true
+  },
+  {
+   "case": "accept.crosscheck",
+   "expected": "agree with the published five-shape control",
+   "actual": "agree delta={'4x4x4': 0, '8x8x8': 0, '12x12x12': 0, '16x16x8': 0, '16x16x16': 0}",
+   "pass": true
+  },
+  {
+   "case": "hygiene.no-orphans-at-exit",
+   "expected": "no process under the scratch dir",
+   "actual": "none",
+   "pass": true
+  }
+ ]
+}

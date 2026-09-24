@@ -1,0 +1,11 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -54,7 +54,7 @@
+ # Operand-burst width in packed words per loop iteration. 1 is the shipped
+ # design; `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds, and
+ # `TPU_DMA_WORDS` names one directly.
+-_WIDEN = TpuParams.widest_burst(T, MAXDIM) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1
++_WIDEN = TpuParams.widest_burst(T, MAXDIM)
+ DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", _WIDEN))
+ 
+ 

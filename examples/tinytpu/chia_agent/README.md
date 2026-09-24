@@ -22,22 +22,25 @@ Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied
    (`{"*": "deny"}`). The MCP tools are all the agent has.
-   `replace_text` / `apply_spec_patch` / `insert_after` reject any path except the two bare
-   file names. That includes a diff that also touches another file, and
+   `replace_text` / `apply_spec_patch` / `insert_after` reject any path except
+   the ones `design.EDITABLE` names (`read_spec()` with no argument lists them,
+   with line counts). That includes a diff that also touches another file, and
    `../` paths.
 2. **Frozen files come from git, never from disk.** `evaluate.py` composes a
    fresh evaluation tree for every candidate. The frozen files come from
-   `git show HEAD:...`, the spec directory supplies only the two editable
-   files, and any other file there is ignored. `cosim.py`, `bench_isa.py`,
-   `stress_isa.py`, `isa_ref.py` and `kpn_model.py` are also checked
-   byte-identical to main @ `476a70d8` (`MAIN_BASE` in `evaluate.py`), so the
-   loop measures and verifies the design exactly as main does. `loop.py`
-   refuses to start if any frozen path is dirty in the working tree.
-3. **Import-time code is policed.** The evaluator imports the two editable
+   `git show HEAD:...`, the spec directory supplies only the files
+   `design.EDITABLE` names, and any other file there is ignored. `cosim.py`,
+   `bench_isa.py`, `stress_isa.py`, `isa_ref.py`, `kpn_model.py`, `shapes.py`,
+   `isa_spec.json`, `isa_encoding.py` and `gen_isa.py` are also checked
+   byte-identical to the base `evaluate.main_base()` DERIVES -- the merge-base
+   of the frozen ref with main -- so the loop measures and verifies the design
+   exactly as main does, and the pin cannot go stale. `loop.py` refuses to
+   start if any frozen path is dirty in the working tree.
+3. **Import-time code is policed.** The evaluator imports the editable
    files, so `spec_policy.py` (itself executed from git) refuses file I/O,
    process spawning, `exec`/`eval`, `sys.modules`, dunder attribute access,
-   `os.environ` writes, and any `examples.*` import other than the two spec
-   modules. It runs at edit time and again at evaluation time. It also refuses
+   `os.environ` writes, and any `examples.*` import other than the
+   design package's own modules. It runs at edit time and again at evaluation time. It also refuses
    numpy's file writers (`savetxt`, `tofile`, `save*`, `dump`, `memmap`,
    `.lib`): `test_harness.py` showed `np.savetxt` at import time overwriting the
    tree's stress gate, so an int16-narrowed datapath passed the gate with
@@ -200,7 +203,7 @@ set to the CHIA project anyway, for any client that does send it.
 call). It refuses to start unless the project bills `CHIA_BILLING_ACCOUNT`
 (CHIA2026) with billing enabled, `aiplatform.googleapis.com` is enabled, a
 per-run cap (`--budget-usd`, now required) is given, and CHIA's cumulative
-spend on CHIA2026 plus that cap fits **`CHIA_TOTAL_CAP_USD` ($100 in
+spend on CHIA2026 plus that cap fits **`CHIA_TOTAL_CAP_USD` ($500 in
 chia.env)**. It prints the account, project, spend so far, remaining, and this
 run's cap. The scripted test model on loopback skips the cloud checks (it
 cannot reach Vertex); nothing else does.

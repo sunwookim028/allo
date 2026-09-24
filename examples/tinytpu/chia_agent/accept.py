@@ -12,7 +12,8 @@ convenience, not evidence. A claim is accepted only by this script:
    against (`--control` reuses an earlier control run's, so one measurement
    serves a whole run),
 4. the candidate diff applied with `git apply` (it may touch only
-   microarch_isa.py and isa_dsl.py -- anything else is refused),
+   the files `chia_agent/design.py` names editable -- anything else is
+   refused),
 5. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
    `cosim.py`, and `cosim.py` again with `TPU_TB=stress` (the RTL correctness
    testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
@@ -66,7 +67,8 @@ import control  # noqa: E402
 #: script imports it. It used to exist here as a second copy; a
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
-from evaluate import vouch  # noqa: E402
+from design import EDITABLE  # noqa: E402
+from evaluate import PARAM_CONFIGS, SCORED, vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
@@ -244,6 +246,10 @@ def main():
                          "cosim the nest the frozen mapper chose rather than the "
                          "candidate's own gemm_program")
     a = ap.parse_args()
+    # ONE driver for both passes. The mapper's 4x4x4 program is 24 words
+    # against gemm_program's 28, so a control measured by `cosim` would hand
+    # every co-design candidate 3 cycles it did not earn.
+    driver = "codesign_cosim" if a.codesign else DRIVER
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     ref = subprocess.run(["git", "rev-parse", a.ref], cwd=REPO, capture_output=True,
@@ -251,14 +257,20 @@ def main():
     wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
     result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
               "design": control.blobs(ref),
-              "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
-                             "clean checkout, all five SHAPES, TPU_* unset"}
+              "driver": driver,
+              "measurement": f"{driver}: Vitis HLS 2023.2 + xsim C/RTL cosim "
+                             "(RTL), clean checkout, all five SHAPES, TPU_* "
+                             f"unset but {SCORED} and TPU_PRJ"}
     subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
                    check=True, capture_output=True)
     try:
         tracked = lambda: sh(["git", "status", "--porcelain",
                               "--untracked-files=no"], wt)[1]
-        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+        # Every TPU_* variable is scrubbed, then the SCORED configuration is
+        # put back explicitly: the design's default is MAXDIM=64 and what is
+        # measured here is the scored 4x4 array at MAXDIM 16.
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith("TPU_")} | SCORED
         env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
                    OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
                    PYTHONDONTWRITEBYTECODE="1")
@@ -267,12 +279,12 @@ def main():
         # refused anyway must not cost a five-shape cosim first.
         # Which spec files this candidate actually changed. Without a diff we
         # cannot tell, so we check both -- the conservative direction.
-        touched = {"microarch_isa.py", "isa_dsl.py"}
+        touched = set(EDITABLE)
         if a.diff:
             diff = a.diff.read_text()
             touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
                 re.findall(r"^--- a/(\S+)", diff, re.M))
-            if not touched or not touched <= {"microarch_isa.py", "isa_dsl.py"}:
+            if not touched or not touched <= set(EDITABLE):
                 raise SystemExit(f"refusing: diff touches {sorted(touched)}")
             (out / "candidate.diff").write_text(diff)
         result["allo_resolves_to"] = build_bindings(wt, env, out)
@@ -281,10 +293,10 @@ def main():
         # on disk. A no-diff run IS the control: its own measurement below.
         ctl = None
         if a.control:
-            ctl = reuse_control(a.control, result["design"], DRIVER)
+            ctl = reuse_control(a.control, result["design"], driver)
         elif a.diff:
             ctl = measure_control(wt, env, out, ref, result["design"], tracked,
-                                  a.keep, DRIVER)
+                                  a.keep, driver)
         if ctl:
             result["control"] = ctl
 
@@ -303,12 +315,18 @@ def main():
         # rejects it for a pre-existing violation it cannot see, act on, or
         # diagnose -- which is worse than a blocked edit, because the message
         # names a file absent from its diff.
+        base = {f: subprocess.run(["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
+                                  capture_output=True, text=True,
+                                  check=True).stdout for f in sorted(touched)}
+        now = {f: (wt / PKG / f).read_text() for f in sorted(touched)}
         problems = [p for f in sorted(touched) for p in
-                    policy["policy_violations"](f, (wt / PKG / f).read_text())
-                    + policy["doc_violations"](f, subprocess.run(
-                        ["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
-                        capture_output=True, text=True, check=True).stdout,
-                        (wt / PKG / f).read_text())]
+                    policy["policy_violations"](f, now[f])
+                    + policy["doc_violations"](f, base[f], now[f])]
+        # The documentation budget is the CANDIDATE's, not each file's: the
+        # design is fourteen files, and fourteen per-file budgets would allow
+        # fourteen times what the guard was written to allow.
+        problems += policy["doc_violations_total"](
+            {f: policy["doc_loss"](base[f], now[f]) for f in sorted(touched)})
         result["policy"] = problems
         if problems:
             raise SystemExit(f"refusing: spec policy: {problems}")
@@ -338,7 +356,7 @@ def main():
         # Parametricity, as in the search's gate: rebuilt at other MAXDIMs,
         # exact (param_check.py, frozen at --ref).
         result["param"], param_ok = {}, True
-        for cfg in ({"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"}):
+        for cfg in PARAM_CONFIGS:
             tag = ",".join(f"{k}={v}" for k, v in cfg.items())
             okp, rcp, op, secp = vouched("param_check", wt, wt, dict(env, **cfg),
                                          out / f"param_check_{tag}.log", cos,
@@ -370,8 +388,7 @@ def main():
         # cosim.py puts its project next to itself by default; keep it in the
         # writable .cosim directory instead. In co-design mode the driver is
         # codesign_cosim.py, which binds the mapper's chosen nest into it.
-        check = "codesign_cosim" if a.codesign else DRIVER
-        candidate, o3 = cosim_pass(wt, env, cos, out, driver=check)
+        candidate, o3 = cosim_pass(wt, env, cos, out, driver=driver)
         untouched("cosim")
         ok3, result["cosim"] = candidate["vouched"], candidate["rows"]
         result["cosim_seconds"] = candidate["seconds"]
@@ -387,7 +404,7 @@ def main():
             cos2 = wt / ".cosim_stress"
             cos2.mkdir()
             ok4, rc4, o4, sec4 = vouched(
-                check, wt, cos2,
+                driver, wt, cos2,
                 dict(env, TPU_PRJ=str(cos2 / "isa_sweep.prj"), TPU_TB="stress"),
                 out / "cosim_stress.log", cos2)
             untouched("cosim stress")
@@ -420,10 +437,10 @@ def main():
                 cycles={s: v["cycles"] for s, v in result["cosim"].items()},
                 design=result["design"], ref=ref, seconds=candidate["seconds"],
                 estimated_ns=candidate["estimated_ns"], vouched=ok3,
-                pristine_tree=not result["checkout_status"], driver=DRIVER,
+                pristine_tree=not result["checkout_status"], driver=driver,
                 source="no diff was applied: this run's own measurement is "
                        "the control")
-            ctl["problems"] = control.unusable(ctl, result["design"], DRIVER)
+            ctl["problems"] = control.unusable(ctl, result["design"], driver)
             result["control"] = ctl
         # The cross-check is on the CONTROL, so it is reported even for a
         # candidate that was rejected: the tools may have moved under both.

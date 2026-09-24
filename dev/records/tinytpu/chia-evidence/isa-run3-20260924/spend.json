@@ -1,0 +1,26 @@
+{
+ "run_tag": "chia-run isa-run3-20260924-123249@1790253169526",
+ "t0_ms": 1790253169526,
+ "source": "opencode's own database (spend.run_spend), NEVER the `usage` field",
+ "note": "every one of the four iteration calls ran the full 2400 s CHIA timeout and reported no usage at all; on the `usage` field this whole run reads $0.00",
+ "run_usd": 20.7192,
+ "run_sessions": 10,
+ "per_session_usd": {
+  "ses_f2c1706deffeRJuYVFXolrlY3L": 0.6438,
+  "ses_f2c3f1784ffe1N5HguPZSieVLp": 2.8419,
+  "ses_f2c3f8077ffey8MkbsGXxsC5aU": 3.6168,
+  "ses_f2c425465ffelGlnOiItMdxDfr": 0.0171,
+  "ses_f2c4478deffeAdP5H7ZGwphflj": 0.1569,
+  "ses_f2c6a7268ffeIKpYqttjw370K6": 3.4899,
+  "ses_f2c6c9fabffe4fdlNxb29BBKcv": 3.835,
+  "ses_f2c6f46b8ffe5FTuVx73ukrhOI": 0.0503,
+  "ses_f2c93f000ffevlPqdS1Mu2j3Iu": 2.7376,
+  "ses_f2c94cba9ffepd8YVUPM3DSOF5": 3.3299
+ },
+ "model_messages": 281,
+ "per_run_cap_usd": 60.0,
+ "cumulative_chia2026_usd_after": 124.2602,
+ "cumulative_sessions_after": 37,
+ "total_cap_usd": 500.0,
+ "smoke_usd": 0.016
+}

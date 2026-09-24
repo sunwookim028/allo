@@ -1,0 +1,32 @@
+{
+ "t0_ms": 1790253169526,
+ "run_tag": "chia-run isa-run3-20260924-123249@1790253169526",
+ "workers": [
+  "front-end",
+  "tail"
+ ],
+ "iterations": 3,
+ "budget_usd": 60.0,
+ "preflight": {
+  "mode": "vertex",
+  "project": "chia2026-tinytpu",
+  "project_number": "762944961825",
+  "billing_account": "01BF39-94AA3F-36BACB",
+  "billing_account_name": "CHIA2026",
+  "model": "google-vertex/gemini-3.1-pro-preview",
+  "location": "global",
+  "budget_usd": 60.0,
+  "total_cap_usd": 500.0,
+  "spent_so_far_usd": 103.5411,
+  "sessions_so_far": 27,
+  "remaining_usd": 396.4589
+ },
+ "model": "google-vertex/gemini-3.1-pro-preview",
+ "head": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+ "codesign": false,
+ "task_template": "Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.\nCurrent cosim cycles (all five shapes, bit-exact, main @ 476a70d8):\n4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686. A matched 4x4\nint8 Gemmini, measured over the same window, takes 144-161/220/347/391/593, so\nthis design is 1.07-1.24x slower. The search scores 4x4x4 + 16x16x16; a winner\nis re-verified bit-exact at all five shapes, by stress_isa, and by the RTL\nstress testbench.\n\nAlready landed (do not re-propose): program prefetch 8 words a cycle, weights\nby scratchpad address with per-PE double-buffered weight loaders (wld), A no\nlonger through spad->vld->vr, accu at II=1 via s.dependence (valid only\nbecause check_program enforces AR_RAW_DIST=4 between an accumulator write and\na read of it -- a closer read is an RTL-only failure the simulator does not\nshow), sequencer-precomputed row counts.\n\nYour starting angle:\n{angle}\n",
+ "strategies": {
+  "front-end": "The front of the 16x16x16 run, measured (per-process cosim timeline\nof the shipped design, window 47-688, reference `timeline_16x16x16`): dma_ld\nruns 211 cycles back to back (68-279) and no PE computes before cycle 285 --\nabout 238 of the 641 cycles pass before the first MAC. vru runs 74 cycles,\nthen is blocked 60 (226-286) until the array starts. The docs' attribution\nestimates (not measured) ~84 cycles of the remaining gap to Gemmini as operand\nstaging plus the serial DMA ahead of the first weight. What in that prologue\nis forced by data dependence, and what is ordering?",
+  "tail": "The back of the 16x16x16 run, measured (same timeline): the last PE\nfinishes at 624, accu runs 312-653 in four ~80-cycle bursts each followed by a\n5-cycle block, and dma_st alternates 38 cycles running with 47 starved and\nfinishes at 688, 35 cycles after accu. The sequencer is blocked 134 of its\ncycles. The docs' attribution lists the drain as part of the (estimated,\nunbuilt) residual. Where does the tail's time go, and what of it overlaps work\nthat could already have finished?"
+ }
+}

@@ -186,6 +186,232 @@ Two observations worth keeping:
 A capped smoke run on the earlier design is recorded in
 `Earlier measurements and corrections`_.
 
+Third paid run, 2026-09-24
+--------------------------
+
+``dev/records/tinytpu/chia-evidence/isa-run3-20260924/``: 2 workers x 3
+iterations, $60 cap, ``gemini-3.1-pro-preview`` on ``chia2026-tinytpu``,
+166.8 minutes, **$20.72** read from opencode's database. The question, what was
+expected of it and what would have counted as a negative were committed
+**before** the run, in
+``dev/records/tinytpu/chia-evidence/prereg-run3-20260924.md``; the result is
+appended to that same file.
+
+This is the first run after the harness repair that made the loop run against
+the design as it now is: a **package**. The hardware had moved out of
+``microarch_isa.py`` into eight modules under ``ip/units/`` while the harness
+still named two editable files, so the agent could only edit a 102-line
+instantiation with no hardware in it. ``chia_agent/design.py`` now names
+fourteen editable paths.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 12 6 34 20 14 14
+
+   * - worker
+     - iter
+     - files touched
+     - 4x4x4 / 16x16x16
+     - verdict
+     - $
+   * - front-end
+     - 1
+     - ``ip/units/dma_load.py``
+     - 175 / 674
+     - not-better
+     - 3.33
+   * - front-end
+     - 2
+     - ``ip/assembler.py``, ``ip/units/dma_load.py``, ``ip/units/sequencer.py``
+     - 176 / 674
+     - not-better
+     - 3.84
+   * - front-end
+     - 3
+     - ``ip/units/dma_load.py``
+     - 175 / 674
+     - not-better
+     - 4.26
+   * - tail
+     - 1
+     - ``ip/tinytpu.py``
+     - 175 / 674
+     - not-better
+     - 2.79
+   * - tail
+     - 2
+     - ``ip/assembler.py``, ``ip/tinytpu.py``, ``ip/units/dma_load.py``,
+       ``ip/units/sequencer.py``
+     - 180 / 683
+     - not-better
+     - 3.49
+   * - **tail**
+     - **3**
+     - ``microarch_isa.py``, ``ip/tinytpu.py``
+     - **175 / 627**
+     - **win**
+     - 2.84
+
+Baseline, measured by each worker itself: 175 / 674.
+
+**Every candidate reached a graded verdict.** None died at ``setup``,
+``policy``, ``import``, ``invariant`` or ``tamper``. That was the run's primary
+pre-registered outcome, and it is what "the loop runs end to end" means -- the
+$0 harness suite passing does not establish it.
+
+**The reach repair is visible in what the workers edited.** Every candidate but
+the winner touched only files under ``ip/``; the winner touched
+``microarch_isa.py`` for a single line of parameter default. **Four of the six
+could not have been expressed at all** under the editable set the harness had
+before the repair. That is behavioural evidence for the decomposition, not an
+inference from a file listing.
+
+The win, independently accepted
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``accept.py`` on a clean ``git worktree`` with its own ``mlir/`` build, against
+a control it measured itself in that run before the candidate's diff existed
+(``accept-tail-iter3/``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 14 14 14 14
+
+   * -
+     - 4x4x4
+     - 8x8x8
+     - 12x12x12
+     - 16x16x8
+     - 16x16x16
+   * - control (this run)
+     - 175
+     - 265
+     - 421
+     - 482
+     - 674
+   * - candidate
+     - 175
+     - 265
+     - **386**
+     - **435**
+     - **627**
+   * - delta
+     - 0
+     - 0
+     - -35
+     - -47
+     - -47
+
+Total **-129 cycles** over the five shapes; -7.0% at 16x16x16 and -9.8% at
+16x16x8. ``bench_isa`` ALL EXACT, ``stress_isa`` 492/492, ``param_check``
+exact at ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and ``TPU_T=8 TPU_MAXDIM=32``,
+all five cosim testbenches bit-exact, the ``TPU_TB=stress`` RTL testbench clean
+over six calls a shape, estimated clock 2.431 ns against the 3.33 ns target,
+spec policy clean, and the cross-check agreeing exactly with ``reproduce.sh``'s
+published row.
+
+The diff is 22 lines across two files: ``_WIDEN =
+TpuParams.widest_burst(T, MAXDIM)`` in ``microarch_isa.py``, which deletes the
+``TPU_DMA_WIDEN`` gate and turns the widened operand burst on by default; and
+the ``ac2sp`` channel (accumulator to ``dma_st``) deepened from ``QD`` to 32 in
+``ip/tinytpu.py``.
+
+**The first half is a rediscovery, and the pre-registration named it before the
+run.** ``TPU_DMA_WIDEN`` was already in the tree and off by default. The agent
+could not switch it on through the environment -- every ``TPU_*`` variable is
+scrubbed before cosim -- so it changed the default. Writing the prediction down
+first is what makes calling it a rediscovery a check rather than an argument.
+The channel depth was not predicted.
+
+Which half won, measured afterwards at $0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The win is two changes, so ``accept.py`` was run again on the burst-widening
+half alone, reusing the control the first acceptance had measured
+(``accept-burst-only/``). No model call, so it costs nothing.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 11 11 13 12 13 12
+
+   * -
+     - 4x4x4
+     - 8x8x8
+     - 12x12x12
+     - 16x16x8
+     - 16x16x16
+     - total
+   * - control
+     - 175
+     - 265
+     - 421
+     - 482
+     - 674
+     - --
+   * - both changes
+     - 175
+     - 265
+     - 386
+     - 435
+     - 627
+     - **-129**
+   * - burst widening alone
+     - 175
+     - 265
+     - 386
+     - 435
+     - 627
+     - **-129**
+
+**Identical, shape for shape.** The ``ac2sp`` deepening is worth **exactly zero
+cycles** over the five shapes, and the whole win is the half the
+pre-registration named before the run.
+
+That agrees, from an independent measurement on a different harness, with what
+the objective work found separately: ``channel_depth`` sums to zero over the
+five published shapes. That work also established what the depth change *does*
+buy -- three legal programs going from hanging to bit-exact -- and that **no
+term in either objective scores it**. So the agent proposed a change whose value
+the objective cannot see, and kept it because the objective did not penalise it
+either. This objective would have accepted that change for no reason and would
+equally have discarded it for no reason; neither outcome is a judgement about
+the change.
+
+A recorded negative, rediscovered from three lines away
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``front-end``'s first iteration merged ``dma_ld``'s two operand-burst loops
+into one bounded by ``max(a_rows, b_rows)``. ``ip/units/dma_load.py:45`` -- in
+the file the agent was reading and editing, three lines above the loop it
+rewrote -- records that this change "was measured to move nothing", and names
+the reason: the bursts are already hidden behind the sequencer's prefetch. It
+scored 175 / 674, unchanged, exactly as the note says.
+
+The information was in-band, adjacent and specific, so this is not an artefact
+of anything withheld. One hypothesis, worth a designed test rather than a claim
+at n=1: a unit-scoped edit is badly placed to weigh a whole-pipeline fact, so
+the decomposition that gave the loop its reach back may also have made
+locally-plausible global nulls easier to propose.
+
+What this run does not show
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+n=1 per arm, like every run before it. No rate of discovery, in either
+direction; one win is one win, not a capability.
+
+And the objective it optimised -- summed cosim cycles at 4x4x4 and 16x16x16 --
+is now known to be **partial**. Work on another track, completed while this run
+was in flight, measured the burst widening as worth **zero** cycles on the
+model suite at the scored configuration (861 to 861, 1,530 to 1,530) against
+-287 and -583 at ``MAXDIM=64``: at ``MAXDIM=16`` a DRAM row is four packed
+words rather than sixteen and the prologue hides the burst for the models. The
+relationship inverts at the scored point -- the GEMM shapes see the widening
+and the models do not. So a **null** against this objective is weaker evidence
+of "no headroom" than it looks, and this **win** is a win on GEMM shapes at one
+configuration rather than a win on the workloads. The pre-registration was left
+as written and the deviation recorded in its results section, where a reader
+can check it.
+
 What Is and Is Not Demonstrated
 -------------------------------
 

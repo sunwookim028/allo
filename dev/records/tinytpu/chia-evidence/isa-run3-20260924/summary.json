@@ -1,0 +1,112 @@
+{
+ "workers": {
+  "front-end": [
+   {
+    "iteration": 1,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 175
+    },
+    "total": 849,
+    "llm_usd": 3.3299
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 176
+    },
+    "total": 850,
+    "llm_usd": 3.835
+   },
+   {
+    "iteration": 3,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 175
+    },
+    "total": 849,
+    "llm_usd": 4.2606
+   }
+  ],
+  "tail": [
+   {
+    "iteration": 1,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 175
+    },
+    "total": 849,
+    "llm_usd": 2.7879
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 683,
+     "4x4x4": 180
+    },
+    "total": 863,
+    "llm_usd": 3.4899
+   },
+   {
+    "iteration": 3,
+    "accepted": true,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 627,
+     "4x4x4": 175
+    },
+    "total": 802,
+    "llm_usd": 2.8419
+   }
+  ]
+ },
+ "baseline": {
+  "16x16x16": 674,
+  "4x4x4": 175
+ },
+ "best": {
+  "worker": "tail",
+  "iteration": 3,
+  "total": 802,
+  "cycles": {
+   "16x16x16": 627,
+   "4x4x4": 175
+  }
+ },
+ "spend": {
+  "usd": 20.7192,
+  "messages": 281,
+  "sessions": {
+   "ses_f2c1706deffeRJuYVFXolrlY3L": 0.6438,
+   "ses_f2c3f1784ffe1N5HguPZSieVLp": 2.8419,
+   "ses_f2c3f8077ffey8MkbsGXxsC5aU": 3.6168,
+   "ses_f2c425465ffelGlnOiItMdxDfr": 0.0171,
+   "ses_f2c4478deffeAdP5H7ZGwphflj": 0.1569,
+   "ses_f2c6a7268ffeIKpYqttjw370K6": 3.4899,
+   "ses_f2c6c9fabffe4fdlNxb29BBKcv": 3.835,
+   "ses_f2c6f46b8ffe5FTuVx73ukrhOI": 0.0503,
+   "ses_f2c93f000ffevlPqdS1Mu2j3Iu": 2.7376,
+   "ses_f2c94cba9ffepd8YVUPM3DSOF5": 3.3299
+  }
+ },
+ "account_window_usd": 20.7192,
+ "wall_seconds": 10010.5,
+ "hard_cap_hit": false
+}

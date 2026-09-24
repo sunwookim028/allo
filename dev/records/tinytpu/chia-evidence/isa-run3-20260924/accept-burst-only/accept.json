@@ -1,0 +1,195 @@
+{
+ "ref": "2f825070cd0481a2487e6c7e7a0bcd0b9d241499",
+ "diff": "/home/sk3463/chia-e2e-scratch/burst-only.diff",
+ "ok": true,
+ "design": {
+  "microarch_isa.py": "a3a5513f57cd7dd68fa93a91b14a5eacd8cba994",
+  "isa_dsl.py": "cb5b690bbfe253f0884ded9d84ee86da981666c8",
+  "ip/isa.py": "5ef15410d6596fe6c70d667173a97e15f853f974",
+  "ip/tinytpu.py": "827d7f357b1112add026d8ece39f9cd34e0fe5ba",
+  "ip/assembler.py": "51328d2bbe8979b3b096f95b2d97c7bf23b76dc2",
+  "ip/programs.py": "28b564fab4df909d2489f80ba8a10d45c442d809",
+  "ip/units/sequencer.py": "b101676c1e7d29f319373ffec022dc1f2a48ba29",
+  "ip/units/dma_load.py": "21136c7dbf09f2773989a648c05046ed887ee74d",
+  "ip/units/scratchpad.py": "e44fa47b3b377c249315f28e199a644acd9d8910",
+  "ip/units/vector_regs.py": "8a5e665ecc4c4766b848f4ed139bcb339bea7ec4",
+  "ip/units/weight_loader.py": "d70f8e1ed87afd9deedec01f1e472c8f846c00af",
+  "ip/units/pe.py": "858891dd00c75ce90577fc029bc1fec4a5eb7b4d",
+  "ip/units/accumulator.py": "a0092791144547e6834ef1e519e7d6fc4ec87590",
+  "ip/units/dma_store.py": "8111c6abc40c75400024585a505736a4d2870966"
+ },
+ "driver": "cosim",
+ "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), clean checkout, all five SHAPES, TPU_* unset but {'TPU_T': '4', 'TPU_MAXDIM': '16'} and TPU_PRJ",
+ "sandbox": true,
+ "allo_resolves_to": "/home/sk3463/allo-chia-e2e/.chia_scratch/accept-accept-burst-only-1790264337/allo/__init__.py",
+ "control": {
+  "cycles": {
+   "4x4x4": 175,
+   "8x8x8": 265,
+   "12x12x12": 421,
+   "16x16x8": 482,
+   "16x16x16": 674
+  },
+  "blobs": {
+   "microarch_isa.py": "a3a5513f57cd7dd68fa93a91b14a5eacd8cba994",
+   "isa_dsl.py": "cb5b690bbfe253f0884ded9d84ee86da981666c8",
+   "ip/isa.py": "5ef15410d6596fe6c70d667173a97e15f853f974",
+   "ip/tinytpu.py": "827d7f357b1112add026d8ece39f9cd34e0fe5ba",
+   "ip/assembler.py": "51328d2bbe8979b3b096f95b2d97c7bf23b76dc2",
+   "ip/programs.py": "28b564fab4df909d2489f80ba8a10d45c442d809",
+   "ip/units/sequencer.py": "b101676c1e7d29f319373ffec022dc1f2a48ba29",
+   "ip/units/dma_load.py": "21136c7dbf09f2773989a648c05046ed887ee74d",
+   "ip/units/scratchpad.py": "e44fa47b3b377c249315f28e199a644acd9d8910",
+   "ip/units/vector_regs.py": "8a5e665ecc4c4766b848f4ed139bcb339bea7ec4",
+   "ip/units/weight_loader.py": "d70f8e1ed87afd9deedec01f1e472c8f846c00af",
+   "ip/units/pe.py": "858891dd00c75ce90577fc029bc1fec4a5eb7b4d",
+   "ip/units/accumulator.py": "a0092791144547e6834ef1e519e7d6fc4ec87590",
+   "ip/units/dma_store.py": "8111c6abc40c75400024585a505736a4d2870966"
+  },
+  "ref": "3c68ba0074a3a7852770e2bc514eb46a19138634",
+  "vouched": true,
+  "estimated_ns": 2.431,
+  "seconds": 292.2,
+  "source": "reused from /home/sk3463/chia-e2e-scratch/runs/isa-run3-20260924-123249/accept-tail-iter3/accept.json: measured in this run from git at 3c68ba00, before the candidate diff was applied",
+  "driver": "cosim",
+  "pristine_tree": true,
+  "measured_unix": 1790263566,
+  "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), all five SHAPES, TPU_* unset but {'TPU_T': '4', 'TPU_MAXDIM': '16'} and TPU_PRJ"
+ },
+ "policy": [],
+ "checkout_status": [
+  "M examples/tinytpu/microarch_isa.py"
+ ],
+ "bench_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 7.6,
+  "all_exact": true
+ },
+ "stress_isa": {
+  "rc": 0,
+  "vouched": true,
+  "seconds": 17.1,
+  "line": [
+   "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)"
+  ]
+ },
+ "param": {
+  "TPU_MAXDIM=8": {
+   "ok": true,
+   "seconds": 7.8,
+   "line": [
+    "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)"
+   ]
+  },
+  "TPU_MAXDIM=12": {
+   "ok": true,
+   "seconds": 8.2,
+   "line": [
+    "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+   ]
+  },
+  "TPU_T=8,TPU_MAXDIM=32": {
+   "ok": true,
+   "seconds": 25.0,
+   "line": [
+    "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+   ]
+  }
+ },
+ "cosim": {
+  "4x4x4": {
+   "cycles": 175,
+   "tb": "TB 4x4x4 mismatches = 0 / 16"
+  },
+  "8x8x8": {
+   "cycles": 265,
+   "tb": "TB 8x8x8 mismatches = 0 / 64"
+  },
+  "12x12x12": {
+   "cycles": 386,
+   "tb": "TB 12x12x12 mismatches = 0 / 144"
+  },
+  "16x16x8": {
+   "cycles": 435,
+   "tb": "TB 16x16x8 mismatches = 0 / 128"
+  },
+  "16x16x16": {
+   "cycles": 627,
+   "tb": "TB 16x16x16 mismatches = 0 / 256"
+  }
+ },
+ "cosim_seconds": 297.2,
+ "estimated_ns": 2.431,
+ "cosim_rtl_stress": {
+  "vouched": true,
+  "ok": true,
+  "shapes": [
+   "4x 4x 4  cycles=175   TB 4x4x4 stress mismatches = 0 over 6 calls",
+   "8x 8x 8  cycles=265   TB 8x8x8 stress mismatches = 0 over 6 calls",
+   "12x12x12  cycles=313   TB 12x12x12 stress mismatches = 0 over 6 calls",
+   "16x16x 8  cycles=313   TB 16x16x8 stress mismatches = 0 over 6 calls",
+   "16x16x16  cycles=313   TB 16x16x16 stress mismatches = 0 over 6 calls"
+  ],
+  "seconds": 295.0
+ },
+ "objective": {
+  "cycles": {
+   "4x4x4": 175,
+   "8x8x8": 265,
+   "12x12x12": 386,
+   "16x16x8": 435,
+   "16x16x16": 627
+  },
+  "resources": {
+   "bram_18k": 52,
+   "dsp": 14,
+   "ff": 20124,
+   "lut": 28610,
+   "uram": 0,
+   "estimated_ns": 2.431
+  },
+  "note": "two terms, reported as a pair per shape; never summed"
+ },
+ "crosscheck": {
+  "status": "agree",
+  "against": "the published 'cosim' control (this design's blobs are not recorded)",
+  "recorded": {
+   "4x4x4": 175,
+   "8x8x8": 265,
+   "12x12x12": 421,
+   "16x16x8": 482,
+   "16x16x16": 674
+  },
+  "measured": {
+   "4x4x4": 175,
+   "8x8x8": 265,
+   "12x12x12": 421,
+   "16x16x8": 482,
+   "16x16x16": 674
+  },
+  "delta": {
+   "4x4x4": 0,
+   "8x8x8": 0,
+   "12x12x12": 0,
+   "16x16x8": 0,
+   "16x16x16": 0
+  },
+  "compared": [
+   "12x12x12",
+   "16x16x16",
+   "16x16x8",
+   "4x4x4",
+   "8x8x8"
+  ]
+ },
+ "delta": {
+  "4x4x4": 0,
+  "8x8x8": 0,
+  "12x12x12": -35,
+  "16x16x8": -47,
+  "16x16x16": -47
+ },
+ "delta_total": -129,
+ "claim": "win"
+}

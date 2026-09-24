@@ -161,17 +161,31 @@ Editable vs. frozen
      - files
      - how it is enforced
    * - **editable**
-     - ``microarch_isa.py``, ``isa_dsl.py``
-     - The agent edits a private copy in ``<run>/<worker>/spec/``, never the
-       repository.
+     - the fourteen paths ``chia_agent/design.py`` names: ``microarch_isa.py``
+       (the parameter set), ``isa_dsl.py`` (the program generator),
+       ``ip/isa.py``, ``ip/tinytpu.py``, ``ip/assembler.py``,
+       ``ip/programs.py``, and the eight units under ``ip/units/``
+     - The agent edits a private copy in ``<run>/<worker>/spec/``, which
+       mirrors the package, never the repository. The hardware left
+       ``microarch_isa.py`` for ``ip/units/`` when the design became a unit
+       library, so an editable set that stopped at the two old file names
+       would no longer contain the machine -- both wins of run 1 landed in
+       what is now ``ip/units/dma_load.py`` and ``ip/units/sequencer.py``.
    * - **frozen**
      - main's ``cosim.py`` (testbench, ``SHAPES``, golden reference, every
        Vitis/TCL setting), ``bench_isa.py``, ``stress_isa.py``,
-       ``isa_ref.py``, ``kpn_model.py``; and ``chia_agent/``'s
-       ``evaluate.py``, ``gate_runner.py``, ``param_check.py``,
-       ``spec_policy.py``
-     - Read from git, never from disk; main's five files must also be
-       byte-identical to ``MAIN_BASE`` (``476a70d8``) in ``evaluate.py``.
+       ``isa_ref.py``, ``kpn_model.py``, ``shapes.py``, ``isa_spec.json``,
+       ``isa_encoding.py``, ``gen_isa.py``; the design's own machinery
+       (``ip/params.py``, the package ``__init__``\ s, and the reduce IP they
+       import); and ``chia_agent/``'s ``evaluate.py``, ``gate_runner.py``,
+       ``param_check.py``, ``spec_policy.py``, ``mapspace.py``,
+       ``codesign_gate.py``, ``codesign_cosim.py``
+     - Read from git, never from disk; main's design evaluator must also be
+       byte-identical to the base ``evaluate.main_base()`` **derives** -- the
+       merge-base of the frozen ref with main. It was a hand-written
+       ``MAIN_BASE`` constant, and it went stale four times in five days,
+       each time refusing every candidate at stage ``setup`` with a message
+       that blamed the design rather than the pin.
 
 Because ``isa_ref.py`` is frozen and ``stress_isa.py`` checks programs against
 it, **what each instruction means is part of the contract**: the agent may
@@ -241,7 +255,8 @@ Guards
 Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied; the MCP
-   edit tools accept only the two bare file names.
+   edit tools accept only the paths ``design.EDITABLE`` names, and
+   ``read_spec()`` with no argument lists them.
 2. **Frozen files from git**, a fresh evaluation tree per candidate, anything
    else in the spec directory ignored; ``loop.py`` refuses to start on a dirty
    frozen path.
@@ -306,7 +321,7 @@ Mechanical enforcement, not instructions:
     processes are sandboxed to their work directory (guard 4) and so cannot
     write a control record either, and the control's cosim verdict is
     nonce-vouched (guard 5) like every other. ``accept.json`` records it as
-    ``control`` -- cycles, the two editable files' blob ids, the ref, the
+    ``control`` -- cycles, every editable file's blob id, the ref, the
     estimated clock, the wall time, when it was measured -- so an accepted
     result can be re-derived against the same control.
     ``--control <control-run>/accept.json`` reuses one control for the rest of
@@ -376,7 +391,7 @@ and bills the project in the request URL. ``preflight.py`` runs before any
 worker or model call in ``swarm.py``, ``loop.py`` and ``smoke.py``, and refuses
 unless the project bills ``CHIA_BILLING_ACCOUNT``, Vertex AI is enabled,
 ``--budget-usd`` is given, and CHIA's cumulative spend so far plus this run's cap
-fits **``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)**; it prints the account,
+fits **``CHIA_TOTAL_CAP_USD`` ($500 in chia.env, and the committed default in ``preflight.py``)**; it prints the account,
 project, spend so far, remaining and the run's cap. Cumulative spend is
 opencode's own database, attributed to CHIA2026 by the cutover time recorded
 in ``billing.json`` (opencode stores no GCP project with a session). These are
@@ -404,15 +419,48 @@ Limits and known failures
 - **Every search so far is n=1 per arm.** No rate of discovery is
   demonstrated; see :doc:`/extensions/chia_results`.
 - **Run 2 was stopped after 2 of 5 iterations** by a per-run cap that summed
-  the whole account rather than its own sessions.
-- **The $0 guard suite, 57 cases at landing, does not currently pass** (one
-  stale assertion, one crash in the loop phase).
+  the whole account rather than its own sessions. Fixed: every session a run
+  opens is titled with the run's tag (``--title``), and ``spend.run_spend``
+  sums those and the ids the loop saw returned. Nothing else on the account
+  is counted against a run's cap.
+- **The $0 guard suite passes: 98 cases, 46.9 minutes** (2026-09-24,
+  ``dev/records/tinytpu/chia-evidence/isa-run3-20260924/harness-test-20260924-results.json``).
+  It was 57 at landing and did not pass; the repair that restored it also
+  added phase ``s``, which checks the static guards -- the derived main base,
+  the pinned scored configuration, the spend attribution and the policy's
+  scope -- in twenty seconds and without Ray or a model.
 - **A ``tamper`` verdict on a run that should have been clean** is usually a
   person or another agent editing the checkout while a measurement was in
-  flight, not the candidate (guard 4).
+  flight, not the candidate (guard 4). Confirmed the hard way on 2026-09-24:
+  an agent edited ``chia_agent/README.md`` -- inside ``CHECKOUT_WATCH`` --
+  while a gate was running, and the guard refused the candidate at ``tamper``
+  without attributing anything to it. An unplanned violation is a better test
+  of that guard than a constructed one.
 - **Timed-out opencode sessions are billed but reported as $0** by the
   per-worker figures, which is why every cap reads opencode's database
-  (``spend.py``) instead.
+  (``spend.py``) instead. Measured at run scale on 2026-09-24: all four of run
+  3's large iteration calls ran the full 2400 s timeout and returned no
+  ``usage``, so **the whole run reads $0.00 on ``usage`` and $20.72 on the
+  database**. The known form was one call billed $4.33 and reported as $0.00.
+- **A pinned constant nobody notices going stale is the defect, not its
+  value.** ``MAIN_BASE`` went stale four times in five days and then stopped
+  resolving at all when the design moved to ``examples/tinytpu/``; each time it
+  refused **every** candidate at stage ``setup`` with a message that blamed the
+  design. It is derived now (``evaluate.main_base``). ``control.PUBLISHED`` had
+  gone stale the same way -- still 172 / 262 / 418 / 484 / 686 after the design
+  shipped 175 / 265 / 421 / 482 / 674 -- and now reads ``reproduce.sh``'s
+  ``EXPECTED``, the one row a gate checks on every run.
+- **``ray.init(address="auto")`` can hang forever on a dead head.** An orphaned
+  Ray head whose raylet's working directory has been removed accepts the
+  connection and then cannot spawn a single worker: every one dies in
+  ``setup_worker.py`` at ``os.getcwd()``, and the driver blocks in ``ray.get``
+  with no error. Observed 2026-09-24 against a head left by a deleted
+  worktree. ``ray stop`` is not the fix (it is host-wide, see below); start a
+  head with a private ``--temp-dir`` and set ``RAY_ADDRESS``, which overrides
+  even an explicit ``address="auto"`` and leaves
+  ``/tmp/ray/ray_current_cluster`` alone for other tracks.
+- **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
+  processes on one host collide. Serialise them.
 
 Running two tracks on one host: ``ray stop`` is global
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
