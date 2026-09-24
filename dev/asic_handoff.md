@@ -271,3 +271,74 @@ in seconds rather than an hour in is the whole value.
 needs no licence, environment or machine. What is still owed is **the extractor
 that generates `results.json` from the reports** — generated, never
 hand-written, or it just moves the retyping one file earlier.
+
+## DECIDED: the flow moves into this repo, and the prose moves into the docs
+
+The owner's decision, 2026-09-24: the ASIC flow is merged into `sunwookim028/allo`
+and Julian's repo (`jbushlow/allo-asic`, Apache-2.0) is left behind. Julian is
+happy with it. Two rules follow, and they settle how ASIC artifacts live here.
+
+**1. Anything regenerable or downloadable is not committed — we ignore it.**
+Not vendored: the 7 MB FreePDK45/Nangate `view-tiny` kit under
+`adks/freepdk-45nm/pkgs`. It is third-party, the ADK node fetches `view-standard`
+at run time anyway, and it is both the view DC cannot use (no `stdcells.db`, no
+`rtk-tech.tf`) and the one whose in-place `adk.tcl` rename breaks a second run.
+Its `configure.yml` and `adk-overlay.tcl` do come across, 8 KB, because those are
+ours to run. Also not committed: mapped netlists, `.ddc`, build trees, `dc.log`,
+SPEF, SDF. The committed settings snapshot plus the scratch path is the
+reproduction record.
+
+Committed, because it is small, durable and citable: the per-variant reports we
+already have, the RTL file lists, `make_stubs.py`, and a settings snapshot
+carrying every DC and mflowgen parameter, the `stdcells.db` md5, **and the clock
+port** — Gemmini is constrained on `clock` and we on `ap_clk`, a legitimate
+difference that a blind checker reads as a discrepancy.
+
+**2. The docs, especially the polished prose, merge into the Sphinx doc system
+under `docs/source/`** — not into stray READMEs. A reader should find the ASIC
+flow where they find everything else.
+
+- Julian's `README.md` (518 lines) is the substantial text: the flat-flow
+  explanation, the design contracts (`sv2v_manifest.f` format, `sram_manifest.yml`
+  schema, the testbench contract), the full constructor parameter reference with
+  defaults, and the vvadd walkthrough. It becomes `docs/source/designs/asic_flow.rst`
+  in the `index.rst` toctree beside `gemmini_comparison.rst`, with our licence
+  header. The parameter reference should read as a table, not a pasted code block.
+- The environment recipe becomes a section under `docs/source/setup/`, because it
+  is a setup instruction: system anaconda, python 3.12, `ucb-bar::sv2v`, mflowgen
+  pinned at `aee0e5d` — stating the trap that plain `pip install mflowgen` gives
+  0.7.0, which lacks the `Node` construct these constructors use. The setup script
+  lands as a script, fixed: it omits `module load anaconda3` and the `conda.sh`
+  source and so fails for anyone but its author.
+- The 36 per-node READMEs and CHANGELOGs travel **with** the nodes, as reference
+  beside the code. They are not reader prose and do not go into Sphinx.
+- Julian's example designs are dropped except `GcdUnit`, the 16-second known-good
+  smoke run, which earns a paragraph in the flow page: it is what tells you a
+  later failure is your design and not the flow.
+
+This narrows `check_numbers.py`'s job to comparing an `.rst` figure against the
+committed report it cites — one destination, same mechanism.
+
+**Scope and history of the vendoring:** the full 36-node library minus the PDK
+payload, as a snapshot at Julian's `e903e36` with the Apache LICENSE and the
+source commit recorded — not a `git subtree`. His development has stopped (37
+commits in June, 31 in July, 41 in August, 5 in September and all of those
+documentation polish, nothing touching the node library since the 12th), so the
+commit trail is cheap to lose and future pulls are unlikely; and a subtree would
+embed those 7 MB of PDK blobs in our history permanently even after the tree
+deletes them. Taking the whole library rather than the four nodes we use avoids a
+second merge the first time anyone wants P&R, power or OpenRAM.
+
+**Stability of what we are adopting, measured:** the node library's own tests run
+per node directory give **182 passing**. One directory fails, `allo-asic-compilation`,
+and only because it imports `allo` — the Allo-integrated path TinyTPU does not
+use. The four nodes our runs depend on are 25 tests, all green. Two weaknesses
+come with it: the tests cannot be collected as a suite from the repo root
+(duplicate test basenames, path assumptions), and the last functional commit is
+labelled *"first draft of RTL-only flow, still have to verify all changes work"*
+— which is the path we use. Both are ours now; a working `pytest` over the
+vendored nodes is the cheapest first improvement.
+
+Nothing here changes the run queue: DIM=8 logic-only with our `T8_MAXDIM64`, then
+the capacity-matched pair, still needing a slot and still better sequenced after
+`QD=16` lands.
