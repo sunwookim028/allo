@@ -464,8 +464,9 @@ text that has moved. What has to change:
 ``chia_agent/param_check.py`` and ``gate_runner.py`` need no change: they work
 through ``microarch_isa``'s module attributes, which are unchanged.
 
-``impact/make_variants.py`` is textually coupled the same way -- it builds the
-historical ablation variants by patching ``microarch_isa.py`` -- and is equally
-stale. Its measurements are recorded on :doc:`tinytpu_history`; regenerating
-them would want the variants expressed as alternative *architectures* over the
-same units, which is the first thing the library makes possible.
+``impact/make_variants.py`` was textually coupled the same way -- it built the
+historical ablation variants by patching ``microarch_isa.py`` -- and went stale
+the same way, so it has been deleted. Its measurements are recorded on
+:doc:`tinytpu_history`; regenerating them would want the variants expressed as
+alternative *architectures* over the same units, which is the first thing the
+library makes possible.
