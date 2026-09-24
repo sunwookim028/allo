@@ -54,6 +54,7 @@ Three toolchain fixes are needed and are applied here:
 
 import os
 import re
+import signal
 import subprocess
 import sys
 
@@ -270,12 +271,35 @@ exit
 """ % (LDFLAGS, " -random_stall" if RANDOM_STALL else "")
 
 
-def vitis(prj, tcl, log):
+# A cosim that does not complete (limitations item 24) otherwise runs until
+# somebody notices: one burned 29 hours for 28 seconds of CPU. `vitis_hls` is
+# started in its OWN SESSION and killed as a PROCESS GROUP, because killing
+# `vitis_hls` alone leaves `xsimk` holding a core -- one survived its parent by
+# 32 minutes (tests/limits/item24_cosim_small_programs_complete.py).
+# 0 disables the bound. The name is shared with act/measure.py deliberately.
+COSIM_TIMEOUT = int(os.environ.get("ACT_COSIM_TIMEOUT", 0))
+
+
+def vitis(prj, tcl, log, bound=None):
     open(os.path.join(prj, "run.tcl"), "w").write(tcl)
     with open(os.path.join(prj, log), "w") as f:
-        subprocess.call(["bash", "-lc",
-                         f"source {VITIS} && cd {prj} && vitis_hls -f run.tcl"],
-                        stdout=f, stderr=subprocess.STDOUT)
+        p = subprocess.Popen(
+            ["bash", "-lc",
+             f"source {VITIS} && cd {prj} && vitis_hls -f run.tcl"],
+            stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            p.communicate(timeout=(bound or None))
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            except OSError:
+                pass
+            p.wait()
+            f.flush()
+    if p.returncode is not None and p.returncode < 0:
+        open(os.path.join(prj, log), "a").write(
+            f"\n*** KILLED by cosim.py after {bound}s "
+            f"(ACT_COSIM_TIMEOUT) -- did NOT complete ***\n")
     return open(os.path.join(prj, log), errors="replace").read()
 
 
@@ -334,7 +358,8 @@ def main():
         rpt = os.path.join(prj, "out.prj/solution1/sim/report/tinytpu_isa_cosim.rpt")
         if os.path.exists(rpt):
             os.remove(rpt)
-        text = vitis(prj, TCL_COSIM, f"cosim_{M}x{K}x{N}.log")
+        text = vitis(prj, TCL_COSIM, f"cosim_{M}x{K}x{N}.log",
+                     bound=COSIM_TIMEOUT)
         mm = [l.strip() for l in text.splitlines() if "mismatches" in l]
         n = cycles(prj)
         results[(M, K, N)] = n
